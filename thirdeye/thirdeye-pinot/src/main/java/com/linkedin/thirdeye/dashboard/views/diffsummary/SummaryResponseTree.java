@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.dashboard.views.diffsummary;
 
-import com.linkedin.thirdeye.client.diffsummary.Cube;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -9,7 +8,7 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.thirdeye.client.diffsummary.CostFunction;
+import com.linkedin.thirdeye.client.diffsummary.costfunction.CostFunction;
 import com.linkedin.thirdeye.client.diffsummary.Dimensions;
 import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
 import org.slf4j.Logger;
@@ -28,7 +27,6 @@ public class SummaryResponseTree {
 
     // Build the header
     Dimensions dimensions = nodes.get(0).getDimensions();
-    double totalValue = nodes.get(0).getOriginalCurrentValue() + nodes.get(0).getOriginalBaselineValue();
     double globalBaselineValue = nodes.get(0).getOriginalCurrentValue();
     double globalCurrentValue = nodes.get(0).getOriginalBaselineValue();
     for (int i = 0; i < levelCount; ++i) {
@@ -99,8 +97,9 @@ public class SummaryResponseTree {
   private static void computeCost(SummaryResponseTreeNode node, double targetRatio, double globalBaselineValue,
       double globalCurrentValue, CostFunction costFunction) {
     if (node.hierarchyNode != null) {
-      node.cost = costFunction.errWithPercentageRemoval(node.getBaselineValue(), node.getCurrentValue(), targetRatio,
-          Cube.PERCENTAGE_CONTRIBUTION_THRESHOLD, globalBaselineValue, globalCurrentValue);
+      node.cost = costFunction
+          .getCost(node.getBaselineValue(), node.getCurrentValue(), targetRatio, globalBaselineValue,
+              globalCurrentValue);
     }
     for (SummaryResponseTreeNode child : node.children) {
       computeCost(child, targetRatio, globalBaselineValue, globalCurrentValue, costFunction);

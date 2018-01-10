@@ -432,6 +432,7 @@ public abstract class ThirdEyeUtils {
           new ConfigurationFactory<>(ThirdEyeDashboardConfiguration.class,
               Validation.buildDefaultValidatorFactory().getValidator(), Jackson.newObjectMapper(), "");
       config = factory.build(configFile);
+      config.setRootDir(thirdEyeConfigDir);
     } catch (Exception e) {
       LOG.error("Exception while constructing ThirdEye config:", e);
       throw new RuntimeException(e);

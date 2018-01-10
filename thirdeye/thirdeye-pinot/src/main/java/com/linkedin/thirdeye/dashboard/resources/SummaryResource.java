@@ -1,43 +1,31 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.client.diffsummary.CostFunction;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-
+import com.linkedin.thirdeye.client.diffsummary.Dimensions;
+import com.linkedin.thirdeye.client.diffsummary.MultiDimensionalSummary;
+import com.linkedin.thirdeye.client.diffsummary.costfunction.BalancedCostFunction;
+import com.linkedin.thirdeye.client.diffsummary.costfunction.CostFunction;
+import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.dashboard.views.diffsummary.SummaryResponse;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.net.URLDecoder;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
-
-import java.util.Set;
-import java.util.TreeSet;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
-
 import org.apache.commons.lang.StringUtils;
-import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.client.diffsummary.Cube;
-import com.linkedin.thirdeye.client.diffsummary.Dimensions;
-import com.linkedin.thirdeye.client.diffsummary.OLAPDataBaseClient;
-import com.linkedin.thirdeye.client.diffsummary.PinotThirdEyeSummaryClient;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
-import com.linkedin.thirdeye.dashboard.views.diffsummary.SummaryResponse;
-import com.linkedin.thirdeye.datasource.MetricExpression;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 
 
 @Path(value = "/dashboard")
@@ -52,9 +40,6 @@ public class SummaryResource {
   private static final String DEFAULT_ONE_SIDE_ERROR = "false";
   private static final String JAVASCRIPT_NULL_STRING = "undefined";
   private static final String HTML_STRING_ENCODING = "UTF-8";
-
-  private static final String TOP_K_POSTFIX = "_topk";
-
 
   @GET
   @Path(value = "/summary/autoDimensionOrder")
@@ -76,19 +61,10 @@ public class SummaryResource {
 
     SummaryResponse response = null;
     try {
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM,collection);
-
-      OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
-      olapClient.setCollection(collection);
-      olapClient.setMetricExpression(metricExpressions.get(0));
-      olapClient.setCurrentStartInclusive(new DateTime(currentStartInclusive, DateTimeZone.forID(timeZone)));
-      olapClient.setCurrentEndExclusive(new DateTime(currentEndExclusive, DateTimeZone.forID(timeZone)));
-      olapClient.setBaselineStartInclusive(new DateTime(baselineStartInclusive, DateTimeZone.forID(timeZone)));
-      olapClient.setBaselineEndExclusive(new DateTime(baselineEndExclusive, DateTimeZone.forID(timeZone)));
-
       Dimensions dimensions;
       if (StringUtils.isBlank(groupByDimensions) || JAVASCRIPT_NULL_STRING.equals(groupByDimensions)) {
-        dimensions = sanitizeDimensions(new Dimensions(Utils.getSchemaDimensionNames(collection)));
+        dimensions =
+            MultiDimensionalSummary.sanitizeDimensions(new Dimensions(Utils.getSchemaDimensionNames(collection)));
       } else {
         dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
       }
@@ -105,17 +81,18 @@ public class SummaryResource {
           OBJECT_MAPPER.readValue(hierarchiesPayload, new TypeReference<List<List<String>>>() {
           });
 
-      CostFunction costFunction = new CostFunction();
-      Cube cube = new Cube(costFunction);
-      cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, hierarchies, filterSetMap);
+      CostFunction costFunction = new BalancedCostFunction();
+      DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
+      MultiDimensionalSummary mdSummary =
+          new MultiDimensionalSummary(CACHE_REGISTRY_INSTANCE.getQueryCache(), costFunction, dateTimeZone);
 
-      Summary summary = new Summary(cube, costFunction);
-      response = summary.computeSummary(summarySize, doOneSideError, topDimensions);
-      response.setMetricName(metric);
+      response = mdSummary
+          .buildSummary(collection, metric, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
+              baselineEndExclusive, dimensions, filterSetMap, summarySize, topDimensions, hierarchies, doOneSideError);
+
     } catch (Exception e) {
       LOG.error("Exception while generating difference summary", e);
-      response = SummaryResponse.buildNotAvailableResponse();
-      response.setMetricName(metric);
+      response = SummaryResponse.buildNotAvailableResponse(metric);
     }
     return OBJECT_MAPPER.writeValueAsString(response);
   }
@@ -138,16 +115,6 @@ public class SummaryResource {
 
     SummaryResponse response = null;
     try {
-      List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM, collection);
-
-      OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
-      olapClient.setCollection(collection);
-      olapClient.setMetricExpression(metricExpressions.get(0));
-      olapClient.setCurrentStartInclusive(new DateTime(currentStartInclusive, DateTimeZone.forID(timeZone)));
-      olapClient.setCurrentEndExclusive(new DateTime(currentEndExclusive, DateTimeZone.forID(timeZone)));
-      olapClient.setBaselineStartInclusive(new DateTime(baselineStartInclusive, DateTimeZone.forID(timeZone)));
-      olapClient.setBaselineEndExclusive(new DateTime(baselineEndExclusive, DateTimeZone.forID(timeZone)));
-
       List<String> allDimensions;
       if (StringUtils.isBlank(groupByDimensions) || JAVASCRIPT_NULL_STRING.equals(groupByDimensions)) {
         allDimensions = Utils.getSchemaDimensionNames(collection);
@@ -167,51 +134,19 @@ public class SummaryResource {
         filterSets = ThirdEyeUtils.convertToMultiMap(filterJsonPayload);
       }
 
-      CostFunction costFunction = new CostFunction();
-      Cube cube = new Cube(costFunction);
-      cube.buildWithManualDimensionOrder(olapClient, dimensions, filterSets);
+      CostFunction costFunction = new BalancedCostFunction();
+      DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
+      MultiDimensionalSummary mdSummary =
+          new MultiDimensionalSummary(CACHE_REGISTRY_INSTANCE.getQueryCache(), costFunction, dateTimeZone);
 
-      Summary summary = new Summary(cube, costFunction);
-      response = summary.computeSummary(summarySize, doOneSideError);
-      response.setMetricName(metric);
+      response = mdSummary
+          .buildSummary(collection, metric, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
+              baselineEndExclusive, dimensions, filterSets, summarySize, 0, Collections.<List<String>>emptyList(),
+              doOneSideError);
     } catch (Exception e) {
       LOG.error("Exception while generating difference summary", e);
-      response = SummaryResponse.buildNotAvailableResponse();
+      response = SummaryResponse.buildNotAvailableResponse(metric);
     }
     return OBJECT_MAPPER.writeValueAsString(response);
-  }
-
-  /**
-   * Removes noisy dimensions.
-   *
-   * @param dimensions the original dimensions.
-   *
-   * @return the original dimensions minus noisy dimensions, which are predefined.
-   *
-   * TODO: Replace with an user configurable method
-   */
-  private static Dimensions sanitizeDimensions(Dimensions dimensions) {
-    List<String> allDimensionNames = dimensions.allDimensions();
-    Set<String> dimensionsToRemove = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-    dimensionsToRemove.add("environment");
-    dimensionsToRemove.add("colo");
-    dimensionsToRemove.add("fabric");
-    for (String dimensionName : allDimensionNames) {
-      if(dimensionName.contains(TOP_K_POSTFIX)) {
-        String rawDimensionName = dimensionName.replaceAll(TOP_K_POSTFIX, "");
-        dimensionsToRemove.add(rawDimensionName.toLowerCase());
-      }
-    }
-    return removeDimensions(dimensions, dimensionsToRemove);
-  }
-
-  private static Dimensions removeDimensions(Dimensions dimensions, Collection<String> dimensionsToRemove) {
-    List<String> dimensionsToRetain = new ArrayList<>();
-    for (String dimensionName : dimensions.allDimensions()) {
-      if(!dimensionsToRemove.contains(dimensionName)){
-        dimensionsToRetain.add(dimensionName);
-      }
-    }
-    return new Dimensions(dimensionsToRetain);
   }
 }

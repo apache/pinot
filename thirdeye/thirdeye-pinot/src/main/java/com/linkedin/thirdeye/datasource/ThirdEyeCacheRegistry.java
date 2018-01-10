@@ -80,7 +80,7 @@ public class ThirdEyeCacheRegistry {
   private static void initDataSources(ThirdEyeConfiguration thirdeyeConfig) {
     try {
       // Initialize adaptors to time series databases.
-      String dataSourcesPath = System.getProperty("dw.rootDir") + thirdeyeConfig.getDataSourcesPath();
+      String dataSourcesPath = thirdeyeConfig.getDataSourcesPath();
       DataSources dataSources = DataSourcesLoader.fromDataSourcesPath(dataSourcesPath);
       if (dataSources == null) {
         throw new IllegalStateException("Could not create data sources from path " + dataSourcesPath);

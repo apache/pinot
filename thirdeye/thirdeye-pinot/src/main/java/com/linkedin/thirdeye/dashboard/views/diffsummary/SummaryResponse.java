@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.dashboard.views.diffsummary;
 
-import com.linkedin.thirdeye.client.diffsummary.CostFunction;
+import com.linkedin.thirdeye.client.diffsummary.costfunction.CostFunction;
 import com.linkedin.thirdeye.client.diffsummary.DimNameValueCostEntry;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
@@ -65,8 +65,9 @@ public class SummaryResponse {
     return loser;
   }
 
-  public static SummaryResponse buildNotAvailableResponse() {
+  public static SummaryResponse buildNotAvailableResponse(String metricName) {
     SummaryResponse response = new SummaryResponse();
+    response.setMetricName(metricName);
     response.dimensions.add(NOT_AVAILABLE);
     return response;
   }

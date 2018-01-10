@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard.views.diffsummary;
 
 import com.linkedin.thirdeye.client.diffsummary.DimNameValueCostEntry;
+import com.linkedin.thirdeye.client.diffsummary.costfunction.BalancedCostFunction;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -13,7 +14,7 @@ import org.jfree.util.Log;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.client.diffsummary.CostFunction;
+import com.linkedin.thirdeye.client.diffsummary.costfunction.CostFunction;
 import com.linkedin.thirdeye.client.diffsummary.Cube;
 import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
 
@@ -26,7 +27,6 @@ public class Summary {
   private int levelCount;
   private List<DPArray> dpArrays;
 
-  private double topValue;
   private double globalBaselineValue;
   private double globalCurrentValue;
 
@@ -39,12 +39,11 @@ public class Summary {
   public Summary(Cube cube, CostFunction costFunction) {
     this.cube = cube;
     this.maxLevelCount = cube.getDimensions().size();
-    this.topValue = cube.getTopBaselineValue() + cube.getTopCurrentValue();
     this.globalBaselineValue = cube.getTopBaselineValue();
     this.globalCurrentValue = cube.getTopCurrentValue();
     this.levelCount = this.maxLevelCount;
     this.costSet = cube.getCostSet();
-    this.basicRowInserter = new BasicRowInserter(new CostFunction());
+    this.basicRowInserter = new BasicRowInserter(new BalancedCostFunction());
     this.oneSideErrorRowInserter = basicRowInserter;
     this.leafRowInserter = basicRowInserter;
 
@@ -336,9 +335,8 @@ public class Summary {
     public void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio) {
       double baselineValue = node.getBaselineValue();
       double currentValue = node.getCurrentValue();
-      double cost = costFunction
-          .errWithPercentageRemoval(baselineValue, currentValue, targetRatio, Cube.PERCENTAGE_CONTRIBUTION_THRESHOLD,
-              globalBaselineValue, globalCurrentValue);
+      double cost =
+          costFunction.getCost(baselineValue, currentValue, targetRatio, globalBaselineValue, globalCurrentValue);
 
       for (int n = dp.size() - 1; n > 0; --n) {
         double val1 = dp.slotAt(n - 1).cost;
@@ -398,7 +396,7 @@ public class Summary {
       e.printStackTrace();
       System.exit(1);
     }
-    Summary summary = new Summary(cube, new CostFunction());
+    Summary summary = new Summary(cube, new BalancedCostFunction());
     try {
       SummaryResponse response = summary.computeSummary(answerSize, doOneSideError, maxDimensionSize);
       System.out.print("JSon String: ");

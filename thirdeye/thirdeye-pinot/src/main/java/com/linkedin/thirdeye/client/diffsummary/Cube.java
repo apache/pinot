@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.client.diffsummary;
 
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+import com.linkedin.thirdeye.client.diffsummary.costfunction.CostFunction;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -31,7 +32,6 @@ public class Cube { // the cube (Ca|Cb)
   private static final Logger LOG = LoggerFactory.getLogger(Cube.class);
 
   private static final int DEFAULT_TOP_DIMENSION = 3;
-  public static final double PERCENTAGE_CONTRIBUTION_THRESHOLD = 3d;
 
   private double topBaselineValue;
   private double topCurrentValue;
@@ -86,17 +86,17 @@ public class Cube { // the cube (Ca|Cb)
 
   public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions)
       throws Exception {
-    buildWithAutoDimensionOrder(olapClient, dimensions, DEFAULT_TOP_DIMENSION, Collections.<List<String>>emptyList(),
-        null);
+    buildWithAutoDimensionOrder(olapClient, dimensions, null,
+        DEFAULT_TOP_DIMENSION, Collections.<List<String>>emptyList());
   }
 
   public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions, int topDimensions)
       throws Exception {
-    buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, Collections.<List<String>>emptyList(), null);
+    buildWithAutoDimensionOrder(olapClient, dimensions, null, topDimensions, Collections.<List<String>>emptyList());
   }
 
-  public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions, int topDimension,
-      List<List<String>> hierarchy, Multimap<String, String> filterSets)
+  public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions,
+      Multimap<String, String> filterSets, int topDimension, List<List<String>> hierarchy)
       throws Exception {
     long tStart = System.nanoTime();
     try {
@@ -304,8 +304,7 @@ public class Cube { // the cube (Ca|Cb)
         String dimValue = wowValues.getDimensionValues().get(0);
 
         double dimValueCost = costFunction
-            .errWithPercentageRemoval(wowValues.baselineValue, wowValues.currentValue, topRatio,
-                PERCENTAGE_CONTRIBUTION_THRESHOLD, baselineTotal, currentTotal);
+            .getCost(wowValues.baselineValue, wowValues.currentValue, topRatio, baselineTotal, currentTotal);
 
         double contributionFactor =
             (wowValues.baselineValue + wowValues.currentValue) / (baselineTotal + currentTotal);
