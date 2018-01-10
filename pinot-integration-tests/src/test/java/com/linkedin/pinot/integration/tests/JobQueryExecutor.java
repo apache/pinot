@@ -25,23 +25,26 @@ public class JobQueryExecutor extends QueryExecutor{
     private static String[] getQueries() {
         String[] queries = {
                 "SELECT * from Job " +
-                        "WHERE jobPostTime > %d",
+                        "WHERE jobPostTime > %d limit %d",
                 "SELECT industry, MIN(baseSalary), AVG(baseSalary)," +
                         "MAX(baseSalary),COUNT(*), AVG(stock), MIN(pto), MAX(pto)," +
                         "AVG(signOnBonus) " + "FROM Job " +
                         "WHERE jobPostTime > %d" +
                         " AND experience > %d" +
-                        " GROUP BY industry",
+                        " GROUP BY industry" +
+                        " limit %d",
                 "SELECT company, title, location, stock, baseSalary, bonus," +
                         "COUNT(*), AVG(stock), MIN(pto), MAX(pto), AVG(annualBonus)," +
                         "MIN(experience) FROM Job " +
                         "WHERE jobPostTime > %d" +
                         " AND experience BETWEEN %d AND %d" +
-                        " GROUP BY company, title, location, stock, baseSalary, signOnBonus",
+                        " GROUP BY company, title, location, stock, baseSalary, signOnBonus" +
+                        " limit %d",
                 "SELECT company, title, location, stock, baseSalary, signOnBonus," +
                         "COUNT(*) FROM Job " +
                         "WHERE jobPostTime > %d" +
-                        " GROUP BY company, title, location, stock, baseSalary, signOnBonus"
+                        " GROUP BY company, title, location, stock, baseSalary, signOnBonus" +
+                        " limit %d"
         };
         return queries;
     }
