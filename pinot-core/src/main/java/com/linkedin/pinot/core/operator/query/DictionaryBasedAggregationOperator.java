@@ -21,7 +21,7 @@ import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
-import com.linkedin.pinot.core.query.aggregation.AggregationResultHolderFactory;
+import com.linkedin.pinot.core.query.aggregation.ResultHolderFactory;
 import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
@@ -77,7 +77,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
       String column = aggregationFunctionContext.getAggregationColumns()[0];
       Dictionary dictionary = _dictionaryMap.get(column);
       FieldSpec.DataType dataType = _dataTypeMap.get(column);
-      AggregationResultHolder resultHolder = AggregationResultHolderFactory.getAggregationResultHolder(functionType, dataType);
+      AggregationResultHolder resultHolder = ResultHolderFactory.getAggregationResultHolder(functionType, dataType);
       switch (functionType) {
       case MAX:
         if (dataType.equals(FieldSpec.DataType.STRING)) {

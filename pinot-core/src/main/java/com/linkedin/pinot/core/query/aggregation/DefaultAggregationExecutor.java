@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory.AggregationFunctionType;
 import java.util.ArrayList;
 import java.util.List;
@@ -64,7 +63,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       AggregationFunctionType aggregationFunctionType = AggregationFunctionType.valueOf(functionName);
       FieldSpec.DataType dataType = _dataTypeMap.get(_aggrFuncContextArray[i].getAggregationColumns()[0]);
       _resultHolderArray[i] =
-          AggregationResultHolderFactory.getAggregationResultHolder(aggregationFunctionType, dataType);
+          ResultHolderFactory.getAggregationResultHolder(aggregationFunctionType, dataType);
     }
     _inited = true;
   }

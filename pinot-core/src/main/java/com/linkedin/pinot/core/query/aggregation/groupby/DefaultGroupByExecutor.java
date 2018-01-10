@@ -23,10 +23,12 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
+import com.linkedin.pinot.core.query.aggregation.ResultHolderFactory;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import java.util.List;
 import javax.annotation.Nonnull;
+
+import static com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory.*;
 
 
 /**
@@ -167,7 +169,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     Preconditions.checkState(aggregationColumns.length == 1);
     int length = transformBlock.getNumDocs();
 
-    if (!aggregationFunction.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+    if (!aggregationFunction.getName().equals(AggregationFunctionType.COUNT.getName())) {
       BlockValSet blockValueSet = transformBlock.getBlockValueSet(aggregationColumns[0]);
       if (_hasMVGroupByColumns) {
         aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, blockValueSet);
@@ -240,8 +242,11 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     _resultHolderArray = new GroupByResultHolder[_numAggrFunc];
     int initialCapacity = Math.min(maxNumResults, _maxInitialResultHolderCapacity);
     for (int i = 0; i < _numAggrFunc; i++) {
-      _resultHolderArray[i] = _aggrFunctionContexts[i].getAggregationFunction()
-          .createGroupByResultHolder(initialCapacity, maxNumResults, trimSize);
+      String functionName = _aggrFunctionContexts[i].getAggregationFunction().getName().toUpperCase();
+      AggregationFunctionType aggregationFunctionType = AggregationFunctionType.valueOf(functionName);
+      _resultHolderArray[i] =
+          ResultHolderFactory.getGroupByResultHolder(aggregationFunctionType, initialCapacity,
+              maxNumResults, trimSize);
     }
   }
 

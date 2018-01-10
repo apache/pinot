@@ -69,18 +69,6 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
     visitor.visit(this);
   }
 
-  @Nonnull
-  @Override
-  public AggregationResultHolder createAggregationResultHolder() {
-    return new ObjectAggregationResultHolder();
-  }
-
-  @Nonnull
-  @Override
-  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
-    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity, trimSize);
-  }
-
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull BlockValSet... blockValSets) {

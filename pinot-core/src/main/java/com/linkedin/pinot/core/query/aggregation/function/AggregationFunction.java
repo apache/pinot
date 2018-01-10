@@ -48,18 +48,6 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   void accept(@Nonnull AggregationFunctionVisitorBase visitor);
 
   /**
-   * Create an aggregation result holder for this function.
-   */
-  @Nonnull
-  AggregationResultHolder createAggregationResultHolder();
-
-  /**
-   * Create a group-by result holder with the given initial capacity, max capacity and trim size for this function.
-   */
-  @Nonnull
-  GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize);
-
-  /**
    * Perform aggregation on the given projection block value sets.
    */
   void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,

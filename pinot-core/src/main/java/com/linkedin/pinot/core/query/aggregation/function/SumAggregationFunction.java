@@ -45,18 +45,6 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
     visitor.visit(this);
   }
 
-  @Nonnull
-  @Override
-  public AggregationResultHolder createAggregationResultHolder() {
-    return new DoubleAggregationResultHolder(DEFAULT_VALUE);
-  }
-
-  @Nonnull
-  @Override
-  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
-    return new DoubleGroupByResultHolder(initialCapacity, maxCapacity, trimSize, DEFAULT_VALUE);
-  }
-
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull BlockValSet... blockValSets) {

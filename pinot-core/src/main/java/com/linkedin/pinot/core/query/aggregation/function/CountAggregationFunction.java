@@ -45,18 +45,6 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
     visitor.visit(this);
   }
 
-  @Nonnull
-  @Override
-  public AggregationResultHolder createAggregationResultHolder() {
-    return new DoubleAggregationResultHolder(DEFAULT_INITIAL_VALUE);
-  }
-
-  @Nonnull
-  @Override
-  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
-    return new DoubleGroupByResultHolder(initialCapacity, maxCapacity, trimSize, DEFAULT_INITIAL_VALUE);
-  }
-
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull BlockValSet... blockValSets) {

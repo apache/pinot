@@ -23,7 +23,7 @@ import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
-import com.linkedin.pinot.core.query.aggregation.AggregationResultHolderFactory;
+import com.linkedin.pinot.core.query.aggregation.ResultHolderFactory;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import java.io.ByteArrayOutputStream;
@@ -338,7 +338,7 @@ public class DataTableBuilder {
         AggregationFunctionFactory.AggregationFunctionType aggregationFunctionType =
             AggregationFunctionFactory.AggregationFunctionType.valueOf(aggregationFunction.getName().toUpperCase());
         AggregationResultHolder aggregationResultHolder =
-            AggregationResultHolderFactory.getAggregationResultHolder(aggregationFunctionType, dataTypes[i]);
+            ResultHolderFactory.getAggregationResultHolder(aggregationFunctionType, dataTypes[i]);
         aggregationResults[i] = aggregationFunction.extractAggregationResult(aggregationResultHolder);
       }
 
