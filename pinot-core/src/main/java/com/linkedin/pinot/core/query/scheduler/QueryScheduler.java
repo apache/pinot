@@ -159,7 +159,8 @@ public abstract class QueryScheduler {
         getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY),
         name());
       */
-    LOGGER.info("RequestProcessed${},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+
+    LOGGER.info("RequestProcessed${},{},{},{},{},{},{},{},{},{},{},{},{}",
             System.currentTimeMillis(),
             request.getInstanceRequest().getRequestId(),
             request.getTableName(),
@@ -172,7 +173,6 @@ public abstract class QueryScheduler {
             getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY),
             getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY),
             getMetadataValue(resultMeta, DataTable.TOTAL_DOCS_METADATA_KEY),
-            getMetadataValue(resultMeta, DataTable.SEGMENT_SIZE_KEY),
             name());
 
     return responseData;
