@@ -15,6 +15,7 @@ public class HierarchyNode {
   int index;
   double baselineValue;
   double currentValue;
+  double cost;
   Row data;
   HierarchyNode parent;
   List<HierarchyNode> children = new ArrayList<>();
@@ -65,6 +66,14 @@ public class HierarchyNode {
   @JsonIgnore
   public double getOriginalCurrentValue() {
     return data.currentValue;
+  }
+
+  public double getCost() {
+    return cost;
+  }
+
+  public void setCost(double cost) {
+    this.cost = cost;
   }
 
   @JsonIgnore

@@ -146,8 +146,9 @@ public class MultiDimensionalSummary {
             .build();
     options.addOption(topDimension);
 
-    Option hierarchies =
-        Option.builder("h").longOpt("hierarchies").desc("dimension hierarchies").hasArg().argName("JSON").build();
+    Option hierarchies = Option.builder("h").longOpt("hierarchies")
+        .desc("dimension hierarchies, which are given in a List of Lists in Json format").hasArg().argName("JSON")
+        .build();
     options.addOption(hierarchies);
 
     Option oneSideError = Option.builder("oneSideError").desc("enable one side error summary").build();
@@ -160,9 +161,9 @@ public class MultiDimensionalSummary {
         Option.builder("timeZone").desc("time zone id in Joda library").hasArg().argName("ID").build();
     options.addOption(dateTimeZone);
 
-    Option costFunctionClass =
-        Option.builder("cost").longOpt("costFunction").desc("the parameters of the cost function").hasArg()
-            .argName("PARAMETERS").build();
+    Option costFunctionClass = Option.builder("cost").longOpt("costFunction").desc(
+        "the parameters of the cost function, which are given in a Map in Json format. "
+            + "Essential field in the map: 'className'").hasArg().argName("JSON").build();
     options.addOption(costFunctionClass);
 
     return options;
@@ -221,7 +222,7 @@ public class MultiDimensionalSummary {
     Options options = buildOptions();
     if (args.length == 0) {
       HelpFormatter formatter = new HelpFormatter();
-      formatter.printHelp(MultiDimensionalSummary.class.getSimpleName(), options);
+      formatter.printHelp(MultiDimensionalSummary.class.getSimpleName() + " thirdeye-configs-path [options]", options);
     } else {
       CommandLineParser parser = new DefaultParser();
       CommandLine commandLine = parser.parse(options, args);

@@ -168,6 +168,7 @@ public class SummaryResponse {
           computeContributionChange(row.baselineValue, row.currentValue, totalBaselineValue, totalCurrentValue);
       row.contributionToOverallChange =
           computeContributionToOverallChange(row.baselineValue, row.currentValue, totalBaselineValue);
+      row.cost = node.getCost();
       StringBuilder sb = new StringBuilder();
       String separator = "";
       for (String s : otherDimensionValues.get(node)) {
@@ -211,12 +212,12 @@ public class SummaryResponse {
   }
 
   public String toString() {
-    ToStringBuilder tsb = new ToStringBuilder(this, ToStringStyle.SHORT_PREFIX_STYLE);
-    tsb.append('\n').append(this.dimensions);
+    StringBuilder sb = new StringBuilder(SummaryResponse.class.getSimpleName());
+    sb.append("\n\t").append(this.dimensions);
     for (SummaryResponseRow row : getResponseRows()) {
-      tsb.append('\n').append(row);
+      sb.append("\n\t").append(row);
     }
-    return tsb.toString();
+    return sb.toString();
   }
 
   private static class NameTag {

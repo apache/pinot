@@ -71,7 +71,6 @@ public class SummaryResponseTree {
   private static void insertChildNodes(SummaryResponseTreeNode node, List<HierarchyNode> hierarchicalNodes) {
     if (node.hierarchyNode != null) {
       hierarchicalNodes.add(node.hierarchyNode);
-      LOG.info("cost: {}, node: {}", node.cost, node.hierarchyNode.toString());
     }
     for (SummaryResponseTreeNode child : node.children) {
       insertChildNodes(child, hierarchicalNodes);
@@ -97,26 +96,28 @@ public class SummaryResponseTree {
   private static void computeCost(SummaryResponseTreeNode node, double targetRatio, double globalBaselineValue,
       double globalCurrentValue, CostFunction costFunction) {
     if (node.hierarchyNode != null) {
-      node.cost = costFunction
+      double nodeCost = costFunction
           .getCost(node.getBaselineValue(), node.getCurrentValue(), targetRatio, globalBaselineValue,
               globalCurrentValue);
+      node.hierarchyNode.setCost(nodeCost);
+      node.subTreeCost = nodeCost;
     }
     for (SummaryResponseTreeNode child : node.children) {
       computeCost(child, targetRatio, globalBaselineValue, globalCurrentValue, costFunction);
-      node.cost += child.cost;
+      node.subTreeCost += child.subTreeCost;
     }
   }
 
   public static class SummaryResponseTreeNodeCostComparator implements Comparator<SummaryResponseTreeNode> {
     @Override
     public int compare(SummaryResponseTreeNode o1, SummaryResponseTreeNode o2) {
-      return Double.compare(o1.cost, o2.cost);
+      return Double.compare(o1.subTreeCost, o2.subTreeCost);
     }
   }
 
   public static class SummaryResponseTreeNode {
     HierarchyNode hierarchyNode; // If it is null, this node is a dummy node.
-    double cost;
+    double subTreeCost;
     int level;
 
     @JsonIgnore
