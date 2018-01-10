@@ -9,6 +9,8 @@ const TIMESERIES_MODE_RELATIVE = 'relative';
 const TIMESERIES_MODE_LOG = 'log';
 const TIMESERIES_MODE_SPLIT = 'split';
 
+const EVENT_MIN_GAP = 60000;
+
 export default Ember.Component.extend({
   entities: null, // {}
 
@@ -275,13 +277,16 @@ export default Ember.Component.extend({
     'entities',
     'displayableUrns',
     function () {
-      const { entities, displayableUrns } =
-        this.getProperties('entities', 'displayableUrns');
+      const { entities, displayableUrns, context } =
+        this.getProperties('entities', 'displayableUrns', 'context');
 
       const selectedEvents = filterPrefix(displayableUrns, 'thirdeye:event:').map(urn => entities[urn]);
 
+      const analysisRangeEnd = context.analysisRange[1];
+      const handleOngoingEnd = (e) => e.end <= 0 ? analysisRangeEnd : e.end;
+
       const starts = selectedEvents.map(e => [e.start, e.urn]);
-      const ends = selectedEvents.map(e => [e.end + 1, e.urn]); // no overlap
+      const ends = selectedEvents.map(e => [handleOngoingEnd(e) + EVENT_MIN_GAP, e.urn]); // no overlap
       const sorted = starts.concat(ends).sort();
 
       //
@@ -381,13 +386,13 @@ export default Ember.Component.extend({
   _transformSeriesRelative(series) {
     const first = series.values.filter(v => v)[0];
     const output = Object.assign({}, series);
-    output.values = series.values.map(v => 1.0 * v / first);
+    output.values = series.values.map(v => v != null ? 1.0 * v / first : null);
     return output;
   },
 
   _transformSeriesLog(series) {
     const output = Object.assign({}, series);
-    output.values = series.values.map(v => Math.log(v));
+    output.values = series.values.map(v => v != null ? Math.log(v) : null);
     return output;
   },
 
