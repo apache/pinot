@@ -144,6 +144,7 @@ public abstract class QueryScheduler {
     byte[] responseData = serializeDataTable(request, result);
     TimerContext timerContext = request.getTimerContext();
     @Nonnull Map<String, String> resultMeta = result.getMetadata();
+    /*
     LOGGER.info("Processed timestamp={}, requestId={},table={},reqSegments={},prunedToSegmentCount={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
         System.currentTimeMillis(),
         request.getInstanceRequest().getRequestId(),
@@ -157,6 +158,23 @@ public abstract class QueryScheduler {
         getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY),
         getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY),
         name());
+      */
+    LOGGER.info("RequestProcessed${},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            System.currentTimeMillis(),
+            request.getInstanceRequest().getRequestId(),
+            request.getTableName(),
+            request.getInstanceRequest().getSearchSegments().size(),
+            request.getSegmentCountAfterPruning(),
+            timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
+            timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME),
+            request.getBrokerId(),
+            getMetadataValue(resultMeta, DataTable.NUM_DOCS_SCANNED_METADATA_KEY),
+            getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY),
+            getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY),
+            getMetadataValue(resultMeta, DataTable.TOTAL_DOCS_METADATA_KEY),
+            getMetadataValue(resultMeta, DataTable.SEGMENT_SIZE_KEY),
+            name());
+
     return responseData;
   }
 

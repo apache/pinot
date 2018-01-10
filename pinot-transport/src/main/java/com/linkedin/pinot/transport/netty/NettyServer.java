@@ -234,7 +234,7 @@ public abstract class NettyServer implements Runnable {
     private final long _defaultLargeQueryLatencyMs;
     private final RequestHandler _handler;
     private final NettyServerMetrics _metric;
-    private final static NettyServerWorkload _workload = new NettyServerWorkload();
+    //private final static NettyServerWorkload _workload = new NettyServerWorkload();
 
     public NettyChannelInboundHandler(RequestHandler handler, NettyServerMetrics metric, long defaultLargeQueryLatencyMs) {
       _handler = handler;
@@ -253,15 +253,16 @@ public abstract class NettyServer implements Runnable {
       //Call processing handler
       final TimerContext requestProcessingLatency = MetricsHelper.startTimer();
       final ChannelHandlerContext requestChannelHandlerContext = ctx;
-      final ServerLatencyMetric metric = new ServerLatencyMetric();
-      ListenableFuture<byte[]> serializedQueryResponse = _handler.processRequest(ctx, request, metric);
+      //final ServerLatencyMetric metric = new ServerLatencyMetric();
+      //ListenableFuture<byte[]> serializedQueryResponse = _handler.processRequest(ctx, request, metric);
+      ListenableFuture<byte[]> serializedQueryResponse = _handler.processRequest(ctx, request);
       Futures.addCallback(serializedQueryResponse, new FutureCallback<byte[]>() {
         void sendResponse(@Nonnull final byte[] result) {
           requestProcessingLatency.stop();
 
-          metric.setTimestamp(System.currentTimeMillis());
-          metric.setLatency(requestProcessingLatency.getLatencyMs());
-          _workload.addWorkLoad(metric.get_tableName(), new ServerLatencyMetric(metric));
+          //metric.setTimestamp(System.currentTimeMillis());
+          //metric.setLatency(requestProcessingLatency.getLatencyMs());
+          //_workload.addWorkLoad(metric.get_tableName(), new ServerLatencyMetric(metric));
           //update workload here
 
           // Send Response
@@ -318,13 +319,13 @@ public abstract class NettyServer implements Runnable {
       return "NettyChannelInboundHandler [_handler=" + _handler + ", _metric=" + _metric + "]";
     }
 
-    public static NettyServerWorkload get_workload() {
-      return _workload;
-    }
+   //public static NettyServerWorkload get_workload() {
+    //return _workload;
+  //}
   }
-  public NettyServerWorkload getWorkload(){
-    return NettyChannelInboundHandler.get_workload();
-  }
+  //public NettyServerWorkload getWorkload(){
+ //   return NettyChannelInboundHandler.get_workload();
+ // }
   public boolean isShutdownComplete() {
     return _shutdownComplete.get();
   }

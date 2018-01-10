@@ -51,12 +51,13 @@ public class ServerMetricsInfo {
     @ApiOperation(value = "Show all hosted segments count and storage size", notes = "Storage size and count of all segments hosted by a Pinot Server")
     @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")})
     public ServerLoadMetrics getLatencyInfo(@ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName) throws WebApplicationException {
-        NettyServerWorkload workload =  serverInstance.getNettyServer().getWorkload();
-        if (workload == null) {
-            throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
-        }
+        //NettyServerWorkload workload =  serverInstance.getNettyServer().getWorkload();
+        //if (workload == null) {
+        //    throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
+       // }
 
-        ServerLoadMetrics serverLoadMetrics = workload.getAvgLoad(tableName);
-        return serverLoadMetrics;
+        //ServerLoadMetrics serverLoadMetrics = workload.getAvgLoad(tableName);
+        //return serverLoadMetrics;
+        return  null;
     }
 }
