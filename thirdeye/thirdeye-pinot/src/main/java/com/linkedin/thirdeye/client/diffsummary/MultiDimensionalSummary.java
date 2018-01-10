@@ -2,16 +2,10 @@ package com.linkedin.thirdeye.client.diffsummary;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.SummaryResource;
 import com.linkedin.thirdeye.dashboard.views.diffsummary.SummaryResponse;
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import io.dropwizard.configuration.ConfigurationFactory;
-import io.dropwizard.jackson.Jackson;
-import java.io.File;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.List;
-import javax.validation.Validation;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -25,55 +19,6 @@ import org.slf4j.LoggerFactory;
 public class MultiDimensionalSummary {
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeSummaryClient.class);
   private static final ObjectMapper objectMapper = new ObjectMapper();
-
-  public static void main(String[] args) throws Exception {
-    Options options = buildOptions();
-    if (args.length == 0) {
-      HelpFormatter formatter = new HelpFormatter();
-      formatter.printHelp(MultiDimensionalSummary.class.getSimpleName(), options);
-    } else {
-      CommandLineParser parser = new DefaultParser();
-      CommandLine commandLine = parser.parse(options, args);
-      List<String> argList = commandLine.getArgList();
-      Preconditions.checkArgument(argList.size() > 0, "Please provide config directory as parameter");
-
-      String dataset = commandLine.getOptionValue("dataset");
-      String metricName = commandLine.getOptionValue("metric");
-      String dimensions = commandLine.getOptionValue("dimensions", "");
-      String filterJson = commandLine.getOptionValue("filters", "{}");
-      long currentStart = Long.parseLong(commandLine.getOptionValue("currentStart"));
-      long currentEnd = Long.parseLong(commandLine.getOptionValue("currentEnd"));
-      long baselineStart = Long.parseLong(commandLine.getOptionValue("baselineStart"));
-      long baselineEnd = Long.parseLong(commandLine.getOptionValue("baselineEnd"));
-
-      int summarySize = Integer.parseInt(commandLine.getOptionValue("size", "10"));
-      int topDimensions = Integer.parseInt(commandLine.getOptionValue("topDimensions", "3"));
-      String hierarchiesJson = commandLine.getOptionValue("hierarchies", "[]");
-      boolean oneSideError = commandLine.hasOption("oneSideError");
-      boolean manualOrder = commandLine.hasOption("manual");
-      String dataTimeZoneId = commandLine.getOptionValue("timeZone", DateTimeZone.UTC.getID());
-
-      initThirdEyeEnvironment(argList.get(0));
-
-      SummaryResource summaryResource = new SummaryResource();
-      String summaryResultJsonString;
-      if (manualOrder) {
-        summaryResultJsonString = summaryResource
-            .buildSummaryManualDimensionOrder(dataset, metricName, currentStart, currentEnd, baselineStart, baselineEnd,
-                dimensions, filterJson, summarySize, oneSideError, dataTimeZoneId);
-      } else {
-        summaryResultJsonString = summaryResource
-            .buildSummary(dataset, metricName, currentStart, currentEnd, baselineStart, baselineEnd, dimensions,
-                filterJson, summarySize, topDimensions, hierarchiesJson, oneSideError, dataTimeZoneId);
-      }
-
-      SummaryResponse summaryResponse = objectMapper.readValue(summaryResultJsonString, SummaryResponse.class);
-      LOG.info(summaryResponse.toString());
-    }
-
-    // Force closing the connections to data sources.
-    System.exit(0);
-  }
 
   private static Options buildOptions() {
     Options options = new Options();
@@ -139,31 +84,56 @@ public class MultiDimensionalSummary {
     return options;
   }
 
-  private static void initThirdEyeEnvironment(String thirdEyeConfigDir) {
-    System.setProperty("dw.rootDir", thirdEyeConfigDir);
-    String dashboardConfigFilePath = thirdEyeConfigDir + "/dashboard.yml";
-    File configFile = new File(dashboardConfigFilePath);
+  public static void main(String[] args) throws Exception {
+    Options options = buildOptions();
+    if (args.length == 0) {
+      HelpFormatter formatter = new HelpFormatter();
+      formatter.printHelp(MultiDimensionalSummary.class.getSimpleName(), options);
+    } else {
+      CommandLineParser parser = new DefaultParser();
+      CommandLine commandLine = parser.parse(options, args);
+      List<String> argList = commandLine.getArgList();
+      Preconditions.checkArgument(argList.size() > 0, "Please provide config directory as parameter");
 
-    ConfigurationFactory<ThirdEyeDashboardConfiguration> factory =
-        new ConfigurationFactory<>(ThirdEyeDashboardConfiguration.class,
-            Validation.buildDefaultValidatorFactory().getValidator(), Jackson.newObjectMapper(), "");
-    ThirdEyeDashboardConfiguration config;
-    try {
-      config = factory.build(configFile);
-    } catch (Exception e) {
-      LOG.error("Exception while constructing ThirdEye config:", e);
-      throw new RuntimeException(e);
+      // Get parameters from command line arguments
+      String dataset = commandLine.getOptionValue("dataset");
+      String metricName = commandLine.getOptionValue("metric");
+      String dimensions = commandLine.getOptionValue("dimensions", "");
+      String filterJson = commandLine.getOptionValue("filters", "{}");
+      long currentStart = Long.parseLong(commandLine.getOptionValue("currentStart"));
+      long currentEnd = Long.parseLong(commandLine.getOptionValue("currentEnd"));
+      long baselineStart = Long.parseLong(commandLine.getOptionValue("baselineStart"));
+      long baselineEnd = Long.parseLong(commandLine.getOptionValue("baselineEnd"));
+
+      int summarySize = Integer.parseInt(commandLine.getOptionValue("size", "10"));
+      int topDimensions = Integer.parseInt(commandLine.getOptionValue("topDimensions", "3"));
+      String hierarchiesJson = commandLine.getOptionValue("hierarchies", "[]");
+      boolean oneSideError = commandLine.hasOption("oneSideError");
+      boolean manualOrder = commandLine.hasOption("manual");
+      String dataTimeZoneId = commandLine.getOptionValue("timeZone", DateTimeZone.UTC.getID());
+
+      // Initialize ThirdEye's environment
+      ThirdEyeUtils.initLightWeightThirdEyeEnvironment(argList.get(0));
+
+      // Trigger summary algorithm
+      SummaryResource summaryResource = new SummaryResource();
+      String summaryResultJsonString;
+      if (manualOrder) {
+        summaryResultJsonString = summaryResource
+            .buildSummaryManualDimensionOrder(dataset, metricName, currentStart, currentEnd, baselineStart, baselineEnd,
+                dimensions, filterJson, summarySize, oneSideError, dataTimeZoneId);
+      } else {
+        summaryResultJsonString = summaryResource
+            .buildSummary(dataset, metricName, currentStart, currentEnd, baselineStart, baselineEnd, dimensions,
+                filterJson, summarySize, topDimensions, hierarchiesJson, oneSideError, dataTimeZoneId);
+      }
+
+      // Log summary result
+      SummaryResponse summaryResponse = objectMapper.readValue(summaryResultJsonString, SummaryResponse.class);
+      LOG.info(summaryResponse.toString());
     }
 
-    String persistenceConfig = thirdEyeConfigDir + "/persistence.yml";
-    LOG.info("Loading persistence config from [{}]", persistenceConfig);
-    DaoProviderUtil.init(new File(persistenceConfig));
-
-    try {
-      ThirdEyeCacheRegistry.initializeCachesWithoutRefreshing(config);
-    } catch (Exception e) {
-      LOG.error("Exception while loading caches:", e);
-      throw new RuntimeException(e);
-    }
+    // Force closing the connections to data sources.
+    System.exit(0);
   }
 }
