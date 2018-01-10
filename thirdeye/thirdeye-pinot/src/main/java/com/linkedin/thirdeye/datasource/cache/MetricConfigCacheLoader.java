@@ -18,7 +18,7 @@ public class MetricConfigCacheLoader extends CacheLoader<MetricDataset, MetricCo
 
 
   @Override
-  public MetricConfigDTO load(MetricDataset metricDataset) throws Exception {
+  public MetricConfigDTO load(MetricDataset metricDataset) {
     LOGGER.debug("Loading MetricConfigCache for metric {} of {}", metricDataset.getMetricName(),
         metricDataset.getDataset());
     MetricConfigDTO metricConfig = metricConfigDAO.findByMetricAndDataset(metricDataset.getMetricName(),

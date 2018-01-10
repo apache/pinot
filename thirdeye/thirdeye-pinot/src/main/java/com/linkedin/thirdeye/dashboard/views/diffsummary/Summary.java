@@ -27,6 +27,8 @@ public class Summary {
   private List<DPArray> dpArrays;
 
   private double topValue;
+  private double globalBaselineValue;
+  private double globalCurrentValue;
 
   private CostFunction costFunction;
   private RowInserter basicRowInserter;
@@ -38,6 +40,8 @@ public class Summary {
     this.cube = cube;
     this.maxLevelCount = cube.getDimensions().size();
     this.topValue = cube.getTopBaselineValue() + cube.getTopCurrentValue();
+    this.globalBaselineValue = cube.getTopBaselineValue();
+    this.globalCurrentValue = cube.getTopCurrentValue();
     this.levelCount = this.maxLevelCount;
     this.costSet = cube.getCostSet();
     this.basicRowInserter = new BasicRowInserter(new CostFunction());
@@ -334,7 +338,7 @@ public class Summary {
       double currentValue = node.getCurrentValue();
       double cost = costFunction
           .errWithPercentageRemoval(baselineValue, currentValue, targetRatio, Cube.PERCENTAGE_CONTRIBUTION_THRESHOLD,
-              topValue);
+              globalBaselineValue, globalCurrentValue);
 
       for (int n = dp.size() - 1; n > 0; --n) {
         double val1 = dp.slotAt(n - 1).cost;

@@ -305,7 +305,7 @@ public class Cube { // the cube (Ca|Cb)
 
         double dimValueCost = costFunction
             .errWithPercentageRemoval(wowValues.baselineValue, wowValues.currentValue, topRatio,
-                PERCENTAGE_CONTRIBUTION_THRESHOLD, currentTotal + baselineTotal);
+                PERCENTAGE_CONTRIBUTION_THRESHOLD, baselineTotal, currentTotal);
 
         double contributionFactor =
             (wowValues.baselineValue + wowValues.currentValue) / (baselineTotal + currentTotal);

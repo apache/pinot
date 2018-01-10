@@ -1,9 +1,9 @@
 package com.linkedin.thirdeye.client.diffsummary;
 
 public class CostFunction {
-  private static double err(double v1, double v2, double parentRatio) {
-    double expectedValue = parentRatio * v1;
-    return (v2 - expectedValue) * Math.log(v2 / expectedValue);
+  private static double err(double baselineValue, double currentValue, double parentRatio) {
+    double expectedBaselineValue = parentRatio * baselineValue;
+    return (currentValue - expectedBaselineValue) * Math.log(currentValue / expectedBaselineValue);
   }
 
   /**
@@ -31,13 +31,24 @@ public class CostFunction {
     }
   }
 
-  public double errWithPercentageRemoval(double v1, double v2, double parentRatio,
-      double threshold, double currentBaselineSum) {
-    double percentageContribution = (((v1 + v2) / currentBaselineSum) * 100);
-    if (Double.compare(percentageContribution, threshold) < 0) {
-      return 0d;
+  public double errWithPercentageRemoval(double baselineValue, double currentValue, double parentRatio,
+      double threshold, double globalBaselineValue, double globalCurrentValue) {
+    double globalSum = globalBaselineValue + globalCurrentValue;
+    if (false) {
+      double contributionToOverallChange = (currentValue - baselineValue) / (globalCurrentValue - globalBaselineValue);
+      double percentageContribution = (((baselineValue ) / globalBaselineValue) * 100);
+      if (Double.compare(percentageContribution, threshold) < 0) {
+        return 0d;
+      } else {
+        return contributionToOverallChange / percentageContribution;
+      }
     } else {
-      return err4EmptyValues(v1, v2, parentRatio) * Math.log(percentageContribution);
+      double percentageContribution = (((baselineValue + currentValue) / globalSum) * 100);
+      if (Double.compare(percentageContribution, threshold) < 0) {
+        return 0d;
+      } else {
+        return err4EmptyValues(baselineValue, currentValue, parentRatio) * Math.log(percentageContribution);
+      }
     }
   }
 }

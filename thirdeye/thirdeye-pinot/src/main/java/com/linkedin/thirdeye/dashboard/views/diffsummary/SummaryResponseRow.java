@@ -15,7 +15,7 @@ public class SummaryResponseRow extends BaseResponseRow {
 
   public static SummaryResponseRow buildNotAvailableRow() {
     SummaryResponseRow row = new SummaryResponseRow();
-    row.names = new ArrayList<String>();
+    row.names = new ArrayList<>();
     row.names.add(SummaryResponse.NOT_AVAILABLE);
     row.percentageChange = SummaryResponse.NOT_AVAILABLE;
     row.contributionChange = SummaryResponse.NOT_AVAILABLE;

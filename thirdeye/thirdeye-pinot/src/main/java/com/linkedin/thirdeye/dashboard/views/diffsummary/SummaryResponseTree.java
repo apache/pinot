@@ -12,9 +12,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.client.diffsummary.CostFunction;
 import com.linkedin.thirdeye.client.diffsummary.Dimensions;
 import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SummaryResponseTree {
+  private static final Logger LOG = LoggerFactory.getLogger(SummaryResponseTree.class);
   @JsonProperty("dimensions")
   List<String> dimensions = new ArrayList<>();
 
@@ -27,6 +29,8 @@ public class SummaryResponseTree {
     // Build the header
     Dimensions dimensions = nodes.get(0).getDimensions();
     double totalValue = nodes.get(0).getOriginalCurrentValue() + nodes.get(0).getOriginalBaselineValue();
+    double globalBaselineValue = nodes.get(0).getOriginalCurrentValue();
+    double globalCurrentValue = nodes.get(0).getOriginalBaselineValue();
     for (int i = 0; i < levelCount; ++i) {
       responseTree.dimensions.add(dimensions.get(i));
     }
@@ -58,7 +62,7 @@ public class SummaryResponseTree {
     }
 
     // Sort the children of each node by their cost
-    sortChildNodes(treeNodes.get(0), totalValue, costFunction);
+    sortChildNodes(treeNodes.get(0), globalBaselineValue, globalCurrentValue, costFunction);
 
     // Put the nodes to a flattened array
     insertChildNodes(treeNodes.get(0), responseTree.hierarchicalNodes);
@@ -67,7 +71,10 @@ public class SummaryResponseTree {
   }
 
   private static void insertChildNodes(SummaryResponseTreeNode node, List<HierarchyNode> hierarchicalNodes) {
-    if (node.hierarchyNode != null) hierarchicalNodes.add(node.hierarchyNode);
+    if (node.hierarchyNode != null) {
+      hierarchicalNodes.add(node.hierarchyNode);
+      LOG.info("cost: {}, node: {}", node.cost, node.hierarchyNode.toString());
+    }
     for (SummaryResponseTreeNode child : node.children) {
       insertChildNodes(child, hierarchicalNodes);
     }
@@ -76,26 +83,27 @@ public class SummaryResponseTree {
   /**
    * A recursive function to sort response tree.
    */
-  private static void sortChildNodes(SummaryResponseTreeNode node, double totalValue, CostFunction costFunction) {
+  private static void sortChildNodes(SummaryResponseTreeNode node, double globalBaselineValue,
+      double globalCurrentValue, CostFunction costFunction) {
     if (node.children.size() == 0) return;
     for (SummaryResponseTreeNode child : node.children) {
-      sortChildNodes(child, totalValue, costFunction);
+      sortChildNodes(child, globalBaselineValue, globalCurrentValue, costFunction);
     }
     double ratio = node.currentRatio();
     for (SummaryResponseTreeNode child : node.children) {
-      computeCost(child, ratio, totalValue, costFunction);
+      computeCost(child, ratio, globalBaselineValue, globalCurrentValue, costFunction);
     }
     Collections.sort(node.children, Collections.reverseOrder(new SummaryResponseTreeNodeCostComparator()));
   }
 
-  private static void computeCost(SummaryResponseTreeNode node, double targetRatio, double totalValue,
-      CostFunction costFunction) {
+  private static void computeCost(SummaryResponseTreeNode node, double targetRatio, double globalBaselineValue,
+      double globalCurrentValue, CostFunction costFunction) {
     if (node.hierarchyNode != null) {
       node.cost = costFunction.errWithPercentageRemoval(node.getBaselineValue(), node.getCurrentValue(), targetRatio,
-          Cube.PERCENTAGE_CONTRIBUTION_THRESHOLD, totalValue);
+          Cube.PERCENTAGE_CONTRIBUTION_THRESHOLD, globalBaselineValue, globalCurrentValue);
     }
     for (SummaryResponseTreeNode child : node.children) {
-      computeCost(child, targetRatio, totalValue, costFunction);
+      computeCost(child, targetRatio, globalBaselineValue, globalCurrentValue, costFunction);
       node.cost += child.cost;
     }
   }
