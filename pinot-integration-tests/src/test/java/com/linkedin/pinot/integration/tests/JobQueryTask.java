@@ -40,21 +40,21 @@ public class JobQueryTask extends QueryTask {
         long min_timestamp = Long.parseLong(config.getProperty("min_timestamp"));
         int min_experience = Integer.parseInt(config.getProperty("min_experience"));
         int max_experience = Integer.parseInt(config.getProperty("max_experience"));
-
+        int max_limit = Integer.parseInt(config.getProperty("max_limit"));
 
         long timestampRange = max_timestamp - min_timestamp + 1;
         int experienceRange = max_experience - min_experience + 1;
         long timestamp = min_timestamp + (int)(Math.random() * timestampRange);
-
+        int limit = (int)(Math.random() * max_limit);
         String query;
         switch (queryId) {
             case 0:
-                query = String.format(queries[queryId], timestamp);
+                query = String.format(queries[queryId], timestamp, limit);
                 runQuery(query);
                 break;
             case 1:
                 int experience = min_experience + (int)(Math.random() * experienceRange);
-                query = String.format(queries[queryId], timestamp, experience);
+                query = String.format(queries[queryId], timestamp, experience, limit);
                 runQuery(query);
                 break;
             case 2:
@@ -66,11 +66,11 @@ public class JobQueryTask extends QueryTask {
                     lowerBound = higherBound;
                     higherBound = temp;
                 }
-                query = String.format(queries[queryId], timestamp, lowerBound, higherBound);
+                query = String.format(queries[queryId], timestamp, lowerBound, higherBound, limit);
                 runQuery(query);
                 break;
             case 3:
-                query = String.format(queries[queryId], timestamp);
+                query = String.format(queries[queryId], timestamp, limit);
                 runQuery(query);
                 break;
         }
