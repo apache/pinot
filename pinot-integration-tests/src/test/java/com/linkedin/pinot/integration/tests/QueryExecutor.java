@@ -40,9 +40,9 @@ public abstract class QueryExecutor {
     public static List<QueryExecutor> getTableExecutors() {
         List<QueryExecutor> queryExecutors = new ArrayList<>();
         queryExecutors.add(JobQueryExecutor.getInstance());
-        queryExecutors.add(AdsQueryExecutor.getInstance());
-        queryExecutors.add(ArticlesQueryExecutor.getInstance());
-        queryExecutors.add(ViewsQueryExecutor.getInstance());
+       // queryExecutors.add(AdsQueryExecutor.getInstance());
+       // queryExecutors.add(ArticlesQueryExecutor.getInstance());
+       // queryExecutors.add(ViewsQueryExecutor.getInstance());
         return queryExecutors;
     }
 
