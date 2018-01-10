@@ -78,9 +78,10 @@ public class QueryTask implements Runnable{
     }
 
     public void runQuery(String query) throws Exception {
-        printStatus(QueryTask.Color.CYAN, "Query : " + query);
-        printStatus(QueryTask.Color.YELLOW, prettyPrintResponse(new JSONObject(getPostQueryCommand().setQuery(query).run())));
-        printStatus(QueryTask.Color.GREEN, "***************************************************");
+        printStatus(QueryTask.Color.CYAN, "Query:" + query);
+        getPostQueryCommand().setQuery(query).run();
+        //printStatus(QueryTask.Color.YELLOW, prettyPrintResponse(new JSONObject(getPostQueryCommand().setQuery(query).run())));
+        //printStatus(QueryTask.Color.GREEN, "***************************************************");
     }
 
     public Properties getConfig() {
