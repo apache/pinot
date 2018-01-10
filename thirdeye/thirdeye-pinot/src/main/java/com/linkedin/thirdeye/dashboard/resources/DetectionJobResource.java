@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
 import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
@@ -73,6 +75,8 @@ public class DetectionJobResource {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private final AlertFilterAutotuneFactory alertFilterAutotuneFactory;
   private final AlertFilterFactory alertFilterFactory;
+
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobResource.class);
   public static final String AUTOTUNE_FEATURE_KEY = "features";
@@ -576,9 +580,15 @@ public class DetectionJobResource {
       long autotuneId = DAO_REGISTRY.getAutotuneConfigDAO().save(autotuneConfig);
       autotuneIds.add(autotuneId);
     }
-    return Response.ok(autotuneIds).build();
-  }
 
+    try {
+      String autotuneIdsJson = OBJECT_MAPPER.writeValueAsString(autotuneIds);
+      return Response.ok(autotuneIdsJson).build();
+    } catch (JsonProcessingException e) {
+      LOG.error("Failed to covert autotune ID list to Json String. Property: {}.", autotuneIds.toString(), e);
+      return Response.serverError().build();
+    }
+  }
 
 
   /**
@@ -697,7 +707,14 @@ public class DetectionJobResource {
       evaluator = new PrecisionRecallEvaluator(anomalyResultDTOS);
     }
 
-    return Response.ok(evaluator.toProperties().toString()).build();
+    Map<String, Number> evaluatorValues = evaluator.toNumberMap();
+    try {
+      String propertiesJson = OBJECT_MAPPER.writeValueAsString(evaluatorValues);
+      return Response.ok(propertiesJson).build();
+    } catch (JsonProcessingException e) {
+      LOG.error("Failed to covert evaluator values to a Json String. Property: {}.", evaluatorValues.toString(), e);
+      return Response.serverError().build();
+    }
   }
 
   /**
@@ -730,7 +747,14 @@ public class DetectionJobResource {
     AlertFilter alertFilter = alertFilterFactory.fromSpec(alertFilterParams);
     PrecisionRecallEvaluator evaluator = new PrecisionRecallEvaluator(alertFilter, anomalyResultDTOS);
 
-    return Response.ok(evaluator.toProperties().toString()).build();
+    Map<String, Number> evaluatorValues = evaluator.toNumberMap();
+    try {
+      String propertiesJson = OBJECT_MAPPER.writeValueAsString(evaluatorValues);
+      return Response.ok(propertiesJson).build();
+    } catch (JsonProcessingException e) {
+      LOG.error("Failed to covert evaluator values to a Json String. Property: {}.", evaluatorValues.toString(), e);
+      return Response.serverError().build();
+    }
   }
 
 
