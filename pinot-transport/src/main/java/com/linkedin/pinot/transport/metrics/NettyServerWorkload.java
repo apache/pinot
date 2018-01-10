@@ -35,8 +35,8 @@ public class NettyServerWorkload {
     protected int threads = THREADS;
     protected ExecutorService threadPool = Executors.newFixedThreadPool(THREADS);
     protected AsynchronousFileChannel log;
-    public static final long CAPTURE_WINDOW = 10000;
-    public static final long FLUSH_WINDOW = 5;
+    public static final long CAPTURE_WINDOW = 1000;
+    public static final long FLUSH_WINDOW = 1;
     private final Map<String, ServerLoadMetrics> avgLoadMap;
 
     public NettyServerWorkload(){
@@ -48,16 +48,16 @@ public class NettyServerWorkload {
             //If already contains tableName get the load list for that table
             List<ServerLatencyMetric> list = avgLoadMap.get(tableName).get_latencies();
             //Get the last entry in the list
-            ServerLatencyMetric l = list.get(list.size()-1);
-            System.out.println(l.getTimestamp() + "-" + load.getTimestamp());
-            if(l.getTimestamp() < load.getTimestamp() && l.getTimestamp() + CAPTURE_WINDOW >= load.getTimestamp()){
+            ServerLatencyMetric lastLoad = list.get(list.size()-1);
+            //System.out.println(lastElement.getTimestamp() + "-" + load.getTimestamp());
+            if((load.getTimestamp() - lastLoad.getTimestamp()) <= CAPTURE_WINDOW){
                 //if incoming load within last window then update window
                 updateLastWindow(tableName, load);
             }else{
-                //else add new entry
-                list.add(load);
                 //flush records to file, flushRecords will take care weather window has maxed out or not
                 flushRecords(tableName);
+                //else add new entry
+                list.add(load);
             }
         }else {
             //if tableName doesn't exist till now
@@ -78,7 +78,7 @@ public class NettyServerWorkload {
         lastLoad.setNumRequests(lastLoad.getNumRequests() + 1);
         lastLoad.setDocuments(lastLoad.getDocuments() + load.getDocuments());
         //update the same index in list now
-        System.out.println(lastLoad.getTimestamp() + "-" + lastLoad.getNumRequests());
+        //System.out.println(lastLoad.getTimestamp() + "-" + lastLoad.getNumRequests());
         list.set(list.size()-1, lastLoad);
     }
 
@@ -97,12 +97,14 @@ public class NettyServerWorkload {
         }
 
         String filePath = "target/workloadData/" + tableName + ".log";
+
         Path path = Paths.get(filePath);
         Path parentDir = path.getParent();
 
         if (null != parentDir && !Files.exists(parentDir)) {
             try {
                 Files.createDirectories(parentDir);
+                System.out.println("log file is created");
             } catch (IOException e) {
                e.printStackTrace();
             }

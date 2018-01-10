@@ -144,7 +144,8 @@ public abstract class QueryScheduler {
     byte[] responseData = serializeDataTable(request, result);
     TimerContext timerContext = request.getTimerContext();
     @Nonnull Map<String, String> resultMeta = result.getMetadata();
-    LOGGER.info("Processed requestId={},table={},reqSegments={},prunedToSegmentCount={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
+    LOGGER.info("Processed timestamp={}, requestId={},table={},reqSegments={},prunedToSegmentCount={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
+        System.currentTimeMillis(),
         request.getInstanceRequest().getRequestId(),
         request.getTableName(),
         request.getInstanceRequest().getSearchSegments().size(),

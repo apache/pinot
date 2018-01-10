@@ -16,7 +16,6 @@
 package com.linkedin.pinot.common.restlet.resources;
 
 public class ServerLatencyMetric {
-    public static final int OBJ_SIZE = 8*4;
     private long _timestamp;
     private long _latency;
     private long _segments;

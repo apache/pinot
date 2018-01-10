@@ -258,6 +258,8 @@ public abstract class NettyServer implements Runnable {
       Futures.addCallback(serializedQueryResponse, new FutureCallback<byte[]>() {
         void sendResponse(@Nonnull final byte[] result) {
           requestProcessingLatency.stop();
+
+          metric.setTimestamp(System.currentTimeMillis());
           metric.setLatency(requestProcessingLatency.getLatencyMs());
           _workload.addWorkLoad(metric.get_tableName(), new ServerLatencyMetric(metric));
           //update workload here

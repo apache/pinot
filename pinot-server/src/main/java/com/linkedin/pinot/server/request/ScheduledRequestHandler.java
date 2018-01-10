@@ -33,6 +33,8 @@ import com.linkedin.pinot.transport.netty.NettyServer;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import java.net.InetSocketAddress;
+import java.util.Map;
+
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
