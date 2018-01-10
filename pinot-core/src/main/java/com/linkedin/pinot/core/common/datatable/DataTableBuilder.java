@@ -347,6 +347,9 @@ public class DataTableBuilder {
           case DOUBLE:
             dataTableBuilder.setColumn(i, ((Double) aggregationResults[i]).doubleValue());
             break;
+          case STRING:
+            dataTableBuilder.setColumn(i, (String) aggregationResults[i]);
+            break;
           case OBJECT:
             dataTableBuilder.setColumn(i, aggregationResults[i]);
             break;

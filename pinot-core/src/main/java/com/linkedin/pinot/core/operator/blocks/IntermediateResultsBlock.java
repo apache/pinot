@@ -230,6 +230,9 @@ public class IntermediateResultsBlock implements Block {
         case DOUBLE:
           dataTableBuilder.setColumn(i, ((Double) _aggregationResult.get(i)).doubleValue());
           break;
+        case STRING:
+          dataTableBuilder.setColumn(i, ((String) _aggregationResult.get(i)));
+          break;
         case OBJECT:
           dataTableBuilder.setColumn(i, _aggregationResult.get(i));
           break;

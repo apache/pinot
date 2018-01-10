@@ -386,7 +386,28 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     testQuery(pqlStarTreeQuery, Lists.newArrayList(sqlQuery1, sqlQuery2));
 
     // string
-    // TODO: add test cases for string column when we add support for min and max on string datatype columns
+    pqlQuery = "SELECT MAXSTRING(CancellationCode) FROM " + DEFAULT_TABLE_NAME;
+    pqlStarTreeQuery =  "SELECT MAXSTRING(CancellationCode) FROM "+ STAR_TREE_TABLE_NAME;
+    sqlQuery = "SELECT MAX(CancellationCode) FROM " + DEFAULT_TABLE_NAME;
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    testQuery(pqlStarTreeQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT MINSTRING(Carrier) FROM " + DEFAULT_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MINSTRING(Carrier) FROM " + STAR_TREE_TABLE_NAME;
+    sqlQuery = "SELECT MIN(Carrier) FROM " + DEFAULT_TABLE_NAME;
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    testQuery(pqlStarTreeQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT MINSTRING(Carrier), MAXSTRING(Carrier) FROM " + DEFAULT_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MINSTRING(Carrier), MAXSTRING(Carrier) FROM " + STAR_TREE_TABLE_NAME;
+    sqlQuery1 = "SELECT MIN(Carrier) FROM " + DEFAULT_TABLE_NAME;
+    sqlQuery2 = "SELECT MAX(Carrier) FROM " + DEFAULT_TABLE_NAME;
+    testQuery(pqlQuery, Lists.newArrayList(sqlQuery1, sqlQuery2));
+    testQuery(pqlStarTreeQuery, Lists.newArrayList(sqlQuery1, sqlQuery2));
+    pqlQuery = "SELECT MINSTRING(Carrier), COUNT(*) FROM " + DEFAULT_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MINSTRING(Carrier), COUNT(*) FROM " + STAR_TREE_TABLE_NAME;
+    sqlQuery1 = "SELECT MIN(Carrier) FROM " + DEFAULT_TABLE_NAME;
+    sqlQuery2 = "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME;
+    testQuery(pqlQuery, Lists.newArrayList(sqlQuery1, sqlQuery2));
+    testQuery(pqlStarTreeQuery, Lists.newArrayList(sqlQuery1, sqlQuery2));
 
     // Check execution stats
     JSONObject response;

@@ -291,6 +291,9 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           case DOUBLE:
             intermediateResultToMerge = dataTable.getDouble(0, i);
             break;
+          case STRING:
+            intermediateResultToMerge = dataTable.getString(0, i);
+            break;
           case OBJECT:
             intermediateResultToMerge = dataTable.getObject(0, i);
             break;

@@ -30,7 +30,9 @@ public class AggregationFunctionFactory {
     // Single-value aggregation functions.
     COUNT("count"),
     MIN("min"),
+    MINSTRING("minstring"),
     MAX("max"),
+    MAXSTRING("maxstring"),
     SUM("sum"),
     AVG("avg"),
     MINMAXRANGE("minMaxRange"),
@@ -62,7 +64,9 @@ public class AggregationFunctionFactory {
     // Multi-value aggregation functions.
     COUNTMV("countMV"),
     MINMV("minMV"),
+    MINMVSTRING("minMVstring"),
     MAXMV("maxMV"),
+    MAXMVSTRING("maxMVstring"),
     SUMMV("sumMV"),
     AVGMV("avgMV"),
     MINMAXRANGEMV("minMaxRangeMV"),
@@ -129,8 +133,12 @@ public class AggregationFunctionFactory {
         return new CountAggregationFunction();
       case MIN:
         return new MinAggregationFunction();
+      case MINSTRING:
+        return new MinStringAggregationFunction();
       case MAX:
         return new MaxAggregationFunction();
+      case MAXSTRING:
+        return new MaxStringAggregationFunction();
       case SUM:
         return new SumAggregationFunction();
       case AVG:
@@ -191,8 +199,12 @@ public class AggregationFunctionFactory {
         return new CountMVAggregationFunction();
       case MINMV:
         return new MinMVAggregationFunction();
+      case MINMVSTRING:
+        return new MinMVStringAggregationFunction();
       case MAXMV:
         return new MaxMVAggregationFunction();
+      case MAXMVSTRING:
+        return new MaxMVStringAggregationFunction();
       case SUMMV:
         return new SumMVAggregationFunction();
       case AVGMV:

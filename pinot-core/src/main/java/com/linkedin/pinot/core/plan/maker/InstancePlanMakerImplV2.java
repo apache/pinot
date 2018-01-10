@@ -89,8 +89,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     if (brokerRequest.isSetAggregationsInfo()) {
 
       if (brokerRequest.isSetGroupBy()) {
-        return new AggregationGroupByPlanNode(indexSegment, brokerRequest,
-            _maxInitialResultHolderCapacity, _numAggrGroupsLimit);
+        return new AggregationGroupByPlanNode(indexSegment, brokerRequest, _maxInitialResultHolderCapacity,
+            _numAggrGroupsLimit);
       } else {
         if (isFitForMetadataBasedPlan(brokerRequest, indexSegment)) {
           return new MetadataBasedAggregationPlanNode(indexSegment, brokerRequest.getAggregationsInfo());
@@ -155,7 +155,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   private static boolean isMetadataBasedAggregationFunction(AggregationInfo aggregationInfo,
       IndexSegment indexSegment) {
-    AggregationFunctionType aggFuncType = AggregationFunctionType.valueOf(aggregationInfo.getAggregationType().toUpperCase());
+    AggregationFunctionType aggFuncType =
+        AggregationFunctionType.valueOf(aggregationInfo.getAggregationType().toUpperCase());
     if (aggFuncType.equals(AggregationFunctionType.COUNT)) {
       return true;
     }
@@ -172,12 +173,12 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     return false;
   }
 
-  private static boolean isMetadataBasedMinMax(AggregationFunctionType aggFuncType,
-      IndexSegment indexSegment, AggregationInfo aggregationInfo) {
+  private static boolean isMetadataBasedMinMax(AggregationFunctionType aggFuncType, IndexSegment indexSegment,
+      AggregationInfo aggregationInfo) {
     // Use minValue and maxValue from metadata, in non star tree cases
     // minValue and maxValue is generated from dictionary on segment load, so it won't be correct in case of star tree
-    if (aggFuncType.isOfType(AggregationFunctionType.MAX, AggregationFunctionType.MIN, AggregationFunctionType.MINMAXRANGE)
-        && !indexSegment.getSegmentMetadata().hasStarTree()) {
+    if (aggFuncType.isOfType(AggregationFunctionType.MAX, AggregationFunctionType.MIN,
+        AggregationFunctionType.MINMAXRANGE) && !indexSegment.getSegmentMetadata().hasStarTree()) {
       String column = aggregationInfo.getAggregationParams().get("column");
       SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) indexSegment.getSegmentMetadata();
       if (segmentMetadata == null || segmentMetadata.getColumnMetadataMap() == null) {
@@ -199,12 +200,11 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
    * @param indexSegment
    * @return True if query can be served using dictionary, false otherwise.
    */
-  public static boolean isFitForDictionaryBasedPlan(BrokerRequest brokerRequest,
-      IndexSegment indexSegment) {
+  public static boolean isFitForDictionaryBasedPlan(BrokerRequest brokerRequest, IndexSegment indexSegment) {
     // Skipping dictionary in case of star tree. Results from dictionary won't be correct
     // because of aggregated values in metrics, and ALL value in dimension
-    if ((brokerRequest.getFilterQuery() != null) || brokerRequest.isSetGroupBy()
-        || indexSegment.getSegmentMetadata().hasStarTree()) {
+    if ((brokerRequest.getFilterQuery() != null) || brokerRequest.isSetGroupBy() || indexSegment.getSegmentMetadata()
+        .hasStarTree()) {
       return false;
     }
     List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
@@ -221,8 +221,10 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   private static boolean isDictionaryBasedAggregationFunction(AggregationInfo aggregationInfo,
       IndexSegment indexSegment) {
-    AggregationFunctionType aggFuncType = AggregationFunctionType.valueOf(aggregationInfo.getAggregationType().toUpperCase());
-    if (aggFuncType.isOfType(AggregationFunctionType.MAX, AggregationFunctionType.MIN, AggregationFunctionType.MINMAXRANGE)) {
+    AggregationFunctionType aggFuncType =
+        AggregationFunctionType.valueOf(aggregationInfo.getAggregationType().toUpperCase());
+    if (aggFuncType.isOfType(AggregationFunctionType.MAX, AggregationFunctionType.MIN,
+        AggregationFunctionType.MAXSTRING, AggregationFunctionType.MINSTRING, AggregationFunctionType.MINMAXRANGE)) {
       String column = aggregationInfo.getAggregationParams().get("column");
       if (indexSegment.getDataSource(column).getDataSourceMetadata().hasDictionary()) {
         return true;
@@ -230,5 +232,4 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     }
     return false;
   }
-
 }
