@@ -220,7 +220,7 @@ public class PrecisionRecallEvaluator {
   public Map<String, Number> toNumberMap() {
     Map<String, Number> evals = new HashMap<>();
     evals.put(RESPONSE_RATE, getResponseRate());
-    evals.put(PRECISION, getPrecision());
+    evals.put(PRECISION, getPrecisionInResponse());
     evals.put(WEIGHTED_PRECISION, getWeightedPrecision());
     evals.put(RECALL, getRecall());
     evals.put(TOTALALERTS, getTotalAlerts());
