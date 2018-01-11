@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.zip.GZIPInputStream;
 
 
@@ -49,7 +50,7 @@ public class RecordReaderUtils {
   }
 
   public static BufferedInputStream getFileBufferStream(File dataFile) throws IOException {
-    return new BufferedInputStream(getFileStreamReader(dataFile), 2048);
+    return new BufferedInputStream(getFileStreamReader(dataFile));
   }
 
   public static Object convertToDataType(String token, FieldSpec fieldSpec) {
@@ -105,6 +106,28 @@ public class RecordReaderUtils {
         } else {
           value[i] = convertToDataType(token.toString(), fieldSpec);
         }
+      }
+    }
+
+    return value;
+  }
+
+  public static Object convertToDataTypeSet(HashSet tokens, FieldSpec fieldSpec) {
+    Object[] value;
+
+    if ((tokens == null) || tokens.isEmpty()) {
+      value = new Object[]{fieldSpec.getDefaultNullValue()};
+    } else {
+      int length = tokens.size();
+      value = new Object[length];
+      int index = 0;
+      for (Object token: tokens) {
+        if (token == null) {
+          value[index] = fieldSpec.getDefaultNullValue();
+        } else {
+          value[index] = convertToDataType(token.toString(), fieldSpec);
+        }
+        index++;
       }
     }
 

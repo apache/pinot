@@ -22,12 +22,12 @@ public class ThriftRecordReaderConfig implements RecordReaderConfig {
 
     private String _thriftClass;
 
-    public String get_thriftClass() {
+    public String getThriftClass() {
         return _thriftClass;
     }
 
-    public void set_thriftClass(String _thriftClass) {
-        this._thriftClass = _thriftClass;
+    public void setThriftClass(String thriftClass) {
+        this._thriftClass = thriftClass;
     }
 
     @Override

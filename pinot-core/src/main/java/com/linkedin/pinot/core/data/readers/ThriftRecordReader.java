@@ -29,6 +29,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 public class ThriftRecordReader implements RecordReader {
@@ -54,7 +55,7 @@ public class ThriftRecordReader implements RecordReader {
         this._schema = schema;
         this._dataFile = dataFile;
         this._recordReaderConfig = recordReaderConfig;
-        this._thriftClass = thriftClassCreator();
+        this._thriftClass = initThriftInstanceCreator();
         this._bufferIn = RecordReaderUtils.getFileBufferStream(dataFile);
         this._binaryIn = new TBinaryProtocol(new TIOStreamTransport(_bufferIn));
         this._fieldNameToIndexMap = new HashMap();
@@ -104,12 +105,16 @@ public class ThriftRecordReader implements RecordReader {
                 int tFieldId = _fieldNameToIndexMap.get(fieldName);
                 TFieldIdEnum tFieldIdEnum = t.fieldForId(tFieldId);
                 Object thriftValue = t.getFieldValue(tFieldIdEnum);
-                Object value;
+                Object value = null;
                 if (fieldSpec.isSingleValueField()) {
                     String token = thriftValue != null ? thriftValue.toString() : null;
                     value = RecordReaderUtils.convertToDataType(token, fieldSpec);
                 } else {
-                    value = RecordReaderUtils.convertToDataTypeArray((ArrayList) thriftValue, fieldSpec);
+                    if(thriftValue instanceof ArrayList) {
+                        value = RecordReaderUtils.convertToDataTypeArray((ArrayList) thriftValue, fieldSpec);
+                    } else if(thriftValue instanceof HashSet) {
+                        value = RecordReaderUtils.convertToDataTypeSet((HashSet) thriftValue, fieldSpec);
+                    }
                 }
                 reuse.putField(fieldName, value);
             }
@@ -133,13 +138,13 @@ public class ThriftRecordReader implements RecordReader {
         _bufferIn.close();
     }
 
-    private Class<TBase<?, ?>> thriftClassCreator() {
+    private Class<TBase<?, ?>> initThriftInstanceCreator() {
         Class<TBase<?, ?>> tBase = null;
-        if (_recordReaderConfig == null || _recordReaderConfig.get_thriftClass() == null) {
+        if (_recordReaderConfig == null || _recordReaderConfig.getThriftClass() == null) {
             throw new IllegalArgumentException("Thrift class not found in the configuration");
         }
         try {
-            tBase = (Class<TBase<?, ?>>) Class.forName(_recordReaderConfig.get_thriftClass());
+            tBase = (Class<TBase<?, ?>>) Class.forName(_recordReaderConfig.getThriftClass());
         } catch (ClassNotFoundException e) {
             throw new RuntimeException("Caught exception while thrift class initialize", e);
         }
