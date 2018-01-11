@@ -129,8 +129,12 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     if (this.properties.containsKey(METRIC_FUNCTION)) {
       taskConfigs.put(taskPrefix + METRIC_FUNCTION, this.properties.get(METRIC_FUNCTION));
     }
-    taskConfigs.put(taskPrefix + WINDOW_SIZE, this.properties.get(WINDOW_SIZE));
-    taskConfigs.put(taskPrefix + WINDOW_UNIT, this.properties.get(WINDOW_UNIT));
+    if (this.properties.containsKey(WINDOW_SIZE)) {
+      taskConfigs.put(taskPrefix + WINDOW_SIZE, this.properties.get(WINDOW_SIZE));
+    }
+    if (this.properties.containsKey(WINDOW_UNIT)) {
+      taskConfigs.put(taskPrefix + WINDOW_UNIT, this.properties.get(WINDOW_UNIT));
+    }
     if (this.properties.containsKey(WINDOW_DELAY)) {
       taskConfigs.put(taskPrefix + WINDOW_DELAY, this.properties.get(WINDOW_DELAY));
     }
