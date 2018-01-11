@@ -148,10 +148,14 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     }
     TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     TimeGranularity dataGranularity = timeSpec.getDataGranularity();
+    TimeGranularity userAssignedDataGranularity = null;
     try{
-      dataGranularity = TimeGranularity.fromString(configuration.getString(DATA_GRANULARITY));
+      userAssignedDataGranularity = TimeGranularity.fromString(configuration.getString(DATA_GRANULARITY));
     } catch (Exception e) {
       LOG.warn("Unable to parse user input data granularity: {}; use default from dataset config", configuration.getString(DATA_GRANULARITY));
+    }
+    if (userAssignedDataGranularity != null) {
+      dataGranularity = userAssignedDataGranularity;
     }
 
     // use the aggregate function in MetricConfig as default function
