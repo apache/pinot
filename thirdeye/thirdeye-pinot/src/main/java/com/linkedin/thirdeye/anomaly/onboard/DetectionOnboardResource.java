@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;

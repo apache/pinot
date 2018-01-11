@@ -36,6 +36,7 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   public static final String EXPLORE_DIMENSION = "exploreDimensions";
   public static final String FILTERS = "filters";
   public static final String METRIC_FUNCTION = "metricFunction";
+  public static final String FUNCTION_TYPE = "functionType";
   public static final String WINDOW_SIZE = "windowSize";
   public static final String WINDOW_UNIT = "windowUnit";
   public static final String WINDOW_DELAY = "windowDelay";
@@ -91,9 +92,6 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
             FUNCTION_NAME,
             COLLECTION_NAME,
             METRIC_NAME,
-            WINDOW_SIZE,
-            WINDOW_UNIT,
-            CRON_EXPRESSION,
             SMTP_HOST,
             SMTP_PORT,
             DEFAULT_ALERT_RECEIVER_ADDRESS,
@@ -218,6 +216,8 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     if (this.properties.containsKey(END)) {
       taskConfigs.put (taskPrefix + END, this.properties.get(END));
     }
+    taskConfigs.put (taskPrefix + SMTP_HOST, this.properties.get(SMTP_HOST));
+    taskConfigs.put (taskPrefix + SMTP_PORT, this.properties.get(SMTP_PORT));
     taskConfigs.put (taskPrefix + THIRDEYE_DASHBOARD_HOST, this.properties.get(THIRDEYE_DASHBOARD_HOST));
     taskConfigs.put (taskPrefix + DEFAULT_ALERT_SENDER_ADDRESS, this.properties.get(DEFAULT_ALERT_SENDER_ADDRESS));
     taskConfigs.put (taskPrefix + DEFAULT_ALERT_RECEIVER_ADDRESS, this.properties.get(DEFAULT_ALERT_RECEIVER_ADDRESS));
