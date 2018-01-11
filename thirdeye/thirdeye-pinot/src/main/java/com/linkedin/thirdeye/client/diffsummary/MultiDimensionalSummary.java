@@ -44,16 +44,16 @@ public class MultiDimensionalSummary {
 
   private static final String TOP_K_POSTFIX = "_topk";
 
-  private QueryCache queryCache;
+  private OLAPDataBaseClient olapClient;
   private CostFunction costFunction;
   private DateTimeZone dateTimeZone;
 
-  public MultiDimensionalSummary(QueryCache queryCache, CostFunction costFunction,
+  public MultiDimensionalSummary(OLAPDataBaseClient olapClient, CostFunction costFunction,
       DateTimeZone dateTimeZone) {
-    Preconditions.checkNotNull(queryCache);
+    Preconditions.checkNotNull(olapClient);
     Preconditions.checkNotNull(dateTimeZone);
     Preconditions.checkNotNull(costFunction);
-    this.queryCache = queryCache;
+    this.olapClient = olapClient;
     this.costFunction = costFunction;
     this.dateTimeZone = dateTimeZone;
   }
@@ -74,7 +74,6 @@ public class MultiDimensionalSummary {
     Preconditions.checkNotNull(hierarchies);
     Preconditions.checkArgument(topDimensions >= 0);
 
-    OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(queryCache);
     olapClient.setCollection(dataset);
     List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM, dataset);
     olapClient.setMetricExpression(metricExpressions.get(0));
@@ -114,7 +113,7 @@ public class MultiDimensionalSummary {
     options.addOption(dimensions);
 
     Option filters =
-        Option.builder("filters").desc("filter to apply on the data cube").hasArg().argName("JSON").build();
+        Option.builder("filters").desc("filter to apply on the data cube (a map of list in Json format)").hasArg().argName("JSON").build();
     options.addOption(filters);
 
     Option currentStart =
@@ -147,7 +146,7 @@ public class MultiDimensionalSummary {
     options.addOption(topDimension);
 
     Option hierarchies = Option.builder("h").longOpt("hierarchies")
-        .desc("dimension hierarchies, which are given in a List of Lists in Json format").hasArg().argName("JSON")
+        .desc("dimension hierarchies (a list of lists in Json format)").hasArg().argName("JSON")
         .build();
     options.addOption(hierarchies);
 
@@ -162,7 +161,7 @@ public class MultiDimensionalSummary {
     options.addOption(dateTimeZone);
 
     Option costFunctionClass = Option.builder("cost").longOpt("costFunction").desc(
-        "the parameters of the cost function, which are given in a Map in Json format. "
+        "the parameters of the cost function (a map in json format) "
             + "Essential field in the map: 'className'").hasArg().argName("JSON").build();
     options.addOption(costFunctionClass);
 
@@ -261,6 +260,7 @@ public class MultiDimensionalSummary {
 
       // Initialize ThirdEye's environment
       ThirdEyeUtils.initLightWeightThirdEyeEnvironment(argList.get(0));
+      OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
 
       // Convert JSON string to Objects
       Dimensions dimensions;
@@ -275,8 +275,7 @@ public class MultiDimensionalSummary {
           });
 
       // Trigger summary algorithm
-      MultiDimensionalSummary mdSummary =
-          new MultiDimensionalSummary(CACHE_REGISTRY_INSTANCE.getQueryCache(), costFunction, timeZone);
+      MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(olapClient, costFunction, timeZone);
       SummaryResponse summaryResponse = mdSummary
           .buildSummary(dataset, metricName, currentStart, currentEnd, baselineStart, baselineEnd, dimensions,
               dataFilter, summarySize, topDimensions, hierarchies, oneSideError);

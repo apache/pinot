@@ -6,6 +6,8 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.client.diffsummary.Dimensions;
 import com.linkedin.thirdeye.client.diffsummary.MultiDimensionalSummary;
+import com.linkedin.thirdeye.client.diffsummary.OLAPDataBaseClient;
+import com.linkedin.thirdeye.client.diffsummary.PinotThirdEyeSummaryClient;
 import com.linkedin.thirdeye.client.diffsummary.costfunction.BalancedCostFunction;
 import com.linkedin.thirdeye.client.diffsummary.costfunction.CostFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
@@ -83,8 +85,8 @@ public class SummaryResource {
 
       CostFunction costFunction = new BalancedCostFunction();
       DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
-      MultiDimensionalSummary mdSummary =
-          new MultiDimensionalSummary(CACHE_REGISTRY_INSTANCE.getQueryCache(), costFunction, dateTimeZone);
+      OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
+      MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(olapClient, costFunction, dateTimeZone);
 
       response = mdSummary
           .buildSummary(collection, metric, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
@@ -136,8 +138,8 @@ public class SummaryResource {
 
       CostFunction costFunction = new BalancedCostFunction();
       DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
-      MultiDimensionalSummary mdSummary =
-          new MultiDimensionalSummary(CACHE_REGISTRY_INSTANCE.getQueryCache(), costFunction, dateTimeZone);
+      OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
+      MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(olapClient, costFunction, dateTimeZone);
 
       response = mdSummary
           .buildSummary(collection, metric, currentStartInclusive, currentEndExclusive, baselineStartInclusive,

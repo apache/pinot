@@ -74,9 +74,14 @@ public class SummaryResponse {
 
   private void buildGainerLoserGroup(List<DimNameValueCostEntry> costSet) {
     for (DimNameValueCostEntry dimNameValueCostEntry : costSet) {
-      if (dimNameValueCostEntry.getCurrentValue() >= dimNameValueCostEntry.getBaselineValue() && gainer.size() < MAX_GAINER_LOSER_COUNT) {
+      if (Double.compare(dimNameValueCostEntry.getCost(), 0d) <= 0) {
+        continue;
+      }
+      if (dimNameValueCostEntry.getCurrentValue() >= dimNameValueCostEntry.getBaselineValue()
+          && gainer.size() < MAX_GAINER_LOSER_COUNT) {
         gainer.add(buildGainerLoserRow(dimNameValueCostEntry));
-      } else if (dimNameValueCostEntry.getCurrentValue() < dimNameValueCostEntry.getBaselineValue() && loser.size() < MAX_GAINER_LOSER_COUNT) {
+      } else if (dimNameValueCostEntry.getCurrentValue() < dimNameValueCostEntry.getBaselineValue()
+          && loser.size() < MAX_GAINER_LOSER_COUNT) {
         loser.add(buildGainerLoserRow(dimNameValueCostEntry));
       }
       if (gainer.size() >= MAX_GAINER_LOSER_COUNT && loser.size() >= MAX_GAINER_LOSER_COUNT) {
