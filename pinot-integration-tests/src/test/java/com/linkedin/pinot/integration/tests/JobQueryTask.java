@@ -40,22 +40,26 @@ public class JobQueryTask extends QueryTask {
         long min_timestamp = Long.parseLong(config.getProperty("min_timestamp"));
         int min_experience = Integer.parseInt(config.getProperty("min_experience"));
         int max_experience = Integer.parseInt(config.getProperty("max_experience"));
-        int max_limit = Integer.parseInt(config.getProperty("max_limit"));
-        int min_limit = Integer.parseInt(config.getProperty("min_limit"));
+        int select_max_limit = Integer.parseInt(config.getProperty("select_max_limit"));
+        int select_min_limit = Integer.parseInt(config.getProperty("select_min_limit"));
+        int groupby_max_limit = Integer.parseInt(config.getProperty("groupby_max_limit"));
+        int groupby_min_limit = Integer.parseInt(config.getProperty("groupby_min_limit"));
 
         long timestampRange = max_timestamp - min_timestamp + 1;
         int experienceRange = max_experience - min_experience + 1;
         long timestamp = min_timestamp + (int)(Math.random() * timestampRange);
-        int limit = (int)(Math.random() * max_limit);
+        int select_limit = select_min_limit + (int)(Math.random() * (select_max_limit - select_min_limit));
+        int groupby_limit = groupby_min_limit + (int)(Math.random() * (groupby_max_limit - groupby_min_limit));
+
         String query;
         switch (queryId) {
             case 0:
-                query = String.format(queries[queryId], timestamp, min_limit + limit);
+                query = String.format(queries[queryId], timestamp, select_limit);
                 runQuery(query);
                 break;
             case 1:
                 int experience = min_experience + (int)(Math.random() * experienceRange);
-                query = String.format(queries[queryId], timestamp, experience, limit);
+                query = String.format(queries[queryId], timestamp, experience, groupby_limit);
                 runQuery(query);
                 break;
             case 2:
@@ -67,11 +71,11 @@ public class JobQueryTask extends QueryTask {
                     lowerBound = higherBound;
                     higherBound = temp;
                 }
-                query = String.format(queries[queryId], timestamp, lowerBound, higherBound, limit);
+                query = String.format(queries[queryId], timestamp, lowerBound, higherBound, groupby_limit);
                 runQuery(query);
                 break;
             case 3:
-                query = String.format(queries[queryId], timestamp, limit);
+                query = String.format(queries[queryId], timestamp, groupby_limit);
                 runQuery(query);
                 break;
         }
