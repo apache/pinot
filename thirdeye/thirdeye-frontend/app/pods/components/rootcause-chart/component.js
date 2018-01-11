@@ -1,7 +1,7 @@
 import Ember from 'ember';
 import moment from 'moment';
 import d3 from 'd3';
-import buildTooltip from 'thirdeye-frontend/helpers/build-tooltip';
+import { buildTooltip, getTimeseriesLookup, getLabels, getColors } from 'thirdeye-frontend/helpers/build-tooltip';
 import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, stripTail, toBaselineRange, toFilters, toMetricLabel, colorMapping } from 'thirdeye-frontend/helpers/utils';
 
 const TIMESERIES_MODE_ABSOLUTE = 'absolute';
@@ -42,11 +42,6 @@ export default Ember.Component.extend({
   colorMapping: colorMapping,
 
   /**
-   * Adding the buildTooltip Template helper to the this context
-   */
-  buildTooltip: buildTooltip,
-
-  /**
    * custom height for split mode
    */
   splitChartHeight: {
@@ -62,21 +57,44 @@ export default Ember.Component.extend({
           const t = moment(items[0].x);
           const hoverUrns = this._onHover(t.valueOf());
 
-          const {
-            entities,
-            timeseries
-          } = this.getProperties('entities', 'timeseries');
+          const { tooltipColors, tooltipLabels, tooltipLookup } =
+            this.getProperties('tooltipColors', 'tooltipLabels', 'tooltipLookup');
 
-          const tooltip = this.buildTooltip.create();
-
-          return tooltip.compute({
-            entities,
-            timeseries,
+          return buildTooltip(
+            tooltipColors,
+            tooltipLabels,
+            tooltipLookup,
             hoverUrns,
-            hoverTimestamp: t.valueOf()
-          });
+            t.valueOf());
         }
       };
+    }
+  ),
+
+  tooltipLookup: Ember.computed(
+    'timeseries',
+    'selectedUrns',
+    function () {
+      const { timeseries, selectedUrns } = this.getProperties('timeseries', 'selectedUrns');
+      return getTimeseriesLookup(timeseries, selectedUrns);
+    }
+  ),
+
+  tooltipLabels: Ember.computed(
+    'entities',
+    'selectedUrns',
+    function () {
+      const { entities, selectedUrns } = this.getProperties('entities', 'selectedUrns');
+      return getLabels(entities, selectedUrns);
+    }
+  ),
+
+  tooltipColors: Ember.computed(
+    'entities',
+    'selectedUrns',
+    function () {
+      const { entities, selectedUrns } = this.getProperties('entities', 'selectedUrns');
+      return getColors(entities, selectedUrns);
     }
   ),
 
