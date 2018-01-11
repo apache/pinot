@@ -17,7 +17,7 @@ const getUrns = (urns) => {
 /**
  * Return the labels for the hovered urns
  */
-const getLabel = (entities, hoverUrns) => {
+export function getLabels(entities, hoverUrns) {
   const metricUrns = filterPrefix(hoverUrns, 'thirdeye:metric:');
   const eventUrns = filterPrefix(hoverUrns, 'thirdeye:event:');
   const labels = {};
@@ -25,23 +25,25 @@ const getLabel = (entities, hoverUrns) => {
   eventUrns.forEach(urn => labels[urn] = entities[urn].label);
 
   return labels;
-};
+}
 
 /**
  * Returns an Object mapping the urns to the timeseries
  * @param {Object} timeseries - all time series
  * @param {Array} hoverUrns   - list of hovered urns
  */
-const getTimeseriesLookup = (timeseries, hoverUrns) => {
+export function getTimeseriesLookup(timeseries, hoverUrns) {
   const frontendUrns = filterPrefix(hoverUrns, 'frontend:metric:');
   const lookup = {};
   frontendUrns.forEach(urn => {
     const ts = timeseries[urn];
-    lookup[urn] = ts.timestamps.map((t, i) => [parseInt(t, 10), ts.values[i]]);
+    const timestamps = ts.timestamps.filter((t, i) => ts.values[i] !== null);
+    const values = ts.values.filter(v => v !== null);
+    lookup[urn] = timestamps.map((t, i) => [parseInt(t, 10), values[i]]).reverse();
   });
 
   return lookup;
-};
+}
 
 /**
  * Returns an Mapping of urns to timeseries values
@@ -49,7 +51,7 @@ const getTimeseriesLookup = (timeseries, hoverUrns) => {
  * @param {Number} hoverTimestamp - hovered time in unix ms
  * @param {Object} lookup         - the mapping object
  */
-const getValues = (hoverUrns, hoverTimestamp, lookup) => {
+export function getValues(hoverUrns, hoverTimestamp, lookup) {
   const metricUrns = filterPrefix(hoverUrns, 'thirdeye:metric:');
 
   hoverTimestamp = parseInt(hoverTimestamp, 10);
@@ -57,12 +59,14 @@ const getValues = (hoverUrns, hoverTimestamp, lookup) => {
   const values = {};
   metricUrns.forEach(urn => {
     // find first smaller or equal element
-    const currentLookup = (lookup[toCurrentUrn(urn)] || []).reverse();
-    const currentTimeseries = currentLookup.find(t => t[0] <= hoverTimestamp && t[1] != null);
+    // NOTE: if speedup required, use binary search
+
+    const currentLookup = lookup[toCurrentUrn(urn)] || [];
+    const currentTimeseries = currentLookup.find(t => t[0] <= hoverTimestamp);
     const current = currentTimeseries ? currentTimeseries[1] : parseFloat('NaN');
 
-    const baselineLookup = (lookup[toBaselineUrn(urn)] || []).reverse();
-    const baselineTimeseries = baselineLookup.find(t => t[0] <= hoverTimestamp && t[1] != null);
+    const baselineLookup = lookup[toBaselineUrn(urn)] || [];
+    const baselineTimeseries = baselineLookup.find(t => t[0] <= hoverTimestamp);
     const baseline = baselineTimeseries ? baselineTimeseries[1] : parseFloat('NaN');
 
     const change = current / baseline - 1;
@@ -83,77 +87,71 @@ const getValues = (hoverUrns, hoverTimestamp, lookup) => {
   });
 
   return values;
-};
+}
 
 /**
  * Return an Mapping of urns to colors
  */
-const getColors = (entities, hoverUrns) => {
+export function getColors(entities, hoverUrns) {
   return filterPrefix(hoverUrns, ['thirdeye:metric:', 'thirdeye:event:'])
     .filter(urn => entities[stripTail(urn)])
     .reduce((agg, urn) => {
       agg[urn] = entities[stripTail(urn)].color;
       return agg;
     }, {});
-};
+}
 
 /**
  * returns an html template for the tooltip
  */
-export default Helper.extend({
-  compute(hash) {
-    const {
-      entities,
-      timeseries,
-      hoverUrns,
-      hoverTimestamp
-    } = hash;
+export function buildTooltip(colors, labels, lookup, hoverUrns, hoverTimestamp) {
+  const [ metricUrns, eventUrns ] = getUrns(hoverUrns);
+  const humanTimeStamp = moment(hoverTimestamp).format('MMM DD, hh:mm a');
 
-    const [ metricUrns, eventUrns ] = getUrns(hoverUrns);
-    const humanTimeStamp = moment(hoverTimestamp).format('MMM DD, hh:mm a');
+  const values = getValues(hoverUrns, hoverTimestamp, lookup);
 
-    // TODO cache these things for performance
-    const labels = getLabel(entities, hoverUrns);
-    const lookup = getTimeseriesLookup(timeseries, hoverUrns);
-    const values = getValues(hoverUrns, hoverTimestamp, lookup);
-    const colors = getColors(entities, hoverUrns);
-
-    /** TODO: abstract the js out of the template */
-    return htmlSafe(`
-      <div class="te-tooltip">
-        <h5 class="te-tooltip__header">${humanTimeStamp} (PDT)</h5>
-        <div class="te-tooltip__body">
-          ${metricUrns.map((urn) => {
+  /** TODO: abstract the js out of the template */
+  return htmlSafe(`
+    <div class="te-tooltip">
+      <h5 class="te-tooltip__header">${humanTimeStamp} (PDT)</h5>
+      <div class="te-tooltip__body">
+        ${metricUrns.map((urn) => {
+          return `
+            <div class="te-tooltip__item">
+              <div class="te-tooltip__indicator">
+                <span class="entity-indicator entity-indicator--flat entity-indicator--${colors[urn]}"></span>
+              </div>
+              <span class="te-tooltip__label">${labels[urn]}</span>
+              <span class="te-tooltip__value te-tooltip__value--${values[urn].color}">
+                ${values[urn].delta}
+              </span>
+            </div>
+            <div class="te-tooltip__item--indent te-tooltip__item--small">
+              <span>Current/Baseline: </span> 
+              <span class="te-tooltip__value">${values[urn].current} / ${values[urn].baseline}</span>
+            </div>
+          `;
+        }).join('')}
+        <div class="te-tooltip__events ${(!eventUrns.length) ? 'te-tooltip__events--hidden' : ''}">
+          ${eventUrns.map((urn) => {
             return `
               <div class="te-tooltip__item">
-                <div class="te-tooltip__indicator">
-                  <span class="entity-indicator entity-indicator--flat entity-indicator--${colors[urn]}"></span>
+                <div>
+                  <span class="entity-indicator entity-indicator--${colors[urn]}"></span>
                 </div>
                 <span class="te-tooltip__label">${labels[urn]}</span>
-                <span class="te-tooltip__value te-tooltip__value--${values[urn].color}">
-                  ${values[urn].delta}
-                </span>
-              </div>
-              <div class="te-tooltip__item--indent te-tooltip__item--small">
-                <span>Current/Baseline: </span> 
-                <span class="te-tooltip__value">${values[urn].current} / ${values[urn].baseline}</span>
               </div>
             `;
           }).join('')}
-          <div class="te-tooltip__events ${(!eventUrns.length) ? 'te-tooltip__events--hidden' : ''}">
-            ${eventUrns.map((urn) => {
-              return `
-                <div class="te-tooltip__item">
-                  <div>
-                    <span class="entity-indicator entity-indicator--${colors[urn]}"></span>
-                  </div>
-                  <span class="te-tooltip__label">${labels[urn]}</span>
-                </div>
-              `;
-            }).join('')}
-          </div>
         </div>
       </div>
-    `);
-  }
+    </div>
+  `);
+}
+
+export default Helper.helper({
+  getColors,
+  getLabels,
+  getTimeseriesLookup,
+  buildTooltip
 });
