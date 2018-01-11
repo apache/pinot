@@ -50,7 +50,7 @@ public class QueryTask implements Runnable{
                 float randomLikelihood = rand.nextFloat();
 
                 for (int i = 0; i < likelihood.length; i++) {
-                    if (randomLikelihood < likelihood[i]) {
+                    if (randomLikelihood <= likelihood[i]) {
                         generateAndRunQuery(i);
                         break;
                     }
