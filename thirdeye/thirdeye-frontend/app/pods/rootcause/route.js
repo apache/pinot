@@ -104,8 +104,8 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       granularity: '1_HOURS',
       anomalyRangeStart:  moment(maxTime).subtract(3, 'hours').valueOf(),
       anomalyRangeEnd: moment(maxTime).valueOf(),
-      analysisRangeStart: moment(maxTime).endOf('day').subtract(1, 'week').valueOf(),
-      analysisRangeEnd: moment(maxTime).endOf('day').valueOf(),
+      analysisRangeStart: moment(maxTime).endOf('day').subtract(1, 'week').valueOf() + 1,
+      analysisRangeEnd: moment(maxTime).endOf('day').valueOf() + 1,
       compareMode: 'WoW'
     };
     let { queryParams } = transition;

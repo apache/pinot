@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toColor, checkStatus, toFilters, appendFilters } from 'thirdeye-frontend/helpers/utils';
+import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toOffsetUrn, toColor, checkStatus, toFilters, appendFilters } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
 import _ from 'lodash';
@@ -113,7 +113,11 @@ export default Ember.Controller.extend({
         const metricUrns = new Set(filterPrefix(Object.keys(entities), 'thirdeye:metric:'));
         const currentUrns = [...metricUrns].map(toCurrentUrn);
         const baselineUrns = [...metricUrns].map(toBaselineUrn);
-        aggregatesService.request(context, new Set(currentUrns.concat(baselineUrns)));
+
+        const offsets = ['wo1w', 'wo2w', 'wo3w', 'wo4w'];
+        const offsetUrns = [...metricUrns].map(urn => [].concat(offsets.map(offset => toOffsetUrn(urn, offset)))).reduce((agg, l) => agg.concat(l), []);
+
+        aggregatesService.request(context, new Set([...currentUrns, ...baselineUrns, ...offsetUrns]));
       }
     }
   ),

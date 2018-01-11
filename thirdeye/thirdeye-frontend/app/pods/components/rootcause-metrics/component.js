@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toCurrentUrn, toBaselineUrn, hasPrefix, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, toOffsetUrn, hasPrefix, filterPrefix } from 'thirdeye-frontend/helpers/utils';
 
 const ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC = 'metric';
 const ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET = 'dataset';
@@ -104,12 +104,42 @@ export default Ember.Component.extend({
     'entities',
     'aggregates',
     function () {
-      const { entities, aggregates } = this.getProperties('entities', 'aggregates');
-      return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
-        .reduce((agg, urn) => {
-          agg[urn] = aggregates[toCurrentUrn(urn)] / aggregates[toBaselineUrn(urn)] - 1;
-          return agg;
-        }, {});
+      const { entities, aggregates } = this.getProperties('entities', 'aggregates'); // poll observer
+      return this._changesOffset('baseline');
+    }
+  ),
+
+  changesFormatted: Ember.computed(
+    'changes',
+    function () {
+      const { changes } = this.getProperties('changes');
+      return this._changesFormatted(changes);
+    }
+  ),
+
+  changesOffset: Ember.computed(
+    'entities',
+    'aggregates',
+    function () {
+      const { entities, aggregates } = this.getProperties('entities', 'aggregates'); // poll observer
+
+      const offsets = ['wo1w', 'wo2w', 'wo3w', 'wo4w', 'baseline'];
+      const dict = {}
+      offsets.forEach(offset => dict[offset] = this._changesOffset(offset));
+
+      return dict;
+    }
+  ),
+
+  changesOffsetFormatted: Ember.computed(
+    'changesOffset',
+    function () {
+      const { changesOffset } = this.getProperties('changesOffset');
+
+      const dict = {};
+      Object.keys(changesOffset).forEach(offset => dict[offset] = this._changesFormatted(changesOffset[offset]));
+
+      return dict;
     }
   ),
 
@@ -125,22 +155,32 @@ export default Ember.Component.extend({
     }
   ),
 
-  changesFormatted: Ember.computed(
-    'changes',
-    function () {
-      const { changes } = this.getProperties('changes');
-      return Object.keys(changes).reduce((agg, urn) => {
-        const value = changes[urn];
-        const sign = value > 0 ? '+' : '';
-        if (Math.abs(value) > 5) {
-          agg[urn] = 'spike';
-        } else {
-          agg[urn] = sign + (value * 100).toFixed(2) + '%';
-        }
+  _changesOffset(offset) {
+    const { entities, aggregates } = this.getProperties('entities', 'aggregates');
+    return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
+      .reduce((agg, urn) => {
+      agg[urn] = aggregates[toCurrentUrn(urn)] / aggregates[toOffsetUrn(urn, offset)] - 1;
+      return agg;
+    }, {});
+  },
+
+  _changesFormatted(changes) {
+    return Object.keys(changes).reduce((agg, urn) => {
+      const value = changes[urn];
+      if (Number.isNaN(value)) {
+        agg[urn] = '-';
         return agg;
-      }, {});
-    }
-  ),
+      }
+
+      const sign = value > 0 ? '+' : '';
+      if (Math.abs(value) > 5) {
+        agg[urn] = 'spike';
+      } else {
+        agg[urn] = sign + (value * 100).toFixed(2) + '%';
+      }
+      return agg;
+    }, {});
+  },
 
   actions: {
     /**
