@@ -28,6 +28,7 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +64,9 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
   public static final String IS_ACTIVE = DefaultDetectionOnboardJob.FUNCTION_IS_ACTIVE;
   public static final String CRON_EXPRESSION = DefaultDetectionOnboardJob.CRON_EXPRESSION;
   public static final String ALERT_FILTER_PATTERN = DefaultDetectionOnboardJob.AUTOTUNE_PATTERN;
-  public static final String ALERT_FILTER_SENSITIVITY_LEVEL = DefaultDetectionOnboardJob.AUTOTUNE_SENSITIVITY_LEVEL;
+  public static final String ALERT_FILTER_TYPE = DefaultDetectionOnboardJob.AUTOTUNE_TYPE;
+  public static final String ALERT_FILTER_FEATURES = DefaultDetectionOnboardJob.AUTOTUNE_FEATURES;
+  public static final String ALERT_FILTER_MTTD = DefaultDetectionOnboardJob.AUTOTUNE_MTTD;
   public static final String ALERT_ID = DefaultDetectionOnboardJob.ALERT_ID;
   public static final String ALERT_NAME = DefaultDetectionOnboardJob.ALERT_NAME;
   public static final String ALERT_CRON = DefaultDetectionOnboardJob.ALERT_CRON;
@@ -76,7 +79,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
   public static final String DEFAULT_WINDOW_DELAY = "0";
   public static final String DEFAULT_ALERT_CRON = "0 0/5 * 1/1 * ? *"; // Every 5 min
   public static final String DEFAULT_ALERT_FILTER_PATTERN = AlertFilterAutoTuneOnboardingTask.DEFAULT_AUTOTUNE_PATTERN;
-  public static final String DEFAULT_ALERT_FILTER_SENSITIVITY_LEVEL = AlertFilterAutoTuneOnboardingTask.DEFAULT_AUTOTUNE_SENSITIVITY_LEVEL;
+  public static final String DEFAULT_ALERT_FILTER_TYPE = "AUTOTUNE";
 
   private AnomalyFunctionManager anoomalyFunctionDAO;
   private AlertConfigManager alertConfigDAO;
@@ -123,21 +126,17 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     }
 
     // check if duplicate name exists
-    List<AnomalyFunctionDTO> duplicateFunctions = anoomalyFunctionDAO.findWhereNameLike(configuration.getString(FUNCTION_NAME));
-    for (AnomalyFunctionDTO duplicateFunction : duplicateFunctions) {
-      if (duplicateFunction.getFunctionName().equals(configuration.getString(FUNCTION_NAME))) {
-        throw new IllegalArgumentException("Duplicate function name " + configuration.getString(FUNCTION_NAME)
-            + " is found");
-      }
+    AnomalyFunctionDTO duplicateFunction = anoomalyFunctionDAO.findWhereNameEquals(configuration.getString(FUNCTION_NAME));
+    if (duplicateFunction != null) {
+      throw new IllegalArgumentException("Duplicate function name " + configuration.getString(FUNCTION_NAME)
+          + " is found");
     }
 
-    if (configuration.getString(ALERT_NAME) != null) {
-      List<AlertConfigDTO> duplicateAlerts = alertConfigDAO.findWhereNameLike(configuration.getString(ALERT_NAME));
-      for (AlertConfigDTO duplicateAlert : duplicateAlerts) {
-        if (duplicateAlert.getName().equals(configuration.getString(ALERT_NAME))) {
-          throw new IllegalArgumentException("Duplicate alert name " + configuration.getString(ALERT_NAME)
-              + " is found");
-        }
+    if (StringUtils.isNotBlank(configuration.getString(ALERT_NAME))) {
+      AlertConfigDTO duplicateAlert = alertConfigDAO.findWhereNameEquals(configuration.getString(ALERT_NAME));
+      if (duplicateAlert != null) {
+        throw new IllegalArgumentException("Duplicate alert name " + configuration.getString(ALERT_NAME)
+            + " is found");
       }
     }
 
@@ -148,13 +147,15 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     }
     TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     TimeGranularity dataGranularity = timeSpec.getDataGranularity();
-    TimeGranularity userAssignedDataGranularity = null;
-    try{
-      userAssignedDataGranularity = TimeGranularity.fromString(configuration.getString(DATA_GRANULARITY));
-    } catch (Exception e) {
-      LOG.warn("Unable to parse user input data granularity: {}; use default from dataset config", configuration.getString(DATA_GRANULARITY));
-    }
-    if (userAssignedDataGranularity != null) {
+    if (configuration.containsKey(DATA_GRANULARITY)) {
+      TimeGranularity userAssignedDataGranularity = null;
+      try {
+        userAssignedDataGranularity = TimeGranularity.fromString(configuration.getString(DATA_GRANULARITY));
+      } catch (Exception e) {
+        LOG.warn("Unable to parse user input data granularity: {}; use default from dataset config",
+            configuration.getString(DATA_GRANULARITY));
+        throw new IllegalArgumentException("Unsupported time granularity: " + configuration.getString(DATA_GRANULARITY));
+      }
       dataGranularity = userAssignedDataGranularity;
     }
 
@@ -192,8 +193,13 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     // Assign Default Alert Filter
     Map<String, String> alertFilter = new HashMap<>();
     alertFilter.put(ALERT_FILTER_PATTERN, configuration.getString(ALERT_FILTER_PATTERN, DEFAULT_ALERT_FILTER_PATTERN));
-    alertFilter.put(ALERT_FILTER_SENSITIVITY_LEVEL, configuration.getString(ALERT_FILTER_SENSITIVITY_LEVEL,
-          DEFAULT_ALERT_FILTER_SENSITIVITY_LEVEL));
+    alertFilter.put(ALERT_FILTER_TYPE, configuration.getString(ALERT_FILTER_TYPE, DEFAULT_ALERT_FILTER_TYPE));
+    if (configuration.containsKey(ALERT_FILTER_FEATURES)) {
+      alertFilter.put(ALERT_FILTER_FEATURES, configuration.getString(ALERT_FILTER_FEATURES));
+    }
+    if (configuration.containsKey(ALERT_FILTER_MTTD)) {
+      alertFilter.put(ALERT_FILTER_MTTD, configuration.getString(ALERT_FILTER_MTTD));
+    }
     anomalyFunction.setAlertFilter(alertFilter);
     this.anoomalyFunctionDAO.update(anomalyFunction);
 

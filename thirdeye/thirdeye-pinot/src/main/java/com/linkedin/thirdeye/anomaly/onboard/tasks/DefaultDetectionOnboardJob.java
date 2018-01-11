@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardJob;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnBoardJobRunner;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardTask;
 import com.linkedin.thirdeye.anomaly.onboard.utils.PropertyCheckUtils;
+import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.util.ArrayList;
@@ -53,8 +54,12 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   public static final String ALERT_APPLICATION = "application";
   public static final String ANOMALY_FUNCTION_CONFIG = "anomalyFuncitonConfig";
   public static final String ALERT_CONFIG = "alertConfig";
-  public static final String AUTOTUNE_PATTERN = "pattern";
-  public static final String AUTOTUNE_SENSITIVITY_LEVEL = "sensitivity";
+  public static final String AUTOTUNE_PATTERN = DetectionJobResource.AUTOTUNE_PATTERN_KEY;
+  public static final String AUTOTUNE_TYPE = "autoTuneType";
+  public static final String AUTOTUNE_FEATURES = DetectionJobResource.AUTOTUNE_FEATURE_KEY;
+  public static final String AUTOTUNE_MTTD = DetectionJobResource.AUTOTUNE_MTTD_KEY;
+  public static final String HOLIDAY_STARTS = "holidayStarts";
+  public static final String HOLIDAY_ENDS = "holidayEnds";
   public static final String REMOVE_ANOMALY_IN_WINDOW = "removeAnomaliesInWindow";
   public static final String PERIOD = "period";
   public static final String START = "start";
@@ -150,6 +155,18 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     if (this.properties.containsKey(FUNCTION_IS_ACTIVE)) {
       taskConfigs.put(taskPrefix + FUNCTION_IS_ACTIVE, this.properties.get(FUNCTION_IS_ACTIVE));
     }
+    if (this.properties.containsKey(AUTOTUNE_PATTERN)) {
+      taskConfigs.put(taskPrefix + AUTOTUNE_PATTERN, this.properties.get(AUTOTUNE_PATTERN));
+    }
+    if (this.properties.containsKey(AUTOTUNE_TYPE)) {
+      taskConfigs.put(taskPrefix + AUTOTUNE_TYPE, this.properties.get(AUTOTUNE_TYPE));
+    }
+    if (this.properties.containsKey(AUTOTUNE_FEATURES)) {
+      taskConfigs.put(taskPrefix + AUTOTUNE_FEATURES, this.properties.get(AUTOTUNE_FEATURES));
+    }
+    if (this.properties.containsKey(AUTOTUNE_MTTD)) {
+      taskConfigs.put(taskPrefix + AUTOTUNE_MTTD, this.properties.get(AUTOTUNE_MTTD));
+    }
     taskConfigs.put(taskPrefix + CRON_EXPRESSION, this.properties.get(CRON_EXPRESSION));
     if (this.properties.containsKey(ALERT_ID)) {
       taskConfigs.put(taskPrefix + ALERT_ID, this.properties.get(ALERT_ID));
@@ -208,8 +225,20 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     if (this.properties.containsKey(AUTOTUNE_PATTERN)) {
       taskConfigs.put (taskPrefix + AUTOTUNE_PATTERN, this.properties.get(AUTOTUNE_PATTERN));
     }
-    if (this.properties.containsKey(AUTOTUNE_SENSITIVITY_LEVEL)) {
-      taskConfigs.put (taskPrefix + AUTOTUNE_SENSITIVITY_LEVEL, this.properties.get(AUTOTUNE_SENSITIVITY_LEVEL));
+    if (this.properties.containsKey(AUTOTUNE_TYPE)) {
+      taskConfigs.put (taskPrefix + AUTOTUNE_TYPE, this.properties.get(AUTOTUNE_TYPE));
+    }
+    if (this.properties.containsKey(AUTOTUNE_FEATURES)) {
+      taskConfigs.put (taskPrefix + AUTOTUNE_FEATURES, this.properties.get(AUTOTUNE_FEATURES));
+    }
+    if (this.properties.containsKey(AUTOTUNE_MTTD)) {
+      taskConfigs.put (taskPrefix + AUTOTUNE_MTTD, this.properties.get(AUTOTUNE_MTTD));
+    }
+    if (this.properties.containsKey(HOLIDAY_STARTS)) {
+      taskConfigs.put (taskPrefix + HOLIDAY_STARTS, this.properties.get(HOLIDAY_STARTS));
+    }
+    if (this.properties.containsKey(HOLIDAY_ENDS)) {
+      taskConfigs.put (taskPrefix + HOLIDAY_ENDS, this.properties.get(HOLIDAY_ENDS));
     }
 
     taskPrefix = NotificationOnboardingTask.TASK_NAME + ".";
