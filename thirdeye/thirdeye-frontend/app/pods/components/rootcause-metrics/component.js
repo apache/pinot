@@ -38,6 +38,9 @@ export default Ember.Component.extend({
     this.setProperties({ sortProperty: ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE, sortMode: ROOTCAUSE_METRICS_SORT_MODE_ASC });
   },
 
+  /**
+   * List of metric urns, sorted by sortMode.
+   */
   urns: Ember.computed(
     'entities',
     'metrics',
@@ -76,6 +79,9 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Metric labels, keyed by urn
+   */
   metrics: Ember.computed(
     'entities',
     function () {
@@ -88,6 +94,9 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Dataset labels, keyed by metric urn
+   */
   datasets: Ember.computed(
     'entities',
     function () {
@@ -100,6 +109,9 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Change values from baseline to current time range, keyed by metric urn
+   */
   changes: Ember.computed(
     'entities',
     'aggregates',
@@ -109,6 +121,9 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Formatted change strings for 'changes'
+   */
   changesFormatted: Ember.computed(
     'changes',
     function () {
@@ -117,6 +132,9 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Change values from multiple offsets to current time range, keyed by offset, then by metric urn
+   */
   changesOffset: Ember.computed(
     'entities',
     'aggregates',
@@ -131,6 +149,9 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Formatted change strings for 'changesOffset'
+   */
   changesOffsetFormatted: Ember.computed(
     'changesOffset',
     function () {
@@ -143,6 +164,9 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Anomalyity scores, keyed by metric urn
+   */
   scores: Ember.computed(
     'entities',
     function () {
@@ -155,6 +179,12 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Compute changes from a given offset to the current time range, as a fraction.
+   *
+   * @param {String} offset time range offset, e.g. 'baseline', 'wow', 'wo2w', ...
+   * @returns {Object} change values, keyed by metric urn
+   */
   _computeChangesForOffset(offset) {
     const { entities, aggregates } = this.getProperties('entities', 'aggregates');
     return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
@@ -164,6 +194,12 @@ export default Ember.Component.extend({
     }, {});
   },
 
+  /**
+   * Format changes dict with sign and decimals and gracefully handle outliers
+   *
+   * @param {Object} changes change values, keyed by metric urn
+   * @returns {Object} formatted change strings
+   */
   _formatChanges(changes) {
     return Object.keys(changes).reduce((agg, urn) => {
       const value = changes[urn];
