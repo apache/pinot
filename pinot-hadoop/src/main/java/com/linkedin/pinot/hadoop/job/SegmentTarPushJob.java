@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.hadoop.job;
 
+import com.linkedin.pinot.common.utils.FileUploadUtils;
 import java.io.InputStream;
 import java.util.Properties;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileStatus;
@@ -26,16 +26,12 @@ import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-
 
 public class SegmentTarPushJob extends Configured {
 
   private String _segmentPath;
   private String[] _hosts;
-  private String _port;
-  public static final int MAX_RETRIES = 5;
-  public static final int SLEEP_BETWEEN_RETRIES_IN_SECONDS = 60;
+  private int _port;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentTarPushJob.class);
 
@@ -43,8 +39,7 @@ public class SegmentTarPushJob extends Configured {
     super(new Configuration());
     _segmentPath = properties.getProperty("path.to.output") + "/";
     _hosts = properties.getProperty("push.to.hosts").split(",");
-    _port = properties.getProperty("push.to.port");
-
+    _port = Integer.parseInt(properties.getProperty("push.to.port"));
   }
 
   public void run() throws Exception {
@@ -59,7 +54,6 @@ public class SegmentTarPushJob extends Configured {
         pushOneTarFile(fs, fileStatus.getPath());
       }
     }
-
   }
 
   public void pushDir(FileSystem fs, Path path) throws Exception {
@@ -80,51 +74,18 @@ public class SegmentTarPushJob extends Configured {
       return;
     }
     for (String host : _hosts) {
-      InputStream inputStream = null;
-      try {
-        inputStream = fs.open(path);
+      try (InputStream inputStream = fs.open(path)) {
         fileName = fileName.split(".tar")[0];
         LOGGER.info("******** Upoading file: {} to Host: {} and Port: {} *******", fileName, host, _port);
         try {
-          InputStream is = fs.open(path);
-          int responseCode = FileUploadUtils.sendSegment(
-              host + ":" + _port, fileName, /* pushTimeoutMs */ 60000, is, 5, /* sleepTimeSec */ 60);
+          int responseCode = FileUploadUtils.uploadSegment(host, _port, fileName, inputStream);
           LOGGER.info("Response code: {}", responseCode);
         } catch (Exception e) {
           LOGGER.error("******** Error Upoading file: {} to Host: {} and Port: {}  *******", fileName, host, _port);
           LOGGER.error("Caught exception during upload", e);
           throw new RuntimeException("Got Error during send tar files to push hosts!");
         }
-      } finally {
-        inputStream.close();
       }
     }
   }
-
-  public static int sendSegmentFile(final String host, final String port, final String fileName,
-      final FileSystem fs, final Path path) {
-    int retval = 0;
-    for (int numRetries = 0; ; numRetries++) {
-      try {
-        InputStream inputStream = fs.open(path);
-        long length = fs.getFileStatus(path).getLen();
-        retval = FileUploadUtils.sendSegmentFile(host, port, fileName, inputStream, length);
-        break;
-      } catch (Exception e) {
-        if (numRetries >= MAX_RETRIES) {
-          throw new RuntimeException(e);
-        }
-        LOGGER.warn("Retry " + numRetries + " of Upload of File " + fileName + " to host " + host
-            + " after error trying to send file ");
-        try {
-          Thread.sleep(SLEEP_BETWEEN_RETRIES_IN_SECONDS * 1000);
-        } catch (Exception e1) {
-          LOGGER.error("Upload of File " + fileName + " to host " + host + " interrupted while waiting to retry after error");
-          throw new RuntimeException(e1);
-        }
-      }
-    }
-    return retval;
-  }
-
 }

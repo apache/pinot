@@ -28,9 +28,9 @@ import com.linkedin.pinot.common.segment.fetcher.SegmentFetcher;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.PinotMinionUserAgentHeader;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.PinotMinionUserAgentHeader;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -285,7 +285,7 @@ public class PinotSegmentUploadRestletResource {
       tempSegmentDir.deleteOnExit();
 
       // Get upload type
-      List<String> uploadTypes = headers.getRequestHeader(FileUploadUtils.UPLOAD_TYPE);
+      List<String> uploadTypes = headers.getRequestHeader(FileUploadUtils.CustomHeaders.UPLOAD_TYPE);
       FileUploadUtils.FileUploadType uploadType = FileUploadUtils.FileUploadType.getDefaultUploadType();
       if (uploadTypes != null && uploadTypes.size() > 0) {
         String uploadTypeStr = uploadTypes.get(0);
@@ -574,10 +574,11 @@ public class PinotSegmentUploadRestletResource {
     return ControllerConf.constructDownloadUrl(tableName, segmentName, provider.getVip());
   }
 
-  private String getDownloadUri(FileUploadUtils.FileUploadType uploadType, HttpHeaders headers, String segmentJsonStr) throws Exception {
+  private String getDownloadUri(FileUploadUtils.FileUploadType uploadType, HttpHeaders headers, String segmentJsonStr)
+      throws Exception {
     switch (uploadType) {
       case URI:
-        return headers.getRequestHeader(FileUploadUtils.DOWNLOAD_URI).get(0);
+        return headers.getRequestHeader(FileUploadUtils.CustomHeaders.DOWNLOAD_URI).get(0);
       case JSON:
         // Get segmentJsonStr
         JSONTokener tokener = new JSONTokener(segmentJsonStr);

@@ -15,79 +15,66 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import com.linkedin.pinot.common.utils.FileUploadUtils.FileUploadType;
+import com.sun.net.httpserver.Headers;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.util.Random;
 import org.apache.commons.io.IOUtils;
-import org.apache.http.protocol.HTTP;
+import org.apache.http.HttpStatus;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.utils.FileUploadUtils.FileUploadType;
-import com.sun.net.httpserver.Headers;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
-
-import static org.testng.AssertJUnit.assertTrue;
 
 
 @Test
 public class FileUploadUtilsTest {
-
   private static final String TEST_HOST = "localhost";
-  private static final String TEST_PORT =
-      "" + (new Random(System.currentTimeMillis()).nextInt(10000) + 10000);
+  private static final int TEST_PORT = new Random().nextInt(10000) + 10000;
   private static final String TEST_URI = "http://testhost/segments/testSegment";
   private static HttpServer TEST_SERVER;
 
   @BeforeClass
   public void setup() throws Exception {
-    TEST_SERVER = HttpServer.create(new InetSocketAddress(Integer.parseInt(TEST_PORT)), 0);
+    TEST_SERVER = HttpServer.create(new InetSocketAddress(TEST_PORT), 0);
     TEST_SERVER.createContext("/segments", new testSegmentUploadHandler());
     TEST_SERVER.setExecutor(null); // creates a default executor
     TEST_SERVER.start();
   }
 
-
   static class testSegmentUploadHandler implements HttpHandler {
-    private int calledJson = 0;
-    private int calledUri = 0;
 
     @Override
     public void handle(HttpExchange httpExchange) throws IOException {
       Headers requestHeaders = httpExchange.getRequestHeaders();
-      String uploadTypeStr = requestHeaders.getFirst(FileUploadUtils.UPLOAD_TYPE);
+      String uploadTypeStr = requestHeaders.getFirst(FileUploadUtils.CustomHeaders.UPLOAD_TYPE);
       FileUploadType uploadType = FileUploadType.valueOf(uploadTypeStr);
-      if (!requestHeaders.getFirst(HTTP.CONTENT_TYPE).equals("application/json")) {
-        sendResponse(httpExchange, 400, "failed");
-      }
 
+      String downloadUri = null;
       if (uploadType == FileUploadType.JSON) {
         InputStream bodyStream = httpExchange.getRequestBody();
-        String requestBody = IOUtils.toString(bodyStream, "UTF-8");
-        com.alibaba.fastjson.JSONObject jsonObject =
-            com.alibaba.fastjson.JSONObject.parseObject(requestBody);
-        Assert.assertEquals(jsonObject.get(CommonConstants.Segment.Offline.DOWNLOAD_URL), TEST_URI);
-        calledJson++;
-        // System.out.println("calledJson = " + calledJson);
-      } else if (uploadType == FileUploadType.URI) {
-        String downloadUri = requestHeaders.getFirst(FileUploadUtils.DOWNLOAD_URI);
+        try {
+          JSONObject jsonObject = new JSONObject(IOUtils.toString(bodyStream, "UTF-8"));
+          downloadUri = (String) jsonObject.get(CommonConstants.Segment.Offline.DOWNLOAD_URL);
+        } catch (JSONException e) {
+          throw new RuntimeException(e);
+        }
         Assert.assertEquals(downloadUri, TEST_URI);
-        calledUri++;
-        // System.out.println("calledUri = " + calledUri);
-      } else if (uploadType == FileUploadType.TAR) {
-        // Do nothing.
+      } else if (uploadType == FileUploadType.URI) {
+        downloadUri = requestHeaders.getFirst(FileUploadUtils.CustomHeaders.DOWNLOAD_URI);
       } else {
-        // Shouldn't reach here
-        Assert.assertTrue(false);
+        Assert.fail();
       }
-      sendResponse(httpExchange, 200, "OK");
+      Assert.assertEquals(downloadUri, TEST_URI);
+      sendResponse(httpExchange, HttpStatus.SC_OK, "OK");
     }
 
     public void sendResponse(HttpExchange httpExchange, int code, String response) throws IOException {
@@ -104,18 +91,15 @@ public class FileUploadUtilsTest {
   }
 
   @Test
-  public void testSendFileWithUri() {
-    int respCode = FileUploadUtils.sendSegmentUri(TEST_HOST, TEST_PORT, TEST_URI, 1, 1);
-    Assert.assertEquals(respCode, 200);
+  public void testSendFileWithUri() throws Exception {
+    Assert.assertEquals(FileUploadUtils.sendSegmentUri(TEST_HOST, TEST_PORT, TEST_URI), HttpStatus.SC_OK);
   }
-
 
   @Test
-  public void testSendFileWithJson() throws JSONException {
+  public void testSendFileWithJson() throws Exception {
     JSONObject segmentJson = new JSONObject();
     segmentJson.put(CommonConstants.Segment.Offline.DOWNLOAD_URL, TEST_URI);
-    int respCode = FileUploadUtils.sendSegmentJson(TEST_HOST, TEST_PORT, segmentJson);
-    Assert.assertEquals(respCode, 200);
+    String jsonString = segmentJson.toString();
+    Assert.assertEquals(FileUploadUtils.sendSegmentJson(TEST_HOST, TEST_PORT, jsonString), HttpStatus.SC_OK);
   }
-
 }

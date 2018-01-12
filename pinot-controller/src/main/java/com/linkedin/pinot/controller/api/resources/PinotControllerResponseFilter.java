@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.controller.api.resources;
 
-import java.io.IOException;
-import java.util.Map;
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
+import java.io.IOException;
 import javax.inject.Singleton;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
@@ -31,52 +30,31 @@ import javax.ws.rs.ext.Provider;
 @Singleton
 @Provider
 public class PinotControllerResponseFilter implements ContainerResponseFilter {
-  private final static String CONTROLLER_COMPONENT = "pinot-controller";
-  private static final String HDR_CONTROLLER_VERSION = "Pinot-Controller-Version";
-  private final static String HDR_CONTROLLER_HOST = "Pinot-Controller-Host";
+  private static final String CONTROLLER_COMPONENT = "pinot-controller";
+  private static final String UNKNOWN = "Unknown";
 
-  private volatile static String controllerHostName = null;
-  private volatile static String controllerVersion = null;
+  private final String _controllerHost;
+  private final String _controllerVersion;
+
+  public PinotControllerResponseFilter() {
+    String controllerHost = NetUtil.getHostnameOrAddress();
+    if (controllerHost != null) {
+      _controllerHost = controllerHost;
+    } else {
+      _controllerHost = UNKNOWN;
+    }
+    String controllerVersion = Utils.getComponentVersions().get(CONTROLLER_COMPONENT);
+    if (controllerVersion != null) {
+      _controllerVersion = controllerVersion;
+    } else {
+      _controllerVersion = UNKNOWN;
+    }
+  }
 
   @Override
   public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext)
       throws IOException {
-    responseContext.getHeaders().putSingle(HDR_CONTROLLER_HOST, getControllerHostName());
-    responseContext.getHeaders().putSingle(HDR_CONTROLLER_VERSION, getHdrControllerVersion());
-  }
-
-  private String getControllerHostName() {
-    if (controllerHostName != null) {
-      return controllerHostName;
-    }
-
-    synchronized (this) {
-      if (controllerHostName != null) {
-        return controllerHostName;
-      }
-      controllerHostName = NetUtil.getHostnameOrAddress();
-      if (controllerHostName == null) {
-        // In case of a temporary failure, we will go back to getting the right value again.
-        return "unknown";
-      }
-      return controllerHostName;
-    }
-  }
-
-  private String getHdrControllerVersion() {
-    if (controllerVersion != null) {
-      return controllerVersion;
-    }
-    synchronized (this) {
-      if (controllerVersion != null) {
-        return controllerVersion;
-      }
-      Map<String, String> versions = Utils.getComponentVersions();
-      controllerVersion = versions.get(CONTROLLER_COMPONENT);
-      if (controllerVersion == null) {
-        controllerVersion = "Unknown";
-      }
-      return controllerVersion;
-    }
+    responseContext.getHeaders().putSingle(CommonConstants.Controller.HOST_HTTP_HEADER, _controllerHost);
+    responseContext.getHeaders().putSingle(CommonConstants.Controller.VERSION_HTTP_HEADER, _controllerVersion);
   }
 }

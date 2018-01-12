@@ -15,16 +15,16 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
+import com.linkedin.pinot.common.exception.HttpErrorStatusException;
 import com.linkedin.pinot.common.exception.PermanentDownloadException;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.FileDownloadUtils;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
+import java.io.File;
+import java.util.concurrent.Callable;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.util.concurrent.Callable;
 
 import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.*;
 
@@ -48,14 +48,19 @@ public class HttpSegmentFetcher implements SegmentFetcher {
       @Override
       public Boolean call() throws Exception {
         try {
-          final long httpGetResponseContentLength = FileUploadUtils.getFile(uri, tempFile);
-          LOGGER.info(
-              "Downloaded file from {} to {}; Length of httpGetResponseContent: {}; Length of downloaded file: {}", uri,
-              tempFile, httpGetResponseContentLength, tempFile.length());
+          int statusCode = FileDownloadUtils.downloadFile(uri, tempFile);
+          LOGGER.info("Downloaded file from {} to {}; Length of downloaded file: {}; Response status code: {}", uri,
+              tempFile, tempFile.length(), statusCode);
           return true;
-        } catch (PermanentDownloadException e) {
-          LOGGER.error("Failed to download file from {}, won't retry", uri, e);
-          throw e;
+        } catch (HttpErrorStatusException e) {
+          int statusCode = e.getStatusCode();
+          if (statusCode >= 500) {
+            LOGGER.error("Failed to download file from {}, might retry", uri, e);
+            return false;
+          } else {
+            LOGGER.error("Failed to download file from {}, won't retry", uri, e);
+            throw new PermanentDownloadException(e.getMessage());
+          }
         } catch (Exception e) {
           LOGGER.error("Failed to download file from {}, might retry", uri, e);
           return false;
@@ -63,5 +68,4 @@ public class HttpSegmentFetcher implements SegmentFetcher {
       }
     });
   }
-
 }

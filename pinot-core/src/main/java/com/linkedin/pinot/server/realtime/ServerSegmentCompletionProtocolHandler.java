@@ -17,6 +17,8 @@
 
 package com.linkedin.pinot.server.realtime;
 
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -36,7 +38,6 @@ import org.apache.commons.httpclient.methods.multipart.PartSource;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 
 
 /**
@@ -160,8 +161,8 @@ public class ServerSegmentCompletionProtocolHandler {
     try {
       int responseCode = httpClient.executeMethod(postMethod);
       // TODO Pick these up from constants defined in a common place.
-      Header controllerHostNameHdr =  postMethod.getResponseHeader("Pinot-Controller-Host");
-      Header controllerVersionHdr = postMethod.getResponseHeader("Pinot-Controller-Version");
+      Header controllerHostNameHdr =  postMethod.getResponseHeader(CommonConstants.Controller.HOST_HTTP_HEADER);
+      Header controllerVersionHdr = postMethod.getResponseHeader(CommonConstants.Controller.VERSION_HTTP_HEADER);
 
       if (responseCode >= 300) {
         LOGGER.error("Bad controller response code {} for {} from {}, version {}", responseCode, request,

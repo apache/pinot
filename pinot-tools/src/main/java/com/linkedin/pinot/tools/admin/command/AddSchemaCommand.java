@@ -15,18 +15,15 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
-import com.linkedin.pinot.tools.Command;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-
-import org.kohsuke.args4j.Option;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.tools.Command;
+import java.io.File;
+import java.io.FileNotFoundException;
+import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class AddSchemaCommand extends AbstractBaseAdminCommand implements Command {
@@ -116,8 +113,7 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
 
     Schema s = Schema.fromFile(schemaFile);
 
-    FileUploadUtils.sendFile(_controllerHost, _controllerPort, "schemas", s.getSchemaName(), new FileInputStream(
-        schemaFile), schemaFile.length(), FileUploadUtils.SendFileMethod.POST);
+    FileUploadUtils.addSchema(_controllerHost, Integer.parseInt(_controllerPort), s.getSchemaName(), schemaFile);
 
     return true;
   }

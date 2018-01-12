@@ -40,7 +40,6 @@ import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
 import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 import java.io.File;
-import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -202,13 +201,11 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void addSchema(File schemaFile, String schemaName) throws Exception {
-    FileUploadUtils.sendFile(LOCAL_HOST, Integer.toString(_controllerPort), "schemas", schemaName,
-        new FileInputStream(schemaFile), schemaFile.length(), FileUploadUtils.SendFileMethod.POST);
+    FileUploadUtils.addSchema(LOCAL_HOST, _controllerPort, schemaName, schemaFile);
   }
 
   protected void updateSchema(File schemaFile, String schemaName) throws Exception {
-    FileUploadUtils.sendFile(LOCAL_HOST, Integer.toString(_controllerPort), "schemas/" + schemaName, schemaName,
-        new FileInputStream(schemaFile), schemaFile.length(), FileUploadUtils.SendFileMethod.PUT);
+    FileUploadUtils.updateSchema(LOCAL_HOST, _controllerPort, schemaName, schemaFile);
   }
 
   /**
@@ -216,13 +213,12 @@ public abstract class ClusterTest extends ControllerTest {
    *
    * @param segmentDir Segment directory
    */
-  protected void uploadSegments(@Nonnull File segmentDir) {
+  protected void uploadSegments(@Nonnull File segmentDir) throws Exception {
     String[] segmentNames = segmentDir.list();
     Assert.assertNotNull(segmentNames);
     for (String segmentName : segmentNames) {
       File segmentFile = new File(segmentDir, segmentName);
-      FileUploadUtils.sendSegmentFile(LOCAL_HOST, Integer.toString(_controllerPort), segmentName, segmentFile,
-          segmentFile.length());
+      FileUploadUtils.uploadSegment(LOCAL_HOST, _controllerPort, segmentName, segmentFile);
     }
   }
 
