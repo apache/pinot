@@ -77,7 +77,7 @@ export default Ember.Controller.extend({
       invisibleUrns: new Set(),
       hoverUrns: new Set(),
       filteredUrns: new Set(),
-      activeTab: ROOTCAUSE_TAB_DIMENSIONS,
+      activeTab: ROOTCAUSE_TAB_METRICS,
       timeseriesMode: 'absolute'
     });
   },
