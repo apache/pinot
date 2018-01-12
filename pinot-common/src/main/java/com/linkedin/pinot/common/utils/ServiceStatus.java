@@ -75,6 +75,18 @@ public class ServiceStatus {
     }
   }
 
+  public static String getStatusDescription() {
+    if (serviceStatusCallback == null) {
+      return STATUS_DESCRIPTION_INIT;
+    } else {
+      try {
+        return serviceStatusCallback.getStatusDescription();
+      } catch (Exception e) {
+        return "Exception: " + e.getMessage();
+      }
+    }
+  }
+
   public static class MultipleCallbackServiceStatusCallback implements ServiceStatusCallback {
     private final List<? extends ServiceStatusCallback> _statusCallbacks;
 
@@ -185,8 +197,10 @@ public class ServiceStatus {
       if (_finishedStartingUp) {
         return Status.GOOD;
       }
+      int index = 0;
 
       for (String resourceToMonitor : _resourcesToMonitor) {
+        final String completedCountStr = "(" + index + "/" + _resourcesToMonitor.size() + ")";
         // If the instance is already done starting up, skip checking its state
         if (_resourcesDoneStartingUp.contains(resourceToMonitor)) {
           continue;
@@ -196,7 +210,7 @@ public class ServiceStatus {
         T helixState = getState(resourceToMonitor);
 
         if (idealState == null || helixState == null) {
-          _statusDescription = "idealState or helixState is null";
+          _statusDescription = "idealState or helixState is null" + completedCountStr;
           return Status.STARTING;
         }
 
@@ -207,7 +221,8 @@ public class ServiceStatus {
 
         Map<String, String> statePartitionStateMap = getPartitionStateMap(helixState);
         if(statePartitionStateMap.isEmpty() && !idealState.getPartitionSet().isEmpty()) {
-          _statusDescription = "statePartitionStateMapSize=" + statePartitionStateMap.size() + ", idealStateSize=" + idealState.getPartitionSet().size();
+          _statusDescription = "statePartitionStateMapSize=" + statePartitionStateMap.size() + ", idealStateSize="
+              + idealState.getPartitionSet().size() + completedCountStr;
           return Status.STARTING;
         }
 
@@ -224,7 +239,7 @@ public class ServiceStatus {
 
           // If this instance state is not in the current state, then it hasn't finished starting up
           if (!statePartitionStateMap.containsKey(partition)) {
-            _statusDescription = "statePartitionStateMap does not have " + partition;
+            _statusDescription = "statePartitionStateMap does not have " + partition + completedCountStr;
             return Status.STARTING;
           }
 
@@ -233,7 +248,8 @@ public class ServiceStatus {
           // If the instance state is not ERROR and is not the same as what's expected from the ideal state, then it
           // hasn't finished starting up
           if (!"ERROR".equals(currentStateStatus) && !idealStateStatus.equals(currentStateStatus)) {
-            _statusDescription = partition +" currentStateStatus=" + currentStateStatus + ", idealStateStatus=" + idealStateStatus;
+            _statusDescription = partition +" currentStateStatus=" + currentStateStatus + ", idealStateStatus="
+                + idealStateStatus + completedCountStr;
             return Status.STARTING;
           }
         }
