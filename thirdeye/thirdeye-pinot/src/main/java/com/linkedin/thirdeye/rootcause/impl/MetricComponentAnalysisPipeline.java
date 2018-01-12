@@ -141,14 +141,28 @@ public class MetricComponentAnalysisPipeline extends Pipeline {
     // collects filters over multiple iterations
     final Multimap<String, String> filters = HashMultimap.create(metric.getFilters());
 
+    // metric total for score calculation
+    final MetricSlice sliceTotal = MetricSlice.from(metric.getId(), anomaly.getStart(), anomaly.getEnd(), filters);
+    final double total;
+    try {
+      total = getTotal(sliceTotal);
+
+    } catch (Exception e) {
+      LOG.warn("Could not retrieve total for '{}'", metric.getUrn());
+      return new PipelineResult(context, dimensions);
+    }
+
     for (int k = 0; k < this.k; k++) {
       try {
         final MetricSlice sliceCurrent = MetricSlice.from(metric.getId(), anomaly.getStart(), anomaly.getEnd(), filters);
         final MetricSlice sliceBaseline = MetricSlice.from(metric.getId(), baseline.getStart(), baseline.getEnd(), filters);
 
+        final double subTotal = getTotal(sliceCurrent);
+
         final DataFrame dfScoresRaw = getDimensionScores(sliceCurrent, sliceBaseline);
 
-        LOG.info("Iteration {}: analyzing '{}'\n{}", k, filters, dfScoresRaw.head(50));
+        final double percentage = Math.round(subTotal / total * 10000) / 100.0;
+        LOG.info("Iteration {}: analyzing '{}' ({} %)\n{}", k, filters, percentage, dfScoresRaw.head(50));
 
         // ignore zero scores, known combinations
         final DataFrame dfScores = dfScoresRaw
@@ -174,17 +188,12 @@ public class MetricComponentAnalysisPipeline extends Pipeline {
 
         String name = dfScores.getString(COL_DIM_NAME, 0);
         String value = dfScores.getString(COL_DIM_VALUE, 0);
-        double score = dfScores.getDouble(COL_SCORE, 0);
+        double score = dfScores.getDouble(COL_SCORE, 0) * subTotal / total;
 
         rawDimensions.put(name, value);
         dimensions.add(DimensionEntity.fromDimension(score * metric.getScore(), name, value, DimensionEntity.TYPE_GENERATED));
 
-        // NOTE: workaround for ThirdEye's lack of exclusion query ("dimName != dimValue")
-        if (!filters.keySet().contains(name)) {
-          Set<String> allValues = new HashSet<>(dfScoresRaw.filterEquals(COL_DIM_NAME, name).dropNull().getStrings(COL_DIM_VALUE).unique().toList());
-          filters.putAll(name, allValues);
-        }
-        filters.remove(name, value);
+        filters.put(name, "!" + value);
 
       } catch (Exception e) {
         LOG.warn("Error calculating dimension scores for '{}'. Skipping.", metric.getUrn(), e);
@@ -192,6 +201,16 @@ public class MetricComponentAnalysisPipeline extends Pipeline {
     }
 
     return new PipelineResult(context, dimensions);
+  }
+
+  private double getTotal(MetricSlice slice) throws Exception {
+    String ref = String.format("%d", slice.getMetricId());
+    RequestContainer rc = DataFrameUtils.makeAggregateRequest(slice, Collections.<String>emptyList(), ref, this.metricDAO, this.datasetDAO);
+    ThirdEyeResponse res = this.cache.getQueryResult(rc.getRequest());
+
+    DataFrame raw = DataFrameUtils.evaluateResponse(res, rc);
+
+    return raw.getDoubles(DataFrameUtils.COL_VALUE).doubleValue();
   }
 
   private DataFrame getContribution(MetricSlice slice, String dimension) throws Exception {
