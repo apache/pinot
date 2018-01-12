@@ -244,6 +244,7 @@ public class ControllerStarter {
 
     ServiceStatus.setServiceStatusCallback(new ServiceStatus.ServiceStatusCallback() {
       private boolean _isStarted = false;
+      private String _statusDescription = "Helix ZK Not connected";
       @Override
       public ServiceStatus.Status getServiceStatus() {
         if(_isStarted) {
@@ -260,8 +261,13 @@ public class ControllerStarter {
           return ServiceStatus.Status.STARTING;
         } else {
           _isStarted = true;
+          _statusDescription = ServiceStatus.STATUS_DESCRIPTION_NONE;
           return ServiceStatus.Status.GOOD;
         }
+      }
+      @Override
+      public String getStatusDescription() {
+        return _statusDescription;
       }
     });
 
