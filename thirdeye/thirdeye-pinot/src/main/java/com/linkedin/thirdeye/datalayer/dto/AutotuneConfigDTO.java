@@ -38,7 +38,7 @@ public class AutotuneConfigDTO extends AutotuneConfigBean {
     this.alertFilter = alertFilter;
   }
 
-  public void setAlertFilter(BaseAlertFilter baseAlertFilter) {
+  public void initAlertFilter(BaseAlertFilter baseAlertFilter) {
     this.alertFilter = baseAlertFilter;
     this.tuningProps = baseAlertFilter.toProperties();
   }

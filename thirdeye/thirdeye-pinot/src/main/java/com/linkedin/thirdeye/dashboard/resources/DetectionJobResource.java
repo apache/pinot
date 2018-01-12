@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
 import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
-import com.linkedin.thirdeye.detector.function.AnomalyFunction;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -62,6 +62,8 @@ import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
 
+import static com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO.*;
+
 
 @Path("/detection-job")
 @Produces(MediaType.APPLICATION_JSON)
@@ -82,6 +84,7 @@ public class DetectionJobResource {
   public static final String AUTOTUNE_PATTERN_KEY = "pattern";
   public static final String AUTOTUNE_MTTD_KEY = "mttd";
   private static final String COMMA_SEPARATOR = ",";
+  private static final String SIGN_TEST_WINDOW_SIZE = "signTestWindowSize";
 
   public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory,
       AlertFilterAutotuneFactory alertFilterAutotuneFactory) {
@@ -533,7 +536,7 @@ public class DetectionJobResource {
       AnomalyFunctionDTO functionSpec =
           DAO_REGISTRY.getAnomalyFunctionDAO().findById(Long.valueOf(anomalyFunctionIds.get(0)));
       BaseAlertFilter currentAlertFilter = alertFilterFactory.fromSpec(functionSpec.getAlertFilter());
-      autotuneConfig.setAlertFilter(currentAlertFilter);
+      autotuneConfig.initAlertFilter(currentAlertFilter);
     }
 
     Properties autotuneProperties = autotuneConfig.getTuningProps();
@@ -1075,19 +1078,29 @@ public class DetectionJobResource {
       @QueryParam("severity") @NotNull double severity) {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
-    // Compute minimum-time-to-detect for both pattern, and choose the minimum as the minimum-time-to-detect for alert filter
-    // For one pattern alert, the MTTD is always +Infinity for the other pattern, hence by taking minimum the evaluate results will lie in the pattern of interest
-    // For two pattern alerts, the MTTD is computed to take as the minimum value of both side
-    double alertFilterMTTDInHour = Double.POSITIVE_INFINITY;
-    if (!Double.isNaN(alertFilter.getAlertFilterMTTD(severity))) {
-      alertFilterMTTDInHour = Math.min(alertFilterMTTDInHour, alertFilter.getAlertFilterMTTD(severity));
+    // Compute minimum-time-to-detect for both pattern, and choose the maximum value as the minimum-time-to-detect for alert filter
+    // For one pattern alert, the MTTD is always +Infinity for the other pattern, hence this step we only use MTTD from the interested pattern
+    // For two pattern alerts, the MTTD is computed to take as the maximum value of both side
+    double alertFilterMTTDInHour = 0;
+    double alertFilterMTTDUP = alertFilter.getAlertFilterMTTD(severity);
+    double alertFilterMTTDDOWN = alertFilter.getAlertFilterMTTD(-1.0 * severity);
+    if (!Double.isInfinite(alertFilterMTTDUP) && !Double.isNaN(alertFilterMTTDUP)) {
+      alertFilterMTTDInHour = Math.max(alertFilterMTTDInHour, alertFilterMTTDUP);
     }
-    if (!Double.isNaN(alertFilter.getAlertFilterMTTD(-1.0 * severity))) {
-      alertFilterMTTDInHour = Math.min(alertFilterMTTDInHour, alertFilter.getAlertFilterMTTD(-1.0 * severity));
+    if (!Double.isInfinite(alertFilterMTTDDOWN) && !Double.isNaN(alertFilterMTTDDOWN) ) {
+      alertFilterMTTDInHour = Math.max(alertFilterMTTDInHour, alertFilterMTTDDOWN);
     }
+
     TimeUnit detectionUnit = anomalyFunctionSpec.getBucketUnit();
     int detectionBucketSize = anomalyFunctionSpec.getBucketSize();
-    double functionMTTDInHour = TimeUnit.HOURS.convert(detectionBucketSize, detectionUnit);
+    int detectionWindowSize = 1;
+    try {
+      Properties functionProps = toProperties(anomalyFunctionSpec.getProperties());
+      detectionWindowSize = Integer.valueOf(functionProps.getProperty(SIGN_TEST_WINDOW_SIZE, "1"));
+    } catch (IOException e) {
+      LOG.warn("Failed to fetch function properties when evaluating mttd!");
+    }
+    double functionMTTDInHour = TimeUnit.HOURS.convert(detectionBucketSize * detectionWindowSize, detectionUnit);
     return Response.ok(Math.max(functionMTTDInHour, alertFilterMTTDInHour)).build();
   }
 
@@ -1109,10 +1122,30 @@ public class DetectionJobResource {
     // Get current function
     long functionId = target.getFunctionId();
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(functionId);
-    double alertFilterMTTDInHour = alertFilter.getAlertFilterMTTD(severity);
+    // Compute minimum-time-to-detect for both pattern, and choose the maximum value as the minimum-time-to-detect for alert filter
+    // For one pattern alert, the MTTD is always +Infinity for the other pattern, hence this step we only use MTTD from the interested pattern
+    // For two pattern alerts, the MTTD is computed to take as the maximum value of both side
+
+    double alertFilterMTTDInHour = 0;
+    double alertFilterMTTDUP = alertFilter.getAlertFilterMTTD(severity);
+    double alertFilterMTTDDOWN = alertFilter.getAlertFilterMTTD(-1.0 * severity);
+    if (!Double.isInfinite(alertFilterMTTDUP) && !Double.isNaN(alertFilterMTTDUP)) {
+      alertFilterMTTDInHour = Math.max(alertFilterMTTDInHour, alertFilterMTTDUP);
+    }
+    if (!Double.isInfinite(alertFilterMTTDDOWN) && !Double.isNaN(alertFilterMTTDDOWN)) {
+      alertFilterMTTDInHour = Math.max(alertFilterMTTDInHour, alertFilterMTTDDOWN);
+    }
+
     TimeUnit detectionUnit = anomalyFunctionSpec.getBucketUnit();
     int detectionBucketSize = anomalyFunctionSpec.getBucketSize();
-    double functionMTTDInHour = TimeUnit.HOURS.convert(detectionBucketSize, detectionUnit);
+    int detectionWindowSize = 1;
+    try {
+      Properties functionProps = toProperties(anomalyFunctionSpec.getProperties());
+      detectionWindowSize = Integer.valueOf(functionProps.getProperty(SIGN_TEST_WINDOW_SIZE, "1"));
+    } catch (IOException e) {
+      LOG.warn("Failed to fetch function properties when evaluating mttd!");
+    }
+    double functionMTTDInHour = TimeUnit.HOURS.convert(detectionBucketSize * detectionWindowSize, detectionUnit);
     return Response.ok(Math.max(functionMTTDInHour, alertFilterMTTDInHour)).build();
   }
 
