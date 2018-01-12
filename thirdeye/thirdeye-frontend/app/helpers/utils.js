@@ -148,6 +148,10 @@ export function toBaselineUrn(urn) {
   return metricUrnHelper('frontend:metric:baseline:', urn);
 }
 
+export function toOffsetUrn(urn, compareMode) {
+  return metricUrnHelper(`frontend:metric:${compareMode}:`, urn);
+}
+
 export function toMetricUrn(urn) {
   return metricUrnHelper('thirdeye:metric:', urn);
 }
@@ -189,18 +193,37 @@ export function filterPrefix(urns, prefixes) {
   return makeIterable(urns).filter(urn => hasPrefix(urn, prefixes));
 }
 
-export function toBaselineRange(anomalyRange, compareMode) {
+export function toBaselineRange(currentRange, compareMode) {
   const offset = {
-    WoW: 1,
-    Wo2W: 2,
-    Wo3W: 3,
-    Wo4W: 4
-  }[compareMode];
+    current: 0,
+    wow: 1,
+    wo1w: 1,
+    wo2w: 2,
+    wo3w: 3,
+    wo4w: 4
+  }[compareMode.toLowerCase()];
 
-  const start = moment(anomalyRange[0]).subtract(offset, 'weeks').valueOf();
-  const end = moment(anomalyRange[1]).subtract(offset, 'weeks').valueOf();
+  if (offset === 0) {
+    return currentRange;
+  }
+
+  const start = moment(currentRange[0]).subtract(offset, 'weeks').valueOf();
+  const end = moment(currentRange[1]).subtract(offset, 'weeks').valueOf();
 
   return [start, end];
+}
+
+export function toAbsoluteRange(urn, currentRange, baselineCompareMode) {
+  if (!urn.startsWith('frontend:metric:')) {
+    return currentRange;
+  }
+
+  let compareMode = urn.split(':')[2];
+  if (compareMode === 'baseline') {
+    compareMode = baselineCompareMode;
+  }
+
+  return toBaselineRange(currentRange, compareMode);
 }
 
 export function toFilters(urns) {
@@ -318,12 +341,14 @@ export default Ember.Helper.helper({
   toCurrentUrn,
   toBaselineUrn,
   toMetricUrn,
+  toOffsetUrn,
   stripTail,
   extractTail,
   appendTail,
   hasPrefix,
   filterPrefix,
   toBaselineRange,
+  toAbsoluteRange,
   toFilters,
   toFilterMap,
   findLabelMapping,

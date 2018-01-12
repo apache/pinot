@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toCurrentUrn, toBaselineUrn, hasPrefix, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, toOffsetUrn, hasPrefix, filterPrefix } from 'thirdeye-frontend/helpers/utils';
 
 const ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC = 'metric';
 const ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET = 'dataset';
@@ -38,6 +38,9 @@ export default Ember.Component.extend({
     this.setProperties({ sortProperty: ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE, sortMode: ROOTCAUSE_METRICS_SORT_MODE_ASC });
   },
 
+  /**
+   * List of metric urns, sorted by sortMode.
+   */
   urns: Ember.computed(
     'entities',
     'metrics',
@@ -76,6 +79,9 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Metric labels, keyed by urn
+   */
   metrics: Ember.computed(
     'entities',
     function () {
@@ -88,6 +94,9 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Dataset labels, keyed by metric urn
+   */
   datasets: Ember.computed(
     'entities',
     function () {
@@ -100,19 +109,64 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Change values from baseline to current time range, keyed by metric urn
+   */
   changes: Ember.computed(
     'entities',
     'aggregates',
     function () {
-      const { entities, aggregates } = this.getProperties('entities', 'aggregates');
-      return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
-        .reduce((agg, urn) => {
-          agg[urn] = aggregates[toCurrentUrn(urn)] / aggregates[toBaselineUrn(urn)] - 1;
-          return agg;
-        }, {});
+      const { entities, aggregates } = this.getProperties('entities', 'aggregates'); // poll observer
+      return this._computeChangesForOffset('baseline');
     }
   ),
 
+  /**
+   * Formatted change strings for 'changes'
+   */
+  changesFormatted: Ember.computed(
+    'changes',
+    function () {
+      const { changes } = this.getProperties('changes');
+      return this._formatChanges(changes);
+    }
+  ),
+
+  /**
+   * Change values from multiple offsets to current time range, keyed by offset, then by metric urn
+   */
+  changesOffset: Ember.computed(
+    'entities',
+    'aggregates',
+    function () {
+      const { entities, aggregates } = this.getProperties('entities', 'aggregates'); // poll observer
+
+      const offsets = ['wo1w', 'wo2w', 'wo3w', 'wo4w', 'baseline'];
+      const dict = {}
+      offsets.forEach(offset => dict[offset] = this._computeChangesForOffset(offset));
+
+      return dict;
+    }
+  ),
+
+  /**
+   * Formatted change strings for 'changesOffset'
+   */
+  changesOffsetFormatted: Ember.computed(
+    'changesOffset',
+    function () {
+      const { changesOffset } = this.getProperties('changesOffset');
+
+      const dict = {};
+      Object.keys(changesOffset).forEach(offset => dict[offset] = this._formatChanges(changesOffset[offset]));
+
+      return dict;
+    }
+  ),
+
+  /**
+   * Anomalyity scores, keyed by metric urn
+   */
   scores: Ember.computed(
     'entities',
     function () {
@@ -125,22 +179,44 @@ export default Ember.Component.extend({
     }
   ),
 
-  changesFormatted: Ember.computed(
-    'changes',
-    function () {
-      const { changes } = this.getProperties('changes');
-      return Object.keys(changes).reduce((agg, urn) => {
-        const value = changes[urn];
-        const sign = value > 0 ? '+' : '';
-        if (Math.abs(value) > 5) {
-          agg[urn] = 'spike';
-        } else {
-          agg[urn] = sign + (value * 100).toFixed(2) + '%';
-        }
+  /**
+   * Compute changes from a given offset to the current time range, as a fraction.
+   *
+   * @param {String} offset time range offset, e.g. 'baseline', 'wow', 'wo2w', ...
+   * @returns {Object} change values, keyed by metric urn
+   */
+  _computeChangesForOffset(offset) {
+    const { entities, aggregates } = this.getProperties('entities', 'aggregates');
+    return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
+      .reduce((agg, urn) => {
+      agg[urn] = aggregates[toCurrentUrn(urn)] / aggregates[toOffsetUrn(urn, offset)] - 1;
+      return agg;
+    }, {});
+  },
+
+  /**
+   * Format changes dict with sign and decimals and gracefully handle outliers
+   *
+   * @param {Object} changes change values, keyed by metric urn
+   * @returns {Object} formatted change strings
+   */
+  _formatChanges(changes) {
+    return Object.keys(changes).reduce((agg, urn) => {
+      const value = changes[urn];
+      if (Number.isNaN(value)) {
+        agg[urn] = '-';
         return agg;
-      }, {});
-    }
-  ),
+      }
+
+      const sign = value > 0 ? '+' : '';
+      if (Math.abs(value) > 5) {
+        agg[urn] = 'spike';
+      } else {
+        agg[urn] = sign + (value * 100).toFixed(2) + '%';
+      }
+      return agg;
+    }, {});
+  },
 
   actions: {
     /**

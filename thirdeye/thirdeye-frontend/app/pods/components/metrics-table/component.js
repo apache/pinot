@@ -1,6 +1,5 @@
 import Component from '@ember/component';
 import { computed } from '@ember/object';
-import _ from 'lodash';
 
 export default Component.extend({
   /**
@@ -17,11 +16,37 @@ export default Component.extend({
     }, {
       propertyName: 'score',
       title: 'Anomalous Score',
+      disableFiltering: true,
       className: 'rootcause-metric__table__column'
     }, {
-      template: 'custom/metrics-table-changes',
-      propertyName: 'change',
-      title: 'Changes',
+      propertyName: 'changeFormatted',
+      sortedBy: 'change',
+      title: 'baseline',
+      disableFiltering: true,
+      className: 'rootcause-metric__table__column'
+    }, {
+      propertyName: 'change1wFormatted',
+      sortedBy: 'change1w',
+      title: 'WoW',
+      disableFiltering: true,
+      className: 'rootcause-metric__table__column'
+    }, {
+      propertyName: 'change2wFormatted',
+      sortedBy: 'change2w',
+      title: 'Wo2W',
+      disableFiltering: true,
+      className: 'rootcause-metric__table__column'
+    }, {
+      propertyName: 'change3wFormatted',
+      sortedBy: 'change3w',
+      title: 'Wo3W',
+      disableFiltering: true,
+      className: 'rootcause-metric__table__column'
+    }, {
+      propertyName: 'change4wFormatted',
+      sortedBy: 'change4w',
+      title: 'Wo4W',
+      disableFiltering: true,
       className: 'rootcause-metric__table__column'
     }
   ],
@@ -35,20 +60,29 @@ export default Component.extend({
     'urns',
     'metrics',
     'scores',
-    'changesFormatted',
+    'changesOffset',
+    'changesOffsetFormatted',
     function() {
       let arr = [];
-      const properties = ['urns', 'metrics', 'scores', 'changesFormatted', 'selectedUrns'];
-      const { urns, metrics, scores, changesFormatted, selectedUrns } = this.getProperties(...properties);
-      const urnsClone = _.cloneDeep(urns);
+      const { urns, metrics, scores, changesOffset, changesOffsetFormatted, selectedUrns } =
+        this.getProperties('urns', 'metrics', 'scores', 'changesOffset', 'changesOffsetFormatted', 'selectedUrns');
 
-      urnsClone.forEach(urn => {
+      urns.forEach(urn => {
         arr.push({
           urn,
           isSelected: selectedUrns.has(urn),
           metric: metrics[urn],
           score: scores[urn],
-          change: changesFormatted[urn]
+          change: changesOffset['baseline'][urn],
+          change1w: changesOffset['wo1w'][urn],
+          change2w: changesOffset['wo2w'][urn],
+          change3w: changesOffset['wo3w'][urn],
+          change4w: changesOffset['wo4w'][urn],
+          changeFormatted: changesOffsetFormatted['baseline'][urn],
+          change1wFormatted: changesOffsetFormatted['wo1w'][urn],
+          change2wFormatted: changesOffsetFormatted['wo2w'][urn],
+          change3wFormatted: changesOffsetFormatted['wo3w'][urn],
+          change4wFormatted: changesOffsetFormatted['wo4w'][urn]
         });
       });
       return arr;
