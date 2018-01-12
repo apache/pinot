@@ -41,7 +41,7 @@ export default Component.extend({
     'entities',
     'anomalyUrn',
     function () {
-      const { entities, anomalyUrn } = getProperties('entities', 'anomalyUrn');
+      const { entities, anomalyUrn } = getProperties(this, 'entities', 'anomalyUrn');
 
       if (!anomalyUrn || !entities || !entities[anomalyUrn]) { return false; }
 
@@ -50,45 +50,45 @@ export default Component.extend({
   ),
 
   functionName: computed('anomaly', function () {
-    return get('anomaly').attributes.function[0];
+    return get(this, 'anomaly').attributes.function[0];
   }),
 
   anomalyId: computed('anomaly', function () {
-    return get('anomaly').urn.split(':')[3];
+    return get(this, 'anomaly').urn.split(':')[3];
   }),
 
   metric: computed('anomaly', function () {
-    return get('anomaly').attributes.metric[0];
+    return get(this, 'anomaly').attributes.metric[0];
   }),
 
   dataset: computed('anomaly', function () {
-    return get('anomaly').attributes.dataset[0];
+    return get(this, 'anomaly').attributes.dataset[0];
   }),
 
   current: computed('anomaly', function () {
-    return parseFloat(get('anomaly').attributes.current[0]).toFixed(3);
+    return parseFloat(get(this, 'anomaly').attributes.current[0]).toFixed(3);
   }),
 
   baseline: computed('anomaly', function () {
-    return parseFloat(get('anomaly').attributes.baseline[0]).toFixed(3);
+    return parseFloat(get(this, 'anomaly').attributes.baseline[0]).toFixed(3);
   }),
 
   change: computed('anomaly', function () {
-    const attr = get('anomaly').attributes;
+    const attr = get(this, 'anomaly').attributes;
     return (parseFloat(attr.current[0]) / parseFloat(attr.baseline[0]) - 1);
   }),
 
   status: computed('anomaly', function () {
-    return get('anomaly').attributes.status[0];
+    return get(this, 'anomaly').attributes.status[0];
   }),
 
   duration: computed('anomaly', function () {
-    const anomaly = get('anomaly');
+    const anomaly = get(this, 'anomaly');
     return moment.duration(anomaly.end - anomaly.start).humanize();
   }),
 
   dimensions: computed('anomaly', function () {
-    const attr = get('anomaly').attributes;
+    const attr = get(this, 'anomaly').attributes;
     const dimNames = attr.dimensions || [];
     const dimValues = dimNames.reduce((agg, dimName) => { agg[dimName] = attr[dimName][0]; return agg; }, {});
     return dimNames.sort().map(dimName => dimValues[dimName]).join(', ');
@@ -101,35 +101,35 @@ export default Component.extend({
     'metric',
     function () {
       const { dataset, metric } =
-        getProperties('dataset', 'metric');
+        getProperties(this, 'dataset', 'metric');
       return `${dataset}::${metric}`;
     }
   ),
 
   dimensionsFormatted: computed('anomaly', function () {
-    const dimensions = get('dimensions');
+    const dimensions = get(this, 'dimensions');
     return dimensions ? ` (${dimensions})` : '';
   }),
 
   changeFormatted: computed('change', function () {
-    const change = get('change');
+    const change = get(this, 'change');
     const prefix = change > 0 ? '+' : '';
     return `${prefix}${humanizeFloat(change * 100)}%`;
   }),
 
   startFormatted: computed('anomaly', function () {
-    return moment(get('anomaly').start).format('MMM D YYYY, hh:mm a');
+    return moment(get(this, 'anomaly').start).format('MMM D YYYY, hh:mm a');
   }),
 
   endFormatted: computed('anomaly', function () {
-    return moment(get('anomaly').end).format('MMM D YYYY, hh:mm a');
+    return moment(get(this, 'anomaly').end).format('MMM D YYYY, hh:mm a');
   }),
 
   isHidden: computed(
     'requiresFeedback',
     'isHiddenUser',
     function () {
-      const { requiresFeedback, isHiddenUser } = getProperties('requiresFeedback', 'isHiddenUser');
+      const { requiresFeedback, isHiddenUser } = getProperties(this, 'requiresFeedback', 'isHiddenUser');
       if (isHiddenUser === ROOTCAUSE_HIDDEN_DEFAULT) {
         return !requiresFeedback;
       }
@@ -137,21 +137,45 @@ export default Component.extend({
     }
   ),
 
+  /**
+   * Harrier link for an anomaly
+   * @type {String}
+   */
+  harrierLink: computed(
+    'anomaly',
+    function() {
+      const attributes = get(this, 'anomaly').attributes;
+      return attributes.HARRIER;
+    }
+  ),
+
+  /**
+   * InGraph link for an anomaly
+   * @type {String}
+   */
+  inGraphLink: computed(
+    'anomaly',
+    function() {
+      const attributes = get(this, 'anomaly').attributes;
+      return attributes.INGRAPH;
+    }
+  ),
+
   actions: {
     onFeedback(status) {
-      const { onFeedback, anomalyUrn } = getProperties('onFeedback', 'anomalyUrn');
+      const { onFeedback, anomalyUrn } = getProperties(this, 'onFeedback', 'anomalyUrn');
 
       if (onFeedback) {
         onFeedback(anomalyUrn, status, '');
       }
 
       // TODO reload anomaly entity instead
-      setProperties({ status });
+      setProperties(this, { status });
     },
 
     toggleHidden() {
-      const { isHidden } = getProperties('isHidden');
-      setProperties({ isHiddenUser: !isHidden });
+      const { isHidden } = getProperties(this, 'isHidden');
+      setProperties(this, { isHiddenUser: !isHidden });
     }
   }
 });

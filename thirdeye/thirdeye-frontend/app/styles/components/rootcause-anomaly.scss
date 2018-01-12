@@ -36,8 +36,11 @@
   }
 
   &__header {
-    display: flex;
-    justify-content: space-between;
+    padding: 12px 24px;
+
+    span {
+      margin-right: 20px;
+    }
   }
 
   &__dropdown {
