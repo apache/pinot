@@ -24,6 +24,11 @@ export default Ember.Controller.extend({
   ],
 
   //
+  // route errors
+  //
+  routeErrors: null, // Set
+
+  //
   // services
   //
   entitiesService: Ember.inject.service('rootcause-entities-cache'),
@@ -234,6 +239,8 @@ export default Ember.Controller.extend({
 
   isLoadingBreakdowns: Ember.computed.gt('breakdownsService.pending.size', 0),
 
+  hasErrorsRoute: Ember.computed.gt('routeErrors.size', 0),
+
   hasErrorsEntities: Ember.computed.gt('entitiesService.errors.size', 0),
 
   hasErrorsTimeseries: Ember.computed.gt('timeseriesService.errors.size', 0),
@@ -242,7 +249,7 @@ export default Ember.Controller.extend({
 
   hasErrorsBreakdowns: Ember.computed.gt('breakdownsService.errors.size', 0),
 
-  hasErrors: Ember.computed.or(
+  hasServiceErrors: Ember.computed.or(
     'hasErrorsEntities',
     'hasErrorsTimeseries',
     'hasErrorsAggregates',
@@ -494,7 +501,7 @@ export default Ember.Controller.extend({
     /**
      * Clears error logs of data services
      */
-    clearErrors(type) {
+    clearServiceErrors(type) {
       const { entitiesService, timeseriesService, aggregatesService, breakdownsService } =
         this.getProperties('entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService');
 
@@ -516,6 +523,13 @@ export default Ember.Controller.extend({
           break;
 
       }
+    },
+
+    /**
+     * Clears error logs of route loading/controller setup
+     */
+    clearRouteErrors() {
+      this.setProperties({ routeErrors: new Set() });
     }
   }
 });

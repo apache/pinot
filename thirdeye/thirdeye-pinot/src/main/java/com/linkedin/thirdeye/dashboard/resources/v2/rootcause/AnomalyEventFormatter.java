@@ -80,7 +80,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     }
 
     String label = String.format("%s%s", func.getFunctionName(), dimensionString);
-    String link = String.format("thirdeye#investigate?anomalyId=%d", dto.getId());
+    String link = String.format("#/rootcause?anomalyId=%d", dto.getId());
 
     RootCauseEventEntity out = makeRootCauseEventEntity(entity, label, link, dto.getStartTime(), dto.getEndTime(), null);
     out.setAttributes(attributes);

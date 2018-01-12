@@ -159,13 +159,24 @@ const adjustHolidayTimestamp = (event) => {
  * Helper function to append localized date/time to deployment event label
  */
 const adjustInformedLabel = (event) => {
-  if (event.eventType == 'informed') {
-    let displayLabel = event.displayLabel + ' (' + moment(event.start).format('hh:mm a') + ')';
+  if (event.eventType === 'informed') {
+    const displayLabel = event.displayLabel + ' (' + moment(event.start).format('hh:mm a') + ')';
     return Object.assign(event, { displayLabel });
   }
-
   return event;
 };
+
+/**
+ * Helper function to adjust investigation link for legacy RCA/anomaly page
+ */
+const adjustAnomalyLink = (event) => {
+  if (event.eventType === 'anomaly') {
+    const anomalyId = event.urn.split(':')[3];
+    const link = `/thirdeye#investigate?anomalyId=${anomalyId}`;
+    return Object.assign(event, { link });
+  }
+  return event;
+}
 
 /**
  * Helper function to humanize a start offset
@@ -262,6 +273,7 @@ function fetchEvents(start, end, mode) {
           .map(adjustHolidayTimestamp)
           .map(event => assignEventTimeInfo(event, anomalyStart, anomalyEnd, baselineStart, baselineEnd, analysisStart, analysisEnd))
           .map(adjustInformedLabel)
+          .map(adjustAnomalyLink)
           .map(assignEventColor)
           .map(setWeight)
           .map(assignHumanTimeInfo)
