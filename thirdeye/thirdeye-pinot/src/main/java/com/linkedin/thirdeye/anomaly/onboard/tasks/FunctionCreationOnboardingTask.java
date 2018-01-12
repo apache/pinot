@@ -216,7 +216,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       emailConfig.setFunctionIds(Arrays.asList(anomalyFunction.getId()));
       alertConfig.setEmailConfig(emailConfig);
       alertConfig.setName(configuration.getString(ALERT_NAME));
-      String thirdeyeDefaultEmail = configuration.getString(configuration.getString(DEFAULT_ALERT_RECEIVER));
+      String thirdeyeDefaultEmail = configuration.getString(DEFAULT_ALERT_RECEIVER);
       alertConfig.setFromAddress(configuration.getString(ALERT_FROM, thirdeyeDefaultEmail));
       String alertRecipients = thirdeyeDefaultEmail;
       if (configuration.containsKey(ALERT_TO)) {

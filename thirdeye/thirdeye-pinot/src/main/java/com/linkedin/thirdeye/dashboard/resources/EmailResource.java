@@ -42,6 +42,7 @@ public class EmailResource {
   private String phantonJsPath;
   private String rootDir;
   private String dashboardHost;
+  private SmtpConfiguration smtpConfiguration;
 
   public EmailResource(ThirdEyeConfiguration thirdEyeConfig) {
     this(thirdEyeConfig.getSmtpConfiguration(), new AlertFilterFactory(thirdEyeConfig.getAlertFilterConfigPath()),
@@ -52,6 +53,7 @@ public class EmailResource {
   public EmailResource(SmtpConfiguration smtpConfiguration, AlertFilterFactory alertFilterFactory,
       String failureFromAddress, String failureToAddress,
       String dashboardHost, String phantonJsPath, String rootDir) {
+    this.smtpConfiguration = smtpConfiguration;
     this.alertDAO = DAO_REGISTRY.getAlertConfigDAO();
     this.appDAO = DAO_REGISTRY.getApplicationDAO();
     this.alertFilterFactory = alertFilterFactory;
@@ -198,8 +200,8 @@ public class EmailResource {
    */
   private SmtpConfiguration getSmtpConfiguration(String smtpHost, Integer smtpPort) {
     SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
-    if (smtpConfiguration != null) {
-      smtpConfiguration = smtpConfiguration;
+    if (this.smtpConfiguration != null) {
+      smtpConfiguration = this.smtpConfiguration;
     } else {
       if (Strings.isNullOrEmpty(smtpHost)) {
         return null;
