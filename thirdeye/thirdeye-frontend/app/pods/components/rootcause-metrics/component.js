@@ -105,7 +105,7 @@ export default Ember.Component.extend({
     'aggregates',
     function () {
       const { entities, aggregates } = this.getProperties('entities', 'aggregates'); // poll observer
-      return this._changesOffset('baseline');
+      return this._computeChangesForOffset('baseline');
     }
   ),
 
@@ -113,7 +113,7 @@ export default Ember.Component.extend({
     'changes',
     function () {
       const { changes } = this.getProperties('changes');
-      return this._changesFormatted(changes);
+      return this._formatChanges(changes);
     }
   ),
 
@@ -125,7 +125,7 @@ export default Ember.Component.extend({
 
       const offsets = ['wo1w', 'wo2w', 'wo3w', 'wo4w', 'baseline'];
       const dict = {}
-      offsets.forEach(offset => dict[offset] = this._changesOffset(offset));
+      offsets.forEach(offset => dict[offset] = this._computeChangesForOffset(offset));
 
       return dict;
     }
@@ -137,7 +137,7 @@ export default Ember.Component.extend({
       const { changesOffset } = this.getProperties('changesOffset');
 
       const dict = {};
-      Object.keys(changesOffset).forEach(offset => dict[offset] = this._changesFormatted(changesOffset[offset]));
+      Object.keys(changesOffset).forEach(offset => dict[offset] = this._formatChanges(changesOffset[offset]));
 
       return dict;
     }
@@ -155,7 +155,7 @@ export default Ember.Component.extend({
     }
   ),
 
-  _changesOffset(offset) {
+  _computeChangesForOffset(offset) {
     const { entities, aggregates } = this.getProperties('entities', 'aggregates');
     return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
       .reduce((agg, urn) => {
@@ -164,7 +164,7 @@ export default Ember.Component.extend({
     }, {});
   },
 
-  _changesFormatted(changes) {
+  _formatChanges(changes) {
     return Object.keys(changes).reduce((agg, urn) => {
       const value = changes[urn];
       if (Number.isNaN(value)) {
