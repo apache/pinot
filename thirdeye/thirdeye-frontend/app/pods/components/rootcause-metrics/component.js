@@ -26,7 +26,7 @@ export default Ember.Component.extend({
    * Currently selected view within the metrics tab
    * @type {String}
    */
-  selectedView: 'table',
+  selectedView: 'card',
 
   /**
    * loading status for component
