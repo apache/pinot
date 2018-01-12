@@ -34,7 +34,9 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 public class PqlUtils {
   private static final Joiner AND = Joiner.on(" AND ");
   private static final Joiner COMMA = Joiner.on(",");
-  private static final Joiner EQUALS = Joiner.on(" = ");
+
+  private static final String PREFIX_EXCLUDE = "!";
+
   private static final Logger LOGGER = LoggerFactory.getLogger(PqlUtils.class);
   private static final int DEFAULT_TOP = 100000;
 
@@ -256,19 +258,28 @@ public class PqlUtils {
     for (Map.Entry<String, Collection<String>> entry : dimensionValues.asMap().entrySet()) {
       String key = entry.getKey();
       Collection<String> values = entry.getValue();
-      String component;
       if (values.isEmpty()) {
         continue;
-      } else if (values.size() == 1) {
-        component = EQUALS.join(key, String.format("'%s'", values.iterator().next().trim()));
-      } else {
-        List<String> quotedValues = new ArrayList<>(values.size());
-        for (String value : values) {
-          quotedValues.add(String.format("'%s'", value.trim()));
-        }
-        component = String.format("%s IN (%s)", key, COMMA.join(quotedValues));
       }
-      components.add(component);
+
+      List<String> include = new ArrayList<>();
+      List<String> exclude = new ArrayList<>();
+
+      for (String value : values) {
+        if (value.startsWith(PREFIX_EXCLUDE)) {
+          exclude.add(quote(value.substring(PREFIX_EXCLUDE.length())));
+        } else {
+          include.add(quote(value));
+        }
+      }
+
+      if (!include.isEmpty()) {
+        components.add(String.format("%s IN (%s)", key, COMMA.join(include)));
+      }
+
+      if (!exclude.isEmpty()) {
+        components.add(String.format("%s NOT IN (%s)", key, COMMA.join(exclude)));
+      }
     }
     if (components.isEmpty()) {
       return null;
@@ -297,4 +308,21 @@ public class PqlUtils {
         dataset);
   }
 
+  /**
+   * Surrounds a value with quote characters that are not contained in the value itself.
+   *
+   * @param value value to be quoted
+   * @return quoted value
+   * @throws IllegalArgumentException if no unused quote char can be found
+   */
+  private static String quote(String value) {
+    String quoteChar = "\"";
+    if (value.contains(quoteChar)) {
+      quoteChar = "\'";
+    }
+    if (value.contains(quoteChar)) {
+      throw new IllegalArgumentException(String.format("Could not find quote char for expression: %s", value));
+    }
+    return String.format("%s%s%s", quoteChar, value, quoteChar);
+  }
 }
