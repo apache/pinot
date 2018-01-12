@@ -100,7 +100,7 @@ public class SummaryResponse {
     row.contributionChange =
         computeContributionChange(row.baselineValue, row.currentValue, totalBaselineValue, totalCurrentValue);
     row.contributionToOverallChange =
-        computeContributionToOverallChange(row.baselineValue, row.currentValue, totalBaselineValue);
+        computeContributionToOverallChange(row.baselineValue, row.currentValue, totalBaselineValue, totalCurrentValue);
     row.cost = DOUBLE_FORMATTER.format(roundUp(costEntry.getCost()));
     return row;
   }
@@ -172,7 +172,7 @@ public class SummaryResponse {
       row.contributionChange =
           computeContributionChange(row.baselineValue, row.currentValue, totalBaselineValue, totalCurrentValue);
       row.contributionToOverallChange =
-          computeContributionToOverallChange(row.baselineValue, row.currentValue, totalBaselineValue);
+          computeContributionToOverallChange(row.baselineValue, row.currentValue, totalBaselineValue, totalCurrentValue);
       row.cost = node.getCost();
       StringBuilder sb = new StringBuilder();
       String separator = "";
@@ -203,9 +203,9 @@ public class SummaryResponse {
     }
   }
 
-  private static String computeContributionToOverallChange(double baseline, double current, double totalBaseline) {
+  private static String computeContributionToOverallChange(double baseline, double current, double totalBaseline, double totalCurrentValue) {
     if (totalBaseline != 0d) {
-      double contributionToOverallChange = ((current - baseline) / (totalBaseline)) * 100d;
+      double contributionToOverallChange = ((current - baseline) / Math.abs(totalCurrentValue - totalBaseline)) * 100d;
       return DOUBLE_FORMATTER.format(roundUp(contributionToOverallChange)) + "%";
     } else {
       return INFINITE;

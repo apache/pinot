@@ -29,6 +29,13 @@ public class SummaryResponseTree {
     Dimensions dimensions = nodes.get(0).getDimensions();
     double globalBaselineValue = nodes.get(0).getOriginalCurrentValue();
     double globalCurrentValue = nodes.get(0).getOriginalBaselineValue();
+    for (HierarchyNode node : nodes) {
+      if (node.getLevel() == 0) {
+        globalBaselineValue = node.getOriginalBaselineValue();
+        globalCurrentValue = node.getOriginalCurrentValue();
+        break;
+      }
+    }
     for (int i = 0; i < levelCount; ++i) {
       responseTree.dimensions.add(dimensions.get(i));
     }

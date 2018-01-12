@@ -18,6 +18,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.jfree.util.Log;
 import org.joda.time.DateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class generates query requests to the backend database and retrieve the data for summary algorithm.
@@ -32,6 +34,8 @@ import org.joda.time.DateTime;
  * located together.
  */
 public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
+  private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeSummaryClient.class);
+
   private final static DateTime NULL_DATETIME = new DateTime();
   private final static int TIME_OUT_VALUE = 120;
   private final static TimeUnit TIME_OUT_UNIT = TimeUnit.SECONDS;
@@ -170,17 +174,18 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
       ThirdEyeRequest currentRequest = bulkRequests.get(i++);
       ThirdEyeResponse baselineResponses = queryResponses.get(baselineRequest).get(TIME_OUT_VALUE, TIME_OUT_UNIT);
       ThirdEyeResponse currentResponses = queryResponses.get(currentRequest).get(TIME_OUT_VALUE, TIME_OUT_UNIT);
-      if (baselineResponses.getNumRows() == 0 || currentResponses.getNumRows() == 0) {
-        throw new Exception("Failed to retrieve results with this request: "
-            + (baselineResponses.getNumRows() == 0 ? baselineRequest : currentRequest));
+      if (baselineResponses.getNumRows() == 0) {
+        LOG.warn("Get 0 rows from the request(s): {}", baselineRequest);
+      }
+      if (currentResponses.getNumRows() == 0) {
+        LOG.warn("Get 0 rows from the request(s): {}", currentRequest);
       }
 
       Map<List<String>, Row> rowTable = new HashMap<>();
       buildMetricFunctionOrExpressionsRows(dimensions, baselineResponses, rowTable, true);
       buildMetricFunctionOrExpressionsRows(dimensions, currentResponses, rowTable, false);
       if (rowTable.size() == 0) {
-        throw new Exception("Failed to retrieve non-zero results with these requests: "
-            + baselineRequest + ", " + currentRequest);
+        LOG.warn("Failed to retrieve non-zero results with these requests: " + baselineRequest + ", " + currentRequest);
       }
       List<Row> rows = new ArrayList<>(rowTable.values());
       res.add(rows);

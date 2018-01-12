@@ -135,36 +135,44 @@ public class Summary {
     // Otherwise, merge DPArrays from its children.
     if (node.getLevel() == levelCount - 1) {
       // Shrink answer size for getting a higher level view, which gives larger picture of the dataset
-      if (node.childrenSize() < dpArray.size()) {
-        dpArray.setShrinkSize(Math.max(1, (node.childrenSize()+1)/2));
-      }
+      // Uncomment the following block to roll-up rows aggressively
+//      if (node.childrenSize() < dpArray.size()) {
+//        dpArray.setShrinkSize(Math.max(2, (node.childrenSize()+1)/2));
+//      }
       for (HierarchyNode child : node.getChildren()) {
         leafRowInserter.insertRowToDPArray(dpArray, child, node.targetRatio());
         updateWowValues(node, dpArray.getAnswer());
         dpArray.targetRatio = node.targetRatio(); // get updated ratio
       }
     } else {
-      List<HierarchyNode> removedNodes = new ArrayList<>();
-      boolean doRollback = false;
-      do {
-        doRollback = false;
-        for (HierarchyNode child : node.getChildren()) {
-          computeChildDPArray(child);
-          removedNodes.addAll(mergeDPArray(node, dpArray, dpArrays.get(node.getLevel() + 1)));
-          updateWowValues(node, dpArray.getAnswer());
-          dpArray.targetRatio = node.targetRatio(); // get updated ratio
-        }
-        // Aggregate current node's answer if it is thinned out due to the user's answer size is too huge.
-        // If the current node is kept being thinned out, it eventually aggregates all its children.
-        if ( nodeIsThinnedOut(node) && dpArray.getAnswer().size() < dpArray.maxSize()) {
-          doRollback = true;
-          rollbackInsertions(node, dpArray.getAnswer(), removedNodes);
-          removedNodes.clear();
-          dpArray.setShrinkSize(Math.max(1, (dpArray.getAnswer().size()*2)/3));
-          dpArray.reset();
-          dpArray.targetRatio = node.targetRatio();
-        }
-      } while (doRollback);
+      for (HierarchyNode child : node.getChildren()) {
+        computeChildDPArray(child);
+        mergeDPArray(node, dpArray, dpArrays.get(node.getLevel() + 1));
+        updateWowValues(node, dpArray.getAnswer());
+        dpArray.targetRatio = node.targetRatio(); // get updated ratio
+      }
+      // Use the following block to replace the above one to roll-up rows aggressively
+//      List<HierarchyNode> removedNodes = new ArrayList<>();
+//      boolean doRollback = false;
+//      do {
+//        doRollback = false;
+//        for (HierarchyNode child : node.getChildren()) {
+//          computeChildDPArray(child);
+//          removedNodes.addAll(mergeDPArray(node, dpArray, dpArrays.get(node.getLevel() + 1)));
+//          updateWowValues(node, dpArray.getAnswer());
+//          dpArray.targetRatio = node.targetRatio(); // get updated ratio
+//        }
+//        // Aggregate current node's answer if it is thinned out due to the user's answer size is too huge.
+//        // If the current node is kept being thinned out, it eventually aggregates all its children.
+//        if ( nodeIsThinnedOut(node) && dpArray.getAnswer().size() < dpArray.maxSize()) {
+//          doRollback = true;
+//          rollbackInsertions(node, dpArray.getAnswer(), removedNodes);
+//          removedNodes.clear();
+//          dpArray.setShrinkSize(Math.max(1, (dpArray.getAnswer().size()*2)/3));
+//          dpArray.reset();
+//          dpArray.targetRatio = node.targetRatio();
+//        }
+//      } while (doRollback);
     }
 
     // Calculate the cost if the node (aggregated row) is put in the answer.
