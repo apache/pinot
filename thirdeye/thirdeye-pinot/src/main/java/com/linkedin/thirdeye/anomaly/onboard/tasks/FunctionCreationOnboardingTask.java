@@ -152,7 +152,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       try {
         userAssignedDataGranularity = TimeGranularity.fromString(configuration.getString(DATA_GRANULARITY));
       } catch (Exception e) {
-        LOG.warn("Unable to parse user input data granularity: {}; use default from dataset config",
+        LOG.error("Unable to parse user input data granularity: {}",
             configuration.getString(DATA_GRANULARITY));
         throw new IllegalArgumentException("Unsupported time granularity: " + configuration.getString(DATA_GRANULARITY));
       }
