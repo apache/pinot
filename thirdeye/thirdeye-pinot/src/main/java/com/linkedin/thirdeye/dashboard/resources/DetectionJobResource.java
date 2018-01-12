@@ -1093,14 +1093,14 @@ public class DetectionJobResource {
 
     TimeUnit detectionUnit = anomalyFunctionSpec.getBucketUnit();
     int detectionBucketSize = anomalyFunctionSpec.getBucketSize();
-    int detectionWindowSize = 1;
+    int detectionMinBuckets = 1;
     try {
       Properties functionProps = toProperties(anomalyFunctionSpec.getProperties());
-      detectionWindowSize = Integer.valueOf(functionProps.getProperty(SIGN_TEST_WINDOW_SIZE, "1"));
+      detectionMinBuckets = Integer.valueOf(functionProps.getProperty(SIGN_TEST_WINDOW_SIZE, "1"));
     } catch (IOException e) {
       LOG.warn("Failed to fetch function properties when evaluating mttd!");
     }
-    double functionMTTDInHour = TimeUnit.HOURS.convert(detectionBucketSize * detectionWindowSize, detectionUnit);
+    double functionMTTDInHour = TimeUnit.HOURS.convert(detectionBucketSize * detectionMinBuckets, detectionUnit);
     return Response.ok(Math.max(functionMTTDInHour, alertFilterMTTDInHour)).build();
   }
 
@@ -1138,14 +1138,14 @@ public class DetectionJobResource {
 
     TimeUnit detectionUnit = anomalyFunctionSpec.getBucketUnit();
     int detectionBucketSize = anomalyFunctionSpec.getBucketSize();
-    int detectionWindowSize = 1;
+    int detectionMinBuckets = 1;
     try {
       Properties functionProps = toProperties(anomalyFunctionSpec.getProperties());
-      detectionWindowSize = Integer.valueOf(functionProps.getProperty(SIGN_TEST_WINDOW_SIZE, "1"));
+      detectionMinBuckets = Integer.valueOf(functionProps.getProperty(SIGN_TEST_WINDOW_SIZE, "1"));
     } catch (IOException e) {
       LOG.warn("Failed to fetch function properties when evaluating mttd!");
     }
-    double functionMTTDInHour = TimeUnit.HOURS.convert(detectionBucketSize * detectionWindowSize, detectionUnit);
+    double functionMTTDInHour = TimeUnit.HOURS.convert(detectionBucketSize * detectionMinBuckets, detectionUnit);
     return Response.ok(Math.max(functionMTTDInHour, alertFilterMTTDInHour)).build();
   }
 
