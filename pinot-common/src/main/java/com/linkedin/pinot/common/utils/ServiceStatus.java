@@ -45,11 +45,14 @@ public class ServiceStatus {
     STARTING, GOOD, BAD
   }
 
+  public static String AWAITING_CONDITION_NONE = "None";
+
   /**
    * Callback that returns the status of the service.
    */
   public interface ServiceStatusCallback {
     Status getServiceStatus();
+    String getAwaitingCondition();
   }
 
   private static ServiceStatusCallback serviceStatusCallback = null;
@@ -91,6 +94,16 @@ public class ServiceStatus {
       // All callbacks report good, therefore we're good too
       return Status.GOOD;
     }
+
+    public String getAwaitingCondition() {
+      StringBuilder awaitingCondition = new StringBuilder();
+      for (ServiceStatusCallback statusCallback : _statusCallbacks) {
+        awaitingCondition.append(
+            statusCallback.getClass().getSimpleName() + ":" + statusCallback.getAwaitingCondition() + "$"
+        );
+      }
+      return awaitingCondition.toString();
+    }
   }
 
   /**
@@ -107,6 +120,7 @@ public class ServiceStatus {
     protected HelixDataAccessor _helixDataAccessor;
     protected Builder _keyBuilder;
     protected Set<String> _resourcesDoneStartingUp = new HashSet<>();
+    private String _awaitingCondition = "*";
 
     public IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName) {
       _helixManager = helixManager;
@@ -157,6 +171,10 @@ public class ServiceStatus {
       LOGGER.info("Monitoring resources {} for start up of instance {}", _resourcesToMonitor, _instanceName);
     }
 
+    public String getAwaitingCondition() {
+      return _awaitingCondition;
+    }
+
     protected abstract T getState(String resourceName);
 
     protected abstract Map<String, String> getPartitionStateMap(T state);
@@ -177,6 +195,7 @@ public class ServiceStatus {
         T helixState = getState(resourceToMonitor);
 
         if (idealState == null || helixState == null) {
+          _awaitingCondition = "idealState or helixState is null";
           return Status.STARTING;
         }
 
@@ -187,6 +206,7 @@ public class ServiceStatus {
 
         Map<String, String> statePartitionStateMap = getPartitionStateMap(helixState);
         if(statePartitionStateMap.isEmpty() && !idealState.getPartitionSet().isEmpty()) {
+          _awaitingCondition = "statePartitionStateMapSize=" + statePartitionStateMap.size() + " and idealStateSize=" + idealState.getPartitionSet().size();
           return Status.STARTING;
         }
 
@@ -203,6 +223,7 @@ public class ServiceStatus {
 
           // If this instance state is not in the current state, then it hasn't finished starting up
           if (!statePartitionStateMap.containsKey(partition)) {
+            _awaitingCondition = "statePartitionStateMap does not have " + partition;
             return Status.STARTING;
           }
 
@@ -211,6 +232,7 @@ public class ServiceStatus {
           // If the instance state is not ERROR and is not the same as what's expected from the ideal state, then it
           // hasn't finished starting up
           if (!"ERROR".equals(currentStateStatus) && !idealStateStatus.equals(currentStateStatus)) {
+            _awaitingCondition = partition +":currentStateStatus=" + currentStateStatus + " and idealStateStatus=" + idealStateStatus;
             return Status.STARTING;
           }
         }
@@ -221,6 +243,7 @@ public class ServiceStatus {
 
       LOGGER.info("Instance {} has finished starting up", _instanceName);
       _finishedStartingUp = true;
+      _awaitingCondition = AWAITING_CONDITION_NONE;
       return Status.GOOD;
     }
 
