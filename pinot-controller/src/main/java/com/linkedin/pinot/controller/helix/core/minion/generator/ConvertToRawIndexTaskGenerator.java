@@ -23,7 +23,6 @@ import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.helix.core.minion.ClusterInfoProvider;
 import com.linkedin.pinot.core.common.MinionConstants;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -116,9 +115,10 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
           continue;
         }
 
-        // Only submit segments that have not been optimized
-        List<String> optimizations = offlineSegmentZKMetadata.getOptimizations();
-        if (optimizations == null || !optimizations.contains(V1Constants.MetadataKeys.Optimization.RAW_INDEX)) {
+        // Only submit segments that have not been converted
+        Map<String, String> customMap = offlineSegmentZKMetadata.getCustomMap();
+        if (customMap == null || !customMap.containsKey(
+            MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY + MinionConstants.TASK_TIME_SUFFIX)) {
           Map<String, String> configs = new HashMap<>();
           configs.put(MinionConstants.TABLE_NAME_KEY, offlineTableName);
           configs.put(MinionConstants.SEGMENT_NAME_KEY, segmentName);

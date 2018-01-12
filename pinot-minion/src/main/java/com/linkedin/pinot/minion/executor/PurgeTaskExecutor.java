@@ -17,9 +17,11 @@ package com.linkedin.pinot.minion.executor;
 
 import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import com.linkedin.pinot.core.common.MinionConstants;
 import com.linkedin.pinot.core.minion.SegmentPurger;
 import java.io.File;
+import java.util.Collections;
 import javax.annotation.Nonnull;
 
 
@@ -42,5 +44,12 @@ public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
     }
 
     return new SegmentPurger(originalIndexDir, workingDir, recordPurger, recordModifier).purgeSegment();
+  }
+
+  @Override
+  protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier() throws Exception {
+    return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.REPLACE,
+        Collections.singletonMap(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
+            String.valueOf(System.currentTimeMillis())));
   }
 }

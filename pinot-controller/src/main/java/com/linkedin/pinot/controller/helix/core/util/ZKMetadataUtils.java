@@ -75,8 +75,6 @@ public class ZKMetadataUtils {
       offlineSegmentZKMetadata.setPartitionMetadata(new SegmentPartitionMetadata(columnPartitionMap));
     }
 
-    offlineSegmentZKMetadata.setOptimizations(segmentMetadata.getOptimizations());
-
     return offlineSegmentZKMetadata;
   }
 

@@ -51,6 +51,11 @@ public class FileUploadUtils {
   public static class CustomHeaders {
     public static final String UPLOAD_TYPE = "UPLOAD_TYPE";
     public static final String DOWNLOAD_URI = "DOWNLOAD_URI";
+    public static final String SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER = "Pinot-SegmentZKMetadataCustomMapModifier";
+  }
+
+  public static class QueryParameters {
+    public static final String ENABLE_PARALLEL_PUSH_PROTECTION = "enableParallelPushProtection";
   }
 
   public static final int DEFAULT_SOCKET_TIMEOUT_MS = 3600 * 1000; // 1 hour

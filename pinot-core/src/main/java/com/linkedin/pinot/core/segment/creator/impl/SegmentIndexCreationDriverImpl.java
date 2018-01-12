@@ -40,6 +40,7 @@ import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
+import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import com.linkedin.pinot.core.startree.OffHeapStarTreeBuilder;
 import com.linkedin.pinot.core.startree.StarTreeBuilder;
 import com.linkedin.pinot.core.startree.StarTreeBuilderConfig;
@@ -386,13 +387,27 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Delete the temporary directory
     FileUtils.deleteQuietly(tempIndexDir);
 
-    // Compute CRC
-    final long crc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc();
+    // Convert segment format if necessary
+    convertFormatIfNeeded(segmentOutputDir);
+
+    // Compute CRC and creation time
+    long crc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc();
+    long creationTime;
+    String creationTimeInConfig = config.getCreationTime();
+    if (creationTimeInConfig != null) {
+      try {
+        creationTime = Long.parseLong(creationTimeInConfig);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while parsing creation time in config, use current time as creation time");
+        creationTime = System.currentTimeMillis();
+      }
+    } else {
+      creationTime = System.currentTimeMillis();
+    }
 
     // Persist creation metadata to disk
-    persistCreationMeta(segmentOutputDir, crc);
+    persistCreationMeta(segmentOutputDir, crc, creationTime);
 
-    convertFormatIfNeeded(segmentOutputDir);
     LOGGER.info("Driver, record read time : {}", totalRecordReadTime);
     LOGGER.info("Driver, stats collector time : {}", totalStatsCollectorTime);
     LOGGER.info("Driver, indexing time : {}", totalIndexTime);
@@ -458,33 +473,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     return segmentStats.getColumnProfileFor(columnName);
   }
 
-  public void overWriteSegmentName(String segmentName) {
-    this.segmentName = segmentName;
-  }
-
-  /**
-   * Writes segment creation metadata to disk.
-   */
-  void persistCreationMeta(File outputDir, long crc)
-      throws IOException {
-    final File crcFile = new File(outputDir, V1Constants.SEGMENT_CREATION_META);
-    final DataOutputStream out = new DataOutputStream(new FileOutputStream(crcFile));
-    out.writeLong(crc);
-
-    long creationTime = System.currentTimeMillis();
-
-    // Use the creation time from the configuration if it exists and is not -1
-    try {
-      long configCreationTime = Long.parseLong(config.getCreationTime());
-      if (0L < configCreationTime) {
-        creationTime = configCreationTime;
-      }
-    } catch (Exception nfe) {
-      // Ignore NPE and NFE, use the current time.
+  public static void persistCreationMeta(File indexDir, long crc, long creationTime) throws IOException {
+    File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
+    File creationMetaFile = new File(segmentDir, V1Constants.SEGMENT_CREATION_META);
+    try (DataOutputStream output = new DataOutputStream(new FileOutputStream(creationMetaFile))) {
+      output.writeLong(crc);
+      output.writeLong(creationTime);
     }
-
-    out.writeLong(creationTime);
-    out.close();
   }
 
   /**
