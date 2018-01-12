@@ -3,7 +3,7 @@ import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
-import { toCurrentUrn, toBaselineUrn, filterPrefix, appendFilters, toFilters } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, appendFilters, toFilters, checkStatus } from 'thirdeye-frontend/helpers/utils';
 import _ from 'lodash';
 
 const queryParamsConfig = {
@@ -78,11 +78,11 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     }
 
     if (sessionId) {
-      session = fetch(`/session/${sessionId}`).then(res => res.json());
+      session = fetch(`/session/${sessionId}`).then(checkStatus).catch(res => undefined);
     }
 
     if (anomalyUrn) {
-      anomalyContext = fetch(`/rootcause/raw?framework=anomalyContext&urns=${anomalyUrn}`).then(res => res.json());
+      anomalyContext = fetch(`/rootcause/raw?framework=anomalyContext&urns=${anomalyUrn}`).then(checkStatus).catch(res => undefined);
     }
 
     return RSVP.hash({
@@ -139,7 +139,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       anomalyRangeEnd
     } = model.queryParams;
 
-    const {
+    let {
       anomalyId,
       metricId,
       sessionId,
@@ -172,6 +172,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     let sessionName = 'New Investigation (' + moment().format(dateFormat) + ')';
     let sessionText = '';
     let sessionModified = true;
+    let routeErrors = new Set();
 
     // metric-initialized context
     if (metricId && metricUrn) {
@@ -187,54 +188,65 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     }
 
     // anomaly-initialized context
-    if (anomalyId && anomalyUrn && anomalyContext) {
-      const contextUrns = anomalyContext.map(e => e.urn);
+    if (anomalyId && anomalyUrn) {
+      if (!_.isEmpty(anomalyContext)) {
+        const contextUrns = anomalyContext.map(e => e.urn);
 
-      const baseMetricUrns = filterPrefix(contextUrns, 'thirdeye:metric:');
-      const dimensionUrns = filterPrefix(contextUrns, 'thirdeye:dimension:');
+        const baseMetricUrns = filterPrefix(contextUrns, 'thirdeye:metric:');
+        const dimensionUrns = filterPrefix(contextUrns, 'thirdeye:dimension:');
 
-      const metricUrns = baseMetricUrns.map(urn => appendFilters(urn, toFilters(dimensionUrns)));
+        const metricUrns = baseMetricUrns.map(urn => appendFilters(urn, toFilters(dimensionUrns)));
 
-      const anomalyRangeUrns = filterPrefix(contextUrns, 'thirdeye:timerange:anomaly:');
-      const analysisRangeUrns = filterPrefix(contextUrns, 'thirdeye:timerange:analysis:');
+        const anomalyRangeUrns = filterPrefix(contextUrns, 'thirdeye:timerange:anomaly:');
+        const analysisRangeUrns = filterPrefix(contextUrns, 'thirdeye:timerange:analysis:');
 
-      // thirdeye:timerange:anomaly:{start}:{end}
-      const anomalyRange = _.slice(anomalyRangeUrns[0].split(':'), 3, 5).map(i => parseInt(i, 10));
+        // thirdeye:timerange:anomaly:{start}:{end}
+        const anomalyRange = _.slice(anomalyRangeUrns[0].split(':'), 3, 5).map(i => parseInt(i, 10));
 
-      // thirdeye:timerange:analysis:{start}:{end}
-      // align to local end of day
-      const [rawStart, rawEnd] = _.slice(analysisRangeUrns[0].split(':'), 3, 5).map(i => parseInt(i, 10));
-      const analysisRange = [moment(rawStart).startOf('day').add(1, 'day').valueOf(), moment(rawEnd).endOf('day').valueOf()];
+        // thirdeye:timerange:analysis:{start}:{end}
+        // align to local end of day
+        const [rawStart, rawEnd] = _.slice(analysisRangeUrns[0].split(':'), 3, 5).map(i => parseInt(i, 10));
+        const analysisRange = [moment(rawStart).startOf('day').add(1, 'day').valueOf(), moment(rawEnd).endOf('day').valueOf()];
 
-      context = {
-        urns: new Set([...metricUrns, anomalyUrn]),
-        anomalyRange,
-        analysisRange,
-        granularity,
-        compareMode
-      };
+        context = {
+          urns: new Set([...metricUrns, anomalyUrn]),
+          anomalyRange,
+          analysisRange,
+          granularity,
+          compareMode
+        };
 
-      selectedUrns = new Set([...metricUrns, ...metricUrns.map(toCurrentUrn), ...metricUrns.map(toBaselineUrn), anomalyUrn]);
-      sessionName = 'New Investigation of #' + anomalyId + ' (' + moment().format(dateFormat) + ')';
-      sessionText = 'Anomaly #' + anomalyId + ' occurred due to ...';
+        selectedUrns = new Set([...metricUrns, ...metricUrns.map(toCurrentUrn), ...metricUrns.map(toBaselineUrn), anomalyUrn]);
+        sessionName = 'New Investigation of #' + anomalyId + ' (' + moment().format(dateFormat) + ')';
+        sessionText = 'Anomaly #' + anomalyId + ' occurred due to ...';
+
+      } else {
+        routeErrors.add(`Could not find anomalyId ${anomalyId}`);
+      }
     }
 
     // session-initialized context
-    if (sessionId && session) {
-      context = {
-        urns: new Set(session.contextUrns),
-        anomalyRange: [session.anomalyRangeStart, session.anomalyRangeEnd],
-        analysisRange: [session.analysisRangeStart, session.analysisRangeEnd],
-        granularity: session.granularity,
-        compareMode: session.compareMode
-      };
-      selectedUrns = new Set(session.selectedUrns);
-      sessionName = session.name;
-      sessionText = session.text;
-      sessionModified = false;
+    if (sessionId) {
+      if (!_.isEmpty(session)) {
+        context = {
+          urns: new Set(session.contextUrns),
+          anomalyRange: [session.anomalyRangeStart, session.anomalyRangeEnd],
+          analysisRange: [session.analysisRangeStart, session.analysisRangeEnd],
+          granularity: session.granularity,
+          compareMode: session.compareMode
+        };
+        selectedUrns = new Set(session.selectedUrns);
+        sessionName = session.name;
+        sessionText = session.text;
+        sessionModified = false;
+
+      } else {
+        routeErrors.add(`Could not find sessionId ${sessionId}`);
+      }
     }
 
     controller.setProperties({
+      routeErrors,
       sessionId,
       sessionName,
       sessionText,
