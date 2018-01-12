@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core.sharding;
 
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.helix.model.IdealState;
 
@@ -25,5 +26,7 @@ Example load metrics are number of segments, storage size of segments, STeP pape
 STeP paper: http://people.csail.mit.edu/rytaft/step.pdf
 */
 public interface ServerLoadMetric {
-  long computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState, String instance,String tableName);
+  double computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState, String instance,String tableName);
+  void updateServerLoadMetric(PinotHelixResourceManager helixResourceManager, String instance, Double currentLoadMetric, String tableName, SegmentMetadata segmentMetadata);
+  void resetServerLoadMetric(PinotHelixResourceManager helixResourceManager, String instance);
 }

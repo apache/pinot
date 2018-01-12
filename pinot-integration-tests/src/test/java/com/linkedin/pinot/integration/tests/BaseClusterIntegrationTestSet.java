@@ -34,6 +34,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 /**
@@ -46,7 +47,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   // Default settings
   private static final String DEFAULT_QUERY_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K";
-  private static final int DEFAULT_NUM_QUERIES_TO_GENERATE = 100;
+  private static final int DEFAULT_NUM_QUERIES_TO_GENERATE = 1000;
   private static final int DEFAULT_MAX_NUM_QUERIES_TO_SKIP_IN_QUERY_FILE = 200;
 
   /**
@@ -183,6 +184,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
+  @Test
   public void testGeneratedQueriesWithMultiValues() throws Exception {
     testGeneratedQueries(true);
   }

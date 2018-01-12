@@ -57,7 +57,9 @@ public class BalancedSegmentSizeSegmentAssignmentStrategyIntegrationTest extends
 
   @Override
   protected String getSegmentAssignmentStrategy() {
-    return "BalancedSegmentSizeSegmentAssignmentStrategy";
+
+    //return "BalancedSegmentSizeSegmentAssignmentStrategy";
+    return "BalancedLatencyBasedSegmentAssignmentStrategy";
   }
 
   @Override

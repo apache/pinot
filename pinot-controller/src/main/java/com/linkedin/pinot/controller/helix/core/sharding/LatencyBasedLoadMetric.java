@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.controller.helix.core.sharding;
 
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.core.query.utils.Pair;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.log4j.Logger;
@@ -29,22 +31,18 @@ import java.util.List;
 import java.util.Map;
 
 public class LatencyBasedLoadMetric implements ServerLoadMetric {
-    //private static final HttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
-    //private static final Executor executor = Executors.newFixedThreadPool(1);
     private static final Logger logger = Logger.getLogger(LatencyBasedLoadMetric.class.getName());
     /**
      *  map to maintain cost of tables calculated by training logs.
       */
-    private Map<String,Long> tableLatencyMap;
+    private Map<String,Pair<Float,Float>> _tableLatencyMap;
     /**
      *  map to maintain server specific costs.
      */
-    private Map<String,Long> serverLatencyMap;
     private static final String COST_FILE = "latencyTrainedData/latency_load.csv";
 
     public LatencyBasedLoadMetric (){
-        this.tableLatencyMap = new HashMap<>();
-        this.serverLatencyMap = new HashMap<>();
+        _tableLatencyMap = new HashMap<>();
         fillTableCosts();
     }
 
@@ -59,63 +57,40 @@ public class LatencyBasedLoadMetric implements ServerLoadMetric {
             logger.info("Latency Based Load metric reading trained cost file:"+trained_cost_file.getAbsolutePath());
             List<String> lines =  FileUtils.readLines(new File(trained_cost_file.getAbsolutePath()));
             //BufferedReader br = new BufferedReader(new FileReader(trained_cost_file));
-
-                for (String line : lines) {
-                    String[] info = line.split(",");
-                    Long cost = 0l;
-                    if (this.tableLatencyMap.containsKey(info[0])) {
-                        cost = this.tableLatencyMap.get(info[0]);
-                    }
-                    cost = cost + (long)(double)Double.valueOf(info[2]);
-                    this.tableLatencyMap.put(info[0], cost);
-                    logger.info("Latency Based cost added for tableName : " + info[0] + " cost :" + cost);
-                }
-
-        }catch (Exception e){
+            for(int i=1; i<lines.size();i++)
+            {
+                String[] costRecord = lines.get(i).split(",");
+                _tableLatencyMap.put(costRecord[0], new Pair(Float.parseFloat(costRecord[1]),Float.parseFloat(costRecord[2])));
+            }
+        }catch (Exception e) {
             e.printStackTrace();
         }
-
-        //tableLatencyMap.put("Job_OFFLINE",(long)(37.99312352282242));
-
     }
 
-    public void addCostToServerMap(String instance, Long cost, PinotHelixResourceManager helixResourceManager, String tableName){
-        logger.info("Latency Based Load metric: Adding cost to server : "+instance + " cost:"+cost);
-        if (tableLatencyMap.containsKey(tableName)){
-            if(cost == 0){
-                cost = tableLatencyMap.get(tableName);
-                logger.info("Setting Server Latency first time Map Entry "+instance + " cost:"+cost);
-            }
-        }
-        this.serverLatencyMap.put(instance,cost);
-        helixResourceManager.setServerLatencyMap(this.serverLatencyMap);
-        for(String key : helixResourceManager.getServerLatencyMap().keySet()){
-            logger.info("Post Server Latency Map Entry "+key + " cost:"+helixResourceManager.getServerLatencyMap().get(key));
-        }
 
-    }
     @Override
-    public long computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState, String instance, String tableName) {
- /*       ServerLatencyMetricReader serverlatencyMetricsReader =
-                new ServerLatencyMetricReader(executor, connectionManager, helixResourceManager);
-*/
-        for(String key : helixResourceManager.getServerLatencyMap().keySet()){
-            logger.info("Pre Server Latency Map Entry "+key + " cost:"+helixResourceManager.getServerLatencyMap().get(key));
+    public double computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState, String instance, String tableName) {
+        Map<String,Double> serverLoadMap = helixResourceManager.getServerLoadMap();
+        if(serverLoadMap.containsKey(instance))
+        {
+            return serverLoadMap.get(instance);
         }
-        this.serverLatencyMap = helixResourceManager.getServerLatencyMap();
-        //ServerLoadMetrics serverLatencyInfo = serverlatencyMetricsReader.getServerLatencyMetrics(instance, tableName,true, 300);
-        // Will Add logic to read from the model file.
-        long tableLatencyCost = 0L;
-        if(this.tableLatencyMap.containsKey(tableName))
-             tableLatencyCost = this.tableLatencyMap.get(tableName);
-        long serverLatencyCost = 0L;
-        if(this.serverLatencyMap.containsKey(instance)){
-            serverLatencyCost = this.serverLatencyMap.get(instance);
+        else
+        {
+            return 0;
         }
+    }
 
-        serverLatencyCost = serverLatencyCost + tableLatencyCost;
-        //this.serverLatencyMap.put(instance,serverLatencyCost);
-        return serverLatencyCost ;
+    @Override
+    public void updateServerLoadMetric(PinotHelixResourceManager helixResourceManager, String instance, Double currentLoadMetric, String tableName, SegmentMetadata segmentMetadata) {
+        Pair<Float,Float> tableCostRecord = _tableLatencyMap.get(tableName);
+        double newServerLoadMetric = currentLoadMetric + (segmentMetadata.getTotalDocs()/tableCostRecord.getFirst())*tableCostRecord.getSecond();
+        helixResourceManager.updateServerLoadMap(instance,newServerLoadMetric);
+    }
+
+    @Override
+    public void resetServerLoadMetric(PinotHelixResourceManager helixResourceManager, String instance) {
+        helixResourceManager.updateServerLoadMap(instance,0D);
     }
 
   /*public static void main(String args[]){

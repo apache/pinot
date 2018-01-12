@@ -109,6 +109,8 @@ public class PinotHelixResourceManager {
   private final Map<String, SegmentAssignmentStrategy> _segmentAssignmentStrategyMap = new HashMap<>();
   private final Map<String, Map<String, Long>> _segmentCrcMap = new HashMap<>();
   private final Map<String, Map<String, Integer>> _lastKnownSegmentMetadataVersionMap = new HashMap<>();
+
+  private Map<String, Double> _serverLoadMap = new HashMap<>();
   private Map<String, Long> _serverLatencyMap = new HashMap<>();
 
   private final String _helixZkURL;
@@ -2258,5 +2260,20 @@ public class PinotHelixResourceManager {
   }
   public void setServerLatencyMap(Map<String,Long> latencyMap){
     this._serverLatencyMap = latencyMap;
+  }
+
+  public Map<String,Double> getServerLoadMap()
+  {
+    return _serverLoadMap;
+  }
+  public void setServerLoadMap(Map<String,Double> serverLoadMap)
+  {
+    this._serverLoadMap = serverLoadMap;
+  }
+  public void updateServerLoadMap(String instance, Double newLoadValue)
+  {
+      _serverLoadMap.put(instance,newLoadValue);
+      LOGGER.info("Laod for server "+ instance + " has been updated to " + newLoadValue.toString());
+
   }
 }

@@ -31,12 +31,12 @@ public class BalancedSegmentSizeSegmentAssignmentStrategy implements SegmentAssi
   public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager,
       ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
       int numReplicas, String tenantName) {
-    //We create a SegmentSizeMetric and pass it to BalancedLoadAssignmentStrategy
+    //We create a SegmentSizeMetric and pass it to BalancedLoadSegmentAssignmentStrategy
     //This means BalancedSegmentSizeSegmentAssignmentStrategy
     ServerLoadMetric serverLoadMetric = new SegmentSizeMetric();
     //ServerLoadMetric serverLoadMetric = new LatencyBasedLoadMetric();
-    BalancedLoadAssignmentStrategy balancedLoadAssignmentStrategy = new BalancedLoadAssignmentStrategy(serverLoadMetric);
-    return balancedLoadAssignmentStrategy.getAssignedInstances(helixResourceManager, propertyStore, helixClusterName,
+    BalancedLoadSegmentAssignmentStrategy BalancedLoadSegmentAssignmentStrategy = new BalancedLoadSegmentAssignmentStrategy(serverLoadMetric);
+    return BalancedLoadSegmentAssignmentStrategy.getAssignedInstances(helixResourceManager, propertyStore, helixClusterName,
         segmentMetadata, numReplicas, tenantName);
   }
 }

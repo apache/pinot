@@ -39,12 +39,12 @@ This class implements a load-based segment assignment strategy where it needs a 
 It then asks all tagged instances to return the load metric using the ServerLatencyMetric object.
 Finally numReplicas of instances that have the least load are selected.
  */
-public class BalancedLoadAssignmentStrategy implements SegmentAssignmentStrategy {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BalancedLoadAssignmentStrategy.class);
+public class BalancedLoadSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BalancedLoadSegmentAssignmentStrategy.class);
   private final double MAX_ACCEPTABLE_ERROR_RATE = 0.5;
   ServerLoadMetric _serverLoadMetric;
 
-  public BalancedLoadAssignmentStrategy(ServerLoadMetric serverLoadMetric) {
+  public BalancedLoadSegmentAssignmentStrategy(ServerLoadMetric serverLoadMetric) {
     _serverLoadMetric = serverLoadMetric;
   }
 
@@ -52,8 +52,10 @@ public class BalancedLoadAssignmentStrategy implements SegmentAssignmentStrategy
   public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager,
       ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
       int numReplicas, String tenantName) {
+
     String serverTenantName;
     String tableName;
+
 
     if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
       tableName = TableNameBuilder.REALTIME.tableNameWithType(segmentMetadata.getTableName());
@@ -64,7 +66,7 @@ public class BalancedLoadAssignmentStrategy implements SegmentAssignmentStrategy
     }
 
     List<String> selectedInstances = new ArrayList<>();
-    Map<String, Long> reportedLoadMetricPerInstanceMap = new HashMap<>();
+    Map<String, Double> reportedLoadMetricPerInstanceMap = new HashMap<>();
     List<String> allTaggedInstances =
         HelixHelper.getEnabledInstancesWithTag(helixResourceManager.getHelixAdmin(), helixClusterName,
             serverTenantName);
@@ -79,13 +81,14 @@ public class BalancedLoadAssignmentStrategy implements SegmentAssignmentStrategy
       //Otherwise we ask servers to return their load parameter
       if (idealState.getPartitionSet().isEmpty()) {
         for (String instance : allTaggedInstances) {
-          reportedLoadMetricPerInstanceMap.put(instance, 0L);
+          reportedLoadMetricPerInstanceMap.put(instance, 0D);
+          _serverLoadMetric.resetServerLoadMetric(helixResourceManager,instance);
         }
       } else {
         // We Do not add servers, that are not tagged, to the map.
         // By this approach, new segments will not be allotted to the server if tags changed.
         for (String instanceName : allTaggedInstances) {
-          long reportedMetric = _serverLoadMetric.computeInstanceMetric(helixResourceManager, idealState, instanceName,tableName);
+          double reportedMetric = _serverLoadMetric.computeInstanceMetric(helixResourceManager, idealState, instanceName,tableName);
           if (reportedMetric != -1) {
             reportedLoadMetricPerInstanceMap.put(instanceName, reportedMetric);
           } else {
@@ -120,9 +123,9 @@ public class BalancedLoadAssignmentStrategy implements SegmentAssignmentStrategy
     LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
         + segmentMetadata.getTableName() + ", selected instances: " + Arrays.toString(selectedInstances.toArray()));
 
-    if(_serverLoadMetric.getClass().equals(LatencyBasedLoadMetric.class))
-      for(String selectedInstance : selectedInstances){
-        ((LatencyBasedLoadMetric) _serverLoadMetric).addCostToServerMap(selectedInstance,reportedLoadMetricPerInstanceMap.get(selectedInstance),helixResourceManager,tableName);
+    for(int i=0; i<selectedInstances.size(); i++)
+    {
+      _serverLoadMetric.updateServerLoadMetric(helixResourceManager,selectedInstances.get(i),reportedLoadMetricPerInstanceMap.get(selectedInstances.get(i)),tableName,segmentMetadata);
     }
     return selectedInstances;
   }

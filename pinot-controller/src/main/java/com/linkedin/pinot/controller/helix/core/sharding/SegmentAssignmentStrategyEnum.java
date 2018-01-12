@@ -26,6 +26,6 @@ public enum SegmentAssignmentStrategyEnum {
   BucketizedSegmentAssignmentStrategy,
   ReplicaGroupSegmentAssignmentStrategy,
   BalancedSegmentSizeSegmentAssignmentStrategy,
-  BalancedLatencyBasedLoadAssignmentStrategy,
+  BalancedLatencyBasedSegmentAssignmentStrategy,
 
 }

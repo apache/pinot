@@ -38,8 +38,8 @@ public class SegmentAssignmentStrategyFactory {
         return new ReplicaGroupSegmentAssignmentStrategy();
       case BalancedSegmentSizeSegmentAssignmentStrategy:
         return new BalancedSegmentSizeSegmentAssignmentStrategy();
-      case BalancedLatencyBasedLoadAssignmentStrategy:
-        return new BalancedLatencyBasedLoadAssignmentStrategy();
+      case BalancedLatencyBasedSegmentAssignmentStrategy:
+        return new BalancedLatencyBasedSegmentAssignmentStrategy();
       default:
         return new BalanceNumSegmentAssignmentStrategy();
     }
