@@ -263,6 +263,14 @@ public class ControllerStarter {
           return ServiceStatus.Status.GOOD;
         }
       }
+      @Override
+      public String getAwaitingCondition() {
+        if (_isStarted) {
+          return ServiceStatus.AWAITING_CONDITION_NONE;
+        } else {
+          return "Helix ZK Not connected";
+        }
+      }
     });
 
     helixResourceManager.getHelixZkManager().addPreConnectCallback(new PreConnectCallback() {
