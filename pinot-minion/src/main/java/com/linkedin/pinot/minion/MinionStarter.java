@@ -130,6 +130,12 @@ public class MinionStarter {
         minionMetrics.addMeteredGlobalValue(MinionMeter.HEALTH_CHECK_GOOD_CALLS, 1L);
         return ServiceStatus.Status.GOOD;
       }
+
+      @Override
+      public String getStatusDescription() {
+        return ServiceStatus.STATUS_DESCRIPTION_NONE;
+      }
+
     });
 
     LOGGER.info("Pinot minion started");
