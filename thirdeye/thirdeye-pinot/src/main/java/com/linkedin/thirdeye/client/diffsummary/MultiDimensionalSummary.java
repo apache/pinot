@@ -13,7 +13,6 @@ import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
 import com.linkedin.thirdeye.dashboard.views.diffsummary.SummaryResponse;
 import com.linkedin.thirdeye.datasource.MetricExpression;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -42,7 +41,7 @@ public class MultiDimensionalSummary {
   private static final ObjectMapper objectMapper = new ObjectMapper();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
-  private static final String TOP_K_POSTFIX = "_topk";
+  public static final String TOP_K_POSTFIX = "_topk";
 
   private OLAPDataBaseClient olapClient;
   private CostFunction costFunction;
@@ -202,7 +201,7 @@ public class MultiDimensionalSummary {
     return new Dimensions(dimensionsToRetain);
   }
 
-  private static CostFunction parseCostFunction(String paramString)
+  public static CostFunction initiateCostFunction(String paramString)
       throws IOException, ClassNotFoundException, NoSuchMethodException, IllegalAccessException,
       InvocationTargetException, InstantiationException {
     HashMap<String, String> params = objectMapper.readValue(paramString, HashMap.class);
@@ -212,9 +211,7 @@ public class MultiDimensionalSummary {
 
     Class<CostFunction> clazz = (Class<CostFunction>) Class.forName(className);
     Constructor<CostFunction> constructor = clazz.getConstructor(Map.class);
-    CostFunction costFunction = constructor.newInstance(new Object[] { params });
-
-    return costFunction;
+    return constructor.newInstance(new Object[] { params });
   }
 
   public static void main(String[] args) throws Exception {
@@ -251,11 +248,11 @@ public class MultiDimensionalSummary {
       // Create cost function
       CostFunction costFunction = null;
       if (commandLine.hasOption("costFunction")) {
-        costFunction = parseCostFunction(commandLine.getOptionValue("costFunction"));
+        costFunction = initiateCostFunction(commandLine.getOptionValue("costFunction"));
       } else {
         costFunction = new BalancedCostFunction();
       }
-      LOG.info(costFunction.getClass().getSimpleName());
+      LOG.info("Using cost function '{}' for summary algorithm.", costFunction.getClass().getSimpleName());
       Preconditions.checkNotNull(costFunction);
 
       // Initialize ThirdEye's environment
