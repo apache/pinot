@@ -198,9 +198,10 @@ public class ServiceStatus {
         return Status.GOOD;
       }
       int index = 0;
+      final int totalResourceCount = _resourcesToMonitor.size();
 
       for (String resourceToMonitor : _resourcesToMonitor) {
-        final String completedCountStr = "(" + index + "/" + _resourcesToMonitor.size() + ")";
+        final String completedCountStr = "(" + resourceToMonitor + ":" + index + "/" + totalResourceCount + ")";
         // If the instance is already done starting up, skip checking its state
         if (_resourcesDoneStartingUp.contains(resourceToMonitor)) {
           continue;
