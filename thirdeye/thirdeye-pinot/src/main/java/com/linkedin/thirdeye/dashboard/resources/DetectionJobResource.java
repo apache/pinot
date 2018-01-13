@@ -1,11 +1,10 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
 import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
-import com.linkedin.thirdeye.detector.function.AnomalyFunction;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -63,6 +62,8 @@ import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
 
+import static com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO.*;
+
 
 @Path("/detection-job")
 @Produces(MediaType.APPLICATION_JSON)
@@ -83,8 +84,10 @@ public class DetectionJobResource {
   public static final String AUTOTUNE_PATTERN_KEY = "pattern";
   public static final String AUTOTUNE_MTTD_KEY = "mttd";
   private static final String COMMA_SEPARATOR = ",";
+  private static final String SIGN_TEST_WINDOW_SIZE = "signTestWindowSize";
 
-  public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory, AlertFilterAutotuneFactory alertFilterAutotuneFactory) {
+  public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory,
+      AlertFilterAutotuneFactory alertFilterAutotuneFactory) {
     this.detectionJobScheduler = detectionJobScheduler;
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
@@ -93,7 +96,6 @@ public class DetectionJobResource {
     this.alertFilterAutotuneFactory = alertFilterAutotuneFactory;
     this.alertFilterFactory = alertFilterFactory;
   }
-
 
   // Toggle Function Activation is redundant to endpoints defined in AnomalyResource
   @Deprecated
@@ -140,7 +142,7 @@ public class DetectionJobResource {
 
   private void toggleRequiresCompletenessCheck(Long id, boolean state) {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
-    if(anomalyFunctionSpec == null) {
+    if (anomalyFunctionSpec == null) {
       throw new NullArgumentException("Function spec not found");
     }
     anomalyFunctionSpec.setRequiresCompletenessCheck(state);
@@ -150,7 +152,7 @@ public class DetectionJobResource {
   @POST
   @Path("/{id}/ad-hoc")
   public Response adHoc(@PathParam("id") Long id, @QueryParam("start") String startTimeIso,
-                        @QueryParam("end") String endTimeIso) throws Exception {
+      @QueryParam("end") String endTimeIso) throws Exception {
     Long startTime = null;
     Long endTime = null;
     if (StringUtils.isBlank(startTimeIso) || StringUtils.isBlank(endTimeIso)) {
@@ -187,10 +189,9 @@ public class DetectionJobResource {
   @POST
   @Path("/anomaly-weight")
   public Response computeSeverity(@NotNull @QueryParam("collection") String collectionName,
-      @NotNull @QueryParam("metric") String metricName,
-      @NotNull @QueryParam("start") String startTimeIso, @NotNull @QueryParam("end") String endTimeIso,
-      @QueryParam("period") String seasonalPeriodInDays, @QueryParam("seasonCount") String seasonCount)
-      throws Exception {
+      @NotNull @QueryParam("metric") String metricName, @NotNull @QueryParam("start") String startTimeIso,
+      @NotNull @QueryParam("end") String endTimeIso, @QueryParam("period") String seasonalPeriodInDays,
+      @QueryParam("seasonCount") String seasonCount) throws Exception {
     DateTime startTime = null;
     DateTime endTime = null;
     if (StringUtils.isNotBlank(startTimeIso)) {
@@ -237,16 +238,16 @@ public class DetectionJobResource {
   @POST
   @Path("/{id}/replay")
   public Response generateAnomaliesInRange(@PathParam("id") @NotNull final long id,
-      @QueryParam("start") @NotNull String startTimeIso,
-      @QueryParam("end") @NotNull String endTimeIso,
+      @QueryParam("start") @NotNull String startTimeIso, @QueryParam("end") @NotNull String endTimeIso,
       @QueryParam("force") @DefaultValue("false") String isForceBackfill,
       @QueryParam("speedup") @DefaultValue("false") final Boolean speedup,
-      @QueryParam("removeAnomaliesInWindow") @DefaultValue("false") final Boolean isRemoveAnomaliesInWindow) throws Exception {
-    Response response = generateAnomaliesInRangeForFunctions(Long.toString(id), startTimeIso, endTimeIso,
-        isForceBackfill, speedup, isRemoveAnomaliesInWindow);
+      @QueryParam("removeAnomaliesInWindow") @DefaultValue("false") final Boolean isRemoveAnomaliesInWindow)
+      throws Exception {
+    Response response =
+        generateAnomaliesInRangeForFunctions(Long.toString(id), startTimeIso, endTimeIso, isForceBackfill, speedup,
+            isRemoveAnomaliesInWindow);
     return response;
   }
-
 
   /**
    * Breaks down the given range into consecutive monitoring windows as per function definition
@@ -273,11 +274,11 @@ public class DetectionJobResource {
   @POST
   @Path("/replay")
   public Response generateAnomaliesInRangeForFunctions(@QueryParam("ids") @NotNull String ids,
-      @QueryParam("start") @NotNull String startTimeIso,
-      @QueryParam("end") @NotNull String endTimeIso,
+      @QueryParam("start") @NotNull String startTimeIso, @QueryParam("end") @NotNull String endTimeIso,
       @QueryParam("force") @DefaultValue("false") String isForceBackfill,
       @QueryParam("speedup") @DefaultValue("false") final Boolean speedup,
-      @QueryParam("removeAnomaliesInWindow") @DefaultValue("false") final Boolean isRemoveAnomaliesInWindow) throws Exception {
+      @QueryParam("removeAnomaliesInWindow") @DefaultValue("false") final Boolean isRemoveAnomaliesInWindow)
+      throws Exception {
     final boolean forceBackfill = Boolean.valueOf(isForceBackfill);
     final List<Long> functionIdList = new ArrayList<>();
     final Map<Long, Long> detectionJobIdMap = new HashMap<>();
@@ -310,8 +311,8 @@ public class DetectionJobResource {
 
     if (startTime.isAfter(endTime)) {
       LOG.error("[Backfill] Monitoring start time is after monitoring end time");
-      throw new IllegalArgumentException(String.format(
-          "[Backfill] Monitoring start time is after monitoring end time"));
+      throw new IllegalArgumentException(
+          String.format("[Backfill] Monitoring start time is after monitoring end time"));
     }
     if (endTime.isAfterNow()) {
       endTime = DateTime.now();
@@ -361,7 +362,7 @@ public class DetectionJobResource {
     new Thread(new Runnable() {
       @Override
       public void run() {
-        for(long detectionJobId : detectionJobIdMap.values()) {
+        for (long detectionJobId : detectionJobIdMap.values()) {
           detectionJobScheduler.waitForJobDone(detectionJobId);
         }
         // Revert window setup
@@ -382,7 +383,7 @@ public class DetectionJobResource {
    * TODO the replay
    * @param functionId
    */
-  private void anomalyFunctionSpeedup (long functionId) {
+  private void anomalyFunctionSpeedup(long functionId) {
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     anomalyFunction.setWindowSize(170);
     anomalyFunction.setWindowUnit(TimeUnit.HOURS);
@@ -435,15 +436,16 @@ public class DetectionJobResource {
     Long jobId = detectionJobScheduler.runOfflineAnalysis(id, analysisTime);
     List<Long> anomalyIds = new ArrayList<>();
     if (jobId == null) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("Anomaly function " + Long.toString(id)
-          + " is inactive. Or thread is interrupted.").build();
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("Anomaly function " + Long.toString(id) + " is inactive. Or thread is interrupted.")
+          .build();
     } else {
       JobStatus jobStatus = detectionJobScheduler.waitForJobDone(jobId);
-      if(jobStatus.equals(JobStatus.FAILED)) {
+      if (jobStatus.equals(JobStatus.FAILED)) {
         return Response.status(Response.Status.NO_CONTENT).entity("Detection job failed").build();
       } else {
-        List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(
-            0, analysisTime.getMillis(), id, true);
+        List<MergedAnomalyResultDTO> mergedAnomalies =
+            mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(0, analysisTime.getMillis(), id, true);
         for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
           anomalyIds.add(mergedAnomaly.getId());
         }
@@ -462,27 +464,29 @@ public class DetectionJobResource {
    * @param holidayEnds: holidayEnds in in ISO Format ex: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
    * @return a list of merged anomalies with holidays removed
    */
-  public static List<MergedAnomalyResultDTO> getMergedAnomaliesRemoveHolidays(long functionId, long startTime, long endTime, String holidayStarts, String holidayEnds) {
+  public static List<MergedAnomalyResultDTO> getMergedAnomaliesRemoveHolidays(long functionId, long startTime,
+      long endTime, String holidayStarts, String holidayEnds) {
     StringTokenizer starts = new StringTokenizer(holidayStarts, ",");
     StringTokenizer ends = new StringTokenizer(holidayEnds, ",");
     MergedAnomalyResultManager anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
-    List<MergedAnomalyResultDTO> totalAnomalies = anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, functionId, true);
+    List<MergedAnomalyResultDTO> totalAnomalies =
+        anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, functionId, true);
     int origSize = totalAnomalies.size();
     long start;
     long end;
     while (starts.hasMoreElements() && ends.hasMoreElements()) {
       start = ISODateTimeFormat.dateTimeParser().parseDateTime(starts.nextToken()).getMillis();
       end = ISODateTimeFormat.dateTimeParser().parseDateTime(ends.nextToken()).getMillis();
-      List<MergedAnomalyResultDTO> holidayMergedAnomalies = anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(start, end, functionId, true);
+      List<MergedAnomalyResultDTO> holidayMergedAnomalies =
+          anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(start, end, functionId, true);
       totalAnomalies.removeAll(holidayMergedAnomalies);
     }
-    if(starts.hasMoreElements() || ends.hasMoreElements()) {
+    if (starts.hasMoreElements() || ends.hasMoreElements()) {
       LOG.warn("Input holiday starts and ends length not equal!");
     }
     LOG.info("Removed {} merged anomalies", origSize - totalAnomalies.size());
     return totalAnomalies;
   }
-
 
   /**
    *
@@ -500,15 +504,11 @@ public class DetectionJobResource {
    */
   @POST
   @Path("/autotune/filter/{functionIds}")
-  public Response tuneAlertFilter(@PathParam("functionIds") String ids,
-      @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso,
-      @QueryParam("autoTuneType") @DefaultValue("AUTOTUNE") String autoTuneType,
+  public Response tuneAlertFilter(@PathParam("functionIds") String ids, @QueryParam("start") String startTimeIso,
+      @QueryParam("end") String endTimeIso, @QueryParam("autoTuneType") @DefaultValue("AUTOTUNE") String autoTuneType,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
-      @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds,
-      @QueryParam("tuningFeatures") String features,
-      @QueryParam("mttd") String mttd,
-      @QueryParam("pattern") String pattern) {
+      @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds, @QueryParam("tuningFeatures") String features,
+      @QueryParam("mttd") String mttd, @QueryParam("pattern") String pattern) {
 
     long startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
     long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
@@ -524,8 +524,7 @@ public class DetectionJobResource {
         continue;
       }
       anomalyFunctionIds.add(id);
-      anomalies.addAll(
-          getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds));
+      anomalies.addAll(getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds));
     }
     if (anomalyFunctionIds.isEmpty()) {
       return Response.status(Status.BAD_REQUEST).entity("No valid function ids").build();
@@ -533,6 +532,13 @@ public class DetectionJobResource {
 
     // create alert filter auto tune
     AutotuneConfigDTO autotuneConfig = new AutotuneConfigDTO();
+    if (anomalyFunctionIds.size() >= 1) {
+      AnomalyFunctionDTO functionSpec =
+          DAO_REGISTRY.getAnomalyFunctionDAO().findById(Long.valueOf(anomalyFunctionIds.get(0)));
+      BaseAlertFilter currentAlertFilter = alertFilterFactory.fromSpec(functionSpec.getAlertFilter());
+      autotuneConfig.initAlertFilter(currentAlertFilter);
+    }
+
     Properties autotuneProperties = autotuneConfig.getTuningProps();
 
     // if new feature set being specified
@@ -559,15 +565,14 @@ public class DetectionJobResource {
       autotuneConfig.setTuningProps(autotuneProperties);
     }
 
-
-    BaseAlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType, autotuneConfig, anomalies);
+    BaseAlertFilterAutoTune alertFilterAutotune =
+        alertFilterAutotuneFactory.fromSpec(autoTuneType, autotuneConfig, anomalies);
     LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
 
     // tune
     try {
       Map<String, String> tunedAlertFilter = alertFilterAutotune.tuneAlertFilter();
       LOG.info("Tuned alert filter with configurations: {}", tunedAlertFilter);
-
     } catch (Exception e) {
       LOG.warn("Exception when tuning alert filter: {}", e.getMessage());
     }
@@ -590,7 +595,6 @@ public class DetectionJobResource {
     }
   }
 
-
   /**
    * Endpoint to check if merged anomalies given a time period have at least one positive label
    * @param id functionId to test anomalies
@@ -602,14 +606,13 @@ public class DetectionJobResource {
    */
   @POST
   @Path("/initautotune/checkhaslabel/{functionId}")
-  public Response checkAnomaliesHasLabel(@PathParam("functionId") long id,
-      @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso,
-      @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
+  public Response checkAnomaliesHasLabel(@PathParam("functionId") long id, @QueryParam("start") String startTimeIso,
+      @QueryParam("end") String endTimeIso, @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
       @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
     long startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
     long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
-    List<MergedAnomalyResultDTO> anomalyResultDTOS = getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds);
+    List<MergedAnomalyResultDTO> anomalyResultDTOS =
+        getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds);
     return Response.ok(AnomalyUtils.checkHasLabels(anomalyResultDTOS)).build();
   }
 
@@ -626,8 +629,7 @@ public class DetectionJobResource {
   @POST
   @Path("/initautotune/filter/{functionId}")
   public Response initiateAlertFilterAutoTune(@PathParam("functionId") long id,
-      @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso,
+      @QueryParam("start") String startTimeIso, @QueryParam("end") String endTimeIso,
       @QueryParam("autoTuneType") @DefaultValue("AUTOTUNE") String autoTuneType,
       @QueryParam("userDefinedPattern") @DefaultValue("UP,DOWN") String userDefinedPattern,
       @QueryParam("Sensitivity") @DefaultValue("MEDIUM") String sensitivity,
@@ -638,7 +640,8 @@ public class DetectionJobResource {
     long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
 
     // get anomalies by function id, start time and end time
-    List<MergedAnomalyResultDTO> anomalies = getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds);
+    List<MergedAnomalyResultDTO> anomalies =
+        getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds);
 
     //initiate AutoTuneConfigDTO
     Properties tuningProperties = new Properties();
@@ -647,7 +650,8 @@ public class DetectionJobResource {
     AutotuneConfigDTO autotuneConfig = new AutotuneConfigDTO(tuningProperties);
 
     // create alert filter auto tune
-    BaseAlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType, autotuneConfig, anomalies);
+    BaseAlertFilterAutoTune alertFilterAutotune =
+        alertFilterAutotuneFactory.fromSpec(autoTuneType, autotuneConfig, anomalies);
     LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
 
     String autotuneId = null;
@@ -666,7 +670,6 @@ public class DetectionJobResource {
     return Response.ok(autotuneId).build();
   }
 
-
   /**
    * The endpoint to evaluate system performance. The evaluation will be based on sent and non sent anomalies
    * @param id: function ID
@@ -680,8 +683,7 @@ public class DetectionJobResource {
   @GET
   @Path("/eval/filter/{functionId}")
   public Response evaluateAlertFilterByFunctionId(@PathParam("functionId") long id,
-      @QueryParam("start") @NotNull String startTimeIso,
-      @QueryParam("end") @NotNull String endTimeIso,
+      @QueryParam("start") @NotNull String startTimeIso, @QueryParam("end") @NotNull String endTimeIso,
       @QueryParam("isProjected") @DefaultValue("false") String isProjected,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
       @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
@@ -701,8 +703,8 @@ public class DetectionJobResource {
       //evaluate current alert filter (calculate current precision and recall)
       evaluator = new PrecisionRecallEvaluator(alertFilter, anomalyResultDTOS);
 
-      LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall:{}", alertFilter.getClass().toString(),
-          evaluator.getWeightedPrecision(), evaluator.getRecall());
+      LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall:{}",
+          alertFilter.getClass().toString(), evaluator.getWeightedPrecision(), evaluator.getRecall());
     } else {
       evaluator = new PrecisionRecallEvaluator(anomalyResultDTOS);
     }
@@ -730,13 +732,12 @@ public class DetectionJobResource {
   @GET
   @Path("/eval/autotune/{autotuneId}")
   public Response evaluateAlertFilterByAutoTuneId(@PathParam("autotuneId") long id,
-      @QueryParam("start") @NotNull  String startTimeIso, @QueryParam("end") @NotNull String endTimeIso,
+      @QueryParam("start") @NotNull String startTimeIso, @QueryParam("end") @NotNull String endTimeIso,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
       @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
 
     long startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
     long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
-
 
     AutotuneConfigDTO target = DAO_REGISTRY.getAutotuneConfigDAO().findById(id);
     long functionId = target.getFunctionId();
@@ -756,7 +757,6 @@ public class DetectionJobResource {
       return Response.serverError().build();
     }
   }
-
 
   /**
    * Perform anomaly function autotune:
@@ -813,16 +813,15 @@ public class DetectionJobResource {
       }
       replayStart = replayEnd.minus(timeGranularity.toPeriod());
     } catch (Exception e) {
-      throw new WebApplicationException("Unable to parse strings, " + replayTimeIso
-          + ", in ISO DateTime format", e);
+      throw new WebApplicationException("Unable to parse strings, " + replayTimeIso + ", in ISO DateTime format", e);
     }
 
     // List all tuning parameter sets
     List<Map<String, String>> tuningParameters = null;
     try {
       tuningParameters = listAllTuningParameters(new JSONObject(tuningJSON));
-    } catch(JSONException e) {
-      LOG.error("Unable to parse json string: {}", tuningJSON, e );
+    } catch (JSONException e) {
+      LOG.error("Unable to parse json string: {}", tuningJSON, e);
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
     if (tuningParameters.size() == 0) { // no tuning combinations
@@ -830,7 +829,8 @@ public class DetectionJobResource {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
     AutotuneMethodType autotuneMethodType = AutotuneMethodType.EXHAUSTIVE;
-    PerformanceEvaluationMethod performanceEvalMethod = PerformanceEvaluationMethod.valueOf(performanceEvaluationMethod.toUpperCase());
+    PerformanceEvaluationMethod performanceEvalMethod =
+        PerformanceEvaluationMethod.valueOf(performanceEvaluationMethod.toUpperCase());
 
     Map<String, Double> originalPerformance = new HashMap<>();
     originalPerformance.put(performanceEvalMethod.name(),
@@ -841,12 +841,11 @@ public class DetectionJobResource {
     //TODO: override existing autotune results by a method "autotuneConfigDAO.udpate()"
     AutotuneConfigDTO targetDTO = null;
     List<AutotuneConfigDTO> functionAutoTuneConfigDTOList =
-        autotuneConfigDAO.findAllByFuctionIdAndWindow(functionId,replayStart.getMillis(), replayEnd.getMillis());
+        autotuneConfigDAO.findAllByFuctionIdAndWindow(functionId, replayStart.getMillis(), replayEnd.getMillis());
     for (AutotuneConfigDTO configDTO : functionAutoTuneConfigDTOList) {
-      if(configDTO.getAutotuneMethod().equals(autotuneMethodType) &&
-          configDTO.getPerformanceEvaluationMethod().equals(performanceEvalMethod) &&
-          configDTO.getStartTime() == replayStart.getMillis() && configDTO.getEndTime() == replayEnd.getMillis() &&
-          configDTO.getGoal() == goal) {
+      if (configDTO.getAutotuneMethod().equals(autotuneMethodType) && configDTO.getPerformanceEvaluationMethod()
+          .equals(performanceEvalMethod) && configDTO.getStartTime() == replayStart.getMillis()
+          && configDTO.getEndTime() == replayEnd.getMillis() && configDTO.getGoal() == goal) {
         targetDTO = configDTO;
         break;
       }
@@ -873,10 +872,11 @@ public class DetectionJobResource {
     autotuneConfigDAO.update(targetDTO);
 
     // Setup threads and start to run
-    for(Map<String, String> config : tuningParameters) {
+    for (Map<String, String> config : tuningParameters) {
       LOG.info("Running backfill replay with parameter configuration: {}" + config.toString());
-      FunctionReplayRunnable backfillRunnable = new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO,
-          mergedAnomalyResultDAO, rawAnomalyResultDAO, autotuneConfigDAO);
+      FunctionReplayRunnable backfillRunnable =
+          new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO,
+              rawAnomalyResultDAO, autotuneConfigDAO);
       backfillRunnable.setTuningFunctionId(functionId);
       backfillRunnable.setFunctionAutotuneConfigId(targetDTO.getId());
       backfillRunnable.setReplayStart(replayStart);
@@ -942,7 +942,6 @@ public class DetectionJobResource {
     return tuningParameters;
   }
 
-
   /**
    * Single function Reply to generate anomalies given a time range
    * Given anomaly function Id, or auto tuned Id, start time, end time, it clones a function with same configurations and replays from start time to end time
@@ -960,8 +959,7 @@ public class DetectionJobResource {
   @POST
   @Path("/replay/singlefunction")
   public Response replayAnomalyFunctionByFunctionId(@QueryParam("functionId") Long functionId,
-      @QueryParam("autotuneId") Long autotuneId,
-      @QueryParam("start") @NotNull String replayStartTimeIso,
+      @QueryParam("autotuneId") Long autotuneId, @QueryParam("start") @NotNull String replayStartTimeIso,
       @QueryParam("end") @NotNull String replayEndTimeIso,
       @QueryParam("speedUp") @DefaultValue("true") boolean speedUp) {
 
@@ -981,9 +979,13 @@ public class DetectionJobResource {
     AutotuneConfigDTO target = null;
     if (autotuneId != null) {
       target = DAO_REGISTRY.getAutotuneConfigDAO().findById(autotuneId);
-      functionReplayRunnable = new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO, target.getConfiguration(), target.getFunctionId(), replayStart, replayEnd, false);
+      functionReplayRunnable =
+          new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO,
+              rawAnomalyResultDAO, target.getConfiguration(), target.getFunctionId(), replayStart, replayEnd, false);
     } else {
-      functionReplayRunnable = new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO, new HashMap<String, String>(), functionId, replayStart, replayEnd, false);
+      functionReplayRunnable =
+          new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO,
+              rawAnomalyResultDAO, new HashMap<String, String>(), functionId, replayStart, replayEnd, false);
     }
     functionReplayRunnable.setSpeedUp(speedUp);
     functionReplayRunnable.run();
@@ -991,11 +993,11 @@ public class DetectionJobResource {
     Map<String, String> responseMessages = new HashMap<>();
     responseMessages.put("cloneFunctionId", String.valueOf(functionReplayRunnable.getLastClonedFunctionId()));
     if (target != null && functionId != null && functionId != target.getFunctionId()) {
-      responseMessages.put("Warning", "Input function Id does not consistent with autotune Id's function, use auto tune Id's information instead.");
+      responseMessages.put("Warning",
+          "Input function Id does not consistent with autotune Id's function, use auto tune Id's information instead.");
     }
     return Response.ok(responseMessages).build();
   }
-
 
   /**
    * Given alert filter autotune Id, update to function spec
@@ -1035,7 +1037,7 @@ public class DetectionJobResource {
    * @param holidayEnds holiday ends time in ISO format to remove merged anomalies: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
    * @return training data in json format
    */
-  @POST
+  @GET
   @Path("/eval/autotunemetadata/{autotuneId}")
   public Response getAlertFilterMetaDataByAutoTuneId(@PathParam("autotuneId") long id,
       @QueryParam("start") String startTimeIso, @QueryParam("end") String endTimeIso,
@@ -1048,8 +1050,8 @@ public class DetectionJobResource {
       startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
       endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
     } catch (Exception e) {
-      throw new WebApplicationException("Unable to parse strings, " + startTimeIso + " and " + endTimeIso
-          + ", in ISO DateTime format", e);
+      throw new WebApplicationException(
+          "Unable to parse strings, " + startTimeIso + " and " + endTimeIso + ", in ISO DateTime format", e);
     }
 
     AutotuneConfigDTO target = DAO_REGISTRY.getAutotuneConfigDAO().findById(id);
@@ -1057,7 +1059,7 @@ public class DetectionJobResource {
     List<MergedAnomalyResultDTO> anomalyResultDTOS =
         getMergedAnomaliesRemoveHolidays(functionId, startTime, endTime, holidayStarts, holidayEnds);
     List<AnomalyUtils.MetaDataNode> metaData = new ArrayList<>();
-    for (MergedAnomalyResultDTO anomaly: anomalyResultDTOS) {
+    for (MergedAnomalyResultDTO anomaly : anomalyResultDTOS) {
       metaData.add(new AnomalyUtils.MetaDataNode(anomaly));
     }
     return Response.ok(metaData).build();
@@ -1067,19 +1069,38 @@ public class DetectionJobResource {
    * Get Minimum Time to Detection for Function.
    * This endpoint evaluate both alert filter's MTTD and bucket size for function and returns the maximum of the two as MTTD
    * @param id function Id to be evaluated
-   * @param severity severity value
+   * @param severity severity value to evaluate minimum-time-to-detect
    * @return minimum time to detection in HOUR
    */
   @GET
   @Path("/eval/mttd/{functionId}")
-  public Response getAlertFilterMTTD (@PathParam("functionId") @NotNull long id,
+  public Response getAlertFilterMTTD(@PathParam("functionId") @NotNull long id,
       @QueryParam("severity") @NotNull double severity) {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
-    double alertFilterMTTDInHour = alertFilter.getAlertFilterMTTD(severity);
+    // Compute minimum-time-to-detect for both pattern, and choose the maximum value as the minimum-time-to-detect for alert filter
+    // For one pattern alert, the MTTD is always +Infinity for the other pattern, hence this step we only use MTTD from the interested pattern
+    // For two pattern alerts, the MTTD is computed to take as the maximum value of both side
+    double alertFilterMTTDInHour = 0;
+    double alertFilterMTTDUP = alertFilter.getAlertFilterMTTD(severity);
+    double alertFilterMTTDDOWN = alertFilter.getAlertFilterMTTD(-1.0 * severity);
+    if (!Double.isInfinite(alertFilterMTTDUP) && !Double.isNaN(alertFilterMTTDUP)) {
+      alertFilterMTTDInHour = Math.max(alertFilterMTTDInHour, alertFilterMTTDUP);
+    }
+    if (!Double.isInfinite(alertFilterMTTDDOWN) && !Double.isNaN(alertFilterMTTDDOWN) ) {
+      alertFilterMTTDInHour = Math.max(alertFilterMTTDInHour, alertFilterMTTDDOWN);
+    }
+
     TimeUnit detectionUnit = anomalyFunctionSpec.getBucketUnit();
     int detectionBucketSize = anomalyFunctionSpec.getBucketSize();
-    double functionMTTDInHour = TimeUnit.HOURS.convert(detectionBucketSize, detectionUnit);
+    int detectionMinBuckets = 1;
+    try {
+      Properties functionProps = toProperties(anomalyFunctionSpec.getProperties());
+      detectionMinBuckets = Integer.valueOf(functionProps.getProperty(SIGN_TEST_WINDOW_SIZE, "1"));
+    } catch (IOException e) {
+      LOG.warn("Failed to fetch function properties when evaluating mttd!");
+    }
+    double functionMTTDInHour = TimeUnit.HOURS.convert(detectionBucketSize * detectionMinBuckets, detectionUnit);
     return Response.ok(Math.max(functionMTTDInHour, alertFilterMTTDInHour)).build();
   }
 
@@ -1092,7 +1113,7 @@ public class DetectionJobResource {
    */
   @GET
   @Path("/eval/projected/mttd/{autotuneId}")
-  public Response getProjectedMTTD (@PathParam("autotuneId") @NotNull long id,
+  public Response getProjectedMTTD(@PathParam("autotuneId") @NotNull long id,
       @QueryParam("severity") @NotNull double severity) {
     //Initiate tuned alert filter
     AutotuneConfigDTO target = DAO_REGISTRY.getAutotuneConfigDAO().findById(id);
@@ -1101,10 +1122,30 @@ public class DetectionJobResource {
     // Get current function
     long functionId = target.getFunctionId();
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(functionId);
-    double alertFilterMTTDInHour = alertFilter.getAlertFilterMTTD(severity);
+    // Compute minimum-time-to-detect for both pattern, and choose the maximum value as the minimum-time-to-detect for alert filter
+    // For one pattern alert, the MTTD is always +Infinity for the other pattern, hence this step we only use MTTD from the interested pattern
+    // For two pattern alerts, the MTTD is computed to take as the maximum value of both side
+
+    double alertFilterMTTDInHour = 0;
+    double alertFilterMTTDUP = alertFilter.getAlertFilterMTTD(severity);
+    double alertFilterMTTDDOWN = alertFilter.getAlertFilterMTTD(-1.0 * severity);
+    if (!Double.isInfinite(alertFilterMTTDUP) && !Double.isNaN(alertFilterMTTDUP)) {
+      alertFilterMTTDInHour = Math.max(alertFilterMTTDInHour, alertFilterMTTDUP);
+    }
+    if (!Double.isInfinite(alertFilterMTTDDOWN) && !Double.isNaN(alertFilterMTTDDOWN)) {
+      alertFilterMTTDInHour = Math.max(alertFilterMTTDInHour, alertFilterMTTDDOWN);
+    }
+
     TimeUnit detectionUnit = anomalyFunctionSpec.getBucketUnit();
     int detectionBucketSize = anomalyFunctionSpec.getBucketSize();
-    double functionMTTDInHour = TimeUnit.HOURS.convert(detectionBucketSize, detectionUnit);
+    int detectionMinBuckets = 1;
+    try {
+      Properties functionProps = toProperties(anomalyFunctionSpec.getProperties());
+      detectionMinBuckets = Integer.valueOf(functionProps.getProperty(SIGN_TEST_WINDOW_SIZE, "1"));
+    } catch (IOException e) {
+      LOG.warn("Failed to fetch function properties when evaluating mttd!");
+    }
+    double functionMTTDInHour = TimeUnit.HOURS.convert(detectionBucketSize * detectionMinBuckets, detectionUnit);
     return Response.ok(Math.max(functionMTTDInHour, alertFilterMTTDInHour)).build();
   }
 
@@ -1117,9 +1158,8 @@ public class DetectionJobResource {
    */
   @GET
   @Path("/eval/projected/anomalies/{autotuneId}")
-  public ArrayList<Long> getPreviewedAnomaliesByAutoTuneId (@PathParam("autotuneId") long autotuneId,
-      @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso) {
+  public ArrayList<Long> getPreviewedAnomaliesByAutoTuneId(@PathParam("autotuneId") long autotuneId,
+      @QueryParam("start") String startTimeIso, @QueryParam("end") String endTimeIso) {
     long startTime;
     long endTime;
     try {
