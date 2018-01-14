@@ -317,9 +317,9 @@ public class Cube { // the cube (Ca|Cb)
     }
 
     Collections.sort(costSet, Collections.reverseOrder());
-    LOG.info("Cost set");
+    LOG.info("\tCost set");
     for (DimNameValueCostEntry entry : costSet.subList(0, Math.min(costSet.size(), 20))) {
-      LOG.info("{}", entry);
+      LOG.info("\t\t{}", entry);
     }
 
     return costSet;

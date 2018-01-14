@@ -290,7 +290,7 @@ public class MultiDimensionalSummary {
               dataFilter, summarySize, depth, hierarchies, oneSideError);
 
       // Log summary result
-      LOG.info(summaryResponse.toString());
+      LOG.info(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(summaryResponse));
     }
 
     // Force closing the connections to data sources.
