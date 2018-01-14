@@ -64,7 +64,6 @@ public class MultiDimensionalSummary {
     Preconditions.checkArgument(!Strings.isNullOrEmpty(dataset));
     Preconditions.checkArgument(!Strings.isNullOrEmpty(metric));
     Preconditions.checkArgument(currentStartInclusive < currentEndExclusive);
-    Preconditions.checkArgument(baselineEndExclusive <= currentStartInclusive);
     Preconditions.checkArgument(baselineStartInclusive < baselineEndExclusive);
     Preconditions.checkNotNull(dimensions);
     Preconditions.checkArgument(dimensions.size() > 0);
@@ -110,6 +109,11 @@ public class MultiDimensionalSummary {
         Option.builder("dim").longOpt("dimensions").desc("dimension names that are separated by comma").hasArg()
             .argName("LIST").build();
     options.addOption(dimensions);
+
+    Option excludedDimensions =
+        Option.builder("notDim").longOpt("excludedDimensions").desc("dimension names to be excluded").hasArg()
+            .argName("LIST").build();
+    options.addOption(excludedDimensions);
 
     Option filters =
         Option.builder("filters").desc("filter to apply on the data cube (a map of list in Json format)").hasArg().argName("JSON").build();
@@ -191,10 +195,10 @@ public class MultiDimensionalSummary {
     return removeDimensions(dimensions, dimensionsToRemove);
   }
 
-  private static Dimensions removeDimensions(Dimensions dimensions, Collection<String> dimensionsToRemove) {
+  public static Dimensions removeDimensions(Dimensions dimensions, Collection<String> dimensionsToRemove) {
     List<String> dimensionsToRetain = new ArrayList<>();
     for (String dimensionName : dimensions.allDimensions()) {
-      if(!dimensionsToRemove.contains(dimensionName)){
+      if(!dimensionsToRemove.contains(dimensionName.trim())){
         dimensionsToRetain.add(dimensionName);
       }
     }
@@ -229,6 +233,7 @@ public class MultiDimensionalSummary {
       String dataset = commandLine.getOptionValue("dataset");
       String metricName = commandLine.getOptionValue("metric");
       String dimensionString = commandLine.getOptionValue("dimensionString", "");
+      String excludedDimensionString = commandLine.getOptionValue("excludedDimensions", "");
       String filterJson = commandLine.getOptionValue("filters", "{}");
       long currentStart = Long.parseLong(commandLine.getOptionValue("currentStart"));
       long currentEnd = Long.parseLong(commandLine.getOptionValue("currentEnd"));
@@ -266,6 +271,11 @@ public class MultiDimensionalSummary {
       } else {
         dimensions = new Dimensions(Arrays.asList(dimensionString.trim().split(",")));
       }
+      if (!Strings.isNullOrEmpty(excludedDimensionString)) {
+        List<String> dimensionsToBeRemoved = Arrays.asList(excludedDimensionString.trim().split(","));
+        dimensions = MultiDimensionalSummary.removeDimensions(dimensions, dimensionsToBeRemoved);
+      }
+
       Multimap<String, String> dataFilter = ThirdEyeUtils.convertToMultiMap(filterJson);
       List<List<String>> hierarchies =
           MultiDimensionalSummary.objectMapper.readValue(hierarchiesJson, new TypeReference<List<List<String>>>() {

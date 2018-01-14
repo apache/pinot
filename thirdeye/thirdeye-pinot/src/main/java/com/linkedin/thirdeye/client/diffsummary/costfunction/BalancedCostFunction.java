@@ -3,11 +3,8 @@ package com.linkedin.thirdeye.client.diffsummary.costfunction;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class BalancedCostFunction implements CostFunction {
-  private static final Logger LOG = LoggerFactory.getLogger(BalancedCostFunction.class);
   public static final String CHANGE_CONTRIBUTION_THRESHOLD_PARAM = "threshold";
   // The threshold to the contribution to overall changes in percentage
   private double changeContributionThreshold = 3d;
@@ -69,6 +66,24 @@ public class BalancedCostFunction implements CostFunction {
     return cost;
   }
 
+  private static double errorWithEmptyBaseline(double currentValue, double parentRatio) {
+    if (Double.compare(parentRatio, 1) < 0) {
+      parentRatio = 2 - parentRatio;
+    }
+    double logExpRatio = Math.log(parentRatio);
+    double cost = currentValue * logExpRatio;
+    return cost;
+  }
+
+  private static double errorWithEmptyCurrent(double baseline, double parentRatio) {
+    if (Double.compare(parentRatio, 1) > 0) {
+      parentRatio = 2 - parentRatio;
+    }
+    double logExpRatio = Math.log(parentRatio);
+    double cost = -baseline * logExpRatio;
+    return cost;
+  }
+
   /**
    * Auto fill in baselineValue and currentValue using parentRatio when one of them is zero.
    * If baselineValue and currentValue both are zero or parentRatio is not finite, this function returns 0.
@@ -81,14 +96,10 @@ public class BalancedCostFunction implements CostFunction {
     if (Double.compare(0., baselineValue) != 0 && Double.compare(0., currentValue) != 0) {
       return error(baselineValue, currentValue, parentRatio, contribution);
     } else if (Double.compare(baselineValue, 0d) == 0 || Double.compare(currentValue, 0d) == 0) {
-      double filledInRatio = Math.max(1d, Math.abs(baselineValue - currentValue));
       if (Double.compare(0., baselineValue) == 0) {
-        return error(currentValue / Math.max(filledInRatio, parentRatio + (1 / filledInRatio)), currentValue,
-            parentRatio, contribution);
+        return errorWithEmptyBaseline(currentValue, parentRatio);
       } else {
-        filledInRatio = 1d / filledInRatio; // because Double.compare(baselineValue, currentValue) > 0
-        return error(baselineValue, baselineValue * Math.min(1 / filledInRatio, parentRatio + filledInRatio),
-            parentRatio, contribution);
+        return errorWithEmptyCurrent(baselineValue, parentRatio);
       }
     } else { // baselineValue and currentValue are zeros. Set cost to zero so the node will be naturally aggregated to its parent.
       return 0.;

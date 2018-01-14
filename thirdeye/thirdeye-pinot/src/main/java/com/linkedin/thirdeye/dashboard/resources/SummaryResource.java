@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Strings;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.client.diffsummary.Dimensions;
@@ -15,6 +16,7 @@ import com.linkedin.thirdeye.dashboard.views.diffsummary.SummaryResponse;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.net.URLDecoder;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -40,6 +42,7 @@ public class SummaryResource {
   private static final String DEFAULT_TOP_DIMENSIONS = "3";
   private static final String DEFAULT_HIERARCHIES = "[]";
   private static final String DEFAULT_ONE_SIDE_ERROR = "false";
+  private static final String DEFAULT_EXCLUDED_DIMENSIONS = "";
   private static final String JAVASCRIPT_NULL_STRING = "undefined";
   private static final String HTML_STRING_ENCODING = "UTF-8";
 
@@ -58,6 +61,7 @@ public class SummaryResource {
       @QueryParam("topDimensions") @DefaultValue(DEFAULT_TOP_DIMENSIONS) int topDimensions,
       @QueryParam("hierarchies") @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
       @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
+      @QueryParam("excludedDimensions") @DefaultValue(DEFAULT_EXCLUDED_DIMENSIONS) String excludedDimensions,
       @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
     if (summarySize < 1) summarySize = 1;
 
@@ -69,6 +73,11 @@ public class SummaryResource {
             MultiDimensionalSummary.sanitizeDimensions(new Dimensions(Utils.getSchemaDimensionNames(collection)));
       } else {
         dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
+      }
+
+      if (!Strings.isNullOrEmpty(excludedDimensions)) {
+        List<String> dimensionsToBeRemoved = Arrays.asList(excludedDimensions.trim().split(","));
+        dimensions = MultiDimensionalSummary.removeDimensions(dimensions, dimensionsToBeRemoved);
       }
 
       Multimap<String, String> filterSetMap;
