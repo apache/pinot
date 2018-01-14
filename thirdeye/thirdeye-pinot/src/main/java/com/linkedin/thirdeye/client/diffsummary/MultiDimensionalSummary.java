@@ -31,6 +31,7 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
+import org.apache.commons.lang3.tuple.MutablePair;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -59,7 +60,7 @@ public class MultiDimensionalSummary {
 
   public SummaryResponse buildSummary(String dataset, String metric, long currentStartInclusive,
       long currentEndExclusive, long baselineStartInclusive, long baselineEndExclusive, Dimensions dimensions,
-      Multimap<String, String> dataFilters, int summarySize, int topDimensions, List<List<String>> hierarchies,
+      Multimap<String, String> dataFilters, int summarySize, int depth, List<List<String>> hierarchies,
       boolean doOneSideError) throws Exception {
     Preconditions.checkArgument(!Strings.isNullOrEmpty(dataset));
     Preconditions.checkArgument(!Strings.isNullOrEmpty(metric));
@@ -70,7 +71,7 @@ public class MultiDimensionalSummary {
     Preconditions.checkNotNull(dataFilters);
     Preconditions.checkArgument(summarySize > 1);
     Preconditions.checkNotNull(hierarchies);
-    Preconditions.checkArgument(topDimensions >= 0);
+    Preconditions.checkArgument(depth >= 0);
 
     olapClient.setCollection(dataset);
     List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM, dataset);
@@ -82,15 +83,18 @@ public class MultiDimensionalSummary {
 
     Cube cube = new Cube(costFunction);
     SummaryResponse response;
-    if (topDimensions > 0) {
-      cube.buildWithAutoDimensionOrder(olapClient, dimensions, dataFilters, topDimensions, hierarchies);
+    if (depth > 0) {
+      List<MutablePair<String, Double>> dimensionCosts =
+          cube.buildWithAutoDimensionOrder(olapClient, dimensions, dataFilters, depth, hierarchies);
       Summary summary = new Summary(cube, costFunction);
-      response = summary.computeSummary(summarySize, doOneSideError, topDimensions);
+      response = summary.computeSummary(summarySize, doOneSideError, depth);
+      response.setDimensionCosts(dimensionCosts);
     } else {
       cube.buildWithManualDimensionOrder(olapClient, dimensions, dataFilters);
       Summary summary = new Summary(cube, costFunction);
       response = summary.computeSummary(summarySize, doOneSideError);
     }
+    response.setDataset(dataset);
     response.setMetricName(metric);
 
     return response;
@@ -143,10 +147,8 @@ public class MultiDimensionalSummary {
         Option.builder("size").longOpt("summarySize").desc("size of summary").hasArg().argName("NUMBER").build();
     options.addOption(size);
 
-    Option topDimension =
-        Option.builder("top").longOpt("topDimensions").desc("number of top dimensions").hasArg().argName("NUMBER")
-            .build();
-    options.addOption(topDimension);
+    Option depth = Option.builder("depth").desc("number of top dimensions").hasArg().argName("NUMBER").build();
+    options.addOption(depth);
 
     Option hierarchies = Option.builder("h").longOpt("hierarchies")
         .desc("dimension hierarchies (a list of lists in Json format)").hasArg().argName("JSON")
@@ -241,10 +243,10 @@ public class MultiDimensionalSummary {
       long baselineEnd = Long.parseLong(commandLine.getOptionValue("baselineEnd"));
 
       int summarySize = Integer.parseInt(commandLine.getOptionValue("size", "10"));
-      int topDimensions = Integer.parseInt(commandLine.getOptionValue("topDimensions", "3"));
+      int depth = Integer.parseInt(commandLine.getOptionValue("depth", "3"));
       String hierarchiesJson = commandLine.getOptionValue("hierarchies", "[]");
       if (commandLine.hasOption("manual")) {
-        topDimensions = 0;
+        depth = 0;
       }
       boolean oneSideError = commandLine.hasOption("oneSideError");
       String dateTimeZoneId = commandLine.getOptionValue("timeZone", DateTimeZone.UTC.getID());
@@ -285,7 +287,7 @@ public class MultiDimensionalSummary {
       MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(olapClient, costFunction, timeZone);
       SummaryResponse summaryResponse = mdSummary
           .buildSummary(dataset, metricName, currentStart, currentEnd, baselineStart, baselineEnd, dimensions,
-              dataFilter, summarySize, topDimensions, hierarchies, oneSideError);
+              dataFilter, summarySize, depth, hierarchies, oneSideError);
 
       // Log summary result
       LOG.info(summaryResponse.toString());

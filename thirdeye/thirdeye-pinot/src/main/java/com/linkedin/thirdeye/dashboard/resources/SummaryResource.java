@@ -16,7 +16,6 @@ import com.linkedin.thirdeye.dashboard.views.diffsummary.SummaryResponse;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.net.URLDecoder;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -39,7 +38,7 @@ public class SummaryResource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   private static final String DEFAULT_TIMEZONE_ID = "UTC";
-  private static final String DEFAULT_TOP_DIMENSIONS = "3";
+  private static final String DEFAULT_DEPTH = "3";
   private static final String DEFAULT_HIERARCHIES = "[]";
   private static final String DEFAULT_ONE_SIDE_ERROR = "false";
   private static final String DEFAULT_EXCLUDED_DIMENSIONS = "";
@@ -49,7 +48,7 @@ public class SummaryResource {
   @GET
   @Path(value = "/summary/autoDimensionOrder")
   @Produces(MediaType.APPLICATION_JSON)
-  public String buildSummary(@QueryParam("dataset") String collection,
+  public String buildSummary(@QueryParam("dataset") String dataset,
       @QueryParam("metric") String metric,
       @QueryParam("currentStart") long currentStartInclusive,
       @QueryParam("currentEnd") long currentEndExclusive,
@@ -58,7 +57,7 @@ public class SummaryResource {
       @QueryParam("dimensions") String groupByDimensions,
       @QueryParam("filters") String filterJsonPayload,
       @QueryParam("summarySize") int summarySize,
-      @QueryParam("topDimensions") @DefaultValue(DEFAULT_TOP_DIMENSIONS) int topDimensions,
+      @QueryParam("depth") @DefaultValue(DEFAULT_DEPTH) int depth,
       @QueryParam("hierarchies") @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
       @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
       @QueryParam("excludedDimensions") @DefaultValue(DEFAULT_EXCLUDED_DIMENSIONS) String excludedDimensions,
@@ -70,7 +69,7 @@ public class SummaryResource {
       Dimensions dimensions;
       if (StringUtils.isBlank(groupByDimensions) || JAVASCRIPT_NULL_STRING.equals(groupByDimensions)) {
         dimensions =
-            MultiDimensionalSummary.sanitizeDimensions(new Dimensions(Utils.getSchemaDimensionNames(collection)));
+            MultiDimensionalSummary.sanitizeDimensions(new Dimensions(Utils.getSchemaDimensionNames(dataset)));
       } else {
         dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
       }
@@ -98,12 +97,12 @@ public class SummaryResource {
       MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(olapClient, costFunction, dateTimeZone);
 
       response = mdSummary
-          .buildSummary(collection, metric, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
-              baselineEndExclusive, dimensions, filterSetMap, summarySize, topDimensions, hierarchies, doOneSideError);
+          .buildSummary(dataset, metric, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
+              baselineEndExclusive, dimensions, filterSetMap, summarySize, depth, hierarchies, doOneSideError);
 
     } catch (Exception e) {
       LOG.error("Exception while generating difference summary", e);
-      response = SummaryResponse.buildNotAvailableResponse(metric);
+      response = SummaryResponse.buildNotAvailableResponse(dataset, metric);
     }
     return OBJECT_MAPPER.writeValueAsString(response);
   }
@@ -111,7 +110,7 @@ public class SummaryResource {
   @GET
   @Path(value = "/summary/manualDimensionOrder")
   @Produces(MediaType.APPLICATION_JSON)
-  public String buildSummaryManualDimensionOrder(@QueryParam("dataset") String collection,
+  public String buildSummaryManualDimensionOrder(@QueryParam("dataset") String dataset,
       @QueryParam("metric") String metric,
       @QueryParam("currentStart") long currentStartInclusive,
       @QueryParam("currentEnd") long currentEndExclusive,
@@ -128,12 +127,12 @@ public class SummaryResource {
     try {
       List<String> allDimensions;
       if (StringUtils.isBlank(groupByDimensions) || JAVASCRIPT_NULL_STRING.equals(groupByDimensions)) {
-        allDimensions = Utils.getSchemaDimensionNames(collection);
+        allDimensions = Utils.getSchemaDimensionNames(dataset);
       } else {
         allDimensions = Arrays.asList(groupByDimensions.trim().split(","));
       }
-      if (allDimensions.size() > Integer.parseInt(DEFAULT_TOP_DIMENSIONS)) {
-        allDimensions = allDimensions.subList(0, Integer.parseInt(DEFAULT_TOP_DIMENSIONS));
+      if (allDimensions.size() > Integer.parseInt(DEFAULT_DEPTH)) {
+        allDimensions = allDimensions.subList(0, Integer.parseInt(DEFAULT_DEPTH));
       }
       Dimensions dimensions = new Dimensions(allDimensions);
 
@@ -151,12 +150,12 @@ public class SummaryResource {
       MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(olapClient, costFunction, dateTimeZone);
 
       response = mdSummary
-          .buildSummary(collection, metric, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
+          .buildSummary(dataset, metric, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
               baselineEndExclusive, dimensions, filterSets, summarySize, 0, Collections.<List<String>>emptyList(),
               doOneSideError);
     } catch (Exception e) {
       LOG.error("Exception while generating difference summary", e);
-      response = SummaryResponse.buildNotAvailableResponse(metric);
+      response = SummaryResponse.buildNotAvailableResponse(dataset, metric);
     }
     return OBJECT_MAPPER.writeValueAsString(response);
   }

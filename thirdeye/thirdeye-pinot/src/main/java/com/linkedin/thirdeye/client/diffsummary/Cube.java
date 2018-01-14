@@ -84,19 +84,19 @@ public class Cube { // the cube (Ca|Cb)
     return costSet;
   }
 
-  public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions)
-      throws Exception {
-    buildWithAutoDimensionOrder(olapClient, dimensions, null,
-        DEFAULT_TOP_DIMENSION, Collections.<List<String>>emptyList());
+  public List<MutablePair<String, Double>> buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient,
+      Dimensions dimensions) throws Exception {
+    return buildWithAutoDimensionOrder(olapClient, dimensions, null, DEFAULT_TOP_DIMENSION,
+        Collections.<List<String>>emptyList());
   }
 
-  public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions, int topDimensions)
-      throws Exception {
-    buildWithAutoDimensionOrder(olapClient, dimensions, null, topDimensions, Collections.<List<String>>emptyList());
+  public List<MutablePair<String, Double>> buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient,
+      Dimensions dimensions, int depth) throws Exception {
+    return buildWithAutoDimensionOrder(olapClient, dimensions, null, depth, Collections.<List<String>>emptyList());
   }
 
-  public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions,
-      Multimap<String, String> filterSets, int topDimension, List<List<String>> hierarchy)
+  public List<MutablePair<String, Double>> buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient,
+      Dimensions dimensions, Multimap<String, String> filterSets, int depth, List<List<String>> hierarchy)
       throws Exception {
     long tStart = System.nanoTime();
     try {
@@ -110,11 +110,14 @@ public class Cube { // the cube (Ca|Cb)
       initializeBasicInfo(olapClient, filterSets);
       Dimensions shrankDimensions = shrinkDimensionsByFilterSets(dimensions, filterSets);
       this.costSet = computeOneDimensionCost(olapClient, topRatio, shrankDimensions, filterSets);
-      this.dimensions = sortDimensionOrder(costSet, shrankDimensions, topDimension, hierarchy);
+      List<MutablePair<String, Double>> dimensionCostPair = new ArrayList<>();
+      this.dimensions = sortDimensionOrder(costSet, shrankDimensions, depth, hierarchy, dimensionCostPair);
 
       LOG.info("Auto decided dimensions: " + this.dimensions);
 
       buildWithManualDimensionOrderInternal(olapClient, this.dimensions, filterSets);
+
+      return dimensionCostPair;
     } finally {
       ThirdeyeMetricsUtil.cubeCallCounter.inc();
       ThirdeyeMetricsUtil.cubeDurationCounter.inc(System.nanoTime() - tStart);
@@ -330,9 +333,12 @@ public class Cube { // the cube (Ca|Cb)
    * @throws Exception An exception is thrown if OLAP database cannot be connected.
    */
   private static Dimensions sortDimensionOrder(List<DimNameValueCostEntry> costSet, Dimensions dimensions,
-      int topDimension, List<List<String>> hierarchy)
+      int depth, List<List<String>> hierarchy, List<MutablePair<String, Double>> dimensionCostPairs)
       throws Exception {
-    List<MutablePair<String, Double>> dimensionCostPairs = new ArrayList<>();
+    if (dimensionCostPairs == null) {
+      dimensionCostPairs = new ArrayList<>();
+    }
+    dimensionCostPairs.clear();
 
     Map<String, Double> dimNameToCost = new HashMap<>();
     for (DimNameValueCostEntry dimNameValueCostEntry : costSet) {
@@ -394,45 +400,47 @@ public class Cube { // the cube (Ca|Cb)
     // Sort dimensions according to their costs in a descending order
     Collections.sort(dimensionCostPairs, Collections.reverseOrder(new DimensionCostPairSorter()));
 
-    // If there exists a huge gap (e.g., 1/10 of cost) between two cost pairs, then we chop of the dimensions because
+    int cutOffPairIdx = dimensionCostPairs.size();
+    // UNCOMMENT the following block to cut off dimensions with small costs. Ideally, a good cost function should be
+    // able to determine if it should stop drilling down.
+    // If there exists a huge gap (e.g., 1/10 of cost) between two cost pairs, then we chop off the dimensions because
     // pairs with small costs does not provide useful information
     // Invariance to keep: cutOffPairIdx <= number of dimensionCostPairs
-    int cutOffPairIdx = 1;
-    if (dimensionCostPairs.size() > 1) {
-      double cutOffCost = dimensionCostPairs.get(0).getRight() / 10d;
-      for (; cutOffPairIdx < dimensionCostPairs.size(); ++cutOffPairIdx) {
-        double curCost = dimensionCostPairs.get(cutOffPairIdx).getRight();
-        if (Double.compare(cutOffCost, curCost) > 0) {
-          break;
-        }
-      }
-    } else {
-      cutOffPairIdx = 0;
-    }
+//    int cutOffPairIdx = 1;
+//    if (dimensionCostPairs.size() > 1) {
+//      double cutOffCost = dimensionCostPairs.get(0).getRight() / 10d;
+//      for (; cutOffPairIdx < dimensionCostPairs.size(); ++cutOffPairIdx) {
+//        double curCost = dimensionCostPairs.get(cutOffPairIdx).getRight();
+//        if (Double.compare(cutOffCost, curCost) > 0) {
+//          break;
+//        }
+//      }
+//    } else {
+//      cutOffPairIdx = 0;
+//    }
 
     // Create a new Dimension instance whose dimensions follow the calculated order
-    ArrayList<String> newDimensions = new ArrayList<>();
+    List<String> sortedDimensions = new ArrayList<>();
     int pairIdx = 0;
     for (MutablePair<String, Double> dimensionCostPair : dimensionCostPairs) {
-      StringBuilder sb = new StringBuilder("  Dimension: ");
+      // Skip dimensions whose cost is zero or smaller
+      if (Double.compare(dimensionCostPair.getRight(), 0) <= 0) {
+        break;
+      }
       if (hierarchicalDimensionMap.containsKey(dimensionCostPair.getLeft())) {
         HierarchicalDimension hierarchicalDimension = hierarchicalDimensionMap.get(dimensionCostPair.getLeft());
         if (pairIdx <= cutOffPairIdx) {
-          newDimensions.addAll(hierarchicalDimension.hierarchy);
+          sortedDimensions.addAll(hierarchicalDimension.hierarchy);
         }
-        sb.append(hierarchicalDimension.hierarchy);
+        dimensionCostPair.setLeft(hierarchicalDimension.hierarchy.toString());
       } else { // The dimension does not belong to any hierarchy
         if (pairIdx <= cutOffPairIdx) {
-          newDimensions.add(dimensionCostPair.getLeft());
+          sortedDimensions.add(dimensionCostPair.getLeft());
         }
-        sb.append(dimensionCostPair.getLeft());
       }
-      sb.append(", Cost: ");
-      sb.append(dimensionCostPair.getRight());
-      LOG.info(sb.toString());
       ++pairIdx;
     }
-    return new Dimensions(newDimensions.subList(0, Math.min(topDimension, newDimensions.size())));
+    return new Dimensions(sortedDimensions.subList(0, Math.min(depth, sortedDimensions.size())));
   }
 
   static class DimensionCostPairSorter implements Comparator<MutablePair<String, Double>> {

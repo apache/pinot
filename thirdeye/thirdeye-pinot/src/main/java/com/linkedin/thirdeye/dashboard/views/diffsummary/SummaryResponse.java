@@ -9,13 +9,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.client.diffsummary.DimensionValues;
 import com.linkedin.thirdeye.client.diffsummary.Dimensions;
 import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
+import org.apache.commons.lang3.tuple.MutablePair;
 
 public class SummaryResponse {
   private final static int MAX_GAINER_LOSER_COUNT = 5;
@@ -26,11 +24,23 @@ public class SummaryResponse {
   static final String NOT_ALL = "(ALL)-";
   static final String NOT_AVAILABLE = "-na-";
 
+  @JsonProperty("dataset")
+  private String dataset;
+
   @JsonProperty("metricName")
   private String metricName;
 
+  @JsonProperty("baselineTotal")
+  private double baselineTotal = 0d;
+
+  @JsonProperty("currentTotal")
+  private double currentTotal = 0d;
+
+  @JsonProperty("globalRatio")
+  private double globalRatio = 1d;
+
   @JsonProperty("dimensions")
-  List<String> dimensions = new ArrayList<>();
+  private List<String> dimensions = new ArrayList<>();
 
   @JsonProperty("responseRows")
   private List<SummaryResponseRow> responseRows = new ArrayList<>();
@@ -41,9 +51,16 @@ public class SummaryResponse {
   @JsonProperty("loser")
   private List<SummaryGainerLoserResponseRow> loser = new ArrayList<>();
 
-  private double totalBaselineValue = 0d;
+  @JsonProperty("dimensinoCosts")
+  private List<MutablePair<String, Double>> dimensionCosts = new ArrayList<>();
 
-  private double totalCurrentValue = 0d;
+  public String getDataset() {
+    return dataset;
+  }
+
+  public void setDataset(String dataset) {
+    this.dataset = dataset;
+  }
 
   public String getMetricName() {
     return metricName;
@@ -65,8 +82,17 @@ public class SummaryResponse {
     return loser;
   }
 
-  public static SummaryResponse buildNotAvailableResponse(String metricName) {
+  public List<MutablePair<String, Double>> getDimensionCosts() {
+    return dimensionCosts;
+  }
+
+  public void setDimensionCosts(List<MutablePair<String, Double>> dimensionCosts) {
+    this.dimensionCosts = dimensionCosts;
+  }
+
+  public static SummaryResponse buildNotAvailableResponse(String dataset, String metricName) {
     SummaryResponse response = new SummaryResponse();
+    response.setDataset(dataset);
     response.setMetricName(metricName);
     response.dimensions.add(NOT_AVAILABLE);
     return response;
@@ -98,18 +124,22 @@ public class SummaryResponse {
     row.dimensionValue = costEntry.getDimValue();
     row.percentageChange = computePercentageChange(row.baselineValue, row.currentValue);
     row.contributionChange =
-        computeContributionChange(row.baselineValue, row.currentValue, totalBaselineValue, totalCurrentValue);
+        computeContributionChange(row.baselineValue, row.currentValue, baselineTotal, currentTotal);
     row.contributionToOverallChange =
-        computeContributionToOverallChange(row.baselineValue, row.currentValue, totalBaselineValue, totalCurrentValue);
+        computeContributionToOverallChange(row.baselineValue, row.currentValue, baselineTotal, currentTotal);
     row.cost = DOUBLE_FORMATTER.format(roundUp(costEntry.getCost()));
     return row;
   }
 
-  public void build(List<HierarchyNode> nodes, int targetLevelCount, List<DimNameValueCostEntry> costSet, CostFunction costFunction) {
+  public void build(List<HierarchyNode> nodes, int targetLevelCount, List<DimNameValueCostEntry> costSet,
+      CostFunction costFunction) {
     // Compute the total baseline and current value
     for(HierarchyNode node : nodes) {
-      totalBaselineValue += node.getBaselineValue();
-      totalCurrentValue += node.getCurrentValue();
+      baselineTotal += node.getBaselineValue();
+      currentTotal += node.getCurrentValue();
+    }
+    if (Double.compare(baselineTotal, 0d) != 0) {
+      globalRatio = roundUp(currentTotal / baselineTotal);
     }
 
     this.buildGainerLoserGroup(costSet);
@@ -124,7 +154,7 @@ public class SummaryResponse {
 
     // Build the header
     Dimensions dimensions = nodes.get(0).getDimensions();
-    for (int i = 0; i < targetLevelCount; ++i) {
+    for (int i = 0; i < dimensions.size(); ++i) {
       this.dimensions.add(dimensions.get(i));
     }
 
@@ -170,9 +200,9 @@ public class SummaryResponse {
       row.currentValue = node.getCurrentValue();
       row.percentageChange = computePercentageChange(row.baselineValue, row.currentValue);
       row.contributionChange =
-          computeContributionChange(row.baselineValue, row.currentValue, totalBaselineValue, totalCurrentValue);
+          computeContributionChange(row.baselineValue, row.currentValue, baselineTotal, currentTotal);
       row.contributionToOverallChange =
-          computeContributionToOverallChange(row.baselineValue, row.currentValue, totalBaselineValue, totalCurrentValue);
+          computeContributionToOverallChange(row.baselineValue, row.currentValue, baselineTotal, currentTotal);
       row.cost = node.getCost();
       StringBuilder sb = new StringBuilder();
       String separator = "";
@@ -194,18 +224,20 @@ public class SummaryResponse {
     }
   }
 
-  private static String computeContributionChange(double baseline, double current, double totalBaseline, double totalCurrent) {
-    if (totalCurrent != 0d && totalBaseline != 0d) {
-      double contributionChange = ((current / totalCurrent) - (baseline / totalBaseline)) * 100d;
+  private static String computeContributionChange(double baseline, double current, double baselineTotal,
+      double currentTotal) {
+    if (currentTotal != 0d && baselineTotal != 0d) {
+      double contributionChange = ((current / currentTotal) - (baseline / baselineTotal)) * 100d;
       return DOUBLE_FORMATTER.format(roundUp(contributionChange)) + "%";
     } else {
       return INFINITE;
     }
   }
 
-  private static String computeContributionToOverallChange(double baseline, double current, double totalBaseline, double totalCurrentValue) {
-    if (totalBaseline != 0d) {
-      double contributionToOverallChange = ((current - baseline) / Math.abs(totalCurrentValue - totalBaseline)) * 100d;
+  private static String computeContributionToOverallChange(double baseline, double current, double baselineTotal,
+      double currentTotal) {
+    if (baselineTotal != 0d) {
+      double contributionToOverallChange = ((current - baseline) / Math.abs(currentTotal - baselineTotal)) * 100d;
       return DOUBLE_FORMATTER.format(roundUp(contributionToOverallChange)) + "%";
     } else {
       return INFINITE;
