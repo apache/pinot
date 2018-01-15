@@ -109,7 +109,8 @@ public class Cube { // the cube (Ca|Cb)
 
       initializeBasicInfo(olapClient, filterSets);
       Dimensions shrankDimensions = shrinkDimensionsByFilterSets(dimensions, filterSets);
-      this.costSet = computeOneDimensionCost(olapClient, topRatio, shrankDimensions, filterSets);
+      this.costSet =
+          computeOneDimensionCost(olapClient, topBaselineValue, topCurrentValue, shrankDimensions, filterSets);
       List<MutablePair<String, Double>> dimensionCostPair = new ArrayList<>();
       this.dimensions = sortDimensionOrder(costSet, shrankDimensions, depth, hierarchy, dimensionCostPair);
 
@@ -142,7 +143,7 @@ public class Cube { // the cube (Ca|Cb)
     long tStart = System.nanoTime();
     try {
       initializeBasicInfo(olapClient, filterSets);
-      this.costSet = computeOneDimensionCost(olapClient, topRatio, dimensions, filterSets);
+      this.costSet = computeOneDimensionCost(olapClient, topBaselineValue, topCurrentValue, dimensions, filterSets);
     } finally {
       ThirdeyeMetricsUtil.cubeCallCounter.inc();
       ThirdeyeMetricsUtil.cubeDurationCounter.inc(System.nanoTime() - tStart);
@@ -190,7 +191,7 @@ public class Cube { // the cube (Ca|Cb)
     if (this.dimensions == null) { // which means buildWithAutoDimensionOrder is not triggered
       initializeBasicInfo(olapClient, filterSets);
       this.dimensions = dimensions;
-      this.costSet = computeOneDimensionCost(olapClient, topRatio, dimensions, filterSets);
+      this.costSet = computeOneDimensionCost(olapClient, topBaselineValue, topCurrentValue, dimensions, filterSets);
     }
 
     int size = 0;
@@ -283,43 +284,35 @@ public class Cube { // the cube (Ca|Cb)
     }
   }
 
-  private List<DimNameValueCostEntry> computeOneDimensionCost(OLAPDataBaseClient olapClient, double topRatio,
-      Dimensions dimensions, Multimap<String, String> filterSets) throws Exception {
+  private List<DimNameValueCostEntry> computeOneDimensionCost(OLAPDataBaseClient olapClient, double baselineTotal,
+      double currentTotal, Dimensions dimensions, Multimap<String, String> filterSets) throws Exception {
+
+    double topRatio = currentTotal / baselineTotal;
+    LOG.info("baselineTotal:{}, currentTotal:{}, ratio:{}", baselineTotal, currentTotal, topRatio);
+
     List<DimNameValueCostEntry> costSet = new ArrayList<>();
-
     List<List<Row>> wowValuesOfDimensions = olapClient.getAggregatedValuesOfDimension(dimensions, filterSets);
-    double baselineTotal = 0;
-    double currentTotal = 0;
-    //use one dimension to compute baseline/current total
-    List<Row> wowValuesOfFirstDimension = wowValuesOfDimensions.get(0);
-    for (Row wowValues : wowValuesOfFirstDimension) {
-      baselineTotal += wowValues.baselineValue;
-      currentTotal += wowValues.currentValue;
-    }
-    LOG.info("baselineTotal: {}", baselineTotal);
-    LOG.info("currentTotal: {}", currentTotal);
-
     for (int i = 0; i < dimensions.size(); ++i) {
       String dimension = dimensions.get(i);
       List<Row> wowValuesOfOneDimension = wowValuesOfDimensions.get(i);
-      for (int j = 0; j < wowValuesOfOneDimension.size(); ++j) {
-        Row wowValues = wowValuesOfOneDimension.get(j);
+      for (Row wowValues : wowValuesOfOneDimension) {
         String dimValue = wowValues.getDimensionValues().get(0);
 
         double dimValueCost = costFunction
             .getCost(wowValues.baselineValue, wowValues.currentValue, topRatio, baselineTotal, currentTotal);
 
-        double contributionFactor =
-            (wowValues.baselineValue + wowValues.currentValue) / (baselineTotal + currentTotal);
-        costSet.add(new DimNameValueCostEntry(dimension, dimValue, dimValueCost, contributionFactor,
-            wowValues.currentValue, wowValues.baselineValue));
+        double contributionFactor = (wowValues.baselineValue + wowValues.currentValue) / (baselineTotal + currentTotal);
+        costSet.add(
+            new DimNameValueCostEntry(dimension, dimValue, dimValueCost, contributionFactor, wowValues.currentValue,
+                wowValues.baselineValue));
       }
     }
 
     Collections.sort(costSet, Collections.reverseOrder());
-    LOG.info("\tCost set");
-    for (DimNameValueCostEntry entry : costSet.subList(0, Math.min(costSet.size(), 20))) {
-      LOG.info("\t\t{}", entry);
+    final int top = 20;
+    LOG.info("Top {} nodes (depth=1):", top);
+    for (DimNameValueCostEntry entry : costSet.subList(0, Math.min(costSet.size(), top))) {
+      LOG.info("\t{}", entry);
     }
 
     return costSet;
