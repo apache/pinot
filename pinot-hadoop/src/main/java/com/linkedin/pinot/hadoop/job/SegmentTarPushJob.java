@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.hadoop.job;
 
-import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import java.io.InputStream;
 import java.util.Properties;
 import org.apache.hadoop.conf.Configuration;
@@ -73,17 +73,19 @@ public class SegmentTarPushJob extends Configured {
     if (!fileName.endsWith(".tar.gz")) {
       return;
     }
-    for (String host : _hosts) {
-      try (InputStream inputStream = fs.open(path)) {
-        fileName = fileName.split(".tar")[0];
-        LOGGER.info("******** Upoading file: {} to Host: {} and Port: {} *******", fileName, host, _port);
-        try {
-          int responseCode = FileUploadUtils.uploadSegment(host, _port, fileName, inputStream);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      for (String host : _hosts) {
+        try (InputStream inputStream = fs.open(path)) {
+          fileName = fileName.split(".tar.gz")[0];
+          LOGGER.info("******** Uploading file: {} to Host: {} and Port: {} *******", fileName, host, _port);
+          int responseCode =
+              fileUploadDownloadClient.uploadSegment(FileUploadDownloadClient.getUploadSegmentHttpURI(host, _port),
+                  fileName, inputStream);
           LOGGER.info("Response code: {}", responseCode);
         } catch (Exception e) {
-          LOGGER.error("******** Error Upoading file: {} to Host: {} and Port: {}  *******", fileName, host, _port);
+          LOGGER.error("******** Error Uploading file: {} to Host: {} and Port: {}  *******", fileName, host, _port);
           LOGGER.error("Caught exception during upload", e);
-          throw new RuntimeException("Got Error during send tar files to push hosts!");
+          throw e;
         }
       }
     }

@@ -31,7 +31,7 @@ import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 
@@ -121,30 +121,25 @@ public class SegmentPushPhase  extends Configured {
       return;
     }
     long length = fs.getFileStatus(path).getLen();
-    for (String host : hosts) {
-      InputStream inputStream = null;
-      try {
-        inputStream = fs.open(path);
-        fileName = fileName.split(".tar")[0];
-        if (fileName.lastIndexOf(ThirdEyeConstants.SEGMENT_JOINER) != -1) {
-          segmentName = fileName.substring(0, fileName.lastIndexOf(ThirdEyeConstants.SEGMENT_JOINER));
-        }
-        LOGGER.info("******** Uploading file: {} to Host: {} and Port: {} *******", fileName, host, port);
-        try {
-          int responseCode = FileUploadUtils.uploadSegment(host, Integer.parseInt(port), fileName, inputStream);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      for (String host : hosts) {
+        try (InputStream inputStream = fs.open(path)) {
+          fileName = fileName.split(".tar.gz")[0];
+          if (fileName.lastIndexOf(ThirdEyeConstants.SEGMENT_JOINER) != -1) {
+            segmentName = fileName.substring(0, fileName.lastIndexOf(ThirdEyeConstants.SEGMENT_JOINER));
+          }
+          LOGGER.info("******** Uploading file: {} to Host: {} and Port: {} *******", fileName, host, port);
+          int responseCode = fileUploadDownloadClient.uploadSegment(
+              FileUploadDownloadClient.getUploadSegmentHttpURI(host, Integer.parseInt(port)), fileName, inputStream);
           LOGGER.info("Response code: {}", responseCode);
-
-          if (uploadSuccess == true && responseCode != 200) {
+          if (responseCode != 200) {
             uploadSuccess = false;
           }
-
         } catch (Exception e) {
           LOGGER.error("******** Error Uploading file: {} to Host: {} and Port: {}  *******", fileName, host, port);
           LOGGER.error("Caught exception during upload", e);
           throw new RuntimeException("Got Error during send tar files to push hosts!");
         }
-      } finally {
-        inputStream.close();
       }
     }
   }

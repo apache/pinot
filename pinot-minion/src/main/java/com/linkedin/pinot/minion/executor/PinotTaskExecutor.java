@@ -16,9 +16,6 @@
 package com.linkedin.pinot.minion.executor;
 
 import com.linkedin.pinot.common.config.PinotTaskConfig;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.minion.MinionContext;
-import java.io.InputStream;
 import javax.annotation.Nonnull;
 
 

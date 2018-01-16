@@ -20,7 +20,7 @@ import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.exception.HttpErrorStatusException;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
@@ -79,7 +79,7 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
     String tableName = configs.get(MinionConstants.TABLE_NAME_KEY);
     final String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
     String downloadURL = configs.get(MinionConstants.DOWNLOAD_URL_KEY);
-    String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
+    final String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
     String originalSegmentCrc = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
 
     LOGGER.info("Start executing {} on table: {}, segment: {} with downloadURL: {}, uploadURL: {}", taskType, tableName,
@@ -127,17 +127,13 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       // segment will not be submitted again
       SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier = getSegmentZKMetadataCustomMapModifier();
       Header segmentZKMetadataCustomMapModifierHeader =
-          new BasicHeader(FileUploadUtils.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
+          new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
               segmentZKMetadataCustomMapModifier.toJsonString());
       final List<Header> httpHeaders = Arrays.asList(ifMatchHeader, segmentZKMetadataCustomMapModifierHeader);
 
       // Set query parameters
       final List<NameValuePair> parameters = Collections.<NameValuePair>singletonList(
-          new BasicNameValuePair(FileUploadUtils.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION, "true"));
-
-      URI uploadUri = new URI(uploadURL);
-      final String host = uploadUri.getHost();
-      final int port = uploadUri.getPort();
+          new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION, "true"));
 
       String maxNumAttemptsConfig = configs.get(MinionConstants.MAX_NUM_ATTEMPTS_KEY);
       int maxNumAttempts =
@@ -151,31 +147,33 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       RetryPolicy retryPolicy =
           RetryPolicies.exponentialBackoffRetryPolicy(maxNumAttempts, initialRetryDelayMs, retryScaleFactor);
 
-      if (!retryPolicy.attempt(new Callable<Boolean>() {
-        @Override
-        public Boolean call() throws Exception {
-          try {
-            FileUploadUtils.uploadSegment(host, port, segmentName, convertedTarredSegmentFile, httpHeaders, parameters,
-                FileUploadUtils.DEFAULT_SOCKET_TIMEOUT_MS);
-            return true;
-          } catch (HttpErrorStatusException e) {
-            int statusCode = e.getStatusCode();
-            if (statusCode == HttpStatus.SC_CONFLICT || statusCode > 500) {
-              // Temporary exception
+      try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+        if (!retryPolicy.attempt(new Callable<Boolean>() {
+          @Override
+          public Boolean call() throws Exception {
+            try {
+              fileUploadDownloadClient.uploadSegment(new URI(uploadURL), segmentName, convertedTarredSegmentFile,
+                  httpHeaders, parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+              return true;
+            } catch (HttpErrorStatusException e) {
+              int statusCode = e.getStatusCode();
+              if (statusCode == HttpStatus.SC_CONFLICT || statusCode > 500) {
+                // Temporary exception
+                LOGGER.warn("Caught temporary exception while uploading segment: {}, will retry", segmentName, e);
+                return false;
+              } else {
+                // Permanent exception
+                LOGGER.error("Caught permanent exception while uploading segment: {}, won't retry", segmentName, e);
+                throw e;
+              }
+            } catch (Exception e) {
               LOGGER.warn("Caught temporary exception while uploading segment: {}, will retry", segmentName, e);
               return false;
-            } else {
-              // Permanent exception
-              LOGGER.error("Caught permanent exception while uploading segment: {}, won't retry", segmentName, e);
-              throw e;
             }
-          } catch (Exception e) {
-            LOGGER.warn("Caught temporary exception while uploading segment: {}, will retry", segmentName, e);
-            return false;
           }
+        })) {
+          throw new RuntimeException("Failed to upload segment: " + segmentName);
         }
-      })) {
-        throw new RuntimeException("Failed to upload segment: " + segmentName);
       }
 
       LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableName, segmentName);

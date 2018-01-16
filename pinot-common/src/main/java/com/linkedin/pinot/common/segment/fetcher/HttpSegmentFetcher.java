@@ -17,10 +17,11 @@ package com.linkedin.pinot.common.segment.fetcher;
 
 import com.linkedin.pinot.common.exception.HttpErrorStatusException;
 import com.linkedin.pinot.common.exception.PermanentDownloadException;
-import com.linkedin.pinot.common.utils.FileDownloadUtils;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import java.io.File;
+import java.net.URI;
 import java.util.concurrent.Callable;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
@@ -30,39 +31,45 @@ import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.*;
 
 
 public class HttpSegmentFetcher implements SegmentFetcher {
+  protected final Logger _logger = LoggerFactory.getLogger(getClass().getSimpleName());
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(HttpSegmentFetcher.class);
-  private int retryCount = RETRY_DEFAULT;
-  private int retryWaitMs = RETRY_WAITIME_MS_DEFAULT;
+  protected FileUploadDownloadClient _httpClient;
+  protected int _retryCount;
+  protected int _retryWaitMs;
 
   @Override
   public void init(Configuration configs) {
-    retryCount = configs.getInt(RETRY, RETRY_DEFAULT);
-    retryWaitMs = configs.getInt(RETRY_WAITIME_MS, RETRY_WAITIME_MS_DEFAULT);
+    initHttpClient(configs);
+    _retryCount = configs.getInt(RETRY, RETRY_DEFAULT);
+    _retryWaitMs = configs.getInt(RETRY_WAITIME_MS, RETRY_WAITIME_MS_DEFAULT);
+  }
+
+  protected void initHttpClient(Configuration configs) {
+    _httpClient = new FileUploadDownloadClient();
   }
 
   @Override
   public void fetchSegmentToLocal(final String uri, final File tempFile) throws Exception {
-    RetryPolicy policy = RetryPolicies.exponentialBackoffRetryPolicy(retryCount, retryWaitMs, 5);
+    RetryPolicy policy = RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, 5);
     policy.attempt(new Callable<Boolean>() {
       @Override
       public Boolean call() throws Exception {
         try {
-          int statusCode = FileDownloadUtils.downloadFile(uri, tempFile);
-          LOGGER.info("Downloaded file from {} to {}; Length of downloaded file: {}; Response status code: {}", uri,
+          int statusCode = _httpClient.downloadFile(new URI(uri), tempFile);
+          _logger.info("Downloaded file from {} to {}; Length of downloaded file: {}; Response status code: {}", uri,
               tempFile, tempFile.length(), statusCode);
           return true;
         } catch (HttpErrorStatusException e) {
           int statusCode = e.getStatusCode();
           if (statusCode >= 500) {
-            LOGGER.error("Failed to download file from {}, might retry", uri, e);
+            _logger.error("Failed to download file from {}, might retry", uri, e);
             return false;
           } else {
-            LOGGER.error("Failed to download file from {}, won't retry", uri, e);
+            _logger.error("Failed to download file from {}, won't retry", uri, e);
             throw new PermanentDownloadException(e.getMessage());
           }
         } catch (Exception e) {
-          LOGGER.error("Failed to download file from {}, might retry", uri, e);
+          _logger.error("Failed to download file from {}, might retry", uri, e);
           return false;
         }
       }

@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.hadoop.job;
 
-import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import java.util.Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -76,17 +76,21 @@ public class SegmentUriPushJob extends Configured {
     if (!fileName.endsWith(".tar.gz")) {
       return;
     }
-    for (String host : _hosts) {
-      String uri = String.format("%s%s%s", _pushUriPrefix, path.toUri().getRawPath(), _pushUriSuffix);
-      LOGGER.info("******** Upoading file: {} to Host: {} and Port: {} with download uri: {} *******", fileName, host,
-          _port, uri);
-      try {
-        int responseCode = FileUploadUtils.sendSegmentUri(host, _port, uri);
-        LOGGER.info("Response code: {}", responseCode);
-      } catch (Exception e) {
-        LOGGER.error("******** Error Upoading file: {} to Host: {} and Port: {}  *******", fileName, host, _port);
-        LOGGER.error("Caught exception during upload", e);
-        throw new RuntimeException("Got Error during send tar files to push hosts!");
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      for (String host : _hosts) {
+        String uri = String.format("%s%s%s", _pushUriPrefix, path.toUri().getRawPath(), _pushUriSuffix);
+        LOGGER.info("******** Uploading file: {} to Host: {} and Port: {} with download uri: {} *******", fileName,
+            host, _port, uri);
+        try {
+          int responseCode =
+              fileUploadDownloadClient.sendSegmentUri(FileUploadDownloadClient.getUploadSegmentHttpURI(host, _port),
+                  uri);
+          LOGGER.info("Response code: {}", responseCode);
+        } catch (Exception e) {
+          LOGGER.error("******** Error Uploading file: {} to Host: {} and Port: {}  *******", fileName, host, _port);
+          LOGGER.error("Caught exception during upload", e);
+          throw e;
+        }
       }
     }
   }

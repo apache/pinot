@@ -26,7 +26,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka;
 import com.linkedin.pinot.common.utils.CommonConstants.Minion;
 import com.linkedin.pinot.common.utils.CommonConstants.Server;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
@@ -40,6 +40,7 @@ import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
 import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 import java.io.File;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -201,11 +202,10 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void addSchema(File schemaFile, String schemaName) throws Exception {
-    FileUploadUtils.addSchema(LOCAL_HOST, _controllerPort, schemaName, schemaFile);
-  }
-
-  protected void updateSchema(File schemaFile, String schemaName) throws Exception {
-    FileUploadUtils.updateSchema(LOCAL_HOST, _controllerPort, schemaName, schemaFile);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      fileUploadDownloadClient.addSchema(FileUploadDownloadClient.getUploadSchemaHttpURI(LOCAL_HOST, _controllerPort),
+          schemaName, schemaFile);
+    }
   }
 
   /**
@@ -216,9 +216,12 @@ public abstract class ClusterTest extends ControllerTest {
   protected void uploadSegments(@Nonnull File segmentDir) throws Exception {
     String[] segmentNames = segmentDir.list();
     Assert.assertNotNull(segmentNames);
-    for (String segmentName : segmentNames) {
-      File segmentFile = new File(segmentDir, segmentName);
-      FileUploadUtils.uploadSegment(LOCAL_HOST, _controllerPort, segmentName, segmentFile);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort);
+      for (String segmentName : segmentNames) {
+        File segmentFile = new File(segmentDir, segmentName);
+        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentName, segmentFile);
+      }
     }
   }
 

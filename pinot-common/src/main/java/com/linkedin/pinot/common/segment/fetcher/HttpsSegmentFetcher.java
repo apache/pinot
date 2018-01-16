@@ -17,38 +17,23 @@
 package com.linkedin.pinot.common.segment.fetcher;
 
 import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.exception.PermanentDownloadException;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.common.utils.retry.RetryPolicy;
-import java.io.BufferedOutputStream;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.URL;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.util.concurrent.Callable;
-import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.io.IOUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.*;
 
 
 /*
@@ -77,35 +62,26 @@ import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.*;
  * At this time, only PKCS12 files are supported for client certificates, and it is assumed that the
  * server is presenting an X509 certificate.
  */
-public class HttpsSegmentFetcher implements SegmentFetcher {
-  SSLSocketFactory _sslSocketFactory;
-
+public class HttpsSegmentFetcher extends HttpSegmentFetcher {
   private static final String SECURITY_ALGORITHM = "TLS";
   private static final String CERTIFICATE_TYPE = "X509";
   private static final String KEYSTORE_TYPE = "PKCS12";
   private static final String KEYMANAGER_FACTORY_ALGORITHM = "SunX509";
 
-  private static String CONFIG_OF_SERVER_CA_CERT = "ssl.server.ca-cert";
-  private static String CONFIG_OF_CLIENT_PKCS12_FILE = "ssl.client.pkcs12.file";
-  private static String CONFIG_OF_CLIENT_PKCS12_PASSWORD = "ssl.client.pkcs12.password";
-  private static String CONFIG_OF_ENABLE_SERVER_VERIFICATION = "ssl.server.enable-verification";
-
-  private int retryCount = RETRY_DEFAULT;
-  private int retryWaitMs = RETRY_WAITIME_MS_DEFAULT;
-
-  public static Logger LOGGER = LoggerFactory.getLogger(HttpsSegmentFetcher.class);
+  private static final String CONFIG_OF_SERVER_CA_CERT = "ssl.server.ca-cert";
+  private static final String CONFIG_OF_CLIENT_PKCS12_FILE = "ssl.client.pkcs12.file";
+  private static final String CONFIG_OF_CLIENT_PKCS12_PASSWORD = "ssl.client.pkcs12.password";
+  private static final String CONFIG_OF_ENABLE_SERVER_VERIFICATION = "ssl.server.enable-verification";
 
   @Override
-  public void init(Configuration configs) {
-    retryCount = configs.getInt(RETRY, RETRY_DEFAULT);
-    retryWaitMs = configs.getInt(RETRY_WAITIME_MS, RETRY_WAITIME_MS_DEFAULT);
+  protected void initHttpClient(Configuration configs) {
     try {
       TrustManager[] trustManagers = setupTrustManagers(configs);
       KeyManager[] keyManagers = setupKeyManagers(configs);
 
       SSLContext sslContext = SSLContext.getInstance(SECURITY_ALGORITHM);
       sslContext.init(keyManagers, trustManagers, null);
-      _sslSocketFactory = sslContext.getSocketFactory();
+      _httpClient = new FileUploadDownloadClient(sslContext);
     } catch (Exception e) {
       Utils.rethrowException(e);
     }
@@ -117,7 +93,8 @@ public class HttpsSegmentFetcher implements SegmentFetcher {
     // trustStore.
     final String serverCACertFile = configs.getString(CONFIG_OF_SERVER_CA_CERT);
     final boolean enableServerVerifiction = configs.getBoolean(CONFIG_OF_ENABLE_SERVER_VERIFICATION, true);
-    final String fileNotConfigured = "Https server CA Certificate file not confugured (" + CONFIG_OF_SERVER_CA_CERT + ")";
+    final String fileNotConfigured =
+        "Https server CA Certificate file not confugured (" + CONFIG_OF_SERVER_CA_CERT + ")";
     if (enableServerVerifiction) {
       if (serverCACertFile == null) {
         throw new RuntimeException(fileNotConfigured);
@@ -136,23 +113,21 @@ public class HttpsSegmentFetcher implements SegmentFetcher {
       return tmf.getTrustManagers();
     }
     // Server verification disabled. Trust all servers
-    LOGGER.warn("{}. All servers will be trusted!", fileNotConfigured);
-    TrustManager[] trustAllCerts = new TrustManager[] {
-        new X509TrustManager() {
-          @Override
-          public void checkClientTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
-          }
+    _logger.warn("{}. All servers will be trusted!", fileNotConfigured);
+    TrustManager[] trustAllCerts = new TrustManager[]{new X509TrustManager() {
+      @Override
+      public void checkClientTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
+      }
 
-          @Override
-          public void checkServerTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
-          }
+      @Override
+      public void checkServerTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
+      }
 
-          @Override
-          public X509Certificate[] getAcceptedIssuers() {
-            return new X509Certificate[0];
-          }
-        }
-    };
+      @Override
+      public X509Certificate[] getAcceptedIssuers() {
+        return new X509Certificate[0];
+      }
+    }};
     return trustAllCerts;
   }
 
@@ -162,8 +137,8 @@ public class HttpsSegmentFetcher implements SegmentFetcher {
       String keyStoreFile = configs.getString(CONFIG_OF_CLIENT_PKCS12_FILE);
       String keyStorePassword = configs.getString(CONFIG_OF_CLIENT_PKCS12_PASSWORD);
       if (keyStoreFile == null || keyStorePassword == null) {
-        LOGGER.info("Either keystore file name (" + CONFIG_OF_CLIENT_PKCS12_FILE + ") or " +
-            "keystore password (" + CONFIG_OF_CLIENT_PKCS12_PASSWORD + ") is not configured"
+        _logger.info("Either keystore file name (" + CONFIG_OF_CLIENT_PKCS12_FILE + ") or " + "keystore password ("
+            + CONFIG_OF_CLIENT_PKCS12_PASSWORD + ") is not configured"
             + ". Client will not present certificate to the server");
         return null;
       }
@@ -175,59 +150,5 @@ public class HttpsSegmentFetcher implements SegmentFetcher {
       Utils.rethrowException(e);
     }
     return null;
-  }
-
-  // TODO: move the download logic into FileDownloadUtils
-  @Override
-  public void fetchSegmentToLocal(final String uri, final File tempFile) throws Exception {
-    RetryPolicy policy = RetryPolicies.exponentialBackoffRetryPolicy(retryCount, retryWaitMs, 5);
-    policy.attempt(new Callable<Boolean>() {
-      @Override
-      public Boolean call() throws Exception {
-        try {
-          URL url = new URL(uri);
-          HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
-          conn.setSSLSocketFactory(_sslSocketFactory);
-          int responseCode = conn.getResponseCode();
-          int contentLength = conn.getContentLength();
-          try (InputStream inputStream = conn.getInputStream()) {
-            if (responseCode >= 400) {
-              if (contentLength > 0) {
-                // don't read more than 1000 bytes
-                byte[] buffer = new byte[Math.min(contentLength, 1000)];
-                inputStream.read(buffer);
-                LOGGER.error("Error response from url:{} \n {}", url, new String(buffer));
-              }
-              String errorMessage =
-                  "Received error response from server while downloading file with uri: " + uri + ", response code: "
-                      + responseCode;
-              LOGGER.error(errorMessage);
-              if (responseCode >= 500) {
-                // Caller may retry
-                throw new RuntimeException(errorMessage);
-              } else {
-                throw new PermanentDownloadException(errorMessage);
-              }
-            } else {
-              try (OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(tempFile))) {
-                IOUtils.copyLarge(inputStream, outputStream);
-              }
-            }
-          }
-          long fileLength = tempFile.length();
-          if (contentLength != -1 && contentLength != fileLength) {
-            // The content-length header was present and does not match the file length.
-            throw new RuntimeException("File length " + fileLength + " does not match content length " + contentLength);
-          }
-          return true;
-        } catch (PermanentDownloadException e) {
-          LOGGER.error("Failed to download file from {}, won't retry", uri, e);
-          throw e;
-        } catch (Exception e) {
-          LOGGER.error("Failed to download file from {}, might retry", uri, e);
-          return false;
-        }
-      }
-    });
   }
 }
