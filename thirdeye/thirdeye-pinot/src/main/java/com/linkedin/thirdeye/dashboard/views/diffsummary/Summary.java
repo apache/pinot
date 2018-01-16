@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard.views.diffsummary;
 
 import com.linkedin.thirdeye.client.diffsummary.DimNameValueCostEntry;
+import com.linkedin.thirdeye.client.diffsummary.costfunctions.BalancedCostFunction;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -13,7 +14,7 @@ import org.jfree.util.Log;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.client.diffsummary.CostFunction;
+import com.linkedin.thirdeye.client.diffsummary.costfunctions.CostFunction;
 import com.linkedin.thirdeye.client.diffsummary.Cube;
 import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
 
@@ -26,19 +27,32 @@ public class Summary {
   private int levelCount;
   private List<DPArray> dpArrays;
 
-  private double topValue;
+  private double globalBaselineValue;
+  private double globalCurrentValue;
 
-  private final RowInserter basicRowInserter = new BasicRowInserter();
-  private RowInserter oneSideErrorRowInserter = basicRowInserter;
-  private RowInserter leafRowInserter = basicRowInserter;
+  private CostFunction costFunction;
+  private RowInserter basicRowInserter;
+  private RowInserter oneSideErrorRowInserter;
+  private RowInserter leafRowInserter;
   private List<DimNameValueCostEntry> costSet;
+  private List<Cube.DimensionCost> sortedDimensionCosts;
 
-  public Summary(Cube cube) {
+  public Summary(Cube cube, CostFunction costFunction) {
     this.cube = cube;
     this.maxLevelCount = cube.getDimensions().size();
-    this.topValue = cube.getTopBaselineValue() + cube.getTopCurrentValue();
+    this.globalBaselineValue = cube.getBaselineTotal();
+    this.globalCurrentValue = cube.getCurrentTotal();
     this.levelCount = this.maxLevelCount;
     this.costSet = cube.getCostSet();
+    this.sortedDimensionCosts = cube.getSortedDimensionCosts();
+    this.basicRowInserter = new BasicRowInserter(new BalancedCostFunction());
+    this.oneSideErrorRowInserter = basicRowInserter;
+    this.leafRowInserter = basicRowInserter;
+
+    this.costFunction = costFunction;
+    this.basicRowInserter = new BasicRowInserter(costFunction);
+    this.oneSideErrorRowInserter = basicRowInserter;
+    this.leafRowInserter = basicRowInserter;
   }
 
   public SummaryResponse computeSummary(int answerSize) {
@@ -75,7 +89,9 @@ public class Summary {
     computeChildDPArray(root);
     List<HierarchyNode> answer = new ArrayList<>(dpArrays.get(0).getAnswer());
     SummaryResponse response = new SummaryResponse();
-    response.build(answer, this.levelCount, this.costSet);
+    response.buildDiffSummary(answer, this.levelCount, costFunction);
+    response.buildGainerLoserGroup(costSet);
+    response.setDimensionCosts(sortedDimensionCosts);
 
     return response;
   }
@@ -123,36 +139,44 @@ public class Summary {
     // Otherwise, merge DPArrays from its children.
     if (node.getLevel() == levelCount - 1) {
       // Shrink answer size for getting a higher level view, which gives larger picture of the dataset
-      if (node.childrenSize() < dpArray.size()) {
-        dpArray.setShrinkSize(Math.max(1, (node.childrenSize()+1)/2));
-      }
+      // Uncomment the following block to roll-up rows aggressively
+//      if (node.childrenSize() < dpArray.size()) {
+//        dpArray.setShrinkSize(Math.max(2, (node.childrenSize()+1)/2));
+//      }
       for (HierarchyNode child : node.getChildren()) {
         leafRowInserter.insertRowToDPArray(dpArray, child, node.targetRatio());
         updateWowValues(node, dpArray.getAnswer());
         dpArray.targetRatio = node.targetRatio(); // get updated ratio
       }
     } else {
-      List<HierarchyNode> removedNodes = new ArrayList<>();
-      boolean doRollback = false;
-      do {
-        doRollback = false;
-        for (HierarchyNode child : node.getChildren()) {
-          computeChildDPArray(child);
-          removedNodes.addAll(mergeDPArray(node, dpArray, dpArrays.get(node.getLevel() + 1)));
-          updateWowValues(node, dpArray.getAnswer());
-          dpArray.targetRatio = node.targetRatio(); // get updated ratio
-        }
-        // Aggregate current node's answer if it is thinned out due to the user's answer size is too huge.
-        // If the current node is kept being thinned out, it eventually aggregates all its children.
-        if ( nodeIsThinnedOut(node) && dpArray.getAnswer().size() < dpArray.maxSize()) {
-          doRollback = true;
-          rollbackInsertions(node, dpArray.getAnswer(), removedNodes);
-          removedNodes.clear();
-          dpArray.setShrinkSize(Math.max(1, (dpArray.getAnswer().size()*2)/3));
-          dpArray.reset();
-          dpArray.targetRatio = node.targetRatio();
-        }
-      } while (doRollback);
+      for (HierarchyNode child : node.getChildren()) {
+        computeChildDPArray(child);
+        mergeDPArray(node, dpArray, dpArrays.get(node.getLevel() + 1));
+        updateWowValues(node, dpArray.getAnswer());
+        dpArray.targetRatio = node.targetRatio(); // get updated ratio
+      }
+      // Use the following block to replace the above one to roll-up rows aggressively
+//      List<HierarchyNode> removedNodes = new ArrayList<>();
+//      boolean doRollback = false;
+//      do {
+//        doRollback = false;
+//        for (HierarchyNode child : node.getChildren()) {
+//          computeChildDPArray(child);
+//          removedNodes.addAll(mergeDPArray(node, dpArray, dpArrays.get(node.getLevel() + 1)));
+//          updateWowValues(node, dpArray.getAnswer());
+//          dpArray.targetRatio = node.targetRatio(); // get updated ratio
+//        }
+//        // Aggregate current node's answer if it is thinned out due to the user's answer size is too huge.
+//        // If the current node is kept being thinned out, it eventually aggregates all its children.
+//        if ( nodeIsThinnedOut(node) && dpArray.getAnswer().size() < dpArray.maxSize()) {
+//          doRollback = true;
+//          rollbackInsertions(node, dpArray.getAnswer(), removedNodes);
+//          removedNodes.clear();
+//          dpArray.setShrinkSize(Math.max(1, (dpArray.getAnswer().size()*2)/3));
+//          dpArray.reset();
+//          dpArray.targetRatio = node.targetRatio();
+//        }
+//      } while (doRollback);
     }
 
     // Calculate the cost if the node (aggregated row) is put in the answer.
@@ -308,17 +332,23 @@ public class Summary {
     }
   }
 
-  private static interface RowInserter {
-    public void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio);
+  private interface RowInserter {
+    void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio);
   }
 
   private class BasicRowInserter implements RowInserter {
+    private final CostFunction costFunction;
+
+    public BasicRowInserter(CostFunction costFunction) {
+      this.costFunction = costFunction;
+    }
+
     @Override
     public void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio) {
       double baselineValue = node.getBaselineValue();
       double currentValue = node.getCurrentValue();
-      double cost = CostFunction.errWithPercentageRemoval(baselineValue, currentValue, targetRatio,
-          Cube.PERCENTAGE_CONTRIBUTION_THRESHOLD, topValue);
+      double cost =
+          costFunction.computeCost(baselineValue, currentValue, targetRatio, globalBaselineValue, globalCurrentValue);
 
       for (int n = dp.size() - 1; n > 0; --n) {
         double val1 = dp.slotAt(n - 1).cost;
@@ -378,7 +408,7 @@ public class Summary {
       e.printStackTrace();
       System.exit(1);
     }
-    Summary summary = new Summary(cube);
+    Summary summary = new Summary(cube, new BalancedCostFunction());
     try {
       SummaryResponse response = summary.computeSummary(answerSize, doOneSideError, maxDimensionSize);
       System.out.print("JSon String: ");
