@@ -35,6 +35,7 @@ public class Summary {
   private RowInserter oneSideErrorRowInserter;
   private RowInserter leafRowInserter;
   private List<DimNameValueCostEntry> costSet;
+  private List<Cube.DimensionCost> sortedDimensionCosts;
 
   public Summary(Cube cube, CostFunction costFunction) {
     this.cube = cube;
@@ -43,6 +44,7 @@ public class Summary {
     this.globalCurrentValue = cube.getCurrentTotal();
     this.levelCount = this.maxLevelCount;
     this.costSet = cube.getCostSet();
+    this.sortedDimensionCosts = cube.getSortedDimensionCosts();
     this.basicRowInserter = new BasicRowInserter(new BalancedCostFunction());
     this.oneSideErrorRowInserter = basicRowInserter;
     this.leafRowInserter = basicRowInserter;
@@ -87,7 +89,9 @@ public class Summary {
     computeChildDPArray(root);
     List<HierarchyNode> answer = new ArrayList<>(dpArrays.get(0).getAnswer());
     SummaryResponse response = new SummaryResponse();
-    response.build(answer, this.levelCount, this.costSet, costFunction);
+    response.buildDiffSummary(answer, this.levelCount, costFunction);
+    response.buildGainerLoserGroup(costSet);
+    response.setDimensionCosts(sortedDimensionCosts);
 
     return response;
   }

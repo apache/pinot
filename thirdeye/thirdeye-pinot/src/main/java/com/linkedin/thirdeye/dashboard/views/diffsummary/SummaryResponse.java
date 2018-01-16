@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.views.diffsummary;
 
+import com.linkedin.thirdeye.client.diffsummary.Cube;
 import com.linkedin.thirdeye.client.diffsummary.costfunction.CostFunction;
 import com.linkedin.thirdeye.client.diffsummary.DimNameValueCostEntry;
 import java.text.DecimalFormat;
@@ -13,7 +14,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.thirdeye.client.diffsummary.DimensionValues;
 import com.linkedin.thirdeye.client.diffsummary.Dimensions;
 import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
-import org.apache.commons.lang3.tuple.MutablePair;
 
 public class SummaryResponse {
   private final static int MAX_GAINER_LOSER_COUNT = 5;
@@ -52,7 +52,7 @@ public class SummaryResponse {
   private List<SummaryGainerLoserResponseRow> loser = new ArrayList<>();
 
   @JsonProperty("dimensinoCosts")
-  private List<MutablePair<String, Double>> dimensionCosts = new ArrayList<>();
+  private List<Cube.DimensionCost> dimensionCosts = new ArrayList<>();
 
   public String getDataset() {
     return dataset;
@@ -82,11 +82,11 @@ public class SummaryResponse {
     return loser;
   }
 
-  public List<MutablePair<String, Double>> getDimensionCosts() {
+  public List<Cube.DimensionCost> getDimensionCosts() {
     return dimensionCosts;
   }
 
-  public void setDimensionCosts(List<MutablePair<String, Double>> dimensionCosts) {
+  public void setDimensionCosts(List<Cube.DimensionCost> dimensionCosts) {
     this.dimensionCosts = dimensionCosts;
   }
 
@@ -98,7 +98,7 @@ public class SummaryResponse {
     return response;
   }
 
-  private void buildGainerLoserGroup(List<DimNameValueCostEntry> costSet) {
+  public void buildGainerLoserGroup(List<DimNameValueCostEntry> costSet) {
     for (DimNameValueCostEntry dimNameValueCostEntry : costSet) {
       if (Double.compare(dimNameValueCostEntry.getCost(), 0d) <= 0) {
         continue;
@@ -131,8 +131,7 @@ public class SummaryResponse {
     return row;
   }
 
-  public void build(List<HierarchyNode> nodes, int targetLevelCount, List<DimNameValueCostEntry> costSet,
-      CostFunction costFunction) {
+  public void buildDiffSummary(List<HierarchyNode> nodes, int targetLevelCount, CostFunction costFunction) {
     // Compute the total baseline and current value
     for(HierarchyNode node : nodes) {
       baselineTotal += node.getBaselineValue();
@@ -141,8 +140,6 @@ public class SummaryResponse {
     if (Double.compare(baselineTotal, 0d) != 0) {
       globalRatio = roundUp(currentTotal / baselineTotal);
     }
-
-    this.buildGainerLoserGroup(costSet);
 
     // If all nodes have a lower level count than targetLevelCount, then it is not necessary to print the summary with
     // height higher than the available level.

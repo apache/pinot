@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client.diffsummary;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import com.linkedin.thirdeye.client.diffsummary.costfunction.CostFunction;
@@ -13,11 +14,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
-import org.apache.commons.lang3.tuple.MutablePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +39,7 @@ public class Cube { // the cube (Ca|Cb)
   private double currentTotal;
   private double topRatio;
   private List<DimNameValueCostEntry> costSet;
+  private List<DimensionCost> sortedDimensionCosts;
 
   @JsonProperty("dimensions")
   private Dimensions dimensions;
@@ -85,7 +87,11 @@ public class Cube { // the cube (Ca|Cb)
     return costSet;
   }
 
-  public List<MutablePair<String, Double>> buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient,
+  public List<DimensionCost> getSortedDimensionCosts() {
+    return sortedDimensionCosts;
+  }
+
+  public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient,
       Dimensions dimensions, Multimap<String, String> filterSets, int depth, List<List<String>> hierarchy)
       throws Exception {
     long tStart = System.nanoTime();
@@ -99,16 +105,13 @@ public class Cube { // the cube (Ca|Cb)
 
       initializeBasicInfo(olapClient, filterSets);
       Dimensions shrankDimensions = shrinkDimensionsByFilterSets(dimensions, filterSets);
-      this.costSet =
-          computeOneDimensionCost(olapClient, baselineTotal, currentTotal, shrankDimensions, filterSets);
-      List<MutablePair<String, Double>> dimensionCostPair = new ArrayList<>();
-      this.dimensions = sortDimensionOrder(costSet, shrankDimensions, depth, hierarchy, dimensionCostPair);
+      costSet = computeOneDimensionCost(olapClient, baselineTotal, currentTotal, shrankDimensions, filterSets);
+      sortedDimensionCosts = calculateSortedDimensionCost(costSet);
+      this.dimensions = sortDimensions(sortedDimensionCosts, depth, hierarchy);
 
-      LOG.info("Auto decided dimensions: " + this.dimensions);
+      LOG.info("Auto-dimension order: " + this.dimensions);
 
       buildWithManualDimensionOrderInternal(olapClient, this.dimensions, filterSets);
-
-      return dimensionCostPair;
     } finally {
       ThirdeyeMetricsUtil.cubeCallCounter.inc();
       ThirdeyeMetricsUtil.cubeDurationCounter.inc(System.nanoTime() - tStart);
@@ -128,8 +131,7 @@ public class Cube { // the cube (Ca|Cb)
   }
 
   public void buildDimensionCostSet(OLAPDataBaseClient olapClient, Dimensions dimensions,
-      Multimap<String, String> filterSets)
-      throws Exception {
+      Multimap<String, String> filterSets) throws Exception {
     long tStart = System.nanoTime();
     try {
       initializeBasicInfo(olapClient, filterSets);
@@ -314,21 +316,59 @@ public class Cube { // the cube (Ca|Cb)
     return costSet;
   }
 
-  /**
-   * Sort dimensions according to their cost, which is the sum of the error for aggregating all its children rows.
-   * Dimensions with larger error is sorted in the front of the list.
-   * The order among the dimensions that belong to the same hierarchical group will be maintained. An example of
-   * a hierarchical group {continent, country}. The cost of a group is the average of member costs.
-   * @throws Exception An exception is thrown if OLAP database cannot be connected.
-   */
-  private static Dimensions sortDimensionOrder(List<DimNameValueCostEntry> costSet, Dimensions dimensions,
-      int depth, List<List<String>> hierarchy, List<MutablePair<String, Double>> dimensionCostPairs)
-      throws Exception {
-    if (dimensionCostPairs == null) {
-      dimensionCostPairs = new ArrayList<>();
-    }
-    dimensionCostPairs.clear();
+  public static class DimensionCost {
+    private String dimensinoName;
+    private double cost;
 
+    public DimensionCost(String dimensinoName, double cost) {
+      this.dimensinoName = Preconditions.checkNotNull(dimensinoName);
+      this.cost = cost;
+    }
+
+    public String getDimensinoName() {
+      return dimensinoName;
+    }
+
+    public double getCost() {
+      return cost;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      DimensionCost that = (DimensionCost) o;
+      return Double.compare(that.cost, cost) == 0 && Objects.equals(dimensinoName, that.dimensinoName);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(dimensinoName, cost);
+    }
+  }
+
+  private static class HierarchicalDimensionCost {
+    List<String> dimensinoNames;
+    double cost;
+
+    public HierarchicalDimensionCost(List<String> dimensinoNames, double cost) {
+      this.dimensinoNames = dimensinoNames;
+      this.cost = cost;
+    }
+  }
+
+  /**
+   * Calculates the cost of each level-1 dimension and sorts them by their cost.
+   *
+   * @param costSet the cost of level-1 dimension values.
+   *
+   * @return A list of dimension names to their cost that are sorted by their costs.
+   */
+  static List<DimensionCost> calculateSortedDimensionCost(List<DimNameValueCostEntry> costSet) {
     Map<String, Double> dimNameToCost = new HashMap<>();
     for (DimNameValueCostEntry dimNameValueCostEntry : costSet) {
       double cost = dimNameValueCostEntry.getCost();
@@ -338,110 +378,129 @@ public class Cube { // the cube (Ca|Cb)
       dimNameToCost.put(dimNameValueCostEntry.getDimName(), cost);
     }
 
-    // Given one dimension name D, returns the hierarchical dimension to which D belong.
-    Map<String, HierarchicalDimension> hierarchicalDimensionMap = new HashMap<>();
-    Set<String> availableDimensionKeySet = new HashSet<>(dimensions.names());
-    // Process the suggested hierarchy list and filter out only the hierarchies that can be applied to the available
-    // dimensions of the dataset.
-    for (List<String> suggestedHierarchyList : hierarchy) {
-      if (suggestedHierarchyList == null || suggestedHierarchyList.size() < 2) {
+    // Sort dimensions by their cost
+    List<DimensionCost> dimensionCosts = new ArrayList<>(dimNameToCost.size());
+    for (Map.Entry<String, Double> dimNameToCostEntry : dimNameToCost.entrySet()) {
+      dimensionCosts.add(new DimensionCost(dimNameToCostEntry.getKey(), dimNameToCostEntry.getValue()));
+    }
+    Collections.sort(dimensionCosts, new Comparator<DimensionCost>() {
+      @Override
+      public int compare(DimensionCost d1, DimensionCost d2) {
+        return Double.compare(d2.cost, d1.cost);
+      }
+    });
+
+    return dimensionCosts;
+  }
+
+
+  /**
+   * Sort dimensions according to their cost, which is the sum of the error for aggregating all its children rows.
+   * Dimensions with larger error is ordered in the front of the list.
+   * The order among the dimensions that belong to the same hierarchical group will be maintained. An example of
+   * a hierarchical group is {continent, country}. The cost of a group is the average of member costs.
+   */
+  static Dimensions sortDimensions(List<DimensionCost> sortedDimensionCosts, int depth,
+      List<List<String>> suggestedHierarchies) {
+
+    // Trim the list of dimension cost to the max depth that is specified by users
+    List<DimensionCost> trimedSortedDimensionCosts =
+        sortedDimensionCosts.subList(0, Math.min(sortedDimensionCosts.size(), Math.max(1, depth)));
+
+    // Reorder the dimensions based on the given hierarchy
+    List<String> dimensionsToBeOrdered = new ArrayList<>(trimedSortedDimensionCosts.size());
+    for (DimensionCost dimensionCost : trimedSortedDimensionCosts) {
+      dimensionsToBeOrdered.add(dimensionCost.dimensinoName);
+    }
+    List<HierarchicalDimensionCost> hierarchicalDimensionCosts =
+        getInitialHierarchicalDimensionList(dimensionsToBeOrdered, suggestedHierarchies);
+    sortHierarchicalDimensions(hierarchicalDimensionCosts, trimedSortedDimensionCosts);
+
+    // The ordered dimension names
+    List<String> dimensionNames = new ArrayList<>();
+    for (HierarchicalDimensionCost value : hierarchicalDimensionCosts) {
+      dimensionNames.addAll(value.dimensinoNames);
+    }
+    return new Dimensions(dimensionNames);
+  }
+
+  /**
+   * Given a list of dimension to be sorted and a list of hierarchy, returns a list of hierarchical dimensions.
+   * Example:
+   *   dimensionsToBeOrdered = ["country", "continent", "page"]
+   *   suggestedHierarchies = [["continent", "country", "postcode"], ["pageGroup", "page"]]
+   *
+   * Returns: [["continent", "country"], ["page"]] (Note: the order of the two group could be arbitrary.)
+   *
+   * @param dimensionsToBeOrdered the dimensions to be considered during auto-dimension.
+   * @param suggestedHierarchies the hierarchy among the dimensions.
+   *
+   * @return a list of hierarchical dimensions.
+   */
+  private static List<HierarchicalDimensionCost> getInitialHierarchicalDimensionList(List<String> dimensionsToBeOrdered,
+      List<List<String>> suggestedHierarchies) {
+
+    List<HierarchicalDimensionCost> hierarchicalDimensionCosts = new ArrayList<>();
+    Set<String> availableDimensionKeySet = new HashSet<>(dimensionsToBeOrdered);
+    // Process the suggested hierarchy list and filter out only the hierarchies that can be applied to the
+    // dimensions to be ordered.
+    for (List<String> suggestedHierarchy : suggestedHierarchies) {
+      if (suggestedHierarchy == null || suggestedHierarchy.size() < 2) {
         continue;
       }
 
-      List<String> actualHierarchy = new ArrayList<>();
-      for (String dimension : suggestedHierarchyList) {
+      List<String> sanatizedHierarchy = new ArrayList<>();
+      for (String dimension : suggestedHierarchy) {
         if (availableDimensionKeySet.contains(dimension)) {
-          actualHierarchy.add(dimension);
+          sanatizedHierarchy.add(dimension);
+          availableDimensionKeySet.remove(dimension);
         }
       }
 
-      if (actualHierarchy.size() > 1) {
-        HierarchicalDimension hierarchicalDimension = new HierarchicalDimension();
-        hierarchicalDimension.hierarchy = actualHierarchy;
-        for (String dimension : actualHierarchy) {
-          hierarchicalDimensionMap.put(dimension, hierarchicalDimension);
-        }
-        hierarchicalDimension.index = dimensionCostPairs.size();
-        dimensionCostPairs.add(new MutablePair<>(actualHierarchy.get(0), .0));
-      }
+      hierarchicalDimensionCosts.add(new HierarchicalDimensionCost(sanatizedHierarchy, 0));
     }
 
-    // Calculate cost for each dimension. The costs of the dimensions of the same hierarchical group will be the max
-    // cost among all the children in that hierarchy.
-    for (int i = 0; i < dimensions.size(); ++i) {
-      String dimension = dimensions.get(i);
-      double cost = 0d;
-      if (dimNameToCost.containsKey(dimension)) {
-        cost += dimNameToCost.get(dimension);
-      }
-
-      if (hierarchicalDimensionMap.containsKey(dimension)) {
-        HierarchicalDimension hierarchicalDimension = hierarchicalDimensionMap.get(dimension);
-        MutablePair<String, Double> costOfDimensionPair = dimensionCostPairs.get(hierarchicalDimension.index);
-        // The max cost of children will be the cost of a group
-        costOfDimensionPair.right = Math.max(cost, costOfDimensionPair.right);
-      } else { // The dimension does not belong to any hierarchy
-        MutablePair<String, Double> costOfDimensionPair = new MutablePair<>(dimension, cost);
-        dimensionCostPairs.add(costOfDimensionPair);
-      }
+    for (String remainDimension : availableDimensionKeySet) {
+      hierarchicalDimensionCosts.add(new HierarchicalDimensionCost(Collections.singletonList(remainDimension), 0));
     }
 
-    // Sort dimensions according to their costs in a descending order
-    Collections.sort(dimensionCostPairs, Collections.reverseOrder(new DimensionCostPairSorter()));
-
-    int cutOffPairIdx = dimensionCostPairs.size();
-    // UNCOMMENT the following block to cut off dimensions with small costs. Ideally, a good cost function should be
-    // able to determine if it should stop drilling down.
-    // If there exists a huge gap (e.g., 1/10 of cost) between two cost pairs, then we chop off the dimensions because
-    // pairs with small costs does not provide useful information
-    // Invariance to keep: cutOffPairIdx <= number of dimensionCostPairs
-//    int cutOffPairIdx = 1;
-//    if (dimensionCostPairs.size() > 1) {
-//      double cutOffCost = dimensionCostPairs.get(0).getRight() / 10d;
-//      for (; cutOffPairIdx < dimensionCostPairs.size(); ++cutOffPairIdx) {
-//        double curCost = dimensionCostPairs.get(cutOffPairIdx).getRight();
-//        if (Double.compare(cutOffCost, curCost) > 0) {
-//          break;
-//        }
-//      }
-//    } else {
-//      cutOffPairIdx = 0;
-//    }
-
-    // Create a new Dimension instance whose dimensions follow the calculated order
-    List<String> sortedDimensions = new ArrayList<>();
-    int pairIdx = 0;
-    for (MutablePair<String, Double> dimensionCostPair : dimensionCostPairs) {
-      // Skip dimensions whose cost is zero or smaller
-      if (Double.compare(dimensionCostPair.getRight(), 0) <= 0) {
-        break;
-      }
-      if (hierarchicalDimensionMap.containsKey(dimensionCostPair.getLeft())) {
-        HierarchicalDimension hierarchicalDimension = hierarchicalDimensionMap.get(dimensionCostPair.getLeft());
-        if (pairIdx <= cutOffPairIdx) {
-          sortedDimensions.addAll(hierarchicalDimension.hierarchy);
-        }
-        dimensionCostPair.setLeft(hierarchicalDimension.hierarchy.toString());
-      } else { // The dimension does not belong to any hierarchy
-        if (pairIdx <= cutOffPairIdx) {
-          sortedDimensions.add(dimensionCostPair.getLeft());
-        }
-      }
-      ++pairIdx;
-    }
-    return new Dimensions(sortedDimensions.subList(0, Math.min(depth, sortedDimensions.size())));
+    return hierarchicalDimensionCosts;
   }
 
-  static class DimensionCostPairSorter implements Comparator<MutablePair<String, Double>> {
-    @Override
-    public int compare(MutablePair<String, Double> o1, MutablePair<String, Double> o2) {
-      return Double.compare(o1.getRight(), o2.getRight());
+  /**
+   * Sort the hierarchical dimension by their group cost, which is the average of the costs of the dimensions in the
+   * same group.
+   *
+   * @param hierarchicalDimensionCosts the list of hierarchical dimensions to be sorted.
+   * @param sortedDimensionCosts the cost of every level-1 dimension.
+   */
+  private static void sortHierarchicalDimensions(List<HierarchicalDimensionCost> hierarchicalDimensionCosts,
+      List<DimensionCost> sortedDimensionCosts) {
+    Map<String, HierarchicalDimensionCost> hierarchicalDimensionCostTable = new HashMap<>();
+    for (HierarchicalDimensionCost hierarchicalDimensionCost : hierarchicalDimensionCosts) {
+      List<String> dimensions = hierarchicalDimensionCost.dimensinoNames;
+      for (String dimension : dimensions) {
+        hierarchicalDimensionCostTable.put(dimension, hierarchicalDimensionCost);
+      }
     }
-  }
 
-  static class HierarchicalDimension {
-    int index = -1;
-    List<String> hierarchy;
+    // Average the cost of each group of hierarchical dimensions
+    for (DimensionCost dimensionCost : sortedDimensionCosts) {
+      HierarchicalDimensionCost hierarchicalDimensionCost =
+          hierarchicalDimensionCostTable.get(dimensionCost.dimensinoName);
+      hierarchicalDimensionCost.cost += dimensionCost.cost;
+    }
+    for (HierarchicalDimensionCost hierarchicalDimensionCost : hierarchicalDimensionCosts) {
+      hierarchicalDimensionCost.cost /= hierarchicalDimensionCost.dimensinoNames.size();
+    }
+
+    // Sort the groups of hierarchical dimensions by their average cost
+    Collections.sort(hierarchicalDimensionCosts, new Comparator<HierarchicalDimensionCost>() {
+      @Override
+      public int compare(HierarchicalDimensionCost o1, HierarchicalDimensionCost o2) {
+        return Double.compare(o2.cost, o1.cost);
+      }
+    });
   }
 
   public void toJson(String fileName)

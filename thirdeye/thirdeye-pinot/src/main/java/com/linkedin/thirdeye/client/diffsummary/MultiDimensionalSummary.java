@@ -83,13 +83,11 @@ public class MultiDimensionalSummary {
 
     Cube cube = new Cube(costFunction);
     SummaryResponse response;
-    if (depth > 0) {
-      List<MutablePair<String, Double>> dimensionCosts =
-          cube.buildWithAutoDimensionOrder(olapClient, dimensions, dataFilters, depth, hierarchies);
+    if (depth > 0) { // depth != 0 means manual dimension order
+      cube.buildWithAutoDimensionOrder(olapClient, dimensions, dataFilters, depth, hierarchies);
       Summary summary = new Summary(cube, costFunction);
       response = summary.computeSummary(summarySize, doOneSideError, depth);
-      response.setDimensionCosts(dimensionCosts);
-    } else {
+    } else { // manual dimension order
       cube.buildWithManualDimensionOrder(olapClient, dimensions, dataFilters);
       Summary summary = new Summary(cube, costFunction);
       response = summary.computeSummary(summarySize, doOneSideError);
