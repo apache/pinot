@@ -38,6 +38,7 @@ import java.util.Random;
 import java.util.Set;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
@@ -60,6 +61,24 @@ public class PqlQueryResource {
   @Inject
   AccessControlFactory _accessControlFactory;
 
+  @POST
+  @Path("pql")
+  public String post(String requestJsonStr, @Context HttpHeaders httpHeaders) {
+    try {
+      JSONObject requestJson = new JSONObject(requestJsonStr);
+      String pqlQuery = requestJson.getString("pql");
+      String traceEnabled = "false";
+      if (requestJson.has("trace")) {
+        traceEnabled = requestJson.getString("trace");
+      }
+      LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
+      return getQueryResponse(pqlQuery, traceEnabled, httpHeaders);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while processing post request", e);
+      return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
+    }
+  }
+
   @GET
   @Path("pql")
   public String get(
@@ -68,44 +87,49 @@ public class PqlQueryResource {
       @Context HttpHeaders httpHeaders) {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
-
-      // Get resource table name.
-      BrokerRequest brokerRequest;
-      try {
-        brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pqlQuery);
-      } catch (Exception e) {
-        LOGGER.info("Caught exception while compiling PQL query: {}, {}", pqlQuery, e.getMessage());
-        return QueryException.getException(QueryException.PQL_PARSING_ERROR, e).toString();
-      }
-      String tableName = TableNameBuilder.extractRawTableName(brokerRequest.getQuerySource().getTableName());
-
-      // Validate data access
-      AccessControl accessControl = _accessControlFactory.create();
-      if (!accessControl.hasDataAccess(httpHeaders, tableName)) {
-        return QueryException.ACCESS_DENIED_ERROR.toString();
-      }
-
-      // Get brokers for the resource table.
-      List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(tableName);
-      if (instanceIds.isEmpty()) {
-        return QueryException.BROKER_RESOURCE_MISSING_ERROR.toString();
-      }
-
-      // Retain only online brokers.
-      instanceIds.retainAll(_pinotHelixResourceManager.getOnlineInstanceList());
-      if (instanceIds.isEmpty()) {
-        return QueryException.BROKER_INSTANCE_MISSING_ERROR.toString();
-      }
-
-      // Send query to a random broker.
-      String instanceId = instanceIds.get(RANDOM.nextInt(instanceIds.size()));
-      InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
-      String url = "http://" + instanceConfig.getHostName().split("_")[1] + ":" + instanceConfig.getPort() + "/query";
-      return sendPQLRaw(url, pqlQuery, traceEnabled);
+      return getQueryResponse(pqlQuery, traceEnabled, httpHeaders);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
       return QueryException.getException(QueryException.INTERNAL_ERROR, e).toString();
     }
+  }
+
+  public String getQueryResponse(String pqlQuery, String traceEnabled, HttpHeaders httpHeaders) {
+    // Get resource table name.
+    BrokerRequest brokerRequest;
+    try {
+      brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pqlQuery);
+    } catch (Exception e) {
+      LOGGER.info("Caught exception while compiling PQL query: {}, {}", pqlQuery, e.getMessage());
+      return QueryException.getException(QueryException.PQL_PARSING_ERROR, e).toString();
+    }
+    String tableName = TableNameBuilder.extractRawTableName(brokerRequest.getQuerySource().getTableName());
+
+    // Validate data access
+    AccessControl accessControl = _accessControlFactory.create();
+    if (!accessControl.hasDataAccess(httpHeaders, tableName)) {
+      return QueryException.ACCESS_DENIED_ERROR.toString();
+    }
+
+    // Get brokers for the resource table.
+    List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(tableName);
+    if (instanceIds.isEmpty()) {
+      return QueryException.BROKER_RESOURCE_MISSING_ERROR.toString();
+    }
+
+    // Retain only online brokers.
+    instanceIds.retainAll(_pinotHelixResourceManager.getOnlineInstanceList());
+    if (instanceIds.isEmpty()) {
+      return QueryException.BROKER_INSTANCE_MISSING_ERROR.toString();
+    }
+
+    // Send query to a random broker.
+    String instanceId = instanceIds.get(RANDOM.nextInt(instanceIds.size()));
+    InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
+    String hostNameWithPrefix = instanceConfig.getHostName();
+    String url = "http://" + hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1) + ":"
+        + instanceConfig.getPort() + "/query";
+    return sendPQLRaw(url, pqlQuery, traceEnabled);
   }
 
   public String sendPostRaw(String urlStr, String requestStr, Map<String, String> headers) {
