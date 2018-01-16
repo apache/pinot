@@ -3,7 +3,7 @@ package com.linkedin.thirdeye.client.diffsummary;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
-import com.linkedin.thirdeye.client.diffsummary.costfunction.CostFunction;
+import com.linkedin.thirdeye.client.diffsummary.costfunctions.CostFunction;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -38,8 +38,8 @@ public class Cube { // the cube (Ca|Cb)
   private double baselineTotal;
   private double currentTotal;
   private double topRatio;
-  private List<DimNameValueCostEntry> costSet;
-  private List<DimensionCost> sortedDimensionCosts;
+  private List<DimNameValueCostEntry> costSet = Collections.emptyList();
+  private List<DimensionCost> sortedDimensionCosts = Collections.emptyList();
 
   @JsonProperty("dimensions")
   private Dimensions dimensions;
@@ -91,51 +91,52 @@ public class Cube { // the cube (Ca|Cb)
     return sortedDimensionCosts;
   }
 
+  /**
+   * Automatically orders of the given dimensions depending on their error cost and builds the subcube of data according
+   * to that order.
+   *
+   * @param olapClient the client to retrieve the data.
+   * @param dimensions the dimensions to be ordered.
+   * @param dataFilter the filter to be applied on the incoming data.
+   * @param depth the number of the top dimensions to be considered in the subcube.
+   * @param hierarchy the hierarchy among the given dimensions, whose order will be honors before dimensions' cost.
+   */
   public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient,
-      Dimensions dimensions, Multimap<String, String> filterSets, int depth, List<List<String>> hierarchy)
+      Dimensions dimensions, Multimap<String, String> dataFilter, int depth, List<List<String>> hierarchy)
       throws Exception {
     long tStart = System.nanoTime();
     try {
-      if (dimensions == null || dimensions.size() == 0) {
-        throw new IllegalArgumentException("Dimensions cannot be empty.");
-      }
-      if (hierarchy == null) {
-        hierarchy = Collections.emptyList();
-      }
+      Preconditions.checkArgument((dimensions != null && dimensions.size() != 0), "Dimensions cannot be empty.");
+      Preconditions.checkNotNull(hierarchy, "hierarchy cannot be null.");
 
-      initializeBasicInfo(olapClient, filterSets);
-      Dimensions shrankDimensions = shrinkDimensionsByFilterSets(dimensions, filterSets);
-      costSet = computeOneDimensionCost(olapClient, baselineTotal, currentTotal, shrankDimensions, filterSets);
+      initializeBasicInfo(olapClient, dataFilter);
+      Dimensions shrankDimensions = shrinkDimensionsByFilterSets(dimensions, dataFilter);
+      costSet = computeOneDimensionCost(olapClient, baselineTotal, currentTotal, shrankDimensions, dataFilter);
       sortedDimensionCosts = calculateSortedDimensionCost(costSet);
       this.dimensions = sortDimensions(sortedDimensionCosts, depth, hierarchy);
 
       LOG.info("Auto-dimension order: " + this.dimensions);
 
-      buildWithManualDimensionOrderInternal(olapClient, this.dimensions, filterSets);
+      buildSubCube(olapClient, this.dimensions, dataFilter);
     } finally {
       ThirdeyeMetricsUtil.cubeCallCounter.inc();
       ThirdeyeMetricsUtil.cubeDurationCounter.inc(System.nanoTime() - tStart);
     }
   }
 
+  /**
+   * Builds the subcube of data according to the given dimensions.
+   *
+   * @param olapClient the client to retrieve the data.
+   * @param dimensions the dimensions, whose order has been given, of the subcube.
+   * @param dataFilter the filter to be applied on the incoming data.
+   */
   public void buildWithManualDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions,
-      Multimap<String, String> filterSets)
+      Multimap<String, String> dataFilter)
       throws Exception {
     long tStart = System.nanoTime();
     try {
-      buildWithManualDimensionOrderInternal(olapClient, dimensions, filterSets);
-    } finally {
-      ThirdeyeMetricsUtil.cubeCallCounter.inc();
-      ThirdeyeMetricsUtil.cubeDurationCounter.inc(System.nanoTime() - tStart);
-    }
-  }
-
-  public void buildDimensionCostSet(OLAPDataBaseClient olapClient, Dimensions dimensions,
-      Multimap<String, String> filterSets) throws Exception {
-    long tStart = System.nanoTime();
-    try {
-      initializeBasicInfo(olapClient, filterSets);
-      this.costSet = computeOneDimensionCost(olapClient, baselineTotal, currentTotal, dimensions, filterSets);
+      buildSubCube(olapClient, dimensions, dataFilter);
     } finally {
       ThirdeyeMetricsUtil.cubeCallCounter.inc();
       ThirdeyeMetricsUtil.cubeDurationCounter.inc(System.nanoTime() - tStart);
@@ -174,16 +175,20 @@ public class Cube { // the cube (Ca|Cb)
     return new Dimensions(dimensionsToRetain);
   }
 
-  private void buildWithManualDimensionOrderInternal(OLAPDataBaseClient olapClient, Dimensions dimensions,
-      Multimap<String, String> filterSets)
+  /**
+   * Builds the subcube according to the given dimension order.
+   *
+   * @param olapClient the data client to retrieve data.
+   * @param dimensions the given dimension order.
+   * @param dataFilter the data filter to applied on the data cube.
+   */
+  private void buildSubCube(OLAPDataBaseClient olapClient, Dimensions dimensions, Multimap<String, String> dataFilter)
       throws Exception {
-    if (dimensions == null || dimensions.size() == 0) {
-      throw new IllegalArgumentException("Dimensions cannot be empty.");
-    }
+    Preconditions.checkArgument((dimensions != null && dimensions.size() != 0), "Dimensions cannot be empty.");
     if (this.dimensions == null) { // which means buildWithAutoDimensionOrder is not triggered
-      initializeBasicInfo(olapClient, filterSets);
+      initializeBasicInfo(olapClient, dataFilter);
       this.dimensions = dimensions;
-      this.costSet = computeOneDimensionCost(olapClient, baselineTotal, currentTotal, dimensions, filterSets);
+      costSet = computeOneDimensionCost(olapClient, baselineTotal, currentTotal, dimensions, dataFilter);
     }
 
     int size = 0;
@@ -196,7 +201,7 @@ public class Cube { // the cube (Ca|Cb)
     //                       / \   \
     //     Level 2          d   e   f
     // The Comparator for generating the order is implemented in the class DimensionValues.
-    List<List<Row>> rowOfLevels = olapClient.getAggregatedValuesOfLevels(dimensions, filterSets);
+    List<List<Row>> rowOfLevels = olapClient.getAggregatedValuesOfLevels(dimensions, dataFilter);
     for (int i = 0; i <= dimensions.size(); ++i) {
       List<Row> rowAtLevelI = rowOfLevels.get(i);
       Collections.sort(rowAtLevelI, new RowDimensionValuesComparator());
@@ -205,7 +210,7 @@ public class Cube { // the cube (Ca|Cb)
     }
     LOG.info("Size of the cube for generating summary: " + size);
 
-    this.hierarchicalNodes = hierarchyRowToHierarchyNode(hierarchicalRows, dimensions);
+    hierarchicalNodes = hierarchyRowToHierarchyNode(hierarchicalRows, dimensions);
   }
 
   /**
@@ -300,7 +305,7 @@ public class Cube { // the cube (Ca|Cb)
         double contributionFactor =
             (wowValues.getBaselineValue() + wowValues.getCurrentValue()) / (baselineTotal + currentTotal);
         double cost = costFunction
-            .getCost(wowValues.getBaselineValue(), wowValues.getCurrentValue(), topRatio, baselineTotal, currentTotal);
+            .computeCost(wowValues.getBaselineValue(), wowValues.getCurrentValue(), topRatio, baselineTotal, currentTotal);
 
         costSet.add(new DimNameValueCostEntry(dimensionName, dimensionValue, wowValues.getBaselineValue(),
             wowValues.getCurrentValue(), contributionFactor, cost));

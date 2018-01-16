@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.dashboard.views.diffsummary;
 
 import com.linkedin.thirdeye.client.diffsummary.Cube;
-import com.linkedin.thirdeye.client.diffsummary.costfunction.CostFunction;
+import com.linkedin.thirdeye.client.diffsummary.costfunctions.CostFunction;
 import com.linkedin.thirdeye.client.diffsummary.DimNameValueCostEntry;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;

@@ -48,7 +48,7 @@ public class HierarchyNode {
     this.parent = Preconditions.checkNotNull(parent);
     Dimensions parentDimension = new Dimensions(parent.data.getDimensions().namesToDepth(parent.getLevel()));
     Dimensions childDimension = new Dimensions(data.getDimensions().namesToDepth(level));
-    Preconditions.checkState(parentDimension.isParentTo(childDimension),
+    Preconditions.checkState(parentDimension.isParentOf(childDimension),
         "Current node is not a child node of the given parent node. Current and parent dimensions: ",
         data.getDimensions(), parent.data.getDimensions());
     parent.children.add(this);

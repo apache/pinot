@@ -51,26 +51,26 @@ public class DimensionsTest {
   }
 
   @Test
-  public void testIsParentTo() {
+  public void testIsParentOf() {
     Dimensions dimensions1 = new Dimensions();
-    Assert.assertFalse(dimensions1.isParentTo(null));
+    Assert.assertFalse(dimensions1.isParentOf(null));
 
     Dimensions dimensions2 = new Dimensions(Arrays.asList("country"));
-    Assert.assertFalse(dimensions2.isParentTo(dimensions2));
-    Assert.assertTrue(dimensions1.isParentTo(dimensions2));
-    Assert.assertFalse(dimensions2.isParentTo(dimensions1));
+    Assert.assertFalse(dimensions2.isParentOf(dimensions2));
+    Assert.assertTrue(dimensions1.isParentOf(dimensions2));
+    Assert.assertFalse(dimensions2.isParentOf(dimensions1));
 
     Dimensions dimensions3 = new Dimensions(Arrays.asList("country", "page"));
-    Assert.assertTrue(dimensions2.isParentTo(dimensions3));
-    Assert.assertFalse(dimensions3.isParentTo(dimensions2));
+    Assert.assertTrue(dimensions2.isParentOf(dimensions3));
+    Assert.assertFalse(dimensions3.isParentOf(dimensions2));
 
     Dimensions dimensions4 = new Dimensions(Arrays.asList("page"));
-    Assert.assertTrue(dimensions4.isParentTo(dimensions3));
-    Assert.assertFalse(dimensions3.isParentTo(dimensions4));
+    Assert.assertTrue(dimensions4.isParentOf(dimensions3));
+    Assert.assertFalse(dimensions3.isParentOf(dimensions4));
 
     Dimensions dimensions5 = new Dimensions(Arrays.asList("random"));
-    Assert.assertFalse(dimensions5.isParentTo(dimensions3));
-    Assert.assertFalse(dimensions3.isParentTo(dimensions5));
+    Assert.assertFalse(dimensions5.isParentOf(dimensions3));
+    Assert.assertFalse(dimensions3.isParentOf(dimensions5));
   }
 
   @Test

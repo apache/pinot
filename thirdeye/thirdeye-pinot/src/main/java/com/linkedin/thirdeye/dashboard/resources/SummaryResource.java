@@ -7,10 +7,11 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.client.diffsummary.Dimensions;
 import com.linkedin.thirdeye.client.diffsummary.MultiDimensionalSummary;
+import com.linkedin.thirdeye.client.diffsummary.MultiDimensionalSummaryCLITool;
 import com.linkedin.thirdeye.client.diffsummary.OLAPDataBaseClient;
 import com.linkedin.thirdeye.client.diffsummary.PinotThirdEyeSummaryClient;
-import com.linkedin.thirdeye.client.diffsummary.costfunction.BalancedCostFunction;
-import com.linkedin.thirdeye.client.diffsummary.costfunction.CostFunction;
+import com.linkedin.thirdeye.client.diffsummary.costfunctions.BalancedCostFunction;
+import com.linkedin.thirdeye.client.diffsummary.costfunctions.CostFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.diffsummary.SummaryResponse;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
@@ -69,14 +70,14 @@ public class SummaryResource {
       Dimensions dimensions;
       if (StringUtils.isBlank(groupByDimensions) || JAVASCRIPT_NULL_STRING.equals(groupByDimensions)) {
         dimensions =
-            MultiDimensionalSummary.sanitizeDimensions(new Dimensions(Utils.getSchemaDimensionNames(dataset)));
+            MultiDimensionalSummaryCLITool.sanitizeDimensions(new Dimensions(Utils.getSchemaDimensionNames(dataset)));
       } else {
         dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
       }
 
       if (!Strings.isNullOrEmpty(excludedDimensions)) {
         List<String> dimensionsToBeRemoved = Arrays.asList(excludedDimensions.trim().split(","));
-        dimensions = MultiDimensionalSummary.removeDimensions(dimensions, dimensionsToBeRemoved);
+        dimensions = MultiDimensionalSummaryCLITool.removeDimensions(dimensions, dimensionsToBeRemoved);
       }
 
       Multimap<String, String> filterSetMap;

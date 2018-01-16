@@ -8,7 +8,7 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.thirdeye.client.diffsummary.costfunction.CostFunction;
+import com.linkedin.thirdeye.client.diffsummary.costfunctions.CostFunction;
 import com.linkedin.thirdeye.client.diffsummary.Dimensions;
 import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
 import org.slf4j.Logger;
@@ -104,7 +104,7 @@ public class SummaryResponseTree {
       double globalCurrentValue, CostFunction costFunction) {
     if (node.hierarchyNode != null) {
       double nodeCost = costFunction
-          .getCost(node.getBaselineValue(), node.getCurrentValue(), targetRatio, globalBaselineValue,
+          .computeCost(node.getBaselineValue(), node.getCurrentValue(), targetRatio, globalBaselineValue,
               globalCurrentValue);
       node.hierarchyNode.setCost(nodeCost);
       node.subTreeCost = nodeCost;

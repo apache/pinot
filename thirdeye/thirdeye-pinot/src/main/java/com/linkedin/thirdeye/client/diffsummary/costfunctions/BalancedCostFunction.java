@@ -1,9 +1,14 @@
-package com.linkedin.thirdeye.client.diffsummary.costfunction;
+package com.linkedin.thirdeye.client.diffsummary.costfunctions;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import java.util.Map;
 
+
+/**
+ * This cost function consider change difference, change ratio, and node size (contribution percentage of a node).
+ * More for details: {@link #computeCost(double, double, double, double, double)}.
+ */
 public class BalancedCostFunction implements CostFunction {
   public static final String CHANGE_CONTRIBUTION_THRESHOLD_PARAM = "threshold";
   // The threshold to the contribution to overall changes in percentage
@@ -29,7 +34,13 @@ public class BalancedCostFunction implements CostFunction {
   }
 
   /**
-   * Returns the cost that consider change difference, change ratio, and node size.
+   * Returns the cost that consider change difference, change ratio, and node size (contribution percentage of a node).
+   *
+   * In brief, this function uses this formula to compute the cost:
+   *   change difference * log(contribution percentage * change ratio)
+   *
+   * In addition, if a node's contribution to overall changes is smaller than the threshold, which is defined when
+   * constructing this class, then the cost is always zero.
    *
    * @param baselineValue the baseline value of the current node.
    * @param currentValue the current value of the current node.
@@ -40,7 +51,7 @@ public class BalancedCostFunction implements CostFunction {
    * @return the cost that consider change difference, change ratio, and node size.
    */
   @Override
-  public double getCost(double baselineValue, double currentValue, double parentRatio, double globalBaselineValue,
+  public double computeCost(double baselineValue, double currentValue, double parentRatio, double globalBaselineValue,
       double globalCurrentValue) {
 
     // Typically, users don't care nodes with small contribution to overall changes

@@ -59,7 +59,7 @@ public class Dimensions {
    *
    * @return true if the current dimension is a parent (subset) to the given dimension.
    */
-  public boolean isParentTo(Dimensions child) {
+  public boolean isParentOf(Dimensions child) {
     if (child == null) { // null dimension is always the top level and hence it is a parent to every dimension
       return false;
     }

@@ -1,11 +1,11 @@
-package com.linkedin.thirdeye.client.diffsummary.costfunction;
+package com.linkedin.thirdeye.client.diffsummary.costfunctions;
 
 import java.util.HashMap;
 import java.util.Map;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static com.linkedin.thirdeye.client.diffsummary.costfunction.BalancedCostFunction.*;
+import static com.linkedin.thirdeye.client.diffsummary.costfunctions.BalancedCostFunction.*;
 
 
 public class BalancedCostFunctionTest {

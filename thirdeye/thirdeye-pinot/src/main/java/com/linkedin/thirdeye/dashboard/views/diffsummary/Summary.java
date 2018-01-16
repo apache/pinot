@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.dashboard.views.diffsummary;
 
 import com.linkedin.thirdeye.client.diffsummary.DimNameValueCostEntry;
-import com.linkedin.thirdeye.client.diffsummary.costfunction.BalancedCostFunction;
+import com.linkedin.thirdeye.client.diffsummary.costfunctions.BalancedCostFunction;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,7 +14,7 @@ import org.jfree.util.Log;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.client.diffsummary.costfunction.CostFunction;
+import com.linkedin.thirdeye.client.diffsummary.costfunctions.CostFunction;
 import com.linkedin.thirdeye.client.diffsummary.Cube;
 import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
 
@@ -348,7 +348,7 @@ public class Summary {
       double baselineValue = node.getBaselineValue();
       double currentValue = node.getCurrentValue();
       double cost =
-          costFunction.getCost(baselineValue, currentValue, targetRatio, globalBaselineValue, globalCurrentValue);
+          costFunction.computeCost(baselineValue, currentValue, targetRatio, globalBaselineValue, globalCurrentValue);
 
       for (int n = dp.size() - 1; n > 0; --n) {
         double val1 = dp.slotAt(n - 1).cost;

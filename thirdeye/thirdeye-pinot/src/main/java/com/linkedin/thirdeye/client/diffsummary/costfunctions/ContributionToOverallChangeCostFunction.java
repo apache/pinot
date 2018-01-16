@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.client.diffsummary.costfunction;
+package com.linkedin.thirdeye.client.diffsummary.costfunctions;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -28,7 +28,7 @@ public class ContributionToOverallChangeCostFunction implements CostFunction {
   }
 
   @Override
-  public double getCost(double baselineValue, double currentValue, double parentRatio, double globalBaselineValue,
+  public double computeCost(double baselineValue, double currentValue, double parentRatio, double globalBaselineValue,
       double globalCurrentValue) {
 
     double contributionToOverallChange = (currentValue - baselineValue) / (globalCurrentValue - globalBaselineValue);

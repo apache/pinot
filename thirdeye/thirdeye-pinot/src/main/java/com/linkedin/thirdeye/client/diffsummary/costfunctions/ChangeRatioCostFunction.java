@@ -1,8 +1,8 @@
-package com.linkedin.thirdeye.client.diffsummary.costfunction;
+package com.linkedin.thirdeye.client.diffsummary.costfunctions;
 
 public class ChangeRatioCostFunction implements CostFunction {
   @Override
-  public double getCost(double baselineValue, double currentValue, double parentRatio, double globalBaselineValue,
+  public double computeCost(double baselineValue, double currentValue, double parentRatio, double globalBaselineValue,
       double globalCurrentValue) {
     return fillEmptyValuesAndGetError(baselineValue, currentValue, parentRatio);
   }
