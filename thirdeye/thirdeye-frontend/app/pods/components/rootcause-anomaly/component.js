@@ -138,26 +138,21 @@ export default Component.extend({
   ),
 
   /**
-   * Harrier link for an anomaly
-   * @type {String}
+   * External links for current anomaly
+   * @type {Object} - an object with key as the link type and value as the url
    */
-  harrierLink: computed(
+  anomalyLinks: computed(
     'anomaly',
     function() {
-      const attributes = get(this, 'anomaly').attributes;
-      return attributes.HARRIER;
-    }
-  ),
+      const { externalUrls } = get(this, 'anomaly.attributes');
+      let urls = {};
 
-  /**
-   * InGraph link for an anomaly
-   * @type {String}
-   */
-  inGraphLink: computed(
-    'anomaly',
-    function() {
-      const attributes = get(this, 'anomaly').attributes;
-      return attributes.INGRAPH;
+      if (externalUrls.length) {
+        externalUrls.forEach(url => {
+          urls[url] = get(this, 'anomaly.attributes')[url][0]; // there will always be only 1 element in this array
+        });
+      }
+      return urls;
     }
   ),
 

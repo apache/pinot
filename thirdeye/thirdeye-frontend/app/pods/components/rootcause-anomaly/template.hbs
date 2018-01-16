@@ -2,16 +2,11 @@
   <div class="row card-container card-container--box-shadow">
     <div class="rootcause-anomaly__header">
       <span class="rootcause-anomaly__title">Anomaly Overview</span>
-      {{#if harrierLink}}
-        <span class="rootcause-anomaly__harrier-link">
-          {{#link-to harrierLink}}HARRIER{{/link-to}}
+      {{#each-in anomalyLinks as |type url|}}
+        <span class="rootcause-anomaly__link">
+          <a target="_blank" href="{{url}}">{{type}}</a>
         </span>
-      {{/if}}
-      {{#if inGraphLink}}
-        <span class="rootcause-anomaly__ingraph-link">
-          {{#link-to harrierLink}}INGRAPH{{/link-to}}
-        </span>
-      {{/if}}
+      {{/each-in}}
       <div class="rootcause-anomaly__icon">
         <a class="thirdeye-link thirdeye-link--tertiary thirdeye-link--muted" {{action "toggleHidden"}}>
           <span><i class="glyphicon glyphicon-menu-{{if isHidden "down" "up"}}"></i></span>
