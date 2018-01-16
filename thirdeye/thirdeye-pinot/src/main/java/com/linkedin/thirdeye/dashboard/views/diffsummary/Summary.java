@@ -39,8 +39,8 @@ public class Summary {
   public Summary(Cube cube, CostFunction costFunction) {
     this.cube = cube;
     this.maxLevelCount = cube.getDimensions().size();
-    this.globalBaselineValue = cube.getTopBaselineValue();
-    this.globalCurrentValue = cube.getTopCurrentValue();
+    this.globalBaselineValue = cube.getBaselineTotal();
+    this.globalCurrentValue = cube.getCurrentTotal();
     this.levelCount = this.maxLevelCount;
     this.costSet = cube.getCostSet();
     this.basicRowInserter = new BasicRowInserter(new BalancedCostFunction());

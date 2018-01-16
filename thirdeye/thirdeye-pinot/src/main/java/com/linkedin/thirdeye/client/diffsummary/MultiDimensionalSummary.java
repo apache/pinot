@@ -183,7 +183,7 @@ public class MultiDimensionalSummary {
    * TODO: Replace with an user configurable method
    */
   public static Dimensions sanitizeDimensions(Dimensions dimensions) {
-    List<String> allDimensionNames = dimensions.allDimensions();
+    List<String> allDimensionNames = dimensions.names();
     Set<String> dimensionsToRemove = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
     dimensionsToRemove.add("environment");
     dimensionsToRemove.add("colo");
@@ -199,7 +199,7 @@ public class MultiDimensionalSummary {
 
   public static Dimensions removeDimensions(Dimensions dimensions, Collection<String> dimensionsToRemove) {
     List<String> dimensionsToRetain = new ArrayList<>();
-    for (String dimensionName : dimensions.allDimensions()) {
+    for (String dimensionName : dimensions.names()) {
       if(!dimensionsToRemove.contains(dimensionName.trim())){
         dimensionsToRetain.add(dimensionName);
       }

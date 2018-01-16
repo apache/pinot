@@ -1,23 +1,27 @@
 package com.linkedin.thirdeye.client.diffsummary;
 
 import com.google.common.base.MoreObjects;
+import com.google.common.base.Preconditions;
 
 public class DimNameValueCostEntry implements Comparable<DimNameValueCostEntry>{
-  private double contributionFactor;
   private String dimName;
   private String dimValue;
   private double cost;
+  private double contributionFactor;
   private double currentValue;
   private double baselineValue;
 
-  public DimNameValueCostEntry(String dimension, String dimValue, double dimValueCost, double contributionFactor,
-      double currentValue, double baselineValue) {
-    this.dimName = dimension;
-    this.dimValue = dimValue;
-    this.cost = dimValueCost;
-    this.contributionFactor = contributionFactor;
-    this.currentValue = currentValue;
+  public DimNameValueCostEntry(String dimensionName, String dimensionValue, double baselineValue, double currentValue,
+      double contributionFactor, double cost) {
+    Preconditions.checkNotNull(dimensionName, "dimension name cannot be null.");
+    Preconditions.checkNotNull(dimensionValue, "dimension value cannot be null.");
+
+    this.dimName = dimensionName;
+    this.dimValue = dimensionValue;
     this.baselineValue = baselineValue;
+    this.currentValue = currentValue;
+    this.contributionFactor = contributionFactor;
+    this.cost = cost;
   }
 
   public double getContributionFactor() {

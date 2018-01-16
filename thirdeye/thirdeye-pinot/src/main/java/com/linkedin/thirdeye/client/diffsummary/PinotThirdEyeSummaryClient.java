@@ -96,7 +96,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   public Row getTopAggregatedValues(Multimap<String, String> filterSets) throws Exception {
     List<String> groupBy = Collections.emptyList();
       List<ThirdEyeRequest> timeOnTimeBulkRequests = constructTimeOnTimeBulkRequests(groupBy, filterSets);
-      Row row = constructAggregatedValues(null, timeOnTimeBulkRequests).get(0).get(0);
+      Row row = constructAggregatedValues(new Dimensions(), timeOnTimeBulkRequests).get(0).get(0);
       return row;
   }
 
@@ -117,7 +117,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
       throws Exception {
       List<ThirdEyeRequest> timeOnTimeBulkRequests = new ArrayList<>();
       for (int level = 0; level < dimensions.size() + 1; ++level) {
-        List<String> groupBy = Lists.newArrayList(dimensions.groupByStringsAtLevel(level));
+        List<String> groupBy = Lists.newArrayList(dimensions.namesToDepth(level));
         timeOnTimeBulkRequests.addAll(constructTimeOnTimeBulkRequests(groupBy, filterSets));
       }
       List<List<Row>> rows = constructAggregatedValues(dimensions, timeOnTimeBulkRequests);
@@ -224,15 +224,13 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
         List<String> dimensionValues = response.getRow(rowIdx).getDimensions();
         Row row = rowTable.get(dimensionValues);
         if (row == null) {
-          row = new Row();
-          row.setDimensions(dimensions);
-          row.setDimensionValues(new DimensionValues(dimensionValues));
+          row = new Row(dimensions, new DimensionValues(dimensionValues));
           rowTable.put(dimensionValues, row);
         }
         if (isBaseline) {
-          row.baselineValue = value;
+          row.setBaselineValue(value);
         } else {
-          row.currentValue = value;
+          row.setCurrentValue(value);
         }
       }
     }

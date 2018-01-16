@@ -31,30 +31,31 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class Cube { // the cube (Ca|Cb)
   private static final Logger LOG = LoggerFactory.getLogger(Cube.class);
 
-  private static final int DEFAULT_TOP_DIMENSION = 3;
+  private static final int DEFAULT_DEPTH = 3;
+  private static final int TOP_COST_ENTRIES_TO_LOG = 20;
 
-  private double topBaselineValue;
-  private double topCurrentValue;
+  private double baselineTotal;
+  private double currentTotal;
   private double topRatio;
   private List<DimNameValueCostEntry> costSet;
 
   @JsonProperty("dimensions")
   private Dimensions dimensions;
 
-  // The data stored in levels
+  // The actual data is stored in levels
   @JsonProperty("hierarchicalRows")
   private List<List<Row>> hierarchicalRows = new ArrayList<>();
 
-  // The logical nodes of the hierarchy among rows (i.e., the actual data)
+  // The logical nodes of the hierarchy among the actual data
   @JsonIgnore
   private List<List<HierarchyNode>> hierarchicalNodes = new ArrayList<>();
 
-  public double getTopBaselineValue() {
-    return topBaselineValue;
+  public double getBaselineTotal() {
+    return baselineTotal;
   }
 
-  public double getTopCurrentValue() {
-    return topCurrentValue;
+  public double getCurrentTotal() {
+    return currentTotal;
   }
 
   public double getTopRatio() {
@@ -85,17 +86,6 @@ public class Cube { // the cube (Ca|Cb)
   }
 
   public List<MutablePair<String, Double>> buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient,
-      Dimensions dimensions) throws Exception {
-    return buildWithAutoDimensionOrder(olapClient, dimensions, null, DEFAULT_TOP_DIMENSION,
-        Collections.<List<String>>emptyList());
-  }
-
-  public List<MutablePair<String, Double>> buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient,
-      Dimensions dimensions, int depth) throws Exception {
-    return buildWithAutoDimensionOrder(olapClient, dimensions, null, depth, Collections.<List<String>>emptyList());
-  }
-
-  public List<MutablePair<String, Double>> buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient,
       Dimensions dimensions, Multimap<String, String> filterSets, int depth, List<List<String>> hierarchy)
       throws Exception {
     long tStart = System.nanoTime();
@@ -110,7 +100,7 @@ public class Cube { // the cube (Ca|Cb)
       initializeBasicInfo(olapClient, filterSets);
       Dimensions shrankDimensions = shrinkDimensionsByFilterSets(dimensions, filterSets);
       this.costSet =
-          computeOneDimensionCost(olapClient, topBaselineValue, topCurrentValue, shrankDimensions, filterSets);
+          computeOneDimensionCost(olapClient, baselineTotal, currentTotal, shrankDimensions, filterSets);
       List<MutablePair<String, Double>> dimensionCostPair = new ArrayList<>();
       this.dimensions = sortDimensionOrder(costSet, shrankDimensions, depth, hierarchy, dimensionCostPair);
 
@@ -143,7 +133,7 @@ public class Cube { // the cube (Ca|Cb)
     long tStart = System.nanoTime();
     try {
       initializeBasicInfo(olapClient, filterSets);
-      this.costSet = computeOneDimensionCost(olapClient, topBaselineValue, topCurrentValue, dimensions, filterSets);
+      this.costSet = computeOneDimensionCost(olapClient, baselineTotal, currentTotal, dimensions, filterSets);
     } finally {
       ThirdeyeMetricsUtil.cubeCallCounter.inc();
       ThirdeyeMetricsUtil.cubeDurationCounter.inc(System.nanoTime() - tStart);
@@ -174,7 +164,7 @@ public class Cube { // the cube (Ca|Cb)
 
   private static Dimensions removeDimensions(Dimensions dimensions, Collection<String> dimensionsToRemove) {
     List<String> dimensionsToRetain = new ArrayList<>();
-    for (String dimensionName : dimensions.allDimensions()) {
+    for (String dimensionName : dimensions.names()) {
       if(!dimensionsToRemove.contains(dimensionName)){
         dimensionsToRetain.add(dimensionName);
       }
@@ -191,7 +181,7 @@ public class Cube { // the cube (Ca|Cb)
     if (this.dimensions == null) { // which means buildWithAutoDimensionOrder is not triggered
       initializeBasicInfo(olapClient, filterSets);
       this.dimensions = dimensions;
-      this.costSet = computeOneDimensionCost(olapClient, topBaselineValue, topCurrentValue, dimensions, filterSets);
+      this.costSet = computeOneDimensionCost(olapClient, baselineTotal, currentTotal, dimensions, filterSets);
     }
 
     int size = 0;
@@ -213,7 +203,7 @@ public class Cube { // the cube (Ca|Cb)
     }
     LOG.info("Size of the cube for generating summary: " + size);
 
-    buildHierarchy();
+    this.hierarchicalNodes = hierarchyRowToHierarchyNode(hierarchicalRows, dimensions);
   }
 
   /**
@@ -223,9 +213,9 @@ public class Cube { // the cube (Ca|Cb)
   private void initializeBasicInfo(OLAPDataBaseClient olapClient, Multimap<String, String> filterSets)
       throws Exception {
     Row topAggValues = olapClient.getTopAggregatedValues(filterSets);
-    topBaselineValue = topAggValues.baselineValue; // aggregated baseline values
-    topCurrentValue = topAggValues.currentValue; // aggregated current values
-    topRatio = topCurrentValue / topBaselineValue; // change ratio
+    baselineTotal = topAggValues.getBaselineValue(); // aggregated baseline values
+    currentTotal = topAggValues.getCurrentValue(); // aggregated current values
+    topRatio = currentTotal / baselineTotal; // change ratio
   }
 
   /**
@@ -234,27 +224,34 @@ public class Cube { // the cube (Ca|Cb)
   static class RowDimensionValuesComparator implements Comparator<Row> {
     @Override
     public int compare(Row r1, Row r2) {
-      return r1.dimensionValues.compareTo(r2.dimensionValues);
+      return r1.getDimensionValues().compareTo(r2.getDimensionValues());
     }
   }
 
   /**
-   * Establish the hierarchy between aggregated and detailed rows.
+   * Establishes the hierarchical relationship between the aggregated data (parent) and detailed data (children).
+   *
+   * @param hierarchicalRows the actual data.
+   * @param dimensions the dimension names of the actual data.
+   *
+   * @return HierarchyNode that contains the hierarchical relationship.
    */
-  private void buildHierarchy() {
+  public static List<List<HierarchyNode>> hierarchyRowToHierarchyNode(List<List<Row>> hierarchicalRows,
+      Dimensions dimensions) {
+
+    List<List<HierarchyNode>> hierarchicalNodes = new ArrayList<>();
     HashMap<String, HierarchyNode> curParent = new HashMap<>();
     HashMap<String, HierarchyNode> nextParent = new HashMap<>();
 
-    for (int level = 0; level <= this.dimensions.size(); ++level) {
+    for (int level = 0; level <= dimensions.size(); ++level) {
       hierarchicalNodes.add(new ArrayList<HierarchyNode>(hierarchicalRows.get(level).size()));
 
       if (level != 0) {
-
         for (int index = 0; index < hierarchicalRows.get(level).size(); ++index) {
           Row row = hierarchicalRows.get(level).get(index);
           StringBuilder parentDimValues = new StringBuilder();
           for (int i = 0; i < level - 1; ++i) {
-            parentDimValues.append(row.dimensionValues.get(i));
+            parentDimValues.append(row.getDimensionValues().get(i));
           }
           HierarchyNode parentNode = curParent.get(parentDimValues.toString());
           // Sometimes Pinot returns a node without any matching parent; we discard those nodes.
@@ -262,26 +259,27 @@ public class Cube { // the cube (Ca|Cb)
             continue;
           }
           HierarchyNode node = new HierarchyNode(level, index, row, parentNode);
-          parentNode.children.add(node);
           hierarchicalNodes.get(level).add(node);
           // Add current node's dimension values to next parent lookup table for the next level of nodes
-          parentDimValues.append(row.dimensionValues.get(level - 1));
+          parentDimValues.append(row.getDimensionValues().get(level - 1));
           nextParent.put(parentDimValues.toString(), node);
         }
       } else { // root
         Row row = hierarchicalRows.get(0).get(0);
-        HierarchyNode node = new HierarchyNode(0, 0, row, null);
+        HierarchyNode node = new HierarchyNode(row);
         hierarchicalNodes.get(0).add(node);
         nextParent.put("", node);
       }
 
       // The last level of nodes won't be a parent of any other nodes, so we don't need to initialized
       // the hashmap of parent nodes for it.
-      if (level != this.dimensions.size()) {
+      if (level != dimensions.size()) {
         curParent = nextParent;
         nextParent = new HashMap<>();
       }
     }
+
+    return hierarchicalNodes;
   }
 
   private List<DimNameValueCostEntry> computeOneDimensionCost(OLAPDataBaseClient olapClient, double baselineTotal,
@@ -293,25 +291,23 @@ public class Cube { // the cube (Ca|Cb)
     List<DimNameValueCostEntry> costSet = new ArrayList<>();
     List<List<Row>> wowValuesOfDimensions = olapClient.getAggregatedValuesOfDimension(dimensions, filterSets);
     for (int i = 0; i < dimensions.size(); ++i) {
-      String dimension = dimensions.get(i);
+      String dimensionName = dimensions.get(i);
       List<Row> wowValuesOfOneDimension = wowValuesOfDimensions.get(i);
       for (Row wowValues : wowValuesOfOneDimension) {
-        String dimValue = wowValues.getDimensionValues().get(0);
+        String dimensionValue = wowValues.getDimensionValues().get(0);
+        double contributionFactor =
+            (wowValues.getBaselineValue() + wowValues.getCurrentValue()) / (baselineTotal + currentTotal);
+        double cost = costFunction
+            .getCost(wowValues.getBaselineValue(), wowValues.getCurrentValue(), topRatio, baselineTotal, currentTotal);
 
-        double dimValueCost = costFunction
-            .getCost(wowValues.baselineValue, wowValues.currentValue, topRatio, baselineTotal, currentTotal);
-
-        double contributionFactor = (wowValues.baselineValue + wowValues.currentValue) / (baselineTotal + currentTotal);
-        costSet.add(
-            new DimNameValueCostEntry(dimension, dimValue, dimValueCost, contributionFactor, wowValues.currentValue,
-                wowValues.baselineValue));
+        costSet.add(new DimNameValueCostEntry(dimensionName, dimensionValue, wowValues.getBaselineValue(),
+            wowValues.getCurrentValue(), contributionFactor, cost));
       }
     }
 
     Collections.sort(costSet, Collections.reverseOrder());
-    final int top = 20;
-    LOG.info("Top {} nodes (depth=1):", top);
-    for (DimNameValueCostEntry entry : costSet.subList(0, Math.min(costSet.size(), top))) {
+    LOG.info("Top {} nodes (depth=1):", TOP_COST_ENTRIES_TO_LOG);
+    for (DimNameValueCostEntry entry : costSet.subList(0, Math.min(costSet.size(), TOP_COST_ENTRIES_TO_LOG))) {
       LOG.info("\t{}", entry);
     }
 
@@ -344,7 +340,7 @@ public class Cube { // the cube (Ca|Cb)
 
     // Given one dimension name D, returns the hierarchical dimension to which D belong.
     Map<String, HierarchicalDimension> hierarchicalDimensionMap = new HashMap<>();
-    Set<String> availableDimensionKeySet = new HashSet<>(dimensions.allDimensions());
+    Set<String> availableDimensionKeySet = new HashSet<>(dimensions.names());
     // Process the suggested hierarchy list and filter out only the hierarchies that can be applied to the available
     // dimensions of the dataset.
     for (List<String> suggestedHierarchyList : hierarchy) {
@@ -456,15 +452,22 @@ public class Cube { // the cube (Ca|Cb)
   public static Cube fromJson(String fileName)
       throws IOException {
     Cube cube = new ObjectMapper().readValue(new File(fileName), Cube.class);
-    cube.buildHierarchy();
+    cube.rebuildHierarchy();
     return cube;
+  }
+
+  /**
+   * Reestablishes the hierarchy between aggregated and detailed rows after the cube is read from a Json string.
+   */
+  private void rebuildHierarchy() {
+    this.hierarchicalNodes = hierarchyRowToHierarchyNode(hierarchicalRows, dimensions);
   }
 
   @Override
   public String toString() {
     ToStringBuilder tsb = new ToStringBuilder(this, ToStringStyle.MULTI_LINE_STYLE);
-    tsb.append("Baseline Value", topBaselineValue)
-        .append("Current Value", topCurrentValue)
+    tsb.append("Baseline Value", baselineTotal)
+        .append("Current Value", currentTotal)
         .append("Ratio", topRatio)
         .append("Dimentions", this.dimensions)
         .append("#Detailed Rows", hierarchicalRows.get(hierarchicalRows.size() - 1).size());
