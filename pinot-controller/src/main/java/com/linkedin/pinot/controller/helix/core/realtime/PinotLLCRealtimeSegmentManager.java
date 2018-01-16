@@ -41,7 +41,6 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.events.MetadataEventNotifierFactory;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -928,17 +927,18 @@ public class PinotLLCRealtimeSegmentManager {
     return getPartitionOffset(offsetCriteria, partitionId, kafkaStreamMetadata);
   }
 
-  private long getPartitionOffset(final String offsetCriteria, int partitionId, KafkaStreamMetadata kafkaStreamMetadata) {
+  private long getPartitionOffset(final String offsetCriteria, int partitionId,
+      KafkaStreamMetadata kafkaStreamMetadata) {
     KafkaOffsetFetcher kafkaOffsetFetcher = new KafkaOffsetFetcher(offsetCriteria, partitionId, kafkaStreamMetadata);
-    RetryPolicy policy = RetryPolicies.fixedDelayRetryPolicy(3, 1000);
-    boolean success = policy.attempt(kafkaOffsetFetcher);
-    if (success) {
+    try {
+      RetryPolicies.fixedDelayRetryPolicy(3, 1000L).attempt(kafkaOffsetFetcher);
       return kafkaOffsetFetcher.getOffset();
+    } catch (Exception e) {
+      Exception fetcherException = kafkaOffsetFetcher.getException();
+      LOGGER.error("Could not get offset for topic {} partition {}, criteria {}",
+          kafkaStreamMetadata.getKafkaTopicName(), partitionId, offsetCriteria, fetcherException);
+      throw new RuntimeException(fetcherException);
     }
-    Exception e = kafkaOffsetFetcher.getException();
-    LOGGER.error("Could not get offset for topic {} partition {}, criteria {}",
-        kafkaStreamMetadata.getKafkaTopicName(), partitionId, offsetCriteria, e);
-    throw new RuntimeException(e);
   }
 
   /**

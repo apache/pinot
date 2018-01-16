@@ -16,16 +16,12 @@
 package com.linkedin.pinot.common.utils.retry;
 
 /**
- * Retry policy without delay between attempts.
+ * The <code>AttemptsExceededException</code> indicates that the operation does not succeed within maximum number of
+ * attempts.
  */
-public class NoDelayRetryPolicy extends BaseRetryPolicy {
+public class AttemptsExceededException extends Exception {
 
-  public NoDelayRetryPolicy(int maxNumAttempts) {
-    super(maxNumAttempts);
-  }
-
-  @Override
-  protected long getNextDelayMs() {
-    return 0L;
+  public AttemptsExceededException(String message) {
+    super(message);
   }
 }

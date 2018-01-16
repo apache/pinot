@@ -19,7 +19,6 @@ import com.linkedin.pinot.common.exception.HttpErrorStatusException;
 import com.linkedin.pinot.common.exception.PermanentDownloadException;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import java.io.File;
 import java.net.URI;
 import java.util.concurrent.Callable;
@@ -50,26 +49,27 @@ public class HttpSegmentFetcher implements SegmentFetcher {
 
   @Override
   public void fetchSegmentToLocal(final String uri, final File tempFile) throws Exception {
-    RetryPolicy policy = RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, 5);
-    policy.attempt(new Callable<Boolean>() {
+    RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, 5).attempt(new Callable<Boolean>() {
       @Override
       public Boolean call() throws Exception {
         try {
           int statusCode = _httpClient.downloadFile(new URI(uri), tempFile);
-          _logger.info("Downloaded file from {} to {}; Length of downloaded file: {}; Response status code: {}", uri,
+          _logger.info("Downloaded file from: {} to: {}; Length of downloaded file: {}; Response status code: {}", uri,
               tempFile, tempFile.length(), statusCode);
           return true;
         } catch (HttpErrorStatusException e) {
           int statusCode = e.getStatusCode();
           if (statusCode >= 500) {
-            _logger.error("Failed to download file from {}, might retry", uri, e);
+            // Temporary exception
+            _logger.warn("Caught temporary exception while downloading file from: {}, will retry", uri, e);
             return false;
           } else {
-            _logger.error("Failed to download file from {}, won't retry", uri, e);
+            // Permanent exception
+            _logger.error("Caught permanent exception while downloading file from: {}, won't retry", uri, e);
             throw new PermanentDownloadException(e.getMessage());
           }
         } catch (Exception e) {
-          _logger.error("Failed to download file from {}, might retry", uri, e);
+          _logger.warn("Caught temporary exception while downloading file from: {}, will retry", uri, e);
           return false;
         }
       }
