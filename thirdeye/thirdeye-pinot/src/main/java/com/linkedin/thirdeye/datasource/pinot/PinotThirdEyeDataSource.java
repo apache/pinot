@@ -246,7 +246,12 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
     Preconditions
         .checkNotNull(this.pinotResponseCache, "{} doesn't connect to Pinot or cache is not initialized.", getName());
 
-    return this.pinotResponseCache.get(pinotQuery);
+    try {
+      return this.pinotResponseCache.get(pinotQuery);
+    } catch (ExecutionException e) {
+      LOG.error("Failed to execute PQL: {}", pinotQuery.getPql());
+      throw e;
+    }
   }
 
   /**
@@ -261,9 +266,13 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
     Preconditions
         .checkNotNull(this.pinotResponseCache, "{} doesn't connect to Pinot or cache is not initialized.", getName());
 
-    pinotResponseCache.refresh(pinotQuery);
-
-    return pinotResponseCache.get(pinotQuery);
+    try {
+      pinotResponseCache.refresh(pinotQuery);
+      return pinotResponseCache.get(pinotQuery);
+    } catch (ExecutionException e) {
+      LOG.error("Failed to refresh PQL: {}", pinotQuery.getPql());
+      throw e;
+    }
   }
 
   private List<String[]> parseResultSets(ThirdEyeRequest request,
