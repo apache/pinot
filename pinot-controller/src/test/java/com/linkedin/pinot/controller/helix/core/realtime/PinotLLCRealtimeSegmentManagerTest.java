@@ -88,6 +88,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     } catch (Exception e) {
 
     }
+    FakePinotLLCRealtimeSegmentManager.IS_CONNECTED = true;
+    FakePinotLLCRealtimeSegmentManager.IS_LEADER = true;
   }
 
   @AfterTest
@@ -245,6 +247,51 @@ public class PinotLLCRealtimeSegmentManagerTest {
     } catch (RuntimeException e) {
       // Expected
     }
+  }
+
+  // Make sure that if we are either not leader or we are disconnected, we do not process metadata commit.
+  @Test
+  public void testCommittingSegmentIfDisconnected() throws Exception {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(true, null);
+
+    final String topic = "someTopic";
+    final String rtTableName = "table_REALTIME";
+    final String rawTableName = TableNameBuilder.extractRawTableName(rtTableName);
+    final int nInstances = 6;
+    final int nPartitions = 16;
+    final int nReplicas = 3;
+    final boolean existingIS = false;
+    List<String> instances = getInstanceList(nInstances);
+    final String startOffset = KAFKA_OFFSET;
+
+    IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, nReplicas);
+    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, DUMMY_HOST, idealState,
+        !existingIS, 10000);
+    // Now commit the first segment of partition 6.
+    final int committingPartition = 6;
+    final long nextOffset = 3425666L;
+    LLCRealtimeSegmentZKMetadata committingSegmentMetadata =  new LLCRealtimeSegmentZKMetadata(segmentManager._records.get(committingPartition));
+    segmentManager._paths.clear();
+    segmentManager._records.clear();
+    segmentManager.IS_CONNECTED = false;
+    boolean status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(),
+        nextOffset);
+    Assert.assertFalse(status);
+    Assert.assertEquals(segmentManager._nCallsToUpdateHelix, 0);  // Idealstate not updated
+    Assert.assertEquals(segmentManager._paths.size(), 0);   // propertystore not updated
+    segmentManager.IS_CONNECTED = true;
+    segmentManager.IS_LEADER = false;
+    status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(),
+        nextOffset);
+    Assert.assertFalse(status);
+    Assert.assertEquals(segmentManager._nCallsToUpdateHelix, 0);  // Idealstate not updated
+    Assert.assertEquals(segmentManager._paths.size(), 0);   // propertystore not updated
+    segmentManager.IS_LEADER = true;
+    status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(),
+        nextOffset);
+    Assert.assertTrue(status);
+    Assert.assertEquals(segmentManager._nCallsToUpdateHelix, 1);  // Idealstate updated
+    Assert.assertEquals(segmentManager._paths.size(), 2);   // propertystore updated
   }
 
   @Test
@@ -736,6 +783,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     public static final Interval INTERVAL = new Interval(3000, 4000);
     public static final String SEGMENT_VERSION = SegmentVersion.v1.toString();
     public static final int NUM_DOCS = 5099775;
+    public static boolean IS_LEADER = true;
+    public static boolean IS_CONNECTED = true;
 
     private SegmentMetadataImpl segmentMetadata;
 
@@ -864,6 +913,16 @@ public class PinotLLCRealtimeSegmentManagerTest {
       } else {
         return _kafkaSmallestOffsetToReturn;
       }
+    }
+
+    @Override
+    protected boolean isLeader() {
+      return IS_LEADER;
+    }
+
+    @Override
+    protected boolean isConnected() {
+      return IS_CONNECTED;
     }
 
     @Override

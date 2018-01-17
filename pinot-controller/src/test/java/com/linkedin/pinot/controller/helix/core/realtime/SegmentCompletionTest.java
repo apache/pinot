@@ -53,10 +53,10 @@ public class SegmentCompletionTest {
 
   @BeforeMethod
   public void testCaseSetup() throws Exception {
-    testCaseSetup(true);
+    testCaseSetup(true, true);
   }
 
-  public void testCaseSetup(boolean isLeader) throws Exception {
+  public void testCaseSetup(boolean isLeader, boolean isConnected) throws Exception {
     segmentManager = new MockPinotLLCRealtimeSegmentManager();
     final int partitionId = 23;
     final int seqId = 12;
@@ -69,7 +69,7 @@ public class SegmentCompletionTest {
     metadata.setNumReplicas(3);
     segmentManager._segmentMetadata = metadata;
 
-    segmentCompletionMgr = new MockSegmentCompletionManager(segmentManager, isLeader);
+    segmentCompletionMgr = new MockSegmentCompletionManager(segmentManager, isLeader, isConnected);
     segmentManager._segmentCompletionMgr = segmentCompletionMgr;
 
     Field fsmMapField = SegmentCompletionManager.class.getDeclaredField("_fsmMap");
@@ -85,7 +85,7 @@ public class SegmentCompletionTest {
   // but segment metadata is fine in zk
   private void replaceSegmentCompletionManager() throws Exception {
     long oldSecs = segmentCompletionMgr._secconds;
-    segmentCompletionMgr = new MockSegmentCompletionManager(segmentManager, true);
+    segmentCompletionMgr = new MockSegmentCompletionManager(segmentManager, true, true);
     segmentCompletionMgr._secconds = oldSecs;
     Field fsmMapField = SegmentCompletionManager.class.getDeclaredField("_fsmMap");
     fsmMapField.setAccessible(true);
@@ -513,6 +513,20 @@ public class SegmentCompletionTest {
 
     // And the FSM should be removed.
     Assert.assertFalse(fsmMap.containsKey(segmentNameStr));
+  }
+
+  @Test
+  public void testControllerNotConnected() throws Exception {
+    testCaseSetup(true, false); // Leader but not connected
+    SegmentCompletionProtocol.Response response;
+    Request.Params params;
+    // s1 sends offset of 20, gets HOLD at t = 5s;
+    segmentCompletionMgr._secconds = 5L;
+    params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr)
+    .withReason("rowLimit");
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.NOT_LEADER);
+
   }
 
   @Test
@@ -1046,7 +1060,7 @@ public class SegmentCompletionTest {
 
   @Test
   public void testNotLeader() throws Exception {
-    testCaseSetup(false);
+    testCaseSetup(false, true);
     SegmentCompletionProtocol.Response response;
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
@@ -1059,9 +1073,10 @@ public class SegmentCompletionTest {
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER);
   }
 
-  private static HelixManager createMockHelixManager(boolean isLeader) {
+  private static HelixManager createMockHelixManager(boolean isLeader, boolean isConnected) {
     HelixManager helixManager = mock(HelixManager.class);
     when(helixManager.isLeader()).thenReturn(isLeader);
+    when(helixManager.isConnected()).thenReturn(isConnected);
     return helixManager;
   }
 
@@ -1115,8 +1130,9 @@ public class SegmentCompletionTest {
 
   public static class MockSegmentCompletionManager extends SegmentCompletionManager {
     public long _secconds;
-    protected MockSegmentCompletionManager(PinotLLCRealtimeSegmentManager segmentManager, boolean isLeader) {
-      super(createMockHelixManager(isLeader), segmentManager, new ControllerMetrics(new MetricsRegistry()));
+    protected MockSegmentCompletionManager(PinotLLCRealtimeSegmentManager segmentManager, boolean isLeader,
+        boolean isConnected) {
+      super(createMockHelixManager(isLeader, isConnected), segmentManager, new ControllerMetrics(new MetricsRegistry()));
     }
     @Override
     protected long getCurrentTimeMs() {

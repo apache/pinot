@@ -153,7 +153,7 @@ public class SegmentCompletionManager {
    * that it currently has (i.e. next offset that it will consume, if it continues to consume).
    */
   public SegmentCompletionProtocol.Response segmentConsumed(SegmentCompletionProtocol.Request.Params reqParams) {
-    if (!_helixManager.isLeader()) {
+    if (!_helixManager.isLeader() || !_helixManager.isConnected()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String segmentNameStr = reqParams.getSegmentName();
@@ -189,7 +189,7 @@ public class SegmentCompletionManager {
    * incoming segment).
    */
   public SegmentCompletionProtocol.Response segmentCommitStart(final SegmentCompletionProtocol.Request.Params reqParams) {
-    if (!_helixManager.isLeader()) {
+    if (!_helixManager.isLeader() || !_helixManager.isConnected()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String segmentNameStr = reqParams.getSegmentName();
@@ -212,7 +212,7 @@ public class SegmentCompletionManager {
   }
 
   public SegmentCompletionProtocol.Response extendBuildTime(final SegmentCompletionProtocol.Request.Params reqParams) {
-    if (!_helixManager.isLeader()) {
+    if (!_helixManager.isLeader() || !_helixManager.isConnected()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String segmentNameStr = reqParams.getSegmentName();
@@ -242,7 +242,7 @@ public class SegmentCompletionManager {
    * @return
    */
   public SegmentCompletionProtocol.Response segmentStoppedConsuming(SegmentCompletionProtocol.Request.Params reqParams) {
-    if (!_helixManager.isLeader()) {
+    if (!_helixManager.isLeader() || !_helixManager.isConnected()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String segmentNameStr = reqParams.getSegmentName();
@@ -277,7 +277,7 @@ public class SegmentCompletionManager {
    */
   public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams, boolean success, boolean isSplitCommit) {
     String segmentLocation = reqParams.getSegmentLocation();
-    if (!_helixManager.isLeader()) {
+    if (!_helixManager.isLeader() || !_helixManager.isConnected()) {
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String segmentNameStr = reqParams.getSegmentName();

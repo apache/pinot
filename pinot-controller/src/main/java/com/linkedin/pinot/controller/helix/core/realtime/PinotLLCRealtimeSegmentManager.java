@@ -197,8 +197,12 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  private boolean isLeader() {
+  protected boolean isLeader() {
     return _helixManager.isLeader();
+  }
+
+  protected boolean isConnected() {
+    return _helixManager.isConnected();
   }
 
   /*
@@ -557,6 +561,13 @@ public class PinotLLCRealtimeSegmentManager {
     File tableDir = new File(baseDir, tableName);
     File fileToMoveTo = new File(tableDir, segmentName);
 
+    if (!isConnected() || !isLeader()) {
+      // We can potentially log a different value than what we saw ....
+      LOGGER.warn("Lost leadership while committing segment file {}, {} for table {}: isLeader={}, isConnected={}",
+          segmentName, segmentLocation, tableName, isLeader(), isConnected());
+      return false;
+    }
+
     try {
       com.linkedin.pinot.common.utils.FileUtils.moveFileWithOverwrite(segmentFile, fileToMoveTo);
     } catch (Exception e) {
@@ -650,6 +661,13 @@ public class PinotLLCRealtimeSegmentManager {
     List<ZNRecord> records = new ArrayList<>(2);
     records.add(oldZnRecord);
     records.add(newZnRecord);
+
+    if (!isConnected() || !isLeader()) {
+      // We can potentially log a different value than what we saw ....
+      LOGGER.warn("Lost leadership while committing segment metadata for{} for table {}: isLeader={}, isConnected={}",
+          committingSegmentNameStr, rawTableName, isLeader(), isConnected());
+      return false;
+    }
     /*
      * Update zookeeper in two steps.
      *
