@@ -561,8 +561,9 @@ public class PinotLLCRealtimeSegmentManager {
     File fileToMoveTo = new File(tableDir, segmentName);
 
     if (!isConnected() || !isLeader()) {
-      LOGGER.warn("Lost leadership while committing segment file {}, {} for table {}", segmentName, segmentLocation,
-          tableName);
+      // We can potentially log a different value than what we saw ....
+      LOGGER.warn("Lost leadership while committing segment file {}, {} for table {}: isLeader={}, isConnected={}",
+          segmentName, segmentLocation, tableName, isLeader(), isConnected());
       return false;
     }
 
@@ -661,8 +662,9 @@ public class PinotLLCRealtimeSegmentManager {
     records.add(newZnRecord);
 
     if (!isConnected() || !isLeader()) {
-      LOGGER.warn("Lost leadership while committing segment metadata for{} for table {}", committingSegmentNameStr,
-          rawTableName);
+      // We can potentially log a different value than what we saw ....
+      LOGGER.warn("Lost leadership while committing segment metadata for{} for table {}: isLeader={}, isConnected={}",
+          committingSegmentNameStr, rawTableName, isLeader(), isConnected());
       return false;
     }
     /*
