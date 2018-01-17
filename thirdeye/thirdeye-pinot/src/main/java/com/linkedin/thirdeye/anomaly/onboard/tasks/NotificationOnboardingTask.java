@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardTask;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardExecutionContext;
 import com.linkedin.thirdeye.dashboard.resources.EmailResource;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.commons.configuration.Configuration;
@@ -65,7 +66,8 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
     Preconditions.checkNotNull(taskConfigs.getString(PHANTON_JS_PATH));
     Preconditions.checkNotNull(taskConfigs.getString(ROOT_DIR));
 
-    Long functionId = (Long) executionContext.getExecutionResult(ANOMALY_FUNCTION_CONFIG);
+    AnomalyFunctionDTO anomalyFunctionSpec = (AnomalyFunctionDTO) executionContext.getExecutionResult(ANOMALY_FUNCTION_CONFIG);
+    Long functionId = anomalyFunctionSpec.getId();
     DateTime start = (DateTime) executionContext.getExecutionResult(NOTIFICATION_START);
     DateTime end = (DateTime) executionContext.getExecutionResult(NOTIFICATION_END);
 

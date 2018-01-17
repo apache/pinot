@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardJob;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnBoardJobRunner;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardTask;
 import com.linkedin.thirdeye.anomaly.onboard.utils.PropertyCheckUtils;
+import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.util.ArrayList;
@@ -36,6 +37,7 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   public static final String EXPLORE_DIMENSION = "exploreDimensions";
   public static final String FILTERS = "filters";
   public static final String METRIC_FUNCTION = "metricFunction";
+  public static final String FUNCTION_TYPE = "functionType";
   public static final String WINDOW_SIZE = "windowSize";
   public static final String WINDOW_UNIT = "windowUnit";
   public static final String WINDOW_DELAY = "windowDelay";
@@ -52,8 +54,12 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   public static final String ALERT_APPLICATION = "application";
   public static final String ANOMALY_FUNCTION_CONFIG = "anomalyFuncitonConfig";
   public static final String ALERT_CONFIG = "alertConfig";
-  public static final String AUTOTUNE_PATTERN = "pattern";
-  public static final String AUTOTUNE_SENSITIVITY_LEVEL = "sensitivity";
+  public static final String AUTOTUNE_PATTERN = DetectionJobResource.AUTOTUNE_PATTERN_KEY;
+  public static final String AUTOTUNE_TYPE = "autoTuneType";
+  public static final String AUTOTUNE_FEATURES = DetectionJobResource.AUTOTUNE_FEATURE_KEY;
+  public static final String AUTOTUNE_MTTD = DetectionJobResource.AUTOTUNE_MTTD_KEY;
+  public static final String HOLIDAY_STARTS = "holidayStarts";
+  public static final String HOLIDAY_ENDS = "holidayEnds";
   public static final String REMOVE_ANOMALY_IN_WINDOW = "removeAnomaliesInWindow";
   public static final String PERIOD = "period";
   public static final String START = "start";
@@ -91,9 +97,6 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
             FUNCTION_NAME,
             COLLECTION_NAME,
             METRIC_NAME,
-            WINDOW_SIZE,
-            WINDOW_UNIT,
-            CRON_EXPRESSION,
             SMTP_HOST,
             SMTP_PORT,
             DEFAULT_ALERT_RECEIVER_ADDRESS,
@@ -131,8 +134,12 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     if (this.properties.containsKey(METRIC_FUNCTION)) {
       taskConfigs.put(taskPrefix + METRIC_FUNCTION, this.properties.get(METRIC_FUNCTION));
     }
-    taskConfigs.put(taskPrefix + WINDOW_SIZE, this.properties.get(WINDOW_SIZE));
-    taskConfigs.put(taskPrefix + WINDOW_UNIT, this.properties.get(WINDOW_UNIT));
+    if (this.properties.containsKey(WINDOW_SIZE)) {
+      taskConfigs.put(taskPrefix + WINDOW_SIZE, this.properties.get(WINDOW_SIZE));
+    }
+    if (this.properties.containsKey(WINDOW_UNIT)) {
+      taskConfigs.put(taskPrefix + WINDOW_UNIT, this.properties.get(WINDOW_UNIT));
+    }
     if (this.properties.containsKey(WINDOW_DELAY)) {
       taskConfigs.put(taskPrefix + WINDOW_DELAY, this.properties.get(WINDOW_DELAY));
     }
@@ -147,6 +154,18 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     }
     if (this.properties.containsKey(FUNCTION_IS_ACTIVE)) {
       taskConfigs.put(taskPrefix + FUNCTION_IS_ACTIVE, this.properties.get(FUNCTION_IS_ACTIVE));
+    }
+    if (this.properties.containsKey(AUTOTUNE_PATTERN)) {
+      taskConfigs.put(taskPrefix + AUTOTUNE_PATTERN, this.properties.get(AUTOTUNE_PATTERN));
+    }
+    if (this.properties.containsKey(AUTOTUNE_TYPE)) {
+      taskConfigs.put(taskPrefix + AUTOTUNE_TYPE, this.properties.get(AUTOTUNE_TYPE));
+    }
+    if (this.properties.containsKey(AUTOTUNE_FEATURES)) {
+      taskConfigs.put(taskPrefix + AUTOTUNE_FEATURES, this.properties.get(AUTOTUNE_FEATURES));
+    }
+    if (this.properties.containsKey(AUTOTUNE_MTTD)) {
+      taskConfigs.put(taskPrefix + AUTOTUNE_MTTD, this.properties.get(AUTOTUNE_MTTD));
     }
     taskConfigs.put(taskPrefix + CRON_EXPRESSION, this.properties.get(CRON_EXPRESSION));
     if (this.properties.containsKey(ALERT_ID)) {
@@ -206,8 +225,20 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     if (this.properties.containsKey(AUTOTUNE_PATTERN)) {
       taskConfigs.put (taskPrefix + AUTOTUNE_PATTERN, this.properties.get(AUTOTUNE_PATTERN));
     }
-    if (this.properties.containsKey(AUTOTUNE_SENSITIVITY_LEVEL)) {
-      taskConfigs.put (taskPrefix + AUTOTUNE_SENSITIVITY_LEVEL, this.properties.get(AUTOTUNE_SENSITIVITY_LEVEL));
+    if (this.properties.containsKey(AUTOTUNE_TYPE)) {
+      taskConfigs.put (taskPrefix + AUTOTUNE_TYPE, this.properties.get(AUTOTUNE_TYPE));
+    }
+    if (this.properties.containsKey(AUTOTUNE_FEATURES)) {
+      taskConfigs.put (taskPrefix + AUTOTUNE_FEATURES, this.properties.get(AUTOTUNE_FEATURES));
+    }
+    if (this.properties.containsKey(AUTOTUNE_MTTD)) {
+      taskConfigs.put (taskPrefix + AUTOTUNE_MTTD, this.properties.get(AUTOTUNE_MTTD));
+    }
+    if (this.properties.containsKey(HOLIDAY_STARTS)) {
+      taskConfigs.put (taskPrefix + HOLIDAY_STARTS, this.properties.get(HOLIDAY_STARTS));
+    }
+    if (this.properties.containsKey(HOLIDAY_ENDS)) {
+      taskConfigs.put (taskPrefix + HOLIDAY_ENDS, this.properties.get(HOLIDAY_ENDS));
     }
 
     taskPrefix = NotificationOnboardingTask.TASK_NAME + ".";
@@ -218,6 +249,8 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     if (this.properties.containsKey(END)) {
       taskConfigs.put (taskPrefix + END, this.properties.get(END));
     }
+    taskConfigs.put (taskPrefix + SMTP_HOST, this.properties.get(SMTP_HOST));
+    taskConfigs.put (taskPrefix + SMTP_PORT, this.properties.get(SMTP_PORT));
     taskConfigs.put (taskPrefix + THIRDEYE_DASHBOARD_HOST, this.properties.get(THIRDEYE_DASHBOARD_HOST));
     taskConfigs.put (taskPrefix + DEFAULT_ALERT_SENDER_ADDRESS, this.properties.get(DEFAULT_ALERT_SENDER_ADDRESS));
     taskConfigs.put (taskPrefix + DEFAULT_ALERT_RECEIVER_ADDRESS, this.properties.get(DEFAULT_ALERT_RECEIVER_ADDRESS));

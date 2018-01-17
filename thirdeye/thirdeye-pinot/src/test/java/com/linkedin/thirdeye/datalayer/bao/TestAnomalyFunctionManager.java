@@ -46,6 +46,12 @@ public class TestAnomalyFunctionManager {
   }
 
   @Test(dependsOnMethods = {"testCreate"})
+  public void testFindNameEquals(){
+    AnomalyFunctionDTO anomalyFunctionSpec = DaoTestUtils.getTestFunctionSpec(metricName, collection);
+    Assert.assertNotNull(anomalyFunctionDAO.findWhereNameEquals(anomalyFunctionSpec.getFunctionName()));
+  }
+
+  @Test(dependsOnMethods = {"testCreate"})
   public void testFindAllByCollection() {
     List<AnomalyFunctionDTO> functions = anomalyFunctionDAO.findAllByCollection(collection);
     Assert.assertEquals(functions.size(), 1);

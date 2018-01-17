@@ -4,12 +4,15 @@ import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardExecutionContext;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardTask;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardTaskContext;
 import com.linkedin.thirdeye.anomaly.onboard.OnboardingTaskTestUtils;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.concurrent.TimeUnit;
 import org.junit.Assert;
@@ -22,6 +25,7 @@ public class TestOnboardingTasks {
   private DAOTestBase daoTestBase;
   private DetectionOnboardTaskContext context;
   private DatasetConfigManager datasetConfigDAO;
+  private MetricConfigManager metricConfigDAO;
   private AnomalyFunctionManager anomalyFunctionDAO;
   private AlertConfigManager alertConfigDAO;
   private JobManager jobDAO;
@@ -31,11 +35,13 @@ public class TestOnboardingTasks {
     daoTestBase = DAOTestBase.getInstance();
     DAORegistry daoRegistry = DAORegistry.getInstance();
     datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
+    metricConfigDAO = daoRegistry.getMetricConfigDAO();
     anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
     alertConfigDAO = daoRegistry.getAlertConfigDAO();
     jobDAO = daoRegistry.getJobDAO();
     context = OnboardingTaskTestUtils.getDetectionTaskContext();
     initDataset();
+    initMetric();
   }
 
   public void initDataset(){
@@ -50,6 +56,19 @@ public class TestOnboardingTasks {
     datasetConfigDAO.save(datasetConfig);
     Assert.assertNotNull(datasetConfigDAO.findByDataset(OnboardingTaskTestUtils.TEST_COLLECTION));
   }
+
+  public void initMetric(){
+    // Prepare for data
+    MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
+    metricConfigDTO.setDataset(OnboardingTaskTestUtils.TEST_COLLECTION);
+    metricConfigDTO.setName(OnboardingTaskTestUtils.TEST_METRIC);
+    metricConfigDTO.setAlias(OnboardingTaskTestUtils.TEST_COLLECTION + "::" + OnboardingTaskTestUtils.TEST_METRIC);
+    metricConfigDTO.setActive(true);
+    metricConfigDTO.setDefaultAggFunction(MetricAggFunction.SUM);
+    metricConfigDAO.save(metricConfigDTO);
+    Assert.assertNotNull(metricConfigDAO.findByMetricName(OnboardingTaskTestUtils.TEST_METRIC));
+  }
+
   @AfterClass(alwaysRun = true)
   public void afterClass(){
     daoTestBase.cleanup();

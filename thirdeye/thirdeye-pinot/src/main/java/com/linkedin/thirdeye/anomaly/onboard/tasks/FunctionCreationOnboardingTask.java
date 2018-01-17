@@ -10,18 +10,25 @@ import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.concurrent.TimeUnit;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +53,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
   public static final String METRIC_NAME = DefaultDetectionOnboardJob.METRIC_NAME;
   public static final String EXPLORE_DIMENSION = DefaultDetectionOnboardJob.EXPLORE_DIMENSION;
   public static final String FILTERS = DefaultDetectionOnboardJob.FILTERS;
+  public static final String FUNCTION_TYPE = DefaultDetectionOnboardJob.FUNCTION_TYPE;
   public static final String METRIC_FUNCTION = DefaultDetectionOnboardJob.METRIC_FUNCTION;
   public static final String WINDOW_SIZE = DefaultDetectionOnboardJob.WINDOW_SIZE;
   public static final String WINDOW_UNIT = DefaultDetectionOnboardJob.WINDOW_UNIT;
@@ -55,6 +63,10 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
   public static final String PROPERTIES = DefaultDetectionOnboardJob.FUNCTION_PROPERTIES;
   public static final String IS_ACTIVE = DefaultDetectionOnboardJob.FUNCTION_IS_ACTIVE;
   public static final String CRON_EXPRESSION = DefaultDetectionOnboardJob.CRON_EXPRESSION;
+  public static final String ALERT_FILTER_PATTERN = DefaultDetectionOnboardJob.AUTOTUNE_PATTERN;
+  public static final String ALERT_FILTER_TYPE = DefaultDetectionOnboardJob.AUTOTUNE_TYPE;
+  public static final String ALERT_FILTER_FEATURES = DefaultDetectionOnboardJob.AUTOTUNE_FEATURES;
+  public static final String ALERT_FILTER_MTTD = DefaultDetectionOnboardJob.AUTOTUNE_MTTD;
   public static final String ALERT_ID = DefaultDetectionOnboardJob.ALERT_ID;
   public static final String ALERT_NAME = DefaultDetectionOnboardJob.ALERT_NAME;
   public static final String ALERT_CRON = DefaultDetectionOnboardJob.ALERT_CRON;
@@ -64,13 +76,15 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
   public static final String DEFAULT_ALERT_RECEIVER = DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER_ADDRESS;
 
   public static final Boolean DEFAULT_IS_ACTIVE = true;
-  public static final String DEFAULT_METRIC_FUNCTION = "SUM";
   public static final String DEFAULT_WINDOW_DELAY = "0";
   public static final String DEFAULT_ALERT_CRON = "0 0/5 * 1/1 * ? *"; // Every 5 min
+  public static final String DEFAULT_ALERT_FILTER_PATTERN = AlertFilterAutoTuneOnboardingTask.DEFAULT_AUTOTUNE_PATTERN;
+  public static final String DEFAULT_ALERT_FILTER_TYPE = "AUTOTUNE";
 
   private AnomalyFunctionManager anoomalyFunctionDAO;
   private AlertConfigManager alertConfigDAO;
   private DatasetConfigManager datasetConfigDAO;
+  private MetricConfigManager metricConfigDAO;
 
   public FunctionCreationOnboardingTask() {
     super(TASK_NAME);
@@ -78,6 +92,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     this.alertConfigDAO = daoRegistry.getAlertConfigDAO();
     this.anoomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
     this.datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
+    this.metricConfigDAO = daoRegistry.getMetricConfigDAO();
   }
 
   /**
@@ -105,13 +120,24 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     Preconditions.checkNotNull(configuration.getString(FUNCTION_NAME));
     Preconditions.checkNotNull(configuration.getString(COLLECTION_NAME));
     Preconditions.checkNotNull(configuration.getString(METRIC_NAME));
-    Preconditions.checkNotNull(configuration.getString(CRON_EXPRESSION));
-    Preconditions.checkNotNull(configuration.getString(WINDOW_SIZE));
-    Preconditions.checkNotNull(configuration.getString(WINDOW_UNIT));
-    Preconditions.checkNotNull(configuration.getString(PROPERTIES));
     Preconditions.checkArgument(configuration.containsKey(ALERT_ID) || configuration.containsKey(ALERT_NAME));
     if (!configuration.containsKey(ALERT_ID)) {
       Preconditions.checkNotNull(configuration.getString(ALERT_TO));
+    }
+
+    // check if duplicate name exists
+    AnomalyFunctionDTO duplicateFunction = anoomalyFunctionDAO.findWhereNameEquals(configuration.getString(FUNCTION_NAME));
+    if (duplicateFunction != null) {
+      throw new IllegalArgumentException("Duplicate function name " + configuration.getString(FUNCTION_NAME)
+          + " is found");
+    }
+
+    if (StringUtils.isNotBlank(configuration.getString(ALERT_NAME))) {
+      AlertConfigDTO duplicateAlert = alertConfigDAO.findWhereNameEquals(configuration.getString(ALERT_NAME));
+      if (duplicateAlert != null) {
+        throw new IllegalArgumentException("Duplicate alert name " + configuration.getString(ALERT_NAME)
+            + " is found");
+      }
     }
 
     // update datasetConfig
@@ -121,24 +147,37 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     }
     TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     TimeGranularity dataGranularity = timeSpec.getDataGranularity();
-    try{
-      dataGranularity = TimeGranularity.fromString(configuration.getString(DATA_GRANULARITY));
-    } catch (Exception e) {
-      LOG.warn("Unable to parse user input data granularity: {}; use default from dataset config", configuration.getString(DATA_GRANULARITY));
+    if (configuration.containsKey(DATA_GRANULARITY)) {
+      TimeGranularity userAssignedDataGranularity = null;
+      try {
+        userAssignedDataGranularity = TimeGranularity.fromString(configuration.getString(DATA_GRANULARITY));
+      } catch (Exception e) {
+        LOG.error("Unable to parse user input data granularity: {}",
+            configuration.getString(DATA_GRANULARITY));
+        throw new IllegalArgumentException("Unsupported time granularity: " + configuration.getString(DATA_GRANULARITY));
+      }
+      dataGranularity = userAssignedDataGranularity;
     }
+
+    // use the aggregate function in MetricConfig as default function
+    MetricConfigDTO metricConfig = metricConfigDAO.findByMetricAndDataset(configuration.getString(METRIC_NAME), configuration.getString(COLLECTION_NAME));
+    String defaultMetricFunction = metricConfig.getDefaultAggFunction().name();
 
     // create function
     AnomalyResource anomalyResource = new AnomalyResource(anomalyFunctionFactory, alertFilterFactory);
     AnomalyFunctionDTO anomalyFunction = null;
     try {
+      AnomalyFunctionDTO defaultFunctionSpec = getDefaultFunctionSpecByTimeGranularity(dataGranularity);
       Response response = anomalyResource.createAnomalyFunction(configuration.getString(COLLECTION_NAME),
           configuration.getString(FUNCTION_NAME), configuration.getString(METRIC_NAME),
-          configuration.getString(METRIC_FUNCTION, DEFAULT_METRIC_FUNCTION),
-          getFunctionTypeByTimeGranularity(dataGranularity), configuration.getString(WINDOW_SIZE), configuration.getString(WINDOW_UNIT),
+          configuration.getString(METRIC_FUNCTION, defaultMetricFunction),
+          configuration.getString(FUNCTION_TYPE, defaultFunctionSpec.getType()),
+          configuration.getString(WINDOW_SIZE, Integer.toString(defaultFunctionSpec.getWindowSize())),
+          configuration.getString(WINDOW_UNIT, defaultFunctionSpec.getWindowUnit().name()),
           configuration.getString(WINDOW_DELAY, DEFAULT_WINDOW_DELAY),
-          configuration.getString(CRON_EXPRESSION), configuration.getString(WINDOW_DELAY_UNIT),
+          configuration.getString(CRON_EXPRESSION, defaultFunctionSpec.getCron()), configuration.getString(WINDOW_DELAY_UNIT),
           configuration.getString(EXPLORE_DIMENSION), configuration.getString(FILTERS),
-          configuration.getString(DATA_GRANULARITY), configuration.getString(PROPERTIES),
+          configuration.getString(DATA_GRANULARITY), configuration.getString(PROPERTIES, ""),
           configuration.getBoolean(IS_ACTIVE, DEFAULT_IS_ACTIVE));
       if (Response.Status.OK.equals(response.getStatusInfo())) {
         long functionId = Long.valueOf(response.getEntity().toString());
@@ -150,6 +189,19 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     } catch (Exception e) {
       throw new IllegalArgumentException(e);
     }
+
+    // Assign Default Alert Filter
+    Map<String, String> alertFilter = new HashMap<>();
+    alertFilter.put(ALERT_FILTER_PATTERN, configuration.getString(ALERT_FILTER_PATTERN, DEFAULT_ALERT_FILTER_PATTERN));
+    alertFilter.put(ALERT_FILTER_TYPE, configuration.getString(ALERT_FILTER_TYPE, DEFAULT_ALERT_FILTER_TYPE));
+    if (configuration.containsKey(ALERT_FILTER_FEATURES)) {
+      alertFilter.put(ALERT_FILTER_FEATURES, configuration.getString(ALERT_FILTER_FEATURES));
+    }
+    if (configuration.containsKey(ALERT_FILTER_MTTD)) {
+      alertFilter.put(ALERT_FILTER_MTTD, configuration.getString(ALERT_FILTER_MTTD));
+    }
+    anomalyFunction.setAlertFilter(alertFilter);
+    this.anoomalyFunctionDAO.update(anomalyFunction);
 
     // create alert config
     AlertConfigDTO alertConfig = null;
@@ -164,7 +216,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       emailConfig.setFunctionIds(Arrays.asList(anomalyFunction.getId()));
       alertConfig.setEmailConfig(emailConfig);
       alertConfig.setName(configuration.getString(ALERT_NAME));
-      String thirdeyeDefaultEmail = configuration.getString(configuration.getString(DEFAULT_ALERT_RECEIVER));
+      String thirdeyeDefaultEmail = configuration.getString(DEFAULT_ALERT_RECEIVER);
       alertConfig.setFromAddress(configuration.getString(ALERT_FROM, thirdeyeDefaultEmail));
       String alertRecipients = thirdeyeDefaultEmail;
       if (configuration.containsKey(ALERT_TO)) {
@@ -178,16 +230,34 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     executionContext.setExecutionResult(ALERT_CONFIG, alertConfig);
   }
 
-  protected String getFunctionTypeByTimeGranularity(TimeGranularity timeGranularity) {
+  protected AnomalyFunctionDTO getDefaultFunctionSpecByTimeGranularity(TimeGranularity timeGranularity) {
+    AnomalyFunctionDTO anomalyFunctionSpec = new AnomalyFunctionDTO();
     switch (timeGranularity.getUnit()) {
       case MINUTES:
-        return "CONFIDENCE_INTERVAL_SIGN_TEST";
+        anomalyFunctionSpec.setType("CONFIDENCE_INTERVAL_SIGN_TEST");
+        anomalyFunctionSpec.setCron("0 0 0 * * ?");
+        anomalyFunctionSpec.setWindowSize(6);
+        anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
+        break;
       case HOURS:
-        return "REGRESSION_GAUSSIAN_SCAN";
+        anomalyFunctionSpec.setType("REGRESSION_GAUSSIAN_SCAN");
+        anomalyFunctionSpec.setCron("0 0 14 1/1 * ? *");
+        anomalyFunctionSpec.setWindowSize(84);
+        anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
+        break;
       case DAYS:
-        return "SPLINE_REGRESSION_VANILLA";
+        anomalyFunctionSpec.setType("SPLINE_REGRESSION_VANILLA");
+        anomalyFunctionSpec.setCron("0 0 14 1/1 * ? *");
+        anomalyFunctionSpec.setWindowSize(1);
+        anomalyFunctionSpec.setWindowUnit(TimeUnit.DAYS);
+        break;
       default:
-        return "WEEK_OVER_WEEK_RULE";
+        anomalyFunctionSpec.setType("WEEK_OVER_WEEK_RULE");
+        anomalyFunctionSpec.setCron("0 0 0 * * ?");
+        anomalyFunctionSpec.setWindowSize(6);
+        anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
+        break;
     }
+    return anomalyFunctionSpec;
   }
 }

@@ -10,8 +10,11 @@ import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import java.io.IOException;
+import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.Configuration;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.joda.time.DateTime;
 import org.joda.time.Period;
 import org.slf4j.Logger;
@@ -23,6 +26,7 @@ import org.slf4j.LoggerFactory;
  */
 public class AlertFilterAutoTuneOnboardingTask extends BaseDetectionOnboardTask {
   private static final Logger LOG = LoggerFactory.getLogger(AlertFilterAutoTuneOnboardingTask.class);
+  private final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   public static final String TASK_NAME = "AlertFilterAutotune";
 
@@ -33,10 +37,14 @@ public class AlertFilterAutoTuneOnboardingTask extends BaseDetectionOnboardTask 
   public static final String BACKFILL_START = DefaultDetectionOnboardJob.START;
   public static final String BACKFILL_END = DefaultDetectionOnboardJob.END;
   public static final String AUTOTUNE_PATTERN = DefaultDetectionOnboardJob.AUTOTUNE_PATTERN;
-  public static final String AUTOTUNE_SENSITIVITY_LEVEL = DefaultDetectionOnboardJob.AUTOTUNE_SENSITIVITY_LEVEL;
+  public static final String AUTOTUNE_TYPE = DefaultDetectionOnboardJob.AUTOTUNE_TYPE;
+  public static final String AUTOTUNE_FEATURES = DefaultDetectionOnboardJob.AUTOTUNE_FEATURES;
+  public static final String AUTOTUNE_MTTD = DefaultDetectionOnboardJob.AUTOTUNE_MTTD;
+  public static final String HOLIDAY_STARTS = DefaultDetectionOnboardJob.HOLIDAY_STARTS;
+  public static final String HOLIDAY_ENDS = DefaultDetectionOnboardJob.HOLIDAY_ENDS;
 
   public static final String DEFAULT_AUTOTUNE_PATTERN = "Up,Down";
-  public static final String DEFAULT_AUTOTUNE_SENSITIVITY_LEVEL = "MEDIUM";
+  public static final String DEFAULT_AUTOTUNE_TYPE = "AUTOTUNE";
 
   public static final String DEFAULT_BACKFILL_PERIOD = FunctionReplayOnboardingTask.DEFAULT_BACKFILL_PERIOD;
 
@@ -65,7 +73,6 @@ public class AlertFilterAutoTuneOnboardingTask extends BaseDetectionOnboardTask 
 
     DetectionJobResource detectionJobResource = new DetectionJobResource(new DetectionJobScheduler(),
         alertFilterFactory, alertFilterAutotuneFactory);
-    MergedAnomalyResultManager mergedAnomalyResultDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
 
     AnomalyFunctionDTO anomalyFunctionSpec = (AnomalyFunctionDTO) executionContext.getExecutionResult(
         ANOMALY_FUNCTION_CONFIG);
@@ -74,19 +81,24 @@ public class AlertFilterAutoTuneOnboardingTask extends BaseDetectionOnboardTask 
     DateTime start = DateTime.parse(taskConfiguration.getString(BACKFILL_START, DateTime.now().toString()));
     DateTime end = DateTime.parse(taskConfiguration.getString(BACKFILL_END, DateTime.now().minus(backfillPeriod).toString()));
 
-    int numReplayedAnomalies = mergedAnomalyResultDAO
-        .findByStartTimeInRangeAndFunctionId(start.getMillis(), end.getMillis(), functionId, false)
-        .size();
+    Response autotuneResponse = detectionJobResource.
+        tuneAlertFilter(Long.toString(functionId), start.toString(), end.toString(),
+            taskConfiguration.getString(AUTOTUNE_TYPE, DEFAULT_AUTOTUNE_TYPE),
+            taskConfiguration.getString(HOLIDAY_STARTS, ""), taskConfiguration.getString(HOLIDAY_ENDS, ""),
+            taskConfiguration.getString(AUTOTUNE_FEATURES),
+            taskConfiguration.getString(AUTOTUNE_MTTD),
+            taskConfiguration.getString(AUTOTUNE_PATTERN, DEFAULT_AUTOTUNE_PATTERN));
 
-    Response initialAutotuneResponse = detectionJobResource.
-        initiateAlertFilterAutoTune(functionId, start.toString(), end.toString(), "AUTOTUNE",
-            taskConfiguration.getString(AUTOTUNE_PATTERN, DEFAULT_AUTOTUNE_PATTERN),
-            taskConfiguration.getString(AUTOTUNE_SENSITIVITY_LEVEL, DEFAULT_AUTOTUNE_SENSITIVITY_LEVEL),
-            "", "");
-
-    if (initialAutotuneResponse.getEntity() != null) {
-      detectionJobResource.updateAlertFilterToFunctionSpecByAutoTuneId(
-          Long.valueOf(initialAutotuneResponse.getEntity().toString()));
+    if (autotuneResponse.getEntity() != null) {
+      List<Long> autotuneIds;
+      try {
+        autotuneIds = OBJECT_MAPPER.readValue(autotuneResponse.getEntity().toString(), List.class);
+      } catch (IOException e) {
+        throw new IllegalStateException("Unable to parse autotune response: " + autotuneResponse.getEntity().toString(), e);
+      }
+      for (int i = 0; i < autotuneIds.size(); i++) {
+        detectionJobResource.updateAlertFilterToFunctionSpecByAutoTuneId(((Number) autotuneIds.get(i)).longValue());
+      }
       LOG.info("Initial alert filter applied");
     } else {
       LOG.info("AutoTune doesn't applied");
