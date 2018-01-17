@@ -52,7 +52,7 @@ public class PinotDataSourceMaxTime {
       pinotThirdEyeDataSource.refreshPQL(maxTimePinotQuery);
       ThirdEyeResultSetGroup resultSetGroup = pinotThirdEyeDataSource.executePQL(maxTimePinotQuery);
       if (resultSetGroup.size() == 0 || resultSetGroup.get(0).getRowCount() == 0) {
-        LOGGER.warn("resultSetGroup is Empty for collection {} is {}", tableName, resultSetGroup);
+        LOGGER.error("Failed to get latest max time for dataset {} with PQL: {}", tableName, maxTimePinotQuery.getPql());
         this.collectionToPrevMaxDataTimeMap.remove(dataset);
       } else {
         long endTime = new Double(resultSetGroup.get(0).getDouble(0)).longValue();

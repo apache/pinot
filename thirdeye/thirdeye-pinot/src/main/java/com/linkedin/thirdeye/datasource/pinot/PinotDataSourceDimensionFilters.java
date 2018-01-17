@@ -14,9 +14,12 @@ import java.util.List;
 import java.util.Map;
 
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +31,9 @@ import com.linkedin.thirdeye.dashboard.Utils;
  */
 public class PinotDataSourceDimensionFilters {
   private static final Logger LOG = LoggerFactory.getLogger(PinotDataSourceDimensionFilters.class);
-  private static final ExecutorService executorService = Executors.newFixedThreadPool(10);
+  private static final ExecutorService executorService = Executors.newCachedThreadPool();
+  private static final int TIME_OUT_SIZE = 60;
+  private static final TimeUnit TIME_OUT_UNIT = TimeUnit.SECONDS;
   private final PinotThirdEyeDataSource pinotThirdEyeDataSource;
 
   public PinotDataSourceDimensionFilters(PinotThirdEyeDataSource pinotThirdEyeDataSource) {
@@ -56,8 +61,7 @@ public class PinotDataSourceDimensionFilters {
     return filters;
   }
 
-  private Map<String, List<String>> getFilters(String dataset, List<String> dimensions, DateTime start, DateTime end)
-      throws Exception {
+  private Map<String, List<String>> getFilters(String dataset, List<String> dimensions, DateTime start, DateTime end) {
     DatasetConfigDTO datasetConfig = ThirdEyeUtils.getDatasetConfigFromName(dataset);
     MetricFunction metricFunction =
         new MetricFunction(MetricAggFunction.COUNT, "*", null, dataset, null, datasetConfig);
@@ -79,17 +83,32 @@ public class PinotDataSourceDimensionFilters {
     for (Map.Entry<ThirdEyeRequest, Future<ThirdEyeResponse>> entry : responseFuturesMap.entrySet()) {
       ThirdEyeRequest request = entry.getKey();
       String dimension = request.getGroupBy().get(0);
-      ThirdEyeResponse thirdEyeResponse = entry.getValue().get();
-      int n = thirdEyeResponse.getNumRowsFor(metricFunction);
-
-      List<String> values = new ArrayList<>();
-      for (int i = 0; i < n; i++) {
-        Map<String, String> row = thirdEyeResponse.getRow(metricFunction, i);
-        String dimensionValue = row.get(dimension);
-        values.add(dimensionValue);
+      ThirdEyeResponse thirdEyeResponse = null;
+      try {
+        thirdEyeResponse = entry.getValue().get(TIME_OUT_SIZE, TIME_OUT_UNIT);
+      } catch (ExecutionException e) {
+        LOG.error("Execution error when getting filter for Dataset '{}' in Dimension '{}'.", dataset, dimension, e);
+      } catch (InterruptedException e) {
+        LOG.warn("Execution is interrupted when getting filter for Dataset '{}' in Dimension '{}'.", dataset, dimension, e);
+        break;
+      } catch (TimeoutException e) {
+        LOG.warn("Time out when getting filter for Dataset '{}' in Dimension '{}'. Time limit: {} {}", dataset, dimension,
+            TIME_OUT_SIZE, TIME_OUT_UNIT);
       }
-      Collections.sort(values);
-      result.put(dimension, values);
+      if (thirdEyeResponse != null) {
+        int n = thirdEyeResponse.getNumRowsFor(metricFunction);
+
+        List<String> values = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+          Map<String, String> row = thirdEyeResponse.getRow(metricFunction, i);
+          String dimensionValue = row.get(dimension);
+          values.add(dimensionValue);
+        }
+        Collections.sort(values);
+        result.put(dimension, values);
+      } else {
+        result.put(dimension, Collections.<String>emptyList());
+      }
     }
     return result;
   }
