@@ -15,10 +15,11 @@
   onCopy=(action "onSessionCopy")}}
 
 <div class="container">
-  {{#if anomalyUrn}}
+  {{#if context.anomalyUrns}}
     {{rootcause-anomaly
       entities=entities
-      anomalyUrn=anomalyUrn
+      aggregates=aggregates
+      anomalyUrns=context.anomalyUrns
       onFeedback=(action "onFeedback")
     }}
   {{/if}}

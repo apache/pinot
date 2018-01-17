@@ -165,7 +165,8 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       anomalyRange,
       analysisRange,
       granularity,
-      compareMode
+      compareMode,
+      anomalyUrns: new Set()
     };
 
     let selectedUrns = new Set();
@@ -181,7 +182,8 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
         anomalyRange,
         analysisRange,
         granularity,
-        compareMode
+        compareMode,
+        anomalyUrns: new Set()
       };
 
       selectedUrns = new Set([metricUrn, toCurrentUrn(metricUrn), toBaselineUrn(metricUrn)]);
@@ -209,11 +211,12 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
         const analysisRange = [moment(rawStart).startOf('day').add(1, 'day').valueOf(), moment(rawEnd).endOf('day').valueOf()];
 
         context = {
-          urns: new Set([...metricUrns, anomalyUrn]),
+          urns: new Set([...metricUrns]),
           anomalyRange,
           analysisRange,
           granularity,
-          compareMode
+          compareMode,
+          anomalyUrns: new Set([...metricUrns, anomalyUrn])
         };
 
         selectedUrns = new Set([...metricUrns, ...metricUrns.map(toCurrentUrn), ...metricUrns.map(toBaselineUrn), anomalyUrn]);
@@ -233,7 +236,8 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
           anomalyRange: [session.anomalyRangeStart, session.anomalyRangeEnd],
           analysisRange: [session.analysisRangeStart, session.analysisRangeEnd],
           granularity: session.granularity,
-          compareMode: session.compareMode
+          compareMode: session.compareMode,
+          anomalyUrns: new Set(session.anomalyUrns || [])
         };
         selectedUrns = new Set(session.selectedUrns);
         sessionName = session.name;

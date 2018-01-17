@@ -82,6 +82,14 @@
             <label class="rootcause-anomaly__stats-label">Change</label>
             <span class="rootcause-anomaly__stats-value rootcause-anomaly__stats-value--{{color-delta change}}">{{changeFormatted}}</span>
           </div>
+          <div class="rootcause-anomaly__stats">
+            <label class="rootcause-anomaly__stats-label">values</label>
+            <span class="rootcause-anomaly__stats-value">{{get values "wo1w"}}</span>
+          </div>
+          <div class="rootcause-anomaly__stats">
+            <label class="rootcause-anomaly__stats-label">changes</label>
+            <span class="rootcause-anomaly__stats-value">{{get changesFormatted "wo1w"}}</span>
+          </div>
           {{#if issueType}}
             <div class="rootcause-anomaly__stats">
               <label class="rootcause-anomaly__stats-label">Issue Type</label>

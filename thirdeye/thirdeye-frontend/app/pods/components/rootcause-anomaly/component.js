@@ -1,7 +1,7 @@
 import Component from "@ember/component";
 import { computed, setProperties, getProperties, get } from '@ember/object';
 import moment from 'moment';
-import { humanizeFloat } from 'thirdeye-frontend/helpers/utils';
+import { humanizeFloat, filterPrefix, toOffsetUrn } from 'thirdeye-frontend/helpers/utils';
 
 const ROOTCAUSE_HIDDEN_DEFAULT = 'default';
 
@@ -20,7 +20,9 @@ export default Component.extend({
   classNames: ['rootcause-anomaly'],
   entities: null, // {}
 
-  anomalyUrn: null, // ""
+  aggregates: null, // {}
+
+  anomalyUrns: null, // Set
 
   onFeedback: null, // func (urn, feedback, comment)
 
@@ -37,6 +39,18 @@ export default Component.extend({
    */
   optionsMapping: ANOMALY_OPTIONS_MAPPING,
 
+  anomalyUrn: computed(
+    'anomalyUrns',
+    function () {
+      const { anomalyUrns } = getProperties(this, 'anomalyUrns');
+      const anomalyEventUrn = filterPrefix(anomalyUrns, 'thirdeye:event:anomaly:');
+
+      if (!anomalyEventUrn) { return; }
+
+      return anomalyEventUrn[0];
+    }
+  ),
+
   anomaly: computed(
     'entities',
     'anomalyUrn',
@@ -46,6 +60,49 @@ export default Component.extend({
       if (!anomalyUrn || !entities || !entities[anomalyUrn]) { return false; }
 
       return entities[anomalyUrn];
+    }
+  ),
+
+  values: computed(
+    'aggregates',
+    'anomalyUrns',
+    function () {
+      const { aggregates, anomalyUrns } = getProperties(this, 'aggregates', 'anomalyUrns');
+
+      const offsets = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
+      const metricUrns = filterPrefix(anomalyUrns, 'thirdeye:metric:');
+
+      if (!metricUrns) { return; }
+
+      // NOTE: single metric only
+      const values = {};
+      [...offsets].forEach(offset => {
+        values[offset] = aggregates[toOffsetUrn(metricUrns[0], offset)];
+      });
+
+      return values;
+    }
+  ),
+
+  changesFormatted: computed(
+    'aggregates',
+    'anomalyUrns',
+    function () {
+      const { aggregates, anomalyUrns } = getProperties(this, 'aggregates', 'anomalyUrns');
+
+      const offsets = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
+      const metricUrns = filterPrefix(anomalyUrns, 'thirdeye:metric:');
+
+      if (!metricUrns) { return; }
+
+      // NOTE: single metric only
+      const changes = {};
+      [...offsets].forEach(offset => {
+        const change = aggregates[toOffsetUrn(metricUrns[0], 'current')] / aggregates[toOffsetUrn(metricUrns[0], offset)] - 1;
+        changes[offset] = (Math.round(change * 1000) / 10.0).toFixed(1);
+      });
+
+      return changes;
     }
   ),
 
@@ -65,6 +122,7 @@ export default Component.extend({
     return get(this, 'anomaly').attributes.dataset[0];
   }),
 
+  // TODO do we need this now?
   current: computed('anomaly', function () {
     return parseFloat(get(this, 'anomaly').attributes.current[0]).toFixed(3);
   }),
