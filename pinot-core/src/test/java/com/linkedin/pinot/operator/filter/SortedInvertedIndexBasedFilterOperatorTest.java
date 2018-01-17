@@ -60,7 +60,7 @@ public class SortedInvertedIndexBasedFilterOperatorTest {
         new SortedInvertedIndexBasedFilterOperator(predicateEvaluator, ds, startDocId, endDocId);
 
 
-    Assert.assertEquals(sortedInvertedIndexBasedFilterOperator.isResultEmpty(), false);
+    Assert.assertFalse(sortedInvertedIndexBasedFilterOperator.isResultEmpty());
 
     BaseFilterBlock baseFilterBlock = sortedInvertedIndexBasedFilterOperator.nextBlock();
     FilterBlockDocIdSet filterBlockDocIdSet = baseFilterBlock.getFilteredBlockDocIdSet();
@@ -76,7 +76,7 @@ public class SortedInvertedIndexBasedFilterOperatorTest {
       num = blockDocIdIterator.next();
     }
     Assert.assertEquals(filterBlockDocIdSet.toString(), "[[1,5], [8,12]]");
-    Assert.assertTrue(expectedDocIds.equals(actualDocIds));
+    Assert.assertEquals(actualDocIds, expectedDocIds);
   }
 
   @Test
@@ -102,7 +102,7 @@ public class SortedInvertedIndexBasedFilterOperatorTest {
         new SortedInvertedIndexBasedFilterOperator(predicateEvaluator, ds, startDocId, endDocId);
 
 
-    Assert.assertEquals(sortedInvertedIndexBasedFilterOperator.isResultEmpty(), false);
+    Assert.assertFalse(sortedInvertedIndexBasedFilterOperator.isResultEmpty());
 
     BaseFilterBlock baseFilterBlock = sortedInvertedIndexBasedFilterOperator.nextBlock();
     FilterBlockDocIdSet filterBlockDocIdSet = baseFilterBlock.getFilteredBlockDocIdSet();
@@ -118,6 +118,6 @@ public class SortedInvertedIndexBasedFilterOperatorTest {
       num = blockDocIdIterator.next();
     }
     Assert.assertEquals(filterBlockDocIdSet.toString(), "[[0,0], [6,7], [13,15]]");
-    Assert.assertTrue(expectedDocIds.equals(actualDocIds));
+    Assert.assertEquals(actualDocIds, expectedDocIds);
   }
 }
