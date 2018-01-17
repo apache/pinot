@@ -45,8 +45,10 @@ import org.slf4j.LoggerFactory;
  * MetricEntities in the search context. It then maps the metrics to ThirdEye's internal database
  * and performs contribution analysis using a {@code DimensionScorer).
  *
- * @see DimensionScorer
+ * @see MetricBreakdownPipeline as a replacement that relies on MetricEntities with filters in the
+ * tail of the URN
  */
+@Deprecated
 public class DimensionAnalysisPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(DimensionAnalysisPipeline.class);
 
