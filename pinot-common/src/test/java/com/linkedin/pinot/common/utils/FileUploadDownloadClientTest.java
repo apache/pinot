@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.common.utils;
 
-import com.linkedin.pinot.common.utils.FileUploadUtils.FileUploadType;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -36,7 +36,7 @@ import org.testng.annotations.Test;
 
 
 @Test
-public class FileUploadUtilsTest {
+public class FileUploadDownloadClientTest {
   private static final String TEST_HOST = "localhost";
   private static final int TEST_PORT = new Random().nextInt(10000) + 10000;
   private static final String TEST_URI = "http://testhost/segments/testSegment";
@@ -55,7 +55,7 @@ public class FileUploadUtilsTest {
     @Override
     public void handle(HttpExchange httpExchange) throws IOException {
       Headers requestHeaders = httpExchange.getRequestHeaders();
-      String uploadTypeStr = requestHeaders.getFirst(FileUploadUtils.CustomHeaders.UPLOAD_TYPE);
+      String uploadTypeStr = requestHeaders.getFirst(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
       FileUploadType uploadType = FileUploadType.valueOf(uploadTypeStr);
 
       String downloadUri = null;
@@ -69,7 +69,7 @@ public class FileUploadUtilsTest {
         }
         Assert.assertEquals(downloadUri, TEST_URI);
       } else if (uploadType == FileUploadType.URI) {
-        downloadUri = requestHeaders.getFirst(FileUploadUtils.CustomHeaders.DOWNLOAD_URI);
+        downloadUri = requestHeaders.getFirst(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
       } else {
         Assert.fail();
       }
@@ -92,7 +92,10 @@ public class FileUploadUtilsTest {
 
   @Test
   public void testSendFileWithUri() throws Exception {
-    Assert.assertEquals(FileUploadUtils.sendSegmentUri(TEST_HOST, TEST_PORT, TEST_URI), HttpStatus.SC_OK);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      Assert.assertEquals(fileUploadDownloadClient.sendSegmentUri(
+          FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), TEST_URI), HttpStatus.SC_OK);
+    }
   }
 
   @Test
@@ -100,6 +103,9 @@ public class FileUploadUtilsTest {
     JSONObject segmentJson = new JSONObject();
     segmentJson.put(CommonConstants.Segment.Offline.DOWNLOAD_URL, TEST_URI);
     String jsonString = segmentJson.toString();
-    Assert.assertEquals(FileUploadUtils.sendSegmentJson(TEST_HOST, TEST_PORT, jsonString), HttpStatus.SC_OK);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      Assert.assertEquals(fileUploadDownloadClient.sendSegmentJson(
+          FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), jsonString), HttpStatus.SC_OK);
+    }
   }
 }

@@ -23,7 +23,7 @@ import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
@@ -36,6 +36,7 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.sql.Timestamp;
@@ -278,8 +279,7 @@ public class PerfBenchmarkDriver {
     _helixResourceManager.addTable(tableConfig);
   }
 
-  private void uploadIndexSegments()
-      throws Exception {
+  private void uploadIndexSegments() throws Exception {
     if (!_conf.isUploadIndexes()) {
       LOGGER.info("Skipping upload index segments step.");
       return;
@@ -287,9 +287,12 @@ public class PerfBenchmarkDriver {
     String indexDirectory = _conf.getIndexDirectory();
     File[] indexFiles = new File(indexDirectory).listFiles();
     Preconditions.checkNotNull(indexFiles);
-    for (File indexFile : indexFiles) {
-      LOGGER.info("Uploading index segment: {}", indexFile.getAbsolutePath());
-      FileUploadUtils.uploadSegment(_controllerHost, _controllerPort, indexFile.getName(), indexFile);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(_controllerHost, _controllerPort);
+      for (File indexFile : indexFiles) {
+        LOGGER.info("Uploading index segment: {}", indexFile.getAbsolutePath());
+        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, indexFile.getName(), indexFile);
+      }
     }
   }
 

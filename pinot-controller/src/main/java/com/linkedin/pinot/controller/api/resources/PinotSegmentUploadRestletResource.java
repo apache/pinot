@@ -28,7 +28,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcher;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
@@ -245,7 +245,7 @@ public class PinotSegmentUploadRestletResource {
   @Path("/segments")
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
   public SuccessResponse uploadSegmentAsMultiPart(FormDataMultiPart multiPart,
-      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadUtils.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
+      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request) {
     return uploadSegmentInternal(multiPart, null, enableParallelPushProtection, headers, request);
   }
@@ -257,7 +257,7 @@ public class PinotSegmentUploadRestletResource {
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
   // TODO Does it even work if the segment is sent as a JSON body? Need to compare with the other API
   public SuccessResponse uploadSegmentAsJson(String segmentJsonStr,    // If segment is present as json body
-      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadUtils.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
+      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request) {
     return uploadSegmentInternal(null, segmentJsonStr, enableParallelPushProtection, headers, request);
   }
@@ -276,12 +276,12 @@ public class PinotSegmentUploadRestletResource {
       tempSegmentDir.deleteOnExit();
 
       // Get upload type
-      String uploadTypeStr = headers.getHeaderString(FileUploadUtils.CustomHeaders.UPLOAD_TYPE);
-      FileUploadUtils.FileUploadType uploadType;
+      String uploadTypeStr = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
+      FileUploadDownloadClient.FileUploadType uploadType;
       if (uploadTypeStr != null) {
-        uploadType = FileUploadUtils.FileUploadType.valueOf(uploadTypeStr);
+        uploadType = FileUploadDownloadClient.FileUploadType.valueOf(uploadTypeStr);
       } else {
-        uploadType = FileUploadUtils.FileUploadType.getDefaultUploadType();
+        uploadType = FileUploadDownloadClient.FileUploadType.getDefaultUploadType();
       }
 
       String downloadURI = null;
@@ -485,7 +485,7 @@ public class PinotSegmentUploadRestletResource {
     try {
       // Modify the custom map in segment ZK metadata
       String segmentZKMetadataCustomMapModifierStr =
-          headers.getHeaderString(FileUploadUtils.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER);
+          headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER);
       SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier;
       if (segmentZKMetadataCustomMapModifierStr != null) {
         segmentZKMetadataCustomMapModifier =
@@ -535,11 +535,11 @@ public class PinotSegmentUploadRestletResource {
     return ControllerConf.constructDownloadUrl(tableName, segmentName, provider.getVip());
   }
 
-  private String getDownloadUri(FileUploadUtils.FileUploadType uploadType, HttpHeaders headers, String segmentJsonStr)
+  private String getDownloadUri(FileUploadDownloadClient.FileUploadType uploadType, HttpHeaders headers, String segmentJsonStr)
       throws Exception {
     switch (uploadType) {
       case URI:
-        return headers.getHeaderString(FileUploadUtils.CustomHeaders.DOWNLOAD_URI);
+        return headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
       case JSON:
         // Get segmentJsonStr
         JSONTokener tokener = new JSONTokener(segmentJsonStr);
