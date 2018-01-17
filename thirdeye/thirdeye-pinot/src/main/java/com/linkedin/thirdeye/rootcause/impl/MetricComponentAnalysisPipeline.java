@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.rootcause.impl;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.TreeMultimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Series;
@@ -18,7 +17,6 @@ import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.MaxScoreSet;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
@@ -42,7 +40,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The MetricComponentAnalysisPipeline performs iterative factor analysis on a metric's dimensions.
- * Returns the k contributors to change (similar to principal components)
+ * Returns the k biggest outliers (contributors to relative change, similar to principal components).
+ *
+ * Iteration executes by choosing the the dimension value (slice) with the biggest change in
+ * contribution and then re-running the analysis while excluding this (and all previously chosen)
+ * slices from the dataset. The result is an ordered list of the top k slices with the biggest
+ * relative change.
  *
  * @see com.linkedin.thirdeye.client.diffsummary.Cube
  */
@@ -162,7 +165,7 @@ public class MetricComponentAnalysisPipeline extends Pipeline {
         final DataFrame dfScoresRaw = getDimensionScores(sliceCurrent, sliceBaseline);
 
         final double percentage = Math.round(subTotal / total * 10000) / 100.0;
-        LOG.info("Iteration {}: analyzing '{}' ({} %)\n{}", k, filters, percentage, dfScoresRaw.head(50));
+        LOG.info("Iteration {}: analyzing '{}' ({} %)\n{}", k, filters, percentage, dfScoresRaw.head(20));
 
         // ignore zero scores, known combinations
         final DataFrame dfScores = dfScoresRaw
@@ -172,23 +175,16 @@ public class MetricComponentAnalysisPipeline extends Pipeline {
                 return values[0] > 0;
               }
             }, COL_SCORE)
-            .filter(new Series.StringConditional() {
-              @Override
-              public boolean apply(String... values) {
-                return !rawDimensions.containsEntry(values[0], values[1]);
-              }
-            }, COL_DIM_NAME, COL_DIM_VALUE)
             .dropNull();
 
         if (dfScores.isEmpty()) {
           break;
         }
 
-        // TODO ignore common attributes (e.g. "continent=North America" for "country=us")
-
         String name = dfScores.getString(COL_DIM_NAME, 0);
         String value = dfScores.getString(COL_DIM_VALUE, 0);
-        double score = dfScores.getDouble(COL_SCORE, 0) * subTotal / total;
+         // double score = Math.abs(dfScores.getDouble(COL_DELTA, 0)); // scaling issue
+        double score = subTotal / total;
 
         rawDimensions.put(name, value);
         dimensions.add(DimensionEntity.fromDimension(score * metric.getScore(), name, value, DimensionEntity.TYPE_GENERATED));
@@ -307,7 +303,7 @@ public class MetricComponentAnalysisPipeline extends Pipeline {
     }
 
     final long timeout = System.currentTimeMillis() + TIMEOUT;
-    Collection<DataFrame> contributors = new ArrayList<>();
+    List<DataFrame> contributors = new ArrayList<>();
     for(Future<DataFrame> future : futures) {
       final long timeLeft = Math.max(timeout - System.currentTimeMillis(), 0);
       contributors.add(future.get(timeLeft, TimeUnit.MILLISECONDS));
@@ -320,7 +316,7 @@ public class MetricComponentAnalysisPipeline extends Pipeline {
         COL_DELTA + ":DOUBLE",
         COL_RAW + ":DOUBLE").build();
 
-    combined = combined.append(contributors.toArray(new DataFrame[contributors.size()]));
+    combined = combined.append(contributors);
     combined.addSeries(COL_SCORE, combined.getDoubles(COL_DELTA).abs());
 
     return combined.sortedBy(COL_SCORE).reverse();
