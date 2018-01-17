@@ -1,3 +1,18 @@
+/**
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.operator.filter;
 
 import com.linkedin.pinot.common.utils.Pairs;
@@ -22,7 +37,7 @@ import static org.mockito.Mockito.*;
 public class SortedInvertedIndexBasedFilterOperatorTest {
 
   @Test
-  public void testSortedInvertedIndexBasedFilterOperator() {
+  public void testSortedInvertedIndexBasedFilterOperatorForMatchingDocId() {
 
     DataSource ds = mock(DataSource.class);
     SortedIndexReader invertedIndexReader = mock(SortedIndexReader.class);
@@ -47,7 +62,7 @@ public class SortedInvertedIndexBasedFilterOperatorTest {
 
     Assert.assertEquals(sortedInvertedIndexBasedFilterOperator.isResultEmpty(), false);
 
-    BaseFilterBlock baseFilterBlock = sortedInvertedIndexBasedFilterOperator.getNextBlock();
+    BaseFilterBlock baseFilterBlock = sortedInvertedIndexBasedFilterOperator.nextBlock();
     FilterBlockDocIdSet filterBlockDocIdSet = baseFilterBlock.getFilteredBlockDocIdSet();
     Assert.assertEquals(filterBlockDocIdSet.getMinDocId(), expectedMinDocId);
     Assert.assertEquals(filterBlockDocIdSet.getMaxDocId(), expectedMaxDocId);
@@ -61,6 +76,48 @@ public class SortedInvertedIndexBasedFilterOperatorTest {
       num = blockDocIdIterator.next();
     }
     Assert.assertEquals(filterBlockDocIdSet.toString(), "[[1,5], [8,12]]");
+    Assert.assertTrue(expectedDocIds.equals(actualDocIds));
+  }
+
+  @Test
+  public void testSortedInvertedIndexBasedFilterOperatorForNonMatchingDocId() {
+    DataSource ds = mock(DataSource.class);
+    SortedIndexReader invertedIndexReader = mock(SortedIndexReader.class);
+    doReturn(invertedIndexReader).when(ds).getInvertedIndex();
+
+    int expectedMinDocId = 0;
+    int expectedMaxDocId = 15;
+    when(invertedIndexReader.getDocIds(anyInt()))
+        .thenReturn(new Pairs.IntPair(expectedMinDocId + 1, 5))
+        .thenReturn(new Pairs.IntPair(8, expectedMaxDocId - 3));
+
+    PredicateEvaluator predicateEvaluator = spy(PredicateEvaluator.class);
+    int[] dictIds = {1, 2};
+    doReturn(true).when(predicateEvaluator).isExclusive();
+    doReturn(dictIds).when(predicateEvaluator).getNonMatchingDictIds();
+
+    int startDocId = 0;
+    int endDocId = 15;
+    SortedInvertedIndexBasedFilterOperator sortedInvertedIndexBasedFilterOperator =
+        new SortedInvertedIndexBasedFilterOperator(predicateEvaluator, ds, startDocId, endDocId);
+
+
+    Assert.assertEquals(sortedInvertedIndexBasedFilterOperator.isResultEmpty(), false);
+
+    BaseFilterBlock baseFilterBlock = sortedInvertedIndexBasedFilterOperator.nextBlock();
+    FilterBlockDocIdSet filterBlockDocIdSet = baseFilterBlock.getFilteredBlockDocIdSet();
+    Assert.assertEquals(filterBlockDocIdSet.getMinDocId(), expectedMinDocId);
+    Assert.assertEquals(filterBlockDocIdSet.getMaxDocId(), expectedMaxDocId);
+
+    BlockDocIdIterator blockDocIdIterator = filterBlockDocIdSet.iterator();
+    int num = blockDocIdIterator.next();
+    List<Integer> actualDocIds = new ArrayList<>();
+    List<Integer> expectedDocIds = Arrays.asList(0,6,7,13,14,15);
+    while (Constants.EOF != num) {
+      actualDocIds.add(num);
+      num = blockDocIdIterator.next();
+    }
+    Assert.assertEquals(filterBlockDocIdSet.toString(), "[[0,0], [6,7], [13,15]]");
     Assert.assertTrue(expectedDocIds.equals(actualDocIds));
   }
 }
