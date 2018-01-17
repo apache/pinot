@@ -49,7 +49,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected BaseFilterBlock getNextBlock() {
+  public BaseFilterBlock getNextBlock() {
     SortedIndexReader invertedIndex = (SortedIndexReader) _dataSource.getInvertedIndex();
     List<IntPair> pairs = new ArrayList<>();
 
