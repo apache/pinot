@@ -4,12 +4,13 @@
  * @exports manage/alert/explore
  */
 import fetch from 'fetch';
-import Ember from 'ember';
 import moment from 'moment';
-import _ from 'lodash';
-import { checkStatus, buildDateEod, postProps } from 'thirdeye-frontend/helpers/utils';
+import Controller from '@ember/controller';
+import { computed } from '@ember/object';
+import { checkStatus, postProps, buildDateEod } from 'thirdeye-frontend/helpers/utils';
+import { buildAnomalyStats } from 'thirdeye-frontend/helpers/manage-alert-utils';
 
-export default Ember.Controller.extend({
+export default Controller.extend({
   /**
    * Be ready to receive time span for anomalies via query params
    */
@@ -51,7 +52,7 @@ export default Ember.Controller.extend({
    * @param {Boolean} isReplayNeeded
    * @return {undefined}
    */
-  initialize(isReplayNeeded) {
+  initialize() {
     this.setProperties({
       filters: {},
       metricData: {},
@@ -65,12 +66,11 @@ export default Ember.Controller.extend({
       isAlertReady: false,
       openReportModal: false,
       isReplayStarted: true,
-      isReplayPending: false,
       isReplayDone: false,
       isReportSuccess: false,
       isReportFailure: false,
+      isPageLoadFailure: false,
       isMetricDataLoading: true,
-      isReplayStatusError: false,
       isReplayModeWrapper: true,
       isAnomalyArrayChanged: false,
       requestCanContinue: true,
@@ -78,6 +78,7 @@ export default Ember.Controller.extend({
       sortColumnScoreUp: false,
       sortColumnChangeUp: false,
       sortColumnResolutionUp: false,
+      checkReplayInterval: 5000,
       baselineOptions: [{ name: 'Predicted', isActive: true }],
       selectedDimension: 'All Dimensions',
       selectedResolution: 'All Resolutions',
@@ -85,10 +86,12 @@ export default Ember.Controller.extend({
       currentPage: 1,
       pageSize: 10
     });
-    // Toggle page mode if replay is needed
-    if (isReplayNeeded) {
-      this.set('isReplayPending', true);
-      this.triggerReplay(this.get('alertId'));
+
+    // Start checking for replay to end if an ID was given
+    if (this.get('isReplayPending')) {
+      Ember.run.later(() => {
+        this.checkReplayStatus(this.get('replayId'));
+      }, this.get('checkReplayInterval'));
     }
   },
 
@@ -96,7 +99,7 @@ export default Ember.Controller.extend({
    * Table pagination: number of pages to display
    * @type {Number}
    */
-  paginationSize: Ember.computed(
+  paginationSize: computed(
     'pagesNum',
     'pageSize',
     function() {
@@ -109,7 +112,7 @@ export default Ember.Controller.extend({
    * Table pagination: total Number of pages to display
    * @type {Number}
    */
-  pagesNum: Ember.computed(
+  pagesNum: computed(
     'filteredAnomalies',
     'pageSize',
     function() {
@@ -123,7 +126,7 @@ export default Ember.Controller.extend({
    * Table pagination: creates the page Array for view
    * @type {Array}
    */
-  viewPages: Ember.computed(
+  viewPages: computed(
     'pages',
     'currentPage',
     'paginationSize',
@@ -142,7 +145,7 @@ export default Ember.Controller.extend({
         ? Math.max(max - size + 1, 1)
         : Math.max(currentPage - step, 1);
 
-      return [...new Array(size)].map((page, index) =>  startingNumber + index);
+      return [...new Array(size)].map((page, index) => startingNumber + index);
     }
   ),
 
@@ -150,7 +153,7 @@ export default Ember.Controller.extend({
    * Table pagination: pre-filtered and sorted anomalies with pagination
    * @type {Array}
    */
-  paginatedFilteredAnomalies: Ember.computed(
+  paginatedFilteredAnomalies: computed(
     'filteredAnomalies.@each',
     'pageSize',
     'currentPage',
@@ -178,13 +181,13 @@ export default Ember.Controller.extend({
    * Indicates the allowed date range picker increment based on granularity
    * @type {Number}
    */
-  timePickerIncrement: Ember.computed('alertData.windowUnit', function() {
+  timePickerIncrement: computed('alertData.windowUnit', function() {
     const granularity = this.get('alertData.windowUnit').toLowerCase();
 
     switch(granularity) {
-      case 'DAYS':
+      case 'days':
         return 1440;
-      case 'HOURS':
+      case 'hours':
         return 60;
       default:
         return 5;
@@ -201,7 +204,7 @@ export default Ember.Controller.extend({
    * date-time-picker: returns a time object from selected range end date
    * @type {Object}
    */
-  viewRegionEnd: Ember.computed(
+  viewRegionEnd: computed(
     'activeRangeEnd',
     function() {
       const end = this.get('activeRangeEnd');
@@ -213,7 +216,7 @@ export default Ember.Controller.extend({
    * date-time-picker: returns a time object from selected range start date
    * @type {Object}
    */
-  viewRegionStart: Ember.computed(
+  viewRegionStart: computed(
     'activeRangeStart',
     function() {
       const start = this.get('activeRangeStart');
@@ -225,13 +228,13 @@ export default Ember.Controller.extend({
    * date-time-picker: indicates the date format to be used based on granularity
    * @type {String}
    */
-  uiDateFormat: Ember.computed('alertData.windowUnit', function() {
+  uiDateFormat: computed('alertData.windowUnit', function() {
     const granularity = this.get('alertData.windowUnit').toLowerCase();
 
     switch(granularity) {
-      case 'DAYS':
+      case 'days':
         return 'MMM D, YYYY';
-      case 'HOURS':
+      case 'hours':
         return 'MMM D, YYYY h a';
       default:
         return 'MMM D, YYYY hh:mm a';
@@ -240,52 +243,15 @@ export default Ember.Controller.extend({
 
   /**
    * Data needed to render the stats 'cards' above the anomaly graph for this alert
+   * TODO: pull this into its own component, as we're re-using it in manage/alert/tune
    * @type {Object}
    */
-  anomalyStats: Ember.computed(
-    'totalAnomalies',
+  anomalyStats: computed(
     'alertEvalMetrics',
+    'alertEvalMetrics.projected',
     function() {
-      const total = this.get('totalAnomalies') || 0;
-      const evalObj = this.get('alertEvalMetrics.eval');
-      const mttd = this.get('alertEvalMetrics.mttd') || '0';
-      const projected = this.get('alertEvalMetrics.projected') || '0';
-      const responseRate = evalObj && evalObj.responseRate ? evalObj.responseRate : '0';
-      const precision = evalObj && evalObj.precision ? evalObj.precision : '0';
-      const recall = evalObj && evalObj.recall ? evalObj.recall : '0';
-
-      const anomalyStats = [
-        {
-          title: 'Number of anomalies',
-          text: 'Estimated average number of anomalies per month',
-          value: total,
-          projected
-        },
-        {
-          title: 'Response rate',
-          text: 'Percentage of anomalies that has a response',
-          value: responseRate
-        },
-        {
-          title: 'Precision',
-          text: 'Among all anomalies detected, the percentage of them that are true.',
-          value: precision,
-          projected
-        },
-        {
-          title: 'Recall',
-          text: 'Among all anomalies that happened, the percentage of them detected by the system',
-          value: recall,
-          projected
-        },
-        {
-          title: 'MTTD for >30% change',
-          text: 'Minimum time to detect for anomalies with > 30% change',
-          value: mttd,
-          projected
-        }
-      ];
-      return anomalyStats;
+      const evalMetrics = this.get('alertEvalMetrics');
+      return buildAnomalyStats(evalMetrics, 'explore');
     }
   ),
 
@@ -294,19 +260,23 @@ export default Ember.Controller.extend({
    * NOTE: this is currently set up to support single-dimension filters
    * @type {Object}
    */
-  filteredAnomalies: Ember.computed(
+  filteredAnomalies: computed(
     'selectedDimension',
     'selectedResolution',
     'anomalyData',
     function() {
-      const targetDimension = this.get('selectedDimension');
-      const targetResolution = this.get('selectedResolution');
+      const {
+        selectedDimension: targetDimension,
+        selectedResolution: targetResolution
+      } = this.getProperties('selectedDimension', 'selectedResolution');
       let anomalies = this.get('anomalyData');
 
       // Filter for selected dimension
       if (targetDimension !== 'All Dimensions') {
         anomalies = anomalies.filter((data) => {
-          return targetDimension === `${data.dimensionList[0].dimensionKey}:${data.dimensionList[0].dimensionVal}`;
+          if (data.dimensionList.length) {
+            return targetDimension === `${data.dimensionList[0].dimensionKey}:${data.dimensionList[0].dimensionVal}`;
+          }
         });
       }
 
@@ -325,7 +295,7 @@ export default Ember.Controller.extend({
    * Placeholder for options for range field. Here we generate arbitrary date ranges from our config.
    * @type {Array}
    */
-  rangeOptionsExample: Ember.computed(
+  rangeOptionsExample: computed(
     'dateRangeToRender',
     function() {
       return this.get('dateRangeToRender').map(this.renderDate);
@@ -338,7 +308,7 @@ export default Ember.Controller.extend({
    * @param {Number} range - number of days (duration)
    * @return {String}
    */
-  renderDate: function(range) {
+  renderDate(range) {
     // TODO: enable single day range
     const newDate = buildDateEod(range, 'days').format("DD MM YYY");
     return `Last ${range} Days (${newDate} to Today)`;
@@ -371,15 +341,20 @@ export default Ember.Controller.extend({
   checkReplayStatus(jobId) {
     const checkStatusUrl = `/thirdeye-admin/job-info/job/${jobId}/status`;
 
-    fetch(checkStatusUrl).then(checkStatus).then((status) => {
-      if (status.toLowerCase() === 'completed') {
-        this.set('isReplayPending', false);
-      } else if (this.get('requestCanContinue')) {
-        Ember.run.later(this, function() {
-          this.checkReplayStatus(jobId);
-        }, 5000);
-      }
-    });
+    fetch(checkStatusUrl).then(checkStatus)
+      .then((status) => {
+        if (status.toLowerCase() === 'completed') {
+          this.set('isReplayPending', false);
+          this.transitionToRoute('manage.alert', this.get('alertId'), { queryParams: { replayId: null }});
+        } else if (this.get('requestCanContinue')) {
+          Ember.run.later(() => {
+            this.checkReplayStatus(jobId);
+          }, this.get('checkReplayInterval'));
+        }
+      })
+      .catch((err) => {
+        this.set('isReplayStatusError', true);
+      });
   },
 
   /**
@@ -418,46 +393,6 @@ export default Ember.Controller.extend({
           loadErrorMsg: errors
         });
       });
-  },
-
-  /**
-   * Sends a request to begin advanced replay for a metric. The replay will fetch new
-   * time-series data based on user-selected sensitivity settings.
-   * @method triggerReplay
-   * @param {Number} functionId - the id for the newly created function (alert)
-   * @return {Ember.RSVP.Promise}
-   */
-  triggerReplay(functionId) {
-    const emailData = this.get('emailData')[0];
-    const startTime = buildDateEod(1, 'month').format("YYYY-MM-DD");
-    const endTime = buildDateEod(1, 'day').format("YYYY-MM-DD");
-    const granularity = this.get('alertData.windowUnit').toLowerCase();
-    const isDailyOrHourly = ['day', 'hour'].includes(granularity);
-    const speedUp = !(granularity.includes('hour') || granularity.includes('day'));
-    const recipients = emailData ? encodeURIComponent(emailData.recipients.replace(/,{2,}/g, '')) : '';
-    const sensitivity = this.get('alertData.alertFilter.sensitivity') || isDailyOrHourly ? 'Sensitive' : 'Medium';
-    const pattern = this.get('alertData.alertFilter.pattern') || null;
-    const replayWrapperUrl = `/detection-job/${functionId}/notifyreplaytuning?start=${startTime}` +
-      `&end=${endTime}&speedup=${speedUp}&userDefinedPattern=${pattern}&sensitivity=${sensitivity}` +
-      `&removeAnomaliesInWindow=true&to=${recipients}`;
-    const replayStartUrl = `/detection-job/${functionId}/replay?start=${startTime}&end=${endTime}&speedup=${speedUp}`;
-
-    // Two ways to trigger replay
-    if (this.get('isReplayModeWrapper')) {
-      fetch(replayWrapperUrl, postProps('')).then((res) => checkStatus(res, 'post')).then(() => {
-        this.set('isReplayPending', false);
-      }).catch(() => {
-        this.set('isReplayStatusError', true);
-      });
-    } else {
-      fetch(replayStartUrl, postProps('')).then((res) => checkStatus(res, 'post')).then((response) => {
-        response.json().then((jobId) => {
-          this.checkReplayStatus(Object.values(jobId)[0]);
-        });
-      }).catch(() => {
-        this.set('isReplayStatusError', true);
-      });
-    }
   },
 
   /**
@@ -541,7 +476,8 @@ export default Ember.Controller.extend({
    */
   clearAll() {
     this.setProperties({
-      requestCanContinue: false
+      requestCanContinue: false,
+      alertEvalMetrics: {}
     });
   },
 
@@ -576,7 +512,7 @@ export default Ember.Controller.extend({
      * @param {Object} inputObj - the selection object
      */
     onChangeAnomalyResponse(anomalyRecord, selectedResponse, inputObj) {
-      const responseObj = _.find(this.get('anomalyResponseObj'), { 'name': selectedResponse });
+      const responseObj = this.get('anomalyResponseObj').find(res => res.name === selectedResponse);
       Ember.set(inputObj, 'selected', selectedResponse);
 
       // Save anomaly feedback
@@ -623,7 +559,7 @@ export default Ember.Controller.extend({
     /**
      * Handle submission of missing anomaly form from alert-report-modal
      */
-    onSubmitMissingAnomaly() {
+    onSave() {
       const { alertId, missingAnomalyProps } = this.getProperties('alertId', 'missingAnomalyProps');
       this.reportAnomaly(alertId, missingAnomalyProps)
         .then((result) => {
@@ -644,7 +580,7 @@ export default Ember.Controller.extend({
     /**
      * Handle missing anomaly modal cancel
      */
-    onCancelMissingAnomaly() {
+    onCancel() {
       this.setProperties({
         openReportModal: false,
         isReportSuccess: false,
@@ -684,9 +620,9 @@ export default Ember.Controller.extend({
 
       // Set new values for each anomaly
       if (isValidSelection) {
-        for (var anomaly of anomalyData) {
+        anomalyData.forEach((anomaly) => {
           const wow = anomaly.wowData;
-          const wowDetails = _.find(wow.compareResults, { 'compareMode': wowObj.name });
+          const wowDetails = wow.compareResults.find(res => res.compareMode === wowObj.name);
           let curr = anomaly.current;
           let base = anomaly.baseline;
           let change = anomaly.changeRate;
@@ -702,7 +638,7 @@ export default Ember.Controller.extend({
             shownBaseline: base,
             shownChangeRate: change
           });
-        }
+        });
       }
     },
 
@@ -717,11 +653,6 @@ export default Ember.Controller.extend({
 
       // Trigger reload in model with new time range. Transition for 'custom' dates is handled by 'onRangeSelection'
       if (rangeOption.value !== 'custom') {
-        this.setProperties({
-          timeRangeOptions: this.newTimeRangeOptions(rangeOption.value),
-          activeRangeStart: moment(rangeOption.start).format(rangeFormat),
-          activeRangeEnd: moment(defaultEndDate).format(rangeFormat)
-        });
         this.transitionToRoute({ queryParams: {
           mode: 'explore',
           duration: rangeOption.value,

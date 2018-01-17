@@ -1,5 +1,4 @@
 <ul class="rootcause-metric__display-view">
-  <li>View: </li>
   <li class="rootcause-metric__display-view--{{if (eq selectedView "card") "active"}}" {{action "selectView" 'card'}}>
     Card
   </li>
@@ -42,6 +41,7 @@
     urns=urns
     metrics=metrics
     scores=scores
-    changesFormatted=changesFormatted
+    changesOffset=changesOffset
+    changesOffsetFormatted=changesOffsetFormatted
     toggleSelection=(action "toggleSelection")}}
 {{/if}}

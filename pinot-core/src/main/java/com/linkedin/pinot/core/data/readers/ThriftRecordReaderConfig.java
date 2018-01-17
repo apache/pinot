@@ -13,17 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.controller.api.events;
+package com.linkedin.pinot.core.data.readers;
 
-import com.linkedin.pinot.common.data.Schema;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
 
+public class ThriftRecordReaderConfig implements RecordReaderConfig {
 
-public class DefaultMetadataChangeNotifier implements MetadataChangeNotifier {
-  public void notifyOnSchemaEvents(Schema oldSchema, Schema newSchema) {
+    private String _thriftClass;
 
-  }
+    public String getThriftClass() {
+        return _thriftClass;
+    }
 
-  public void notifyOnSegmentFlush(String kafkaTopic, String tableName, long offset) {
+    public void setThriftClass(String thriftClass) {
+        this._thriftClass = thriftClass;
+    }
 
-  }
+    @Override
+    public String toString() {
+        return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
+    }
 }

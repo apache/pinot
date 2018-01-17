@@ -25,7 +25,7 @@ public class PropertyCheckUtils {
     }
 
     if (!missingPropertyKeys.isEmpty()) {
-      throw new IllegalArgumentException("Mising Property Keys: " + missingPropertyKeys);
+      throw new IllegalArgumentException("Missing Property Keys: " + missingPropertyKeys);
     }
   }
 }

@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { checkStatus, toBaselineUrn, toBaselineRange, toFilters, toFilterMap } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, toBaselineUrn, toAbsoluteRange, toFilters, toFilterMap } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -51,15 +51,12 @@ export default Ember.Service.extend({
     }
 
     // metrics
-    const metricUrns = missing.filter(urn => urn.startsWith('frontend:metric:current:'));
-    metricUrns.forEach(urn => this._fetchSlice(urn, requestContext.analysisRange, requestContext, (t) => t));
-
-    // baselines
-    const baselineRange = toBaselineRange(requestContext.analysisRange, requestContext.compareMode);
-    const baselineOffset = requestContext.analysisRange[0] - baselineRange[0];
-    const offsetFunc = (timeseries) => this._convertToBaseline(timeseries, baselineOffset);
-    const baselineUrns = missing.filter(urn => urn.startsWith('frontend:metric:baseline:'));
-    baselineUrns.forEach(urn => this._fetchSlice(urn, baselineRange, requestContext, offsetFunc));
+    missing.forEach(urn => {
+      const range = toAbsoluteRange(urn, requestContext.analysisRange, requestContext.compareMode);
+      const offset = requestContext.analysisRange[0] - range[0];
+      const offsetFunc = (ts) => this._offsetTimeseries(ts, offset);
+      return this._fetchSlice(urn, range, requestContext, offsetFunc);
+    });
   },
 
   _complete(requestContext, incoming) {
@@ -82,7 +79,6 @@ export default Ember.Service.extend({
     Object.keys(json).forEach(range =>
       Object.keys(json[range]).filter(sid => sid != 'timestamp').forEach(sid => {
         const jrng = json[range];
-
         timeseries[urn] = {
           timestamps: jrng.timestamp,
           values: jrng[sid]
@@ -92,16 +88,11 @@ export default Ember.Service.extend({
     return timeseries;
   },
 
-  _convertToBaseline(timeseries, offset) {
-    const baseline = {};
+  _offsetTimeseries(timeseries, offset) {
     Object.keys(timeseries).forEach(urn => {
-      const baselineUrn = toBaselineUrn(urn);
-      baseline[baselineUrn] = {
-        values: timeseries[urn].values,
-        timestamps: timeseries[urn].timestamps.map(t => t + offset)
-      };
+      timeseries[urn].timestamps = timeseries[urn].timestamps.map(t => t + offset);
     });
-    return baseline;
+    return timeseries;
   },
 
   _fetchSlice(urn, range, context, offsetFunc) {

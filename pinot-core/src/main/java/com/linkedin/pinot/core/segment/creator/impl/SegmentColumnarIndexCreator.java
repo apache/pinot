@@ -177,8 +177,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         Preconditions.checkState(!invertedIndexColumns.contains(columnName),
             "Cannot create inverted index for raw index column: %s", columnName);
 
-        // TODO: make this configurable.
-        ChunkCompressorFactory.CompressionType compressionType = ChunkCompressorFactory.CompressionType.SNAPPY;
+        ChunkCompressorFactory.CompressionType compressionType = segmentCreationSpec.getColumnCompressionType(columnName);
 
         // Initialize forward index creator
         _forwardIndexCreatorMap.put(columnName,

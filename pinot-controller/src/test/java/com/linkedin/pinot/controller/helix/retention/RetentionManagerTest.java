@@ -56,7 +56,6 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyList;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -483,12 +482,6 @@ public class RetentionManagerTest {
       @Nullable
       @Override
       public String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType) {
-        return null;
-      }
-
-      @Nullable
-      @Override
-      public List<String> getOptimizations() {
         return null;
       }
     };

@@ -43,6 +43,7 @@ import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.api.events.MetadataEventNotifierFactory;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
@@ -100,6 +101,7 @@ public class PinotLLCRealtimeSegmentManager {
   private static final int NUM_LOCKS = 4;
 
   private static final String METADATA_TEMP_DIR_SUFFIX = ".metadata.tmp";
+  private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
 
   private static PinotLLCRealtimeSegmentManager INSTANCE = null;
 
@@ -680,6 +682,10 @@ public class PinotLLCRealtimeSegmentManager {
     } finally {
       lock.unlock();
     }
+
+    // Trigger the metadata event notifier
+    notifyOnSegmentFlush(realtimeTableName);
+
     return true;
   }
 
@@ -1216,6 +1222,17 @@ public class PinotLLCRealtimeSegmentManager {
       znRecord.setListField(Integer.toString(p), instances);
     }
     return znRecord;
+  }
+
+  /**
+   * Helper method to trigger metadata event notifier
+   * @param tableName a table name
+   */
+  private void notifyOnSegmentFlush(String tableName) {
+    final MetadataEventNotifierFactory metadataEventNotifierFactory =
+        MetadataEventNotifierFactory.loadFactory(_controllerConf.subset(METADATA_EVENT_NOTIFIER_PREFIX));
+    final TableConfig tableConfig = getRealtimeTableConfig(tableName);
+    metadataEventNotifierFactory.create().notifyOnSegmentFlush(tableConfig);
   }
 
   protected int getKafkaPartitionCount(KafkaStreamMetadata kafkaStreamMetadata) {

@@ -15,12 +15,11 @@
  *
  * @exports filter-bar
  */
-import Ember from 'ember';
+import Component from "@ember/component";
+import { get, set, setProperties, computed, getProperties, observer } from "@ember/object";
 import _ from 'lodash';
 
-const { setProperties } = Ember;
-
-export default Ember.Component.extend({
+export default Component.extend({
 
   /**
    * Cache for all filters selected (event type + subfilters)
@@ -76,7 +75,7 @@ export default Ember.Component.extend({
     this._super(...arguments);
 
     // Fetch the config file to create sub-filters
-    const filterBlocks = _.cloneDeep(this.get('config'));
+    const filterBlocks = _.cloneDeep(get(this, 'config'));
 
     // Set up filter block object
     filterBlocks.forEach((block, index) => {
@@ -102,7 +101,7 @@ export default Ember.Component.extend({
 
     const eventType = filterBlocks[0].eventType;
 
-    this.setProperties({ filterBlocks, eventType, filterCache: {} });
+    setProperties(this, { filterBlocks, eventType, filterCache: {} });
   },
 
   /**
@@ -110,7 +109,7 @@ export default Ember.Component.extend({
    * (i.e. changes in search form), filter results based on newly updated filteredUrns
    */
   didReceiveAttrs() {
-    const { filteredUrns, onFilter } = this.getProperties('filteredUrns', 'onFilter');
+    const { filteredUrns, onFilter } = getProperties(this, 'filteredUrns', 'onFilter');
     onFilter(filteredUrns);
   },
 
@@ -118,13 +117,13 @@ export default Ember.Component.extend({
    * observer on entities to set default event type when entities is loaded
    * @type {undefined}
    */
-  filteredUrnsObserver: Ember.observer(
+  filteredUrnsObserver: observer(
     'eventType',
     'entities',
     'filterCache',
     'filteredUrns',
     function() {
-      const { filteredUrns, onFilter } = this.getProperties('filteredUrns', 'onFilter');
+      const { filteredUrns, onFilter } = getProperties(this, 'filteredUrns', 'onFilter');
       onFilter(filteredUrns);
     }
   ),
@@ -143,10 +142,10 @@ export default Ember.Component.extend({
    * }
    * @type {Object}
    */
-  attributesMap: Ember.computed(
+  attributesMap: computed(
     'entities',
     function () {
-      let entities = this.get('entities');
+      let entities = get(this, 'entities');
       let map = {};
       if (!_.isEmpty(entities)) {
         // Iterate through each event
@@ -182,19 +181,19 @@ export default Ember.Component.extend({
    * @param {String} attribute - name of attribute to check against config's input's labelMapping
    */
   isInConfig(attribute) {
-    return this.get('filterBlocks').some(filterBlock => filterBlock.inputs.some(input => attribute === input.labelMapping));
+    return get(this, 'filterBlocks').some(filterBlock => filterBlock.inputs.some(input => attribute === input.labelMapping));
   },
 
   /**
    * Computes the filtered urns when there are changes to entities, filterCache, and eventType
    */
-  filteredUrns: Ember.computed(
+  filteredUrns: computed(
     'entities',
     'filterCache',
     'eventType',
     function () {
       const { entities, filterCache, eventType } =
-        this.getProperties('entities', 'filterCache', 'eventType');
+        getProperties(this, 'entities', 'filterCache', 'eventType');
 
       if (!eventType) { return []; }
 
@@ -206,6 +205,53 @@ export default Ember.Component.extend({
       });
 
       return filteredUrns;
+    }
+  ),
+
+  /**
+   * A mapping of event type and number of events of that type
+   * @type {Object}
+   */
+  eventTypeMap: computed(
+    'entities',
+    function() {
+      let holidayCount = 0;
+      let gcnCount = 0;
+      let lixCount = 0;
+      let informedCount = 0;
+      let anomalyCount = 0;
+      const entities = get(this, 'entities');
+
+      Object.keys(entities).forEach(urn => {
+        const e = entities[urn];
+        if (e.type === 'event') {
+          switch(e.eventType) {
+            case 'holiday':
+              holidayCount++;
+              break;
+            case 'gcn':
+              gcnCount++;
+              break;
+            case 'lix':
+              lixCount++;
+              break;
+            case 'informed':
+              informedCount++;
+              break;
+            case 'anomaly':
+              anomalyCount++;
+              break;
+          }
+        }
+      });
+
+      return {
+        holiday: holidayCount,
+        gcn: gcnCount,
+        lix: lixCount,
+        informed: informedCount,
+        anomaly: anomalyCount
+      };
     }
   ),
 
@@ -233,7 +279,7 @@ export default Ember.Component.extend({
      * @param {String[]} selectedValues
      */
     onFilterChange(eventType, labelMapping, selectedValues) {
-      const filterCache = this.get('filterCache');
+      const filterCache = get(this, 'filterCache');
 
       if (!filterCache[eventType]) {
         filterCache[eventType] = {};
@@ -241,7 +287,7 @@ export default Ember.Component.extend({
 
       filterCache[eventType][labelMapping] = new Set(selectedValues);
 
-      this.setProperties({
+      setProperties(this, {
         filterCache: Object.assign({}, filterCache),
         eventType });
     },
@@ -251,14 +297,14 @@ export default Ember.Component.extend({
      * @param {String} eventType
      */
     selectEventType(eventType) {
-      this.set('eventType', eventType);
+      set(this, 'eventType', eventType);
 
-      let filterBlocks = this.get('filterBlocks');
+      let filterBlocks = get(this, 'filterBlocks');
 
       // Hide all other blocks when one is clicked
       filterBlocks.forEach(block => {
         const isHidden = block.eventType !== eventType;
-        Ember.set(block, 'isHidden', isHidden);
+        set(block, 'isHidden', isHidden);
       });
     }
   }

@@ -15,11 +15,6 @@
  */
 package com.linkedin.pinot.controller.api.events;
 
-import com.linkedin.pinot.common.data.Schema;
-
-
-public interface MetadataChangeNotifier {
-  void notifyOnSchemaEvents(Schema oldSchema, Schema newSchema);
-
-  void notifyOnSegmentFlush(String kafkaTopic, String tableName, long offset);
+public enum SchemaEventType {
+  CREATE, UPDATE, DELETE
 }

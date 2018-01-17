@@ -20,11 +20,11 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
+import com.linkedin.pinot.core.data.readers.ThriftRecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.hadoop.job.JobConfigConstants;
-import java.io.File;
-import java.io.IOException;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -35,6 +35,9 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
 
 
 public class HadoopSegmentCreationMapReduceJob {
@@ -241,6 +244,8 @@ public class HadoopSegmentCreationMapReduceJob {
           break;
         case JSON:
           break;
+        case THRIFT:
+          readerConfig = new ThriftRecordReaderConfig();
         default:
           break;
       }
@@ -256,6 +261,9 @@ public class HadoopSegmentCreationMapReduceJob {
       }
       if (dataFilePath.endsWith(".avro")) {
         return FileFormat.AVRO;
+      }
+      if (dataFilePath.endsWith(".thrift")) {
+        return FileFormat.THRIFT;
       }
       throw new RuntimeException("Not support file format - " + dataFilePath);
     }

@@ -134,7 +134,7 @@ public class AnomalyUtils {
 
     public MetaDataNode(MergedAnomalyResultDTO anomaly){
       this.windowSize = 1. * (anomaly.getEndTime() - anomaly.getStartTime()) / 3600000L;
-      this.severity = Math.abs(anomaly.getWeight());
+      this.severity = anomaly.getWeight();
       this.startTimeISO = new Timestamp(anomaly.getStartTime()).toString();
       this.endTimeISO = new Timestamp(anomaly.getEndTime()).toString();
       this.functionName = anomaly.getFunction().getFunctionName();

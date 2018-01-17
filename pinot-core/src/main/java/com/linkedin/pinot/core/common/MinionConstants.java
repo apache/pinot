@@ -19,6 +19,8 @@ public class MinionConstants {
   private MinionConstants() {
   }
 
+  public static final String TASK_TIME_SUFFIX = ".time";
+
   public static final String TABLE_NAME_KEY = "tableName";
   public static final String SEGMENT_NAME_KEY = "segmentName";
   public static final String DOWNLOAD_URL_KEY = "downloadURL";
@@ -29,6 +31,13 @@ public class MinionConstants {
    * hadoop while minion has been working on it.
    */
   public static final String ORIGINAL_SEGMENT_CRC_KEY = "crc";
+
+  /**
+   * For retry policy.
+   */
+  public static final String MAX_NUM_ATTEMPTS_KEY = "maxNumAttempts";
+  public static final String INITIAL_RETRY_DELAY_MS_KEY = "initialRetryDelayMs";
+  public static final String RETRY_SCALE_FACTOR_KEY = "retryScaleFactor";
 
   public static final String TABLE_MAX_NUM_TASKS_KEY = "tableMaxNumTasks";
 

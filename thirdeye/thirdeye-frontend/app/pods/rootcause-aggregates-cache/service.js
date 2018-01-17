@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { checkStatus, toBaselineRange, toFilters, toFilterMap } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, toAbsoluteRange, toFilters, toFilterMap } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -51,13 +51,10 @@ export default Ember.Service.extend({
     }
 
     // metrics
-    const metricUrns = missing.filter(urn => urn.startsWith('frontend:metric:current:'));
-    metricUrns.forEach(urn => this._fetchSlice(urn, requestContext.anomalyRange, requestContext));
-
-    // baselines
-    const baselineRange = toBaselineRange(requestContext.anomalyRange, requestContext.compareMode);
-    const baselineUrns = missing.filter(urn => urn.startsWith('frontend:metric:baseline:'));
-    baselineUrns.forEach(urn => this._fetchSlice(urn, baselineRange, requestContext));
+    missing.forEach(urn => {
+      const range = toAbsoluteRange(urn, requestContext.anomalyRange, requestContext.compareMode);
+      return this._fetchSlice(urn, range, requestContext)
+    });
   },
 
   _complete(requestContext, incoming) {

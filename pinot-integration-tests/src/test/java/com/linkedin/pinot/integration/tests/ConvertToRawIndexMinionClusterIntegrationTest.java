@@ -24,7 +24,6 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
 import com.linkedin.pinot.core.common.MinionConstants;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
@@ -128,9 +127,9 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
           // Check segment ZK metadata
           for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _helixResourceManager.getOfflineSegmentMetadata(
               offlineTableName)) {
-            List<String> optimizations = offlineSegmentZKMetadata.getOptimizations();
-            if (optimizations == null || optimizations.size() != 1 || !optimizations.get(0)
-                .equals(V1Constants.MetadataKeys.Optimization.RAW_INDEX)) {
+            Map<String, String> customMap = offlineSegmentZKMetadata.getCustomMap();
+            if (customMap == null || customMap.size() != 1 || !customMap.containsKey(
+                MinionConstants.ConvertToRawIndexTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX)) {
               return false;
             }
           }
@@ -140,11 +139,6 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
           Assert.assertNotNull(indexDirs);
           for (File indexDir : indexDirs) {
             SegmentMetadata segmentMetadata = new SegmentMetadataImpl(indexDir);
-            List<String> optimizations = segmentMetadata.getOptimizations();
-            if (optimizations == null || optimizations.size() != 1 || !optimizations.get(0)
-                .equals(V1Constants.MetadataKeys.Optimization.RAW_INDEX)) {
-              return false;
-            }
 
             // The columns in COLUMNS_TO_CONVERT should have raw index
             List<String> rawIndexColumns = Arrays.asList(StringUtils.split(COLUMNS_TO_CONVERT, ','));

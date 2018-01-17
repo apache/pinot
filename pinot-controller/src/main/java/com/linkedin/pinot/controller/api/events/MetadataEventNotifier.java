@@ -13,21 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.exception;
+package com.linkedin.pinot.controller.api.events;
 
-/**
- * Custom exception thrown to escape from retries.
- */
-public class PermanentPushFailureException extends RuntimeException {
-  public PermanentPushFailureException(String message) {
-    super(message);
-  }
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.data.Schema;
 
-  public PermanentPushFailureException(String message, Throwable cause) {
-    super(message, cause);
-  }
+public interface MetadataEventNotifier {
+  void notifyOnSchemaEvents(Schema schema, SchemaEventType eventType);
 
-  public PermanentPushFailureException(Throwable cause) {
-    super(cause);
-  }
+  void notifyOnSegmentFlush(TableConfig tableConfig);
 }

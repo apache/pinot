@@ -3,9 +3,11 @@ package com.linkedin.thirdeye.dashboard.resources.v2.rootcause;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.dashboard.resources.v2.ResourceUtils;
 import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEventEntityFormatter;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEventEntity;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -27,15 +29,19 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
   public static final String ATTR_ISSUE_TYPE = "issueType";
   public static final String ATTR_DIMENSIONS = "dimensions";
   public static final String ATTR_COMMENT = "comment";
+  public static final String ATTR_EXTERNAL_URLS = "externalUrls";
 
   private final MergedAnomalyResultManager anomalyDAO;
+  private final MetricConfigManager metricDAO;
 
   public AnomalyEventFormatter() {
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+    this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
   }
 
-  public AnomalyEventFormatter(MergedAnomalyResultManager anomalyDAO) {
+  public AnomalyEventFormatter(MergedAnomalyResultManager anomalyDAO, MetricConfigManager metricDAO) {
     this.anomalyDAO = anomalyDAO;
+    this.metricDAO = metricDAO;
   }
 
   @Override
@@ -57,6 +63,8 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
       status = dto.getFeedback().getFeedbackType();
     }
 
+    Map<String, String> externalUrls = ResourceUtils.getExternalURLs(dto, metricDAO);
+
     Multimap<String, String> attributes = ArrayListMultimap.create();
     attributes.put(ATTR_DATASET, dto.getCollection());
     attributes.put(ATTR_METRIC, dto.getMetric());
@@ -67,7 +75,14 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     attributes.put(ATTR_COMMENT, comment);
     // attributes.put(ATTR_ISSUE_TYPE, null); // TODO
     attributes.putAll(ATTR_DIMENSIONS, dto.getDimensions().keySet());
+    attributes.putAll(ATTR_EXTERNAL_URLS, externalUrls.keySet());
 
+    // external urls as attributes
+    for (Map.Entry<String, String> entry : externalUrls.entrySet()) {
+      attributes.put(entry.getKey(), entry.getValue());
+    }
+
+    // dimensions as attributes
     List<String> dimensionStrings = new ArrayList<>();
     for (Map.Entry<String, String> entry : dto.getDimensions().entrySet()) {
       dimensionStrings.add(entry.getValue());
@@ -80,7 +95,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     }
 
     String label = String.format("%s%s", func.getFunctionName(), dimensionString);
-    String link = String.format("thirdeye#investigate?anomalyId=%d", dto.getId());
+    String link = String.format("#/rootcause?anomalyId=%d", dto.getId());
 
     RootCauseEventEntity out = makeRootCauseEventEntity(entity, label, link, dto.getStartTime(), dto.getEndTime(), null);
     out.setAttributes(attributes);

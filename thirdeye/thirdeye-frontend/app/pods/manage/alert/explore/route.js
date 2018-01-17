@@ -3,11 +3,11 @@
  * @module manage/alert/edit/explore
  * @exports manage/alert/edit/explore
  */
-import Ember from 'ember';
 import fetch from 'fetch';
 import moment from 'moment';
-import _ from 'lodash';
-import { checkStatus, pluralizeTime, buildDateEod, parseProps } from 'thirdeye-frontend/helpers/utils';
+import Route from '@ember/routing/route';
+import { checkStatus, postProps, buildDateEod, toIso } from 'thirdeye-frontend/helpers/utils';
+import { enhanceAnomalies, toIdGroups, setUpTimeRangeOptions, evalObj } from 'thirdeye-frontend/helpers/manage-alert-utils';
 
 /**
  * Shorthand for setting date defaults
@@ -19,8 +19,8 @@ const dateFormat = 'YYYY-MM-DD';
  */
 const paginationDefault = 10;
 const durationDefault = '1m';
-const durationMap = { 'm':'month', 'd':'day', 'w':'week' };
-const startDateDefault = buildDateEod(1, 'month').valueOf();
+const durationMap = { m:'month', d:'day', w:'week' };
+const startDateDefault = buildDateEod(1, 'month');
 const endDateDefault = buildDateEod(1, 'day');
 
 /**
@@ -30,21 +30,17 @@ const endDateDefault = buildDateEod(1, 'day');
  * @returns {Ember.RSVP promise}
  */
 const fetchCombinedAnomalies = (anomalyIds) => {
-  const anomalyPromises = [];
-
-  // Split array of all ids into buckets of 10 (paginationDefault)
-  const idGroups = anomalyIds.map((item, index) => {
-    return (index % paginationDefault === 0) ? anomalyIds.slice(index, index + paginationDefault) : null;
-  }).filter(item => item);
-
-  // Loop on number of pages (paginationDefault) of anomaly data to fetch
-  for (let i = 0; i < idGroups.length; i++) {
-    let idString = encodeURIComponent(idGroups[i].toString());
-    let getAnomalies = fetch(`/anomalies/search/anomalyIds/0/0/${i + 1}?anomalyIds=${idString}`).then(checkStatus);
-    anomalyPromises.push(Ember.RSVP.resolve(getAnomalies));
+  let anomalyPromises = [];
+  if (anomalyIds.length) {
+    const idGroups = toIdGroups(anomalyIds);
+    const anomalyPromiseHash = idGroups.map((group, index) => {
+      let idStringParams = `anomalyIds=${encodeURIComponent(idGroups[index].toString())}`;
+      let getAnomalies = fetch(`/anomalies/search/anomalyIds/0/0/${index + 1}?${idStringParams}`).then(checkStatus);
+      return Ember.RSVP.resolve(getAnomalies);
+    });
+    anomalyPromises = Ember.RSVP.all(anomalyPromiseHash);
   }
-
-  return Ember.RSVP.all(anomalyPromises);
+  return anomalyPromises;
 };
 
 /**
@@ -90,11 +86,7 @@ const queryParamsConfig = {
   replace: true
 };
 
-const replaceConfig = {
-  replace: true
-};
-
-export default Ember.Route.extend({
+export default Route.extend({
   queryParams: {
     duration: queryParamsConfig,
     startDate: queryParamsConfig,
@@ -102,20 +94,21 @@ export default Ember.Route.extend({
   },
 
   beforeModel(transition) {
-    const { duration, startDate } = transition.queryParams;
+    const { duration, startDate, replayId } = transition.queryParams;
 
     // Default to 1 month of anomalies to show if no dates present in query params
     if (!duration || !startDate) {
       this.transitionTo({ queryParams: {
         duration: durationDefault,
         startDate: startDateDefault,
-        endDate: endDateDefault
+        endDate: endDateDefault,
+        replayId
       }});
     }
   },
 
   model(params, transition) {
-    const { id, alertData } = this.modelFor('manage.alert');
+    const { id, alertData, replayId } = this.modelFor('manage.alert');
     if (!id) { return; }
 
     const {
@@ -125,30 +118,31 @@ export default Ember.Route.extend({
     } = transition.queryParams;
 
     // Prepare endpoints for eval, mttd, projected metrics calls
-    const isoStart = moment(Number(startDate)).toISOString();
-    const isoEnd = moment(Number(endDate)).toISOString();
-    const tuneParams = `start=${isoStart}&end=${isoEnd}&autotunetype=AUTOTUNE`;
-    const autoTuneUrl = `/detection-job/autotune/filter/${id}?${tuneParams}`;
-    const evalUrl = `/detection-job/eval/projected/${id}`;
+    const tuneParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
+    const tuneUrl = `/detection-job/autotune/filter/${id}?${tuneParams}`;
+    const evalUrl = `/detection-job/eval/filter/${id}?${tuneParams}`;
     const mttdUrl = `/detection-job/eval/mttd/${id}`;
-
-    // TODO: apply calls for alertEvalMetrics from go/te-ss-alert-flow-api wiki
-    const promiseHash = {
-      eval: null,
-      projected: null,
+    const initialPromiseHash = {
+      evalData: fetch(evalUrl).then(checkStatus), // NOTE: ensure API returns JSON
+      autotuneId: fetch(tuneUrl, postProps('')).then(checkStatus),
       mttd: fetch(mttdUrl).then(checkStatus)
     };
 
-    return Ember.RSVP.hash(promiseHash)
+    return Ember.RSVP.hash(initialPromiseHash)
       .then((alertEvalMetrics) => {
         return {
           id,
+          replayId,
           alertData,
           duration,
           startDate,
           endDate,
+          tuneParams,
           alertEvalMetrics
         };
+      })
+      .catch((err) => {
+        // TODO: Display default error banner in the event of fetch failure
       });
   },
 
@@ -156,12 +150,12 @@ export default Ember.Route.extend({
     this._super(model);
 
     const {
-      id,
+      id: alertId,
       alertData,
-      duration,
+      replayId,
       startDate,
       endDate,
-      autoTune,
+      duration,
       alertEvalMetrics
     } = model;
 
@@ -181,16 +175,42 @@ export default Ember.Route.extend({
       endStamp,
       baseStart,
       baseEnd
-    } = processRangeParams( bucketUnit, duration, startDate, endDate );
+    } = processRangeParams(bucketUnit, duration, startDate, endDate);
+
+    // Load endpoints for projected metrics
+    const qsParams = `start=${baseStart.utc().format(dateFormat)}&end=${baseEnd.utc().format(dateFormat)}&useNotified=true`;
+    const tuneParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
+    const anomalyDataUrl = `/anomalies/search/anomalyIds/${startStamp}/${endStamp}/1?anomalyIds=`;
+    const projectedUrl = `/detection-job/eval/autotune/${alertEvalMetrics.autotuneId}?${tuneParams}`;
+    const projectedMttdUrl = `/detection-job/eval/projected/mttd/${alertEvalMetrics.autotuneId}`;
+    const metricsUrl = `/data/autocomplete/metric?name=${dataset}::${metricName}`;
+    const anomaliesUrl = `/dashboard/anomaly-function/${alertId}/anomalies?${qsParams}`;
+
+    const promiseHash = {
+      projectedMttd: fetch(projectedMttdUrl).then(checkStatus),
+      projectedEval: fetch(projectedUrl).then(checkStatus), // NOTE: ensure API returns JSON
+      metricsByName: fetch(metricsUrl).then(checkStatus),
+      anomalyIds: fetch(anomaliesUrl).then(checkStatus)
+    };
 
     // Set initial value for metricId for early transition cases
     let metricId = '';
 
-    Object.assign(model, { startStamp, endStamp, alertEvalMetrics });
-    return fetch(`/data/autocomplete/metric?name=${dataset}::${metricName}`).then(checkStatus)
-      // Fetch the metric Id for the current alert
-      .then((metricsByName) => {
-        metricId = metricsByName.length ? metricsByName.pop().id : '';
+    Object.assign(model, { startStamp, endStamp, alertEvalMetrics, anomalyDataUrl, replayId });
+
+    return Ember.RSVP.hash(promiseHash)
+      .then((data) => {
+        const totalAnomalies = data.anomalyIds.length;
+        metricId = data.metricsByName.length ? data.metricsByName.pop().id : '';
+        Object.assign(data.projectedEval, { mttd: data.projectedMttd });
+        Object.assign(model.alertEvalMetrics, { projected: data.projectedEval });
+        Object.assign(model, { anomalyIds: data.anomalyIds, totalAnomalies, anomalyDataUrl });
+        return fetchCombinedAnomalies(data.anomalyIds);
+      })
+
+      // Fetch all anomaly data for returned Ids to paginate all from one array
+      .then((rawAnomalyData) => {
+        Object.assign(model, { rawAnomalyData });
         return fetch(`/data/maxDataTime/metricId/${metricId}`).then(checkStatus);
       })
 
@@ -198,8 +218,6 @@ export default Ember.Route.extend({
       // Note: In the event of custom date selection, the end date might be less than maxTime
       .then((maxTime) => {
         const dimension = exploreDimensions || 'All';
-        const startDate = baseStart.utc().format(dateFormat);
-        const endDate = baseEnd.utc().format(dateFormat);
         const currentEnd = moment(maxTime).isValid()
           ? moment(maxTime).valueOf()
           : buildDateEod(1, 'day').valueOf();
@@ -212,34 +230,11 @@ export default Ember.Route.extend({
           `${bucketSize + '_' + bucketUnit}&filters=${encodeURIComponent(formattedFilters)}&minDate=${baseEnd}&maxDate=${baseStart}`;
 
         Object.assign(model, { maxTime, metricDataUrl });
-        return fetch(`/dashboard/anomaly-function/${id}/anomalies?start=${startDate}&end=${endDate}`).then(checkStatus);
-      })
-
-      // Fetching first page of anomaly Ids for current alert
-      .then((anomalyIds) => {
-        const totalAnomalies = anomalyIds.length;
-        const anomalyDataUrl = `/anomalies/search/anomalyIds/${startStamp}/${endStamp}/1?anomalyIds=`;
-        if (Ember.isEmpty(anomalyIds)) { return []; }
-        else {
-          Object.assign(model, { anomalyIds, totalAnomalies, anomalyDataUrl });
-          return fetchCombinedAnomalies(anomalyIds, true);
-        }
-      })
-
-      // Fetch all anomaly data for returned Ids to paginate all from one array
-      // TODO: load only first page, and defer loading the rest
-      .then((rawAnomalyData) => {
-        //rawAnomalyData.forEach(data => anomalies.push(...data.anomalyDetailsList));
-        const anomalies = [].concat(...rawAnomalyData.map(data => data.anomalyDetailsList));
-        // These props are the same for each record, so take it from the first one
-        const filterMaps = rawAnomalyData[0] ? rawAnomalyData[0].searchFilters || [] : [];
-        const anomalyCount = rawAnomalyData[0] ? rawAnomalyData[0].totalAnomalies : 0;
-        Object.assign(model, { anomalies, filterMaps, anomalyCount });
       })
 
       // Got errors?
-      .catch((errors) => {
-        Object.assign(model, { loadError: true, loadErrorMsg: errors });
+      .catch((err) => {
+        Object.assign(model, { loadError: true, loadErrorMsg: err });
       });
   },
 
@@ -248,6 +243,7 @@ export default Ember.Route.extend({
 
     const {
       id,
+      replayId,
       alertData,
       email,
       filters,
@@ -261,7 +257,7 @@ export default Ember.Route.extend({
       alertEvalMetrics,
       allConfigGroups,
       allAppNames,
-      anomalies
+      rawAnomalyData
     } = model;
 
     const resolutionOptions = ['All Resolutions'];
@@ -293,100 +289,16 @@ export default Ember.Route.extend({
 
     // Clean array for response options power-select
     const responseOptions = anomalyResponseObj.map(response => response.name);
-
-    // Set up time range options for entire page
-    const timeRangeOptions = [
-      {
-        name: 'Last 30 Days',
-        value: '1m',
-        start: startDateDefault,
-        isActive: false
-      },
-      {
-        name: 'Last 2 Weeks',
-        value: '2w',
-        start: buildDateEod(2, 'week').valueOf(),
-        isActive: false
-      },
-      {
-        name: 'Last Week',
-        value: '1w',
-        start: buildDateEod(1, 'week').valueOf(),
-        isActive: false
-      },
-      {
-        name: 'Custom',
-        value: 'custom',
-        start: null,
-        isActive: false
-      }
-    ];
-
-    // Does the duration query param match one of our range options? (for highlighting)
-    const matchingDuration = timeRangeOptions.find((range) => range.value === duration);
-    if (matchingDuration) {
-      matchingDuration.isActive = true;
-    } else {
-      timeRangeOptions.find((range) => range.name === 'Custom').isActive = true;
-    }
-
-    // Loop over all anomalies to configure display settings
-    for (var anomaly of anomalies) {
-      let dimensionList = [];
-      const startMoment = moment(anomaly.anomalyStart);
-      const endMoment = moment(anomaly.anomalyEnd);
-      const anomalyDuration = moment.duration(endMoment.diff(startMoment));
-      const days = anomalyDuration.get("days");
-      const hours = anomalyDuration.get("hours");
-      const minutes = anomalyDuration.get("minutes");
-      const durationArr = [pluralizeTime(days, 'day'), pluralizeTime(hours, 'hour'), pluralizeTime(minutes, 'minute')];
-
-      // Placeholder: ChangeRate will not be calculated on front-end
-      const changeRate = (anomaly.current && anomaly.baseline)
-        ? ((anomaly.current - anomaly.baseline) / anomaly.baseline * 100).toFixed(2) : 0;
-
-      // We want to display only non-zero duration values in our table
-      const noZeroDurationArr = _.remove(durationArr, function(item) {
-        return Ember.isPresent(item);
-      });
-
-      // Set 'not reviewed' label
-      if (!anomaly.anomalyFeedback) {
-        anomaly.anomalyFeedback = 'Not reviewed yet';
-      }
-
-      // Add missing properties
-      Object.assign(anomaly, {
-        changeRate,
-        shownChangeRate: changeRate,
-        startDateStr: moment(anomaly.anomalyStart).format('MMM D, hh:mm A'),
-        durationStr: noZeroDurationArr.join(', '),
-        severityScore: (anomaly.current/anomaly.baseline - 1).toFixed(2),
-        shownCurrent: anomaly.current,
-        shownBaseline: anomaly.baseline,
-        showResponseSaved: false,
-        shorResponseFailed: false
-      });
-
-      // Create a list of all available dimensions for toggling. Also massage dimension property.
-      if (anomaly.anomalyFunctionDimension) {
-        let dimensionObj = JSON.parse(anomaly.anomalyFunctionDimension);
-        for (let dimension of Object.keys(dimensionObj)) {
-          let dimensionKey = dimension.dasherize();
-          let dimensionVal = dimensionObj[dimension].join(',');
-          dimensionList.push({ dimensionKey, dimensionVal });
-          dimensionOptions.push(`${dimensionKey}:${dimensionVal}`);
-        }
-        Object.assign(anomaly, { dimensionList });
-      }
-    }
+    const anomalyData = enhanceAnomalies(rawAnomalyData);
 
     // Set up options for resolution filter dropdown based on existing values
-    resolutionOptions.push(...new Set(anomalies.map(record => record.anomalyFeedback)));
+    resolutionOptions.push(...new Set(anomalyData.map(record => record.anomalyFeedback)));
+    const timeRangeOptions = setUpTimeRangeOptions(['1m', '2w', '1w'], duration);
 
     // Prime the controller
     controller.setProperties({
       loadError,
+      replayId,
       alertId: id,
       allConfigGroups,
       allAppNames,
@@ -400,15 +312,17 @@ export default Ember.Route.extend({
       emailData: email,
       anomalyResponseObj,
       filterData: filters,
-      anomalyData: anomalies,
+      anomalyData,
       alertEvalMetrics,
       activeRangeStart: startStamp,
       activeRangeEnd: endStamp,
       isGraphReady: false,
+      isReplayPending: Ember.isPresent(model.replayId),
+      isReplayStatusError: model.replayId === 'err',
       dimensionOptions: Array.from(new Set(dimensionOptions))
     });
 
-    controller.initialize(false);
+    controller.initialize();
   },
 
   resetController(controller, isExiting) {

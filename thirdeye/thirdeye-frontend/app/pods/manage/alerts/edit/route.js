@@ -121,7 +121,7 @@ export default Ember.Route.extend({
       alertDimension: model.function.exploreDimensions,
       metricDimensions: model.metricDimensions,
       metricName: model.function.metric,
-      granularity: model.function.bucketSize + '_' + model.function.bucketUnit,
+      granularity: `${model.function.bucketSize}_${model.function.bucketUnit}`,
       alertFilters: model.function.filters,
       alertProps: model.propsArray,
       alertConfigGroups: model.allConfigGroups,
@@ -142,7 +142,7 @@ export default Ember.Route.extend({
     /**
      * Action called on submission to reload the route's model
      */
-    refreshModel: function() {
+    refreshModel() {
       this.refresh();
     }
   }

@@ -675,11 +675,5 @@ public class ValidationManagerTest {
     public String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType) {
       return null;
     }
-
-    @Nullable
-    @Override
-    public List<String> getOptimizations() {
-      return null;
-    }
   }
 }

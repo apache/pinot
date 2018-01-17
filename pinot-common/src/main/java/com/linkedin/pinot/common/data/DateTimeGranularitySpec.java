@@ -45,10 +45,7 @@ public class DateTimeGranularitySpec {
 
   public DateTimeGranularitySpec(String granularity) {
     _granularity = granularity;
-  }
-
-  public String getGranularity() {
-    return _granularity;
+    isValidGranularity(granularity);
   }
 
   /**
@@ -57,10 +54,13 @@ public class DateTimeGranularitySpec {
    * @param columnUnit
    * @return
    */
-  public static DateTimeGranularitySpec constructGranularity(int columnSize, TimeUnit columnUnit) {
-    Preconditions.checkArgument(columnSize > 0);
-    Preconditions.checkNotNull(columnUnit);
-    return new DateTimeGranularitySpec(Joiner.on(COLON_SEPARATOR).join(columnSize, columnUnit));
+  public DateTimeGranularitySpec(int columnSize, TimeUnit columnUnit) {
+    _granularity = Joiner.on(COLON_SEPARATOR).join(columnSize, columnUnit);
+    isValidGranularity(_granularity);
+  }
+
+  public String getGranularity() {
+    return _granularity;
   }
 
 
@@ -75,7 +75,6 @@ public class DateTimeGranularitySpec {
    * <li>3) granularityToMillis(15:MINUTES) = 900000 (15*60*1000)</li>
    * </ul>
    * </ul>
-   * @param granularity - granularity to convert to millis
    * @return
    */
   public Long granularityToMillis() {
@@ -103,8 +102,8 @@ public class DateTimeGranularitySpec {
     String[] granularityTokens = granularity.split(COLON_SEPARATOR);
     Preconditions.checkArgument(granularityTokens.length == MAX_GRANULARITY_TOKENS,
         GRANULARITY_TOKENS_ERROR_STR);
-    Preconditions.checkArgument(granularityTokens[GRANULARITY_SIZE_POSITION].matches(NUMBER_REGEX)
-        && EnumUtils.isValidEnum(TimeUnit.class, granularityTokens[GRANULARITY_UNIT_POSITION]),
+    Preconditions.checkArgument(granularityTokens[GRANULARITY_SIZE_POSITION].matches(NUMBER_REGEX), GRANULARITY_PATTERN_ERROR_STR);
+    Preconditions.checkArgument(EnumUtils.isValidEnum(TimeUnit.class, granularityTokens[GRANULARITY_UNIT_POSITION]),
         GRANULARITY_PATTERN_ERROR_STR);
 
     return true;

@@ -15,21 +15,18 @@
  */
 package com.linkedin.pinot.common.datetime.convertor;
 
+import com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat;
+import com.linkedin.pinot.common.data.DateTimeFormatSpec;
+import com.linkedin.pinot.common.data.DateTimeFormatUnitSpec.DateTimeTransformUnit;
+import com.linkedin.pinot.common.data.DateTimeGranularitySpec;
 import java.util.concurrent.TimeUnit;
-
 import org.joda.time.Chronology;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.DurationField;
 import org.joda.time.DurationFieldType;
-import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
-
-import com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat;
-import com.linkedin.pinot.common.data.DateTimeFormatSpec;
-import com.linkedin.pinot.common.data.DateTimeGranularitySpec;
-import com.linkedin.pinot.common.data.DateTimeFormatSpec.DateTimeTransformUnit;
 
 /**
  * Convertor for conversion of datetime values from an epoch/sdf format to another epoch/sdf format
@@ -59,8 +56,7 @@ public abstract class DateTimeConvertor {
     inputTimeUnit = inputFormat.getColumnUnit();
     TimeFormat inputTimeFormat = inputFormat.getTimeFormat();
     if (inputTimeFormat.equals(TimeFormat.SIMPLE_DATE_FORMAT)) {
-      String inputSDFFormat = inputFormat.getSDFPattern();
-      inputDateTimeFormatter = DateTimeFormat.forPattern(inputSDFFormat).withZoneUTC();
+      inputDateTimeFormatter = inputFormat.getDateTimeFormatter();
     }
 
     outputTimeSize = outputFormat.getColumnSize();
@@ -100,8 +96,7 @@ public abstract class DateTimeConvertor {
       outputDurationField = durationFieldType.getField(EPOCH_START_CHRONOLOGY);
 
     } else {
-      String outputSDFFormat = outputFormat.getSDFPattern();
-      outputDateTimeFormatter = DateTimeFormat.forPattern(outputSDFFormat).withZoneUTC();
+      outputDateTimeFormatter = outputFormat.getDateTimeFormatter();
     }
 
     outputGranularityMillis = outputGranularity.granularityToMillis();
@@ -157,7 +152,6 @@ public abstract class DateTimeConvertor {
    * convertMillisToEpoch(1498892400000) = 2478 (i.e. dateTimeColumnValueMS/(1000*60*60*24*7))</li>
    * </ul>
    * @param dateTimeValueMillis - date time value in millis to convert
-   * @param outputFormat
    * @return
    */
   protected Long convertMillisToEpoch(Long dateTimeValueMillis) {
@@ -176,7 +170,6 @@ public abstract class DateTimeConvertor {
    * format=1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd, convertMillisToSDF(1498892400000) = 20170701</li>
    * </ul>
    * @param dateTimeValueMillis - date time value in millis to convert
-   * @param outputFormat
    * @return
    */
   protected Long convertMillisToSDF(Long dateTimeValueMillis) {

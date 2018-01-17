@@ -1,3 +1,10 @@
+{{#if hasErrorsRoute}}
+  <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
+    <a class="close" data-dismiss="alert" {{action "clearRouteErrors"}}>&times;</a>
+    Error initializing analysis:{{#each routeErrors as |e|}} <strong>{{e}}</strong>{{/each}}
+  </div>
+{{/if}}
+
 {{rootcause-header
   sessionId=sessionId
   sessionName=sessionName
@@ -52,31 +59,31 @@
         }}
       </div>
     </div>
-    {{#if hasErrors}}
+    {{#if hasServiceErrors}}
       {{#if hasErrorsEntities}}
         <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
-          <a class="close" data-dismiss="alert" {{action "clearErrors" "entities"}}>&times;</a>
+          <a class="close" data-dismiss="alert" {{action "clearServiceErrors" "entities"}}>&times;</a>
           Error for task(s):{{#each entitiesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
         </div>
       {{/if}}
 
       {{#if hasErrorsTimeseries}}
         <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
-          <a class="close" data-dismiss="alert" {{action "clearErrors" "timeseries"}}>&times;</a>
+          <a class="close" data-dismiss="alert" {{action "clearServiceErrors" "timeseries"}}>&times;</a>
           Could not load timeseries:{{#each timeseriesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
         </div>
       {{/if}}
 
       {{#if hasErrorsAggregates}}
         <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
-          <a class="close" data-dismiss="alert" {{action "clearErrors" "aggregates"}}>&times;</a>
+          <a class="close" data-dismiss="alert" {{action "clearServiceErrors" "aggregates"}}>&times;</a>
           Could not load aggregates:{{#each aggregatesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
         </div>
       {{/if}}
 
       {{#if hasErrorsBreakdowns}}
         <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
-          <a class="close" data-dismiss="alert" {{action "clearErrors" "breakdowns"}}>&times;</a>
+          <a class="close" data-dismiss="alert" {{action "clearServiceErrors" "breakdowns"}}>&times;</a>
           Could not load dimensions:{{#each breakdownsService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
         </div>
       {{/if}}
@@ -97,13 +104,14 @@
 
       <div class="card-container__header">
         <div class="card-container__subnav">
-          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "dimensions") "thirdeye-link--active"}}" {{action (mut activeTab) "dimensions"}}>
-            Dimensions
+          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "metrics") "thirdeye-link--active "}}" {{action (mut activeTab)
+            "metrics"}}>
+            Metrics
           </a>
         </div>
         <div class="card-container__subnav">
-          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "metrics") "thirdeye-link--active"}}" {{action (mut activeTab) "metrics"}}>
-            Metrics
+          <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "dimensions") "thirdeye-link--active"}}" {{action (mut activeTab) "dimensions"}}>
+            Dimensions
           </a>
         </div>
         <div class="card-container__subnav">

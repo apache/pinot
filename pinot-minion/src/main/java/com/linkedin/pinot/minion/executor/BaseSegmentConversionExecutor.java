@@ -17,21 +17,30 @@ package com.linkedin.pinot.minion.executor;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
+import com.linkedin.pinot.common.exception.HttpErrorStatusException;
+import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.PinotMinionUserAgentHeader;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import com.linkedin.pinot.core.common.MinionConstants;
 import com.linkedin.pinot.minion.exception.TaskCancelledException;
 import java.io.File;
-import java.io.FileInputStream;
+import java.net.URI;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import javax.annotation.Nonnull;
-import org.apache.commons.httpclient.Header;
 import org.apache.commons.io.FileUtils;
+import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
+import org.apache.http.HttpStatus;
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicHeader;
+import org.apache.http.message.BasicNameValuePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +54,10 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSegmentConversionExecutor.class);
 
+  private static final int DEFAULT_MAX_NUM_ATTEMPTS = 5;
+  private static final long DEFAULT_INITIAL_RETRY_DELAY_MS = 1000L; // 1 second
+  private static final float DEFAULT_RETRY_SCALE_FACTOR = 2f;
+
   /**
    * Convert the segment based on the given {@link PinotTaskConfig}.
    *
@@ -57,12 +70,14 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
   protected abstract File convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
       @Nonnull File workingDir) throws Exception;
 
+  protected abstract SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier() throws Exception;
+
   @Override
   public void executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) throws Exception {
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableName = configs.get(MinionConstants.TABLE_NAME_KEY);
-    String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
+    final String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
     String downloadURL = configs.get(MinionConstants.DOWNLOAD_URL_KEY);
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
     String originalSegmentCrc = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
@@ -93,7 +108,7 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       // Tar the converted segment
       File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
       Preconditions.checkState(convertedTarredSegmentDir.mkdir());
-      File convertedTarredSegmentFile = new File(
+      final File convertedTarredSegmentFile = new File(
           TarGzCompressionUtils.createTarGzOfDirectory(convertedIndexDir.getPath(),
               new File(convertedTarredSegmentDir, segmentName).getPath()));
 
@@ -104,18 +119,64 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
             taskType + " on table: " + tableName + ", segment: " + segmentName + " got cancelled");
       }
 
-      // Upload the converted tarred segment file with original segment crc and task type encoded in the http headers.
-      // Original segment crc is used to check whether the original segment get refreshed, so that the newer segment
-      // won't get override. We can decide how to handle the segment based on the task type on controller side.
+      // Set original segment CRC into HTTP IF-MATCH header to check whether the original segment get refreshed, so that
+      // the newer segment won't get override
+      Header ifMatchHeader = new BasicHeader(HttpHeaders.IF_MATCH, originalSegmentCrc);
+      // Set segment ZK metadata custom map modifier into HTTP header to modify the segment ZK metadata
       // NOTE: even segment is not changed, still need to upload the segment to update the segment ZK metadata so that
       // segment will not be submitted again
-      Header ifMatchHeader = new Header(HttpHeaders.IF_MATCH, originalSegmentCrc);
-      String userAgentParameter = PinotMinionUserAgentHeader.constructUserAgentHeader(taskType, MINION_CONTEXT.getMinionVersion());
-      Header userAgentHeader = new Header(HttpHeaders.USER_AGENT, userAgentParameter);
-      List<Header> httpHeaders = Arrays.asList(ifMatchHeader, userAgentHeader);
-      FileUploadUtils.sendFile(uploadURL, segmentName,
-          new FileInputStream(convertedTarredSegmentFile), convertedTarredSegmentFile.length(),
-          FileUploadUtils.SendFileMethod.POST, httpHeaders);
+      SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier = getSegmentZKMetadataCustomMapModifier();
+      Header segmentZKMetadataCustomMapModifierHeader =
+          new BasicHeader(FileUploadUtils.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
+              segmentZKMetadataCustomMapModifier.toJsonString());
+      final List<Header> httpHeaders = Arrays.asList(ifMatchHeader, segmentZKMetadataCustomMapModifierHeader);
+
+      // Set query parameters
+      final List<NameValuePair> parameters = Collections.<NameValuePair>singletonList(
+          new BasicNameValuePair(FileUploadUtils.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION, "true"));
+
+      URI uploadUri = new URI(uploadURL);
+      final String host = uploadUri.getHost();
+      final int port = uploadUri.getPort();
+
+      String maxNumAttemptsConfig = configs.get(MinionConstants.MAX_NUM_ATTEMPTS_KEY);
+      int maxNumAttempts =
+          maxNumAttemptsConfig != null ? Integer.parseInt(maxNumAttemptsConfig) : DEFAULT_MAX_NUM_ATTEMPTS;
+      String initialRetryDelayMsConfig = configs.get(MinionConstants.INITIAL_RETRY_DELAY_MS_KEY);
+      long initialRetryDelayMs = initialRetryDelayMsConfig != null ? Long.parseLong(initialRetryDelayMsConfig)
+          : DEFAULT_INITIAL_RETRY_DELAY_MS;
+      String retryScaleFactorConfig = configs.get(MinionConstants.RETRY_SCALE_FACTOR_KEY);
+      float retryScaleFactor =
+          retryScaleFactorConfig != null ? Float.parseFloat(retryScaleFactorConfig) : DEFAULT_RETRY_SCALE_FACTOR;
+      RetryPolicy retryPolicy =
+          RetryPolicies.exponentialBackoffRetryPolicy(maxNumAttempts, initialRetryDelayMs, retryScaleFactor);
+
+      if (!retryPolicy.attempt(new Callable<Boolean>() {
+        @Override
+        public Boolean call() throws Exception {
+          try {
+            FileUploadUtils.uploadSegment(host, port, segmentName, convertedTarredSegmentFile, httpHeaders, parameters,
+                FileUploadUtils.DEFAULT_SOCKET_TIMEOUT_MS);
+            return true;
+          } catch (HttpErrorStatusException e) {
+            int statusCode = e.getStatusCode();
+            if (statusCode == HttpStatus.SC_CONFLICT || statusCode > 500) {
+              // Temporary exception
+              LOGGER.warn("Caught temporary exception while uploading segment: {}, will retry", segmentName, e);
+              return false;
+            } else {
+              // Permanent exception
+              LOGGER.error("Caught permanent exception while uploading segment: {}, won't retry", segmentName, e);
+              throw e;
+            }
+          } catch (Exception e) {
+            LOGGER.warn("Caught temporary exception while uploading segment: {}, will retry", segmentName, e);
+            return false;
+          }
+        }
+      })) {
+        throw new RuntimeException("Failed to upload segment: " + segmentName);
+      }
 
       LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableName, segmentName);
     } finally {
