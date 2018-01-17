@@ -67,28 +67,39 @@
 
         <div class="rootcause-anomaly__stats-wrapper">
           <div class="rootcause-anomaly__stats">
-            <label class="rootcause-anomaly__stats-label">Duration</label>
-            <span class="rootcause-anomaly__stats-value">{{duration}}</span>
+            <label class="rootcause-anomaly__stats-label">Current Average</label>
+            <span class="rootcause-anomaly__stats-value">{{get values "current"}}</span>
           </div>
           <div class="rootcause-anomaly__stats">
-            <label class="rootcause-anomaly__stats-label">Current Avg</label>
-            <span class="rootcause-anomaly__stats-value">{{current}}</span>
+            <label class="rootcause-anomaly__stats-label">Predicted Average</label>
+            <span class="rootcause-anomaly__stats-value">{{get values "baseline"}}
+              <span class="rootcause-anomaly__stats-value--{{color-delta get changesFormatted "baseline"}}">
+                {{get changesFormatted "baseline"}}
+              </span>
+            </span>
           </div>
           <div class="rootcause-anomaly__stats">
-            <label class="rootcause-anomaly__stats-label">Baseline Avg</label>
-            <span class="rootcause-anomaly__stats-value">{{baseline}}</span>
+            <label class="rootcause-anomaly__stats-label">WoW</label>
+            <span class="rootcause-anomaly__stats-value">{{get values "wo1w"}}
+              <span class="rootcause-anomaly__stats-value--{{color-delta get changesFormatted "wo1w"}}">
+                {{get changesFormatted "wo1w"}}
+              </span>
+            </span>
           </div>
           <div class="rootcause-anomaly__stats">
-            <label class="rootcause-anomaly__stats-label">Change</label>
-            <span class="rootcause-anomaly__stats-value rootcause-anomaly__stats-value--{{color-delta change}}">{{changeFormatted}}</span>
+            <label class="rootcause-anomaly__stats-label">Wo2W</label>
+            <span class="rootcause-anomaly__stats-value">{{get values "wo2w"}}
+              <span class="rootcause-anomaly__stats-value--{{color-delta get changesFormatted "wo2w"}}">
+                {{get changesFormatted "wo2w"}}
+              </span>
+            </span>
           </div>
           <div class="rootcause-anomaly__stats">
-            <label class="rootcause-anomaly__stats-label">values</label>
-            <span class="rootcause-anomaly__stats-value">{{get values "wo1w"}}</span>
-          </div>
-          <div class="rootcause-anomaly__stats">
-            <label class="rootcause-anomaly__stats-label">changes</label>
-            <span class="rootcause-anomaly__stats-value">{{get changesFormatted "wo1w"}}</span>
+            <label class="rootcause-anomaly__stats-label">Wo3W</label>
+            <span class="rootcause-anomaly__stats-value">{{get values "wo3w"}}
+              <span class="rootcause-anomaly__stats-value--{{color-delta get changesFormatted "wo3w"}}">
+                {{get changesFormatted "wo3w"}}</span>
+            </span>
           </div>
           {{#if issueType}}
             <div class="rootcause-anomaly__stats">

@@ -122,20 +122,6 @@ export default Component.extend({
     return get(this, 'anomaly').attributes.dataset[0];
   }),
 
-  // TODO do we need this now?
-  current: computed('anomaly', function () {
-    return parseFloat(get(this, 'anomaly').attributes.current[0]).toFixed(3);
-  }),
-
-  baseline: computed('anomaly', function () {
-    return parseFloat(get(this, 'anomaly').attributes.baseline[0]).toFixed(3);
-  }),
-
-  change: computed('anomaly', function () {
-    const attr = get(this, 'anomaly').attributes;
-    return (parseFloat(attr.current[0]) / parseFloat(attr.baseline[0]) - 1);
-  }),
-
   status: computed('anomaly', function () {
     return get(this, 'anomaly').attributes.status[0];
   }),
