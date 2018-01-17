@@ -225,7 +225,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
     Set<String> valueSet = new HashSet<>();
 
     for (int i = 0; i < 100; i++) {
-      stringValues[i] = RandomStringUtils.random(MAX_STRING_LENGTH);
+      stringValues[i] = RandomStringUtils.random(MAX_STRING_LENGTH).replace("\t", "");
       valueSet.add(stringValues[i]);
     }
 
