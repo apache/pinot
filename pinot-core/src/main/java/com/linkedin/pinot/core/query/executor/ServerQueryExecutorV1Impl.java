@@ -98,6 +98,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     if (schedulerWaitTimer != null) {
       schedulerWaitTimer.stopAndRecord();
     }
+
+    ThreadMXBean bean = ManagementFactory.getThreadMXBean( );
+
+    long startCpuTime = 0;
+    if(bean.isCurrentThreadCpuTimeSupported())
+    {
+      startCpuTime = bean.getCurrentThreadCpuTime();
+    }
+
+
     TimerContext.Timer queryProcessingTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PROCESSING);
 
     DataTable dataTable;
@@ -162,11 +172,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       // Update the total docs in the metadata based on un-pruned segments.
       dataTableMetadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(totalRawDocs));
 
-      ThreadMXBean bean = ManagementFactory.getThreadMXBean( );
+
       long cpuTime = 0;
       if(bean.isCurrentThreadCpuTimeSupported())
       {
-        cpuTime = bean.getCurrentThreadCpuTime();
+        long endCpuTime = bean.getCurrentThreadCpuTime();
+        cpuTime = endCpuTime-startCpuTime;
       }
       else
       {
