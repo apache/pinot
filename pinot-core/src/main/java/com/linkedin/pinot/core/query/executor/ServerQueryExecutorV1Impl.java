@@ -40,6 +40,9 @@ import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
 import com.linkedin.pinot.core.query.pruner.SegmentPrunerService;
 import com.linkedin.pinot.core.query.pruner.SegmentPrunerServiceImpl;
 import com.linkedin.pinot.core.util.trace.TraceContext;
+
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -158,6 +161,19 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
       // Update the total docs in the metadata based on un-pruned segments.
       dataTableMetadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(totalRawDocs));
+
+      ThreadMXBean bean = ManagementFactory.getThreadMXBean( );
+      long cpuTime = 0;
+      if(bean.isCurrentThreadCpuTimeSupported())
+      {
+        cpuTime = bean.getCurrentThreadCpuTime();
+      }
+      else
+      {
+       cpuTime = -1;
+      }
+      dataTableMetadata.put(DataTable.EXECUTOR_CPU_TIME,Long.toString(cpuTime));
+
       return dataTable;
     } catch (Exception e) {
       _serverMetrics.addMeteredQueryValue(instanceRequest.getQuery(), ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);

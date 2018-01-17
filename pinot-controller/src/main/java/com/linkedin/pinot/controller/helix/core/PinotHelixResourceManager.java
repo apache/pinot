@@ -2273,7 +2273,7 @@ public class PinotHelixResourceManager {
   public void updateServerLoadMap(String instance, Double newLoadValue)
   {
       _serverLoadMap.put(instance,newLoadValue);
-      LOGGER.info("Laod for server "+ instance + " has been updated to " + newLoadValue.toString());
+      LOGGER.info("Load of server "+ instance + " has been updated to " + newLoadValue.toString());
 
   }
 }
