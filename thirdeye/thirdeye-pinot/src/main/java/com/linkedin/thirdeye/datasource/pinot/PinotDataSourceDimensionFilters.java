@@ -31,7 +31,7 @@ import com.linkedin.thirdeye.dashboard.Utils;
  */
 public class PinotDataSourceDimensionFilters {
   private static final Logger LOG = LoggerFactory.getLogger(PinotDataSourceDimensionFilters.class);
-  private static final ExecutorService executorService = Executors.newFixedThreadPool(40);
+  private static final ExecutorService executorService = Executors.newCachedThreadPool();
   private static final int TIME_OUT_SIZE = 60;
   private static final TimeUnit TIME_OUT_UNIT = TimeUnit.SECONDS;
   private final PinotThirdEyeDataSource pinotThirdEyeDataSource;
@@ -90,6 +90,7 @@ public class PinotDataSourceDimensionFilters {
         LOG.error("Execution error when getting filter for Dataset '{}' in Dimension '{}'.", dataset, dimension, e);
       } catch (InterruptedException e) {
         LOG.warn("Execution is interrupted when getting filter for Dataset '{}' in Dimension '{}'.", dataset, dimension, e);
+        break;
       } catch (TimeoutException e) {
         LOG.warn("Time out when getting filter for Dataset '{}' in Dimension '{}'. Time limit: {} {}", dataset, dimension,
             TIME_OUT_SIZE, TIME_OUT_UNIT);
