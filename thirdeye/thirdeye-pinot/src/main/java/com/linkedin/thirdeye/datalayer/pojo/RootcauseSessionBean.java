@@ -24,6 +24,7 @@ public class RootcauseSessionBean extends AbstractBean {
   private Long created;
   private Long updated;
   private Set<String> contextUrns;
+  private Set<String> anomalyUrns;
   private Set<String> selectedUrns;
   private Long anomalyId;
 
@@ -131,6 +132,14 @@ public class RootcauseSessionBean extends AbstractBean {
     this.contextUrns = contextUrns;
   }
 
+  public Set<String> getAnomalyUrns() {
+    return anomalyUrns;
+  }
+
+  public void setAnomalyUrns(Set<String> anomalyUrns) {
+    this.anomalyUrns = anomalyUrns;
+  }
+
   public Set<String> getSelectedUrns() {
     return selectedUrns;
   }
@@ -152,7 +161,7 @@ public class RootcauseSessionBean extends AbstractBean {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof RootcauseSessionBean)) {
+    if (o == null || getClass() != o.getClass()) {
       return false;
     }
     RootcauseSessionBean that = (RootcauseSessionBean) o;
@@ -162,12 +171,13 @@ public class RootcauseSessionBean extends AbstractBean {
         && Objects.equals(anomalyRangeEnd, that.anomalyRangeEnd) && Objects.equals(analysisRangeStart,
         that.analysisRangeStart) && Objects.equals(analysisRangeEnd, that.analysisRangeEnd) && Objects.equals(created,
         that.created) && Objects.equals(updated, that.updated) && Objects.equals(contextUrns, that.contextUrns)
-        && Objects.equals(selectedUrns, that.selectedUrns) && Objects.equals(anomalyId, that.anomalyId);
+        && Objects.equals(anomalyUrns, that.anomalyUrns) && Objects.equals(selectedUrns, that.selectedUrns)
+        && Objects.equals(anomalyId, that.anomalyId);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(name, text, owner, compareMode, granularity, previousId, anomalyRangeStart, anomalyRangeEnd,
-        analysisRangeStart, analysisRangeEnd, created, updated, contextUrns, selectedUrns, anomalyId);
+        analysisRangeStart, analysisRangeEnd, created, updated, contextUrns, anomalyUrns, selectedUrns, anomalyId);
   }
 }
