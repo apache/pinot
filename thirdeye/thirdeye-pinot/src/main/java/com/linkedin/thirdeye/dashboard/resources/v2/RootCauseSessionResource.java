@@ -60,7 +60,7 @@ public class RootCauseSessionResource {
     if (session.getId() == null) {
       session.setCreated(DateTime.now().getMillis());
       session.setOwner(ThirdEyeAuthFilter.getCurrentPrincipal().getName());
-      session.setAnomalyId(extractAnomalyId(session.getContextUrns()));
+      session.setAnomalyId(extractAnomalyId(session.getAnomalyUrns()));
 
     } else {
       RootcauseSessionDTO existing = this.sessionDAO.findById(session.getId());
