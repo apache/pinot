@@ -82,6 +82,14 @@ export function humanizeFloat(f) {
   return f.toFixed(fixed);
 }
 
+/**
+ * Formatter for the human-readable change values in percent with 1 decimal
+ */
+export function humanizeChange(f) {
+  if (Number.isNaN(f)) { return '-'; }
+  return `${f > 0 ? '+' : ''}${(Math.round(f * 1000) / 10.0).toFixed(1)}%`;
+}
+
 export function isIterable(obj) {
   if (obj == null || _.isString(obj)) {
     return false;
@@ -355,6 +363,7 @@ export default Ember.Helper.helper({
   toMetricLabel,
   toColor,
   humanizeFloat,
+  humanizeChange,
   fromFilterMap,
   appendFilters,
   metricColors,

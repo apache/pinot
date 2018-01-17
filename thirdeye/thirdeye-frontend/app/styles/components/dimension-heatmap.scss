@@ -19,6 +19,18 @@
   font-weight: bold;
 }
 
+.analysis-tooltip__column {
+  text-align: right;
+}
+
+.analysis-tooltip__column-header {
+  text-align: left;
+}
+
+.analysis-tooltip__container {
+  width: 400px;
+}
+
 .analysis-tooltip__list {
   list-style: none;
   margin-bottom: 0;
