@@ -1,5 +1,5 @@
 import Component from "@ember/component";
-import { computed, setProperties, getProperties, get, set } from '@ember/object';
+import { computed, setProperties, getProperties, get } from '@ember/object';
 import moment from 'moment';
 import { humanizeFloat, filterPrefix, toOffsetUrn } from 'thirdeye-frontend/helpers/utils';
 
@@ -39,6 +39,10 @@ export default Component.extend({
    */
   optionsMapping: ANOMALY_OPTIONS_MAPPING,
 
+  /**
+   * Urn of an anomaly
+   * @type {String}
+   */
   anomalyUrn: computed(
     'anomalyUrns',
     function () {
