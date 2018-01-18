@@ -10,3 +10,7 @@
 .c3-line {
   stroke-width: 2px;
 }
+
+g[class^='c3-circles-frontend-metric'], g[class*=' c3-circles-frontend-metric']{
+    display: none;
+}
