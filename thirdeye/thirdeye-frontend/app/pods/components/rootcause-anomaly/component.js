@@ -119,9 +119,9 @@ export default Component.extend({
         const roundedChange = (Math.round(change * 1000) / 10.0).toFixed(1);
 
         anomalyInfo[offset] = {
-          change: roundedChange,
-          value: offsetAggregate,
-          changeFormatted: humanizeChange(change)
+          change: roundedChange,  // numerical value (positive or negative) to compute color of the change text
+          value: offsetAggregate, // numerical value to display
+          changeFormatted: humanizeChange(change) // text of % change with + or - sign
         };
       });
 
