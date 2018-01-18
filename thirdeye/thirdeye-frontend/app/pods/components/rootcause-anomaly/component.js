@@ -1,9 +1,10 @@
 import Component from "@ember/component";
 import { computed, setProperties, getProperties, get } from '@ember/object';
 import moment from 'moment';
-import { humanizeFloat, filterPrefix, toOffsetUrn } from 'thirdeye-frontend/helpers/utils';
+import { humanizeFloat, filterPrefix, toOffsetUrn, humanizeChange } from 'thirdeye-frontend/helpers/utils';
 
 const ROOTCAUSE_HIDDEN_DEFAULT = 'default';
+const OFFSETS = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
 
 /**
  * Maps the status from the db to something human readable to display on the form
@@ -27,6 +28,8 @@ export default Component.extend({
   onFeedback: null, // func (urn, feedback, comment)
 
   isHiddenUser: ROOTCAUSE_HIDDEN_DEFAULT,
+
+  offsets: OFFSETS,
 
   /**
    * Array of human readable anomaly options for users to select
@@ -89,36 +92,20 @@ export default Component.extend({
     'anomalyUrns',
     function () {
       const { aggregates, anomalyUrns } = getProperties(this, 'aggregates', 'anomalyUrns');
-
-      const offsets = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
       const metricUrns = filterPrefix(anomalyUrns, 'thirdeye:metric:');
 
       if (!metricUrns) { return; }
 
       let anomalyInfo = {};
 
-      [...offsets].forEach(offset => {
+      [...this.offsets].forEach(offset => {
         const change = aggregates[toOffsetUrn(metricUrns[0], 'current')] / aggregates[toOffsetUrn(metricUrns[0], offset)] - 1;
         const roundedChange = (Math.round(change * 1000) / 10.0).toFixed(1);
-        const sign = change > 0 ? '+' : '';
 
-        let offsetFormatted = '';
-
-        switch(offset) {
-          case 'baseline':
-            offsetFormatted = 'Predicted Average';
-            break;
-          case 'current':
-            offsetFormatted = 'Current Average';
-            break;
-          default:
-            offsetFormatted = offset;
-        }
-
-        anomalyInfo[offsetFormatted] = {};
-        anomalyInfo[offsetFormatted].change = roundedChange;
-        anomalyInfo[offsetFormatted].value = aggregates[toOffsetUrn(metricUrns[0], offset)];
-        anomalyInfo[offsetFormatted].changeFormatted = `${sign}${roundedChange}`;
+        anomalyInfo[offset] = {};
+        anomalyInfo[offset].change = roundedChange;
+        anomalyInfo[offset].value = aggregates[toOffsetUrn(metricUrns[0], offset)];
+        anomalyInfo[offset].changeFormatted = humanizeChange(change);
       });
 
       return anomalyInfo;
