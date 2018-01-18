@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index.loader;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -149,8 +150,14 @@ public class IndexLoadingConfig {
   /**
    * For tests only.
    */
+  @VisibleForTesting
   public void setInvertedIndexColumns(@Nonnull Set<String> invertedIndexColumns) {
     _invertedIndexColumns = invertedIndexColumns;
+  }
+
+  @VisibleForTesting
+  public void setOnHeapDictionaryColumns(@Nonnull Set<String> onHeapDictionaryColumns) {
+    _onHeapDictionaryColumns = onHeapDictionaryColumns;
   }
 
   @Nonnull

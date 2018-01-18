@@ -32,6 +32,10 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
+import com.linkedin.pinot.core.segment.index.readers.OnHeapDoubleDictionary;
+import com.linkedin.pinot.core.segment.index.readers.OnHeapFloatDictionary;
+import com.linkedin.pinot.core.segment.index.readers.OnHeapIntDictionary;
+import com.linkedin.pinot.core.segment.index.readers.OnHeapLongDictionary;
 import com.linkedin.pinot.core.segment.index.readers.OnHeapStringDictionary;
 import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
@@ -114,24 +118,27 @@ public final class ColumnIndexContainer {
     FieldSpec.DataType dataType = metadata.getDataType();
     if (loadOnHeap) {
       String columnName = metadata.getColumnName();
-      if ((dataType != FieldSpec.DataType.STRING)) {
-        LOGGER.warn("Only support on-heap dictionary for String data type, load off-heap dictionary for column: {}",
-            columnName);
-      } else {
-        LOGGER.info("Loading on-heap dictionary for column: {}", columnName);
-      }
+      LOGGER.info("Loading on-heap dictionary for column: {}", columnName);
     }
 
     int length = metadata.getCardinality();
     switch (dataType) {
       case INT:
-        return new IntDictionary(dictionaryBuffer, length);
+        return (loadOnHeap) ? new OnHeapIntDictionary(dictionaryBuffer, length)
+            : new IntDictionary(dictionaryBuffer, length);
+
       case LONG:
-        return new LongDictionary(dictionaryBuffer, length);
+        return (loadOnHeap) ? new OnHeapLongDictionary(dictionaryBuffer, length)
+            : new LongDictionary(dictionaryBuffer, length);
+
       case FLOAT:
-        return new FloatDictionary(dictionaryBuffer, length);
+        return (loadOnHeap) ? new OnHeapFloatDictionary(dictionaryBuffer, length)
+            : new FloatDictionary(dictionaryBuffer, length);
+
       case DOUBLE:
-        return new DoubleDictionary(dictionaryBuffer, length);
+        return (loadOnHeap) ? new OnHeapDoubleDictionary(dictionaryBuffer, length)
+            : new DoubleDictionary(dictionaryBuffer, length);
+
       case STRING:
         int numBytesPerValue = metadata.getStringColumnMaxLength();
         byte paddingByte = (byte) metadata.getPaddingCharacter();
