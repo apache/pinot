@@ -78,7 +78,7 @@ export default Ember.Component.extend({
   },
 
   point: { // on init only
-    show: false
+    show: true
   },
 
   line: { // on init only
