@@ -144,7 +144,7 @@ export default Component.extend({
   anomalyLinks: computed(
     'anomaly',
     function() {
-      const { externalUrls } = get(this, 'anomaly.attributes');
+      const { externalUrls = [] } = get(this, 'anomaly.attributes');
       let urls = {};
 
       if (externalUrls.length) {
