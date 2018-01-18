@@ -21,7 +21,18 @@ export default Component.extend({
   classNames: ['rootcause-anomaly'],
   entities: null, // {}
 
-  aggregates: null, // {}
+  /**
+   * Metrics aggregated over a search context-specific interval keyed by metric urn
+   * @type {Object} - key is metric urn, and value is a number calculated from an aggregated set of numbers interpreted
+   * based on a selected context (i.e. analysis period, baseline)
+   * @example
+   * {
+   *  metric:offset:id: 12345,
+   *  metric:offset:id2: 12345,
+   *  ...
+   * }
+   */
+  aggregates: null,
 
   anomalyUrns: null, // Set
 
@@ -49,22 +60,26 @@ export default Component.extend({
   anomalyUrn: computed(
     'anomalyUrns',
     function () {
-      const { anomalyUrns } = getProperties(this, 'anomalyUrns');
+      const anomalyUrns = get(this, 'anomalyUrns');
       const anomalyEventUrn = filterPrefix(anomalyUrns, 'thirdeye:event:anomaly:');
 
-      if (!anomalyEventUrn) { return; }
+      if (!anomalyEventUrn) return ;
 
       return anomalyEventUrn[0];
     }
   ),
 
+  /**
+   * Information about an anomaly displayed in the overview regarding its id, metric, dimensions, alert name, and duration
+   * @type {Object}
+   */
   anomaly: computed(
     'entities',
     'anomalyUrn',
     function () {
       const { entities, anomalyUrn } = getProperties(this, 'entities', 'anomalyUrn');
 
-      if (!anomalyUrn || !entities || !entities[anomalyUrn]) { return false; }
+      if (!anomalyUrn || !entities || !entities[anomalyUrn]) return ;
 
       return entities[anomalyUrn];
     }
@@ -99,13 +114,15 @@ export default Component.extend({
       let anomalyInfo = {};
 
       [...this.offsets].forEach(offset => {
-        const change = aggregates[toOffsetUrn(metricUrns[0], 'current')] / aggregates[toOffsetUrn(metricUrns[0], offset)] - 1;
+        const offsetAggregate = aggregates[toOffsetUrn(metricUrns[0], offset)];
+        const change = aggregates[toOffsetUrn(metricUrns[0], 'current')] / offsetAggregate - 1;
         const roundedChange = (Math.round(change * 1000) / 10.0).toFixed(1);
 
-        anomalyInfo[offset] = {};
-        anomalyInfo[offset].change = roundedChange;
-        anomalyInfo[offset].value = aggregates[toOffsetUrn(metricUrns[0], offset)];
-        anomalyInfo[offset].changeFormatted = humanizeChange(change);
+        anomalyInfo[offset] = {
+          change: roundedChange,
+          value: offsetAggregate,
+          changeFormatted: humanizeChange(change)
+        };
       });
 
       return anomalyInfo;
