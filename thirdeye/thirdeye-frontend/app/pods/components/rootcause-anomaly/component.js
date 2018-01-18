@@ -64,7 +64,21 @@ export default Component.extend({
   ),
 
   /**
-   *
+   * Information about an anomaly's baselines, changes, and values to be displayed in the anomaly overview
+   * @type {Object}
+   * @example
+   * {
+   *   current: {
+   *    change: 1.1,
+   *    changeFormatted: +1.1,
+   *    value: 5000
+   *   }, {
+   *   baseline: {
+   *    change: 1.1,
+   *    changeFormatted: 1.1,
+   *    value: 1000
+   *   }
+   * }
    */
   anomalyInfo: computed(
     'aggregates',
@@ -84,7 +98,18 @@ export default Component.extend({
         const roundedChange = (Math.round(change * 1000) / 10.0).toFixed(1);
         const sign = change > 0 ? '+' : '';
 
-        let offsetFormatted = offset === 'baseline' ? 'Predicted Average' : offset;
+        let offsetFormatted = '';
+
+        switch(offset) {
+          case 'baseline':
+            offsetFormatted = 'Predicted Average';
+            break;
+          case 'current':
+            offsetFormatted = 'Current Average';
+            break;
+          default:
+            offsetFormatted = offset;
+        }
 
         anomalyInfo[offsetFormatted] = {};
         anomalyInfo[offsetFormatted].change = roundedChange;
