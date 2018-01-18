@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
@@ -17,17 +16,14 @@ import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.MaxScoreSet;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -43,14 +39,15 @@ import org.slf4j.LoggerFactory;
  * Pipeline for identifying relevant dimensions by performing
  * contribution analysis. The pipeline first fetches the Current and Baseline entities and
  * MetricEntities in the search context. It then maps the metrics to ThirdEye's internal database
- * and performs contribution analysis using a {@code DimensionScorer).
+ * and performs contribution analysis.
  *
- * @see MetricBreakdownPipeline as a replacement that relies on MetricEntities with filters in the
- * tail of the URN
+ * <br/><b>NOTE:</b> This is the successor to DimensionAnalysisPipeline. It relies on MetricEntities
+ * with filters in the URN tail instead of DimensionEntities.
+ *
+ * @see DimensionAnalysisPipeline
  */
-@Deprecated
-public class DimensionAnalysisPipeline extends Pipeline {
-  private static final Logger LOG = LoggerFactory.getLogger(DimensionAnalysisPipeline.class);
+public class MetricBreakdownPipeline extends Pipeline {
+  private static final Logger LOG = LoggerFactory.getLogger(MetricBreakdownPipeline.class);
 
   public static final String COL_CONTRIB = "contribution";
   public static final String COL_DELTA = "delta";
@@ -82,7 +79,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
    * @param cache query cache for running contribution analysis
    * @param executor executor service for parallel task execution
    */
-  public DimensionAnalysisPipeline(String outputName, Set<String> inputNames, MetricConfigManager metricDAO,
+  public MetricBreakdownPipeline(String outputName, Set<String> inputNames, MetricConfigManager metricDAO,
       DatasetConfigManager datasetDAO, QueryCache cache, ExecutorService executor, int k) {
     super(outputName, inputNames);
     this.metricDAO = metricDAO;
@@ -99,7 +96,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param properties configuration properties ({@code PROP_K}, {@code PROP_PARALLELISM})
    */
-  public DimensionAnalysisPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
+  public MetricBreakdownPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
     super(outputName, inputNames);
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
@@ -114,52 +111,40 @@ public class DimensionAnalysisPipeline extends Pipeline {
 
     final TimeRangeEntity anomaly = TimeRangeEntity.getTimeRangeAnomaly(context);
     final TimeRangeEntity baseline = TimeRangeEntity.getTimeRangeBaseline(context);
-    final Multimap<String, String> filters = DimensionEntity.makeFilterSet(context);
 
-    Map<Dimension, Double> scores = new HashMap<>();
-    Multimap<Dimension, Entity> related = ArrayListMultimap.create();
+    Set<MetricEntity> output = new MaxScoreSet<>();
 
-    for(MetricEntity me : metricsEntities) {
+    for (MetricEntity me : metricsEntities) {
       try {
-        Multimap<String, String> metricFilters = TreeMultimap.create(); // sorted, unique
-        metricFilters.putAll(filters);
-        metricFilters.putAll(me.getFilters());
-
-        final MetricSlice sliceCurrent = MetricSlice.from(me.getId(), anomaly.getStart(), anomaly.getEnd(), filters);
-        final MetricSlice sliceBaseline = MetricSlice.from(me.getId(), baseline.getStart(), baseline.getEnd(), filters);
+        final MetricSlice sliceCurrent = MetricSlice.from(me.getId(), anomaly.getStart(), anomaly.getEnd(), me.getFilters());
+        final MetricSlice sliceBaseline = MetricSlice.from(me.getId(), baseline.getStart(), baseline.getEnd(), me.getFilters());
 
         DataFrame dfScores = getDimensionScores(sliceCurrent, sliceBaseline);
 
-        for(int i=0; i<dfScores.size(); i++) {
+        for (int i=0; i<dfScores.size(); i++) {
+          String name = dfScores.getString(COL_DIM_NAME, i);
+          String value = dfScores.getString(COL_DIM_VALUE, i);
           double score = dfScores.getDouble(COL_SCORE, i);
+
           if (score <= 0)
             continue;
 
-          Dimension d = new Dimension(dfScores.getString(COL_DIM_NAME, i), dfScores.getString(COL_DIM_VALUE, i));
+          Multimap<String, String> newFilters = TreeMultimap.create(me.getFilters());
+          newFilters.put(name, value);
 
-          if(!scores.containsKey(d))
-            scores.put(d, 0.0d);
-          scores.put(d, Math.max(scores.get(d), score * me.getScore()));
-
-          related.put(d, me);
+          output.add(me.withScore(me.getScore() * score).withFilters(newFilters));
         }
       } catch (Exception e) {
         LOG.warn("Error calculating dimension scores for '{}'. Skipping.", me.getUrn(), e);
       }
     }
 
-    Set<DimensionEntity> entities = new HashSet<>();
-    for(Dimension d : scores.keySet()) {
-      entities.add(d.toEntity(scores.get(d), related.get(d)));
-    }
-
-    return new PipelineResult(context, EntityUtils.topkNormalized(entities, this.k));
+    return new PipelineResult(context, EntityUtils.topkNormalized(output, this.k));
   }
 
   private DataFrame getContribution(MetricSlice slice, String dimension) throws Exception {
     String ref = String.format("%d-%s", slice.getMetricId(), dimension);
-    RequestContainer
-        rc = DataFrameUtils.makeAggregateRequest(slice, Collections.singletonList(dimension), ref, this.metricDAO, this.datasetDAO);
+    RequestContainer rc = DataFrameUtils.makeAggregateRequest(slice, Collections.singletonList(dimension), ref, this.metricDAO, this.datasetDAO);
     ThirdEyeResponse res = this.cache.getQueryResult(rc.getRequest());
 
     DataFrame raw = DataFrameUtils.evaluateResponse(res, rc);
@@ -255,44 +240,4 @@ public class DimensionAnalysisPipeline extends Pipeline {
 
     return combined.sortedBy(COL_SCORE).reverse();
   }
-
-  private static class Dimension {
-    final String name;
-    final String value;
-
-    public Dimension(String name, String value) {
-      this.name = name;
-      this.value = value;
-    }
-
-    public String getName() {
-      return name;
-    }
-
-    public String getValue() {
-      return value;
-    }
-
-    public DimensionEntity toEntity(double score, Collection<Entity> related) {
-      return DimensionEntity.fromDimension(score, related, this.name, this.value, DimensionEntity.TYPE_GENERATED);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (o == null || getClass() != o.getClass()) {
-        return false;
-      }
-      Dimension dimension = (Dimension) o;
-      return Objects.equals(name, dimension.name) && Objects.equals(value, dimension.value);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(name, value);
-    }
-  }
-
 }

@@ -44,11 +44,15 @@ public class MetricEntity extends Entity {
   }
 
   public MetricEntity withFilters(Multimap<String, String> filters) {
-    return new MetricEntity(this.getUrn(), this.getScore(), this.getRelated(), this.id, filters);
+    return new MetricEntity(TYPE.formatURN(this.id, filters), this.getScore(), this.getRelated(), this.id, filters);
+  }
+
+  public MetricEntity withoutFilters() {
+    return new MetricEntity(TYPE.formatURN(this.id), this.getScore(), this.getRelated(), this.id, filters);
   }
 
   public static MetricEntity fromMetric(double score, Collection<? extends Entity> related, long id, Multimap<String, String> filters) {
-    return new MetricEntity(TYPE.formatURN(id), score, new ArrayList<>(related), id, filters);
+    return new MetricEntity(TYPE.formatURN(id, filters), score, new ArrayList<>(related), id, ArrayListMultimap.<String, String>create(filters));
   }
 
   public static MetricEntity fromMetric(double score, Collection<? extends Entity> related, long id) {
@@ -56,7 +60,7 @@ public class MetricEntity extends Entity {
   }
 
   public static MetricEntity fromMetric(double score, long id, Multimap<String, String> filters) {
-    return fromMetric(score, new ArrayList<Entity>(), id, filters);
+    return fromMetric(score, new ArrayList<Entity>(), id, ArrayListMultimap.<String, String>create(filters));
   }
 
   public static MetricEntity fromMetric(double score, long id) {
@@ -66,6 +70,7 @@ public class MetricEntity extends Entity {
   public static MetricEntity fromURN(String urn, double score) {
     if(!TYPE.isType(urn))
       throw new IllegalArgumentException(String.format("URN '%s' is not type '%s'", urn, TYPE.getPrefix()));
+    // TODO handle filter strings containing ":"
     String[] parts = urn.split(":");
     if(parts.length <= 2)
       throw new IllegalArgumentException(String.format("URN must have at least 3 parts but has '%d'", parts.length));
@@ -73,7 +78,7 @@ public class MetricEntity extends Entity {
     return fromMetric(score, Long.parseLong(parts[2]), parseFilterStrings(filterStrings));
   }
 
-  public static Multimap<String, String> parseFilterStrings(List<String> filterStrings) {
+  private static Multimap<String, String> parseFilterStrings(List<String> filterStrings) {
     Multimap<String, String> filters = ArrayListMultimap.create();
 
     for(String filterString : filterStrings) {

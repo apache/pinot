@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import java.util.Arrays;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -40,4 +42,60 @@ public class MetricEntityTest {
   public void testFiltersLongFail() {
     MetricEntity.fromURN("thirdeye:metric:12345:key=value=1", 1.0);
   }
+
+  @Test
+  public void testCreateWithFilter() {
+    Multimap<String, String> filters = ArrayListMultimap.create();
+    filters.put("key", "value");
+    filters.put("key", "otherValue");
+    filters.put("anotherKey", "otherValue");
+
+    MetricEntity e = MetricEntity.fromMetric(1.0, 123, filters);
+
+    Assert.assertEquals(e.getUrn().split(":").length, 6);
+    Assert.assertTrue(e.getUrn().startsWith("thirdeye:metric:123"));
+    Assert.assertTrue(e.getUrn().contains(":anotherKey=otherValue"));
+    Assert.assertTrue(e.getUrn().contains(":key=value"));
+    Assert.assertTrue(e.getUrn().contains(":key=otherValue"));
+  }
+
+  @Test
+  public void testSetFilters() {
+    Multimap<String, String> filters1 = ArrayListMultimap.create();
+    filters1.put("key", "otherValue");
+    filters1.put("anotherKey", "otherValue");
+
+    Multimap<String, String> filters2 = ArrayListMultimap.create();
+    filters2.put("key", "value");
+
+    MetricEntity e = MetricEntity.fromMetric(1.0, 123, filters1);
+    Assert.assertEquals(e.getUrn().split(":").length, 5);
+    Assert.assertTrue(e.getUrn().startsWith("thirdeye:metric:123"));
+    Assert.assertTrue(e.getUrn().contains(":anotherKey=otherValue"));
+    Assert.assertTrue(e.getUrn().contains(":key=otherValue"));
+
+    MetricEntity aug = e.withFilters(filters2);
+    Assert.assertEquals(aug.getUrn().split(":").length, 4);
+    Assert.assertTrue(aug.getUrn().startsWith("thirdeye:metric:123"));
+    Assert.assertTrue(aug.getUrn().contains(":key=value"));
+  }
+
+  @Test
+  public void testRemoveFilters() {
+    Multimap<String, String> filters = ArrayListMultimap.create();
+    filters.put("key", "value");
+    filters.put("key", "otherValue");
+    filters.put("anotherKey", "otherValue");
+
+    MetricEntity e = MetricEntity.fromMetric(1.0, 123, filters);
+    Assert.assertEquals(e.getUrn().split(":").length, 6);
+    Assert.assertTrue(e.getUrn().startsWith("thirdeye:metric:123"));
+    Assert.assertTrue(e.getUrn().contains(":anotherKey=otherValue"));
+    Assert.assertTrue(e.getUrn().contains(":key=value"));
+    Assert.assertTrue(e.getUrn().contains(":key=otherValue"));
+
+    MetricEntity drop = e.withoutFilters();
+    Assert.assertEquals(drop.getUrn(), "thirdeye:metric:123");
+  }
+
 }

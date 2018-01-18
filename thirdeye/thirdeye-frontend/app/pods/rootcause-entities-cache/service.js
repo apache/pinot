@@ -111,12 +111,9 @@ export default Ember.Service.extend({
 
   _makeUrl(framework, context) {
     const metricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
-
-    // TODO support long format metric urns in backend
-    const baseMetricUrns = metricUrns.map(stripTail);
     const dimensionUrns = toFilters(metricUrns).map(t => `thirdeye:dimension:${t[0]}:${t[1]}:provided`);
 
-    const urnString = [...baseMetricUrns, ...dimensionUrns].join(',');
+    const urnString = [...metricUrns, ...dimensionUrns].join(',');
     const baselineRange = toBaselineRange(context.anomalyRange, context.compareMode);
     return `/rootcause/query?framework=${framework}` +
       `&anomalyStart=${context.anomalyRange[0]}&anomalyEnd=${context.anomalyRange[1]}` +

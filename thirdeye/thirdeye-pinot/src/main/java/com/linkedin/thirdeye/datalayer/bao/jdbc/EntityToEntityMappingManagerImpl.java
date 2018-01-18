@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
 import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 
 @Singleton
@@ -16,14 +17,22 @@ public class EntityToEntityMappingManagerImpl extends AbstractManagerImpl<Entity
 
   @Override
   public List<EntityToEntityMappingDTO> findByFromURN(String fromURN) {
-    Predicate predicate = Predicate.EQ("fromURN", fromURN);
-    return findByPredicate(predicate);
+    return findByPredicate(Predicate.EQ("fromURN", fromURN));
+  }
+
+  @Override
+  public List<EntityToEntityMappingDTO> findByFromURNs(Set<String> fromURNs) {
+    return findByPredicate(Predicate.IN("fromURN", fromURNs.toArray()));
   }
 
   @Override
   public List<EntityToEntityMappingDTO> findByToURN(String toURN) {
-    Predicate predicate = Predicate.EQ("toURN", toURN);
-    return findByPredicate(predicate);
+    return findByPredicate(Predicate.EQ("toURN", toURN));
+  }
+
+  @Override
+  public List<EntityToEntityMappingDTO> findByToURNs(Set<String> toURNs) {
+    return findByPredicate(Predicate.IN("toURN", toURNs.toArray()));
   }
 
   @Override
@@ -39,19 +48,16 @@ public class EntityToEntityMappingManagerImpl extends AbstractManagerImpl<Entity
 
   @Override
   public List<EntityToEntityMappingDTO> findByMappingType(String mappingType) {
-    Predicate predicate = Predicate.EQ("mappingType", mappingType.toString());
-    return findByPredicate(predicate);
+    return findByPredicate(Predicate.EQ("mappingType", mappingType));
   }
 
   @Override
   public List<EntityToEntityMappingDTO> findByFromURNAndMappingType(String fromURN, String mappingType) {
-    Predicate predicate = Predicate.AND(Predicate.EQ("fromURN", fromURN), Predicate.EQ("mappingType", mappingType.toString()));
-    return findByPredicate(predicate);
+    return findByPredicate(Predicate.AND(Predicate.EQ("fromURN", fromURN), Predicate.EQ("mappingType", mappingType)));
   }
 
   @Override
   public List<EntityToEntityMappingDTO> findByToURNAndMappingType(String toURN, String mappingType) {
-    Predicate predicate = Predicate.AND(Predicate.EQ("toURN", toURN), Predicate.EQ("mappingType", mappingType.toString()));
-    return findByPredicate(predicate);
+    return findByPredicate(Predicate.AND(Predicate.EQ("toURN", toURN), Predicate.EQ("mappingType", mappingType)));
   }
 }

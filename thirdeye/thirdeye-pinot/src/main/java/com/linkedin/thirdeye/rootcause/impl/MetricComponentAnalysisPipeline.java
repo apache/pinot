@@ -1,10 +1,10 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.TreeMultimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
+import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
@@ -17,17 +17,16 @@ import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.MaxScoreSet;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -40,29 +39,34 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Pipeline for identifying relevant dimensions by performing
- * contribution analysis. The pipeline first fetches the Current and Baseline entities and
- * MetricEntities in the search context. It then maps the metrics to ThirdEye's internal database
- * and performs contribution analysis using a {@code DimensionScorer).
+ * The MetricComponentAnalysisPipeline performs iterative factor analysis on a metric's dimensions.
+ * Returns the k biggest outliers (contributors to relative change, similar to principal components).
  *
- * @see MetricBreakdownPipeline as a replacement that relies on MetricEntities with filters in the
- * tail of the URN
+ * Iteration executes by choosing the the dimension value (slice) with the biggest change in
+ * contribution and then re-running the analysis while excluding this (and all previously chosen)
+ * slices from the dataset. The result is an ordered list of the top k slices with the biggest
+ * relative change.
+ *
+ * @see com.linkedin.thirdeye.client.diffsummary.Cube
  */
-@Deprecated
-public class DimensionAnalysisPipeline extends Pipeline {
-  private static final Logger LOG = LoggerFactory.getLogger(DimensionAnalysisPipeline.class);
+public class MetricComponentAnalysisPipeline extends Pipeline {
+  private static final Logger LOG = LoggerFactory.getLogger(MetricComponentAnalysisPipeline.class);
 
-  public static final String COL_CONTRIB = "contribution";
-  public static final String COL_DELTA = "delta";
-  public static final String COL_DIM_NAME = "dimension";
-  public static final String COL_DIM_VALUE = "value";
-  public static final String COL_SCORE = "score";
+  private static final String COL_RAW = "raw";
+  private static final String COL_CONTRIB = "contribution";
+  private static final String COL_DELTA = "delta";
+  private static final String COL_DIM_NAME = "dimension";
+  private static final String COL_DIM_VALUE = "value";
+  private static final String COL_SCORE = "score";
 
-  public static final String PROP_PARALLELISM = "parallelism";
-  public static final int PROP_PARALLELISM_DEFAULT = 1;
+  private static final String PROP_PARALLELISM = "parallelism";
+  private static final int PROP_PARALLELISM_DEFAULT = 1;
 
-  public static final String PROP_K = "k";
-  public static final int PROP_K_DEFAULT = -1;
+  private static final String PROP_K = "k";
+  private static final int PROP_K_DEFAULT = 3;
+
+  private static final String PROP_EXCLUDE_DIMENSIONS = "excludeDimensions";
+  private static final Set<String> PROP_EXCLUDE_DIMENSIONS_DEFAULT = Collections.emptySet();
 
   public static final long TIMEOUT = 120000;
 
@@ -70,6 +74,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
   private final ExecutorService executor;
+  private final Set<String> excludeDimensions;
   private final int k;
 
   /**
@@ -82,13 +87,14 @@ public class DimensionAnalysisPipeline extends Pipeline {
    * @param cache query cache for running contribution analysis
    * @param executor executor service for parallel task execution
    */
-  public DimensionAnalysisPipeline(String outputName, Set<String> inputNames, MetricConfigManager metricDAO,
-      DatasetConfigManager datasetDAO, QueryCache cache, ExecutorService executor, int k) {
+  public MetricComponentAnalysisPipeline(String outputName, Set<String> inputNames, MetricConfigManager metricDAO,
+      DatasetConfigManager datasetDAO, QueryCache cache, ExecutorService executor, Set<String> excludeDimensions, int k) {
     super(outputName, inputNames);
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
     this.cache = cache;
     this.executor = executor;
+    this.excludeDimensions = excludeDimensions;
     this.k = k;
   }
 
@@ -97,15 +103,21 @@ public class DimensionAnalysisPipeline extends Pipeline {
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
-   * @param properties configuration properties ({@code PROP_K}, {@code PROP_PARALLELISM})
+   * @param properties configuration properties ({@code PROP_K}, {@code PROP_PARALLELISM}, {@code PROP_EXCLUDE_DIMENSIONS})
    */
-  public DimensionAnalysisPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
+  public MetricComponentAnalysisPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
     super(outputName, inputNames);
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
     this.executor = Executors.newFixedThreadPool(MapUtils.getInteger(properties, PROP_PARALLELISM, PROP_PARALLELISM_DEFAULT));
     this.k = MapUtils.getInteger(properties, PROP_K, PROP_K_DEFAULT);
+
+    if (properties.containsKey(PROP_EXCLUDE_DIMENSIONS)) {
+      this.excludeDimensions = new HashSet<>((Collection<String>) properties.get(PROP_EXCLUDE_DIMENSIONS));
+    } else {
+      this.excludeDimensions = PROP_EXCLUDE_DIMENSIONS_DEFAULT;
+    }
   }
 
   @Override
@@ -114,52 +126,92 @@ public class DimensionAnalysisPipeline extends Pipeline {
 
     final TimeRangeEntity anomaly = TimeRangeEntity.getTimeRangeAnomaly(context);
     final TimeRangeEntity baseline = TimeRangeEntity.getTimeRangeBaseline(context);
-    final Multimap<String, String> filters = DimensionEntity.makeFilterSet(context);
 
-    Map<Dimension, Double> scores = new HashMap<>();
-    Multimap<Dimension, Entity> related = ArrayListMultimap.create();
+    final Multimap<String, String> rawDimensions = HashMultimap.create();
+    final Set<DimensionEntity> dimensions = new MaxScoreSet<>();
 
-    for(MetricEntity me : metricsEntities) {
+    if (metricsEntities.isEmpty()) {
+      return new PipelineResult(context, new MaxScoreSet<>());
+    }
+
+    if (metricsEntities.size() > 1) {
+      // NOTE: emergency brake, expensive computation and queries
+      throw new IllegalArgumentException("Cannot process more than one metric at a time");
+    }
+
+    final MetricEntity metric = metricsEntities.iterator().next();
+
+    // collects filters over multiple iterations
+    final Multimap<String, String> filters = HashMultimap.create(metric.getFilters());
+
+    // metric total for score calculation
+    final MetricSlice sliceTotal = MetricSlice.from(metric.getId(), anomaly.getStart(), anomaly.getEnd(), filters);
+    final double total;
+    try {
+      total = getTotal(sliceTotal);
+
+    } catch (Exception e) {
+      LOG.warn("Could not retrieve total for '{}'", metric.getUrn());
+      return new PipelineResult(context, dimensions);
+    }
+
+    for (int k = 0; k < this.k; k++) {
       try {
-        Multimap<String, String> metricFilters = TreeMultimap.create(); // sorted, unique
-        metricFilters.putAll(filters);
-        metricFilters.putAll(me.getFilters());
+        final MetricSlice sliceCurrent = MetricSlice.from(metric.getId(), anomaly.getStart(), anomaly.getEnd(), filters);
+        final MetricSlice sliceBaseline = MetricSlice.from(metric.getId(), baseline.getStart(), baseline.getEnd(), filters);
 
-        final MetricSlice sliceCurrent = MetricSlice.from(me.getId(), anomaly.getStart(), anomaly.getEnd(), filters);
-        final MetricSlice sliceBaseline = MetricSlice.from(me.getId(), baseline.getStart(), baseline.getEnd(), filters);
+        final double subTotal = getTotal(sliceCurrent);
 
-        DataFrame dfScores = getDimensionScores(sliceCurrent, sliceBaseline);
+        final DataFrame dfScoresRaw = getDimensionScores(sliceCurrent, sliceBaseline);
 
-        for(int i=0; i<dfScores.size(); i++) {
-          double score = dfScores.getDouble(COL_SCORE, i);
-          if (score <= 0)
-            continue;
+        final double percentage = Math.round(subTotal / total * 10000) / 100.0;
+        LOG.info("Iteration {}: analyzing '{}' ({} %)\n{}", k, filters, percentage, dfScoresRaw.head(20));
 
-          Dimension d = new Dimension(dfScores.getString(COL_DIM_NAME, i), dfScores.getString(COL_DIM_VALUE, i));
+        // ignore zero scores, known combinations
+        final DataFrame dfScores = dfScoresRaw
+            .filter(new Series.DoubleConditional() {
+              @Override
+              public boolean apply(double... values) {
+                return values[0] > 0;
+              }
+            }, COL_SCORE)
+            .dropNull();
 
-          if(!scores.containsKey(d))
-            scores.put(d, 0.0d);
-          scores.put(d, Math.max(scores.get(d), score * me.getScore()));
-
-          related.put(d, me);
+        if (dfScores.isEmpty()) {
+          break;
         }
+
+        String name = dfScores.getString(COL_DIM_NAME, 0);
+        String value = dfScores.getString(COL_DIM_VALUE, 0);
+         // double score = Math.abs(dfScores.getDouble(COL_DELTA, 0)); // scaling issue
+        double score = subTotal / total;
+
+        rawDimensions.put(name, value);
+        dimensions.add(DimensionEntity.fromDimension(score * metric.getScore(), name, value, DimensionEntity.TYPE_GENERATED));
+
+        filters.put(name, "!" + value);
+
       } catch (Exception e) {
-        LOG.warn("Error calculating dimension scores for '{}'. Skipping.", me.getUrn(), e);
+        LOG.warn("Error calculating dimension scores for '{}'. Skipping.", metric.getUrn(), e);
       }
     }
 
-    Set<DimensionEntity> entities = new HashSet<>();
-    for(Dimension d : scores.keySet()) {
-      entities.add(d.toEntity(scores.get(d), related.get(d)));
-    }
+    return new PipelineResult(context, dimensions);
+  }
 
-    return new PipelineResult(context, EntityUtils.topkNormalized(entities, this.k));
+  private double getTotal(MetricSlice slice) throws Exception {
+    String ref = String.format("%d", slice.getMetricId());
+    RequestContainer rc = DataFrameUtils.makeAggregateRequest(slice, Collections.<String>emptyList(), ref, this.metricDAO, this.datasetDAO);
+    ThirdEyeResponse res = this.cache.getQueryResult(rc.getRequest());
+
+    DataFrame raw = DataFrameUtils.evaluateResponse(res, rc);
+
+    return raw.getDoubles(DataFrameUtils.COL_VALUE).doubleValue();
   }
 
   private DataFrame getContribution(MetricSlice slice, String dimension) throws Exception {
     String ref = String.format("%d-%s", slice.getMetricId(), dimension);
-    RequestContainer
-        rc = DataFrameUtils.makeAggregateRequest(slice, Collections.singletonList(dimension), ref, this.metricDAO, this.datasetDAO);
+    RequestContainer rc = DataFrameUtils.makeAggregateRequest(slice, Collections.singletonList(dimension), ref, this.metricDAO, this.datasetDAO);
     ThirdEyeResponse res = this.cache.getQueryResult(rc.getRequest());
 
     DataFrame raw = DataFrameUtils.evaluateResponse(res, rc);
@@ -167,6 +219,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
     DataFrame out = new DataFrame();
     out.addSeries(dimension, raw.getStrings(dimension));
     out.addSeries(COL_CONTRIB, raw.getDoubles(DataFrameUtils.COL_VALUE).normalizeSum());
+    out.addSeries(COL_RAW, raw.getDoubles(DataFrameUtils.COL_VALUE));
     out.setIndex(dimension);
 
     return out;
@@ -178,15 +231,21 @@ public class DimensionAnalysisPipeline extends Pipeline {
 
     DataFrame joined = curr.joinOuter(base)
         .fillNull(COL_CONTRIB + DataFrame.COLUMN_JOIN_LEFT)
-        .fillNull(COL_CONTRIB + DataFrame.COLUMN_JOIN_RIGHT);
+        .fillNull(COL_CONTRIB + DataFrame.COLUMN_JOIN_RIGHT)
+        .fillNull(COL_RAW + DataFrame.COLUMN_JOIN_LEFT)
+        .fillNull(COL_RAW + DataFrame.COLUMN_JOIN_RIGHT);
 
     DoubleSeries diff = joined.getDoubles(COL_CONTRIB + DataFrame.COLUMN_JOIN_LEFT)
         .subtract(joined.getDoubles(COL_CONTRIB + DataFrame.COLUMN_JOIN_RIGHT));
+
+    DoubleSeries diffRaw = joined.getDoubles(COL_RAW + DataFrame.COLUMN_JOIN_LEFT)
+        .subtract(joined.getDoubles(COL_RAW + DataFrame.COLUMN_JOIN_RIGHT));
 
     DataFrame df = new DataFrame();
     df.addSeries(dimension, joined.getStrings(dimension));
     df.addSeries(COL_CONTRIB, joined.getDoubles(COL_CONTRIB + DataFrame.COLUMN_JOIN_LEFT));
     df.addSeries(COL_DELTA, diff);
+    df.addSeries(COL_RAW, diffRaw);
     df.setIndex(dimension);
 
     return df;
@@ -196,6 +255,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
     DataFrame df = new DataFrame();
     df.addSeries(COL_CONTRIB, dfDelta.get(COL_CONTRIB));
     df.addSeries(COL_DELTA, dfDelta.get(COL_DELTA));
+    df.addSeries(COL_RAW, dfDelta.get(COL_RAW));
     df.addSeries(COL_DIM_NAME, StringSeries.fillValues(dfDelta.size(), dimension));
     df.addSeries(COL_DIM_VALUE, dfDelta.get(dimension));
     return df;
@@ -234,11 +294,16 @@ public class DimensionAnalysisPipeline extends Pipeline {
 
     Collection<Future<DataFrame>> futures = new ArrayList<>();
     for(String dimension : dataset.getDimensions()) {
+      // don't explore dimensions that are excluded
+      if (this.excludeDimensions.contains(dimension)) {
+        continue;
+      }
+
       futures.add(getContributionDeltaPackedAsync(current, baseline, dimension));
     }
 
     final long timeout = System.currentTimeMillis() + TIMEOUT;
-    Collection<DataFrame> contributors = new ArrayList<>();
+    List<DataFrame> contributors = new ArrayList<>();
     for(Future<DataFrame> future : futures) {
       final long timeLeft = Math.max(timeout - System.currentTimeMillis(), 0);
       contributors.add(future.get(timeLeft, TimeUnit.MILLISECONDS));
@@ -248,51 +313,12 @@ public class DimensionAnalysisPipeline extends Pipeline {
         COL_DIM_NAME + ":STRING",
         COL_DIM_VALUE + ":STRING",
         COL_CONTRIB + ":DOUBLE",
-        COL_DELTA + ":DOUBLE").build();
+        COL_DELTA + ":DOUBLE",
+        COL_RAW + ":DOUBLE").build();
 
-    combined = combined.append(contributors.toArray(new DataFrame[contributors.size()]));
+    combined = combined.append(contributors);
     combined.addSeries(COL_SCORE, combined.getDoubles(COL_DELTA).abs());
 
     return combined.sortedBy(COL_SCORE).reverse();
   }
-
-  private static class Dimension {
-    final String name;
-    final String value;
-
-    public Dimension(String name, String value) {
-      this.name = name;
-      this.value = value;
-    }
-
-    public String getName() {
-      return name;
-    }
-
-    public String getValue() {
-      return value;
-    }
-
-    public DimensionEntity toEntity(double score, Collection<Entity> related) {
-      return DimensionEntity.fromDimension(score, related, this.name, this.value, DimensionEntity.TYPE_GENERATED);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (o == null || getClass() != o.getClass()) {
-        return false;
-      }
-      Dimension dimension = (Dimension) o;
-      return Objects.equals(name, dimension.name) && Objects.equals(value, dimension.value);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(name, value);
-    }
-  }
-
 }
