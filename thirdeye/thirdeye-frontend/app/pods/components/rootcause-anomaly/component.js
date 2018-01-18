@@ -1,5 +1,5 @@
 import Component from "@ember/component";
-import { computed, setProperties, getProperties, get } from '@ember/object';
+import { computed, setProperties, getProperties, get, set } from '@ember/object';
 import moment from 'moment';
 import { humanizeFloat, filterPrefix, toOffsetUrn } from 'thirdeye-frontend/helpers/utils';
 
@@ -63,7 +63,10 @@ export default Component.extend({
     }
   ),
 
-  values: computed(
+  /**
+   *
+   */
+  anomalyInfo: computed(
     'aggregates',
     'anomalyUrns',
     function () {
@@ -74,35 +77,22 @@ export default Component.extend({
 
       if (!metricUrns) { return; }
 
-      // NOTE: single metric only
-      const values = {};
-      [...offsets].forEach(offset => {
-        values[offset] = aggregates[toOffsetUrn(metricUrns[0], offset)];
-      });
+      let anomalyInfo = {};
 
-      return values;
-    }
-  ),
-
-  changesFormatted: computed(
-    'aggregates',
-    'anomalyUrns',
-    function () {
-      const { aggregates, anomalyUrns } = getProperties(this, 'aggregates', 'anomalyUrns');
-
-      const offsets = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
-      const metricUrns = filterPrefix(anomalyUrns, 'thirdeye:metric:');
-
-      if (!metricUrns) { return; }
-
-      // NOTE: single metric only
-      const changes = {};
       [...offsets].forEach(offset => {
         const change = aggregates[toOffsetUrn(metricUrns[0], 'current')] / aggregates[toOffsetUrn(metricUrns[0], offset)] - 1;
-        changes[offset] = (Math.round(change * 1000) / 10.0).toFixed(1);
+        const roundedChange = (Math.round(change * 1000) / 10.0).toFixed(1);
+        const sign = change > 0 ? '+' : '';
+
+        let offsetFormatted = offset === 'baseline' ? 'Predicted Average' : offset;
+
+        anomalyInfo[offsetFormatted] = {};
+        anomalyInfo[offsetFormatted].change = roundedChange;
+        anomalyInfo[offsetFormatted].value = aggregates[toOffsetUrn(metricUrns[0], offset)];
+        anomalyInfo[offsetFormatted].changeFormatted = `${sign}${roundedChange}`;
       });
 
-      return changes;
+      return anomalyInfo;
     }
   ),
 

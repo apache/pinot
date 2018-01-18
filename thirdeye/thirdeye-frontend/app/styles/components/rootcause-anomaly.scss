@@ -101,8 +101,12 @@
     font-size: 24px;
     line-height: 32px;
     font-weight: normal;
+  }
 
-    //To do: make this into mixin
+  &__stats-change {
+    font-size: 14px;
+    margin-left: 10px;
+
     &--positive {
       color: $te-green;
     }
