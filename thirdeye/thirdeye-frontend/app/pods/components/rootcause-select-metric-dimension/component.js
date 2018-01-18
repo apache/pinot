@@ -107,6 +107,7 @@ export default Ember.Component.extend({
 
       const metricUrn = appendFilters(baseUrn, fromFilterMap(filterMap));
 
+      // only trigger on actual metric/filter change
       if (_.isEqual(metricUrn, selectedUrn)) { return; }
 
       const updates = { [metricUrn]: true, [toBaselineUrn(metricUrn)]: true, [toCurrentUrn(metricUrn)]: true };
