@@ -29,8 +29,6 @@
  * @author smcclung
  */
 
-import Ember from 'ember';
-import _ from 'lodash';
 import moment from 'moment';
 import Component from '@ember/component';
 import { computed } from '@ember/object';

@@ -113,6 +113,13 @@ export function enhanceAnomalies(rawAnomalies) {
   return newAnomalies;
 }
 
+/**
+ * Generates time range options for selection in the self-serve UI
+ * @method setUpTimeRangeOptions
+ * @param {Array} datesKeys - array of keys used to generate time ranges
+ * @param {String} duration - the selected time span that is default
+ * @return {Array}
+ */
 export function setUpTimeRangeOptions(datesKeys, duration) {
   const newRangeArr = [];
 
@@ -168,8 +175,7 @@ export function evalObj() {
  * and returns a sorted list of graph-ready dimension objects.
  * @method getTopDimensions
  * @param {Object} dimensionObj - the object containing available subdimension for current metric
- * @param {String} dimensionUrl - the URL for the related dimensions call
- * @param {Number} maxSize - number of sub-dimensions to display on graph
+ * @param {Array} scoredDimensions - array of dimensions scored by relevance
  * @param {String} selectedDimension - the user-selected dimension to graph
  * @return {RSVP Promise}
  */
