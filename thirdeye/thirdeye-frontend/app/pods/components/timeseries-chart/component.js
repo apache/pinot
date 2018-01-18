@@ -144,6 +144,9 @@ export default Ember.Component.extend({
   },
 
   _updateCache() {
+    // debounce: do not trigger if chart object already destroyed
+    if (this.isDestroyed) { return; }
+
     const series = this.get('series') || {};
     this.set('_seriesCache', _.cloneDeep(series));
   },
@@ -163,7 +166,7 @@ export default Ember.Component.extend({
     const cache = this.get('cache') || {};
 
     if (!_.isEqual(series, cache)) {
-      Ember.run.debounce(this, this._updateChart, 250);
+      Ember.run.debounce(this, this._updateChart, 300);
     }
   },
 
