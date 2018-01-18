@@ -233,7 +233,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     // session-initialized context
     if (sessionId) {
       if (!_.isEmpty(session)) {
-        let { name: sessionName, text: sessionText, updatedBy: sessionOwner, updated: sessionUpdatedTime } = this.get('session');
+        const { name, text, updatedBy, updated } = model.session;
         context = {
           urns: new Set(session.contextUrns),
           anomalyRange: [session.anomalyRangeStart, session.anomalyRangeEnd],
@@ -244,12 +244,10 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
         };
         selectedUrns = new Set(session.selectedUrns);
 
-        this.setProperties({
-          sessionName,
-          sessionText,
-          sessionOwner,
-          sessionUpdatedTime
-        });
+        sessionName = name;
+        sessionText = text;
+        sessionOwner = updatedBy;
+        sessionUpdatedTime = moment(updated).format(dateFormat);
 
         sessionModified = false;
 
