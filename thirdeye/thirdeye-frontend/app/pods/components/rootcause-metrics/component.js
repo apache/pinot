@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toCurrentUrn, toBaselineUrn, toOffsetUrn, hasPrefix, filterPrefix, toMetricLabel } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, toOffsetUrn, hasPrefix, filterPrefix, toMetricLabel, makeSortable, humanizeChange } from 'thirdeye-frontend/helpers/utils';
 
 const ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC = 'metric';
 const ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET = 'dataset';
@@ -18,9 +18,9 @@ export default Ember.Component.extend({
 
   onSelection: null, // function (Set, state)
 
-  sortProperty: null, // ""
+  sortProperty: ROOTCAUSE_METRICS_SORT_PROPERTY_SCORE,
 
-  sortMode: null, // ""
+  sortMode: ROOTCAUSE_METRICS_SORT_MODE_DESC,
 
   /**
    * Currently selected view within the metrics tab
@@ -32,11 +32,6 @@ export default Ember.Component.extend({
    * loading status for component
    */
   isLoading: false,
-
-  init() {
-    this._super(...arguments);
-    this.setProperties({ sortProperty: ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE, sortMode: ROOTCAUSE_METRICS_SORT_MODE_ASC });
-  },
 
   /**
    * List of metric urns, sorted by sortMode.
@@ -55,27 +50,27 @@ export default Ember.Component.extend({
       const metricUrns = filterPrefix(Object.keys(entities), ['thirdeye:metric:']);
       let output = [];
 
-      if (sortProperty == ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC) {
-        output = metricUrns.map(urn => [metrics[urn], urn]).sort().map(t => t[1]);
+      if (sortProperty === ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC) {
+        output = metricUrns.map(urn => [metrics[urn], urn]).sort();
       }
 
-      if (sortProperty == ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET) {
-        output = metricUrns.map(urn => [datasets[urn], urn]).sort().map(t => t[1]);
+      if (sortProperty === ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET) {
+        output = metricUrns.map(urn => [datasets[urn], urn]).sort();
       }
 
-      if (sortProperty == ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE) {
-        output = metricUrns.map(urn => [changes[urn], urn]).sort((a, b) => parseFloat(a) - parseFloat(b)).map(t => t[1]);
+      if (sortProperty === ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE) {
+        output = metricUrns.map(urn => [makeSortable(changes[urn]), urn]).sort((a, b) => a[0] - b[0]);
       }
 
-      if (sortProperty == ROOTCAUSE_METRICS_SORT_PROPERTY_SCORE) {
-        output = metricUrns.map(urn => [scores[urn], urn]).sort((a, b) => parseFloat(b) - parseFloat(a)).map(t => t[1]);
+      if (sortProperty === ROOTCAUSE_METRICS_SORT_PROPERTY_SCORE) {
+        output = metricUrns.map(urn => [makeSortable(scores[urn]), urn]).sort((a, b) => a[0] - b[0]);
       }
 
-      if (sortMode == ROOTCAUSE_METRICS_SORT_MODE_DESC) {
+      if (sortMode === ROOTCAUSE_METRICS_SORT_MODE_DESC) {
         output = output.reverse();
       }
 
-      return output;
+      return output.map(t => t[1]);
     }
   ),
 
@@ -202,18 +197,18 @@ export default Ember.Component.extend({
    */
   _formatChanges(changes) {
     return Object.keys(changes).reduce((agg, urn) => {
-      const value = changes[urn];
-      if (Number.isNaN(value)) {
+      const change = changes[urn];
+      if (Number.isNaN(change)) {
         agg[urn] = '-';
         return agg;
       }
 
-      const sign = value > 0 ? '+' : '';
-      if (Math.abs(value) > 5) {
+      if (Math.abs(change) > 5) {
         agg[urn] = 'spike';
-      } else {
-        agg[urn] = sign + (value * 100).toFixed(2) + '%';
+        return agg;
       }
+
+      agg[urn] = humanizeChange(change);
       return agg;
     }, {});
   },

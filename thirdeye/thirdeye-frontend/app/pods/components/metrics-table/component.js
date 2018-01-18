@@ -1,5 +1,6 @@
 import Component from '@ember/component';
 import { computed } from '@ember/object';
+import { makeSortable } from 'thirdeye-frontend/helpers/utils';
 
 export default Component.extend({
   /**
@@ -20,31 +21,31 @@ export default Component.extend({
       className: 'rootcause-metric__table__column'
     }, {
       propertyName: 'changeFormatted',
-      sortedBy: 'change',
+      sortedBy: 'changeSortable',
       title: 'baseline',
       disableFiltering: true,
       className: 'rootcause-metric__table__column'
     }, {
       propertyName: 'change1wFormatted',
-      sortedBy: 'change1w',
+      sortedBy: 'change1wSortable',
       title: 'WoW',
       disableFiltering: true,
       className: 'rootcause-metric__table__column'
     }, {
       propertyName: 'change2wFormatted',
-      sortedBy: 'change2w',
+      sortedBy: 'change2wSortable',
       title: 'Wo2W',
       disableFiltering: true,
       className: 'rootcause-metric__table__column'
     }, {
       propertyName: 'change3wFormatted',
-      sortedBy: 'change3w',
+      sortedBy: 'change3wSortable',
       title: 'Wo3W',
       disableFiltering: true,
       className: 'rootcause-metric__table__column'
     }, {
       propertyName: 'change4wFormatted',
-      sortedBy: 'change4w',
+      sortedBy: 'change4wSortable',
       title: 'Wo4W',
       disableFiltering: true,
       className: 'rootcause-metric__table__column'
@@ -82,7 +83,12 @@ export default Component.extend({
           change1wFormatted: changesOffsetFormatted['wo1w'][urn],
           change2wFormatted: changesOffsetFormatted['wo2w'][urn],
           change3wFormatted: changesOffsetFormatted['wo3w'][urn],
-          change4wFormatted: changesOffsetFormatted['wo4w'][urn]
+          change4wFormatted: changesOffsetFormatted['wo4w'][urn],
+          changeSortable: makeSortable(changesOffset['baseline'][urn]),
+          change1wSortable: makeSortable(changesOffset['wo1w'][urn]),
+          change2wSortable: makeSortable(changesOffset['wo2w'][urn]),
+          change3wSortable: makeSortable(changesOffset['wo3w'][urn]),
+          change4wSortable: makeSortable(changesOffset['wo4w'][urn])
         });
       });
       return arr;

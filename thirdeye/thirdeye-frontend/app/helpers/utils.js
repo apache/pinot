@@ -90,6 +90,17 @@ export function humanizeChange(f) {
   return `${f > 0 ? '+' : ''}${(Math.round(f * 1000) / 10.0).toFixed(1)}%`;
 }
 
+/**
+ * Parses the input as float and returns it, unless it is NaN where it returns Number.NEGATIVE_INFINITY instead
+ */
+export function makeSortable(f) {
+  const n = parseFloat(f);
+  if (Number.isNaN(n)) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  return n;
+}
+
 export function isIterable(obj) {
   if (obj == null || _.isString(obj)) {
     return false;
@@ -364,6 +375,7 @@ export default Ember.Helper.helper({
   toColor,
   humanizeFloat,
   humanizeChange,
+  makeSortable,
   fromFilterMap,
   appendFilters,
   metricColors,
