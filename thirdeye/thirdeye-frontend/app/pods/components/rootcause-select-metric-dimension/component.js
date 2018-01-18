@@ -102,10 +102,12 @@ export default Ember.Component.extend({
     },
 
     onSelect() {
-      const { baseUrn, filterMap, onSelection } =
-        this.getProperties('baseUrn', 'filterMap', 'onSelection');
+      const { baseUrn, filterMap, selectedUrn, onSelection } =
+        this.getProperties('baseUrn', 'filterMap', 'selectedUrn', 'onSelection');
 
       const metricUrn = appendFilters(baseUrn, fromFilterMap(filterMap));
+
+      if (_.isEqual(metricUrn, selectedUrn)) { return; }
 
       const updates = { [metricUrn]: true, [toBaselineUrn(metricUrn)]: true, [toCurrentUrn(metricUrn)]: true };
 
