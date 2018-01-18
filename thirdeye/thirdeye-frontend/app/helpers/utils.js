@@ -90,6 +90,17 @@ export function humanizeChange(f) {
   return `${f > 0 ? '+' : ''}${(Math.round(f * 1000) / 10.0).toFixed(1)}%`;
 }
 
+/**
+ * Parses the input as float and returns it, unless it is NaN where it returns Number.NEGATIVE_INFINITY instead
+ */
+export function makeSortable(f) {
+  const n = parseFloat(f);
+  if (Number.isNaN(n)) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  return n;
+}
+
 export function isIterable(obj) {
   if (obj == null || _.isString(obj)) {
     return false;
@@ -165,9 +176,9 @@ export function toMetricUrn(urn) {
 }
 
 export function toMetricLabel(urn, entities) {
-  let metricName = stripTail(urn);
-  if (entities && entities[stripTail(urn)]) {
-    metricName = entities[stripTail(urn)].label.split("::")[1];
+  let metricName = urn;
+  if (entities && entities[urn]) {
+    metricName = entities[urn].label.split("::")[1].split("_").join(' ');
   }
 
   const filters = toFilters(urn).map(t => t[1]);
@@ -280,6 +291,26 @@ export function toColor(urn) {
   return 'none';
 }
 
+export function toColorDirection(delta, inverse = false) {
+  if (Number.isNaN(delta)) { return 'neutral'; }
+  
+  if (inverse) { delta *= -1; }
+  
+  switch(Math.sign(delta)) {
+    case -1: return 'negative';
+    case 0: return 'neutral';
+    case 1: return 'positive';
+  }
+}
+
+export function isInverse(urn, entities) {
+  if (!entities) { return false; }
+  if (!entities[urn]) { return false; }
+  if (!entities[urn].attributes) { return false; }
+  if (!entities[urn].attributes.inverse) { return false; }
+  return (entities[urn].attributes.inverse[0] === 'true');
+}
+
 /**
  * finds the corresponding labelMapping field given a label in the filterBarConfig
  * This is only a placeholder since the filterBarConfig is not finalized
@@ -362,8 +393,11 @@ export default Ember.Helper.helper({
   findLabelMapping,
   toMetricLabel,
   toColor,
+  toColorDirection,
+  isInverse,
   humanizeFloat,
   humanizeChange,
+  makeSortable,
   fromFilterMap,
   appendFilters,
   metricColors,

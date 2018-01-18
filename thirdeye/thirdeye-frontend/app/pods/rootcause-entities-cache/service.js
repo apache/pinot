@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { checkStatus, filterObject, filterPrefix, toBaselineRange, stripTail, toFilters } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, filterObject, filterPrefix, toBaselineRange, toFilters } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -49,7 +49,7 @@ export default Ember.Service.extend({
         return;
       }
 
-      const frameworks = new Set(['relatedEvents', 'relatedDimensions', 'relatedMetrics']);
+      const frameworks = new Set(['events', 'metricAnalysis']);
 
       this.setProperties({ context: _.cloneDeep(requestContext), pending: frameworks });
 
@@ -71,18 +71,23 @@ export default Ember.Service.extend({
       return;
     }
 
-    const pinnedBaseUrns = new Set([...pinnedUrns].map(stripTail));
+    const pinnedBaseUrns = new Set([...pinnedUrns]);
 
     // evict unselected
     const { entities, pending } = this.getProperties('entities', 'pending');
-    const stale = new Set(this._evictionCandidates(entities, framework).map(stripTail));
+    const stale = new Set(this._evictionCandidates(entities, framework));
     const staleSelected = new Set([...stale].filter(urn => pinnedBaseUrns.has(urn)));
     const staleUnselected = new Set([...stale].filter(urn => !pinnedBaseUrns.has(urn)));
+
+    // TODO dedicated _complete_identity() method?
+    // adjust incoming scores for identity
+    if (framework === 'identity') {
+      Object.keys(incoming).filter(urn => urn in entities).forEach(urn => incoming[urn].score = entities[urn].score);
+    }
 
     // rebuild remaining cache
     const remaining = {};
     Object.keys(entities).filter(urn => !staleUnselected.has(urn)).forEach(urn => remaining[urn] = entities[urn]);
-    Object.keys(entities).filter(urn => staleSelected.has(urn)).forEach(urn => remaining[urn].score = -1);
 
     // merge
     const newEntities = Object.assign({}, remaining, incoming);
@@ -96,11 +101,9 @@ export default Ember.Service.extend({
 
   _evictionCandidates(entities, framework) {
     switch (framework) {
-      case 'relatedEvents':
+      case 'events':
         return filterPrefix(Object.keys(entities), 'thirdeye:event:');
-      case 'relatedDimensions':
-        return filterPrefix(Object.keys(entities), 'thirdeye:dimension:');
-      case 'relatedMetrics':
+      case 'metricAnalysis':
         return filterPrefix(Object.keys(entities), 'thirdeye:metric:');
       case 'identity':
         return [];
@@ -110,10 +113,7 @@ export default Ember.Service.extend({
   },
 
   _makeUrl(framework, context) {
-    const metricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
-    const dimensionUrns = toFilters(metricUrns).map(t => `thirdeye:dimension:${t[0]}:${t[1]}:provided`);
-
-    const urnString = [...metricUrns, ...dimensionUrns].join(',');
+    const urnString = filterPrefix(context.urns, 'thirdeye:metric:').join(',');
     const baselineRange = toBaselineRange(context.anomalyRange, context.compareMode);
     return `/rootcause/query?framework=${framework}` +
       `&anomalyStart=${context.anomalyRange[0]}&anomalyEnd=${context.anomalyRange[1]}` +
@@ -123,8 +123,7 @@ export default Ember.Service.extend({
   },
 
   _makeIdentityUrl(urns) {
-    const baseUrns = [...urns].map(stripTail);
-    const urnString = baseUrns.join(',');
+    const urnString = [...urns].join(',');
     return `/rootcause/raw?framework=identity&urns=${urnString}`;
   },
 

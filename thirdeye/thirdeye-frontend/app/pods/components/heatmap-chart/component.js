@@ -5,8 +5,10 @@ import d3 from 'd3';
 const { get } = Ember;
 
 // TODO: move to utils file
-const getBackgroundColor = function (factor = 0) {
+const getBackgroundColor = function (factor = 0, inverse = false) {
   if (Number.isNaN(factor)) { return 'rgba(0,0,0,0)'; }
+
+  if (inverse) { factor *= -1; }
 
   const opacity = Math.min(Math.abs(factor / 0.25), 1.0);
   const color = factor > 0 ? '0,0,234' : '234,0,0';
@@ -15,8 +17,10 @@ const getBackgroundColor = function (factor = 0) {
 };
 
 // TODO: move to utils file
-const getTextColor = function (factor = 0) {
+const getTextColor = function (factor = 0, inverse = false) {
   if (Number.isNaN(factor)) { return 'rgba(0,0,0,255)'; }
+
+  if (inverse) { factor *= -1; }
 
   const opacity = Math.min(Math.abs(factor / 0.25), 1.0);
 
@@ -143,7 +147,7 @@ export default Ember.Component.extend({
     cell.append('svg:rect')
       .attr('width', d => Math.max(d.dx - 1, 0))
       .attr('height', d => Math.max(d.dy - 1, 0))
-      .style('fill', d => getBackgroundColor(d.actualValue));
+      .style('fill', d => getBackgroundColor(d.actualValue, d.inverse));
 
     // colored text
     cell.append('svg:text')
@@ -167,7 +171,7 @@ export default Ember.Component.extend({
         if (d.role !== 'value') {
           return 'rgba(0,0,0,0.45)';
         }
-        return getTextColor(d.actualValue)
+        return getTextColor(d.actualValue, d.inverse)
       });
 
     cell.on('click', get(this, 'heatmapClickHandler').bind(this));

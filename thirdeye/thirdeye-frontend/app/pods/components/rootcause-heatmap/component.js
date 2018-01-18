@@ -1,6 +1,6 @@
 import Ember from 'ember';
 import { getProperties, computed } from '@ember/object';
-import { toCurrentUrn, toBaselineUrn, filterPrefix, toMetricLabel, appendTail, humanizeChange } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, toMetricLabel, appendTail, humanizeChange, isInverse } from 'thirdeye-frontend/helpers/utils';
 import _ from 'lodash';
 
 const ROOTCAUSE_ROLLUP_MODE_CHANGE = 'change';
@@ -119,6 +119,15 @@ export default Ember.Component.extend({
     }
   ),
 
+  inverse: Ember.computed(
+    'selectedUrn',
+    'entities',
+    function () {
+      const { selectedUrn, entities } = this.getProperties('selectedUrn', 'entities');
+      return isInverse(selectedUrn, entities);
+    }
+  ),
+
   _dataRollup: Ember.computed(
     'current',
     'baseline',
@@ -168,8 +177,10 @@ export default Ember.Component.extend({
   cells: Ember.computed(
     '_dataRollup',
     'mode',
+    'isInverse',
     function () {
-      const { _dataRollup: values, mode } = this.getProperties('_dataRollup', 'mode');
+      const { _dataRollup: values, mode, inverse } =
+        this.getProperties('_dataRollup', 'mode', 'inverse');
 
       const transformation = this._makeTransformation(mode);
 
@@ -198,6 +209,7 @@ export default Ember.Component.extend({
             label: labelValue,
             value,
             size,
+            inverse,
 
             currTotal,
             baseTotal,

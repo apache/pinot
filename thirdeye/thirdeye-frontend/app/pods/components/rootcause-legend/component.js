@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toCurrentUrn, toBaselineUrn, filterPrefix, stripTail, hasPrefix, toFilters, toEntities, toMetricLabel } from '../../../helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, hasPrefix, toFilters, toEntities, toMetricLabel } from 'thirdeye-frontend/helpers/utils';
 
 export default Ember.Component.extend({
   entities: null, // {}
@@ -28,15 +28,16 @@ export default Ember.Component.extend({
     'validUrns',
     function () {
       const { validUrns, entities } = this.getProperties('validUrns', 'entities');
-      return filterPrefix(validUrns, 'thirdeye:metric:').reduce((agg, urn) => {
-        agg[urn] = toMetricLabel(urn, entities);
-        return agg;
-      }, {});
+      return filterPrefix(validUrns, 'thirdeye:metric:').
+        reduce((agg, urn) => {
+          agg[urn] = toMetricLabel(urn, entities);
+          return agg;
+        }, {});
     }
   ),
 
   /**
-   * Parses the validUrns and builds out 
+   * Parses the validUrns and builds out
    * a Mapping of event Types to a mapping of urns
    * @type {Objectgit sta}
    */
@@ -46,7 +47,7 @@ export default Ember.Component.extend({
     function () {
       const { entities, validUrns } = this.getProperties('entities', 'validUrns');
       return filterPrefix(validUrns, 'thirdeye:event:')
-        .reduce((agg, urn) => { 
+        .reduce((agg, urn) => {
           const type = urn.split(':')[2];
           agg[type] = agg[type] || {};
           Object.assign(agg[type], {
@@ -63,7 +64,12 @@ export default Ember.Component.extend({
     'validUrns',
     function () {
       const { entities, validUrns } = this.getProperties('entities', 'validUrns');
-      return validUrns.filter(urn => entities[stripTail(urn)]).reduce((agg, urn) => { agg[urn] = entities[stripTail(urn)].color; return agg; }, {});
+      return validUrns
+        .filter(urn => entities[urn])
+        .reduce((agg, urn) => {
+          agg[urn] = entities[urn].color;
+          return agg;
+        }, {});
     }
   ),
 

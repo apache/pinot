@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.rootcause.impl;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.TreeMultimap;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -109,7 +110,7 @@ public class AnomalyContextPipeline extends Pipeline {
       output.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_ANALYSIS, end - this.analysisWindow, end));
 
       // filters
-      Multimap<String, String> filters = ArrayListMultimap.create();
+      Multimap<String, String> filters = TreeMultimap.create();
       for (Map.Entry<String, String> entry : anomalyDTO.getDimensions().entrySet()) {
         filters.put(entry.getKey(), entry.getValue());
 
