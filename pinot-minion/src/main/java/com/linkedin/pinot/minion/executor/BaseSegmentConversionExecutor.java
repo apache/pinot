@@ -148,7 +148,7 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
           RetryPolicies.exponentialBackoffRetryPolicy(maxNumAttempts, initialRetryDelayMs, retryScaleFactor);
 
       try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-        if (!retryPolicy.attempt(new Callable<Boolean>() {
+        retryPolicy.attempt(new Callable<Boolean>() {
           @Override
           public Boolean call() throws Exception {
             try {
@@ -171,9 +171,7 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
               return false;
             }
           }
-        })) {
-          throw new RuntimeException("Failed to upload segment: " + segmentName);
-        }
+        });
       }
 
       LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableName, segmentName);

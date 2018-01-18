@@ -24,7 +24,6 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumer;
 import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumerFactory;
@@ -220,14 +219,13 @@ public class PinotTableIdealStateBuilder {
 
   public static int getPartitionCount(KafkaStreamMetadata kafkaMetadata) {
     KafkaPartitionsCountFetcher fetcher = new KafkaPartitionsCountFetcher(kafkaMetadata);
-    RetryPolicy policy = RetryPolicies.noDelayRetryPolicy(3);
-    boolean successful = policy.attempt(fetcher);
-    if (successful) {
+    try {
+      RetryPolicies.noDelayRetryPolicy(3).attempt(fetcher);
       return fetcher.getPartitionCount();
-    } else {
-      Exception e = fetcher.getException();
-      LOGGER.error("Could not get partition count for {}", kafkaMetadata.getKafkaTopicName(), e);
-      throw new RuntimeException(e);
+    } catch (Exception e) {
+      Exception fetcherException = fetcher.getException();
+      LOGGER.error("Could not get partition count for {}", kafkaMetadata.getKafkaTopicName(), fetcherException);
+      throw new RuntimeException(fetcherException);
     }
   }
 

@@ -2078,27 +2078,29 @@ public class PinotHelixResourceManager {
    */
   public PinotResourceManagerResponse dropInstance(final String instanceName) {
     // Delete '/INSTANCES/<server_name>'
-    final String instancePath = "/" + _helixClusterName + "/INSTANCES/" + instanceName;
-    boolean successfulInstanceRemove = DEFAULT_RETRY_POLICY.attempt(new Callable<Boolean>() {
-      @Override
-      public Boolean call()
-          throws Exception {
-        return _helixDataAccessor.getBaseDataAccessor().remove(instancePath, AccessOption.PERSISTENT);
-      }
-    });
-    if (!successfulInstanceRemove) {
+    try {
+      final String instancePath = "/" + _helixClusterName + "/INSTANCES/" + instanceName;
+      DEFAULT_RETRY_POLICY.attempt(new Callable<Boolean>() {
+        @Override
+        public Boolean call()
+            throws Exception {
+          return _helixDataAccessor.getBaseDataAccessor().remove(instancePath, AccessOption.PERSISTENT);
+        }
+      });
+    } catch (Exception e) {
       return new PinotResourceManagerResponse("Failed to erase /INSTANCES/" + instanceName, false);
     }
 
     // Delete '/CONFIGS/PARTICIPANT/<server_name>'
-    boolean successfulConfigRemove = DEFAULT_RETRY_POLICY.attempt(new Callable<Boolean>() {
-      @Override
-      public Boolean call() throws Exception {
-        PropertyKey instanceKey = _keyBuilder.instanceConfig(instanceName);
-        return _helixDataAccessor.removeProperty(instanceKey);
-      }
-    });
-    if (!successfulConfigRemove) {
+    try {
+      DEFAULT_RETRY_POLICY.attempt(new Callable<Boolean>() {
+        @Override
+        public Boolean call() throws Exception {
+          PropertyKey instanceKey = _keyBuilder.instanceConfig(instanceName);
+          return _helixDataAccessor.removeProperty(instanceKey);
+        }
+      });
+    } catch (Exception e) {
       return new PinotResourceManagerResponse("Failed to erase /CONFIGS/PARTICIPANT/" + instanceName
           + " Make sure to erase /CONFIGS/PARTICIPANT/" + instanceName  + " manually since /INSTANCES/" + instanceName
           + " has already been removed.", false);
