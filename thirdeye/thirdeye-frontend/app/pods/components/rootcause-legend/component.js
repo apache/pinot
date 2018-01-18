@@ -28,10 +28,11 @@ export default Ember.Component.extend({
     'validUrns',
     function () {
       const { validUrns, entities } = this.getProperties('validUrns', 'entities');
-      return filterPrefix(validUrns, 'thirdeye:metric:').reduce((agg, urn) => {
-        agg[urn] = toMetricLabel(urn, entities);
-        return agg;
-      }, {});
+      return filterPrefix(validUrns, 'thirdeye:metric:').
+        reduce((agg, urn) => {
+          agg[urn] = toMetricLabel(urn, entities);
+          return agg;
+        }, {});
     }
   ),
 
@@ -63,7 +64,12 @@ export default Ember.Component.extend({
     'validUrns',
     function () {
       const { entities, validUrns } = this.getProperties('entities', 'validUrns');
-      return validUrns.filter(urn => entities[urn]).reduce((agg, urn) => { agg[urn] = entities[urn].color; return agg; }, {});
+      return validUrns
+        .filter(urn => entities[urn])
+        .reduce((agg, urn) => {
+          agg[urn] = entities[urn].color;
+          return agg;
+        }, {});
     }
   ),
 
