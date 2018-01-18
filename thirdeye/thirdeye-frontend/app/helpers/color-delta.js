@@ -9,7 +9,7 @@ import Ember from 'ember';
 export function colorDelta([value = 'N/A']) {
   let sign = true;
   if (value ===  'N/A') { return; }
-  
+
   if (Number.isFinite(value)) {
     sign = parseInt(value * 100) >= 0;
   } else {

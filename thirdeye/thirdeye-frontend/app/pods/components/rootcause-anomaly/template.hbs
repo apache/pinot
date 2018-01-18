@@ -73,7 +73,7 @@
           <div class="rootcause-anomaly__stats">
             <label class="rootcause-anomaly__stats-label">Predicted Average</label>
             <span class="rootcause-anomaly__stats-value">{{get values "baseline"}}
-              <span class="rootcause-anomaly__stats-value--{{color-delta get changesFormatted "baseline"}}">
+              <span class="rootcause-anomaly__stats-value--{{color-delta (get changesFormatted "baseline")}}">
                 {{get changesFormatted "baseline"}}
               </span>
             </span>
@@ -81,7 +81,7 @@
           <div class="rootcause-anomaly__stats">
             <label class="rootcause-anomaly__stats-label">WoW</label>
             <span class="rootcause-anomaly__stats-value">{{get values "wo1w"}}
-              <span class="rootcause-anomaly__stats-value--{{color-delta get changesFormatted "wo1w"}}">
+              <span class="rootcause-anomaly__stats-value--{{color-delta (get changesFormatted "wo1w")}}">
                 {{get changesFormatted "wo1w"}}
               </span>
             </span>
@@ -89,7 +89,7 @@
           <div class="rootcause-anomaly__stats">
             <label class="rootcause-anomaly__stats-label">Wo2W</label>
             <span class="rootcause-anomaly__stats-value">{{get values "wo2w"}}
-              <span class="rootcause-anomaly__stats-value--{{color-delta get changesFormatted "wo2w"}}">
+              <span class="rootcause-anomaly__stats-value--{{color-delta (get changesFormatted "wo2w")}}">
                 {{get changesFormatted "wo2w"}}
               </span>
             </span>
@@ -97,7 +97,7 @@
           <div class="rootcause-anomaly__stats">
             <label class="rootcause-anomaly__stats-label">Wo3W</label>
             <span class="rootcause-anomaly__stats-value">{{get values "wo3w"}}
-              <span class="rootcause-anomaly__stats-value--{{color-delta get changesFormatted "wo3w"}}">
+              <span class="rootcause-anomaly__stats-value--{{color-delta (get changesFormatted "wo3w")}}">
                 {{get changesFormatted "wo3w"}}</span>
             </span>
           </div>
