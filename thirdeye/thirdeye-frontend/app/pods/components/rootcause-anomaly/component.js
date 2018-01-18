@@ -1,9 +1,10 @@
 import Component from "@ember/component";
 import { computed, setProperties, getProperties, get } from '@ember/object';
 import moment from 'moment';
-import { humanizeFloat } from 'thirdeye-frontend/helpers/utils';
+import { humanizeFloat, filterPrefix, toOffsetUrn, humanizeChange } from 'thirdeye-frontend/helpers/utils';
 
 const ROOTCAUSE_HIDDEN_DEFAULT = 'default';
+const OFFSETS = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
 
 /**
  * Maps the status from the db to something human readable to display on the form
@@ -20,11 +21,26 @@ export default Component.extend({
   classNames: ['rootcause-anomaly'],
   entities: null, // {}
 
-  anomalyUrn: null, // ""
+  /**
+   * Metrics aggregated over a search context-specific interval keyed by metric urn
+   * @type {Object} - key is metric urn, and value is a number calculated from an aggregated set of numbers interpreted
+   * based on a selected context (i.e. analysis period, baseline)
+   * @example
+   * {
+   *  metric:offset:id: 12345,
+   *  metric:offset:id2: 12345,
+   *  ...
+   * }
+   */
+  aggregates: null,
+
+  anomalyUrns: null, // Set
 
   onFeedback: null, // func (urn, feedback, comment)
 
   isHiddenUser: ROOTCAUSE_HIDDEN_DEFAULT,
+
+  offsets: OFFSETS,
 
   /**
    * Array of human readable anomaly options for users to select
@@ -37,15 +53,79 @@ export default Component.extend({
    */
   optionsMapping: ANOMALY_OPTIONS_MAPPING,
 
+  /**
+   * Urn of an anomaly
+   * @type {String}
+   */
+  anomalyUrn: computed(
+    'anomalyUrns',
+    function () {
+      const anomalyUrns = get(this, 'anomalyUrns');
+      const anomalyEventUrn = filterPrefix(anomalyUrns, 'thirdeye:event:anomaly:');
+
+      if (!anomalyEventUrn) return ;
+
+      return anomalyEventUrn[0];
+    }
+  ),
+
+  /**
+   * Information about an anomaly displayed in the overview regarding its id, metric, dimensions, alert name, and duration
+   * @type {Object}
+   */
   anomaly: computed(
     'entities',
     'anomalyUrn',
     function () {
       const { entities, anomalyUrn } = getProperties(this, 'entities', 'anomalyUrn');
 
-      if (!anomalyUrn || !entities || !entities[anomalyUrn]) { return false; }
+      if (!anomalyUrn || !entities || !entities[anomalyUrn]) return ;
 
       return entities[anomalyUrn];
+    }
+  ),
+
+  /**
+   * Information about an anomaly's baselines, changes, and values to be displayed in the anomaly overview
+   * @type {Object}
+   * @example
+   * {
+   *   current: {
+   *    change: 1.1,
+   *    changeFormatted: +1.1,
+   *    value: 5000
+   *   }, {
+   *   baseline: {
+   *    change: 1.1,
+   *    changeFormatted: 1.1,
+   *    value: 1000
+   *   }
+   * }
+   */
+  anomalyInfo: computed(
+    'aggregates',
+    'anomalyUrns',
+    function () {
+      const { aggregates, anomalyUrns } = getProperties(this, 'aggregates', 'anomalyUrns');
+      const metricUrns = filterPrefix(anomalyUrns, 'thirdeye:metric:');
+
+      if (!metricUrns) { return; }
+
+      let anomalyInfo = {};
+
+      [...this.offsets].forEach(offset => {
+        const offsetAggregate = aggregates[toOffsetUrn(metricUrns[0], offset)];
+        const change = aggregates[toOffsetUrn(metricUrns[0], 'current')] / offsetAggregate - 1;
+        const roundedChange = (Math.round(change * 1000) / 10.0).toFixed(1);
+
+        anomalyInfo[offset] = {
+          change: roundedChange,  // numerical value (positive or negative) to compute color of the change text
+          value: offsetAggregate, // numerical value to display
+          changeFormatted: humanizeChange(change) // text of % change with + or - sign
+        };
+      });
+
+      return anomalyInfo;
     }
   ),
 
@@ -63,19 +143,6 @@ export default Component.extend({
 
   dataset: computed('anomaly', function () {
     return get(this, 'anomaly').attributes.dataset[0];
-  }),
-
-  current: computed('anomaly', function () {
-    return parseFloat(get(this, 'anomaly').attributes.current[0]).toFixed(3);
-  }),
-
-  baseline: computed('anomaly', function () {
-    return parseFloat(get(this, 'anomaly').attributes.baseline[0]).toFixed(3);
-  }),
-
-  change: computed('anomaly', function () {
-    const attr = get(this, 'anomaly').attributes;
-    return (parseFloat(attr.current[0]) / parseFloat(attr.baseline[0]) - 1);
   }),
 
   status: computed('anomaly', function () {

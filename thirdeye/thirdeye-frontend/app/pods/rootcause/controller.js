@@ -104,9 +104,14 @@ export default Ember.Controller.extend({
         return;
       }
 
-      entitiesService.request(context, selectedUrns);
+      // entities
+      const entitiesUrns = new Set([...selectedUrns, ...context.urns, ...context.anomalyUrns]);
+      entitiesService.request(context, entitiesUrns);
+
+      // timeseries
       timeseriesService.request(context, selectedUrns);
 
+      // breakdowns
       if (activeTab === ROOTCAUSE_TAB_DIMENSIONS) {
         const metricUrns = new Set(filterPrefix(context.urns, 'thirdeye:metric:'));
         const currentUrns = [...metricUrns].map(toCurrentUrn);
@@ -114,16 +119,20 @@ export default Ember.Controller.extend({
         breakdownsService.request(context, new Set(currentUrns.concat(baselineUrns)));
       }
 
+      // aggregates
+      const offsets = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
+      const aggregatesUrns = new Set();
+
       if (activeTab === ROOTCAUSE_TAB_METRICS) {
-        const metricUrns = new Set(filterPrefix(Object.keys(entities), 'thirdeye:metric:'));
-        const currentUrns = [...metricUrns].map(toCurrentUrn);
-        const baselineUrns = [...metricUrns].map(toBaselineUrn);
-
-        const offsets = ['wo1w', 'wo2w', 'wo3w', 'wo4w'];
-        const offsetUrns = [...metricUrns].map(urn => [].concat(offsets.map(offset => toOffsetUrn(urn, offset)))).reduce((agg, l) => agg.concat(l), []);
-
-        aggregatesService.request(context, new Set([...currentUrns, ...baselineUrns, ...offsetUrns]));
+        filterPrefix(Object.keys(entities), 'thirdeye:metric:').forEach(urn => aggregatesUrns.add(urn));
       }
+
+      if (!_.isEmpty(context.anomalyUrns)) {
+        filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => aggregatesUrns.add(urn));
+      }
+
+      const offsetUrns = [...aggregatesUrns].map(urn => [].concat(offsets.map(offset => toOffsetUrn(urn, offset)))).reduce((agg, l) => agg.concat(l), []);
+      aggregatesService.request(context, new Set(offsetUrns));
     }
   ),
 
@@ -159,18 +168,6 @@ export default Ember.Controller.extend({
     'breakdownsService.breakdowns',
     function () {
       return this.get('breakdownsService.breakdowns');
-    }
-  ),
-
-  anomalyUrn: Ember.computed(
-    'context',
-    function () {
-      const { context } = this.getProperties('context');
-      const anomalyUrns = filterPrefix(context.urns, 'thirdeye:event:anomaly:');
-
-      if (!anomalyUrns) { return false; }
-
-      return anomalyUrns[0];
     }
   ),
 
@@ -271,6 +268,7 @@ export default Ember.Controller.extend({
       analysisRangeStart: context.analysisRange[0],
       analysisRangeEnd: context.analysisRange[1],
       contextUrns: context.urns,
+      anomalyUrns: context.anomalyUrns,
       selectedUrns
     };
   },
@@ -453,8 +451,8 @@ export default Ember.Controller.extend({
 
       const updates = [...metricUrns, ...currentUrns, ...baselineUrns].reduce((agg, urn) => {
         agg[urn] = true;
-      return agg;
-    }, {});
+        return agg;
+      }, {});
 
       this.send('onSelection', updates);
     },

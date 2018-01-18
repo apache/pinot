@@ -66,22 +66,18 @@
         </div>
 
         <div class="rootcause-anomaly__stats-wrapper">
-          <div class="rootcause-anomaly__stats">
-            <label class="rootcause-anomaly__stats-label">Duration</label>
-            <span class="rootcause-anomaly__stats-value">{{duration}}</span>
-          </div>
-          <div class="rootcause-anomaly__stats">
-            <label class="rootcause-anomaly__stats-label">Current Avg</label>
-            <span class="rootcause-anomaly__stats-value">{{current}}</span>
-          </div>
-          <div class="rootcause-anomaly__stats">
-            <label class="rootcause-anomaly__stats-label">Baseline Avg</label>
-            <span class="rootcause-anomaly__stats-value">{{baseline}}</span>
-          </div>
-          <div class="rootcause-anomaly__stats">
-            <label class="rootcause-anomaly__stats-label">Change</label>
-            <span class="rootcause-anomaly__stats-value rootcause-anomaly__stats-value--{{color-delta change}}">{{changeFormatted}}</span>
-          </div>
+          {{#each offsets as |offset|}}
+            <div class="rootcause-anomaly__stats">
+              <label class="rootcause-anomaly__stats-label">{{offset}}</label>
+              <span class="rootcause-anomaly__stats-value">{{get anomalyInfo (concat offset ".value")}}
+                {{#unless (eq offset 'Current Average')}}
+                  <span class="rootcause-anomaly__stats-change rootcause-anomaly__stats-change--{{color-delta (get anomalyInfo (concat offset ".change"))}}">
+                    ({{get anomalyInfo (concat offset ".changeFormatted")}})
+                  </span>
+                {{/unless}}
+              </span>
+            </div>
+          {{/each}}
           {{#if issueType}}
             <div class="rootcause-anomaly__stats">
               <label class="rootcause-anomaly__stats-label">Issue Type</label>
