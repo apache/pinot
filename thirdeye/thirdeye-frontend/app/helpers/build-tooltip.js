@@ -1,6 +1,6 @@
 import Helper from '@ember/component/helper';
 import { htmlSafe } from '@ember/string';
-import { filterPrefix, toBaselineUrn, toCurrentUrn, toMetricLabel, humanizeFloat } from 'thirdeye-frontend/helpers/utils';
+import { filterPrefix, toBaselineUrn, toCurrentUrn, toMetricLabel, humanizeFloat, humanizeChange, toColorDirection, isInverse } from 'thirdeye-frontend/helpers/utils';
 import moment from 'moment';
 import d3 from 'd3';
 
@@ -49,7 +49,7 @@ const getTimeseriesLookup = (timeseries, hoverUrns) => {
  * @param {Number} hoverTimestamp - hovered time in unix ms
  * @param {Object} lookup         - the mapping object
  */
-const getValues = (hoverUrns, hoverTimestamp, lookup) => {
+const getValues = (hoverUrns, hoverTimestamp, lookup, entities) => {
   const metricUrns = filterPrefix(hoverUrns, 'thirdeye:metric:');
 
   hoverTimestamp = parseInt(hoverTimestamp, 10);
@@ -67,18 +67,11 @@ const getValues = (hoverUrns, hoverTimestamp, lookup) => {
 
     const change = current / baseline - 1;
 
-    const color = (change) => {
-      if (Number.isNaN(change)) {
-        return 'neutral';
-      }
-      return change > 0 ? 'positive' : 'negative';
-    };
-
     values[urn] = {
       current: d3.format('.3s')(humanizeFloat(current)),
       baseline: d3.format('.3s')(humanizeFloat(baseline)),
-      delta: `${change > 0 ? '+' : ''}${humanizeFloat(change * 100)}`,
-      color: color(change)
+      delta: humanizeChange(change),
+      color: toColorDirection(change, isInverse(urn, entities))
     };
   });
 
@@ -115,7 +108,7 @@ export default Helper.extend({
     // TODO cache these things for performance
     const labels = getLabel(entities, hoverUrns);
     const lookup = getTimeseriesLookup(timeseries, hoverUrns);
-    const values = getValues(hoverUrns, hoverTimestamp, lookup);
+    const values = getValues(hoverUrns, hoverTimestamp, lookup, entities);
     const colors = getColors(entities, hoverUrns);
 
     /** TODO: abstract the js out of the template */
