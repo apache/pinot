@@ -13,6 +13,11 @@
     color: app-shade(black, 9);
     margin: 0;
   }
+
+  &__last-updated-info {
+    margin-top: 10px;
+  }
+
   &__side {
     display: flex;
     align-items: flex-end;
