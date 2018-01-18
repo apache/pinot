@@ -291,6 +291,26 @@ export function toColor(urn) {
   return 'none';
 }
 
+export function toColorDirection(delta, inverse = false) {
+  if (Number.isNaN(delta)) { return 'neutral'; }
+  
+  if (inverse) { delta *= -1; }
+  
+  switch(Math.sign(delta)) {
+    case -1: return 'negative';
+    case 0: return 'neutral';
+    case 1: return 'positive';
+  }
+}
+
+export function isInverse(urn, entities) {
+  if (!entities) { return false; }
+  if (!entities[urn]) { return false; }
+  if (!entities[urn].attributes) { return false; }
+  if (!entities[urn].attributes.inverse) { return false; }
+  return (entities[urn].attributes.inverse[0] === 'true');
+}
+
 /**
  * finds the corresponding labelMapping field given a label in the filterBarConfig
  * This is only a placeholder since the filterBarConfig is not finalized
@@ -373,6 +393,8 @@ export default Ember.Helper.helper({
   findLabelMapping,
   toMetricLabel,
   toColor,
+  toColorDirection,
+  isInverse,
   humanizeFloat,
   humanizeChange,
   makeSortable,

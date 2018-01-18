@@ -1,6 +1,6 @@
 import Component from '@ember/component';
 import { computed } from '@ember/object';
-import { makeSortable } from 'thirdeye-frontend/helpers/utils';
+import { makeSortable, toMetricLabel, toColorDirection, isInverse } from 'thirdeye-frontend/helpers/utils';
 
 export default Component.extend({
   /**
@@ -11,8 +11,8 @@ export default Component.extend({
     {
       template: 'custom/table-checkbox'
     }, {
-      propertyName: 'metric',
-      title: 'Metric Name',
+      propertyName: 'label',
+      title: 'Metric',
       className: 'rootcause-metric__table__column'
     }, {
       propertyName: 'score',
@@ -20,32 +20,30 @@ export default Component.extend({
       disableFiltering: true,
       className: 'rootcause-metric__table__column'
     }, {
-      propertyName: 'changeFormatted',
-      sortedBy: 'changeSortable',
-      title: 'baseline',
-      disableFiltering: true,
-      className: 'rootcause-metric__table__column'
-    }, {
-      propertyName: 'change1wFormatted',
-      sortedBy: 'change1wSortable',
+      propertyName: 'wo1w',
+      template: 'custom/metrics-table-changes/wo1w',
+      sortedBy: 'sortable_wo1w',
       title: 'WoW',
       disableFiltering: true,
       className: 'rootcause-metric__table__column'
     }, {
-      propertyName: 'change2wFormatted',
-      sortedBy: 'change2wSortable',
+      propertyName: 'wo2w',
+      template: 'custom/metrics-table-changes/wo2w',
+      sortedBy: 'sortable_wo2w',
       title: 'Wo2W',
       disableFiltering: true,
       className: 'rootcause-metric__table__column'
     }, {
-      propertyName: 'change3wFormatted',
-      sortedBy: 'change3wSortable',
+      propertyName: 'wo3w',
+      template: 'custom/metrics-table-changes/wo3w',
+      sortedBy: 'sortable_wo3w',
       title: 'Wo3W',
       disableFiltering: true,
       className: 'rootcause-metric__table__column'
     }, {
-      propertyName: 'change4wFormatted',
-      sortedBy: 'change4wSortable',
+      propertyName: 'wo4w',
+      template: 'custom/metrics-table-changes/wo4w',
+      sortedBy: 'sortable_wo4w',
       title: 'Wo4W',
       disableFiltering: true,
       className: 'rootcause-metric__table__column'
@@ -57,43 +55,41 @@ export default Component.extend({
    * @type Object[] - array of objects, each corresponding to a row in the table
    */
   metricsTableData: computed(
-    'selectedUrns',
     'urns',
-    'metrics',
-    'scores',
+    'selectedUrns',
+    'entities',
     'changesOffset',
-    'changesOffsetFormatted',
     function() {
-      let arr = [];
-      const { urns, metrics, scores, changesOffset, changesOffsetFormatted, selectedUrns } =
-        this.getProperties('urns', 'metrics', 'scores', 'changesOffset', 'changesOffsetFormatted', 'selectedUrns');
+      const { urns, entities, changesOffset, selectedUrns } =
+        this.getProperties('urns', 'entities', 'changesOffset', 'selectedUrns');
 
-      urns.forEach(urn => {
-        arr.push({
+      return urns.map(urn => {
+        return {
           urn,
           isSelected: selectedUrns.has(urn),
-          metric: metrics[urn],
-          score: scores[urn],
-          change: changesOffset['baseline'][urn],
-          change1w: changesOffset['wo1w'][urn],
-          change2w: changesOffset['wo2w'][urn],
-          change3w: changesOffset['wo3w'][urn],
-          change4w: changesOffset['wo4w'][urn],
-          changeFormatted: changesOffsetFormatted['baseline'][urn],
-          change1wFormatted: changesOffsetFormatted['wo1w'][urn],
-          change2wFormatted: changesOffsetFormatted['wo2w'][urn],
-          change3wFormatted: changesOffsetFormatted['wo3w'][urn],
-          change4wFormatted: changesOffsetFormatted['wo4w'][urn],
-          changeSortable: makeSortable(changesOffset['baseline'][urn]),
-          change1wSortable: makeSortable(changesOffset['wo1w'][urn]),
-          change2wSortable: makeSortable(changesOffset['wo2w'][urn]),
-          change3wSortable: makeSortable(changesOffset['wo3w'][urn]),
-          change4wSortable: makeSortable(changesOffset['wo4w'][urn])
-        });
+          label: toMetricLabel(urn, entities),
+          score: entities[urn].score.toFixed(2),
+          wo1w: this._makeRecord('wo1w', urn),
+          wo2w: this._makeRecord('wo2w', urn),
+          wo3w: this._makeRecord('wo3w', urn),
+          wo4w: this._makeRecord('wo4w', urn),
+          sortable_wo1w: makeSortable(changesOffset['wo1w'][urn]),
+          sortable_wo2w: makeSortable(changesOffset['wo2w'][urn]),
+          sortable_wo3w: makeSortable(changesOffset['wo3w'][urn]),
+          sortable_wo4w: makeSortable(changesOffset['wo4w'][urn])
+        };
       });
-      return arr;
     }
   ),
+
+  _makeRecord(offset, urn) {
+    const { entities, changesOffset, changesOffsetFormatted } =
+      this.getProperties('entities', 'changesOffset', 'changesOffsetFormatted');
+    return {
+      value: changesOffsetFormatted[offset][urn],
+      direction: toColorDirection(changesOffset[offset][urn], isInverse(urn, entities))
+    };
+  },
 
   /**
    * Keeps track of items that are selected in the table

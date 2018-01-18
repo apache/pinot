@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toCurrentUrn, toBaselineUrn, toOffsetUrn, hasPrefix, filterPrefix, toMetricLabel, makeSortable, humanizeChange } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, toOffsetUrn, hasPrefix, filterPrefix, toMetricLabel, makeSortable, humanizeChange, isInverse, toColorDirection } from 'thirdeye-frontend/helpers/utils';
 
 const ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC = 'metric';
 const ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET = 'dataset';
@@ -171,6 +171,22 @@ export default Ember.Component.extend({
           agg[urn] = entities[urn].score.toFixed(2);
           return agg;
         }, {});
+    }
+  ),
+
+  /**
+   * Trend direction label (positive, neutral, negative) for change values
+   */
+  directions: Ember.computed(
+    'entities',
+    'changes',
+    function () {
+      const { entities, changes } = this.getProperties('entities', 'changes');
+
+      return Object.keys(changes).reduce((agg, urn) => {
+        agg[urn] = toColorDirection(changes[urn], isInverse(urn, entities));
+        return agg;
+      }, {});
     }
   ),
 
