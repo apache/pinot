@@ -121,6 +121,7 @@ export default Ember.Component.extend({
     const timestamps = loadKeys.map(sid => [`${sid}-timestamps`].concat(series[sid].timestamps));
 
     const columns = values.concat(timestamps);
+    debugger;
 
     const colors = {};
     loadKeys.filter(sid => series[sid].color).forEach(sid => colors[sid] = colorMapping[series[sid].color]);
