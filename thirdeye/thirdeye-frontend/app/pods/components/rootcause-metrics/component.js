@@ -50,20 +50,22 @@ export default Ember.Component.extend({
       const metricUrns = filterPrefix(Object.keys(entities), ['thirdeye:metric:']);
       let output = [];
 
-      if (sortProperty === ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC) {
-        output = metricUrns.map(urn => [metrics[urn], urn]).sort();
-      }
+      switch(sortProperty) {
+        case ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC:
+          output = metricUrns.map(urn => [metrics[urn], urn]).sort();
+          break;
 
-      if (sortProperty === ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET) {
-        output = metricUrns.map(urn => [datasets[urn], urn]).sort();
-      }
+        case ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET:
+          output = metricUrns.map(urn => [datasets[urn], urn]).sort();
+          break;
 
-      if (sortProperty === ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE) {
-        output = metricUrns.map(urn => [makeSortable(changes[urn]), urn]).sort((a, b) => a[0] - b[0]);
-      }
+        case ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE:
+          output = metricUrns.map(urn => [makeSortable(changes[urn]), urn]).sort((a, b) => a[0] - b[0]);
+          break;
 
-      if (sortProperty === ROOTCAUSE_METRICS_SORT_PROPERTY_SCORE) {
-        output = metricUrns.map(urn => [makeSortable(scores[urn]), urn]).sort((a, b) => a[0] - b[0]);
+        case ROOTCAUSE_METRICS_SORT_PROPERTY_SCORE:
+          output = metricUrns.map(urn => [makeSortable(scores[urn]), urn]).sort((a, b) => a[0] - b[0]);
+          break;
       }
 
       if (sortMode === ROOTCAUSE_METRICS_SORT_MODE_DESC) {
