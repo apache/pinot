@@ -29,7 +29,7 @@ public class MetricEntityTest {
   public void testFiltersMultikey() {
     MetricEntity e = MetricEntity.fromURN("thirdeye:metric:12345:key=value:key=other:otherKey=yetAnotherValue", 1.0);
     Assert.assertEquals(e.getFilters().size(), 3);
-    Assert.assertEquals(e.getFilters().get("key"), Arrays.asList("value", "other"));
+    Assert.assertEquals(e.getFilters().get("key"), Arrays.asList("other", "value")); // stratification
     Assert.assertEquals(e.getFilters().get("otherKey").iterator().next(), "yetAnotherValue");
   }
 

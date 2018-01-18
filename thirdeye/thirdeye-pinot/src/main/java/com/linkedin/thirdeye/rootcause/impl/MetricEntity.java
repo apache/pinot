@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.rootcause.impl;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.TreeMultimap;
 import com.linkedin.thirdeye.rootcause.Entity;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -79,7 +80,7 @@ public class MetricEntity extends Entity {
   }
 
   private static Multimap<String, String> parseFilterStrings(List<String> filterStrings) {
-    Multimap<String, String> filters = ArrayListMultimap.create();
+    Multimap<String, String> filters = TreeMultimap.create();
 
     for(String filterString : filterStrings) {
       String[] parts = filterString.split("=");
