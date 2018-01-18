@@ -1,6 +1,6 @@
 import Helper from '@ember/component/helper';
 import { htmlSafe } from '@ember/string';
-import { filterPrefix, toBaselineUrn, toCurrentUrn, toMetricLabel, stripTail, humanizeFloat } from 'thirdeye-frontend/helpers/utils';
+import { filterPrefix, toBaselineUrn, toCurrentUrn, toMetricLabel, humanizeFloat } from 'thirdeye-frontend/helpers/utils';
 import moment from 'moment';
 import d3 from 'd3';
 
@@ -90,9 +90,9 @@ const getValues = (hoverUrns, hoverTimestamp, lookup) => {
  */
 const getColors = (entities, hoverUrns) => {
   return filterPrefix(hoverUrns, ['thirdeye:metric:', 'thirdeye:event:'])
-    .filter(urn => entities[stripTail(urn)])
+    .filter(urn => entities[urn])
     .reduce((agg, urn) => {
-      agg[urn] = entities[stripTail(urn)].color;
+      agg[urn] = entities[urn].color;
       return agg;
     }, {});
 };

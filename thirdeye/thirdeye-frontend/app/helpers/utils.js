@@ -165,9 +165,9 @@ export function toMetricUrn(urn) {
 }
 
 export function toMetricLabel(urn, entities) {
-  let metricName = stripTail(urn);
-  if (entities && entities[stripTail(urn)]) {
-    metricName = entities[stripTail(urn)].label.split("::")[1];
+  let metricName = urn;
+  if (entities && entities[urn]) {
+    metricName = entities[urn].label.split("::")[1].split("_").join(' ');
   }
 
   const filters = toFilters(urn).map(t => t[1]);

@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toCurrentUrn, toBaselineUrn, toOffsetUrn, hasPrefix, filterPrefix } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, toOffsetUrn, hasPrefix, filterPrefix, toMetricLabel } from 'thirdeye-frontend/helpers/utils';
 
 const ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC = 'metric';
 const ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET = 'dataset';
@@ -88,7 +88,7 @@ export default Ember.Component.extend({
       const { entities } = this.getProperties('entities');
       return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
         .reduce((agg, urn) => {
-          agg[urn] = entities[urn].label.split('::')[1].split("_").join(' ');
+          agg[urn] = toMetricLabel(urn, entities);
           return agg;
         }, {});
     }
