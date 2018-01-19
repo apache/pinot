@@ -173,7 +173,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     let sessionName = 'New Investigation (' + moment().format(dateFormat) + ')';
     let sessionText = '';
     let sessionOwner = '';
-    let sessionUpdatedTime = undefined;
+    let sessionUpdatedTime = '';
     let sessionModified = true;
     let routeErrors = new Set();
 
@@ -248,7 +248,6 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
         sessionText = text;
         sessionOwner = updatedBy;
         sessionUpdatedTime = moment(updated).format(dateFormat);
-
         sessionModified = false;
 
       } else {
