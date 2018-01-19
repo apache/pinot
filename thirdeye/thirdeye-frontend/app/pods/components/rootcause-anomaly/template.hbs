@@ -70,9 +70,9 @@
             <div class="rootcause-anomaly__stats">
               <label class="rootcause-anomaly__stats-label">{{offset}}</label>
               <span class="rootcause-anomaly__stats-value">{{get anomalyInfo (concat offset ".value")}}
-                {{#unless (eq offset 'Current Average')}}
-                  <span class="rootcause-anomaly__stats-change rootcause-anomaly__stats-change--{{color-delta (get anomalyInfo (concat offset ".change"))}}">
-                    ({{get anomalyInfo (concat offset ".changeFormatted")}})
+                {{#unless (eq offset 'current')}}
+                  <span class="rootcause-anomaly__stats-change rootcause-anomaly__stats-change--{{get anomalyInfo (concat offset ".direction")}}">
+                    ({{get anomalyInfo (concat offset ".change")}})
                   </span>
                 {{/unless}}
               </span>

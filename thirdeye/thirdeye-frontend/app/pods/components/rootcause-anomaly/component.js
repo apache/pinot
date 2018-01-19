@@ -1,7 +1,7 @@
 import Component from "@ember/component";
 import { computed, setProperties, getProperties, get } from '@ember/object';
 import moment from 'moment';
-import { humanizeFloat, filterPrefix, toOffsetUrn, humanizeChange } from 'thirdeye-frontend/helpers/utils';
+import { humanizeFloat, filterPrefix, toOffsetUrn, humanizeChange, toColorDirection, isInverse } from 'thirdeye-frontend/helpers/utils';
 
 const ROOTCAUSE_HIDDEN_DEFAULT = 'default';
 const OFFSETS = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
@@ -19,6 +19,7 @@ const ANOMALY_OPTIONS_MAPPING = {
 
 export default Component.extend({
   classNames: ['rootcause-anomaly'],
+
   entities: null, // {}
 
   /**
@@ -105,23 +106,28 @@ export default Component.extend({
   anomalyInfo: computed(
     'aggregates',
     'anomalyUrns',
+    'entities',
     function () {
-      const { aggregates, anomalyUrns } = getProperties(this, 'aggregates', 'anomalyUrns');
+      const { aggregates, anomalyUrns, entities } =
+        getProperties(this, 'aggregates', 'anomalyUrns', 'entities');
+
       const metricUrns = filterPrefix(anomalyUrns, 'thirdeye:metric:');
 
       if (!metricUrns) { return; }
 
-      let anomalyInfo = {};
+      // NOTE: supports single metric only
+      const metricUrn = metricUrns[0];
+
+      const anomalyInfo = {};
 
       [...this.offsets].forEach(offset => {
-        const offsetAggregate = aggregates[toOffsetUrn(metricUrns[0], offset)];
-        const change = aggregates[toOffsetUrn(metricUrns[0], 'current')] / offsetAggregate - 1;
-        const roundedChange = (Math.round(change * 1000) / 10.0).toFixed(1);
+        const offsetAggregate = aggregates[toOffsetUrn(metricUrn, offset)];
+        const change = aggregates[toOffsetUrn(metricUrn, 'current')] / offsetAggregate - 1;
 
         anomalyInfo[offset] = {
-          change: roundedChange,  // numerical value (positive or negative) to compute color of the change text
           value: offsetAggregate, // numerical value to display
-          changeFormatted: humanizeChange(change) // text of % change with + or - sign
+          change: humanizeChange(change), // text of % change with + or - sign
+          direction: toColorDirection(change, isInverse(metricUrn, entities))
         };
       });
 
