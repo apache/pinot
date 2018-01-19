@@ -75,15 +75,9 @@
 
     &--positive {
       color: $te-green;
-      &::after {
-        content: "%"
-      }
     }
     &--negative {
       color: $te-red;
-      &::after {
-        content: "%"
-      }
     }
     &--neutral {
       color: app-shade(black, 9);
