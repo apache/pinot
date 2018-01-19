@@ -155,7 +155,7 @@ export function appendTail(urn, tail) {
 }
 
 export function appendFilters(urn, filters) {
-  const tail = filters.map(t => `${t[0]}=${t[1]}`);
+  const tail = filters.map(t => encodeURIComponent(`${t[0]}=${t[1]}`));
   return appendTail(urn, tail);
 }
 
@@ -247,10 +247,10 @@ export function toAbsoluteRange(urn, currentRange, baselineCompareMode) {
 
 export function toFilters(urns) {
   const flatten = (agg, l) => agg.concat(l);
+  const dimensionFilters = filterPrefix(urns, 'thirdeye:dimension:').map(urn => _.slice(urn.split(':').map(decodeURIComponent), 2, 4));
+  const metricFilters = filterPrefix(urns, 'thirdeye:metric:').map(extractTail).map(enc => enc.map(tup => decodeURIComponent(tup).split('='))).reduce(flatten, []);
+  const frontendMetricFilters = filterPrefix(urns, 'frontend:metric:').map(extractTail).map(enc => enc.map(tup => decodeURIComponent(tup).split('='))).reduce(flatten, []);
 
-  const dimensionFilters = filterPrefix(urns, 'thirdeye:dimension:').map(urn => _.slice(urn.split(':'), 2, 4));
-  const metricFilters = filterPrefix(urns, 'thirdeye:metric:').map(extractTail).map(enc => enc.map(tup => tup.split('='))).reduce(flatten, []);
-  const frontendMetricFilters = filterPrefix(urns, 'frontend:metric:').map(extractTail).map(enc => enc.map(tup => tup.split('='))).reduce(flatten, []);
   return [...dimensionFilters, ...metricFilters, ...frontendMetricFilters].sort();
 }
 
@@ -293,9 +293,9 @@ export function toColor(urn) {
 
 export function toColorDirection(delta, inverse = false) {
   if (Number.isNaN(delta)) { return 'neutral'; }
-  
+
   if (inverse) { delta *= -1; }
-  
+
   switch(Math.sign(delta)) {
     case -1: return 'negative';
     case 0: return 'neutral';

@@ -113,7 +113,7 @@ export default Ember.Service.extend({
   },
 
   _makeUrl(framework, context) {
-    const urnString = filterPrefix(context.urns, 'thirdeye:metric:').join(',');
+    const urnString = filterPrefix(context.urns, 'thirdeye:metric:').map(encodeURIComponent).join(',');
     const baselineRange = toBaselineRange(context.anomalyRange, context.compareMode);
     return `/rootcause/query?framework=${framework}` +
       `&anomalyStart=${context.anomalyRange[0]}&anomalyEnd=${context.anomalyRange[1]}` +
@@ -123,7 +123,7 @@ export default Ember.Service.extend({
   },
 
   _makeIdentityUrl(urns) {
-    const urnString = [...urns].join(',');
+    const urnString = [...urns].map(encodeURIComponent).join(',');
     return `/rootcause/raw?framework=identity&urns=${urnString}`;
   },
 

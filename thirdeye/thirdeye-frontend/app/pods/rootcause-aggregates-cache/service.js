@@ -87,7 +87,6 @@ export default Ember.Service.extend({
     const metricId = urn.split(':')[3];
     const metricFilters = toFilters([urn]);
     const filters = toFilterMap(metricFilters);
-
     const filterString = encodeURIComponent(JSON.stringify(filters));
 
     const url = `/aggregation/aggregate?metricIds=${metricId}&ranges=${range[0]}:${range[1]}&filters=${filterString}`;
