@@ -101,26 +101,47 @@ export function makeSortable(f) {
   return n;
 }
 
+/**
+ * Returns true for collection-like objects with an iterator function, but treats strings as atomic item. Also null-safe.
+ */
 export function isIterable(obj) {
-  if (obj == null || _.isString(obj)) {
+  if (obj === null || _.isString(obj)) {
     return false;
   }
   return typeof obj[Symbol.iterator] === 'function';
 }
 
+/**
+ * Turns both atomic and collection-like objects into an iterable array. Null safe.
+ *
+ * @see isIterable(obj)
+ */
 export function makeIterable(obj) {
-  if (obj == null) {
+  if (obj === null) {
     return [];
   }
   return isIterable(obj) ? [...obj] : [obj];
 }
 
+/**
+ * Returns a copy of {obj} whose immediate properties have been filtered by {func}, similar Array.filter().
+ *
+ * @param {Object} obj object to filter on
+ * @param {Function} func filter function, returning true or false
+ */
 export function filterObject(obj, func) {
   const out = {};
   Object.keys(obj).filter(key => func(obj[key])).forEach(key => out[key] = obj[key]);
   return out;
 }
 
+/**
+ * Returns the base entity URN by removing any optional long tail.
+ * Example: 'thirdeye:metric:123:country=IT' returns 'thirdeye:metric:123'
+ *
+ * @param {string} urn entity urn
+ * @returns {string} base urn without tail
+ */
 export function stripTail(urn) {
   const parts = urn.split(':');
   if (urn.startsWith('thirdeye:metric:')) {
@@ -132,6 +153,13 @@ export function stripTail(urn) {
   return urn;
 }
 
+/**
+ * Returns the tail fragments of a long-form entity urn as Array. Returns an empty array if no tail exists.
+ * Example: 'thirdeye:metric:123:country=IT:page=start' returns ['country=IT', 'page=start']
+ *
+ * @param {string} urn entity urn
+ * @returns {Array} tail fragments
+ */
 export function extractTail(urn) {
   const parts = urn.split(':');
   if (urn.startsWith('thirdeye:metric:')) {
@@ -143,6 +171,13 @@ export function extractTail(urn) {
   return [];
 }
 
+/**
+ * Appends tail fragments to an existing urn. Merges with existing tail fragments and applies them in sorted order.
+ *
+ * @param {String} urn entity urn
+ * @param {Array} tail tail fragments array
+ * @returns {String} merged entity urn
+ */
 export function appendTail(urn, tail) {
   if (_.isEmpty(tail)) {
     return urn;
@@ -154,27 +189,70 @@ export function appendTail(urn, tail) {
   return `${stripTail(urn)}${appendString}`;
 }
 
+/**
+ * Appends filter fragments to a metric urn. Works similar to appendTail(), but converts filter tuples into Strings first.
+ *
+ * @see appendTail(urn, tail)
+ *
+ * @param {string} urn entity urn
+ * @param {Array} filters array of filter tuples [key, value]
+ * @returns {string} merged metric urn
+ */
 export function appendFilters(urn, filters) {
   const tail = filters.map(t => encodeURIComponent(`${t[0]}=${t[1]}`));
   return appendTail(urn, tail);
 }
 
+/**
+ * Converts any metric urn to its frontend metric-reference equivalent with a 'current' offset
+ * Example: 'thirdeye:metric:123:country=IT' returns 'frontend:metric:current:123:country=IT'
+ *
+ * @param {string} urn metric urn
+ * @returns {string} frontend metric-reference urn with offset 'current'
+ */
 export function toCurrentUrn(urn) {
   return metricUrnHelper('frontend:metric:current:', urn);
 }
 
+/**
+ * Converts any metric urn to its frontend metric-reference equivalent with a 'baseline' offset
+ * Example: 'thirdeye:metric:123:country=IT' returns 'frontend:metric:baseline:123:country=IT'
+ *
+ * @param {string} urn metric urn
+ * @returns {string} frontend metric-reference urn with offset 'baseline'
+ */
 export function toBaselineUrn(urn) {
   return metricUrnHelper('frontend:metric:baseline:', urn);
 }
 
-export function toOffsetUrn(urn, compareMode) {
-  return metricUrnHelper(`frontend:metric:${compareMode}:`, urn);
+/**
+ * Converts any metric urn to its frontend metric-reference equivalent, with an user-specified offset.
+ *
+ * @param {string} urn metric urn
+ * @param {string} offset metric reference offset ('current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w)
+ * @returns {string} frontend metric-reference urn with given offset
+ */
+export function toOffsetUrn(urn, offset) {
+  return metricUrnHelper(`frontend:metric:${offset}:`, urn);
 }
 
+/**
+ * Converts any metric urn to its entity equivalent
+ * Example: 'frontend:metric:wo2w:123:country=IT' returns 'thirdeye:metric:123:country=IT'
+ *
+ * @param {string} urn metric urn
+ */
 export function toMetricUrn(urn) {
   return metricUrnHelper('thirdeye:metric:', urn);
 }
 
+/**
+ * Returns a human-readable label for a metric urn, optionally using information from the entities cache.
+ *
+ * @param {string} urn metric urn
+ * @param {Object} entities entities cache
+ * @returns {string} human-readable metric label
+ */
 export function toMetricLabel(urn, entities) {
   let metricName = urn;
   if (entities && entities[urn]) {
@@ -187,6 +265,13 @@ export function toMetricLabel(urn, entities) {
   return `${metricName}${filterString}`;
 }
 
+/**
+ * Helper to replace metric urn prefixes of entity urns and reference urns.
+ *
+ * @param {string} prefix
+ * @param {string} urn
+ * @returns {string} urn with given prefix
+ */
 function metricUrnHelper(prefix, urn) {
   const parts = urn.split(':');
   if (hasPrefix(urn, 'thirdeye:metric:')) {
@@ -200,38 +285,77 @@ function metricUrnHelper(prefix, urn) {
   throw new Error(`Requires metric urn, but found ${urn}`);
 }
 
+/**
+ * Helper to append an optional tail to a urn
+ *
+ * @param {Array} parts urn fragments
+ * @param {int} baseLen length of the base urn, in fragments
+ * @returns {string} urn with optional tail
+ */
 function makeUrnTail(parts, baseLen) {
   return parts.length > baseLen ? ':' + _.slice(parts, baseLen).join(':') : '';
 }
 
+/**
+ * Returns true if the given urn matches AT LEAST one of the given prefixes, otherwise false.
+ * NOTE: specify prefixes with ':' at the end to avoid matching partial fragments
+ *
+ * @param {string} urn entity urn
+ * @param {Array} prefixes array of candidate prefixes
+ * @returns {boolean}
+ */
 export function hasPrefix(urn, prefixes) {
   return !_.isEmpty(makeIterable(prefixes).filter(pre => urn.startsWith(pre)));
 }
 
+/**
+ * Filters an array of urns for a given set of candidate prefixes using hasPrefix(urn, prefixes).
+ *
+ * @see hasPrefix(urn, prefixes)
+ *
+ * @param {Array} urns array of entity urns
+ * @param {Array} prefixes array of candidate prefixes
+ * @returns {boolean}
+ */
 export function filterPrefix(urns, prefixes) {
   return makeIterable(urns).filter(urn => hasPrefix(urn, prefixes));
 }
 
-export function toBaselineRange(currentRange, compareMode) {
-  const offset = {
+/**
+ * Converts a time range tuple to another time range with a given offset
+ *
+ * @param {Array} range time range tuple [start, end]
+ * @param {string} offset time offset ('current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w)
+ * @returns {Array} offset time range tuple
+ */
+export function toBaselineRange(range, offset) {
+  const offsetWeeks = {
     current: 0,
     wow: 1,
     wo1w: 1,
     wo2w: 2,
     wo3w: 3,
     wo4w: 4
-  }[compareMode.toLowerCase()];
+  }[offset.toLowerCase()];
 
-  if (offset === 0) {
-    return currentRange;
+  if (offsetWeeks === 0) {
+    return range;
   }
 
-  const start = moment(currentRange[0]).subtract(offset, 'weeks').valueOf();
-  const end = moment(currentRange[1]).subtract(offset, 'weeks').valueOf();
+  const start = moment(range[0]).subtract(offsetWeeks, 'weeks').valueOf();
+  const end = moment(range[1]).subtract(offsetWeeks, 'weeks').valueOf();
 
   return [start, end];
 }
 
+/**
+ * Replace frontend metric-reference 'baseline' offset with absolute offset
+ *
+ * @param {string} urn frontend metric-reference urn
+ * @param {Array} currentRange current time range tuple [start, end]
+ * @param {string} baselineCompareMode absolute offset for baseline ('wo1w', 'wo2w', 'wo3w', 'wo4w')
+ * @returns {string} frontend metric-reference urn with absolute offset
+ */
 export function toAbsoluteRange(urn, currentRange, baselineCompareMode) {
   if (!urn.startsWith('frontend:metric:')) {
     return currentRange;
@@ -245,6 +369,12 @@ export function toAbsoluteRange(urn, currentRange, baselineCompareMode) {
   return toBaselineRange(currentRange, compareMode);
 }
 
+/**
+ * Extract filter tuples from urns. Supports 'thirdeye:dimension:', 'thirdeye:metric:', 'frontend:metric:' prefixes.
+ *
+ * @param {Array} urns array of urns
+ * @returns {Array} array of sorted unique filter tuples ([key, value])
+ */
 export function toFilters(urns) {
   const flatten = (agg, l) => agg.concat(l);
   const dimensionFilters = filterPrefix(urns, 'thirdeye:dimension:').map(urn => _.slice(urn.split(':').map(decodeURIComponent), 2, 4));
@@ -258,6 +388,14 @@ function splitFilterFragment(fragment) {
   return [parts[0], _.slice(parts, 1).join('=')];
 }
 
+/**
+ * Converts a filter multimap/object into an array of filter tuples [key, value]
+ *
+ * @see toFilterMap(filters)
+ *
+ * @param {Object} filterMap filter values, keyed by filter keys
+ * @returns {Array} filter tuples
+ */
 export function fromFilterMap(filterMap) {
   const filters = [];
   Object.keys(filterMap).forEach(key => {
@@ -268,6 +406,14 @@ export function fromFilterMap(filterMap) {
   return filters;
 }
 
+/**
+ * Converts an array of filter tuples [key, value] into a filter multimap/object.
+ *
+ * @see fromFilterMap(filterMap)
+ *
+ * @param {Array} filters array fo filter tuples
+ * @returns {Object} multimap of filter values, keyed by filter keys
+ */
 export function toFilterMap(filters) {
   const filterMap = {};
   filters.forEach(t => {
@@ -284,6 +430,14 @@ export function toFilterMap(filters) {
   return filterMap;
 }
 
+/**
+ * Returns a color identify based on static mapping of an entity urn's id portion. Supports 'thirdeye:metric:' and 'thirdeye:event:' prefixes.
+ *
+ * @see colorMapping
+ *
+ * @param {string} urn entity urn with id
+ * @returns {string} color identifier
+ */
 export function toColor(urn) {
   // TODO move to controller, requires color loading from backend
   if (urn.startsWith('thirdeye:event:')) {
@@ -295,6 +449,15 @@ export function toColor(urn) {
   return 'none';
 }
 
+/**
+ * Returns a direction identifier for a floating point number. NaN safe.
+ *
+ * @see isInverse(urn, entities)
+ *
+ * @param {float} delta floating point delta
+ * @param {boolean} inverse invert mapping
+ * @returns {string} direction identifier ('negative', 'neutral', 'positive')
+ */
 export function toColorDirection(delta, inverse = false) {
   if (Number.isNaN(delta)) { return 'neutral'; }
 
@@ -307,6 +470,16 @@ export function toColorDirection(delta, inverse = false) {
   }
 }
 
+/**
+ * Extract information about an inverse coloring of metric changes for a urn from the entities cache.
+ * (i.e. by default up is positive, and down 'negative', this property inverts the display coloring)
+ *
+ * @see toColorDirection(delta, inverse)
+ *
+ * @param {string} urn metric urn
+ * @param {Object} entities entities cache
+ * @returns {boolean} if metric changes
+ */
 export function isInverse(urn, entities) {
   if (!entities) { return false; }
   if (!entities[urn]) { return false; }
