@@ -215,7 +215,7 @@ export default Ember.Controller.extend({
 
   isLoadingTimeseries: Ember.computed.gt('timeseriesService.pending.size', 0),
 
-  isLoadingAggregates: Ember.computed.gt('aggregatesService.pending.size', 0),
+  isLoadingAggregates: Ember.computed.or('aggregatesService.pending.size', 'entitiesService.pending.size'),
 
   isLoadingBreakdowns: Ember.computed.gt('breakdownsService.pending.size', 0),
 
