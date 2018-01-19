@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.rootcause.impl;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.MaxScoreSet;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -141,6 +142,24 @@ public class EntityUtils {
    */
   public static Set<Entity> topkNormalized(Collection<? extends Entity> entities, int k) {
     return topk(normalizeScores(entities), k);
+  }
+
+  /**
+   * Filters the input collection by (super) class {@code clazz}.
+   * Returns a set of typed Entities or an empty set if no matching instances are found.  URN
+   * conflicts are resolved by preserving the entity with the highest score.
+   *
+   * @param clazz (super) class to filter by
+   * @param <T> (super) class of output collection
+   * @return set of Entities with given super class
+   */
+  public static <T extends Entity> Set<T> filter(Collection<? extends Entity> entities, Class<? extends T> clazz) {
+    Set<T> filtered = new MaxScoreSet<>();
+    for (Entity e : entities) {
+      if (clazz.isInstance(e))
+        filtered.add((T) e);
+    }
+    return filtered;
   }
 
   /**
