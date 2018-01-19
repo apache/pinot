@@ -20,12 +20,6 @@ const ROOTCAUSE_SERVICE_BREAKDOWNS = "breakdowns";
 export default Ember.Controller.extend({
   session: Ember.inject.service(),
 
-  /**
-   * User ldap
-   * @type {String}
-   */
-  user: Ember.computed.reads('session.data.authenticated.name'),
-
   queryParams: [
     'metricId',
     'anomalyId',
@@ -384,12 +378,13 @@ export default Ember.Controller.extend({
      */
     onSessionSave() {
       const jsonString = JSON.stringify(this._makeSession());
+      const sessionUpdatedBy = this.get('session.data.authenticated.name'); // fetch ldap of current user
 
       return fetch(`/session/`, { method: 'POST', body: jsonString })
         .then(checkStatus)
         .then(res => this.setProperties({
           sessionId: res,
-          sessionOwner: this.get('user'),
+          sessionUpdatedBy,
           sessionUpdatedTime: moment().format('LLLL'),
           sessionModified: false
         }));

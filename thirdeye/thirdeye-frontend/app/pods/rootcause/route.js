@@ -172,7 +172,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     let selectedUrns = new Set();
     let sessionName = 'New Investigation (' + moment().format(dateFormat) + ')';
     let sessionText = '';
-    let sessionOwner = '';
+    let sessionUpdatedBy = '';
     let sessionUpdatedTime = '';
     let sessionModified = true;
     let routeErrors = new Set();
@@ -246,7 +246,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
         sessionName = name;
         sessionText = text;
-        sessionOwner = updatedBy;
+        sessionUpdatedBy = updatedBy;
         sessionUpdatedTime = moment(updated).format(dateFormat);
         sessionModified = false;
 
@@ -260,7 +260,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       sessionId,
       sessionName,
       sessionText,
-      sessionOwner,
+      sessionUpdatedBy,
       sessionUpdatedTime,
       sessionModified,
       settingsConfig,

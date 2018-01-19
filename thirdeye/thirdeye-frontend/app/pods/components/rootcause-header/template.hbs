@@ -31,7 +31,7 @@
     </div>
     <div class="col-xs-10">
       {{#if sessionId}}
-        <p class="rootcause-header__last-updated-info">Last edited by {{sessionOwner}} on {{sessionUpdatedTime}}</p>
+        <p class="rootcause-header__last-updated-info">Last edited by {{sessionUpdatedBy}} on {{sessionUpdatedTime}}</p>
       {{/if}}
       {{#unless showComment}}
         <a class="thirdeye-link" {{action (mut showComment) true}}>
