@@ -4,6 +4,7 @@ import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
 import _ from 'lodash';
 import fetch from 'fetch';
+import moment from 'moment';
 
 const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
 const ROOTCAUSE_TAB_METRICS = "metrics";
@@ -17,6 +18,8 @@ const ROOTCAUSE_SERVICE_BREAKDOWNS = "breakdowns";
 // TODO: Update module import to comply by new Ember standards
 
 export default Ember.Controller.extend({
+  session: Ember.inject.service(),
+
   queryParams: [
     'metricId',
     'anomalyId',
@@ -375,11 +378,14 @@ export default Ember.Controller.extend({
      */
     onSessionSave() {
       const jsonString = JSON.stringify(this._makeSession());
+      const sessionUpdatedBy = this.get('session.data.authenticated.name'); // fetch ldap of current user
 
       return fetch(`/session/`, { method: 'POST', body: jsonString })
         .then(checkStatus)
         .then(res => this.setProperties({
           sessionId: res,
+          sessionUpdatedBy,
+          sessionUpdatedTime: moment().format('LLLL'),
           sessionModified: false
         }));
     },

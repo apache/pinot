@@ -27,11 +27,12 @@
       {{/unless}}
     </div>
     <div class="rootcause-header__side">
-      {{!-- hiding save copy for now --}}
-      {{!-- <button {{action "onCopy"}} class="te-button">Save Copy</button><br/> --}}
       <button {{action "onSave"}} class="te-button">Save</button>
     </div>
     <div class="col-xs-10">
+      {{#if sessionId}}
+        <p class="rootcause-header__last-updated-info">Last edited by {{sessionUpdatedBy}} on {{sessionUpdatedTime}}</p>
+      {{/if}}
       {{#unless showComment}}
         <a class="thirdeye-link" {{action (mut showComment) true}}>
           <span><i class="glyphicon glyphicon-plus"></i></span>
