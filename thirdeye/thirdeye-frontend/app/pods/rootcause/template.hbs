@@ -25,34 +25,44 @@
   {{/if}}
 
   <div class="row card-container card-container--box-shadow">
-    <div class="rootcause-wrapper">
-      {{rootcause-legend
-        entities=entities
-        selectedUrns=selectedUrns
-        invisibleUrns=invisibleUrns
-        onVisibility=(action "onVisibility")
-        onSelection=(action "onSelection")
-      }}
-      <div class="container rootcause-wrapper__chart">
-        {{rootcause-chart-toolbar
-          context=context
-          timeseriesMode=timeseriesMode
-          onContext=(action "onContext")
-          onChart=(action "onChart")
-        }}
-        {{#if isLoadingTimeseries}}
-          <div class="spinner-wrapper spinner-wrapper--card">
-            {{ember-spinner}}
-          </div>
-        {{/if}}
-        {{rootcause-chart
+    <div class="card-container__header card-container__header--no-border card-container__header--flush-bottom">
+      <span class="card-container__title">Root cause Analysis</span>
+    </div>
+
+    <div class="card-container__body card-container__body--flush-bottom">
+      <div class="rootcause-wrapper">
+        {{rootcause-legend
           entities=entities
-          selectedUrns=chartSelectedUrns
-          timeseries=timeseries
-          timeseriesMode=timeseriesMode
-          context=context
-          onHover=(action "chartOnHover")
+          selectedUrns=selectedUrns
+          invisibleUrns=invisibleUrns
+          onVisibility=(action "onVisibility")
+          onSelection=(action "onSelection")
         }}
+        <div class="rootcause-wrapper__chart">
+          <div class="row rootcause-wrapper__toolbar">
+            {{rootcause-chart-toolbar
+              context=context
+              timeseriesMode=timeseriesMode
+              onContext=(action "onContext")
+              onChart=(action "onChart")
+            }}
+          </div>
+          {{#if isLoadingTimeseries}}
+            <div class="spinner-wrapper spinner-wrapper--card">
+              {{ember-spinner}}
+            </div>
+          {{/if}}
+          {{rootcause-chart
+            entities=entities
+            selectedUrns=chartSelectedUrns
+            timeseries=timeseries
+            timeseriesMode=timeseriesMode
+            context=context
+            onHover=(action "chartOnHover")
+          }}
+        </div>
+      </div>
+      <div class="row rootcause-compare">
         {{rootcause-select-comparison-range
           range=context.anomalyRange
           compareMode=context.compareMode
@@ -60,6 +70,7 @@
         }}
       </div>
     </div>
+
     {{#if hasServiceErrors}}
       {{#if hasErrorsEntities}}
         <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
@@ -90,7 +101,8 @@
       {{/if}}
     {{/if}}
 
-    <div class="card-container card-container--space-around">
+
+    <div class="card-container card-container--space-around card-container--flush-top">
       <div class="card-container__row card-container__row--flex row">
         <div class="col-xs-10">
           {{rootcause-select-metric-dimension

@@ -57,6 +57,11 @@
     margin: 24px;
   }
 
+  &--flush-top {
+    padding-top: 0;
+    margin-top: 0;
+  }
+
   &--box-shadow {
     border-color: transparent;
     box-shadow:
@@ -77,9 +82,22 @@
     border-bottom: 1px solid $te-grey--border;
     padding: 12px $te-spacing-lg;
     color: app-shade(black, 0.85);
+
     &--no-border {
       border: none;
     }
+
+    &--flush-bottom {
+      padding-bottom: 0;
+    }
+  }
+
+  &__title {
+    font-size: 18px;
+    line-height: 24px;
+    font-weight: 600;
+    color: app-shade(black, 9);
+    margin-bottom: 0;
   }
 
   &__subnav {
@@ -88,10 +106,13 @@
   }
 
   &__body,
-
   &__footer {
     padding: $te-spacing-lg;
+    &--flush-bottom {
+      padding-bottom: 0;
+    }
   }
+
 }
 
 .rca-search-bar {

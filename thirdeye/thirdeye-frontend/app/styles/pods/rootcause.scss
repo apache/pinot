@@ -1,5 +1,4 @@
 .rootcause-wrapper {
-  border-bottom: 1px solid $te-grey--border;
   display: flex;
   position: relative;
 
@@ -8,8 +7,16 @@
     flex-direction: column;
     align-items: stretch;
     flex-grow: 1;
-    padding-top: 12px;
+    border: 1px solid app-shade(black, 0.15);
+    border-radius: 2px;
+    margin-left: 16px;
+    padding: 12px;
   }
+}
+
+.rootcause-compare {
+  margin-top: 12px;
+  margin-bottom: 12px;
 }
 
 .rootcause-chart-container-fluid {
