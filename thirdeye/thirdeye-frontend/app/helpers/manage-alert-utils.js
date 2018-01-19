@@ -8,16 +8,12 @@ import moment from 'moment';
  * @returns {Object}
  */
 export function formatEvalMetric(metric, isPercentage = false) {
-  const isWhole = Number(metric) % 1 === 0;
+  const isWhole = Number.isInteger(Number(metric));
   let shown = (metric === 'Infinity') ? metric : 'N/A';
-  if (isFinite(metric)) {
-    if (isPercentage) {
-      shown = isWhole ? metric * 100 : (metric * 100).toFixed(1);
-    } else {
-      shown = isWhole ? metric : metric.toFixed(1);
-    }
-  }
-  return shown;
+  const multiplier = isPercentage ? 100 : 1;
+  const convertedNum = metric * multiplier;
+  const formattedNum = isWhole ? convertedNum : convertedNum.toFixed(1);
+  return isFinite(metric) ? formattedNum : shown;
 }
 
 /**
@@ -237,7 +233,7 @@ export function buildAnomalyStats(alertEvalMetrics, mode, severity = '30', isPer
       title: 'Number of anomalies',
       key: 'totalAlerts',
       text: 'Estimated average number of anomalies',
-      tooltip,
+      tooltip
     },
     {
       title: 'Precision',
