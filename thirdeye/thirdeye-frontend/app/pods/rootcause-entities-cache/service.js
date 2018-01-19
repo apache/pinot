@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { checkStatus, filterObject, filterPrefix, toBaselineRange, toFilters } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, filterObject, filterPrefix, toBaselineRange, toFilters, toColor } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
@@ -12,7 +12,7 @@ export default Ember.Service.extend({
 
   pending: null, // Set
 
-  errors: null, // Set({ frameowrk, error })
+  errors: null, // Set({ framework, error })
 
   init() {
     this._super(...arguments);
@@ -43,15 +43,16 @@ export default Ember.Service.extend({
 
     // rootcause search
     if (!_.isEqual(context, requestContext)) {
+      const newEntities = filterObject(entities, (e) => urns.has(e.urn));
+
       if (!requestContext.urns || !requestContext.urns.size) {
-        const newEntities = filterObject(entities, (e) => urns.has(e.urn));
         this.setProperties({ context: _.cloneDeep(requestContext), entities: newEntities });
         return;
       }
 
       const frameworks = new Set(['events', 'metricAnalysis']);
 
-      this.setProperties({ context: _.cloneDeep(requestContext), pending: frameworks });
+      this.setProperties({ context: _.cloneDeep(requestContext), entities: newEntities, pending: frameworks });
 
       frameworks.forEach(framework => {
         fetch(this._makeUrl(framework, requestContext))
@@ -84,6 +85,9 @@ export default Ember.Service.extend({
     if (framework === 'identity') {
       Object.keys(incoming).filter(urn => urn in entities).forEach(urn => incoming[urn].score = entities[urn].score);
     }
+
+    // augment color property
+    Object.keys(incoming).forEach(urn => incoming[urn].color = toColor(urn));
 
     // rebuild remaining cache
     const remaining = {};
