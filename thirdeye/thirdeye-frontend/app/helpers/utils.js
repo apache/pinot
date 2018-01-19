@@ -248,9 +248,14 @@ export function toAbsoluteRange(urn, currentRange, baselineCompareMode) {
 export function toFilters(urns) {
   const flatten = (agg, l) => agg.concat(l);
   const dimensionFilters = filterPrefix(urns, 'thirdeye:dimension:').map(urn => _.slice(urn.split(':').map(decodeURIComponent), 2, 4));
-  const metricFilters = filterPrefix(urns, 'thirdeye:metric:').map(extractTail).map(enc => enc.map(tup => decodeURIComponent(tup).split('='))).reduce(flatten, []);
-  const frontendMetricFilters = filterPrefix(urns, 'frontend:metric:').map(extractTail).map(enc => enc.map(tup => decodeURIComponent(tup).split('='))).reduce(flatten, []);
+  const metricFilters = filterPrefix(urns, 'thirdeye:metric:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
+  const frontendMetricFilters = filterPrefix(urns, 'frontend:metric:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
   return [...new Set([...dimensionFilters, ...metricFilters, ...frontendMetricFilters])].sort();
+}
+
+function splitFilterFragment(fragment) {
+  const parts = fragment.split('=');
+  return [parts[0], _.slice(parts, 1).join('=')];
 }
 
 export function fromFilterMap(filterMap) {

@@ -86,7 +86,7 @@ public class MetricEntity extends Entity {
     Multimap<String, String> filters = TreeMultimap.create();
 
     for(String filterString : filterStrings) {
-      String[] parts = EntityUtils.decodeURNComponent(filterString).split("=");
+      String[] parts = EntityUtils.decodeURNComponent(filterString).split("=", 2);
       if (parts.length != 2) {
         throw new IllegalArgumentException(String.format("Could not parse filter string '%s'", filterString));
       }

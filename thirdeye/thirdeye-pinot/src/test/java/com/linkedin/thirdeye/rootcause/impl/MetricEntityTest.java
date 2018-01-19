@@ -33,6 +33,13 @@ public class MetricEntityTest {
   }
 
   @Test
+  public void testFilterEncodedMultipleEquals() {
+    MetricEntity e = MetricEntity.fromURN("thirdeye:metric:12345:key%3Dvalue%3D1", 1.0);
+    Assert.assertEquals(e.getFilters().size(), 1);
+    Assert.assertEquals(e.getFilters().get("key").iterator().next(), "value=1");
+  }
+
+  @Test
   public void testFiltersMultikey() {
     MetricEntity e = MetricEntity.fromURN("thirdeye:metric:12345:key=value:key=other:otherKey=yetAnotherValue", 1.0);
     Assert.assertEquals(e.getFilters().size(), 3);
@@ -43,11 +50,6 @@ public class MetricEntityTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testFiltersShortFail() {
     MetricEntity.fromURN("thirdeye:metric:12345:key:key2=value2", 1.0);
-  }
-
-  @Test(expectedExceptions = IllegalArgumentException.class)
-  public void testFiltersLongFail() {
-    MetricEntity.fromURN("thirdeye:metric:12345:key=value=1", 1.0);
   }
 
   @Test
