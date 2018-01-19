@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.plan.maker;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.AggregationGroupByPlanNode;
@@ -34,6 +35,7 @@ import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -224,7 +226,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     AggregationFunctionType aggFuncType = AggregationFunctionType.valueOf(aggregationInfo.getAggregationType().toUpperCase());
     if (aggFuncType.isOfType(AggregationFunctionType.MAX, AggregationFunctionType.MIN, AggregationFunctionType.MINMAXRANGE)) {
       String column = aggregationInfo.getAggregationParams().get("column");
-      if (indexSegment.getDataSource(column).getDataSourceMetadata().hasDictionary()) {
+      DataSource dataSource = indexSegment.getDataSource(column);
+      if (dataSource.getDataSourceMetadata().hasDictionary() && dataSource.getDictionary().isSorted()) {
         return true;
       }
     }

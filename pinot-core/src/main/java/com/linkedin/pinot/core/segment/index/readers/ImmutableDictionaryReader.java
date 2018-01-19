@@ -56,6 +56,10 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
     return _length;
   }
 
+  public boolean isSorted() {
+    return true;
+  }
+
   @Override
   public void close() {
     _valueReader.close();
