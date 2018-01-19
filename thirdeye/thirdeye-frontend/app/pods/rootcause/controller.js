@@ -97,8 +97,8 @@ export default Ember.Controller.extend({
     'breakdownsService',
     'activeTab',
     function () {
-      const { context, entities, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, activeTab } =
-        this.getProperties('context', 'entities', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'activeTab');
+      const { context, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, activeTab } =
+        this.getProperties('context', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'activeTab');
 
       if (!context || !selectedUrns) {
         return;
@@ -107,6 +107,7 @@ export default Ember.Controller.extend({
       // entities
       const entitiesUrns = new Set([...selectedUrns, ...context.urns, ...context.anomalyUrns]);
       entitiesService.request(context, entitiesUrns);
+
 
       // timeseries
       timeseriesService.request(context, selectedUrns);
@@ -120,18 +121,23 @@ export default Ember.Controller.extend({
       }
 
       // aggregates
-      const offsets = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
       const aggregatesUrns = new Set();
 
       if (activeTab === ROOTCAUSE_TAB_METRICS) {
+        // cache may be stale, fetch directly from service
+        const entities = this.get('entitiesService.entities');
         filterPrefix(Object.keys(entities), 'thirdeye:metric:').forEach(urn => aggregatesUrns.add(urn));
       }
 
-      if (!_.isEmpty(context.anomalyUrns)) {
+      if (context.anomalyUrns.size > 0) {
         filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => aggregatesUrns.add(urn));
       }
 
-      const offsetUrns = [...aggregatesUrns].map(urn => [].concat(offsets.map(offset => toOffsetUrn(urn, offset)))).reduce((agg, l) => agg.concat(l), []);
+      const offsets = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
+      const offsetUrns = [...aggregatesUrns]
+        .map(urn => [].concat(offsets.map(offset => toOffsetUrn(urn, offset))))
+        .reduce((agg, l) => agg.concat(l), []);
+
       aggregatesService.request(context, new Set(offsetUrns));
     }
   ),
@@ -140,36 +146,13 @@ export default Ember.Controller.extend({
   // Public properties (computed)
   //
 
-  entities: Ember.computed(
-    'entitiesService.entities',
-    function () {
-      const entities = _.cloneDeep(this.get('entitiesService.entities'));
+  entities: Ember.computed.reads('entitiesService.entities'),
 
-      Object.keys(entities).forEach(urn => entities[urn].color = toColor(urn));
-      return entities;
-    }
-  ),
+  timeseries: Ember.computed.reads('timeseriesService.timeseries'),
 
-  timeseries: Ember.computed(
-    'timeseriesService.timeseries',
-    function () {
-      return this.get('timeseriesService.timeseries');
-    }
-  ),
+  aggregates: Ember.computed.reads('aggregatesService.aggregates'),
 
-  aggregates: Ember.computed(
-    'aggregatesService.aggregates',
-    function () {
-      return this.get('aggregatesService.aggregates');
-    }
-  ),
-
-  breakdowns: Ember.computed(
-    'breakdownsService.breakdowns',
-    function () {
-      return this.get('breakdownsService.breakdowns');
-    }
-  ),
+  breakdowns: Ember.computed.reads('breakdownsService.breakdowns'),
 
   metricUrn: Ember.computed(
     'context',
