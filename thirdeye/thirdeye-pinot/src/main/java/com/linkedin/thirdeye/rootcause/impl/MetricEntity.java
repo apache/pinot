@@ -1,13 +1,16 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
 import com.linkedin.thirdeye.rootcause.Entity;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -23,7 +26,7 @@ public class MetricEntity extends Entity {
   protected MetricEntity(String urn, double score, List<? extends Entity> related, long id, Multimap<String, String> filters) {
     super(urn, score, related);
     this.id = id;
-    this.filters = ArrayListMultimap.create(filters);
+    this.filters = filters;
   }
 
   public long getId() {
@@ -45,7 +48,7 @@ public class MetricEntity extends Entity {
   }
 
   public MetricEntity withFilters(Multimap<String, String> filters) {
-    return new MetricEntity(TYPE.formatURN(this.id, filters), this.getScore(), this.getRelated(), this.id, filters);
+    return new MetricEntity(TYPE.formatURN(this.id, encodeFilters(filters)), this.getScore(), this.getRelated(), this.id, filters);
   }
 
   public MetricEntity withoutFilters() {
@@ -53,19 +56,19 @@ public class MetricEntity extends Entity {
   }
 
   public static MetricEntity fromMetric(double score, Collection<? extends Entity> related, long id, Multimap<String, String> filters) {
-    return new MetricEntity(TYPE.formatURN(id, filters), score, new ArrayList<>(related), id, ArrayListMultimap.<String, String>create(filters));
+    return new MetricEntity(TYPE.formatURN(id, encodeFilters(filters)), score, new ArrayList<>(related), id, TreeMultimap.create(filters));
   }
 
   public static MetricEntity fromMetric(double score, Collection<? extends Entity> related, long id) {
-    return fromMetric(score, related, id, ArrayListMultimap.<String, String>create());
+    return fromMetric(score, related, id, TreeMultimap.<String, String>create());
   }
 
   public static MetricEntity fromMetric(double score, long id, Multimap<String, String> filters) {
-    return fromMetric(score, new ArrayList<Entity>(), id, ArrayListMultimap.<String, String>create(filters));
+    return fromMetric(score, new ArrayList<Entity>(), id, filters);
   }
 
   public static MetricEntity fromMetric(double score, long id) {
-    return fromMetric(score, new ArrayList<Entity>(), id, ArrayListMultimap.<String, String>create());
+    return fromMetric(score, new ArrayList<Entity>(), id, TreeMultimap.<String, String>create());
   }
 
   public static MetricEntity fromURN(String urn, double score) {
@@ -76,14 +79,14 @@ public class MetricEntity extends Entity {
     if(parts.length <= 2)
       throw new IllegalArgumentException(String.format("URN must have at least 3 parts but has '%d'", parts.length));
     List<String> filterStrings = Arrays.asList(Arrays.copyOfRange(parts, 3, parts.length));
-    return fromMetric(score, Long.parseLong(parts[2]), parseFilterStrings(filterStrings));
+    return fromMetric(score, Long.parseLong(parts[2]), decodeFilters(filterStrings));
   }
 
-  private static Multimap<String, String> parseFilterStrings(List<String> filterStrings) {
+  private static Multimap<String, String> decodeFilters(List<String> filterStrings) {
     Multimap<String, String> filters = TreeMultimap.create();
 
     for(String filterString : filterStrings) {
-      String[] parts = filterString.split("=");
+      String[] parts = EntityUtils.decodeURNComponent(filterString).split("=");
       if (parts.length != 2) {
         throw new IllegalArgumentException(String.format("Could not parse filter string '%s'", filterString));
       }
@@ -92,4 +95,16 @@ public class MetricEntity extends Entity {
 
     return filters;
   }
+
+  private static List<String> encodeFilters(Multimap<String, String> filters) {
+    List<String> output = new ArrayList<>();
+
+    Multimap<String, String> sorted = TreeMultimap.create(filters);
+    for(Map.Entry<String, String> entry : sorted.entries()) {
+      output.add(EntityUtils.encodeURNComponent(String.format("%s=%s", entry.getKey(), entry.getValue())));
+    }
+
+    return output;
+  }
+
 }

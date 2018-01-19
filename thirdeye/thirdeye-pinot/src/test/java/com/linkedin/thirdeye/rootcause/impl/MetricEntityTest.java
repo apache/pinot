@@ -26,6 +26,13 @@ public class MetricEntityTest {
   }
 
   @Test
+  public void testFilterEncoded() {
+    MetricEntity e = MetricEntity.fromURN("thirdeye:metric:12345:key%3Dvalue", 1.0);
+    Assert.assertEquals(e.getFilters().size(), 1);
+    Assert.assertEquals(e.getFilters().get("key").iterator().next(), "value");
+  }
+
+  @Test
   public void testFiltersMultikey() {
     MetricEntity e = MetricEntity.fromURN("thirdeye:metric:12345:key=value:key=other:otherKey=yetAnotherValue", 1.0);
     Assert.assertEquals(e.getFilters().size(), 3);
@@ -54,9 +61,9 @@ public class MetricEntityTest {
 
     Assert.assertEquals(e.getUrn().split(":").length, 6);
     Assert.assertTrue(e.getUrn().startsWith("thirdeye:metric:123"));
-    Assert.assertTrue(e.getUrn().contains(":anotherKey=otherValue"));
-    Assert.assertTrue(e.getUrn().contains(":key=value"));
-    Assert.assertTrue(e.getUrn().contains(":key=otherValue"));
+    Assert.assertTrue(e.getUrn().contains(":anotherKey%3DotherValue"));
+    Assert.assertTrue(e.getUrn().contains(":key%3Dvalue"));
+    Assert.assertTrue(e.getUrn().contains(":key%3DotherValue"));
   }
 
   @Test
@@ -71,13 +78,13 @@ public class MetricEntityTest {
     MetricEntity e = MetricEntity.fromMetric(1.0, 123, filters1);
     Assert.assertEquals(e.getUrn().split(":").length, 5);
     Assert.assertTrue(e.getUrn().startsWith("thirdeye:metric:123"));
-    Assert.assertTrue(e.getUrn().contains(":anotherKey=otherValue"));
-    Assert.assertTrue(e.getUrn().contains(":key=otherValue"));
+    Assert.assertTrue(e.getUrn().contains(":anotherKey%3DotherValue"));
+    Assert.assertTrue(e.getUrn().contains(":key%3DotherValue"));
 
     MetricEntity aug = e.withFilters(filters2);
     Assert.assertEquals(aug.getUrn().split(":").length, 4);
     Assert.assertTrue(aug.getUrn().startsWith("thirdeye:metric:123"));
-    Assert.assertTrue(aug.getUrn().contains(":key=value"));
+    Assert.assertTrue(aug.getUrn().contains(":key%3Dvalue"));
   }
 
   @Test
@@ -90,9 +97,9 @@ public class MetricEntityTest {
     MetricEntity e = MetricEntity.fromMetric(1.0, 123, filters);
     Assert.assertEquals(e.getUrn().split(":").length, 6);
     Assert.assertTrue(e.getUrn().startsWith("thirdeye:metric:123"));
-    Assert.assertTrue(e.getUrn().contains(":anotherKey=otherValue"));
-    Assert.assertTrue(e.getUrn().contains(":key=value"));
-    Assert.assertTrue(e.getUrn().contains(":key=otherValue"));
+    Assert.assertTrue(e.getUrn().contains(":anotherKey%3DotherValue"));
+    Assert.assertTrue(e.getUrn().contains(":key%3Dvalue"));
+    Assert.assertTrue(e.getUrn().contains(":key%3DotherValue"));
 
     MetricEntity drop = e.withoutFilters();
     Assert.assertEquals(drop.getUrn(), "thirdeye:metric:123");

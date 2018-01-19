@@ -101,13 +101,13 @@ public class MetricMappingPipelineTest {
     List<MetricEntity> result = getSorted(pipeline.run(context));
 
     Assert.assertEquals(result.size(), 7);
-    assertEquals(result.get(0), "thirdeye:metric:100:L=1:L=2:M=3:N=4:Q=1:Q=2", 1.0);
-    assertEquals(result.get(1), "thirdeye:metric:101:S=one", 0.9);
-    assertEquals(result.get(2), "thirdeye:metric:102:S=one", 0.9);
-    assertEquals(result.get(3), "thirdeye:metric:103:M=3:R=1:R=2", 0.9);
-    assertEquals(result.get(4), "thirdeye:metric:104:M=3", 0.81);
-    assertEquals(result.get(5), "thirdeye:metric:105:M=3:N=4", 0.9);
-    assertEquals(result.get(6), "thirdeye:metric:106:N=4", 0.81);
+    assertEquals(result.get(0), "thirdeye:metric:100:L%3D1:L%3D2:M%3D3:N%3D4:Q%3D1:Q%3D2", 1.0);
+    assertEquals(result.get(1), "thirdeye:metric:101:S%3Done", 0.9);
+    assertEquals(result.get(2), "thirdeye:metric:102:S%3Done", 0.9);
+    assertEquals(result.get(3), "thirdeye:metric:103:M%3D3:R%3D1:R%3D2", 0.9);
+    assertEquals(result.get(4), "thirdeye:metric:104:M%3D3", 0.81);
+    assertEquals(result.get(5), "thirdeye:metric:105:M%3D3:N%3D4", 0.9);
+    assertEquals(result.get(6), "thirdeye:metric:106:N%3D4", 0.81);
   }
 
   private static MetricConfigDTO makeMetric(long id, String dataset) {

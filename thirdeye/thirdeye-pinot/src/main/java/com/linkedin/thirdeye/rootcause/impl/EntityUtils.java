@@ -1,9 +1,10 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.MaxScoreSet;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -280,5 +281,37 @@ public class EntityUtils {
    */
   public static <T extends Entity> List<T> addRelated(Iterable<T> entities, Entity related) {
     return addRelated(entities, Collections.singletonList(related));
+  }
+
+  /**
+   * Decode URN fragment to original data.
+   * <br/><b>NOTE:</b> almost similar to JavaScript's decodeURIComponent, but may cause issues with '+'
+   *
+   * @param value urn fragment value
+   * @return decoded value
+   */
+  public static String decodeURNComponent(String value) {
+    try {
+      return URLDecoder.decode(value, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      // must not happen, utf-8 is part of java spec
+      throw new IllegalStateException(e);
+    }
+  }
+
+  /**
+   * Encode data to URN fragment.
+   * <br/><b>NOTE:</b> almost similar to JavaScript's encodeURIComponent, but may cause issues with '+'
+   *
+   * @param value value
+   * @return encoded urn fragment
+   */
+  public static String encodeURNComponent(String value) {
+    try {
+      return URLEncoder.encode(value, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      // must not happen, utf-8 is part of java spec
+      throw new IllegalStateException(e);
+    }
   }
 }

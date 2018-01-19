@@ -30,32 +30,29 @@ public final class EntityType {
   }
 
   /**
-   * Returns the parameterized type as string urn. Attaches values in order. Also unwraps the last element
-   * if provided as a Map or Multimap.
+   * Returns the parameterized type as string urn. Attaches values in order. Also unwraps elements
+   * if provided as a Collection.
    *
    * @param values parameters, in order
    * @return formatted urn
    */
   public String formatURN(Object... values) {
-    if (values.length <= 0) {
-      return this.prefix;
+    List<String> tailValues = new ArrayList<>();
+    for (Object value : values) {
+
+      // unwrap collection
+      if (value instanceof Collection) {
+        for (Object v : (Collection<String>) value) {
+          tailValues.add(v.toString());
+        }
+
+      // single item
+      } else {
+        tailValues.add(value.toString());
+      }
     }
 
-    if (values[values.length - 1] instanceof Map) {
-      Map<String, String> tailValues = (Map<String, String>) values[values.length - 1];
-      Object[] headValues = Arrays.copyOf(values, values.length - 1);
-      String tail = tailValues.isEmpty() ? "" :  ":" + makeTail(tailValues.entrySet());
-      return this.prefix + StringUtils.join(headValues, ":") + tail;
-    }
-
-    if (values[values.length - 1] instanceof Multimap) {
-      Multimap<String, String> tailValues = (Multimap<String, String>) values[values.length - 1];
-      Object[] headValues = Arrays.copyOf(values, values.length - 1);
-      String tail = tailValues.isEmpty() ? "" :  ":" + makeTail(tailValues.entries());
-      return this.prefix + StringUtils.join(headValues, ":") + tail;
-    }
-
-    return this.prefix + StringUtils.join(values, ":");
+    return this.prefix + StringUtils.join(tailValues, ":");
   }
 
   public boolean isType(String urn) {
@@ -66,13 +63,4 @@ public final class EntityType {
     return e.getUrn().startsWith(this.prefix);
   }
 
-  private static String makeTail(Collection<Map.Entry<String, String>> entries) {
-    List<String> parts = new ArrayList<>();
-
-    for (Map.Entry<String, String> entry : entries) {
-      parts.add(String.format("%s=%s", entry.getKey(), entry.getValue()));
-    }
-
-    return StringUtils.join(parts, ":");
-  }
 }
