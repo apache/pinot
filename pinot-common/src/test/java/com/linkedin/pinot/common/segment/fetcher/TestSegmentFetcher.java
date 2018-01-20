@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
+import java.util.Collections;
+import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 
 import java.io.File;
@@ -30,5 +32,10 @@ public class TestSegmentFetcher implements SegmentFetcher {
   @Override
   public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
 
+  }
+
+  @Override
+  public Set<String> getProtectedConfigKeys() {
+    return Collections.<String>emptySet();
   }
 }

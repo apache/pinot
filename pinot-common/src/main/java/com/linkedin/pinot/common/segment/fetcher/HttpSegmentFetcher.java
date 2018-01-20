@@ -21,6 +21,10 @@ import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import java.io.File;
 import java.net.URI;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
@@ -74,5 +78,10 @@ public class HttpSegmentFetcher implements SegmentFetcher {
         }
       }
     });
+  }
+
+  @Override
+  public Set<String> getProtectedConfigKeys() {
+    return Collections.<String>emptySet();
   }
 }
