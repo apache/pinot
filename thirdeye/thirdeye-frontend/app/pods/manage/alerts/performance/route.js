@@ -125,8 +125,8 @@ const standardDeviation = (values) => {
  */
 const calculateRate = (anomalies, subset) => {
   let percentage = 0;
-  if (anomalies && anomalies.tot && subset && subset.tot) {
-    percentage = (subset.tot * 100) / anomalies.tot;
+  if (anomalies && subset) {
+    percentage = (subset * 100) / anomalies;
   }
   return Number(percentage.toFixed());
 };
@@ -225,8 +225,14 @@ export default Ember.Route.extend({
           });
 
           // Make custom calculations
-          avgData['responseRate'] = avgData['responseRate'] ? calculateRate(avgData['totalAlerts'], avgData['totalResponses']) : 'N/A';
-          avgData['precision'] = avgData['precision'] ? calculateRate(avgData['totalAlerts'], avgData['trueAnomalies']) : 'N/A';
+          let pTrue = avgData['trueAnomalies'] ? avgData['trueAnomalies'].tot || 0 : 0;
+          let pNew = avgData['newTrend'] ? avgData['newTrend'].tot || 0 : 0;
+          let pFalse = avgData['falseAlarm'] ? avgData['falseAlarm'].tot || 0 : 0;
+          let rResponses = avgData['totalResponses'] ? avgData['totalResponses'].tot || 0 : 0;
+          let rTotal = avgData['totalAlerts'] ? avgData['totalAlerts'].tot || 0 : 0;
+          let precisionTotal = pTrue + pNew + pFalse;
+          avgData['responseRate'] = avgData['responseRate'] ? calculateRate(rTotal, rResponses) : 'N/A';
+          avgData['precision'] = avgData['precision'] ? calculateRate(precisionTotal, pTrue + pNew) : 'N/A';
 
           // Add perf data to application groups array
           newGroupArr.push({

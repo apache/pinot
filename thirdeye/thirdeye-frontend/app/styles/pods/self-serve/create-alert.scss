@@ -8,7 +8,7 @@
   border-radius: 5px;
 
   &--pending {
-    background-color: $te-light-grey;
+    background-color: app-shade(black, 1);
     height: 420px;
     text-align: center;
     font-weight: bold;

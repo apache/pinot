@@ -14,8 +14,7 @@
       {{#if (not isReplayPending)}}
         <div class="te-search-results__cta">
           {{#if isOverViewModeActive}}
-            <a class="te-button te-button--link" {{action "onClickEdit"}}>Edit</a>
-            <button {{action "onClickAlertSubscribe"}} class="te-button te-button--outline">Subscribe</button>
+            <button class="te-button te-button--outline" {{action "onClickEdit"}}>Edit</button>
           {{else}}
             <button {{action "onClickNavToOverview"}} class="te-button te-button--outline">Back to overview</button>
           {{/if}}
@@ -73,7 +72,9 @@
         </li>
         <li class="te-search-results__row">
           <div class="te-search-results__option te-search-results__option--solo">Anomaly Pattern</div>
-          <div class="te-search-results__value-solo" title={{alertData.pattern}}>{{alertData.pattern}}</div>
+          <div class="te-search-results__value-solo" title={{alertData.pattern}}>
+            {{if alertData.pattern alertData.pattern 'N/A'}}
+          </div>
         </li>
         <li class="te-search-results__row">
           <div class="te-search-results__option te-search-results__option--solo">Mailing List</div>
@@ -84,13 +85,23 @@
           </div>
         </li>
       </div>
+      <div class="col-xs-12 col-sm-7">
+        <li class="te-search-results__row">
+          <div class="te-search-results__option te-search-results__option--solo">Granularity</div>
+          <div class="te-search-results__value-solo" title={{alertData.granularity}}>
+            <span class="{{unless alertData.granularity 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+              {{if alertData.granularity alertData.granularity 'N/A'}}
+            </span>
+          </div>
+        </li>
+      </div>
     </ul>
 
     {{#if isEditModeActive}}
       <div class="te-topcard-subnav">
         <div class="te-topcard-subnav__item">
           {{#link-to "manage.alert.edit" alertData.id class="thirdeye-link thirdeye-link--smaller thirdeye-link--nav" activeClass="thirdeye-link--active"}}
-            Alert settings
+            Edit alert settings
           {{/link-to}}
         </div>
         <div class="te-topcard-subnav__item">
