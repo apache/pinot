@@ -1,0 +1,7 @@
+[
+  {
+    "column" : "JobID",
+    "range" : false,
+    "cardinality" : 100000
+  }
+]

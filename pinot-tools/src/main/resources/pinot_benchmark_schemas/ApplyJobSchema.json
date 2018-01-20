@@ -1,0 +1,66 @@
+{
+  "metricFieldSpecs": [
+    {
+      "dataType" : "INT",
+      "name" : "JobAdReviewTime"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "INT",
+      "name" : "TimeSpent"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "singleValueField" : true,
+      "dataType" : "String",
+      "name" : "ApplicantProfileId"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "ApplicantHeadline"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "ApplicantPosition"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "JobID"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "JobUrl"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "JobTitle"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "JobAbstract"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "JobWriter"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "JobCompany"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "DidApplyIsFinalized?"
+    }
+  ],
+  "schemaName": "ApplyJobSchema"
+}

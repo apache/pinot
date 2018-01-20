@@ -50,6 +50,8 @@ public class GlobalPlanImplV0 extends Plan {
 
   @Override
   public void execute() {
+    long tid = Thread.currentThread().getId();
+
     long startTime = System.currentTimeMillis();
     PlanNode root = getRoot();
     UResultOperator operator = (UResultOperator) root.run();

@@ -35,12 +35,12 @@ public final class SchemaInfo {
     public static String SEGMENT_DIR = "/tmp/segment";
 
     /* Schema Files for tables */
-    public static final List<String> SCHEMAS = Arrays.asList("new_data/jobSchema.json", "new_data/adsSchema.json",
-            "new_data/articlesSchema.json", "new_data/viewsSchema.json");
+    public static final List<String> SCHEMAS = Arrays.asList("schemas/benchmark/pinot/PinotJobSchema.json", "schemas/benchmark/pinot/AdClickSchema.json",
+            "schemas/benchmark/pinot/ReadArticleSchema.json", "schemas/benchmark/pinot/ProfileViewSchema.json");
 
     /* Schema Annotation files for each schema file */
-    public static final List<String> SCHEMAS_ANNOTATIONS = Arrays.asList("new_data/jobSchemaAnnotation.json",
-            "new_data/adsSchemaAnnotation.json", "new_data/articlesSchemaAnnotation.json", "new_data/viewsSchemaAnnotation.json");
+    public static final List<String> SCHEMAS_ANNOTATIONS = Arrays.asList("schemas/benchmark/pinot/PinotJobSchemaAnnotation.json",
+            "schemas/benchmark/pinot/AdClickSchemaAnnotation.json", "schemas/benchmark/pinot/ReadArticleSchemaAnnotation.json", "schemas/benchmark/pinot/viewsSchemaAnnotation.json");
 
     /* Number of records to generate for each table */
     public static final List<Integer> NUM_RECORDS = Arrays.asList(7500, 1000, 1000, 1000);
@@ -58,8 +58,8 @@ public final class SchemaInfo {
     public static final List<String> TABLE_NAMES = Arrays.asList("Job", "Ads", "Articles", "Views");
 
     /* Table configuration files */
-    public static final List<String> TABLE_DEFINITIONS = Arrays.asList("new_data/jobTable.json",
-            "new_data/adsTable.json", "new_data/articlesTable.json", "new_data/viewsTable.json");
+    public static final List<String> TABLE_DEFINITIONS = Arrays.asList("schemas/benchmark/pinot/PinotJobTable.json",
+            "schemas/benchmark/pinot/AdClickTable.json", "schemas/benchmark/pinot/ReadArticleTable.json", "schemas/benchmark/pinot/viewsTable.json");
 
     /* Upload intervals for each table (in minutes) */
     public static final List<Integer> UPLOAD_DURATION = Arrays.asList(1, 2, 1, 2);

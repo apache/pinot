@@ -2,55 +2,55 @@
   "metricFieldSpecs": [
     {
       "dataType" : "INT",
-      "name" : "adPostTime"
+      "name" : "ProfileVieweTimestamp"
     },
     {
       "singleValueField" : true,
       "dataType" : "INT",
-      "name" : "posterId"
-    },
-    {
-      "singleValueField" : true,
-      "dataType" : "INT",
-      "name" : "popularityScore"
-    },
-    {
-      "singleValueField" : true,
-      "dataType" : "INT",
-      "name" : "ranking"
-    },
-    {
-      "singleValueField" : true,
-      "dataType" : "INT",
-      "name" : "earning"
-    },
-    {
-      "singleValueField" : true,
-      "dataType" : "INT",
-      "name" : "costOfMaking"
-    },
-    {
-      "singleValueField" : true,
-      "dataType" : "INT",
-      "name" : "viewersCount"
+      "name" : "ReviewTime"
     }
   ],
   "dimensionFieldSpecs": [
     {
       "singleValueField" : true,
-      "dataType": "STRING",
-      "name": "title"
+      "dataType" : "STRING",
+      "name" : "ViewerProfileId"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "ViewedProfileId"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "company"
+      "name": "ViewerCompany"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "category"
+      "name": "ViewerHeadline"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "ViewerPosition"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "ViewedProfileHeadline"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "ViewedProfilePosition"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "WereProfilesConnected?"
     }
   ],
-  "schemaName": "AdsSchema"
+  "schemaName": "ProfileViewSchema"
 }

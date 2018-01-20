@@ -53,6 +53,7 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.util.parsing.combinator.token.StdTokens;
 
 
 public class ServerQueryExecutorV1Impl implements QueryExecutor {
@@ -100,6 +101,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     ThreadMXBean bean = ManagementFactory.getThreadMXBean( );
+    long tid = Thread.currentThread().getId();
 
     long startCpuTime = 0;
     if(bean.isCurrentThreadCpuTimeSupported())
@@ -177,7 +179,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       if(bean.isCurrentThreadCpuTimeSupported())
       {
         long endCpuTime = bean.getCurrentThreadCpuTime();
-        cpuTime = endCpuTime-startCpuTime;
+        if(endCpuTime >= startCpuTime)
+        {
+          cpuTime = endCpuTime-startCpuTime;
+        }
+        else
+        {
+          cpuTime = Long.MIN_VALUE - startCpuTime;
+          cpuTime += endCpuTime;
+        }
+
       }
       else
       {

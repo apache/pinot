@@ -16,6 +16,7 @@
 package com.linkedin.pinot.tools.data.generator;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.utils.DataTable;
 
 
 /**
@@ -37,7 +38,10 @@ public class GeneratorFactory {
     if (type == DataType.STRING) {
       return new StringGenerator(cardinality);
     }
-
+    if (type == DataType.STRING_ID)
+    {
+      return  new StringIDGenerator(cardinality);
+    }
     return new NumberGenerator(cardinality, type, false);
   }
 
@@ -60,7 +64,6 @@ public class GeneratorFactory {
       case DOUBLE:
         generator = new RangeDoubleGenerator(start, end);
         break;
-
       default:
         throw new RuntimeException("Invalid datatype");
 

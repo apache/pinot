@@ -2,60 +2,60 @@
   "metricFieldSpecs": [
     {
       "dataType" : "INT",
-      "name" : "profileViewedTimestamp"
+      "name" : "ArticleReadTime"
     },
     {
       "singleValueField" : true,
       "dataType" : "INT",
-      "name" : "viewerId"
-    },
-    {
-      "singleValueField" : true,
-      "dataType" : "INT",
-      "name" : "viewedUserId"
-    },
-    {
-      "singleValueField" : true,
-      "dataType" : "INT",
-      "name" : "weeklyChange"
-    },
-    {
-      "singleValueField" : true,
-      "dataType" : "INT",
-      "name" : "monthlyChange"
-    },
-    {
-      "singleValueField" : true,
-      "dataType" : "INT",
-      "name" : "appearancesInSearch"
-    },
-    {
-      "singleValueField" : true,
-      "dataType" : "INT",
-      "name" : "connectionDuration"
+      "name" : "TimeSpent"
     }
   ],
   "dimensionFieldSpecs": [
     {
       "singleValueField" : true,
-      "dataType": "STRING",
-      "name": "viewerLocation"
+      "dataType" : "String",
+      "name" : "ReaderProfileId"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "ViewerHeadline"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "ViewerPosition"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "ArticleID"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "ArticleUrl"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "viewedUserLocation"
+      "name": "ArticleTitle"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "viewerCompany"
+      "name": "ArticleAbstract"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "viewerTitle"
+      "name": "ArticleWriter"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "ArticleCompany"
     }
   ],
-  "schemaName": "ProfileSchema"
+  "schemaName": "ReadArticleSchema"
 }

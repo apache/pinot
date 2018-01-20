@@ -1,0 +1,7 @@
+[
+  {
+    "column" : "ArticleID",
+    "range" : false,
+    "cardinality" : 100000
+  }
+]

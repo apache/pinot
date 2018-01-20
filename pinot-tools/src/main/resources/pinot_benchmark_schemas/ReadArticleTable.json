@@ -1,19 +1,18 @@
 {
-  "tableName": "TestTable",
+  "tableName": "ReadArticle",
   "tableType": "OFFLINE",
   "segmentsConfig": {
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-    "schemaName": "testSchema",
+    "schemaName": "ReadArticleSchema",
     "replication": "1"
   },
   "tenants": {
   },
   "tableIndexConfig": {
     "loadMode": "HEAP",
-    "invertedIndexColumns": [
-      "id"
-    ]
+    "invertedIndexColumns": [],
+    "lazyLoad"  : "true"
   },
   "metadata": {
     "customConfigs": {

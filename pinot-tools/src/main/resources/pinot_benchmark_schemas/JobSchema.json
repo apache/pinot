@@ -1,0 +1,42 @@
+{
+  "metricFieldSpecs": [
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING_ID",
+      "name" : "JobID"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "JobUrl"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "JobTitle"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "JobLocation"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "JobAbstract"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "JobWriter"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "JobCompany"
+    }
+  ],
+  "schemaName": "JobSchema"
+}

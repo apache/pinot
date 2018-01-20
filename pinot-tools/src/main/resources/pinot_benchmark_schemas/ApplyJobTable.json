@@ -1,10 +1,10 @@
 {
-  "tableName": "Views",
+  "tableName": "ApplyJob",
   "tableType": "OFFLINE",
   "segmentsConfig": {
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-    "schemaName": "ProfileSchema",
+    "schemaName": "ApplyJobSchema",
     "replication": "1"
   },
   "tenants": {

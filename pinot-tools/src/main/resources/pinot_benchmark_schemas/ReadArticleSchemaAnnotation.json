@@ -2,14 +2,14 @@
   {
     "column" : "articlePostTime",
     "range" : true,
-    "rangeStart" : 946684800,
+    "rangeStart" : 1483228800,
     "rangeEnd"   : 1508873892
   },
   {
     "column" : "posterId",
     "range" : true,
-    "rangeStart" : 1,
-    "rangeEnd"   : 100000
+    "rangeStart" : 1000000000,
+    "rangeEnd"   : 9000000000
   },
   {
     "column" : "popularityScore",

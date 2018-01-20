@@ -139,7 +139,7 @@ public class DataGenerator {
   }
 
   public static void main(String[] args) throws IOException, JSONException {
-    final String[] columns = { "column1", "column2", "column3", "column4", "column5" };
+    final String[] columns = { "column1"};
     final Map<String, DataType> dataTypes = new HashMap<String, DataType>();
     final Map<String, FieldType> fieldTypes = new HashMap<String, FieldType>();
     final Map<String, TimeUnit> timeUnits = new HashMap<String, TimeUnit>();
@@ -148,7 +148,7 @@ public class DataGenerator {
     final Map<String, IntRange> range = new HashMap<String, IntRange>();
 
     for (final String col : columns) {
-      dataTypes.put(col, DataType.INT);
+      dataTypes.put(col, DataType.STRING_ID);
       fieldTypes.put(col, FieldType.DIMENSION);
       cardinality.put(col, 1000);
     }

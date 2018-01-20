@@ -1,0 +1,57 @@
+{
+  "metricFieldSpecs": [
+    {
+      "singleValueField" : true,
+      "dataType" : "LONG",
+      "name" : "ClickTime"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "ViewerProfileId"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "ViewerHeadline"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "ViewerPosition"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "AdID"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "AdUrl"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "AdTitle"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "AdText"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "AdCompany"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "AdCampaign"
+    }
+  ],
+  "schemaName": "AdClickSchema"
+}

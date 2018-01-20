@@ -1,0 +1,37 @@
+{
+  "metricFieldSpecs": [
+   ],
+  "dimensionFieldSpecs": [
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING_ID",
+      "name" : "AdID"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "AdUrl"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "AdTitle"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "AdText"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "AdCompany"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "AdCampaign"
+    }
+  ],
+  "schemaName": "AdSchema"
+}

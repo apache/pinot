@@ -1,0 +1,37 @@
+{
+  "metricFieldSpecs": [
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING_ID",
+      "name" : "ArticleID"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "ArticleUrl"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "ArticleTitle"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "ArticleAbstract"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "ArticleWriter"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "ArticleCompany"
+    }
+  ],
+  "schemaName": "ArticleSchema"
+}

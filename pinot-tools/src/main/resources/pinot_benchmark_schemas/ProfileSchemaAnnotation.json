@@ -1,0 +1,7 @@
+[
+  {
+    "column" : "ProfileID",
+    "range" : false,
+    "cardinality" : 100000
+  }
+]

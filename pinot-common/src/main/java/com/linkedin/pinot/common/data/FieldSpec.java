@@ -226,7 +226,8 @@ public abstract class FieldSpec {
     LONG_ARRAY,
     FLOAT_ARRAY,
     DOUBLE_ARRAY,
-    STRING_ARRAY;
+    STRING_ARRAY,
+    STRING_ID;
 
     public boolean isNumber() {
       switch (this) {

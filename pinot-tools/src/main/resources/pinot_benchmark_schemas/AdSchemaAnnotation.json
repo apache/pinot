@@ -1,0 +1,32 @@
+[
+  {
+    "column" : "AdID",
+    "range" : false,
+    "cardinality" : 100000
+  },
+  {
+    "column" : "AdUrl",
+    "range" : false,
+    "cardinality" : 100000
+  },
+  {
+    "column" : "AdTitle",
+    "range" : false,
+    "cardinality" : 50000
+  },
+  {
+    "column" : "AdText",
+    "range" : false,
+    "cardinality" : 100000
+  },
+  {
+    "column" : "AdCompany",
+    "range" : false,
+    "cardinality" : 5000
+  },
+  {
+    "column" : "AdCampaign",
+    "range" : false,
+    "cardinality" : 1000
+  }
+]
