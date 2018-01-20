@@ -580,7 +580,6 @@ export default Ember.Helper.helper({
   metricColors,
   colorMapping,
   eventColorMapping,
-  buildDateEod,
   parseProps,
   postProps,
   toIso
