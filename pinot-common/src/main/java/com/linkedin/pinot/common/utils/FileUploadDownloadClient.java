@@ -41,12 +41,6 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
-import org.apache.http.config.Registry;
-import org.apache.http.config.RegistryBuilder;
-import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.http.conn.socket.ConnectionSocketFactory;
-import org.apache.http.conn.socket.PlainConnectionSocketFactory;
-import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.entity.mime.HttpMultipartMode;
@@ -56,7 +50,6 @@ import org.apache.http.entity.mime.content.FileBody;
 import org.apache.http.entity.mime.content.InputStreamBody;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 
 
 public class FileUploadDownloadClient implements Closeable {
@@ -99,13 +92,7 @@ public class FileUploadDownloadClient implements Closeable {
    * @param sslContext
    */
   public FileUploadDownloadClient(SSLContext sslContext) {
-    SSLConnectionSocketFactory sslConnectionSocketFactory = new SSLConnectionSocketFactory(sslContext);
-    Registry<ConnectionSocketFactory> registry =
-        RegistryBuilder.<ConnectionSocketFactory>create().register("http", new PlainConnectionSocketFactory())
-            .register("https", sslConnectionSocketFactory)
-            .build();
-    HttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager(registry);
-    _httpClient = HttpClients.custom().setConnectionManager(connectionManager).build();
+    _httpClient = HttpClients.custom().setSSLContext(sslContext).build();
   }
 
   private static URI getURI(String scheme, String host, int port, String path) throws URISyntaxException {
