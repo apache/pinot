@@ -5,7 +5,7 @@
     <div class="col-xs-12">
       <legend class="te-form__section-title">Metric Details</legend>
     </div>
-    <div class="form-group col-xs-12 col-sm-8">
+    <div class="col-xs-12 col-sm-8">
       <div class="te-page__right te-page__right--inside">
         {{#link-to "self-serve.import-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
           Import a Metric From InGraphs
@@ -34,7 +34,7 @@
       {{/bs-alert}}
     {{/if}}
 
-    <div class="form-group col-xs-6 col-sm-4">
+    <div class="col-xs-6 col-sm-4">
       <label for="select-granularity" class="control-label te-label">Desired Granularity</label>
       {{#power-select
         options=metricGranularityOptions
@@ -51,7 +51,7 @@
       {{/power-select}}
     </div>
 
-    <div class="form-group col-xs-6">
+    <div class="col-xs-6">
       <label for="select-filters" class="control-label te-label required">Filters (optional)</label>
       {{filter-select
         options=filters
@@ -62,7 +62,7 @@
       }}
     </div>
 
-    <div class="form-group col-xs-6">
+    <div class="col-xs-6">
       <label for="select-dimension" class="control-label te-label">Dimension (optional)</label>
       {{#power-select
         classNames="te-input"
@@ -100,7 +100,6 @@
             showLegend=true
             enableZoom=true
             componentId='create-alert'
-            showGraphLegend=showGraphLegend
             showGraphLegend=false
             onSelection=(action "onSelection")
             onPrimaryMetricToggle=(action "onPrimaryMetricToggle")
@@ -119,17 +118,17 @@
     </div>
   </fieldset>
 
-  <fieldset class="te-form__se  ction row">
+  <fieldset class="te-form__section row">
     <div class="col-xs-12">
       <legend class="te-form__section-title">Detection Configuration</legend>
     </div>
     {{!-- Field: Pattern --}}
-    <div class="form-group col-xs-6">
+    <div class="col-xs-{{if isNewUx '4' '6'}}">
       <label for="select-pattern" class="control-label te-label required">Pattern of Interest *</label>
       {{#power-select
         loadingMessage="Waiting for the server...."
         triggerId="select-pattern"
-        triggerClass="te-form__select"
+        triggerClass="te-form__select {{if isNewUx 'col-xs-4'}}"
         placeholder="Select a Pattern"
         loadingMessage="Please select a metric first"
         options=patternsOfInterest
@@ -145,39 +144,88 @@
     </div>
 
     {{!-- Field: Sensitivity --}}
-    <div class="form-group col-xs-6">
-      <label for="select-sensitivity" class="control-label te-label required">
-        Sensitivity (optional)
-        <span>
-          <i class="glyphicon glyphicon-question-sign"></i>
-          {{#tooltip-on-element class="te-tooltip"}}
-            How sensitive do you want your alert to be? "Sensitive" sends emails for most anomalies. "Robust" only sends emails for the strongest anomalies. You can always see the full list of anomalies on ThirdEye.
-          {{/tooltip-on-element}}
-        </span>
-      </label>
-      {{#power-select
-        loadingMessage="Waiting for the server...."
-        triggerId="select-sensitivity"
-        triggerClass="te-form__select"
-        placeholder="Select a sensitivity"
-        loadingMessage="Please select a metric first"
-        options=sensitivityOptions
-        allowClear=true
-        searchEnabled=false
-        selected=selectedSensitivity
-        onchange=(action (mut selectedSensitivity))
-        disabled=(not isMetricSelected)
-        required=true
-        as |sensitivity|
-      }}
+    {{#if isNewUx}}
+      <div class="te-form__vertical-block col-xs-12">
+        <label for="select-sensitivity" class="control-label te-label required">
+          Sensitivity (optional)
+        </label>
+        <div class="te-form__indent-block--custom">
+          <span class="te-form__list-label">When</span>
+          <div class="te-form__tune-field">
+            {{#power-select
+              triggerId="alert-tune-severity"
+              triggerClass="te-form__tune-field"
+              verticalPosition="below"
+              placeholder="Select a severity"
+              options=tuneSeverityOptions
+              searchEnabled=false
+              selected=selectedSeverityOption
+              onchange=(action (mut selectedSeverityOption))
+              disabled=(not isMetricSelected)
+              as |severity|
+            }}
+              {{severity}}
+            {{/power-select}}
+          </div>
+          <span class="te-form__list-label">is >=</span>
+          <div class="te-form__tune-field te-form__tune-field--amount">
+            {{input
+              type="text"
+              id="custom-tune-percent"
+              class="form-control te-input te-input"
+              value=customPercentChange
+              disabled=(not isMetricSelected)
+            }}
+          </div>
+          <span class="te-form__list-label--suffix">{{sensitivityUnits}}, </span>
+          <span class="te-form__list-label">MTTD should be no more than</span>
+          <div class="te-form__tune-field te-form__tune-field--amount">
+            {{input
+              type="text"
+              id="custom-tune-mttd"
+              class="form-control te-input"
+              value=customMttdChange
+              disabled=(not isMetricSelected)
+            }}
+          </div>
+          <span class="te-form__list-label">hours</span>
+        </div>
+      </div>
+    {{else}}
+      <div class="form-group col-xs-6">
+        <label for="select-sensitivity" class="control-label te-label required">
+          Sensitivity (optional)
+          <span>
+            <i class="glyphicon glyphicon-question-sign"></i>
+            {{#tooltip-on-element class="te-tooltip"}}
+              How sensitive do you want your alert to be? "Sensitive" sends emails for most anomalies. "Robust" only sends emails for the strongest anomalies. You can always see the full list of anomalies on ThirdEye.
+            {{/tooltip-on-element}}
+          </span>
+        </label>
+        {{#power-select
+          loadingMessage="Waiting for the server...."
+          triggerId="select-sensitivity"
+          triggerClass="te-form__select"
+          placeholder="Select a sensitivity"
+          loadingMessage="Please select a metric first"
+          options=sensitivityOptions
+          allowClear=true
+          searchEnabled=false
+          selected=selectedSensitivity
+          onchange=(action (mut selectedSensitivity))
+          disabled=(not isMetricSelected)
+          required=true
+          as |sensitivity|
+        }}
 
-        {{sensitivity}}
-      {{/power-select}}
-    </div>
+          {{sensitivity}}
+        {{/power-select}}
+      </div>
+    {{/if}}
 
     {{!-- Field: Weekly Effect --}}
     {{#if (eq selectedGranularity 'DAYS')}}
-      <div class="form-group col-xs-6">
+      <div class="col-xs-6">
         <label for="select-effect" class="control-label te-label required">
           Weekly Seasonality *
           <span>
@@ -212,7 +260,7 @@
     </div>
 
     {{!-- Field: Alert Name --}}
-    <div class="form-group col-xs-12">
+    <div class="col-xs-12">
       <label for="anomaly-form-function-name" class="control-label te-label required">
         Alert Name *
         <div class="te-form__sub-label">Please follow this naming convention: <span class="te-form__sub-label--strong">productName_metricName_dimensionName_other</span></div>
@@ -233,7 +281,7 @@
     </div>
 
     {{!-- Field: App Name --}}
-    <div class="form-group col-xs-12">
+    <div class="col-xs-12">
       <label for="anomaly-form-app-name" class="control-label te-label required">Related Application, Product or Team *</label>
        {{#power-select
           options=allApplicationNames
@@ -253,7 +301,7 @@
     </div>
 
     {{!-- Field: Select Existing Subscription Group --}}
-    <div class="form-group col-sm-6">
+    <div class="col-sm-6">
       <label for="config-group" class="control-label te-label">Add This Alert To An Existing Subscription Group</label>
       {{#power-select
         options=filteredConfigGroups
@@ -273,7 +321,7 @@
       {{/power-select}}
     </div>
     {{!--  Fields for new alert group creation --}}
-    <div class="form-group col-sm-6">
+    <div class="col-sm-6">
       <label for="config-group-new-name" class="control-label te-label"><strong>Or</strong> Provide A New Subscription Group Name</label>
       {{#if isGroupNameDuplicate}}
         <div class="te-form__alert--warning alert-warning">Warning: <strong>{{newConfigGroupName}}</strong> already exists. Please try another name.</div>
@@ -291,7 +339,7 @@
     </div>
     {{!-- Alert Group Metadata --}}
     {{#if selectedConfigGroup}}
-      <div class="form-group col-xs-12">
+      <div class="col-xs-12">
         {{#if selectedGroupFunctions.length}}
           {{#bs-accordion as |acc|}}
             {{#acc.item class="te-form__custom-label" title=selectedConfigGroupSubtitle}}
@@ -310,7 +358,7 @@
       </div>
     {{/if}}
     {{!-- Field: new alert group recipient emails --}}
-    <div class="form-group col-xs-12">
+    <div class="col-xs-12">
       <label for="config-group" class="control-label te-label">
         Add Alert Notification Recipients *
         <div class="te-form__sub-label">Current recipients: <span class="te-form__sub-label--strong">{{if selectedGroupRecipients selectedGroupRecipients "None"}}</span></div>

@@ -8,6 +8,12 @@ import fetch from 'fetch';
 import RSVP from 'rsvp';
 
 export default Ember.Route.extend({
+  queryParams: {
+    newUx: {
+      refreshModel: false,
+      replace: true
+    }
+  },
 
   actions: {
     /**
@@ -25,9 +31,10 @@ export default Ember.Route.extend({
    * @method model
    * @return {Object}
    */
-  model() {
+  model(params, transition) {
     return RSVP.hash({
       // Fetch all alert group configurations
+      isNewUx: transition.queryParams.newUx || false,
       allConfigGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(res => res.json()),
       allAppNames: fetch('/thirdeye/entity/APPLICATION').then(res => res.json())
     });

@@ -7,10 +7,17 @@ import fetch from 'fetch';
 import Ember from 'ember';
 import moment from 'moment';
 import _ from 'lodash';
-import { checkStatus, buildDateEod } from 'thirdeye-frontend/helpers/utils';
+import Controller from '@ember/controller';
+import { computed } from '@ember/object';
 import { task, timeout } from 'ember-concurrency';
+import { checkStatus, buildDateEod } from 'thirdeye-frontend/helpers/utils';
 
-export default Ember.Controller.extend({
+export default Controller.extend({
+  /**
+   * Be ready to receive trigger for loading new ux with redirect to alert page
+   */
+  queryParams: ['newUx'],
+  newUx: null,
 
   /**
    * Initialized alert creation page settings
@@ -54,7 +61,7 @@ export default Ember.Controller.extend({
   /**
    * Change this to activate new alert anomaly page redirect
    */
-  redirectToAlertPage: true,
+  isNewUx: Ember.computed.reads('model.isNewUx'),
 
   /**
    * Component property initial settings
@@ -121,14 +128,76 @@ export default Ember.Controller.extend({
       'Robust (Low)': 'LOW',
       'Medium': 'MEDIUM',
       'Sensitive (High)': 'HIGH'
+    },
+    severity: {
+      'Percentage of Change': 'weight',
+      'Absolute Value of Change': 'deviation'
     }
   },
+
+  /**
+   * Severity display options (power-select) and values
+   * @type {Object}
+   */
+  tuneSeverityOptions: computed(
+    'optionMap.severity',
+    function() {
+      const severityOptions = Object.keys(this.get('optionMap.severity'));
+      return severityOptions;
+    }
+  ),
+
+  /**
+   * Conditionally display '%' based on selected severity option
+   * @type {String}
+   */
+  sensitivityUnits: computed('selectedSeverityOption', function() {
+    const chosenSeverity = this.get('selectedSeverityOption');
+    const isNotPercent = chosenSeverity && chosenSeverity.includes('Absolute');
+    return isNotPercent ? '' : '%';
+  }),
+
+  /**
+   * Builds the new autotune filter from custom tuning options
+   * @type {String}
+   */
+  alertFilterObj: computed(
+    'selectedSeverityOption',
+    'customPercentChange',
+    'customMttdChange',
+    'selectedPattern',
+    function() {
+      const {
+        severity: severityMap,
+        pattern: patternMap
+      } = this.getProperties('optionMap');
+
+      const {
+        selectedPattern,
+        customMttdChange,
+        customPercentChange,
+        selectedSeverityOption: selectedSeverity
+      } = this.getProperties('selectedPattern', 'customMttdChange', 'customPercentChange', 'selectedSeverityOption');
+
+      const mttdVal = Number(customMttdChange).toFixed(2);
+      const severityThresholdVal = (Number(customPercentChange)/100).toFixed(2);
+      const featureString = `window_size_in_hour,${severityMap[selectedSeverity]}`;
+      const mttdString = `window_size_in_hour=${mttdVal};${severityMap[selectedSeverity]}=${severityThresholdVal}`;
+      const patternString = patternMap[selectedPattern] ? `&pattern=${encodeURIComponent(patternMap[selectedPattern])}` : '';
+      const finalStr = `&features=${encodeURIComponent(featureString)}&mttd=${encodeURIComponent(mttdString)}${patternString}`;
+      return {
+        features: featureString,
+        mttd: mttdString,
+        pattern: patternString
+      };
+    }
+  ),
 
   /**
    * All selected dimensions to be loaded into graph
    * @returns {Array}
    */
-  selectedDimensions: Ember.computed(
+  selectedDimensions: computed(
     'topDimensions',
     'topDimensions.@each.isSelected',
     function() {
@@ -140,7 +209,7 @@ export default Ember.Controller.extend({
    * Setting default sensitivity if selectedSensitivity is undefined
    * @returns {String}
    */
-  sensitivityWithDefault: Ember.computed(
+  sensitivityWithDefault: computed(
     'selectedSensitivity',
     'selectedGranularity',
     function() {
@@ -449,7 +518,7 @@ export default Ember.Controller.extend({
           topDimensions = filteredDimensions.sortBy('score').reverse().slice(0, maxSize);
           topDimensionLabels = [...new Set(topDimensions.map(key => key.label.split('=')[1]))];
           // Build the array of subdimension objects for the selected dimension
-          for(let subDimension of topDimensionLabels){
+          for (let subDimension of topDimensionLabels) {
             if (subDimension && dimensionObj[subDimension]) {
               dimensionList.push({
                 name: subDimension,
@@ -577,7 +646,7 @@ export default Ember.Controller.extend({
    * @method isAlertGroupEditModeActive
    * @return {Boolean}
    */
-  isAlertGroupEditModeActive: Ember.computed(
+  isAlertGroupEditModeActive: computed(
     'selectedConfigGroup',
     'newConfigGroupName',
     function() {
@@ -590,7 +659,7 @@ export default Ember.Controller.extend({
    * @method isFilterSelectDisabled
    * @return {Boolean}
    */
-  isFilterSelectDisabled: Ember.computed(
+  isFilterSelectDisabled: computed(
     'filters',
     'isMetricSelected',
     function() {
@@ -603,7 +672,7 @@ export default Ember.Controller.extend({
    * @method isGranularitySelectDisabled
    * @return {Boolean}
    */
-  isGranularitySelectDisabled: Ember.computed(
+  isGranularitySelectDisabled: computed(
     'granularities',
     'isMetricSelected',
     function() {
@@ -617,7 +686,7 @@ export default Ember.Controller.extend({
    * @param {Number} metricId - Id of selected metric to graph
    * @return {Boolean} PreventSubmit
    */
-  isSubmitDisabled: Ember.computed(
+  isSubmitDisabled: computed(
     'selectedMetricOption',
     'selectedPattern',
     'selectedWeeklyEffect',
@@ -697,7 +766,7 @@ export default Ember.Controller.extend({
    * @param {Object} selectedMetricOption - the selected metric's properties
    * @return {Object} New function object
    */
-  newAlertProperties: Ember.computed(
+  newAlertProperties: computed(
     'alertFunctionName',
     'selectedMetricOption',
     'selectedDimension',
@@ -783,7 +852,7 @@ export default Ember.Controller.extend({
    * @param {Object} selectedApplication - user-selected application object
    * @return {Array} activeGroups - filtered list of groups that are active
    */
-  filteredConfigGroups: Ember.computed(
+  filteredConfigGroups: computed(
     'selectedApplication',
     function() {
       const appName = this.get('selectedApplication');
@@ -803,7 +872,7 @@ export default Ember.Controller.extend({
    * @method graphMessageText
    * @return {String} the appropriate graph placeholder text
    */
-  graphMessageText: Ember.computed(
+  graphMessageText: computed(
     'isMetricDataInvalid',
     function() {
       const defaultMsg = 'Once a metric is selected, the metric replay graph will show here';
@@ -817,7 +886,7 @@ export default Ember.Controller.extend({
    * @method graphMailtoLink
    * @return {String} the URI-encoded mailto link
    */
-  graphMailtoLink: Ember.computed(
+  graphMailtoLink: computed(
     'selectedMetricOption',
     function() {
       const selectedMetric = this.get('selectedMetricOption');
@@ -835,7 +904,7 @@ export default Ember.Controller.extend({
    * @method selectedConfigGroupSubtitle
    * @return {String} title of expandable section for selected config group
    */
-  selectedConfigGroupSubtitle: Ember.computed(
+  selectedConfigGroupSubtitle: computed(
     'selectedConfigGroup',
     function () {
       return `Alerts Monitored by: ${this.get('selectedConfigGroup.name')}`;
@@ -989,6 +1058,7 @@ export default Ember.Controller.extend({
      * @return {undefined}
      */
     onSelectGranularity(selectedObj) {
+      console.log('newUx: ', this.get('isNewUx'));
       this.setProperties({
         selectedGranularity: selectedObj,
         isMetricDataLoading: true
@@ -1163,7 +1233,7 @@ export default Ember.Controller.extend({
         alertGroupNewRecipient: newEmails
       } = this.getProperties('newAlertProperties', 'selectedGroupRecipients', 'alertGroupNewRecipient');
 
-      const redirectToAlertPage = this.get('redirectToAlertPage');
+      const redirectToAlertPage = this.get('isNewUx');
       const newEmailsArr = newEmails ? newEmails.replace(/ /g, '').split(',') : [];
       const existingEmailsArr = oldEmails ? oldEmails.replace(/ /g, '').split(',') : [];
       const newRecipientsArr = newEmailsArr.length ? existingEmailsArr.concat(newEmailsArr) : existingEmailsArr;
@@ -1241,7 +1311,9 @@ export default Ember.Controller.extend({
           }
 
           // Redirect to onboarding page to trigger wrapper
-          this.transitionToRoute('manage.alert', this.get('newFuncId'), { queryParams: { replayId }});
+          if (redirectToAlertPage) {
+            this.transitionToRoute('manage.alert', this.get('newFuncId'), { queryParams: { replayId }});
+          }
         // If Alert Group edit/create fails, remove the orphaned anomaly Id
         }).catch((error) => {
           this.setAlertCreateErrorState(error);
