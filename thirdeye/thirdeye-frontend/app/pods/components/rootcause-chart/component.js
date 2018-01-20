@@ -105,8 +105,7 @@ export default Ember.Component.extend({
           min: analysisRange[0],
           max: analysisRange[1],
           tick: {
-            count: Math.ceil(moment.duration(analysisRange[1] - analysisRange[0]).asDays()),
-            format: '%Y-%m-%d'
+            fit: false
           }
         }
       };
