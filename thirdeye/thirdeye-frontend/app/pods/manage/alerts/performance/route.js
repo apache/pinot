@@ -198,6 +198,7 @@ export default Ember.Route.extend({
 
           // Get array of keys from first record
           let metricKeys = Object.keys(groupData[0].data);
+          let getTotalValue = (key) => Ember.getWithDefault(avgData, key, 0);
           count++;
 
           // Look at each anomaly's perf object keys. For our "roundable" fields, get derived data
@@ -224,12 +225,12 @@ export default Ember.Route.extend({
             avgData[key].values = allValues;
           });
 
-          // Make custom calculations
-          let pTrue = avgData['trueAnomalies'] ? avgData['trueAnomalies'].tot || 0 : 0;
-          let pNew = avgData['newTrend'] ? avgData['newTrend'].tot || 0 : 0;
-          let pFalse = avgData['falseAlarm'] ? avgData['falseAlarm'].tot || 0 : 0;
-          let rResponses = avgData['totalResponses'] ? avgData['totalResponses'].tot || 0 : 0;
-          let rTotal = avgData['totalAlerts'] ? avgData['totalAlerts'].tot || 0 : 0;
+          // Gather totals and make custom calculations
+          let pTrue = getTotalValue('trueAnomalies.tot');
+          let pNew = getTotalValue('newTrend.tot');
+          let pFalse = getTotalValue('falseAlarm.tot');
+          let rResponses = getTotalValue('totalResponses.tot');
+          let rTotal = getTotalValue('totalAlerts.tot');
           let precisionTotal = pTrue + pNew + pFalse;
           avgData['responseRate'] = avgData['responseRate'] ? calculateRate(rTotal, rResponses) : 'N/A';
           avgData['precision'] = avgData['precision'] ? calculateRate(precisionTotal, pTrue + pNew) : 'N/A';
@@ -259,22 +260,8 @@ export default Ember.Route.extend({
 
       })
       .catch((err) => {
+        console.log('err : ', err);
         controller.set('isDataLoadingError', true);
       });
-  },
-
-  /**
-   * Model hook for the create alert route.
-   * @method resetController
-   * @param {Object} controller - active controller
-   * @param {Boolean} isExiting - exit status
-   * @param {Object} transition - transition obj
-   * @return {undefined}
-   */
-  resetController(controller, isExiting) {
-    this._super(...arguments);
-    if (isExiting) {
-      controller.clearAll();
-    }
   }
 });
