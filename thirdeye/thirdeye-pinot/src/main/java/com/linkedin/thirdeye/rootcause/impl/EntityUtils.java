@@ -285,7 +285,7 @@ public class EntityUtils {
 
   /**
    * Decode URN fragment to original data.
-   * <br/><b>NOTE:</b> almost similar to JavaScript's decodeURIComponent, but may cause issues with '+'
+   * <br/><b>NOTE:</b> compatible with JavaScript's decodeURIComponent
    *
    * @param value urn fragment value
    * @return decoded value
@@ -301,14 +301,20 @@ public class EntityUtils {
 
   /**
    * Encode data to URN fragment.
-   * <br/><b>NOTE:</b> almost similar to JavaScript's encodeURIComponent, but may cause issues with '+'
+   * <br/><b>NOTE:</b> similar to JavaScript's encodeURIComponent for basic ascii set
    *
    * @param value value
    * @return encoded urn fragment
    */
   public static String encodeURNComponent(String value) {
     try {
-      return URLEncoder.encode(value, "UTF-8");
+      return URLEncoder.encode(value, "UTF-8")
+          .replace("+", "%20")
+          .replace("%21", "!")
+          .replace("%27", "\'")
+          .replace("%28", "(")
+          .replace("%29", ")")
+          .replace("%7E", "~");
     } catch (UnsupportedEncodingException e) {
       // must not happen, utf-8 is part of java spec
       throw new IllegalStateException(e);
