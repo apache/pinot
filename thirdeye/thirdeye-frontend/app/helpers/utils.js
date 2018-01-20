@@ -401,7 +401,7 @@ export function fromFilterMap(filterMap) {
   Object.keys(filterMap).forEach(key => {
     [...filterMap[key]].forEach(value => {
       filters.push([key, value]);
-    })
+    });
   });
   return filters;
 }
@@ -481,12 +481,11 @@ export function toColorDirection(delta, inverse = false) {
  * @returns {boolean} whether metric changes are colored inversely
  */
 export function isInverse(urn, entities) {
-  if (!entities) { return false; }
-  if (!entities[urn]) { return false; }
-  if (!entities[urn].attributes) { return false; }
-  if (!entities[urn].attributes.inverse) { return false; }
-  return (entities[urn].attributes.inverse[0] === 'true');
-}
+  try {
+    return (entities[urn].attributes.inverse[0] === 'true');
+  } catch (error) {
+    return false;
+  }}
 
 /**
  * Extracts information about whether a metric is tagged as additive or not.
@@ -496,12 +495,11 @@ export function isInverse(urn, entities) {
  * @returns {boolean} if metric is tagged as additive
  */
 export function isAdditive(urn, entities) {
-  if (!entities) { return false; }
-  if (!entities[urn]) { return false; }
-  if (!entities[urn].attributes) { return false; }
-  if (!entities[urn].attributes.additive) { return false; }
-  return (entities[urn].attributes.additive[0] === 'true');
-}
+  try {
+    return (entities[urn].attributes.additive[0] === 'true');
+  } catch (error) {
+    return false;
+  }}
 
 /**
  * finds the corresponding labelMapping field given a label in the filterBarConfig
@@ -565,7 +563,6 @@ export function toIso(dateStr) {
 
 export default Ember.Helper.helper({
   checkStatus,
-  buildDateEod,
   isIterable,
   makeIterable,
   filterObject,
