@@ -1,6 +1,6 @@
 import Ember from 'ember';
 import { getProperties, computed } from '@ember/object';
-import { toCurrentUrn, toBaselineUrn, filterPrefix, toMetricLabel, appendTail, humanizeChange, isInverse } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, toMetricLabel, appendTail, humanizeChange, isInverse, isAdditive } from 'thirdeye-frontend/helpers/utils';
 import _ from 'lodash';
 
 const ROOTCAUSE_ROLLUP_MODE_CHANGE = 'change';
@@ -33,6 +33,8 @@ export default Ember.Component.extend({
   selectedUrn: null, // Set
 
   onSelection: null, // func (updates)
+
+  isLoadingBreakdowns: null, // bool
 
   //
   // internal
@@ -107,24 +109,42 @@ export default Ember.Component.extend({
 
   hasCurrent: Ember.computed(
     'current',
+    'isLoadingBreakdowns',
     function () {
-      return Object.keys(this.get('current')).length > 0;
+      const { current, isLoadingBreakdowns } = this.getProperties('current', 'isLoadingBreakdowns');
+      return isLoadingBreakdowns || !_.isEmpty(current);
     }
   ),
 
   hasBaseline: Ember.computed(
     'baseline',
+    'isLoadingBreakdowns',
     function () {
-      return Object.keys(this.get('baseline')).length > 0;
+      const { baseline, isLoadingBreakdowns } = this.getProperties('baseline', 'isLoadingBreakdowns');
+      return isLoadingBreakdowns || !_.isEmpty(baseline);
     }
   ),
 
-  inverse: Ember.computed(
+  isInverse: Ember.computed(
     'selectedUrn',
     'entities',
     function () {
       const { selectedUrn, entities } = this.getProperties('selectedUrn', 'entities');
       return isInverse(selectedUrn, entities);
+    }
+  ),
+
+  isAdditive: Ember.computed(
+    'selectedUrn',
+    'entities',
+    function () {
+      const { selectedUrn, entities } = this.getProperties('selectedUrn', 'entities');
+      // prevent flashing error message
+      if (!(selectedUrn in entities)) {
+        return true;
+      }
+
+      return isAdditive(selectedUrn, entities);
     }
   ),
 
@@ -179,8 +199,8 @@ export default Ember.Component.extend({
     'mode',
     'isInverse',
     function () {
-      const { _dataRollup: values, mode, inverse } =
-        this.getProperties('_dataRollup', 'mode', 'inverse');
+      const { _dataRollup: values, mode, isInverse } =
+        this.getProperties('_dataRollup', 'mode', 'isInverse');
 
       const transformation = this._makeTransformation(mode);
 
@@ -209,7 +229,7 @@ export default Ember.Component.extend({
             label: labelValue,
             value,
             size,
-            inverse,
+            inverse: isInverse,
 
             currTotal,
             baseTotal,

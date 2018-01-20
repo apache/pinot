@@ -343,7 +343,7 @@ export function toBaselineRange(range, offset) {
   }
 
   const start = moment(range[0]).subtract(offsetWeeks, 'weeks').valueOf();
-  const end = moment(range[1]).subtract(offsetWeeks, 'weeks').valueOf();
+  const end = start + (range[1] - range[0]);
 
   return [start, end];
 }
@@ -471,14 +471,14 @@ export function toColorDirection(delta, inverse = false) {
 }
 
 /**
- * Extract information about an inverse coloring of metric changes for a urn from the entities cache.
- * (i.e. by default up is positive, and down 'negative', this property inverts the display coloring)
+ * Extract information about whether a metric is tagged as inverse.
+ * (i.e. by default up is positive, and down 'negative', this property inverts the coloring)
  *
  * @see toColorDirection(delta, inverse)
  *
  * @param {string} urn metric urn
  * @param {Object} entities entities cache
- * @returns {boolean} if metric changes
+ * @returns {boolean} whether metric changes are colored inversely
  */
 export function isInverse(urn, entities) {
   if (!entities) { return false; }
@@ -486,6 +486,21 @@ export function isInverse(urn, entities) {
   if (!entities[urn].attributes) { return false; }
   if (!entities[urn].attributes.inverse) { return false; }
   return (entities[urn].attributes.inverse[0] === 'true');
+}
+
+/**
+ * Extracts information about whether a metric is tagged as additive or not.
+ *
+ * @param {string} urn metric urn
+ * @param {Object} entities entities cache
+ * @returns {boolean} if metric is tagged as additive
+ */
+export function isAdditive(urn, entities) {
+  if (!entities) { return false; }
+  if (!entities[urn]) { return false; }
+  if (!entities[urn].attributes) { return false; }
+  if (!entities[urn].attributes.additive) { return false; }
+  return (entities[urn].attributes.additive[0] === 'true');
 }
 
 /**
