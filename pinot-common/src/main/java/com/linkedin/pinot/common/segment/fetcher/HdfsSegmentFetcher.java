@@ -18,6 +18,8 @@ package com.linkedin.pinot.common.segment.fetcher;
 import com.google.common.base.Strings;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
+import java.util.Collections;
+import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -121,5 +123,10 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
       LOGGER.error(String.format("failed to fetch %s from hdfs to local %s", uri, tempFilePath), ex);
       throw ex;
     }
+  }
+
+  @Override
+  public Set<String> getProtectedConfigKeys() {
+    return Collections.<String>emptySet();
   }
 }

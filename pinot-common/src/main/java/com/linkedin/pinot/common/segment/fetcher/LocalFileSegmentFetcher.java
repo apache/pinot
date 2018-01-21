@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
+import java.util.Collections;
+import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -34,5 +36,10 @@ public class LocalFileSegmentFetcher implements SegmentFetcher {
   public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
     FileUtils.copyFile(new File(uri), tempFile);
     LOGGER.info("Copy file from {} to {}; Length of file: {}", uri, tempFile, tempFile.length());
+  }
+
+  @Override
+  public Set<String> getProtectedConfigKeys() {
+    return Collections.<String>emptySet();
   }
 }

@@ -27,6 +27,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.Collections;
+import java.util.Set;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -99,6 +101,7 @@ public class HttpsSegmentFetcher extends HttpSegmentFetcher {
       if (serverCACertFile == null) {
         throw new RuntimeException(fileNotConfigured);
       }
+      _logger.info("Initializing trust store from {}", serverCACertFile);
       FileInputStream is = new FileInputStream(new File(serverCACertFile));
       CertificateFactory certificateFactory = CertificateFactory.getInstance(CERTIFICATE_TYPE);
       X509Certificate cert = (X509Certificate) certificateFactory.generateCertificate(is);
@@ -110,6 +113,7 @@ public class HttpsSegmentFetcher extends HttpSegmentFetcher {
 
       TrustManagerFactory tmf = TrustManagerFactory.getInstance(CERTIFICATE_TYPE);
       tmf.init(trustStore);
+      _logger.info("Successfully initialized trust store");
       return tmf.getTrustManagers();
     }
     // Server verification disabled. Trust all servers
@@ -137,18 +141,25 @@ public class HttpsSegmentFetcher extends HttpSegmentFetcher {
       String keyStoreFile = configs.getString(CONFIG_OF_CLIENT_PKCS12_FILE);
       String keyStorePassword = configs.getString(CONFIG_OF_CLIENT_PKCS12_PASSWORD);
       if (keyStoreFile == null || keyStorePassword == null) {
-        _logger.info("Either keystore file name (" + CONFIG_OF_CLIENT_PKCS12_FILE + ") or " + "keystore password ("
-            + CONFIG_OF_CLIENT_PKCS12_PASSWORD + ") is not configured"
-            + ". Client will not present certificate to the server");
+        _logger.info("Either keystore file name ({}) or keystore password ({}) is not configured. Client will not present certificates to server.",
+            CONFIG_OF_CLIENT_PKCS12_FILE, CONFIG_OF_CLIENT_PKCS12_PASSWORD);
         return null;
       }
+      _logger.info("Setting up keystore with file {}", keyStoreFile);
       keyStore.load(new FileInputStream(new File(keyStoreFile)), keyStorePassword.toCharArray());
       KeyManagerFactory kmf = KeyManagerFactory.getInstance(KEYMANAGER_FACTORY_ALGORITHM);
       kmf.init(keyStore, keyStorePassword.toCharArray());
+      _logger.info("Successfully initialized keystore");
       return kmf.getKeyManagers();
     } catch (Exception e) {
       Utils.rethrowException(e);
     }
     return null;
   }
+
+  @Override
+  public Set<String> getProtectedConfigKeys() {
+    return Collections.singleton(CONFIG_OF_CLIENT_PKCS12_PASSWORD);
+  }
+
 }

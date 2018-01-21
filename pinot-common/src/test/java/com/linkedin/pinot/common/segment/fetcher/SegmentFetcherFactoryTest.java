@@ -17,6 +17,8 @@ package com.linkedin.pinot.common.segment.fetcher;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
 import java.io.File;
+import java.util.Collections;
+import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.mockito.ArgumentCaptor;
@@ -104,6 +106,11 @@ public class SegmentFetcherFactoryTest {
 
     @Override
     public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
+    }
+
+    @Override
+    public Set<String> getProtectedConfigKeys() {
+      return Collections.<String>emptySet();
     }
   }
 }
