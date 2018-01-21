@@ -88,6 +88,7 @@ import org.apache.helix.NotificationContext;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -535,6 +536,22 @@ public class PinotLLCRealtimeSegmentManager {
 
   }
 
+  protected boolean writeSegmentsToPropertyStore(String oldZnodePath, String newZnodePath, ZNRecord oldRecord, ZNRecord newRecord,
+      final String realtimeTableName, int expectedVersion) {
+
+    boolean success = _propertyStore.set(oldZnodePath, oldRecord, expectedVersion, AccessOption.PERSISTENT);
+    if (!success) {
+      LOGGER.error("Failed to write old segments to property store for table {}. Expected zookeeper version number: {}",
+          realtimeTableName, expectedVersion);
+      return false;
+    }
+    success = _propertyStore.set(newZnodePath, newRecord, AccessOption.PERSISTENT);
+    if (!success) {
+      LOGGER.error("Failed to write new segments to property store for table {}.", realtimeTableName);
+    }
+    return success;
+  }
+
   protected void writeSegmentsToPropertyStore(List<String> paths, List<ZNRecord> records, final String realtimeTableName) {
     try {
       _propertyStore.setChildren(paths, records, AccessOption.PERSISTENT);
@@ -605,11 +622,19 @@ public class PinotLLCRealtimeSegmentManager {
     final long now = System.currentTimeMillis();
     final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
 
+    Stat stat = new Stat();
     final LLCRealtimeSegmentZKMetadata oldSegMetadata = getRealtimeSegmentZKMetadata(realtimeTableName,
-        committingSegmentNameStr);
+        committingSegmentNameStr, stat);
     final LLCSegmentName oldSegmentName = new LLCSegmentName(committingSegmentNameStr);
     final int partitionId = oldSegmentName.getPartitionId();
     final int oldSeqNum = oldSegmentName.getSequenceNumber();
+
+    if (oldSegMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+      LOGGER.warn("Status of segment metadata {} has already been changed by other controller for table {}: Status={}",
+          committingSegmentNameStr, rawTableName, oldSegMetadata.getStatus());
+      return false;
+    }
+
     oldSegMetadata.setEndOffset(nextOffset);
     oldSegMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     oldSegMetadata.setDownloadUrl(
@@ -632,7 +657,7 @@ public class PinotLLCRealtimeSegmentManager {
     // creating a new segment
     if (partitionAssignment == null) {
       LOGGER.warn("Kafka partition assignment not found for {}", realtimeTableName);
-      throw new RuntimeException("Kafka partition assigment not found. Not committing segment");
+      throw new RuntimeException("Kafka partition assignment not found. Not committing segment");
     }
     List<String> newInstances = partitionAssignment.getListField(Integer.toString(partitionId));
 
@@ -654,16 +679,9 @@ public class PinotLLCRealtimeSegmentManager {
 
     final String newZnodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, newSegmentNameStr);
 
-    List<String> paths = new ArrayList<>(2);
-    paths.add(oldZnodePath);
-    paths.add(newZnodePath);
-    List<ZNRecord> records = new ArrayList<>(2);
-    records.add(oldZnRecord);
-    records.add(newZnRecord);
-
     if (!isConnected() || !isLeader()) {
       // We can potentially log a different value than what we saw ....
-      LOGGER.warn("Lost leadership while committing segment metadata for{} for table {}: isLeader={}, isConnected={}",
+      LOGGER.warn("Lost leadership while committing segment metadata for {} for table {}: isLeader={}, isConnected={}",
           committingSegmentNameStr, rawTableName, isLeader(), isConnected());
       return false;
     }
@@ -681,7 +699,13 @@ public class PinotLLCRealtimeSegmentManager {
      * If the controller fails after step-2, we are fine because the idealState has the new segments.
      * If the controller fails before step-1, the server will see this as an upload failure, and will re-try.
      */
-    writeSegmentsToPropertyStore(paths, records, realtimeTableName);
+    boolean success = writeSegmentsToPropertyStore(oldZnodePath, newZnodePath, oldZnRecord, newZnRecord,
+        realtimeTableName, stat.getVersion());
+    if (!success) {
+      LOGGER.warn("Fail to write segments to property store for {} for table {}: isLeader={}, isConnected={}",
+          committingSegmentNameStr, rawTableName, isLeader(), isConnected());
+      return false;
+    }
 
     // TODO Introduce a controller failure here for integration testing
 
@@ -835,8 +859,8 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName) {
-    ZNRecord znRecord = _propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segmentName), null, AccessOption.PERSISTENT);
+  public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName, Stat stat) {
+    ZNRecord znRecord = _propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segmentName), stat, AccessOption.PERSISTENT);
     if (znRecord == null) {
       LOGGER.error("Segment metadata not found for table {}, segment {}. (can happen during table drop)", realtimeTableName, segmentName);
       throw new RuntimeException("Segment metadata not found for table " + realtimeTableName + " segment " + segmentName);
@@ -1009,7 +1033,7 @@ public class PinotLLCRealtimeSegmentManager {
   private long getBetterStartOffsetIfNeeded(final String realtimeTableName, final int partition,
       final LLCSegmentName latestSegment, final long oldestOffsetInKafka, final int nextSeqNum) {
     final LLCRealtimeSegmentZKMetadata oldSegMetadata =
-        getRealtimeSegmentZKMetadata(realtimeTableName, latestSegment.getSegmentName());
+        getRealtimeSegmentZKMetadata(realtimeTableName, latestSegment.getSegmentName(), null);
     CommonConstants.Segment.Realtime.Status status = oldSegMetadata.getStatus();
     long segmentStartOffset = oldestOffsetInKafka;
     final long prevSegStartOffset = oldSegMetadata.getStartOffset();  // Offset at which the prev segment intended to start consuming

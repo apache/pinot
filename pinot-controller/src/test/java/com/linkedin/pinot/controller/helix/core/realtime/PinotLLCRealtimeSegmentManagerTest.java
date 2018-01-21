@@ -52,6 +52,7 @@ import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
+import org.apache.zookeeper.data.Stat;
 import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
@@ -749,6 +750,82 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
   }
 
+  @Test
+  public void testCommitSegmentWhenControllerWentThroughGC() {
+
+    FakePinotLLCRealtimeSegmentManager segmentManager1 = new FakePinotLLCRealtimeSegmentManager(true, null);
+    FakePinotLLCRealtimeSegmentManager segmentManager2 = new FakePinotLLCRealtimeSegmentManagerII(true, null,
+        FakePinotLLCRealtimeSegmentManagerII.SCENARIO_1_ZK_VERSION_NUM_HAS_CHANGE);
+    FakePinotLLCRealtimeSegmentManager segmentManager3 = new FakePinotLLCRealtimeSegmentManagerII(true, null,
+        FakePinotLLCRealtimeSegmentManagerII.SCENARIO_2_METADATA_STATUS_HAS_CHANGE);
+
+
+    final String rtTableName = "table_REALTIME";
+    final String rawTableName = TableNameBuilder.extractRawTableName(rtTableName);
+    setupSegmentManager(segmentManager1);
+    setupSegmentManager(segmentManager2);
+    setupSegmentManager(segmentManager3);
+    // Now commit the first segment of partition 6.
+    final int committingPartition = 6;
+    final long nextOffset = 3425666L;
+    LLCRealtimeSegmentZKMetadata committingSegmentMetadata =  new LLCRealtimeSegmentZKMetadata(segmentManager2._records.get(committingPartition));
+
+    boolean status = segmentManager1.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(),
+        nextOffset);
+    Assert.assertTrue(status);  // Committing segment metadata succeeded.
+
+    status = segmentManager2.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(),
+        nextOffset);
+    Assert.assertFalse(status); // Committing segment metadata failed.
+
+    status = segmentManager3.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(),
+        nextOffset);
+    Assert.assertFalse(status); // Committing segment metadata failed.
+  }
+
+  private void setupSegmentManager(FakePinotLLCRealtimeSegmentManager segmentManager) {
+    final String topic = "someTopic";
+    final String rtTableName = "table_REALTIME";
+    final int nInstances = 6;
+    final int nPartitions = 16;
+    final int nReplicas = 3;
+    final boolean existingIS = false;
+    List<String> instances = getInstanceList(nInstances);
+
+    IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, nReplicas);
+    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, KAFKA_OFFSET, DUMMY_HOST, idealState,
+        !existingIS, 10000);
+  }
+
+  static class FakePinotLLCRealtimeSegmentManagerII extends FakePinotLLCRealtimeSegmentManager {
+
+    final static int SCENARIO_1_ZK_VERSION_NUM_HAS_CHANGE = 1;
+    final static int SCENARIO_2_METADATA_STATUS_HAS_CHANGE = 2;
+
+    private int _scenario;
+
+    FakePinotLLCRealtimeSegmentManagerII(boolean setupInitialSegments, List<String> existingLLCSegments, int scenario) {
+      super(setupInitialSegments, existingLLCSegments);
+      _scenario = scenario;
+    }
+
+    @Override
+    public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName, Stat stat) {
+      LLCRealtimeSegmentZKMetadata metadata = super.getRealtimeSegmentZKMetadata(realtimeTableName, segmentName, stat);
+      switch (_scenario) {
+        case SCENARIO_1_ZK_VERSION_NUM_HAS_CHANGE:
+          // Mock another controller has already updated the segment metadata, which makes the version number self increase.
+          stat.setVersion(_version + 1);
+          break;
+        case SCENARIO_2_METADATA_STATUS_HAS_CHANGE:
+          // Mock another controller has updated the status of the old segment metadata.
+          metadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+          break;
+      }
+      return metadata;
+    }
+  }
+
   static class FakePinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
 
     private static final ControllerConf CONTROLLER_CONF = new ControllerConf();
@@ -786,6 +863,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     public static boolean IS_LEADER = true;
     public static boolean IS_CONNECTED = true;
 
+    public int _version;
+
     private SegmentMetadataImpl segmentMetadata;
 
     protected FakePinotLLCRealtimeSegmentManager(boolean setupInitialSegments, List<String> existingLLCSegments) {
@@ -812,6 +891,27 @@ public class PinotLLCRealtimeSegmentManagerTest {
       CONTROLLER_CONF.setControllerVipHost("vip");
       CONTROLLER_CONF.setControllerPort("9000");
       CONTROLLER_CONF.setDataDir(baseDir.toString());
+
+      _version = 0;
+    }
+
+    @Override
+    protected boolean writeSegmentsToPropertyStore(String oldZnodePath, String newZnodePath, ZNRecord oldRecord, ZNRecord newRecord,
+        final String realtimeTableName, int expectedVersion) {
+      List<String> paths = new ArrayList<>();
+      List<ZNRecord> records = new ArrayList<>();
+      paths.add(oldZnodePath);
+      paths.add(newZnodePath);
+      records.add(oldRecord);
+      records.add(newRecord);
+      // Check whether the version is the valid or not, i.e. no one else has modified the metadata.
+      if (expectedVersion == _version) {
+        _version++;
+        writeSegmentsToPropertyStore(paths, records, realtimeTableName);
+        return true;
+      } else {
+        return false;
+      }
     }
 
     @Override
@@ -877,9 +977,18 @@ public class PinotLLCRealtimeSegmentManagerTest {
       return _partitionAssignment;
     }
 
-    public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName) {
+    @Override
+    public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName, Stat stat) {
       if (_metadataMap.containsKey(segmentName)) {
-        return _metadataMap.get(segmentName);
+        LLCRealtimeSegmentZKMetadata oldMetadata = _metadataMap.get(segmentName);
+
+        LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
+        metadata.setSegmentName(oldMetadata.getSegmentName());
+        metadata.setDownloadUrl(oldMetadata.getDownloadUrl());
+        metadata.setNumReplicas(oldMetadata.getNumReplicas());
+        metadata.setEndOffset(oldMetadata.getEndOffset());
+        metadata.setStatus(oldMetadata.getStatus());
+        return metadata;
       }
       LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
       metadata.setSegmentName(segmentName);
