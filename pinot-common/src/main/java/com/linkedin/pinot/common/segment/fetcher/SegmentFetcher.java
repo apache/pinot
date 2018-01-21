@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
-import java.util.List;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 

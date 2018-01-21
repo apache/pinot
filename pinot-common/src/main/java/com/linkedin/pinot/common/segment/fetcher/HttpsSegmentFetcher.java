@@ -28,7 +28,6 @@ import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
@@ -160,7 +159,6 @@ public class HttpsSegmentFetcher extends HttpSegmentFetcher {
 
   @Override
   public Set<String> getProtectedConfigKeys() {
-    Set<String> configKeys = new HashSet<>();
     return Collections.singleton(CONFIG_OF_CLIENT_PKCS12_PASSWORD);
   }
 
