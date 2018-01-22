@@ -6,15 +6,15 @@ import _ from 'lodash';
 import fetch from 'fetch';
 import moment from 'moment';
 
-const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
-const ROOTCAUSE_TAB_METRICS = "metrics";
-const ROOTCAUSE_TAB_EVENTS = "events";
+const ROOTCAUSE_TAB_DIMENSIONS = 'dimensions';
+const ROOTCAUSE_TAB_METRICS = 'metrics';
+const ROOTCAUSE_TAB_EVENTS = 'events';
 
-const ROOTCAUSE_SERVICE_ROUTE = "route";
-const ROOTCAUSE_SERVICE_ENTITIES = "entities";
-const ROOTCAUSE_SERVICE_TIMESERIES = "timeseries";
-const ROOTCAUSE_SERVICE_AGGREGATES = "aggregates";
-const ROOTCAUSE_SERVICE_BREAKDOWNS = "breakdowns";
+const ROOTCAUSE_SERVICE_ROUTE = 'route';
+const ROOTCAUSE_SERVICE_ENTITIES = 'entities';
+const ROOTCAUSE_SERVICE_TIMESERIES = 'timeseries';
+const ROOTCAUSE_SERVICE_AGGREGATES = 'aggregates';
+const ROOTCAUSE_SERVICE_BREAKDOWNS = 'breakdowns';
 
 // TODO: Update module import to comply by new Ember standards
 
