@@ -103,13 +103,18 @@ public class HttpsSegmentFetcher extends HttpSegmentFetcher {
       }
       _logger.info("Initializing trust store from {}", serverCACertFile);
       FileInputStream is = new FileInputStream(new File(serverCACertFile));
-      CertificateFactory certificateFactory = CertificateFactory.getInstance(CERTIFICATE_TYPE);
-      X509Certificate cert = (X509Certificate) certificateFactory.generateCertificate(is);
-
-      String serverKey = "https-server";
       KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
       trustStore.load(null);
-      trustStore.setCertificateEntry(serverKey, cert);
+      CertificateFactory certificateFactory = CertificateFactory.getInstance(CERTIFICATE_TYPE);
+      int i = 0;
+      while (is.available() > 0) {
+        X509Certificate cert = (X509Certificate) certificateFactory.generateCertificate(is);
+        _logger.info("Read certificate serial number {} by issuer {} ", cert.getSerialNumber().toString(16), cert.getIssuerDN().toString());
+
+        String serverKey = "https-server-" + i;
+        trustStore.setCertificateEntry(serverKey, cert);
+        i++;
+      }
 
       TrustManagerFactory tmf = TrustManagerFactory.getInstance(CERTIFICATE_TYPE);
       tmf.init(trustStore);
