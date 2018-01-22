@@ -149,11 +149,6 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       anomalyContext
     } = model;
 
-    const settingsConfig = {
-      granularityOptions: ['5_MINUTES', '15_MINUTES', '1_HOURS', '3_HOURS', '1_DAYS'],
-      compareModeOptions: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W']
-    };
-
     const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
     const analysisRange = [analysisRangeStart, analysisRangeEnd];
 
@@ -223,7 +218,6 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
         selectedUrns = new Set([...metricUrns, ...metricUrns.map(toCurrentUrn), ...metricUrns.map(toBaselineUrn), anomalyUrn]);
         sessionName = 'New Investigation of #' + anomalyId + ' (' + moment().format(dateFormat) + ')';
-        sessionText = 'Anomaly #' + anomalyId + ' occurred due to ...';
 
       } else {
         routeErrors.add(`Could not find anomalyId ${anomalyId}`);
@@ -263,7 +257,6 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       sessionUpdatedBy,
       sessionUpdatedTime,
       sessionModified,
-      settingsConfig,
       selectedUrns,
       context
     });
