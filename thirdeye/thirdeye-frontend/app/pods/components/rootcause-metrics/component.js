@@ -56,15 +56,15 @@ export default Ember.Component.extend({
           break;
 
         case ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET:
-          output = metricUrns.map(urn => [datasets[urn], urn]).sort();
+          output = metricUrns.map(urn => [datasets[urn], metrics[urn], urn]).sort();
           break;
 
         case ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE:
-          output = metricUrns.map(urn => [makeSortable(changes[urn]), urn]).sort((a, b) => a[0] - b[0]);
+          output = metricUrns.map(urn => [makeSortable(changes[urn]), metrics[urn], urn]).sort(this._compareMixedTuple);
           break;
 
         case ROOTCAUSE_METRICS_SORT_PROPERTY_SCORE:
-          output = metricUrns.map(urn => [makeSortable(scores[urn]), urn]).sort((a, b) => a[0] - b[0]);
+          output = metricUrns.map(urn => [makeSortable(scores[urn]), metrics[urn], urn]).sort(this._compareMixedTuple);
           break;
       }
 
@@ -72,7 +72,7 @@ export default Ember.Component.extend({
         output = output.reverse();
       }
 
-      return output.map(t => t[1]);
+      return output.map(t => t[2]);
     }
   ),
 
@@ -193,6 +193,19 @@ export default Ember.Component.extend({
   ),
 
   /**
+   * Helper for sorting mixed tuple (float, string) accounting for -inf
+   *
+   * @param {Array} a first tuple
+   * @param {Array} b second tuple
+   * @returns {number}
+   */
+  _compareMixedTuple(a, b) {
+    const first = a[0] - b[0];
+    if (first !== 0) { return first; }
+    return a[1] === b[1] ? 0 : a[1] > b[1] ? 1 : -1;
+  },
+
+  /**
    * Compute changes from a given offset to the current time range, as a fraction.
    *
    * @param {String} offset time range offset, e.g. 'baseline', 'wow', 'wo2w', ...
@@ -255,8 +268,11 @@ export default Ember.Component.extend({
 
     toggleSort(property) {
       const { sortProperty, sortMode } = this.getProperties('sortProperty', 'sortMode');
-      if (property != sortProperty) {
-        this.setProperties({ sortProperty: property, sortMode: ROOTCAUSE_METRICS_SORT_MODE_ASC });
+      if (property !== sortProperty) {
+        const newSortMode = property === ROOTCAUSE_METRICS_SORT_PROPERTY_SCORE ?
+          ROOTCAUSE_METRICS_SORT_MODE_DESC : ROOTCAUSE_METRICS_SORT_MODE_ASC;
+
+        this.setProperties({ sortProperty: property, sortMode: newSortMode });
       } else {
         const newSortMode = sortMode == ROOTCAUSE_METRICS_SORT_MODE_ASC ?
           ROOTCAUSE_METRICS_SORT_MODE_DESC : ROOTCAUSE_METRICS_SORT_MODE_ASC;
