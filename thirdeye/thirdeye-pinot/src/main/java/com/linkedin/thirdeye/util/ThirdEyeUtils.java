@@ -371,7 +371,6 @@ public abstract class ThirdEyeUtils {
     return metricConfig;
   }
 
-
   /**
    * Get rounded double value, according to the value of the double.
    * Max rounding will be upto 4 decimals
@@ -383,6 +382,16 @@ public abstract class ThirdEyeUtils {
    * @return
    */
   public static String getRoundedValue(double value) {
+    if (Double.isNaN(value) || Double.isInfinite(value)) {
+      if (Double.isNaN(value)) {
+        return Double.toString(Double.NaN);
+      }
+      if (value > 0) {
+        return Double.toString(Double.POSITIVE_INFINITY);
+      } else {
+        return Double.toString(Double.NEGATIVE_INFINITY);
+      }
+    }
     StringBuffer decimalFormatBuffer = new StringBuffer(TWO_DECIMALS_FORMAT);
     double compareValue = 0.1;
     while (value > 0 && value < compareValue && !decimalFormatBuffer.toString().equals(MAX_DECIMALS_FORMAT)) {
