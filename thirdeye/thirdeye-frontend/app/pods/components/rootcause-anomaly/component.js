@@ -4,6 +4,7 @@ import moment from 'moment';
 import { humanizeFloat, filterPrefix, toOffsetUrn, humanizeChange, toColorDirection, isInverse } from 'thirdeye-frontend/helpers/utils';
 
 const ROOTCAUSE_HIDDEN_DEFAULT = 'default';
+
 const OFFSETS = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
 
 /**
@@ -11,10 +12,10 @@ const OFFSETS = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
  * @type {Object}
  */
 const ANOMALY_OPTIONS_MAPPING = {
-  'ANOMALY': 'Yes (True Anomaly)',
-  'ANOMALY_NEW_TREND': 'Yes (But New Trend)',
-  'NOT_ANOMALY': 'No (False Alarm)',
-  'NO_FEEDBACK': 'To Be Determined'
+  ANOMALY: 'Yes (True Anomaly)',
+  ANOMALY_NEW_TREND: 'Yes (But New Trend)',
+  NOT_ANOMALY: 'No (False Alarm)',
+  NO_FEEDBACK: 'To Be Determined'
 };
 
 export default Component.extend({
@@ -198,6 +199,10 @@ export default Component.extend({
     return moment(get(this, 'anomaly').end).format('MMM D YYYY, hh:mm a');
   }),
 
+  requiresFeedback: computed('status', function () {
+    return get(this, 'status') === 'NO_FEEDBACK';
+  }),
+
   isHidden: computed(
     'requiresFeedback',
     'isHiddenUser',
@@ -238,7 +243,7 @@ export default Component.extend({
       }
 
       // TODO reload anomaly entity instead
-      setProperties(this, { status });
+      setProperties(this, { status, isHiddenUser: false });
     },
 
     toggleHidden() {
