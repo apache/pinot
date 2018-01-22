@@ -116,19 +116,21 @@
         {{/if}}
       </div>
     </div>
+
   </fieldset>
 
   <fieldset class="te-form__section row">
     <div class="col-xs-12">
       <legend class="te-form__section-title">Detection Configuration</legend>
     </div>
+
     {{!-- Field: Pattern --}}
-    <div class="col-xs-{{if isNewUx '4' '6'}}">
+    <div class="col-xs-{{if isNewUx '3' '6'}}">
       <label for="select-pattern" class="control-label te-label required">Pattern of Interest *</label>
       {{#power-select
         loadingMessage="Waiting for the server...."
         triggerId="select-pattern"
-        triggerClass="te-form__select {{if isNewUx 'col-xs-4'}}"
+        triggerClass="te-form__select"
         placeholder="Select a Pattern"
         loadingMessage="Please select a metric first"
         options=patternsOfInterest
@@ -143,12 +145,10 @@
       {{/power-select}}
     </div>
 
-    {{!-- Field: Sensitivity --}}
+    {{!-- Field: Sensitivity with mode option --}}
     {{#if isNewUx}}
       <div class="te-form__vertical-block col-xs-12">
-        <label for="select-sensitivity" class="control-label te-label required">
-          Sensitivity (optional)
-        </label>
+        <label for="select-sensitivity" class="control-label te-label required">Sensitivity (optional)</label>
         <div class="te-form__indent-block--custom">
           <span class="te-form__list-label">When</span>
           <div class="te-form__tune-field">
@@ -192,7 +192,7 @@
         </div>
       </div>
     {{else}}
-      <div class="form-group col-xs-6">
+      <div class="col-xs-6">
         <label for="select-sensitivity" class="control-label te-label required">
           Sensitivity (optional)
           <span>
@@ -217,7 +217,6 @@
           required=true
           as |sensitivity|
         }}
-
           {{sensitivity}}
         {{/power-select}}
       </div>

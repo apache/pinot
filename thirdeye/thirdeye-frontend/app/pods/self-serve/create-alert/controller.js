@@ -170,7 +170,7 @@ export default Controller.extend({
       const {
         severity: severityMap,
         pattern: patternMap
-      } = this.getProperties('optionMap');
+      } = this.getProperties('optionMap').optionMap;
 
       const {
         selectedPattern,
@@ -179,17 +179,22 @@ export default Controller.extend({
         selectedSeverityOption: selectedSeverity
       } = this.getProperties('selectedPattern', 'customMttdChange', 'customPercentChange', 'selectedSeverityOption');
 
-      const mttdVal = Number(customMttdChange).toFixed(2);
-      const severityThresholdVal = (Number(customPercentChange)/100).toFixed(2);
-      const featureString = `window_size_in_hour,${severityMap[selectedSeverity]}`;
-      const mttdString = `window_size_in_hour=${mttdVal};${severityMap[selectedSeverity]}=${severityThresholdVal}`;
-      const patternString = patternMap[selectedPattern] ? `&pattern=${encodeURIComponent(patternMap[selectedPattern])}` : '';
-      const finalStr = `&features=${encodeURIComponent(featureString)}&mttd=${encodeURIComponent(mttdString)}${patternString}`;
-      return {
-        features: featureString,
-        mttd: mttdString,
-        pattern: patternString
-      };
+      const requiredProps = ['customMttdChange', 'customPercentChange', 'selectedSeverityOption'];
+      const isCustomFilterPossible = requiredProps.every(val => Ember.isPresent(this.get(val)));
+      const filterObj = { pattern: patternMap[selectedPattern] };
+
+      if (isCustomFilterPossible) {
+        const mttdVal = Number(customMttdChange).toFixed(2);
+        const severityThresholdVal = (Number(customPercentChange)/100).toFixed(2);
+        // NOTE: finalStr will be used in next iteration
+        // const finalStr = `&features=${encodeURIComponent(featureString)}&mttd=${encodeURIComponent(mttdString)}${patternString}`;
+        Object.assign(filterObj, {
+          features: `window_size_in_hour,${severityMap[selectedSeverity]}`,
+          mttd: `window_size_in_hour=${mttdVal};${severityMap[selectedSeverity]}=${severityThresholdVal}`
+        });
+      }
+
+      return filterObj;
     }
   ),
 
@@ -1257,6 +1262,9 @@ export default Controller.extend({
 
       // URL encode filters to avoid API issues
       newFunctionObj.filters = encodeURIComponent(newFunctionObj.filters);
+
+      // Add selected severity options to alert function
+      newFunctionObj.alertFilter = this.get('alertFilterObj');
 
       // First, save our new alert function.
       this.saveThirdEyeFunction(newFunctionObj).then(newFunctionId => {
