@@ -21,7 +21,6 @@ import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.math.BigInteger;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -106,9 +105,9 @@ public class HttpsSegmentFetcher extends HttpSegmentFetcher {
       FileInputStream is = new FileInputStream(new File(serverCACertFile));
       KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
       trustStore.load(null);
+      CertificateFactory certificateFactory = CertificateFactory.getInstance(CERTIFICATE_TYPE);
       int i = 0;
       while (is.available() > 0) {
-        CertificateFactory certificateFactory = CertificateFactory.getInstance(CERTIFICATE_TYPE);
         X509Certificate cert = (X509Certificate) certificateFactory.generateCertificate(is);
         _logger.info("Read certificate serial number {} by issuer {} ", cert.getSerialNumber().toString(16), cert.getIssuerDN().toString());
 
