@@ -4,7 +4,6 @@
  * @exports create
  */
 import fetch from 'fetch';
-import Ember from 'ember';
 import moment from 'moment';
 import _ from 'lodash';
 import Controller from '@ember/controller';
@@ -456,8 +455,10 @@ export default Controller.extend({
     this.fetchAnomalyGraphData(graphConfig).then(metricData => {
       if (!this.isMetricGraphable(metricData)) {
         // Metric has no data. not graphing
-        this.clearAll();
-        this.set('isMetricDataInvalid', true);
+        this.setProperties({
+          isMetricDataInvalid: true,
+          isMetricDataLoading: false
+        });
       } else {
         // Dimensions are selected. Compile, rank, and send them to the graph.
         if(selectedDimension) {
@@ -1063,7 +1064,6 @@ export default Controller.extend({
      * @return {undefined}
      */
     onSelectGranularity(selectedObj) {
-      console.log('newUx: ', this.get('isNewUx'));
       this.setProperties({
         selectedGranularity: selectedObj,
         isMetricDataLoading: true
