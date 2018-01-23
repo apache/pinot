@@ -68,19 +68,18 @@
         <div class="rootcause-anomaly__stats-wrapper">
           {{#each offsets as |offset|}}
             <div class="rootcause-anomaly__stats">
-              <label class="rootcause-anomaly__stats-label">{{offset}}</label>
-              <span class="rootcause-anomaly__stats-value">{{get anomalyInfo (concat offset ".value")}}
-                {{#unless (eq offset 'current')}}
-                  <span class="rootcause-anomaly__stats-change rootcause-anomaly__stats-change--{{get anomalyInfo (concat offset ".direction")}}">
+              <span class="rootcause-anomaly__stats-label">{{offset}}</span>
+              <span class="rootcause-anomaly__stats-value">
+                <span class="rootcause-anomaly__stats-number">{{format-number (get anomalyInfo (concat offset ".value")) formatter="d3" format=".3s"}}</span>
+                  <span class="rootcause-anomaly__stats-change {{if (eq offset 'current') 'rootcause-anomaly__stats-change--hidden'}} rootcause-anomaly__stats-change--{{get anomalyInfo (concat offset ".direction")}}">
                     ({{get anomalyInfo (concat offset ".change")}})
                   </span>
-                {{/unless}}
               </span>
             </div>
           {{/each}}
           {{#if issueType}}
             <div class="rootcause-anomaly__stats">
-              <label class="rootcause-anomaly__stats-label">Issue Type</label>
+              <span class="rootcause-anomaly__stats-label">Issue Type</span>
               <span class="rootcause-anomaly__stats-value">{{issueType}}</span>
             </div>
           {{/if}}
@@ -92,8 +91,8 @@
         <span class="rootcause-anomaly__title rootcause-anomaly__title--small">Is this an anomaly?</span>
         <span>
           <i class="glyphicon glyphicon-question-sign"></i>
-          {{#tooltip-on-element class="te-tooltip te-tooltip--large" as |popover|}}
-          <div class="te-tooltip__header te-tooltip__header--">
+          {{#tooltip-on-element class="te-tooltip te-tooltip--large te-tooltip--cover" as |popover|}}
+          <div class="te-tooltip__header">
             <span class="te-tooltip__title">What do the options mean?</span>
           </div>
           <div class="te-tooltip__body te-tooltip__body--large">

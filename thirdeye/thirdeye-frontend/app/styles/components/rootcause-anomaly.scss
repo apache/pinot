@@ -77,10 +77,11 @@
   &__stats {
     flex-grow: 1;
     border-radius: 2px;
-    padding: 8px 16px;
+    padding: 8px 4px 8px 16px;
     border: 1px solid $te-grey--border;
     margin-right: 8px;
     display: flex;
+    flex-shrink: 0;
     flex-basis: 0;
     flex-direction: column;
     justify-content: space-between;
@@ -94,18 +95,28 @@
   &__stats-label {
     font-weight: 600;
     line-height: 20px;
-    font-size: 18px;
+    font-size: 14px;
+    flex-grow: 1;
   }
 
   &__stats-value {
     font-size: 24px;
     line-height: 32px;
     font-weight: normal;
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+
+  &__stats-number {
+    margin-right: 5px;
   }
 
   &__stats-change {
     font-size: 14px;
-    margin-left: 10px;
+    font-weight: 600;
+    line-height: 14px;
+    margin-bottom: 7px;
 
     &--positive {
       color: $te-green;
@@ -113,6 +124,10 @@
 
     &--negative {
       color: $te-red;
+    }
+
+    &--hidden {
+      visibility: hidden;
     }
   }
 
