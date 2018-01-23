@@ -26,7 +26,7 @@ export default Ember.Component.extend({
    * Currently selected view within the metrics tab
    * @type {String}
    */
-  selectedView: 'card',
+  selectedView: 'table',
 
   /**
    * loading status for component
@@ -189,6 +189,43 @@ export default Ember.Component.extend({
         agg[urn] = toColorDirection(changes[urn], isInverse(urn, entities));
         return agg;
       }, {});
+    }
+  ),
+
+  /**
+   * Urls of associated metric, keyed by metric url
+   * @type {Object} - key is metric urn, and value is an array of objects, each object has a key of the url label,
+   * and value as the url
+   * @example
+   * {
+   *  thirdeye:metric:12345: [],
+   *  thirdeye:metric:23456: [
+   *    {urlLabel: url},
+   *    {urlLabel: url}
+   *  ]
+   * }
+   */
+  links: Ember.computed(
+    'urns',
+    function() {
+      const { urns, entities } = this.getProperties('urns', 'entities');
+      let metricUrlList = {};
+
+      urns.forEach(urn => {
+        const attributes = entities[urn].attributes;
+        const { externalUrls = [] } = attributes;
+        let urnUrlArray = [];
+
+        externalUrls.forEach(urlLabel => {
+          urnUrlArray.push({
+            [urlLabel]: attributes[urlLabel][0]
+          });
+        });
+
+        metricUrlList[urn] = urnUrlArray;
+      });
+
+      return metricUrlList;
     }
   ),
 

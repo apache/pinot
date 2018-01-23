@@ -15,6 +15,12 @@ export default Component.extend({
       title: 'Metric',
       className: 'rootcause-metric__table__column'
     }, {
+      template: 'custom/rca-metric-links',
+      propertyName: 'links',
+      title: 'Links',
+      disableFiltering: true,
+      className: 'rootcause-metric__table__column'
+    }, {
       propertyName: 'score',
       title: 'Anomalous Score',
       disableFiltering: true,
@@ -59,13 +65,15 @@ export default Component.extend({
     'selectedUrns',
     'entities',
     'changesOffset',
+    'links',
     function() {
-      const { urns, entities, changesOffset, selectedUrns } =
-        this.getProperties('urns', 'entities', 'changesOffset', 'selectedUrns');
+      const { urns, entities, changesOffset, selectedUrns, links } =
+        this.getProperties('urns', 'entities', 'changesOffset', 'selectedUrns', 'links');
 
       return urns.map(urn => {
         return {
           urn,
+          links: links[urn],
           isSelected: selectedUrns.has(urn),
           label: toMetricLabel(urn, entities),
           score: entities[urn].score.toFixed(2),
