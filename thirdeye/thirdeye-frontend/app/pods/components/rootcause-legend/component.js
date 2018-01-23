@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toCurrentUrn, toBaselineUrn, filterPrefix, hasPrefix, toFilters, toEntities, toMetricLabel } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, hasPrefix, toFilters, toEntities, toMetricLabel, toEventLabel } from 'thirdeye-frontend/helpers/utils';
 
 export default Ember.Component.extend({
   entities: null, // {}
@@ -51,7 +51,7 @@ export default Ember.Component.extend({
           const type = urn.split(':')[2];
           agg[type] = agg[type] || {};
           Object.assign(agg[type], {
-            [urn]: entities[urn].label
+            [urn]: toEventLabel(urn, entities)
           });
 
           return agg;

@@ -1,6 +1,6 @@
 import Helper from '@ember/component/helper';
 import { htmlSafe } from '@ember/string';
-import { filterPrefix, toBaselineUrn, toCurrentUrn, toMetricLabel, humanizeFloat, humanizeChange, toColorDirection, isInverse } from 'thirdeye-frontend/helpers/utils';
+import { filterPrefix, toBaselineUrn, toCurrentUrn, toMetricLabel, toEventLabel, humanizeFloat, humanizeChange, toColorDirection, isInverse } from 'thirdeye-frontend/helpers/utils';
 import moment from 'moment';
 import d3 from 'd3';
 
@@ -22,7 +22,7 @@ const getLabel = (entities, hoverUrns) => {
   const eventUrns = filterPrefix(hoverUrns, 'thirdeye:event:');
   const labels = {};
   metricUrns.forEach(urn => labels[urn] = toMetricLabel(urn, entities));
-  eventUrns.forEach(urn => labels[urn] = entities[urn].label);
+  eventUrns.forEach(urn => labels[urn] = toEventLabel(urn, entities));
 
   return labels;
 };

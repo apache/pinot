@@ -266,6 +266,24 @@ export function toMetricLabel(urn, entities) {
 }
 
 /**
+ * Returns a human-readable label for an event urn
+ *
+ * @param {string} urn event urn
+ * @param {Object} entities entities cache
+ * @returns {string} human-readable event label
+ */
+export function toEventLabel(urn, entities) {
+  let label = entities[urn].label;
+
+  if (urn.includes('anomaly')) {
+    const [, id] = urn.split(':anomaly:');
+    label = `#${id} ${label}`;
+  }
+
+  return label;
+}
+
+/**
  * Helper to replace metric urn prefixes of entity urns and reference urns.
  *
  * @param {string} prefix

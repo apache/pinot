@@ -55,6 +55,7 @@
 .events-table {
   &__column {
     width: 400px;
+    word-break: break-all;
 
     &--checkbox {
       width: 30px;
