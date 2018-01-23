@@ -124,7 +124,7 @@ public class SegmentCompletionManager {
         // TODO if we keep a list of last few committed segments, we don't need to go to zk for this.
         final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(segmentName.getTableName());
         LLCRealtimeSegmentZKMetadata segmentMetadata =
-            _segmentManager.getRealtimeSegmentZKMetadata(realtimeTableName, segmentName.getSegmentName());
+            _segmentManager.getRealtimeSegmentZKMetadata(realtimeTableName, segmentName.getSegmentName(), null);
         if (segmentMetadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.DONE)) {
           // Best to go through the state machine for this case as well, so that all code regarding state handling is in one place
           // Also good for synchronization, because it is possible that multiple threads take this path, and we don't want
