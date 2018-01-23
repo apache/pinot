@@ -10,6 +10,9 @@ const ROOTCAUSE_METRICS_OUTPUT_MODE_ASC = 'asc';
 const ROOTCAUSE_METRICS_OUTPUT_MODE_DESC = 'desc';
 
 export default Ember.Component.extend({
+  //
+  // external properties
+  //
   entities: null, // {}
 
   aggregates: null, // {}
@@ -18,23 +21,37 @@ export default Ember.Component.extend({
 
   onSelection: null, // function (Set, state)
 
+  //
+  // internal properties
+  //
+
+  /**
+   * primary property to sort on
+   * @type {string}
+   */
   sortProperty: ROOTCAUSE_METRICS_SORT_PROPERTY_SCORE,
 
+  /**
+   * output order
+   * @type {string}
+   */
   outputMode: ROOTCAUSE_METRICS_OUTPUT_MODE_DESC,
 
   /**
    * Currently selected view within the metrics tab
-   * @type {String}
+   * @type {string}
    */
   selectedView: 'card',
 
   /**
    * loading status for component
+   * @type {boolean}
    */
   isLoading: false,
 
   /**
    * List of metric urns, sorted by sortProperty and ordered by outputMode.
+   * @type {Array}
    */
   urns: Ember.computed(
     'entities',
@@ -110,6 +127,7 @@ export default Ember.Component.extend({
 
   /**
    * Metric labels, keyed by urn
+   * @type {Object}
    */
   metrics: Ember.computed(
     'entities',
@@ -125,6 +143,7 @@ export default Ember.Component.extend({
 
   /**
    * Dataset labels, keyed by metric urn
+   * @type {Object}
    */
   datasets: Ember.computed(
     'entities',
@@ -140,6 +159,7 @@ export default Ember.Component.extend({
 
   /**
    * Change values from baseline to current time range, keyed by metric urn
+   * @type {Object}
    */
   changes: Ember.computed(
     'entities',
@@ -152,6 +172,7 @@ export default Ember.Component.extend({
 
   /**
    * Formatted change strings for 'changes'
+   * @type {Object}
    */
   changesFormatted: Ember.computed(
     'changes',
@@ -163,6 +184,7 @@ export default Ember.Component.extend({
 
   /**
    * Change values from multiple offsets to current time range, keyed by offset, then by metric urn
+   * @type {Object}
    */
   changesOffset: Ember.computed(
     'entities',
@@ -180,6 +202,7 @@ export default Ember.Component.extend({
 
   /**
    * Formatted change strings for 'changesOffset'
+   * @type {Object}
    */
   changesOffsetFormatted: Ember.computed(
     'changesOffset',
@@ -210,6 +233,7 @@ export default Ember.Component.extend({
 
   /**
    * Trend direction label (positive, neutral, negative) for change values
+   * @type {Object}
    */
   directions: Ember.computed(
     'entities',
@@ -266,6 +290,7 @@ export default Ember.Component.extend({
   actions: {
     /**
      * Sets the selected view for metrics tab
+     * @param {string} selectedView selected view mode
      */
     selectView(selectedView) {
       this.setProperties({ selectedView });
@@ -273,7 +298,7 @@ export default Ember.Component.extend({
 
     /**
      * Toggles the selection of a metric card on/off
-     * @param urn
+     * @param {string} urn selected urn
      */
     toggleSelection(urn) {
       const { selectedUrns, onSelection } = this.getProperties('selectedUrns', 'onSelection');
@@ -290,7 +315,7 @@ export default Ember.Component.extend({
 
     /**
      * Sets the sort property and toggles the output mode to asc/desc on repeated click
-     * @param property
+     * @param {string} property selected sortProperty
      */
     toggleSort(property) {
       const { sortProperty, outputMode } = this.getProperties('sortProperty', 'outputMode');
