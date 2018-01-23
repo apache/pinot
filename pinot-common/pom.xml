@@ -16,15 +16,15 @@
     limitations under the License.
 
 -->
-<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>com.linkedin.pinot</groupId>
     <version>0.016</version>
   </parent>
-  <groupId>com.linkedin.pinot</groupId>
   <artifactId>pinot-common</artifactId>
   <version>0.016</version>
   <name>pinot-common</name>
@@ -33,7 +33,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
   <build>
-  <!-- Antlr stuff -->
+    <!-- Antlr stuff -->
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -183,7 +183,28 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
-   <profiles>
+  <profiles>
+    <profile>
+      <id>build-shaded-jar</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-shade-plugin</artifactId>
+            <executions>
+              <execution>
+                <phase>package</phase>
+                <goals>
+                  <goal>shade</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>profile-buildthrift</id>
       <activation>
@@ -205,17 +226,17 @@
                 <phase>generate-sources</phase>
                 <configuration>
                   <tasks>
-                    <delete dir="target/generated-sources/gen-javabean" />
-                    <mkdir dir="target/generated-sources" />
+                    <delete dir="target/generated-sources/gen-javabean"/>
+                    <mkdir dir="target/generated-sources"/>
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen" />
+                      <arg value="--gen"/>
                       <arg value="java:beans"/>
                       <arg value="-o"/>
                       <arg value="target/generated-sources"/>
                       <arg value="src/thrift/request.thrift"/>
                     </exec>
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen" />
+                      <arg value="--gen"/>
                       <arg value="java:beans"/>
                       <arg value="-o"/>
                       <arg value="target/generated-sources"/>
