@@ -2,6 +2,7 @@ import Component from '@ember/component';
 import { computed, setProperties, getProperties } from '@ember/object';
 import { reads } from '@ember/object/computed';
 import { checkStatus, toMetricLabel } from 'thirdeye-frontend/helpers/utils';
+import moment from 'moment';
 
 export default Component.extend({
   //
