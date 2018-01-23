@@ -259,8 +259,7 @@ export default Ember.Route.extend({
         });
 
       })
-      .catch((err) => {
-        console.log('err : ', err);
+      .catch(() => {
         controller.set('isDataLoadingError', true);
       });
   }

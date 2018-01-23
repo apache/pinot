@@ -52,6 +52,12 @@ export default Controller.extend({
   isExiting: false, // exit detection
 
   /**
+   * The config group that the current alert belongs to
+   * @type {Object}
+   */
+  originalConfigGroup: computed.reads('model.originalConfigGroup'),
+
+  /**
    * Returns the list of existing config groups and updates it if a new one is added.
    * @method allAlertsConfigGroups
    * @return {Array} list of existing config groups
@@ -226,7 +232,7 @@ export default Controller.extend({
    */
   prepareFunctions(configGroup, newId = 0) {
     const newFunctionList = [];
-    const existingFunctionList = configGroup && configGroup.emailConfig ? configGroup.emailConfig.functionIds : [];
+    const existingFunctionList = _.has(configGroup, 'emailConfig') ? configGroup.emailConfig.functionIds : [];
     let cnt = 0;
 
     // Build object for each function(alert) to display in results table
@@ -325,7 +331,7 @@ export default Controller.extend({
      * @return {undefined}
      */
     validateAlertName(name) {
-      const originalName = this.get('model.alertData.functionName');
+      const originalName = this.get('alertFunctionName');
       let isDuplicateName = false;
       if (name === originalName) { return; }
 
@@ -411,7 +417,7 @@ export default Controller.extend({
      */
     onSelectConfigGroup(selectedObj) {
       const emails = selectedObj.recipients || '';
-      const configGroupSwitched = selectedObj.name !== this.get('model.originalConfigGroup.name');
+      const configGroupSwitched = selectedObj.name !== this.get('originalConfigGroup.name');
 
       this.setProperties({
         selectedConfigGroup: selectedObj,
@@ -454,16 +460,13 @@ export default Controller.extend({
      */
     onSubmit() {
       const {
-        alertData: postFunctionBody,
-        originalConfigGroup
-      } = this.model;
-
-      const {
         isActive,
         alertId: currentId,
+        originalConfigGroup,
         isEditedConfigGroup,
         isNewConfigGroup,
         alertFunctionName,
+        alertData: postFunctionBody,
         newConfigGroupName: newGroupName,
         alertGroupNewRecipient: newEmails,
         selectedApplication,
@@ -474,9 +477,11 @@ export default Controller.extend({
       } = this.getProperties(
         'isActive',
         'alertId',
+        'originalConfigGroup',
         'isEditedConfigGroup',
         'isNewConfigGroup',
         'alertFunctionName',
+        'alertData',
         'newConfigGroupName',
         'alertGroupNewRecipient',
         'selectedApplication',

@@ -67,21 +67,43 @@ export default Route.extend({
   setupController(controller, model) {
     this._super(controller, model);
 
+    const {
+      alertData,
+      selectedAppName,
+      selectedApplication,
+      allApps: allApplications,
+      propsArray: alertProps,
+      loadError: isLoadError,
+      loadErrorMsg: loadErrorMessage,
+      allConfigGroups: alertConfigGroups,
+      originalConfigGroup: selectedConfigGroup
+    } = model;
+
+    const {
+      isActive,
+      bucketSize,
+      bucketUnit,
+      id: alertId,
+      filters: alertFilters,
+      functionName: alertFunctionName
+    } = alertData;
+
     controller.setProperties({
       model,
-      granularity: model.alertData.bucketSize + '_' + model.alertData.bucketUnit,
-      alertFilters: model.alertData.filters,
-      alertProps: model.propsArray,
-      alertConfigGroups: model.allConfigGroups,
-      alertFunctionName: model.alertData.functionName,
-      alertId: model.alertData.id,
-      isActive: model.alertData.isActive,
-      allApplications: model.allApps,
-      selectedConfigGroup: model.originalConfigGroup,
-      selectedApplication: model.selectedApplication,
-      selectedAppName: model.selectedAppName,
-      isLoadError: model.loadError,
-      loadErrorMessage: model.loadErrorMsg
+      alertData,
+      alertFilters,
+      alertProps,
+      alertConfigGroups,
+      alertFunctionName,
+      alertId,
+      isActive,
+      allApplications,
+      selectedConfigGroup,
+      selectedApplication,
+      selectedAppName,
+      isLoadError,
+      loadErrorMessage,
+      granularity: `${bucketSize}_${bucketUnit}`
     });
   },
 
