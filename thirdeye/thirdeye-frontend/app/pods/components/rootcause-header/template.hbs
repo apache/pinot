@@ -31,10 +31,10 @@
     </div>
     <div class="col-xs-10">
       {{#if sessionId}}
-        <p class="rootcause-header__last-updated-info">Last edited by {{sessionUpdatedBy}} on {{sessionUpdatedTime}}</p>
+        <p class="rootcause-header__last-updated-info">Last saved by {{sessionUpdatedBy}} on {{sessionUpdatedTimeFormatted}}</p>
       {{/if}}
-      {{#unless showComment}}
-        <a class="thirdeye-link" {{action (mut showComment) true}}>
+      {{#unless isCommentEditMode}}
+        <a class="thirdeye-link" {{action (mut isCommentEditMode) true}}>
           <span><i class="glyphicon glyphicon-plus"></i></span>
           <span>New comment</span>
           {{#tooltip-on-element class="te-tooltip"}} Add a comment {{/tooltip-on-element}}

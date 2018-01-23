@@ -5,6 +5,12 @@
   </div>
 {{/if}}
 
+{{#if sessionUpdateWarning}}
+  <div class="rootcause-alert alert alert-warning fade in">
+    {{sessionUpdateWarning}}
+  </div>
+{{/if}}
+
 {{rootcause-header
   sessionId=sessionId
   sessionName=sessionName

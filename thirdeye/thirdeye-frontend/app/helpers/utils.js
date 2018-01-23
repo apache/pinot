@@ -46,6 +46,8 @@ export const eventColorMapping = {
   anomaly: 'teal'
 };
 
+export const dateFormatFull = 'ddd, MMM D YYYY, h:mm a';
+
 /**
  * The Promise returned from fetch() won't reject on HTTP error status even if the response is an HTTP 404 or 500.
  * This helps us define a custom response handler.
@@ -594,5 +596,6 @@ export default Ember.Helper.helper({
   eventColorMapping,
   parseProps,
   postProps,
-  toIso
+  toIso,
+  dateFormatFull
 });
