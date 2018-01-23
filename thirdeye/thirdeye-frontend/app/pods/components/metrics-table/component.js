@@ -22,9 +22,9 @@ export default Component.extend({
       className: 'rootcause-metric__table__links-column rootcause-metric__table__links-column--small'
     }, {
       propertyName: 'score',
-      title: 'Anomalous Score',
+      title: 'Anomalous',
       disableFiltering: true,
-      className: 'rootcause-metric__table__column'
+      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--small'
     }, {
       propertyName: 'wo1w',
       template: 'custom/metrics-table-changes/wo1w',
