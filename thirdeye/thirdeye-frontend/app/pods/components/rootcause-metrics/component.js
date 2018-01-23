@@ -193,6 +193,45 @@ export default Ember.Component.extend({
   ),
 
   /**
+   * A mapping of each metric and its url(s)
+   * @type {Object} - key is metric urn, and value is an array of objects, each object has a key of the url label,
+   * and value as the url
+   * @example
+   * {
+   *  thirdeye:metric:12345: [],
+   *  thirdeye:metric:23456: [
+   *    {urlLabel: url},
+   *    {urlLabel: url}
+   *  ]
+   * }
+   */
+  links: Ember.computed(
+    'urns',
+    function() {
+      const { urns, entities } = this.getProperties('urns', 'entities');
+      let metricUrlMapping = {};
+
+      urns.forEach(urn => {
+        const attributes = entities[urn].attributes;
+        const { externalUrls = [] } = attributes;
+        let urlArr = [];
+
+        // Add the list of urls for each url type
+        externalUrls.forEach(urlLabel => {
+          urlArr.push({
+            [urlLabel]: attributes[urlLabel][0] // each type should only have 1 url
+          });
+        });
+
+        // Map all the url lists to a metric urn
+        metricUrlMapping[urn] = urlArr;
+      });
+
+      return metricUrlMapping;
+    }
+  ),
+
+  /**
    * Compute changes from a given offset to the current time range, as a fraction.
    *
    * @param {String} offset time range offset, e.g. 'baseline', 'wow', 'wo2w', ...
