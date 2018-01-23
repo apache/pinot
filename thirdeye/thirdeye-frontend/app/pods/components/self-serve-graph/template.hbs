@@ -4,7 +4,7 @@
       <div class="te-form__super-label">...Displaying top 5 contributing subDimensions for <strong>{{alertDimension}}</strong></div>
     {{/if}}
     {{#if isMetricDataLoading}}
-        <div class="spinner-wrapper--self-serve">{{ember-spinner}}</div>
+      <div class="spinner-wrapper-self-serve">{{ember-spinner}}</div>
       <div class="te-graph-alert__content">
         <div class="glyphicon glyphicon-{{if isMetricDataInvalid 'alert' 'equalizer'}} te-graph-alert__icon{{if isMetricDataInvalid '--warning'}}"></div>
         <p class="te-graph-alert__pre-text">{{graphMessageText.loading}}</p>
@@ -24,7 +24,6 @@
           componentId=componentId
           showGraphLegend=false
           onSelection=(action "onSelection")
-          onPrimaryMetricToggle=(action "onPrimaryMetricToggle")
         }}
         <div class="te-form__note">
           NOTE: If you find the metric shown above is inconsistent, please email <a class="thirdeye-link-secondary" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a>.

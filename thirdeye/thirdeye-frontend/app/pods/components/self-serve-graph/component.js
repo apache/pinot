@@ -1,12 +1,25 @@
-/*    {{self-serve-graph
-      isMetricDataLoading=isMetricDataLoading
-      isMetricDataInvalid=isMetricDataInvalid
-      isDimensionFetchDone=isDimensionFetchDone
-      isMetricSelected=isMetricSelected
+/**
+ * Wrapper component for the anomaly-graph component as used in the self-serve flow.
+ * It handles presentation of the graph under various loading and error conditions.
+ * @module components/self-serve-graph
+ * @property {Boolean} isMetricDataLoading  - is primary metric data still loading
+ * @property {Boolean} isMetricDataInvalid  - has the metric data been found to be not graphable
+ * @property {Boolean} isDimensionFetchDone - are we done preparing dimension data
+ * @property {Object} metricData            - primary metric data
+ * @property {Array} topDimensions          - top x dimensions to load aside from primary metric
+ * @property {String} componentId           - id for the graph wrapper element
+ * @example
+    {{self-serve-graph
+      isMetricDataLoading=false
+      isMetricDataInvalid=false
+      isDimensionFetchDone=false
       metricData=metricData
       topDimensions=topDimensions
       componentId='create-alert'
-    }}*/
+    }}
+ * @exports self-serve-graph
+ * @author smcclung
+ */
 
 import Component from '@ember/component';
 import { computed } from '@ember/object';
@@ -45,18 +58,10 @@ selectedDimensions: computed(
   'topDimensions',
   'topDimensions.@each.isSelected',
   function() {
-    console.log('topDimensions : ', topDimensions);
     const topDimensions = this.get('topDimensions');
     return topDimensions ? this.get('topDimensions').filterBy('isSelected') : [];
   }
 ),
-
-didReceiveAttrs() {
-    this._super(...arguments);
-
-
-
-},
 
 actions: {
     /**
@@ -67,13 +72,6 @@ actions: {
     onSelection(selectedDimension) {
       const { isSelected } = selectedDimension;
       Ember.set(selectedDimension, 'isSelected', !isSelected);
-    },
-
-    /**
-     * Handles the primary metric selection in the alert creation
-     */
-    onPrimaryMetricToggle() {
-      return;
     }
 }
 

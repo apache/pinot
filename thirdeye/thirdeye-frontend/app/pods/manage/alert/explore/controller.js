@@ -286,7 +286,7 @@ export default Controller.extend({
   baselineTitle: computed(
     'baselineOptions',
     function() {
-      const activeOpName = this.get('baselineOptions').filter(item => item.isActive).pop().name;
+      const activeOpName = this.get('baselineOptions').filter(item => item.isActive)[0].name;
       const displayName = (activeOpName !== 'Predicted') ? `Current/${activeOpName}` : activeOpName;
       return displayName;
     }
