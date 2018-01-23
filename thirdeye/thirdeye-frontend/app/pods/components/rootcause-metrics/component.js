@@ -26,7 +26,7 @@ export default Ember.Component.extend({
    * Currently selected view within the metrics tab
    * @type {String}
    */
-  selectedView: 'table',
+  selectedView: 'card',
 
   /**
    * loading status for component
@@ -193,7 +193,7 @@ export default Ember.Component.extend({
   ),
 
   /**
-   * Urls of associated metric, keyed by metric url
+   * A mapping of each metric and its url(s)
    * @type {Object} - key is metric urn, and value is an array of objects, each object has a key of the url label,
    * and value as the url
    * @example
@@ -209,23 +209,25 @@ export default Ember.Component.extend({
     'urns',
     function() {
       const { urns, entities } = this.getProperties('urns', 'entities');
-      let metricUrlList = {};
+      let metricUrlMapping = {};
 
       urns.forEach(urn => {
         const attributes = entities[urn].attributes;
         const { externalUrls = [] } = attributes;
-        let urnUrlArray = [];
+        let urlArr = [];
 
+        // Add the list of urls for each url type
         externalUrls.forEach(urlLabel => {
-          urnUrlArray.push({
-            [urlLabel]: attributes[urlLabel][0]
+          urlArr.push({
+            [urlLabel]: attributes[urlLabel][0] // each type should only have 1 url
           });
         });
 
-        metricUrlList[urn] = urnUrlArray;
+        // Map all the url lists to a metric urn
+        metricUrlMapping[urn] = urlArr;
       });
 
-      return metricUrlList;
+      return metricUrlMapping;
     }
   ),
 
