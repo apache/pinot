@@ -116,6 +116,14 @@
           <a class="thirdeye-link thirdeye-link--settings" {{action "onPrimarySelection"}}>+ add to chart</a>
         </div>
       </div>
+      <div class="card-container__row card-container__row--flex row">
+        <div class="col-xs-12">
+          {{rootcause-data-indicator
+            selectedUrn=metricUrn
+            anomalyRange=context.anomalyRange
+          }}
+        </div>
+      </div>
 
       <div class="card-container__header">
         <div class="card-container__subnav">
