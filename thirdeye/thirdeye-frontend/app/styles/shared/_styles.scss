@@ -138,6 +138,7 @@ body {
 
     &--wider {
       width: 600px;
+      float: left;
       margin-left: -15px;
       display: inline-block;
       color: app-shade(black, 7);

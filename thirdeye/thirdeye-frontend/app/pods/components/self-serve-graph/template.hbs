@@ -1,0 +1,39 @@
+<div class="col-xs-12 te-graph-container">
+  <div class="te-graph-alert {{if (or isMetricDataLoading isMetricDataInvalid) 'te-graph-alert--pending'}}">
+    {{#if isDimensionFetchDone}}
+      <div class="te-form__super-label">...Displaying top 5 contributing subDimensions for <strong>{{alertDimension}}</strong></div>
+    {{/if}}
+    {{#if isMetricDataLoading}}
+      <div class="spinner-wrapper-self-serve">{{ember-spinner}}</div>
+      <div class="te-graph-alert__content">
+        <div class="glyphicon glyphicon-{{if isMetricDataInvalid 'alert' 'equalizer'}} te-graph-alert__icon{{if isMetricDataInvalid '--warning'}}"></div>
+        <p class="te-graph-alert__pre-text">{{graphMessageText.loading}}</p>
+      </div>
+    {{else}}
+      {{#if (not isMetricDataInvalid)}}
+        {{anomaly-graph
+          primaryMetric=metricData
+          selectedDimensions=selectedDimensions
+          dimensions=topDimensions
+          showDimensions=true
+          isLoading=loading
+          showSubchart=true
+          showLegend=true
+          enableZoom=true
+          legendText=legendText
+          componentId=componentId
+          showGraphLegend=false
+          onSelection=(action "onSelection")
+        }}
+        <div class="te-form__note">
+          NOTE: If you find the metric shown above is inconsistent, please email <a class="thirdeye-link-secondary" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a>.
+        </div>
+      {{else}}
+        <div class="te-graph-alert__content">
+          <div class="glyphicon glyphicon-{{if isMetricDataInvalid 'alert' 'equalizer'}} te-graph-alert__icon{{if isMetricDataInvalid '--warning'}}"></div>
+          <p class="te-graph-alert__pre-text">{{graphMessageText.error}}</p>
+        </div>
+      {{/if}}
+    {{/if}}
+  </div>
+</div>

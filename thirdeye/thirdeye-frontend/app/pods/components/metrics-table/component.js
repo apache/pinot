@@ -13,40 +13,46 @@ export default Component.extend({
     }, {
       propertyName: 'label',
       title: 'Metric',
-      className: 'rootcause-metric__table__column'
+      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--large'
+    }, {
+      template: 'custom/rca-metric-links',
+      propertyName: 'links',
+      title: 'Links',
+      disableFiltering: true,
+      className: 'rootcause-metric__table__links-column rootcause-metric__table__links-column--small'
     }, {
       propertyName: 'score',
-      title: 'Anomalous Score',
+      title: 'Anomalous',
       disableFiltering: true,
-      className: 'rootcause-metric__table__column'
+      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--small'
     }, {
       propertyName: 'wo1w',
       template: 'custom/metrics-table-changes/wo1w',
       sortedBy: 'sortable_wo1w',
       title: 'WoW',
       disableFiltering: true,
-      className: 'rootcause-metric__table__column'
+      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--small'
     }, {
       propertyName: 'wo2w',
       template: 'custom/metrics-table-changes/wo2w',
       sortedBy: 'sortable_wo2w',
       title: 'Wo2W',
       disableFiltering: true,
-      className: 'rootcause-metric__table__column'
+      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--small'
     }, {
       propertyName: 'wo3w',
       template: 'custom/metrics-table-changes/wo3w',
       sortedBy: 'sortable_wo3w',
       title: 'Wo3W',
       disableFiltering: true,
-      className: 'rootcause-metric__table__column'
+      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--small'
     }, {
       propertyName: 'wo4w',
       template: 'custom/metrics-table-changes/wo4w',
       sortedBy: 'sortable_wo4w',
       title: 'Wo4W',
       disableFiltering: true,
-      className: 'rootcause-metric__table__column'
+      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--small'
     }
   ],
 
@@ -59,13 +65,15 @@ export default Component.extend({
     'selectedUrns',
     'entities',
     'changesOffset',
+    'links',
     function() {
-      const { urns, entities, changesOffset, selectedUrns } =
-        this.getProperties('urns', 'entities', 'changesOffset', 'selectedUrns');
+      const { urns, entities, changesOffset, selectedUrns, links } =
+        this.getProperties('urns', 'entities', 'changesOffset', 'selectedUrns', 'links');
 
       return urns.map(urn => {
         return {
           urn,
+          links: links[urn],
           isSelected: selectedUrns.has(urn),
           label: toMetricLabel(urn, entities),
           score: entities[urn].score.toFixed(2),

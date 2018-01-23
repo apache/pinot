@@ -4,21 +4,16 @@ import moment from 'moment';
 /**
  * Handles types and defaults returned from eval/projected endpoints
  * @param {Number|String} metric - number or string like 'NaN', 'Infinity'
- * @param {Boolean} allowDecimal - should this metric be shown as whole number?
+ * @param {Boolean} isPercentage - shall we treat this as a % or a whole number?
  * @returns {Object}
  */
-export function formatEvalMetric(metric, allowDecimal = false) {
-  let shown = 'N/A';
-  if (!isNaN(metric)) {
-    if (allowDecimal) {
-      shown = (Number(metric) === 1 || Number(metric) === 0)
-        ? metric * 100
-        : (metric * 100).toFixed(1);
-    } else {
-      shown = metric;
-    }
-  }
-  return shown;
+export function formatEvalMetric(metric, isPercentage = false) {
+  const isWhole = Number.isInteger(Number(metric));
+  let shown = (metric === 'Infinity') ? metric : 'N/A';
+  const multiplier = isPercentage ? 100 : 1;
+  const convertedNum = metric * multiplier;
+  const formattedNum = isWhole ? convertedNum : convertedNum.toFixed(1);
+  return isFinite(metric) ? formattedNum : shown;
 }
 
 /**
@@ -52,12 +47,12 @@ export function toIdGroups(anomalyIds, bucketSize = 10) {
  */
 export function enhanceAnomalies(rawAnomalies) {
   const newAnomalies = [];
-  const anomaliesPresent = rawAnomalies.length ;
+  const anomaliesPresent = rawAnomalies && rawAnomalies.length;
   // De-dupe raw anomalies, extract only the good stuff (anomalyDetailsList)
   const anomalies = anomaliesPresent ? [].concat(...rawAnomalies.map(data => data.anomalyDetailsList)) : [];
 
   // Loop over all anomalies to configure display settings
-  for (var anomaly of anomalies) {
+  anomalies.forEach((anomaly) => {
     let dimensionList = [];
     const startMoment = moment(anomaly.anomalyStart);
     const endMoment = moment(anomaly.anomalyEnd);
@@ -97,20 +92,30 @@ export function enhanceAnomalies(rawAnomalies) {
     // Create a list of all available dimensions for toggling. Also massage dimension property.
     if (anomaly.anomalyFunctionDimension) {
       let dimensionObj = JSON.parse(anomaly.anomalyFunctionDimension);
+      let dimensionStrArr = [];
       for (let dimension of Object.keys(dimensionObj)) {
         let dimensionKey = dimension.dasherize();
         let dimensionVal = dimensionObj[dimension].join(',');
         dimensionList.push({ dimensionKey, dimensionVal });
+        dimensionStrArr.push(`${dimensionKey}:${dimensionVal}`);
       }
-      Object.assign(anomaly, { dimensionList });
+      let dimensionString = dimensionStrArr.join(' & ');
+      Object.assign(anomaly, { dimensionList, dimensionString });
     }
 
     newAnomalies.push(anomaly);
-  }
+  });
 
   return newAnomalies;
 }
 
+/**
+ * Generates time range options for selection in the self-serve UI
+ * @method setUpTimeRangeOptions
+ * @param {Array} datesKeys - array of keys used to generate time ranges
+ * @param {String} duration - the selected time span that is default
+ * @return {Array}
+ */
 export function setUpTimeRangeOptions(datesKeys, duration) {
   const newRangeArr = [];
 
@@ -161,19 +166,65 @@ export function evalObj() {
 }
 
 /**
+ * If a dimension has been selected, the metric data object will contain subdimensions.
+ * This method calls for dimension ranking by metric, filters for the selected dimension,
+ * and returns a sorted list of graph-ready dimension objects.
+ * @method getTopDimensions
+ * @param {Object} dimensionObj - the object containing available subdimension for current metric
+ * @param {Array} scoredDimensions - array of dimensions scored by relevance
+ * @param {String} selectedDimension - the user-selected dimension to graph
+ * @return {RSVP Promise}
+ */
+export function getTopDimensions(dimensionObj = {}, scoredDimensions, selectedDimension) {
+  const maxSize = 5;
+  const colors = ['orange', 'teal', 'purple', 'red', 'green', 'pink'];
+  let dimensionList = [];
+  let colorIndex = 0;
+
+  if (selectedDimension) {
+    const filteredDimensions =  _.filter(scoredDimensions, (dimension) => {
+      return dimension.label.split('=')[0] === selectedDimension;
+    });
+    const topDimensions = filteredDimensions.sortBy('score').reverse().slice(0, maxSize);
+    const topDimensionLabels = [...new Set(topDimensions.map(key => key.label.split('=')[1]))];
+
+    // Build the array of subdimension objects for the selected dimension
+    topDimensionLabels.forEach((subDimension) => {
+      if (dimensionObj[subDimension] && subDimension !== '') {
+        dimensionList.push({
+          name: subDimension,
+          metricName: subDimension,
+          color: colors[colorIndex],
+          baselineValues: dimensionObj[subDimension].baselineValues,
+          currentValues: dimensionObj[subDimension].currentValues
+        });
+        colorIndex++;
+      }
+    });
+  }
+
+  // Return sorted list of dimension objects
+  return dimensionList;
+}
+
+/**
  * Data needed to render the stats 'cards' above the anomaly graph for a given alert
  * @param {Object} alertEvalMetrics - contains the alert's performance data
  * @param {String} mode - the originating route
+ * @param {String} severity - the severity threshold entered
+ * @param {Boolean} isPercent - suffix associated with the selected severity mode
  * @returns {Array}
  */
-export function buildAnomalyStats(alertEvalMetrics, mode) {
+export function buildAnomalyStats(alertEvalMetrics, mode, severity = '30', isPercent = true) {
   const tooltip = false;
+  const severityUnit = isPercent ? '%' : '';
 
   const responseRateObj = {
     title: 'Response Rate',
     key: 'responseRate',
     units: '%',
     tooltip,
+    hideProjected: true,
     text: '% of anomalies that are reviewed.'
   };
 
@@ -199,11 +250,11 @@ export function buildAnomalyStats(alertEvalMetrics, mode) {
       text: 'Among all anomalies that happened, the % of them detected by the system.'
     },
     {
-      title: 'MTTD for >30% change',
+      title: `MTTD for > ${severity}${severityUnit} change`,
       key: 'mttd',
-      units: 'hours',
+      units: 'hrs',
       tooltip,
-      text: 'Minimum time to detect for anomalies with > 30% change'
+      text: `Minimum time to detect for anomalies with > ${severity}${severityUnit} change`
     }
   ];
 
@@ -212,16 +263,17 @@ export function buildAnomalyStats(alertEvalMetrics, mode) {
   }
 
   anomalyStats.forEach((stat) => {
-    let origData = alertEvalMetrics.evalData[stat.key];
+    let origData = alertEvalMetrics.current[stat.key];
     let newData = alertEvalMetrics.projected[stat.key];
-    stat.value = formatEvalMetric(origData);
-    stat.projected = formatEvalMetric(newData);
-    if (stat.units) {
-      stat.valueUnits = isNaN(origData) ? null : stat.units;
-      stat.projectedUnits = isNaN(newData) ? null : stat.units;
-      stat.showDirectionIcon = !isNaN(origData) && !isNaN(newData) && origData !== newData;
-      stat.direction = stat.showDirectionIcon && origData > newData ? 'bottom' : 'top';
-    }
+    let isPercentageMetric = stat.units === '%';
+    let isTotal = stat.key === 'totalAlerts';
+    stat.showProjected = mode === 'explore';
+    stat.value = isTotal ? origData : formatEvalMetric(origData, isPercentageMetric);
+    stat.projected = isTotal ? newData : formatEvalMetric(newData, isPercentageMetric);
+    stat.valueUnits = isFinite(origData) ? stat.units : null;
+    stat.projectedUnits = isFinite(newData) ? stat.units : null;
+    stat.showDirectionIcon = isFinite(origData) && isFinite(newData) && origData !== newData;
+    stat.direction = stat.showDirectionIcon && origData > newData ? 'bottom' : 'top';
   });
 
   return anomalyStats;
@@ -232,6 +284,7 @@ export default helper(
   toIdGroups,
   pluralizeTime,
   enhanceAnomalies,
+  getTopDimensions,
   setUpTimeRangeOptions,
   buildAnomalyStats,
   evalObj

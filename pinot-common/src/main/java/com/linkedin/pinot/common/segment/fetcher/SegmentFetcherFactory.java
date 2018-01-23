@@ -19,6 +19,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
@@ -106,7 +107,7 @@ public class SegmentFetcherFactory {
       try {
         LOGGER.info("Initializing segment fetcher for protocol {}, class {}", protocol, fetcher.getClass().getName());
         Configuration conf = segmentFetcherFactoryConfig.subset(protocol);
-        logFetcherInitConfig(protocol, conf);
+        logFetcherInitConfig(fetcher, protocol, conf);
         fetcher.init(conf);
       } catch (Exception | LinkageError e) {
         LOGGER.error("Failed to initialize SegmentFetcher for protocol {}. This protocol will not be availalble ", protocol, e);
@@ -138,12 +139,17 @@ public class SegmentFetcherFactory {
     throw new UnsupportedOperationException("Not supported uri: " + uri);
   }
 
-  private static void logFetcherInitConfig(String protocol, Configuration conf) {
+  private static void logFetcherInitConfig(SegmentFetcher fetcher, String protocol, Configuration conf) {
     LOGGER.info("Initializing protocol [{}] with the following configs:", protocol);
     Iterator iter = conf.getKeys();
+    Set<String> secretKeys = fetcher.getProtectedConfigKeys();
     while (iter.hasNext()) {
       String key = (String) iter.next();
-      LOGGER.info("{}: {}", key, conf.getString(key));
+      if (secretKeys.contains(key)) {
+        LOGGER.info("{}: {}", key, "********");
+      } else {
+        LOGGER.info("{}: {}", key, conf.getString(key));
+      }
     }
     LOGGER.info("");
   }

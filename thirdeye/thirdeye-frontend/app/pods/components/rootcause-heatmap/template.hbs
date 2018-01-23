@@ -1,4 +1,18 @@
-<div class="row">
+<div class="card-container__row--flex row">
+  <div class="col-xs-8">
+    {{#unless isAdditive}}
+      <div class="rootcause-message rootcause-message__warning">Dataset is not marked additive. Heatmap may not be proportional.</div>
+    {{/unless}}
+
+    {{#unless hasCurrent}}
+      <div class="rootcause-message rootcause-message__warning">No data for current range</div>
+    {{/unless}}
+
+    {{#unless hasBaseline}}
+      <div class="rootcause-message rootcause-message__warning">No data for baseline range</div>
+    {{/unless}}
+
+  </div>
   <div class="col-xs-4 pull-right">
     <label class="te-label te-label--small" for="select-heatmap-mode">Color heatmap by: </label>
     {{#power-select
@@ -11,14 +25,6 @@
     {{/power-select}}
   </div>
 </div>
-
-{{#unless hasCurrent}}
-  <div class="rootcause-message rootcause-message__warning">No data for current range</div>
-{{/unless}}
-
-{{#unless hasBaseline}}
-  <div class="rootcause-message rootcause-message__warning">No data for baseline range</div>
-{{/unless}}
 
 {{heatmap-chart
   cells=cells

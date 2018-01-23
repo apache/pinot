@@ -6,20 +6,19 @@ import _ from 'lodash';
 import fetch from 'fetch';
 import moment from 'moment';
 
-const ROOTCAUSE_TAB_DIMENSIONS = "dimensions";
-const ROOTCAUSE_TAB_METRICS = "metrics";
-const ROOTCAUSE_TAB_EVENTS = "events";
+const ROOTCAUSE_TAB_DIMENSIONS = 'dimensions';
+const ROOTCAUSE_TAB_METRICS = 'metrics';
+const ROOTCAUSE_TAB_EVENTS = 'events';
 
-const ROOTCAUSE_SERVICE_ENTITIES = "entities";
-const ROOTCAUSE_SERVICE_TIMESERIES = "timeseries";
-const ROOTCAUSE_SERVICE_AGGREGATES = "aggregates";
-const ROOTCAUSE_SERVICE_BREAKDOWNS = "breakdowns";
+const ROOTCAUSE_SERVICE_ROUTE = 'route';
+const ROOTCAUSE_SERVICE_ENTITIES = 'entities';
+const ROOTCAUSE_SERVICE_TIMESERIES = 'timeseries';
+const ROOTCAUSE_SERVICE_AGGREGATES = 'aggregates';
+const ROOTCAUSE_SERVICE_BREAKDOWNS = 'breakdowns';
 
 // TODO: Update module import to comply by new Ember standards
 
 export default Ember.Controller.extend({
-  session: Ember.inject.service(),
-
   queryParams: [
     'metricId',
     'anomalyId',
@@ -34,6 +33,8 @@ export default Ember.Controller.extend({
   //
   // services
   //
+  authService: Ember.inject.service('session'),
+
   entitiesService: Ember.inject.service('rootcause-entities-cache'),
 
   timeseriesService: Ember.inject.service('rootcause-timeseries-cache'),
@@ -43,42 +44,84 @@ export default Ember.Controller.extend({
   breakdownsService: Ember.inject.service('rootcause-breakdowns-cache'),
 
   //
-  // rootcause search context
-  //
-  context: null, // { urns: Set, anomalyRange: [2], baselineRange: [2], analysisRange: [2] }
-
-  //
   // user selection
   //
+
+  /**
+   * rootcause search context
+   *
+   * {
+   *   urns: Set,
+   *   anomalyUrns: Set,
+   *   anomalyRange: [2],
+   *   analysisRange: [2],
+   *   compareMode: string
+   *   granularity: string
+   * }
+   */
+  context: null, //
+
+  /**
+   * entity urns selected for display
+   */
   selectedUrns: null, // Set
 
+  /**
+   * entity urns marked as invisible
+   */
   invisibleUrns: null, // Set
 
+  /**
+   * entity urns currently being hovered over
+   */
   hoverUrns: null, // Set
 
+  /**
+   * (event) entity urns passing the filter side-bar
+   */
   filteredUrns: null,
 
+  /**
+   * displayed investigation tab ('metrics', 'dimensions', ...)
+   */
   activeTab: null, // ""
 
+  /**
+   * display mode for timeseries chart
+   */
   timeseriesMode: null, // ""
 
   //
   // session data
   //
 
+  /**
+   * rootcause session title (on top)
+   */
   sessionName: null, // ""
 
+  /**
+   * rootcause session comments (on top)
+   */
   sessionText: null, // ""
 
+  /**
+   * rootcause session modification indicator
+   */
   sessionModified: null, // true
 
   //
   // static component config
   //
+
+  /**
+   * side-bar filter config
+   */
   filterConfig: config, // {}
 
-  settingsConfig: null, // {}
-
+  /**
+   * Default settings
+   */
   init() {
     this._super(...arguments);
     this.setProperties({
@@ -90,6 +133,25 @@ export default Ember.Controller.extend({
     });
   },
 
+  /**
+   * Context observer manages subscriptions to data feeds.
+   *
+   * Manages entities, timeseries, aggregates, and breakdowns. Pushes context modifications to data
+   * services to refresh caches on-demand. Changes propagate throughout the application via the respective
+   * computed properties ('entities', 'timeseries', 'aggregates', 'breakdowns')
+   *
+   * entities:     rootcause search results, such as events and metrics
+   *               (typically displayed in event table, timeseries chart)
+   *
+   * timeseries:   time-ordered metric values for display in chart
+   *               (typically displayed in timeseries chart)
+   *
+   * aggregates:   metrics values summarized over multiple time windows (anomaly, baseline, ...)
+   *               (typically displayed in metrics table, anomaly header)
+   *
+   * breakdowns:   de-aggregated metric values over multiple time windows (anomaly, baseline, ...)
+   *               (typically displayed in dimension heatmap)
+   */
   _contextObserver: Ember.observer(
     'context',
     'entities',
@@ -149,14 +211,29 @@ export default Ember.Controller.extend({
   // Public properties (computed)
   //
 
+  /**
+   * Subscribed entities cache
+   */
   entities: Ember.computed.reads('entitiesService.entities'),
 
+  /**
+   * Subscribed timeseries cache
+   */
   timeseries: Ember.computed.reads('timeseriesService.timeseries'),
 
+  /**
+   * Subscribed aggregates cache
+   */
   aggregates: Ember.computed.reads('aggregatesService.aggregates'),
 
+  /**
+   * Subscribed breakdowns cache
+   */
   breakdowns: Ember.computed.reads('breakdownsService.breakdowns'),
 
+  /**
+   * Primary metric urn for rootcause search
+   */
   metricUrn: Ember.computed(
     'context',
     function () {
@@ -169,6 +246,9 @@ export default Ember.Controller.extend({
     }
   ),
 
+  /**
+   * Visible series and events in timeseries chart
+   */
   chartSelectedUrns: Ember.computed(
     'entities',
     'selectedUrns',
@@ -184,6 +264,9 @@ export default Ember.Controller.extend({
     }
   ),
 
+  /**
+   * (Event) entities for event table as filtered by the side bar
+   */
   eventTableEntities: Ember.computed(
     'entities',
     'filteredUrns',
@@ -193,8 +276,14 @@ export default Ember.Controller.extend({
     }
   ),
 
+  /**
+   * Columns config for event table
+   */
   eventTableColumns: EVENT_TABLE_COLUMNS,
 
+  /**
+   * (Event) entities for filtering in the side bar
+   */
   eventFilterEntities: Ember.computed(
     'entities',
     function () {
@@ -203,6 +292,9 @@ export default Ember.Controller.extend({
     }
   ),
 
+  /**
+   * Visible entities for tooltip
+   */
   tooltipEntities: Ember.computed(
     'entities',
     'invisibleUrns',
@@ -214,6 +306,9 @@ export default Ember.Controller.extend({
     }
   ),
 
+  //
+  // loading indicators
+  //
   isLoadingEntities: Ember.computed.gt('entitiesService.pending.size', 0),
 
   isLoadingTimeseries: Ember.computed.gt('timeseriesService.pending.size', 0),
@@ -222,6 +317,9 @@ export default Ember.Controller.extend({
 
   isLoadingBreakdowns: Ember.computed.gt('breakdownsService.pending.size', 0),
 
+  //
+  // error indicators
+  //
   hasErrorsRoute: Ember.computed.gt('routeErrors.size', 0),
 
   hasErrorsEntities: Ember.computed.gt('entitiesService.errors.size', 0),
@@ -239,6 +337,12 @@ export default Ember.Controller.extend({
     'hasErrorsBreakdowns'
   ),
 
+  /**
+   * Serializes the current controller state for persistence as rca session
+   *
+   * @returns serialized rca session state
+   * @private
+   */
   _makeSession() {
     const { context, selectedUrns, sessionId, sessionName, sessionText } =
       this.getProperties('context', 'selectedUrns', 'sessionId', 'sessionName', 'sessionText');
@@ -361,7 +465,7 @@ export default Ember.Controller.extend({
      */
     onSessionSave() {
       const jsonString = JSON.stringify(this._makeSession());
-      const sessionUpdatedBy = this.get('session.data.authenticated.name'); // fetch ldap of current user
+      const sessionUpdatedBy = this.get('authService.data.authenticated.name'); // fetch ldap of current user
 
       return fetch(`/session/`, { method: 'POST', body: jsonString })
         .then(checkStatus)
@@ -486,9 +590,9 @@ export default Ember.Controller.extend({
     },
 
     /**
-     * Clears error logs of data services
+     * Clears error logs of data services and/or route
      */
-    clearServiceErrors(type) {
+    clearErrors(type) {
       const { entitiesService, timeseriesService, aggregatesService, breakdownsService } =
         this.getProperties('entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService');
 
@@ -509,14 +613,11 @@ export default Ember.Controller.extend({
           breakdownsService.clearErrors();
           break;
 
-      }
-    },
+        case ROOTCAUSE_SERVICE_ROUTE:
+          this.setProperties({ routeErrors: new Set() });
+          break;
 
-    /**
-     * Clears error logs of route loading/controller setup
-     */
-    clearRouteErrors() {
-      this.setProperties({ routeErrors: new Set() });
+      }
     }
   }
 });

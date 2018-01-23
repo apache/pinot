@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
+import org.apache.zookeeper.data.Stat;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -1093,7 +1094,7 @@ public class SegmentCompletionTest {
     }
 
     @Override
-    public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName) {
+    public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName, Stat stat) {
       return _segmentMetadata;
     }
 

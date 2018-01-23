@@ -19,8 +19,6 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -32,7 +30,7 @@ import org.slf4j.LoggerFactory;
  * </ul>
  * <p>This helps avoid creation of String from byte[], which is expensive as well as creates garbage.
  */
-public class OnHeapStringDictionary extends ImmutableDictionaryReader {
+public class OnHeapStringDictionary extends OnHeapDictionary {
   private final byte _paddingByte;
   private final String[] _unpaddedStrings;
   private final String[] _paddedStrings;
@@ -87,26 +85,6 @@ public class OnHeapStringDictionary extends ImmutableDictionaryReader {
   @Override
   public String get(int dictId) {
     return _unpaddedStrings[dictId];
-  }
-
-  @Override
-  public int getIntValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public long getLongValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public float getFloatValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public double getDoubleValue(int dictId) {
-    throw new UnsupportedOperationException();
   }
 
   @Override

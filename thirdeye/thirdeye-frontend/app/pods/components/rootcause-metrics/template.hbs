@@ -1,24 +1,27 @@
-<ul class="rootcause-metric__display-view">
-  <li class="rootcause-metric__display-view--{{if (eq selectedView "card") "active"}}" {{action "selectView" 'card'}}>
-    Card
-  </li>
-  <li>|</li>
-  <li class="rootcause-metric__display-view--{{if (eq selectedView "table") "active"}}" {{action "selectView" 'table'}}>
-    Table
-  </li>
-</ul>
+<div class="row">
+  {{#if (eq selectedView "card")}}
+    <div class="col-xs-8">
+      sort
+      | <a {{action "toggleSort" "metric"}}>metric</a>
+      | <a {{action "toggleSort" "dataset"}}>dataset</a>
+      | <a {{action "toggleSort" "change"}}>change</a>
+      | <a {{action "toggleSort" "score"}}>score</a>
+    </div>
+  {{/if}}
+  <div class="col-xs-4 pull-right">
+    <ul class="rootcause-metric__display-view">
+      <li class="rootcause-metric__display-view--{{if (eq selectedView "card") "active"}}" {{action "selectView" 'card'}}>
+        Card
+      </li>
+      <li>|</li>
+      <li class="rootcause-metric__display-view--{{if (eq selectedView "table") "active"}}" {{action "selectView" 'table'}}>
+        Table
+      </li>
+    </ul>
+  </div>
+</div>
 
 {{#if (eq selectedView "card")}}
-  <div class="row">
-    <div class="col-xs-12">
-      sort
-      | <button {{action "toggleSort" "metric"}}>metric</button>
-      | <button {{action "toggleSort" "dataset"}}>dataset</button>
-      | <button {{action "toggleSort" "change"}}>change</button>
-      | <button {{action "toggleSort" "score"}}>score</button>
-    </div>
-  </div>
-
   {{#each urns as |urn|}}
     <div class="col-lg-2 col-md-3 col-xs-6 rootcause-metric__card
       {{if (set-has selectedUrns urn) "rootcause-metric__card--selected"}}"
@@ -37,6 +40,7 @@
 {{else}}
   {{metrics-table
     urns=urns
+    links=links
     selectedUrns=selectedUrns
     entities=entities
     changesOffset=changesOffset
