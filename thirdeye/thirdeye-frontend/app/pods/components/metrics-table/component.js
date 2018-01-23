@@ -19,7 +19,7 @@ export default Component.extend({
       propertyName: 'links',
       title: 'Links',
       disableFiltering: true,
-      className: 'rootcause-metric__table__column'
+      className: 'rootcause-metric__table__links-column'
     }, {
       propertyName: 'score',
       title: 'Anomalous Score',
