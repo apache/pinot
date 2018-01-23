@@ -69,42 +69,15 @@
   </fieldset>
 
   <fieldset class="te-form__section row">
-    {{#if isSelectMetricError}}
-      {{#bs-alert type="danger"}}
-        <strong>{{selectMetricErrMsg}}</strong> Unable to fetch data for this metric.
-      {{/bs-alert}}
-    {{/if}}
-
-    <div class="col-xs-12">
-      <div class="te-graph-alert {{if (not isMetricSelected) 'te-graph-alert--pending'}}">
-        {{#if isMetricDataLoading}}
-          <div class="spinner-wrapper--self-serve">{{ember-spinner}}</div>
-        {{/if}}
-        {{#if isMetricSelected}}
-          {{anomaly-graph
-            primaryMetric=selectedMetric
-            selectedDimensions=selectedDimensions
-            dimensions=topDimensions
-            showDimensions=true
-            isLoading=loading
-            showSubchart=true
-            showLegend=true
-            enableZoom=true
-            componentId='create-alert'
-            showGraphLegend=showGraphLegend
-            showGraphLegend=false
-            onSelection=(action "onSelection")
-            onPrimaryMetricToggle=(action "onPrimaryMetricToggle")
-            height=400
-          }}
-        {{else}}
-          <div class="te-graph-alert__content">
-            <div class="glyphicon glyphicon-{{if isMetricDataInvalid 'alert' 'equalizer'}} te-graph-alert__icon{{if isMetricDataInvalid '--warning'}}"></div>
-            <p class="te-graph-alert__pre-text">{{graphMessageText}}</p>
-          </div>
-        {{/if}}
-      </div>
-    </div>
+    {{self-serve-graph
+      isMetricDataLoading=false
+      isMetricDataInvalid=isMetricDataInvalid
+      isDimensionFetchDone=true
+      isMetricSelected=true
+      metricData=metricData
+      topDimensions=topDimensions
+      componentId='report-anomaly'
+    }}
   </fieldset>
 
   <fieldset class="te-form__section row">

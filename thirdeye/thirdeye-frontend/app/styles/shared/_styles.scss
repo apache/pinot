@@ -124,6 +124,18 @@ body {
       float: right;
     }
   }
+
+  &__select {
+    float: none;
+
+    &--wider {
+      width: 600px;
+      float: left;
+      margin-left: -15px;
+      display: inline-block;
+      color: app-shade(black, 7);
+    }
+  }
 }
 
 .te-content-block {
