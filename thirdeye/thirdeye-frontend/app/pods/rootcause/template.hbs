@@ -17,7 +17,7 @@
   onCopy=(action "onSessionCopy")}}
 
 <div class="container">
-  {{#if context.anomalyUrns}}
+  {{#if context.anomalyUrns.size}}
     {{rootcause-anomaly
       entities=entities
       aggregates=aggregates
