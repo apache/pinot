@@ -112,6 +112,9 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Array of displayable urns in timeseries chart (events, metrics, metric refs)
+   */
   displayableUrns: Ember.computed(
     'entities',
     'timeseries',
@@ -126,6 +129,9 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Transformed data series as ingested by timeseries-chart
+   */
   series: Ember.computed(
     'entities',
     'timeseries',
@@ -152,6 +158,9 @@ export default Ember.Component.extend({
     show: false
   },
 
+  /**
+   * Dictionary of transformed data series for split view, keyed by metric ref urn.
+   */
   splitSeries: Ember.computed(
     'entities',
     'timeseries',
@@ -186,6 +195,9 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Array of urns for split view. One per metric ref urn.
+   */
   splitUrns: Ember.computed(
     'entities',
     'displayableUrns',
@@ -205,6 +217,9 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Dictionary of chart labels for split view, keyed by metric ref urn.
+   */
   splitLabels: Ember.computed(
     'entities',
     'displayableUrns',
@@ -225,6 +240,9 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Split view indicator
+   */
   isSplit: Ember.computed(
     'timeseriesMode',
     function () {
@@ -236,6 +254,12 @@ export default Ember.Component.extend({
   // helpers
   //
 
+  /**
+   * Returns a dictionary with transformed data series as ingested by timeseries-chart for a given set of
+   * urns (metric refs and event entities).
+   *
+   * @param {Array} urns metric ref urns
+   */
   _makeChartSeries(urns) {
     const { context } = this.getProperties('context');
     const { anomalyRange } = context;
@@ -255,6 +279,9 @@ export default Ember.Component.extend({
     return series;
   },
 
+  /**
+   * Dictionary for the min and mix timestamps of events and timeseries for hover bounds checking
+   */
   _hoverBounds: Ember.computed(
     'entities',
     'timeseries',
@@ -272,6 +299,9 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Dictionary of y-values for event entities. Laid out by a swimlane algorithm purely for display purposes
+   */
   _eventValues: Ember.computed(
     'entities',
     'displayableUrns',
@@ -321,10 +351,25 @@ export default Ember.Component.extend({
     }
   ),
 
+  /**
+   * Converts a urn into a valid series label as ingested by timeseries-chart
+   *
+   * @param {string} urn entity urn
+   * @returns {string} label
+   * @private
+   */
   _makeLabel(urn) {
     return urn;
   },
 
+  /**
+   * Returns a transformed data series as ingested by timeseries-chart for a given urn. Supports
+   * metric refs and event entities.
+   *
+   * @param {string} urn entity urn
+   * @returns {Object} timeseries-chart series instance
+   * @private
+   */
   _makeSeries(urn) {
     const { entities, timeseries, timeseriesMode, _eventValues, context } =
       this.getProperties('entities', 'timeseries', 'timeseriesMode', '_eventValues', 'context');
@@ -368,6 +413,14 @@ export default Ember.Component.extend({
     }
   },
 
+  /**
+   * Returns a timeseries transformed by mode.
+   *
+   * @param {string} mode transformation mode
+   * @param {Object} series timeseries container ({ timestamps: [], values: [] })
+   * @returns {Object} transformed timeseries container
+   * @private
+   */
   _transformSeries(mode, series) {
     switch(mode) {
       case TIMESERIES_MODE_ABSOLUTE:
@@ -382,19 +435,48 @@ export default Ember.Component.extend({
     return series;
   },
 
+  /**
+   * Transforms the input timeseries to relative values based on first value.
+   *
+   * @param {Object} series timeseries container
+   * @private
+   */
   _transformSeriesRelative(series) {
-    const first = series.values.filter(v => v)[0];
+    const first = series.values.filter(v => v)[0] || 1.0;
     const output = Object.assign({}, series);
     output.values = series.values.map(v => v != null ? 1.0 * v / first : null);
     return output;
   },
 
+  /**
+   * Transforms the input timeseries to log values, with a custom interpretation
+   *
+   * @param {Object} series timeseries container
+   * @private
+   */
   _transformSeriesLog(series) {
     const output = Object.assign({}, series);
-    output.values = series.values.map(v => v != null ? Math.log(v) : null);
+    output.values = series.values.map(v => v != null ? this._customLog(v) : null);
     return output;
   },
 
+  /**
+   * Log transform helper for values <= 0
+   *
+   * @param {Float} v value
+   * @private
+   */
+  _customLog(v) {
+    if (v <= 0) { return null; }
+    return Math.log(v);
+  },
+
+  /**
+   * Returns the set of urns whose timeseries bounds include the timestamp d.
+   *
+   * @param {Int} d timestamp in millis
+   * @private
+   */
   _onHover(d) {
     const { _hoverBounds: bounds, displayableUrns, onHover } =
       this.getProperties('_hoverBounds', 'displayableUrns', 'onHover');
