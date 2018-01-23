@@ -9,68 +9,55 @@
             {{range.name}}
             {{#if (eq range.name "Custom")}}
               : {{date-range-picker
-                class="te-pill-selectors__range-picker"
-                timePicker=false
-                timePicker24Hour=true
-                timePickerIncrement=timePickerIncrement
-                maxDate=maxTime
-                start=viewRegionStart
-                end=viewRegionEnd
-                ranges=predefinedRanges
-                showCustomRangeLabel=false
-                format=uiDateFormat
-                serverFormat="YYYY-MM-DD HH:mm"
-                applyAction=(action "onRangeSelection")
-              }}
+                  class="te-pill-selectors__range-picker"
+                  timePicker=false
+                  timePicker24Hour=true
+                  timePickerIncrement=timePickerIncrement
+                  maxDate=maxTime
+                  start=viewRegionStart
+                  end=viewRegionEnd
+                  ranges=predefinedRanges
+                  showCustomRangeLabel=false
+                  format=uiDateFormat
+                  serverFormat="YYYY-MM-DD HH:mm"
+                  applyAction=(action "onRangeSelection")
+                }}
             {{/if}}
           </li>
         {{/each}}
       </ul>
     </div>
 
+    {{#if isPageLoadFailure}}
+      {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
+        <strong>Error:</strong> Failed to load performance data.
+      {{/bs-alert}}
+    {{/if}}
+
     <div class="te-horizontal-cards te-content-block">
       <h4 class="te-alert-page__subtitle">Alert Performance</h4>
       <a class="te-pill-selectors__side-link" {{action "onClickTuneSensitivity" this}}>Customize sensitivity</a>
       <div class="te-horizontal-cards__container">
         {{!-- Alert anomaly stats cards --}}
-        {{#each anomalyStats as |card|}}
-          <ul class="te-horizontal-cards__card">
-
-            <li class="te-horizontal-cards">
-              <div class="te-horizontal-cards__card-title">{{card.title}}</div>
-              {{#if card.tooltip}}
-                <div class="te-horizontal-cards__card-tooltip">
-                  <span>
-                    <i class="glyphicon glyphicon-question-sign"></i>
-                    {{#tooltip-on-element}}{{card.text}}{{/tooltip-on-element}}
-                  </span>
-                </div>
-              {{else}}
-                <div class="te-horizontal-cards__card-text">{{card.text}}</div>
-              {{/if}}
-            </li>
-
-            <li class="te-horizontal-cards__card-value te-horizontal-cards__card-value--tight">
-              <div class="te-horizontal-cards__val-group">
-                <div class="te-horizontal-cards__card-number">
-                  {{card.value}}
-                  {{#if (and card.units (not-eq card.value "N/A"))}}
-                    <span class="te-horizontal-cards__card-units">{{card.units}}</span>
-                  {{/if}}
-                </div>
-                <div class="te-horizontal-cards__card-subt {{if (eq card.projected "none") "te-horizontal-cards__card-subt--hide"}}">Projected:
-                  <strong>{{card.projected}}</strong>
-                  {{#if (and card.units (not-eq card.projected "N/A"))}}
-                    <span class="te-horizontal-cards__card-units--small">{{card.units}}</span>
-                  {{/if}}
-                </div>
-              </div>
-            </li>
-
-          </ul>
-        {{/each}}
+        {{anomaly-stats-block
+          isTunePreviewActive=isTunePreviewActive
+          displayMode="explore"
+          anomalyStats=anomalyStats
+        }}
       </div>
     </div>
+
+    {{#if isReportSuccess}}
+      {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
+        <strong>Success:</strong> We have saved the reported anomaly for alert id <strong>{{alertId}}</strong>
+      {{/bs-alert}}
+    {{/if}}
+
+    {{#if isReportFailure}}
+      {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
+        <strong>Error:</strong> Failed to save reported anomaly.
+      {{/bs-alert}}
+    {{/if}}
 
     <div class="te-content-block">
       <h4>Anomalies over time ({{filteredAnomalies.length}})</h4>
@@ -78,12 +65,14 @@
 
       <div class="te-pill-selectors">
         {{!-- Dimension selector --}}
-        <div class="te-pill-selectors__range-picker col-md-3">
+        <div class="te-form__select--wider col-md-3">
           {{#power-select
             triggerId="select-dimension"
             triggerClass="te-form__select"
             options=dimensionOptions
             searchEnabled=false
+            matchTriggerWidth=true
+            matchContentWidth=true
             selected=selectedDimension
             onchange=(action "onSelectDimension")
             as |dimension|
@@ -98,6 +87,8 @@
             triggerClass="te-form__select"
             options=resolutionOptions
             searchEnabled=false
+            matchTriggerWidth=true
+            matchContentWidth=true
             selected=selectedResolution
             onchange=(action "onSelectResolution")
             as |resolution|
@@ -107,56 +98,47 @@
         </div>
       </div>
 
-      {{#if openReportModal}}
-        {{#te-modal
-          headerText="Report Undetected Anomaly"
-          cancelButtonText="Cancel"
-          submitButtonText="Report"
-          saveAction=(action "onSave")
-          cancelAction=(action "onCancel")
-        }}
+      {{!-- Missing anomaly modal --}}
+      {{#te-modal
+        headerText="Report Undetected Anomaly"
+        cancelButtonText="Cancel"
+        submitButtonText="Report"
+        saveAction=(action "onSave")
+        cancelAction=(action "onCancel")
+        isShowingModal=openReportModal
+      }}
+        {{#if renderModalContent}}
           {{alert-report-modal
             metricName=alertData.metric
             alertName=alertData.functionName
             dimensionOptions=dimensionOptions
+            showTimePicker=true
             timePickerIncrement=timePickerIncrement
             maxTime=maxTime
             viewRegionStart=viewRegionStart
             viewRegionEnd=viewRegionEnd
             predefinedRanges=predefinedRanges
             uiDateFormat=uiDateFormat
-            graphMessageText=""
+            metricData=metricData
+            topDimensions=topDimensions
+            isMetricDataInvalid=isMetricDataInvalid
             inputAction=(action "onInputMissingAnomaly")
           }}
-        {{/te-modal}}
-      {{/if}}
+        {{else}}
+          {{ember-spinner}}
+        {{/if}}
+      {{/te-modal}}
 
-      {{!-- Alert anomaly graph --}}
-      <div class="te-graph-container col-xs-12">
-        <div class="te-graph-alert {{if (not isGraphReady) 'te-graph-alert--pending'}}">
-          {{#if isMetricDataLoading}}
-            <div class="spinner-wrapper--self-serve">{{ember-spinner}}</div>
-          {{/if}}
-          {{#if isGraphReady}}
-            {{anomaly-graph
-              primaryMetric=metricData
-              isLoading=loading
-              showSubchart=true
-              showLegend=false
-              legendText=legendText
-              enableZoom=true
-              componentId='create-alert'
-              showGraphLegend=false
-              height=400
-            }}
-          {{else}}
-             <div class="te-graph-alert__content">
-              <div class="glyphicon glyphicon-equalizer}} te-graph-alert__icon"></div>
-              <p class="te-graph-alert__pre-text">Loading graph...</p>
-            </div>
-          {{/if}}
-        </div>
-      </div>
+      {{!-- Alert page graph --}}
+      {{self-serve-graph
+        isMetricDataLoading=isMetricDataLoading
+        isMetricDataInvalid=isMetricDataInvalid
+        isDimensionFetchDone=isDimensionFetchDone
+        isMetricSelected=true
+        metricData=metricData
+        topDimensions=topDimensions
+        componentId='alert-page'
+      }}
 
       {{#if filteredAnomalies}}
         {{!-- Baseline type selector --}}
@@ -195,7 +177,7 @@
              </th>
              <th class="te-anomaly-table__cell-head">
               <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "change"}}>
-                Current/WoW
+                {{baselineTitle}}
                 <i class="te-anomaly-table__glyph glyphicon {{if sortColumnChangeUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
               </a>
              </th>
@@ -215,7 +197,11 @@
             <tr class="te-anomaly-table__row">
                <td class="te-anomaly-table__cell">
                 <ul class="te-anomaly-table__list">
-                  <li class="te-anomaly-table__list--stronger">{{anomaly.startDateStr}}</li>
+                  <li class="te-anomaly-table__list--stronger">
+                    <a target="_blank" class="te-anomaly-table__link" href="/thirdeye#anomalies?anomaliesSearchMode=id&pageNumber=1&anomalyIds={{anomaly.anomalyId}}">
+                      {{anomaly.startDateStr}}
+                    </a>
+                  </li>
                   <li class="te-anomaly-table__list--lighter">{{anomaly.durationStr}}</li>
                 </ul>
                </td>
@@ -312,23 +298,5 @@
       </p>
     </div>
 
-  {{/if}}
-
-  {{#if isReportSuccess}}
-    {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
-      <strong>Success:</strong> We have saved the reported anomaly for alert id <strong>{{alertId}}</strong>
-    {{/bs-alert}}
-  {{/if}}
-
-  {{#if isReportFailure}}
-    {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
-      <strong>Error:</strong> Failed to save reported anomaly.
-    {{/bs-alert}}
-  {{/if}}
-
-  {{#if isPageLoadFailure}}
-    {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
-      <strong>Error:</strong> Failed to load performance data.
-    {{/bs-alert}}
   {{/if}}
 </div>

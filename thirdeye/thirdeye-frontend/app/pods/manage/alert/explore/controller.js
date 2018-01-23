@@ -20,18 +20,6 @@ export default Controller.extend({
   endDate: null,
 
   /**
-   * Standard legend settings for graph
-   */
-  legendText: {
-    dotted: {
-      text: 'WoW'
-    },
-    solid: {
-      text: 'Observed'
-    }
-  },
-
-  /**
    * Mapping anomaly table column names to corresponding prop keys
    */
   sortMap: {
@@ -56,21 +44,20 @@ export default Controller.extend({
     this.setProperties({
       filters: {},
       metricData: {},
-      graphConfig: {},
       loadedWowData: [],
       predefinedRanges: {},
       missingAnomalyProps: {},
       selectedSortMode: '',
       selectedTimeRange: '',
       selectedFilters: JSON.stringify({}),
-      isAlertReady: false,
       openReportModal: false,
       isReplayStarted: true,
+      isAlertReady: false,
       isReplayDone: false,
+      isGraphReady: false,
       isReportSuccess: false,
       isReportFailure: false,
       isPageLoadFailure: false,
-      isMetricDataLoading: true,
       isReplayModeWrapper: true,
       isAnomalyArrayChanged: false,
       requestCanContinue: true,
@@ -79,7 +66,6 @@ export default Controller.extend({
       sortColumnChangeUp: false,
       sortColumnResolutionUp: false,
       checkReplayInterval: 5000,
-      baselineOptions: [{ name: 'Predicted', isActive: true }],
       selectedDimension: 'All Dimensions',
       selectedResolution: 'All Resolutions',
       dateRangeToRender: [30, 10, 5],
@@ -195,12 +181,6 @@ export default Controller.extend({
   }),
 
   /**
-   * Indicates the allowed date range picker increment based on granularity
-   * @type {Boolean}
-   */
-  showGraph: Ember.computed.bool('isGraphReady'),
-
-  /**
    * date-time-picker: returns a time object from selected range end date
    * @type {Object}
    */
@@ -264,29 +244,26 @@ export default Controller.extend({
     'selectedDimension',
     'selectedResolution',
     'anomalyData',
+    'anomaliesLoaded',
     function() {
       const {
+        anomaliesLoaded,
         selectedDimension: targetDimension,
         selectedResolution: targetResolution
-      } = this.getProperties('selectedDimension', 'selectedResolution');
-      let anomalies = this.get('anomalyData');
+      } = this.getProperties('selectedDimension', 'selectedResolution', 'anomaliesLoaded');
+      let anomalies = [];
 
-      // Filter for selected dimension
-      if (targetDimension !== 'All Dimensions') {
-        anomalies = anomalies.filter((data) => {
-          if (data.dimensionList.length) {
-            return targetDimension === `${data.dimensionList[0].dimensionKey}:${data.dimensionList[0].dimensionVal}`;
-          }
-        });
+      if (anomaliesLoaded) {
+        anomalies = this.get('anomalyData');
+        if (targetDimension !== 'All Dimensions') {
+          // Filter for selected dimension
+          anomalies = anomalies.filter(data => targetDimension === data.dimensionString);
+        }
+        if (targetResolution !== 'All Resolutions') {
+          // Filter for selected resolution
+          anomalies = anomalies.filter(data => targetResolution === data.anomalyFeedback);
+        }
       }
-
-      // Filter for selected resolution
-      if (targetResolution !== 'All Resolutions') {
-        anomalies = anomalies.filter((data) => {
-          return targetResolution === data.anomalyFeedback;
-        });
-      }
-
       return anomalies;
     }
   ),
@@ -303,6 +280,19 @@ export default Controller.extend({
   ),
 
   /**
+   * Find the active baseline option name
+   * @type {String}
+   */
+  baselineTitle: computed(
+    'baselineOptions',
+    function() {
+      const activeOpName = this.get('baselineOptions').filter(item => item.isActive).pop().name;
+      const displayName = (activeOpName !== 'Predicted') ? `Current/${activeOpName}` : activeOpName;
+      return displayName;
+    }
+  ),
+
+  /**
    * Generate date range selection options if needed
    * @method renderDate
    * @param {Number} range - number of days (duration)
@@ -312,22 +302,6 @@ export default Controller.extend({
     // TODO: enable single day range
     const newDate = buildDateEod(range, 'days').format("DD MM YYY");
     return `Last ${range} Days (${newDate} to Today)`;
-  },
-
-  /**
-   * Fetches change rate data for each available anomaly id
-   * @method fetchCombinedAnomalyChangeData
-   * @returns {Ember.RSVP promise}
-   */
-  fetchCombinedAnomalyChangeData() {
-    let promises = {};
-
-    for (var anomaly of this.get('anomalyData')) {
-      let id = anomaly.anomalyId;
-      promises[id] = fetch(`/anomalies/${id}`).then(checkStatus);
-    }
-
-    return Ember.RSVP.hash(promises);
   },
 
   /**
@@ -341,6 +315,7 @@ export default Controller.extend({
   checkReplayStatus(jobId) {
     const checkStatusUrl = `/thirdeye-admin/job-info/job/${jobId}/status`;
 
+    // In replay status check, continue to display "pending" banner unless we have success.
     fetch(checkStatusUrl).then(checkStatus)
       .then((status) => {
         if (status.toLowerCase() === 'completed') {
@@ -351,47 +326,6 @@ export default Controller.extend({
             this.checkReplayStatus(jobId);
           }, this.get('checkReplayInterval'));
         }
-      })
-      .catch((err) => {
-        this.set('isReplayStatusError', true);
-      });
-  },
-
-  /**
-   * Downloads data that is not critical for the initial page load
-   * TODO: Should we move all requests to the route?
-   * @method fetchDeferredAnomalyData
-   * @return {Promise}
-   */
-  fetchDeferredAnomalyData() {
-    const wowOptions = ['Wow', 'Wo2W', 'Wo3W', 'Wo4W'];
-    const { anomalyData, baselineOptions } = this.getProperties('anomalyData', 'baselineOptions');
-    const newWowList = wowOptions.map((item) => {
-      return { name: item, isActive: false };
-    });
-
-    return this.fetchCombinedAnomalyChangeData()
-      .then((wowData) => {
-        anomalyData.forEach((anomaly) => {
-          anomaly.wowData = wowData[anomaly.anomalyId] || {};
-        });
-        // Display rest of options once data is loaded ('2week', 'Last Week')
-        this.set('baselineOptions', [baselineOptions[0], ...newWowList]);
-        return fetch(this.get('metricDataUrl')).then(checkStatus);
-      })
-      .then((metricData) => {
-        // Display graph once data has loaded
-        this.setProperties({
-          isGraphReady: true,
-          isMetricDataLoading: false,
-          metricData
-        });
-      })
-      .catch((errors) => {
-        this.setProperties({
-          loadError: true,
-          loadErrorMsg: errors
-        });
       });
   },
 
@@ -452,19 +386,23 @@ export default Controller.extend({
    * @return {Promise}
    */
   reportAnomaly(id, data) {
-    const reportUrl = `/anomalies/reportAnomaly/${id}`;
-    const requiredProps = [data.startTime, data.endTime, data.feedbackType];
+    const reportUrl = `/anomalies/reportAnomaly/${id}?`;
+    const updateUrl = `/anomalies/updateFeedbackRange/${data.startTime}/${data.endTime}/${id}?feedbackType=${data.feedbackType}`;
+    const requiredProps = ['data.startTime', 'data.endTime', 'data.feedbackType'];
     const missingData = !requiredProps.every(prop => Ember.isPresent(prop));
+    let queryStringUrl = reportUrl;
 
     if (missingData) {
       return Promise.reject(new Error('missing data'));
     } else {
-      data.startTime = moment(data.startTime).utc().valueOf();
-      data.endTime = moment(data.endTime).utc().valueOf();
-      return fetch(reportUrl, postProps(data)).then((res) => checkStatus(res, 'post'))
+      Object.entries(data).forEach(([key, value]) => {
+        queryStringUrl += `&${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+      });
+      // Step 1: Report the anomaly
+      return fetch(queryStringUrl, postProps('')).then((res) => checkStatus(res, 'post'))
         .then((saveResult) => {
-          const updateUrl = `/anomalies/updateFeedbackRange/${data.startTime}/${data.endTime}/${id}`;
-          return fetch(updateUrl, postProps(data)).then((res) => checkStatus(res, 'post'));
+          // Step 2: Automatically update anomaly feedback in that range
+          return fetch(updateUrl, postProps('')).then((res) => checkStatus(res, 'post'));
         });
     }
   },
@@ -563,10 +501,7 @@ export default Controller.extend({
       const { alertId, missingAnomalyProps } = this.getProperties('alertId', 'missingAnomalyProps');
       this.reportAnomaly(alertId, missingAnomalyProps)
         .then((result) => {
-          this.setProperties({
-            openReportModal: false,
-            isReportSuccess: true
-          });
+          this.set('isReportSuccess', true);
         })
         // If failure, leave modal open and report
         .catch((err) => {
@@ -582,9 +517,9 @@ export default Controller.extend({
      */
     onCancel() {
       this.setProperties({
-        openReportModal: false,
         isReportSuccess: false,
-        isReportFailure: false
+        isReportFailure: false,
+        renderModalContent: false
       });
     },
 
@@ -592,7 +527,16 @@ export default Controller.extend({
      * Open modal for missing anomalies
      */
     onClickReportAnomaly() {
-      this.set('openReportModal', true);
+      this.setProperties({
+        isReportSuccess: false,
+        isReportFailure: false,
+        openReportModal: true
+      });
+      // We need the C3/D3 graph to render after its containing parent elements are rendered
+      // in order to avoid strange overflow effects.
+      Ember.run.later(() => {
+        this.set('renderModalContent', true);
+      })
     },
 
     /**
