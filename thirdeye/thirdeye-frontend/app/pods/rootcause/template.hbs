@@ -1,7 +1,13 @@
 {{#if hasErrorsRoute}}
   <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
     <a class="close" data-dismiss="alert" {{action "clearErrors" "route"}}>&times;</a>
-    Error initializing analysis:{{#each routeErrors as |e|}} <strong>{{e}}</strong>{{/each}}
+    Error:{{#each routeErrors as |e|}} <strong>{{e}}</strong>{{/each}}
+  </div>
+{{/if}}
+
+{{#if sessionUpdateWarning}}
+  <div class="rootcause-alert alert alert-warning fade in">
+    {{sessionUpdateWarning}}
   </div>
 {{/if}}
 

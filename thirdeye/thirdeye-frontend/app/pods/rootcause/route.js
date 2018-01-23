@@ -3,7 +3,7 @@ import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
-import { toCurrentUrn, toBaselineUrn, filterPrefix, appendFilters, toFilters, checkStatus } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, appendFilters, toFilters, checkStatus, dateFormatFull } from 'thirdeye-frontend/helpers/utils';
 import _ from 'lodash';
 
 const queryParamsConfig = {
@@ -152,8 +152,6 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
     const analysisRange = [analysisRangeStart, analysisRangeEnd];
 
-    const dateFormat = 'ddd, MMM D YYYY, h:mm a';
-
     // default blank context
     let context = {
       urns: new Set(),
@@ -165,7 +163,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     };
 
     let selectedUrns = new Set();
-    let sessionName = 'New Investigation (' + moment().format(dateFormat) + ')';
+    let sessionName = 'New Investigation (' + moment().format(dateFormatFull) + ')';
     let sessionText = '';
     let sessionUpdatedBy = '';
     let sessionUpdatedTime = '';
@@ -217,7 +215,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
         };
 
         selectedUrns = new Set([...metricUrns, ...metricUrns.map(toCurrentUrn), ...metricUrns.map(toBaselineUrn), anomalyUrn]);
-        sessionName = 'New Investigation of #' + anomalyId + ' (' + moment().format(dateFormat) + ')';
+        sessionName = 'New Investigation of #' + anomalyId + ' (' + moment().format(dateFormatFull) + ')';
 
       } else {
         routeErrors.add(`Could not find anomalyId ${anomalyId}`);
@@ -241,7 +239,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
         sessionName = name;
         sessionText = text;
         sessionUpdatedBy = updatedBy;
-        sessionUpdatedTime = moment(updated).format(dateFormat);
+        sessionUpdatedTime = updated;
         sessionModified = false;
 
       } else {
