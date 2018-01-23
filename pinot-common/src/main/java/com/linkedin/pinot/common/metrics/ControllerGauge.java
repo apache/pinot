@@ -33,7 +33,12 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   REALTIME_TABLE_COUNT("TableCount", true),
   OFFLINE_TABLE_COUNT("TableCount", true),
 
-  SHORT_OF_LIVE_INSTANCES("ShortOfLiveInstances", false); // Number of extra live instances needed.
+  SHORT_OF_LIVE_INSTANCES("ShortOfLiveInstances", false), // Number of extra live instances needed.
+
+  REALTIME_TABLE_ESTIMATED_SIZE("RealtimeTableEstimatedSize", false), // Estimated size of realtime table.
+  OFFLINE_TABLE_ESTIMATED_SIZE("OfflineTableEstimatedSize", false),   // Estimated size of offline table.
+
+  TABLE_QUOTA("TableQuotaBasedOnTableConfig", false); // Table quota based on setting in table config.
 
   private final String gaugeName;
   private final String unit;

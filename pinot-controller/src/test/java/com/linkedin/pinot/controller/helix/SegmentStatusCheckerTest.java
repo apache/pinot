@@ -15,42 +15,81 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metrics.ControllerGauge;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
+import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
+import org.apache.helix.InstanceType;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.mockito.ArgumentMatchers;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 public class SegmentStatusCheckerTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusCheckerTest.class);
   private SegmentStatusChecker segmentStatusChecker;
   private PinotHelixResourceManager helixResourceManager;
   private MetricsRegistry metricsRegistry;
   private ControllerMetrics controllerMetrics;
   private ControllerConf config;
+  private Map<String, FakeSizeServer> serverMap = new HashMap<>();
+  private final int serverPortStart = 20000;
+  private final String URI_PATH = "/table/";
+  private final HelixManager helixManager = new ZKHelixManager("StatusChecker", null, InstanceType.CONTROLLER, "");
 
   @BeforeSuite
   public void setUp() throws Exception {
+
+    int counter = 0;
+    // server0
+    FakeSizeServer s = new FakeSizeServer(Arrays.asList("s1","s2", "s3"), serverPortStart + counter);
+    s.start(URI_PATH, createHandler(200, s.sizes, 0));
+    serverMap.put(serverName(counter), s);
+    ++counter;
+
+    // server1
+    s = new FakeSizeServer(Arrays.asList("s2","s5"), serverPortStart + counter);
+    s.start(URI_PATH, createHandler(200, s.sizes, 0));
+    serverMap.put(serverName(counter), s);
+    ++counter;
   }
 
   @AfterSuite
@@ -95,16 +134,51 @@ public class SegmentStatusCheckerTest {
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+      when(helixResourceManager.getHelixZkManager()).thenReturn(helixManager);
+      when(helixResourceManager.hasOfflineTable(anyString())).thenAnswer(new Answer() {
+        @Override
+        public Object answer(InvocationOnMock invocationOnMock)
+            throws Throwable {
+          String table = (String) invocationOnMock.getArguments()[0];
+          return table.indexOf("offline") >= 0;
+        }
+      });
+      when(helixResourceManager.hasRealtimeTable(anyString())).thenAnswer(new Answer() {
+        @Override
+        public Object answer(InvocationOnMock invocationOnMock)
+            throws Throwable {
+          String table = (String) invocationOnMock.getArguments()[0];
+          return table.indexOf("realtime") >= 0;
+        }
+      });
+      final String[] servers = { "server0", "server1"};
+      when(helixResourceManager.getInstanceToSegmentsInATableMap(anyString()))
+          .thenAnswer(new Answer<Object>() {
+            @Override
+            public Object answer(InvocationOnMock invocationOnMock)
+                throws Throwable {
+              return subsetOfServerSegments(servers);
+            }
+          });
+      when(helixResourceManager.getDataInstanceAdminEndpoints(ArgumentMatchers.<String>anySet()))
+          .thenAnswer(new Answer<Object>() {
+            @Override
+            public Object answer(InvocationOnMock invocationOnMock)
+                throws Throwable {
+              return serverEndpoints(servers);
+            }
+          });
     }
     {
       config = mock(ControllerConf.class);
       when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
       when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
+      when(config.getServerAdminRequestTimeoutSeconds()).thenReturn(100);
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
-    segmentStatusChecker.setMetricsRegistry(controllerMetrics);
+    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+
     segmentStatusChecker.runSegmentMetrics();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 1);
@@ -114,6 +188,10 @@ public class SegmentStatusCheckerTest {
         ControllerGauge.PERCENT_OF_REPLICAS), 33);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
         ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
+        ControllerGauge.REALTIME_TABLE_ESTIMATED_SIZE), 0L);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
+        ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE), 630L);
     segmentStatusChecker.stop();
   }
 
@@ -162,16 +240,52 @@ public class SegmentStatusCheckerTest {
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+      when(helixResourceManager.getHelixZkManager()).thenReturn(helixManager);
+      when(helixResourceManager.hasOfflineTable(anyString())).thenAnswer(new Answer() {
+        @Override
+        public Object answer(InvocationOnMock invocationOnMock)
+            throws Throwable {
+          String table = (String) invocationOnMock.getArguments()[0];
+          return table.indexOf("offline") >= 0;
+        }
+      });
+      when(helixResourceManager.hasRealtimeTable(anyString())).thenAnswer(new Answer() {
+        @Override
+        public Object answer(InvocationOnMock invocationOnMock)
+            throws Throwable {
+          String table = (String) invocationOnMock.getArguments()[0];
+          return table.indexOf("realtime") >= 0;
+        }
+      });
+      final String[] servers = { "server0", "server1"};
+      when(helixResourceManager.getInstanceToSegmentsInATableMap(anyString()))
+          .thenAnswer(new Answer<Object>() {
+            @Override
+            public Object answer(InvocationOnMock invocationOnMock)
+                throws Throwable {
+              return subsetOfServerSegments(servers);
+            }
+          });
+
+      when(helixResourceManager.getDataInstanceAdminEndpoints(ArgumentMatchers.<String>anySet()))
+          .thenAnswer(new Answer<Object>() {
+            @Override
+            public Object answer(InvocationOnMock invocationOnMock)
+                throws Throwable {
+              return serverEndpoints(servers);
+            }
+          });
     }
     {
       config = mock(ControllerConf.class);
       when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
       when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
+      when(config.getServerAdminRequestTimeoutSeconds()).thenReturn(100);
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
-    segmentStatusChecker.setMetricsRegistry(controllerMetrics);
+    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+
     segmentStatusChecker.runSegmentMetrics();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
@@ -181,6 +295,10 @@ public class SegmentStatusCheckerTest {
         ControllerGauge.PERCENT_OF_REPLICAS), 100);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
         ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
+        ControllerGauge.REALTIME_TABLE_ESTIMATED_SIZE), 630L);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
+        ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE), 0L);
     segmentStatusChecker.stop();
   }
 
@@ -208,8 +326,7 @@ public class SegmentStatusCheckerTest {
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
-    segmentStatusChecker.setMetricsRegistry(controllerMetrics);
+    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.runSegmentMetrics();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
@@ -275,16 +392,52 @@ public class SegmentStatusCheckerTest {
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
       when(helixResourceManager.getPropertyStore()).thenReturn(propertyStore);
+      when(helixResourceManager.getHelixZkManager()).thenReturn(helixManager);
+      when(helixResourceManager.hasOfflineTable(anyString())).thenAnswer(new Answer() {
+        @Override
+        public Object answer(InvocationOnMock invocationOnMock)
+            throws Throwable {
+          String table = (String) invocationOnMock.getArguments()[0];
+          return table.indexOf("offline") >= 0;
+        }
+      });
+      when(helixResourceManager.hasRealtimeTable(anyString())).thenAnswer(new Answer() {
+        @Override
+        public Object answer(InvocationOnMock invocationOnMock)
+            throws Throwable {
+          String table = (String) invocationOnMock.getArguments()[0];
+          return table.indexOf("realtime") >= 0;
+        }
+      });
+      final String[] servers = { "server0", "server1"};
+      when(helixResourceManager.getInstanceToSegmentsInATableMap(anyString()))
+          .thenAnswer(new Answer<Object>() {
+            @Override
+            public Object answer(InvocationOnMock invocationOnMock)
+                throws Throwable {
+              return subsetOfServerSegments(servers);
+            }
+          });
+
+      when(helixResourceManager.getDataInstanceAdminEndpoints(ArgumentMatchers.<String>anySet()))
+          .thenAnswer(new Answer<Object>() {
+            @Override
+            public Object answer(InvocationOnMock invocationOnMock)
+                throws Throwable {
+              return serverEndpoints(servers);
+            }
+          });
     }
     {
       config = mock(ControllerConf.class);
       when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
       when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(0);
+      when(config.getServerAdminRequestTimeoutSeconds()).thenReturn(100);
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
-    segmentStatusChecker.setMetricsRegistry(controllerMetrics);
+    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+
     segmentStatusChecker.runSegmentMetrics();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 1);
@@ -292,6 +445,10 @@ public class SegmentStatusCheckerTest {
         ControllerGauge.NUMBER_OF_REPLICAS), 0);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
         ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 75);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
+        ControllerGauge.REALTIME_TABLE_ESTIMATED_SIZE), 0L);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
+        ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE), 630L);
     segmentStatusChecker.stop();
   }
 
@@ -323,16 +480,53 @@ public class SegmentStatusCheckerTest {
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+      when(helixResourceManager.getHelixZkManager()).thenReturn(helixManager);
+
+      when(helixResourceManager.hasOfflineTable(anyString())).thenAnswer(new Answer() {
+        @Override
+        public Object answer(InvocationOnMock invocationOnMock)
+            throws Throwable {
+          String table = (String) invocationOnMock.getArguments()[0];
+          return table.indexOf("offline") >= 0;
+        }
+      });
+      when(helixResourceManager.hasRealtimeTable(anyString())).thenAnswer(new Answer() {
+        @Override
+        public Object answer(InvocationOnMock invocationOnMock)
+            throws Throwable {
+          String table = (String) invocationOnMock.getArguments()[0];
+          return table.indexOf("realtime") >= 0;
+        }
+      });
+      final String[] servers = { "server0", "server1"};
+      when(helixResourceManager.getInstanceToSegmentsInATableMap(anyString()))
+          .thenAnswer(new Answer<Object>() {
+            @Override
+            public Object answer(InvocationOnMock invocationOnMock)
+                throws Throwable {
+              return subsetOfServerSegments(servers);
+            }
+          });
+
+      when(helixResourceManager.getDataInstanceAdminEndpoints(ArgumentMatchers.<String>anySet()))
+          .thenAnswer(new Answer<Object>() {
+            @Override
+            public Object answer(InvocationOnMock invocationOnMock)
+                throws Throwable {
+              return serverEndpoints(servers);
+            }
+          });
     }
     {
       config = mock(ControllerConf.class);
       when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
       when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
+      when(config.getServerAdminRequestTimeoutSeconds()).thenReturn(100);
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
-    segmentStatusChecker.setMetricsRegistry(controllerMetrics);
+    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+
     segmentStatusChecker.runSegmentMetrics();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
@@ -367,8 +561,7 @@ public class SegmentStatusCheckerTest {
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
-    segmentStatusChecker.setMetricsRegistry(controllerMetrics);
+    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.runSegmentMetrics();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
@@ -429,16 +622,55 @@ public class SegmentStatusCheckerTest {
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
       when(helixResourceManager.getPropertyStore()).thenReturn(propertyStore);
+      when(helixResourceManager.getHelixZkManager()).thenReturn(helixManager);
     }
     {
       config = mock(ControllerConf.class);
       when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
       when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
+      when(config.getServerAdminRequestTimeoutSeconds()).thenReturn(100);
     }
+
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
-    segmentStatusChecker.setMetricsRegistry(controllerMetrics);
+    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+
+    when(helixResourceManager.hasOfflineTable(anyString())).thenAnswer(new Answer() {
+      @Override
+      public Object answer(InvocationOnMock invocationOnMock)
+          throws Throwable {
+        String table = (String) invocationOnMock.getArguments()[0];
+        return table.indexOf("offline") >= 0;
+      }
+    });
+    when(helixResourceManager.hasRealtimeTable(anyString())).thenAnswer(new Answer() {
+      @Override
+      public Object answer(InvocationOnMock invocationOnMock)
+          throws Throwable {
+        String table = (String) invocationOnMock.getArguments()[0];
+        return table.indexOf("realtime") >= 0;
+      }
+    });
+
+    final String[] servers = { "server0", "server1"};
+    when(helixResourceManager.getInstanceToSegmentsInATableMap(anyString()))
+        .thenAnswer(new Answer<Object>() {
+          @Override
+          public Object answer(InvocationOnMock invocationOnMock)
+              throws Throwable {
+            return subsetOfServerSegments(servers);
+          }
+        });
+
+    when(helixResourceManager.getDataInstanceAdminEndpoints(ArgumentMatchers.<String>anySet()))
+        .thenAnswer(new Answer<Object>() {
+          @Override
+          public Object answer(InvocationOnMock invocationOnMock)
+              throws Throwable {
+            return serverEndpoints(servers);
+          }
+        });
+
     segmentStatusChecker.runSegmentMetrics();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
@@ -475,16 +707,54 @@ public class SegmentStatusCheckerTest {
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+      when(helixResourceManager.getHelixZkManager()).thenReturn(helixManager);
     }
     {
       config = mock(ControllerConf.class);
       when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
       when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
+      when(config.getServerAdminRequestTimeoutSeconds()).thenReturn(100);
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
-    segmentStatusChecker.setMetricsRegistry(controllerMetrics);
+    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+
+    when(helixResourceManager.hasOfflineTable(anyString())).thenAnswer(new Answer() {
+      @Override
+      public Object answer(InvocationOnMock invocationOnMock)
+          throws Throwable {
+        String table = (String) invocationOnMock.getArguments()[0];
+        return table.indexOf("offline") >= 0;
+      }
+    });
+    when(helixResourceManager.hasRealtimeTable(anyString())).thenAnswer(new Answer() {
+      @Override
+      public Object answer(InvocationOnMock invocationOnMock)
+          throws Throwable {
+        String table = (String) invocationOnMock.getArguments()[0];
+        return table.indexOf("realtime") >= 0;
+      }
+    });
+
+    final String[] servers = { "server0", "server1"};
+    when(helixResourceManager.getInstanceToSegmentsInATableMap(anyString()))
+        .thenAnswer(new Answer<Object>() {
+          @Override
+          public Object answer(InvocationOnMock invocationOnMock)
+              throws Throwable {
+            return subsetOfServerSegments(servers);
+          }
+        });
+
+    when(helixResourceManager.getDataInstanceAdminEndpoints(ArgumentMatchers.<String>anySet()))
+        .thenAnswer(new Answer<Object>() {
+          @Override
+          public Object answer(InvocationOnMock invocationOnMock)
+              throws Throwable {
+            return serverEndpoints(servers);
+          }
+        });
+
     segmentStatusChecker.runSegmentMetrics();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
@@ -523,8 +793,7 @@ public class SegmentStatusCheckerTest {
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
-    segmentStatusChecker.setMetricsRegistry(controllerMetrics);
+    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.runSegmentMetrics();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
@@ -578,8 +847,7 @@ public class SegmentStatusCheckerTest {
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
-    segmentStatusChecker.setMetricsRegistry(controllerMetrics);
+    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.runSegmentMetrics();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
@@ -590,5 +858,94 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
     segmentStatusChecker.stop();
+  }
+
+  private Map<String, List<String>> subsetOfServerSegments(String...servers) {
+    Map<String, List<String>> subset = new HashMap<>();
+    for (String server : servers) {
+      subset.put(server, serverMap.get(server).segments);
+    }
+    return subset;
+  }
+
+  private BiMap<String, String> serverEndpoints(String...servers) {
+    BiMap<String, String> endpoints = HashBiMap.create(servers.length);
+    for (String server : servers) {
+      endpoints.put(server, serverMap.get(server).endpoint);
+    }
+    return endpoints;
+  }
+
+  private static class FakeSizeServer {
+    List<String> segments;
+    String endpoint;
+    int port;
+    List<SegmentSizeInfo> sizes = new ArrayList<>();
+    HttpServer httpServer;
+
+    FakeSizeServer(List<String> segments, int port) {
+      this.segments = segments;
+      this.endpoint = "localhost:" + port;
+      this.port = port;
+      populateSizes(segments);
+    }
+
+    void populateSizes(List<String> segments) {
+      for (String segment : segments) {
+        SegmentSizeInfo sizeInfo =
+            new SegmentSizeInfo(segment, getSegmentSize(segment));
+        sizes.add(sizeInfo);
+      }
+    }
+
+    static long getSegmentSize(String segment) {
+      int index = Integer.parseInt(segment.substring(1));
+      return 100 + index * 10;
+    }
+
+    private void  start(String path, HttpHandler handler)
+        throws IOException {
+      httpServer = HttpServer.create(new InetSocketAddress(port), 0);
+      httpServer.createContext(path, handler);
+      new Thread(new Runnable() {
+        @Override
+        public void run() {
+          httpServer.start();
+        }
+      }).start();
+    }
+  }
+
+  private HttpHandler createHandler(final int status,
+      final List<SegmentSizeInfo> segmentSizes, final int sleepTimeMs) {
+    return new HttpHandler() {
+      @Override
+      public void handle(HttpExchange httpExchange)
+          throws IOException {
+        if (sleepTimeMs > 0) {
+          try {
+            Thread.sleep(sleepTimeMs);
+          } catch (InterruptedException e) {
+            LOGGER.info("Handler interrupted during sleep");
+          }
+        }
+
+        TableSizeInfo tableInfo = new TableSizeInfo("myTable", 0);
+        tableInfo.segments = segmentSizes;
+        for (SegmentSizeInfo segmentSize : segmentSizes) {
+          tableInfo.diskSizeInBytes += segmentSize.diskSizeInBytes;
+        }
+
+        String json = new ObjectMapper().writeValueAsString(tableInfo);
+        httpExchange.sendResponseHeaders(status, json.length());
+        OutputStream responseBody = httpExchange.getResponseBody();
+        responseBody.write(json.getBytes());
+        responseBody.close();
+      }
+    };
+  }
+
+  private String serverName(int index) {
+    return "server" + index;
   }
 }
