@@ -1,7 +1,7 @@
 {{#if record.links.length}}
   {{#each record.links as |link|}}
     {{#each-in link as |linkLabel url|}}
-      <a href="{{url}}" target="_blank">{{linkLabel}}</a>
+      <a href="{{url}}" target="_blank" class="thirdeye-link">{{linkLabel}}</a>
     {{/each-in}}
   {{/each}}
 {{else}}
