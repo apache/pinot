@@ -69,10 +69,27 @@ export default Route.extend({
       alertData,
       pathInfo,
       replayId,
-      destination
+      destination,
+      allConfigGroups
     } = model;
 
+    // Itereate through config groups to enhance all alerts with extra properties (group name, application)
+    allConfigGroups.forEach((config) => {
+      let groupFunctionIds = config.emailConfig && config.emailConfig.functionIds ? config.emailConfig.functionIds : [];
+      let foundMatch = groupFunctionIds.find(funcId => funcId === Number(id));
+      if (foundMatch) {
+        Object.assign(alertData, {
+          application: config.application,
+          group: config.name
+        });
+      }
+    });
+
     const isEditModeActive = destination.includes('edit') || destination.includes('tune');
+    const pattern = alertData.alertFilter ? alertData.alertFilter.pattern : 'N/A';
+    const granularity = alertData.bucketSize && alertData.bucketUnit ? `${alertData.bucketSize}_${alertData.bucketUnit}` : 'N/A';
+
+    Object.assign(alertData, { pattern, granularity });
 
     controller.setProperties({
       id,
@@ -90,6 +107,10 @@ export default Route.extend({
       if (transition.targetName === 'manage.alert.index') {
         this.refresh();
       }
+    },
+
+    error(error, transition) {
+      console.log('caught in parent : ', error);
     }
   }
 

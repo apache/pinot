@@ -20,34 +20,48 @@ export default Controller.extend({
 
   /**
    * Set initial view values
+   * @method initialize
+   * @return {undefined}
    */
-  filterBy: 'All',
-  isGraphReady: false,
-  isTunePreviewActive: false,
-  isTuneSaveSuccess: false,
-  isTuneSaveFailure: false,
-  selectedSeverityOption: 'Percentage of Change',
-  selectedTunePattern: 'None',
-  customPercentChange: '30',
-  selectedTuneType: 'current',
-  customMttdChange: '5',
-  predefinedRanges: {},
-  today: moment(),
-  selectedSortMode: '',
-  sortColumnStartUp: false,
-  sortColumnScoreUp: false,
-  sortColumnChangeUp: false,
-  sortColumnResolutionUp: false,
+  initialize() {
+    this.setProperties({
+      filterBy: 'All',
+      isGraphReady: false,
+      isTunePreviewActive: false,
+      isTuneSaveSuccess: false,
+      isTuneSaveFailure: false,
+      selectedSeverityOption: 'Percentage of Change',
+      selectedTunePattern: 'None',
+      customPercentChange: '30',
+      selectedTuneType: 'current',
+      customMttdChange: '5',
+      predefinedRanges: {},
+      today: moment(),
+      selectedSortMode: '',
+      sortColumnStartUp: false,
+      sortColumnScoreUp: false,
+      sortColumnChangeUp: false,
+      sortColumnResolutionUp: false
+    });
+  },
 
   /**
    * Severity display options (power-select) and values
    */
-  severityMap: {
-    'Percentage of Change': 'weight',
-    'Absolute Value of Change': 'deviation',
-    'Site Wide Impact': 'site_wide_impact'
-  },
+  severityMap: computed('alertData', function() {
+    const severityObj = {
+      'Percentage of Change': 'weight',
+      'Absolute Value of Change': 'deviation'
+    };
+    if (this.get('alertData.toCalculateGlobalMetric') !== false) {
+      severityObj['Site Wide Impact'] = 'site_wide_impact';
+    }
+    return severityObj;
+  }),
 
+  /**
+   * Severity power-select options
+   */
   tuneSeverityOptions: computed('severityMap', function() {
     return Object.keys(this.get('severityMap'));
   }),
@@ -77,6 +91,16 @@ export default Controller.extend({
   },
 
   /**
+   * Conditional formatting for tuning fields
+   */
+  isTuneAmountPercent: computed(
+    'selectedSeverityOption',
+    function() {
+      return this.get('selectedSeverityOption') !== 'Absolute Value of Change';
+    }
+  ),
+
+  /**
    * Builds the new autotune filter from custom tuning options
    * @type {String}
    */
@@ -88,14 +112,18 @@ export default Controller.extend({
     function() {
       const severityMap = this.get('severityMap');
       const patternMap = this.get('patternMap');
+      const amountChange = this.get('customPercentChange');
       const selectedPattern = this.get('selectedTunePattern');
       const selectedSeverity = this.get('selectedSeverityOption');
+      const isPercent = selectedSeverity === 'Percentage of Change';
       const mttdVal = Number(this.get('customMttdChange')).toFixed(2);
-      const severityThresholdVal = (Number(this.get('customPercentChange'))/100).toFixed(2);
+      const severityThresholdVal = isPercent ? (Number(amountChange)/100).toFixed(2) : amountChange;
       const featureString = `window_size_in_hour,${severityMap[selectedSeverity]}`;
       const mttdString = `window_size_in_hour=${mttdVal};${severityMap[selectedSeverity]}=${severityThresholdVal}`;
       const patternString = patternMap[selectedPattern] ? `&pattern=${encodeURIComponent(patternMap[selectedPattern])}` : '';
-      return `&features=${encodeURIComponent(featureString)}&mttd=${encodeURIComponent(mttdString)}${patternString}`;
+      const configString = `&features=${encodeURIComponent(featureString)}&mttd=${encodeURIComponent(mttdString)}${patternString}`;
+      console.log('custom string : ', configString);
+      return { configString, severityVal: severityThresholdVal };
     }
   ),
 
@@ -168,11 +196,15 @@ export default Controller.extend({
    * @type {Object}
    */
   anomalyStats: computed(
+    'customPercentChange',
+    'selectedSeverityOption',
     'alertEvalMetrics',
     'alertEvalMetrics.projected',
     function() {
       const evalMetrics = this.get('alertEvalMetrics');
-      return buildAnomalyStats(evalMetrics, 'tune');
+      const severity = this.get('customPercentChange');
+      const isPercent = !this.get('selectedSeverityOption').includes('Absolute');
+      return buildAnomalyStats(evalMetrics, 'tune', severity, isPercent);
     }
   ),
 
@@ -192,6 +224,7 @@ export default Controller.extend({
       } = this.getProperties('anomalyData', 'filterBy', 'selectedSortMode');
       let filterKey = '';
       let filteredAnomalies = anomalies;
+      let num = 1;
 
       switch (activeFilter) {
         case 'True Anomalies':
@@ -218,6 +251,15 @@ export default Controller.extend({
         } else {
           filteredAnomalies = filteredAnomalies.sortBy(this.get('sortMap')[sortKey]).reverse();
         }
+      }
+
+      // Number the list
+      if (this.get('isTunePreviewActive')) {
+        filteredAnomalies.forEach((anomaly) => {
+          //anomaly.index = num;
+          Ember.set(anomaly, 'index', num);
+          num ++;
+        });
       }
 
       return filteredAnomalies;
@@ -297,17 +339,17 @@ export default Controller.extend({
     /**
      * Enable preview button
      */
-    onUpdateTuneType() {
+/*    onUpdateTuneType() {
       // TODO: if needed, handle enable/disable of preview button here
       // this.set('isPreviewDisabled', false);
-    },
+    },*/
 
     /**
      * Handle "reset" click - reload the model
      */
     onResetPage() {
-      this.set('isTunePreviewActive', false);
-      this.send('resetPage');
+      this.initialize();
+      this.set('alertEvalMetrics.projected', this.get('originalProjectedMetrics'));
     },
 
     /**
@@ -355,10 +397,13 @@ export default Controller.extend({
      * tuning if we have custom settings (tuning data for default option is already loaded)
      */
     onClickPreviewPerformance() {
+      console.log('customTuneQueryString : ', decodeURIComponent(this.get('customTuneQueryString').configString));
       const isTuneTypeCustom = this.get('selectedTuneType') === 'custom';
       this.set('isTunePreviewActive', true);
       if (isTuneTypeCustom) {
         this.send('triggerTuningSequence', this.get('customTuneQueryString'));
+      } else {
+        this.set('alertEvalMetrics.projected', this.get('originalProjectedMetrics'));
       }
     }
   }

@@ -13,6 +13,7 @@ import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups, evalObj } from 'th
  * Basic alert page defaults
  */
 const durationDefault = '3m';
+const defaultSeverity = '0.3';
 const dateFormat = 'YYYY-MM-DD';
 const startDateDefault = buildDateEod(3, 'month');
 const endDateDefault = buildDateEod(1, 'day');
@@ -58,7 +59,6 @@ const anomalyTableStats = (anomalies) => {
  * @returns {Ember.RSVP promise}
  */
 const fetchCombinedAnomalies = (anomalyIds) => {
-  let anomalyPromises = [];
   if (anomalyIds.length) {
     const idGroups = toIdGroups(anomalyIds);
     const anomalyPromiseHash = idGroups.map((group, index) => {
@@ -66,9 +66,10 @@ const fetchCombinedAnomalies = (anomalyIds) => {
       let getAnomalies = fetch(`/anomalies/search/anomalyIds/0/0/${index + 1}?${idStringParams}`).then(checkStatus);
       return Ember.RSVP.resolve(getAnomalies);
     });
-    anomalyPromises = Ember.RSVP.all(anomalyPromiseHash);
+    return Ember.RSVP.all(anomalyPromiseHash);
+  } else {
+    return Ember.RSVP.resolve([]);
   }
-  return anomalyPromises;
 };
 
 /**
@@ -79,13 +80,13 @@ const fetchCombinedAnomalies = (anomalyIds) => {
  * @param {String} alertId - current alert Id
  * @returns {Object} containing fetch promises
  */
-const tuningPromiseHash = (startDate, endDate, tuneId, alertId) => {
+const tuningPromiseHash = (startDate, endDate, tuneId, alertId, severity = defaultSeverity) => {
   const baseStart = moment(Number(startDate));
   const baseEnd = moment(Number(endDate));
   const tuneParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
   const qsParams = `start=${baseStart.utc().format(dateFormat)}&end=${baseEnd.utc().format(dateFormat)}&useNotified=true`;
   const projectedUrl = `/detection-job/eval/autotune/${tuneId}?${tuneParams}`;
-  const projectedMttdUrl = `/detection-job/eval/projected/mttd/${tuneId}`;
+  const projectedMttdUrl = `/detection-job/eval/projected/mttd/${tuneId}?severity=${severity}`;
   const anomaliesUrlA = `/dashboard/anomaly-function/${alertId}/anomalies?${qsParams}`;
   const anomaliesUrlB =`/detection-job/eval/projected/anomalies/${tuneId}?${qsParams}`;
 
@@ -151,16 +152,17 @@ export default Route.extend({
     // Prepare endpoints for the initial eval, mttd, projected metrics calls
     const tuneParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
     const tuneIdUrl = `/detection-job/autotune/filter/${id}?${tuneParams}`;
-    const evalUrl = `/detection-job/eval/filter/${id}?${tuneParams}`;
-    const mttdUrl = `/detection-job/eval/mttd/${id}`;
+    const evalUrl = `/detection-job/eval/filter/${id}?${tuneParams}&isProjected=TRUE`;
+    const mttdUrl = `/detection-job/eval/mttd/${id}?severity=${defaultSeverity}`;
     const initialPromiseHash = {
-      evalData: fetch(evalUrl).then(checkStatus), // NOTE: ensure API returns JSON
+      current: fetch(evalUrl).then(checkStatus), // NOTE: ensure API returns JSON
       autotuneId: fetch(tuneIdUrl, postProps('')).then(checkStatus),
       mttd: fetch(mttdUrl).then(checkStatus)
     };
 
     return Ember.RSVP.hash(initialPromiseHash)
       .then((alertEvalMetrics) => {
+        Object.assign(alertEvalMetrics.current, { mttd: alertEvalMetrics.mttd});
         return {
           id,
           alertData,
@@ -190,6 +192,7 @@ export default Route.extend({
     return Ember.RSVP.hash(tuningPromiseHash(startDate, endDate, alertEvalMetrics.autotuneId, alertId))
       .then((data) => {
         const idsRemoved = anomalyDiff(data.idListA, data.idListB).idsRemoved;
+        Object.assign(data.projectedEval, { mttd: data.projectedMttd });
         Object.assign(model.alertEvalMetrics, { projected: data.projectedEval });
         return fetchCombinedAnomalies(idsRemoved);
       })
@@ -227,8 +230,11 @@ export default Route.extend({
       alertId: id,
       timeRangeOptions,
       anomalyData,
-      alertEvalMetrics
+      alertEvalMetrics,
+      originalProjectedMetrics: alertEvalMetrics.projected
     });
+
+    controller.initialize();
   },
 
   resetController(controller, isExiting) {
@@ -266,7 +272,8 @@ export default Route.extend({
     },
 
     // User clicks "preview", having configured performance settings
-    triggerTuningSequence(configString) {
+    triggerTuningSequence(configObj) {
+      const { configString, severityVal } = configObj;
       const {
         id: alertId,
         startDate,
@@ -277,7 +284,7 @@ export default Route.extend({
 
       fetch(tuneIdUrl + configString, postProps('')).then(checkStatus)
         .then((autoTuneId) => {
-          return Ember.RSVP.hash(tuningPromiseHash(startDate, endDate, autoTuneId[0], alertId));
+          return Ember.RSVP.hash(tuningPromiseHash(startDate, endDate, autoTuneId[0], alertId, severityVal));
         })
         .then((data) => {
           const idsRemoved = anomalyDiff(data.idListA, data.idListB).idsRemoved;

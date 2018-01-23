@@ -1,5 +1,33 @@
 <div class="manage-alert-tune">
 
+  <div class="te-pill-selectors">
+    {{!-- Date range selector --}}
+    <div class="te-pill-selectors__label">Showing</div>
+    <ul class="te-alert-page-hzlist">
+      {{#each timeRangeOptions as |range|}}
+        <li class="te-alert-page-hzlist__item {{if range.isActive "te-alert-page-hzlist__item--active"}}" {{action "onRangeOptionClick" range}}>
+          {{range.name}}
+          {{#if (eq range.name "Custom")}}
+            : {{date-range-picker
+              class="te-pill-selectors__range-picker"
+              timePicker=false
+              timePicker24Hour=true
+              timePickerIncrement=timePickerIncrement
+              maxDate=today
+              start=viewRegionStart
+              end=viewRegionEnd
+              ranges=predefinedRanges
+              showCustomRangeLabel=false
+              format=uiDateFormat
+              serverFormat="YYYY-MM-DD HH:mm"
+              applyAction=(action "onRangeSelection")
+            }}
+          {{/if}}
+        </li>
+      {{/each}}
+    </ul>
+  </div>
+
   <div class="te-content-block">
     <fieldset class="te-form__section te-form__section--first te-form__section--slim row">
       <div class="col-xs-12">
@@ -7,24 +35,37 @@
       </div>
       <ul class="te-form__list col-xs-12 col-sm-8">
         <li class="te-form__list-item">
-          {{#radio-button
-            value="current"
-            groupValue=selectedTuneType
-            changed=(action "onUpdateTuneType")
-            }}
-            <div class="te-form__list-label">Tune automatically with current settings</div>
+          {{#radio-button value="current" groupValue=selectedTuneType}}
+            <div class="te-form__list-label">Tune automatically with default settings</div>
           {{/radio-button}}
         </li>
         <li class="te-form__list-item">
-          {{#radio-button
-            value="custom"
-            groupValue=selectedTuneType
-            changed=(action "onUpdateTuneType")
-            }}
+          {{#radio-button value="custom" groupValue=selectedTuneType}}
             <div class="te-form__list-label">Tune with customized settings</div>
           {{/radio-button}}
          </li>
       </ul>
+
+      <div class="te-form__indent-block col-xs-8">
+        <span class="te-form__list-label">Anomaly Pattern</span>
+        <div class="te-form__tune-field">
+          {{#power-select
+            triggerId="alert-tune-pattern"
+            triggerClass="te-form__tune-field"
+            verticalPosition="below"
+            renderInPlace=true
+            options=tunePatternOptions
+            searchEnabled=false
+            selected=selectedTunePattern
+            placeHolder="Select Pattern"
+            onchange=(action (mut selectedTunePattern))
+            disabled=isCustomFieldsDisabled
+            as |pattern|
+          }}
+            {{pattern}}
+          {{/power-select}}
+        </div>
+      </div>
 
       <div class="te-form__indent-block col-xs-10">
         <span class="te-form__list-label">When</span>
@@ -54,7 +95,9 @@
             disabled=isCustomFieldsDisabled
           }}
         </div>
-        <span class="te-form__list-label--suffix">%, </span>
+        {{#if isTuneAmountPercent}}
+          <span class="te-form__list-label--suffix">%, </span>
+        {{/if}}
         <span class="te-form__list-label">MTTD should be no more than</span>
         <div class="te-form__tune-field te-form__tune-field--amount">
           {{input
@@ -68,25 +111,6 @@
         <span class="te-form__list-label">hours</span>
       </div>
 
-      <div class="te-form__indent-block col-xs-8">
-        <span class="te-form__list-label">Anomaly Pattern</span>
-        <div class="te-form__tune-field">
-          {{#power-select
-            triggerId="alert-tune-pattern"
-            triggerClass="te-form__tune-field"
-            verticalPosition="below"
-            renderInPlace=true
-            options=tunePatternOptions
-            searchEnabled=false
-            selected=selectedTunePattern
-            onchange=(action (mut selectedTunePattern))
-            disabled=isCustomFieldsDisabled
-            as |pattern|
-          }}
-            {{pattern}}
-          {{/power-select}}
-        </div>
-      </div>
       <div class="te-form__cta-row">
         <a class="te-button te-button--link" {{action "onResetPage" preventDefault=false}}>Reset</a>
         {{bs-button
@@ -99,90 +123,15 @@
     </fieldset>
   </div>
 
-  <div class="te-pill-selectors">
-    {{!-- Date range selector --}}
-    <div class="te-pill-selectors__label">Showing</div>
-    <ul class="te-alert-page-hzlist">
-      {{#each timeRangeOptions as |range|}}
-        <li class="te-alert-page-hzlist__item {{if range.isActive "te-alert-page-hzlist__item--active"}}" {{action "onRangeOptionClick" range}}>
-          {{range.name}}
-          {{#if (eq range.name "Custom")}}
-            : {{date-range-picker
-              class="te-pill-selectors__range-picker"
-              timePicker=false
-              timePicker24Hour=true
-              timePickerIncrement=timePickerIncrement
-              maxDate=today
-              start=viewRegionStart
-              end=viewRegionEnd
-              ranges=predefinedRanges
-              showCustomRangeLabel=false
-              format=uiDateFormat
-              serverFormat="YYYY-MM-DD HH:mm"
-              applyAction=(action "onRangeSelection")
-            }}
-          {{/if}}
-        </li>
-      {{/each}}
-    </ul>
-  </div>
-
   <div class="te-horizontal-cards te-content-block">
     <h4 class="te-alert-page__subtitle">{{if isTunePreviewActive "Compare" "Current"}} Alert Performance</h4>
     <div class="te-horizontal-cards__container">
-
       {{!-- Alert anomaly stats cards --}}
-      {{#each anomalyStats as |card|}}
-        <ul class="te-horizontal-cards__card">
-
-          <li class="te-horizontal-cards">
-            <div class="te-horizontal-cards__card-title">{{card.title}}</div>
-            {{#if card.tooltip}}
-              <div class="te-horizontal-cards__card-tooltip">
-                <span>
-                  <i class="glyphicon glyphicon-question-sign"></i>
-                  {{#tooltip-on-element}}{{card.text}}{{/tooltip-on-element}}
-                </span>
-              </div>
-            {{else}}
-              <div class="te-horizontal-cards__card-text">{{card.text}}</div>
-            {{/if}}
-          </li>
-
-          <li class="te-horizontal-cards__card-value">
-            <div class="te-horizontal-cards__val-group">
-              {{#if isTunePreviewActive}}
-                <div class="te-horizontal-cards__card-subt">Current</div>
-              {{/if}}
-              <div class="te-horizontal-cards__card-number">
-                {{card.value}}
-                {{#if card.valueUnits}}
-                  <span class="te-horizontal-cards__card-units">{{card.valueUnits}}</span>
-                {{/if}}
-              </div>
-            </div>
-            {{#if isTunePreviewActive}}
-              <div class="te-horizontal-cards__val-group">
-                <i class="te-horizontal-cards__val-glyph--middle glyphicon glyphicon-menu-right"></i>
-              </div>
-              <div class="te-horizontal-cards__val-group">
-                <div class="te-horizontal-cards__card-subt">New</div>
-                <div class="te-horizontal-cards__card-number">
-                  {{#if card.showDirectionIcon}}
-                    <i class="te-horizontal-cards__val-glyph--right glyphicon glyphicon-triangle-{{card.direction}}"></i>
-                  {{/if}}
-                  {{card.projected}}
-                  {{#if card.projectedUnits}}
-                    <span class="te-horizontal-cards__card-units">{{card.projectedUnits}}</span>
-                  {{/if}}
-                </div>
-              </div>
-            {{/if}}
-          </li>
-
-        </ul>
-      {{/each}}
-
+      {{anomaly-stats-block
+        isTunePreviewActive=isTunePreviewActive
+        displayMode="tune"
+        anomalyStats=anomalyStats
+      }}
     </div>
     {{#if isTunePreviewActive}}
       <div class="te-form__cta-button">
@@ -272,6 +221,7 @@
             <tr class="te-anomaly-table__row">
                <td class="te-anomaly-table__cell">
                 <ul class="te-anomaly-table__list">
+                  <li class="te-anomaly-table__list--shadow">{{anomaly.index}}</li>
                   <li class="te-anomaly-table__list--stronger">{{anomaly.startDateStr}}</li>
                   <li class="te-anomaly-table__list--lighter">{{anomaly.durationStr}}</li>
                 </ul>
