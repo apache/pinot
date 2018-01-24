@@ -157,7 +157,7 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
               return true;
             } catch (HttpErrorStatusException e) {
               int statusCode = e.getStatusCode();
-              if (statusCode == HttpStatus.SC_CONFLICT || statusCode > 500) {
+              if (statusCode == HttpStatus.SC_CONFLICT || statusCode >= 500) {
                 // Temporary exception
                 LOGGER.warn("Caught temporary exception while uploading segment: {}, will retry", segmentName, e);
                 return false;
