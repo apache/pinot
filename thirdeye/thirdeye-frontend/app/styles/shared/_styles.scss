@@ -162,7 +162,7 @@ body {
 .te-label {
   font-weight: normal;
   color:  app-shade(black, 9);
-  margin: 15px 0 12px 0;
+  margin-bottom: 12px;
 
   &--flush {
     margin-bottom: 0;
@@ -269,7 +269,6 @@ body {
       box-shadow: none;
       padding: 3px 5px;
       height: auto;
-      width: auto;
     }
   }
 

@@ -47,7 +47,7 @@
       </ul>
 
       <div class="te-form__indent-block col-xs-8">
-        <span class="te-form__list-label">Anomaly Pattern</span>
+        <label for="alert-tune-pattern" class="te-form__list-label">Anomaly Pattern</label>
         <div class="te-form__tune-field">
           {{#power-select
             triggerId="alert-tune-pattern"
@@ -68,7 +68,7 @@
       </div>
 
       <div class="te-form__indent-block col-xs-10">
-        <span class="te-form__list-label">When</span>
+        <label for="alert-tune-pattern" class="te-form__list-label">When</label>
         <div class="te-form__tune-field">
           {{#power-select
             triggerId="alert-tune-severity"
@@ -85,7 +85,8 @@
             {{severity}}
           {{/power-select}}
         </div>
-        <span class="te-form__list-label">is >=</span>
+{{!--         <span class="te-form__list-label">is >=</span> --}}
+        <label for="custom-tune-percent" class="te-form__list-label">is >=</label>
         <div class="te-form__tune-field te-form__tune-field--amount">
           {{input
             type="text"
@@ -98,7 +99,8 @@
         {{#if isTuneAmountPercent}}
           <span class="te-form__list-label--suffix">%, </span>
         {{/if}}
-        <span class="te-form__list-label">MTTD should be no more than</span>
+        {{!-- <span class="te-form__list-label">MTTD should be no more than</span> --}}
+        <label for="custom-tune-mttd" class="te-form__list-label">MTTD should be no more than</label>
         <div class="te-form__tune-field te-form__tune-field--amount">
           {{input
             type="text"

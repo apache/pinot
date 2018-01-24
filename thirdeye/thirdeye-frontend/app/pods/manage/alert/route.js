@@ -109,6 +109,7 @@ export default Route.extend({
     },
 
     error(error, transition) {
+      this.controller.set('isLoadError', true);
       console.log('caught in parent : ', error);
     }
   }

@@ -7,7 +7,7 @@ import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
 import { checkStatus, postProps, buildDateEod, toIso } from 'thirdeye-frontend/helpers/utils';
-import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups, evalObj } from 'thirdeye-frontend/helpers/manage-alert-utils';
+import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups } from 'thirdeye-frontend/helpers/manage-alert-utils';
 
 /**
  * Basic alert page defaults
@@ -152,10 +152,10 @@ export default Route.extend({
     // Prepare endpoints for the initial eval, mttd, projected metrics calls
     const tuneParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
     const tuneIdUrl = `/detection-job/autotune/filter/${id}?${tuneParams}`;
-    const evalUrl = `/detection-job/eval/filter/${id}?${tuneParams}&isProjected=TRUE`;
+    const evalUrl = `/detection-jobx/eval/filter/${id}?${tuneParams}&isProjected=TRUE`;
     const mttdUrl = `/detection-job/eval/mttd/${id}?severity=${defaultSeverity}`;
     const initialPromiseHash = {
-      current: fetch(evalUrl).then(checkStatus), // NOTE: ensure API returns JSON
+      current: fetch(evalUrl).then(checkStatus),
       autotuneId: fetch(tuneIdUrl, postProps('')).then(checkStatus),
       mttd: fetch(mttdUrl).then(checkStatus)
     };
@@ -174,8 +174,8 @@ export default Route.extend({
           alertEvalMetrics
         };
       })
-      .catch((err) => {
-        // TODO: Display default error banner in the event of fetch failure
+      .catch((error) => {
+        return Ember.RSVP.reject({ error, location: `${this.routeName}:model`, calls: initialPromiseHash });
       });
   },
 
@@ -201,8 +201,8 @@ export default Route.extend({
         Object.assign(model, { rawAnomalyData });
       })
       // Got errors?
-      .catch((err) => {
-        Object.assign(model, { loadError: true, loadErrorMsg: err });
+      .catch((error) => {
+        return Ember.RSVP.reject({ loadError, location: `${this.routeName}:afterModel`, calls: tuningPromiseHash });
       });
   },
 
@@ -262,13 +262,14 @@ export default Route.extend({
 
     // User clicks "save" on previewed tune settings
     submitTuningRequest(tuneId) {
-      this.saveAutoTuneSettings(tuneId).then((result) => {
-        this.controller.set('isTuneSaveSuccess', true);
-      })
-      .catch((error) => {
-        this.controller.set('isTuneSaveFailure', true);
-        this.controller.set('failureMessage', error);
-      });
+      this.saveAutoTuneSettings(tuneId)
+        .then((result) => {
+          this.controller.set('isTuneSaveSuccess', true);
+        })
+        .catch((error) => {
+          this.controller.set('isTuneSaveFailure', true);
+          this.controller.set('failureMessage', error);
+        });
     },
 
     // User clicks "preview", having configured performance settings

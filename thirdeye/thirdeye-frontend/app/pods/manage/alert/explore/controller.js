@@ -536,7 +536,7 @@ export default Controller.extend({
       // in order to avoid strange overflow effects.
       Ember.run.later(() => {
         this.set('renderModalContent', true);
-      })
+      });
     },
 
     /**
@@ -577,7 +577,7 @@ export default Controller.extend({
             change = wowDetails.change.toFixed(2);
           }
 
-          Ember.setProperties( anomaly, {
+          Ember.setProperties(anomaly, {
             shownCurrent: curr,
             shownBaseline: base,
             shownChangeRate: change

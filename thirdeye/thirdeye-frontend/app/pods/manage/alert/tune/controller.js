@@ -47,12 +47,14 @@ export default Controller.extend({
 
   /**
    * Severity display options (power-select) and values
+   * @type {Object}
    */
   severityMap: computed('alertData', function() {
     const severityObj = {
       'Percentage of Change': 'weight',
       'Absolute Value of Change': 'deviation'
     };
+    // make site wide impact available only for alerts with the following condition
     if (this.get('alertData.toCalculateGlobalMetric') !== false) {
       severityObj['Site Wide Impact'] = 'site_wide_impact';
     }
@@ -61,6 +63,7 @@ export default Controller.extend({
 
   /**
    * Severity power-select options
+   * @type {Array}
    */
   tuneSeverityOptions: computed('severityMap', function() {
     return Object.keys(this.get('severityMap'));
@@ -76,6 +79,10 @@ export default Controller.extend({
     'Down Only': 'DOWN'
   },
 
+  /**
+   * Returns selectable pattern options for power-select
+   * @type {Array}
+   */
   tunePatternOptions: computed('patternMap', function() {
     return Object.keys(this.get('patternMap'));
   }),
@@ -92,13 +99,11 @@ export default Controller.extend({
 
   /**
    * Conditional formatting for tuning fields
+   * @type {Boolean}
    */
-  isTuneAmountPercent: computed(
-    'selectedSeverityOption',
-    function() {
-      return this.get('selectedSeverityOption') !== 'Absolute Value of Change';
-    }
-  ),
+  isTuneAmountPercent: computed('selectedSeverityOption', function() {
+    return this.get('selectedSeverityOption') !== 'Absolute Value of Change';
+  }),
 
   /**
    * Builds the new autotune filter from custom tuning options
@@ -110,11 +115,13 @@ export default Controller.extend({
     'customMttdChange',
     'selectedTunePattern',
     function() {
-      const severityMap = this.get('severityMap');
-      const patternMap = this.get('patternMap');
-      const amountChange = this.get('customPercentChange');
-      const selectedPattern = this.get('selectedTunePattern');
-      const selectedSeverity = this.get('selectedSeverityOption');
+      const {
+        severityMap,
+        patternMap,
+        customPercentChange: amountChange,
+        selectedTunePattern: selectedPattern,
+        selectedSeverityOption: selectedSeverity
+      } = this.getProperties('severityMap', 'patternMap', 'customPercentChange', 'selectedTunePattern', 'selectedSeverityOption');
       const isPercent = selectedSeverity === 'Percentage of Change';
       const mttdVal = Number(this.get('customMttdChange')).toFixed(2);
       const severityThresholdVal = isPercent ? (Number(amountChange)/100).toFixed(2) : amountChange;
@@ -122,7 +129,6 @@ export default Controller.extend({
       const mttdString = `window_size_in_hour=${mttdVal};${severityMap[selectedSeverity]}=${severityThresholdVal}`;
       const patternString = patternMap[selectedPattern] ? `&pattern=${encodeURIComponent(patternMap[selectedPattern])}` : '';
       const configString = `&features=${encodeURIComponent(featureString)}&mttd=${encodeURIComponent(mttdString)}${patternString}`;
-      console.log('custom string : ', configString);
       return { configString, severityVal: severityThresholdVal };
     }
   ),
@@ -201,8 +207,10 @@ export default Controller.extend({
     'alertEvalMetrics',
     'alertEvalMetrics.projected',
     function() {
-      const evalMetrics = this.get('alertEvalMetrics');
-      const severity = this.get('customPercentChange');
+      const {
+        alertEvalMetrics: evalMetrics,
+        customPercentChange: severity
+      } = this.getProperties('alertEvalMetrics', 'customPercentChange');
       const isPercent = !this.get('selectedSeverityOption').includes('Absolute');
       return buildAnomalyStats(evalMetrics, 'tune', severity, isPercent);
     }
@@ -237,8 +245,8 @@ export default Controller.extend({
           filterKey = 'New Trend';
           break;
         default:
-          filterKey = ''
-      };
+          filterKey = '';
+      }
 
       // Filter anomalies in table according to filterkey
       if (activeFilter !== 'All') {
@@ -256,9 +264,8 @@ export default Controller.extend({
       // Number the list
       if (this.get('isTunePreviewActive')) {
         filteredAnomalies.forEach((anomaly) => {
-          //anomaly.index = num;
           Ember.set(anomaly, 'index', num);
-          num ++;
+          num++;
         });
       }
 
@@ -329,20 +336,11 @@ export default Controller.extend({
 
     /**
      * Save the currently loaded tuning options
-     * @method onSubmitTuning
      */
     onSubmitTuning() {
       const tuneId = this.get('alertEvalMetrics.autotuneId');
       this.send('submitTuningRequest', tuneId);
     },
-
-    /**
-     * Enable preview button
-     */
-/*    onUpdateTuneType() {
-      // TODO: if needed, handle enable/disable of preview button here
-      // this.set('isPreviewDisabled', false);
-    },*/
 
     /**
      * Handle "reset" click - reload the model
@@ -388,7 +386,7 @@ export default Controller.extend({
       } else {
         this.set('selectedSortMode', `${sortKey}:down`);
       }
-      //On sort, set table to first pagination page
+      // On sort, set table to first pagination page
       this.set('currentPage', 1);
     },
 
@@ -397,7 +395,6 @@ export default Controller.extend({
      * tuning if we have custom settings (tuning data for default option is already loaded)
      */
     onClickPreviewPerformance() {
-      console.log('customTuneQueryString : ', decodeURIComponent(this.get('customTuneQueryString').configString));
       const isTuneTypeCustom = this.get('selectedTuneType') === 'custom';
       this.set('isTunePreviewActive', true);
       if (isTuneTypeCustom) {
