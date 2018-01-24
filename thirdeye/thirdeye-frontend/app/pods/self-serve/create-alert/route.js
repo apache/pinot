@@ -6,23 +6,13 @@
 import Ember from 'ember';
 import fetch from 'fetch';
 import RSVP from 'rsvp';
+import { postProps, checkStatus } from 'thirdeye-frontend/helpers/utils';
 
 export default Ember.Route.extend({
   queryParams: {
     newUx: {
       refreshModel: false,
       replace: true
-    }
-  },
-
-  actions: {
-    /**
-    * Refresh route's model.
-    * @method refreshModel
-    * @return {undefined}
-    */
-    refreshModel() {
-      this.refresh();
     }
   },
 
@@ -53,6 +43,34 @@ export default Ember.Route.extend({
     if (isExiting) {
       controller.clearAll();
     }
-  }
+  },
+
+  actions: {
+    /**
+    * Refresh route's model.
+    * @method refreshModel
+    */
+    refreshModel() {
+      this.refresh();
+    },
+
+    /**
+    * Trigger alert replay sequence after create has finished
+    * @param {Number} alertId - Id of newly created alert function
+    * @method triggerReplaySequence
+    */
+    triggerReplaySequence(alertId) {
+      const replayUrl = this.controller.buildReplayUrl(alertId);
+      fetch(replayUrl, postProps('')).then(checkStatus)
+        .then((replayId) => {
+          this.transitionTo('manage.alert', alertId, { queryParams: { replayId }});
+        })
+        // In the event of failure to trigger, transition anyway, without replay Id
+        // The new API will handle notifying users of job failures.
+        .catch(() => {
+          this.transitionTo('manage.alert', alertId, { queryParams: { replayId: 0 }});
+        });
+    }
+  },
 
 });

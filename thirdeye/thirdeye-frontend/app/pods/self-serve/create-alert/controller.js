@@ -42,6 +42,7 @@ export default Controller.extend({
   isEmailError: false,
   isDuplicateEmail: false,
   showGraphLegend: false,
+  redirectToAlertPage: true,
   metricGranularityOptions: [],
   topDimensions: [],
   originalDimensions: [],
@@ -471,13 +472,15 @@ export default Controller.extend({
                 isMetricDataLoading: false,
                 topDimensions: orderedDimensions
               });
+            })
+            .catch(() => {
+              this.set('isMetricDataLoading', false);
             });
-        } else {
-          this.set('isMetricDataLoading', false);
         }
         // Metric has data. now sending new data to graph.
         this.setProperties({
           isMetricSelected: true,
+          isMetricDataLoading: false,
           showGraphLegend: Ember.isPresent(selectedDimension),
           selectedMetric: Object.assign(metricData, { color: 'blue' })
         });
@@ -554,6 +557,28 @@ export default Controller.extend({
   },
 
   /**
+   * Generate the URL needed to trigger replay for new alert
+   * @method buildReplayUrl
+   * @param {Number} functionId - the newly created function's id
+   * @return {String}
+   */
+  buildReplayUrl(functionId) {
+    const replayDateFormat = "YYYY-MM-DDTHH:mm:ss.SSS[Z]";
+    const startTime = buildDateEod(1, 'month').format(replayDateFormat);
+    const endTime = buildDateEod(1, 'day').format(replayDateFormat);
+    const granularity = this.get('graphConfig.granularity').toLowerCase();
+    const speedUp = !(granularity.includes('hour') || granularity.includes('day'));
+    const recipients = this.get('selectedConfigGroup.recipients');
+    const sensitivity = this.get('sensitivityWithDefault');
+    const selectedPattern = this.get('selectedPattern');
+    const pattern = this.optionMap.pattern[selectedPattern];
+
+    return `/detection-job/${functionId}/notifyreplaytuning?start=${startTime}` +
+      `&end=${endTime}&speedup=${speedUp}&userDefinedPattern=${pattern}&sensitivity=${sensitivity}` +
+      `&removeAnomaliesInWindow=true&removeAnomaliesInWindow=true&to=${recipients}`;
+  },
+
+  /**
    * Replay Flow Step 2 - Replay cloned function
    * @method callReplayStart
    * @param {Number} clonedId - id of the cloned function
@@ -606,7 +631,9 @@ export default Controller.extend({
     });
 
     // Begin triggering of replay sequence
-    return this.callReplayStart(newFuncId, startTime, endTime);
+    this.callReplayStart(newFuncId, startTime, endTime).then((replayId) => {
+      return replayId;
+    })
   },
 
   /**
@@ -1238,7 +1265,7 @@ export default Controller.extend({
         alertGroupNewRecipient: newEmails
       } = this.getProperties('newAlertProperties', 'selectedGroupRecipients', 'alertGroupNewRecipient');
 
-      const redirectToAlertPage = this.get('isNewUx');
+      const redirectToAlertPage = this.get('redirectToAlertPage');
       const newEmailsArr = newEmails ? newEmails.replace(/ /g, '').split(',') : [];
       const existingEmailsArr = oldEmails ? oldEmails.replace(/ /g, '').split(',') : [];
       const newRecipientsArr = newEmailsArr.length ? existingEmailsArr.concat(newEmailsArr) : existingEmailsArr;
@@ -1284,32 +1311,35 @@ export default Controller.extend({
         finalConfigObj.emailConfig.functionIds.push(newFunctionId);
 
         // Finally, save our Alert Config Groupg
-        this.saveThirdEyeEntity(finalConfigObj, 'ALERT_CONFIG').then(alertResult => {
-          // Display success confirmations including new alert Id and recipients
-          this.setProperties({
-            selectedGroupRecipients: finalConfigObj.recipients.replace(/,+/g, ', '),
-            isCreateAlertSuccess: true,
-            finalFunctionId: newFunctionId
-          });
-          // Confirm group creation if not in group edit mode
-          if (!isEditGroupMode) {
-            this.set('isCreateGroupSuccess', true);
-          }
-          // Display function added to group confirmation
-          this.prepareFunctions(finalConfigObj, newFunctionId).then(functionData => {
-            this.set('selectedGroupFunctions', functionData);
-          });
+        this.saveThirdEyeEntity(finalConfigObj, 'ALERT_CONFIG')
+          .then(alertResult => {
+            // Display success confirmations including new alert Id and recipients
+            this.setProperties({
+              selectedGroupRecipients: finalConfigObj.recipients.replace(/,+/g, ', '),
+              isCreateAlertSuccess: true,
+              finalFunctionId: newFunctionId
+            });
+            // Confirm group creation if not in group edit mode
+            if (!isEditGroupMode) {
+              this.set('isCreateGroupSuccess', true);
+            }
 
-          // Now, disable form
-          this.setProperties({
-            isFormDisabled: true,
-            isMetricSelected: false,
-            isMetricDataInvalid: false
-          });
-          this.set('newFuncId', newFunctionId);
-          return this.triggerReplay(newFunctionId);
+            // Display function added to group confirmation
+            this.prepareFunctions(finalConfigObj, newFunctionId).then(functionData => {
+              this.set('selectedGroupFunctions', functionData);
+            });
+
+            // Now, disable form
+            this.setProperties({
+              isFormDisabled: true,
+              isMetricSelected: false,
+              isMetricDataInvalid: false
+            });
+            this.set('newFuncId', newFunctionId);
+            this.send('triggerReplaySequence', newFunctionId);
+/*          return this.triggerReplay(newFunctionId);
         }).then((replayId) => {
-
+          debugger;
           if (!this.get('isReplayStatusError')) {
             this.setProperties({
               isReplayStatusSuccess: true,
@@ -1321,14 +1351,18 @@ export default Controller.extend({
           // Redirect to onboarding page to trigger wrapper
           if (redirectToAlertPage) {
             this.transitionToRoute('manage.alert', this.get('newFuncId'), { queryParams: { replayId }});
-          }
+          }*/
         // If Alert Group edit/create fails, remove the orphaned anomaly Id
         }).catch((error) => {
+          console.log('catch 2');
+          debugger;
           this.setAlertCreateErrorState(error);
           this.removeThirdEyeFunction(newFunctionId);
         });
       // Alert creation call has failed
       }).catch((error) => {
+        console.log('catch 3');
+        debugger;
         this.setAlertCreateErrorState(error);
       });
     }

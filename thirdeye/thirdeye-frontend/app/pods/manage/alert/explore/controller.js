@@ -65,7 +65,7 @@ export default Controller.extend({
       sortColumnScoreUp: false,
       sortColumnChangeUp: false,
       sortColumnResolutionUp: false,
-      checkReplayInterval: 5000,
+      checkReplayInterval: 60000, // 1min
       selectedDimension: 'All Dimensions',
       selectedResolution: 'All Resolutions',
       dateRangeToRender: [30, 10, 5],
@@ -76,7 +76,7 @@ export default Controller.extend({
     // Start checking for replay to end if an ID was given
     if (this.get('isReplayPending')) {
       Ember.run.later(() => {
-        this.checkReplayStatus(this.get('replayId'));
+        this.set('isReplayPending', false);
       }, this.get('checkReplayInterval'));
     }
   },
