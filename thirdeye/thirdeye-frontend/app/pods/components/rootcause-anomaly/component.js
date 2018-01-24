@@ -106,10 +106,6 @@ export default Component.extend({
     }
   ),
 
-  //
-  // anomaly properties for display
-  //
-
   /**
    * Anomaly function (alert) name
    * @type {string}
@@ -198,10 +194,6 @@ export default Component.extend({
     const anomaly = get(this, 'anomaly');
     return moment.duration(anomaly.end - anomaly.start).humanize();
   }),
-
-  //
-  // expand / hide anomaly header
-  //
 
   /**
    * Default state for hide/expand panel
