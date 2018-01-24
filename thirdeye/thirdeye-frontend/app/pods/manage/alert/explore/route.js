@@ -7,7 +7,7 @@ import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
 import { checkStatus, postProps, parseProps, buildDateEod, toIso } from 'thirdeye-frontend/helpers/utils';
-import { enhanceAnomalies, toIdGroups, setUpTimeRangeOptions, fetchGraphData, getTopDimensions } from 'thirdeye-frontend/helpers/manage-alert-utils';
+import { enhanceAnomalies, toIdGroups, setUpTimeRangeOptions, getTopDimensions } from 'thirdeye-frontend/helpers/manage-alert-utils';
 
 /**
  * Shorthand for setting date defaults
@@ -105,7 +105,7 @@ const processRangeParams = (bucketUnit, duration, start, end) => {
   return { startStamp, endStamp, baseStart, baseEnd };
 };
 
- /**
+/**
  * Builds the graph metric URL from config settings
  * TODO: Pull this into utils if used by create-alert
  * @param {Object} cfg - settings for current metric graph
@@ -286,7 +286,7 @@ export default Route.extend({
       })
       // Catch is not mandatory here due to our error action, but left it to add more context
       .catch((err) => {
-        return Ember.RSVP.reject({ err, location: `${this.routeName}:model`, calls: anomalyPromiseHash });
+        return Ember.RSVP.reject({ err, location: `${this.routeName}:afterModel`, calls: anomalyPromiseHash });
       });
   },
 

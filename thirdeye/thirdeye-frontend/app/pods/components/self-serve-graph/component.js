@@ -26,53 +26,53 @@ import { computed } from '@ember/object';
 
 export default Component.extend({
 
-isMetricDataLoading: true,
-isMetricDataInvalid: false,
-isDimensionFetchDone: false,
-metricData: {},
-topDimensions: [],
-componentId: '',
+  isMetricDataLoading: true,
+  isMetricDataInvalid: false,
+  isDimensionFetchDone: false,
+  metricData: {},
+  topDimensions: [],
+  componentId: '',
 
-graphMessageText: {
-  loading: 'Graph will appear here when data is loaded...',
-  error: 'Could not load graph data for this metric...'
-},
-
-/**
- * Standard legend settings for graph
- */
-legendText: {
-  dotted: {
-    text: 'WoW'
+  graphMessageText: {
+    loading: 'Graph will appear here when data is loaded...',
+    error: 'Could not load graph data for this metric...'
   },
-  solid: {
-    text: 'Observed'
-  }
-},
 
-/**
- * All selected dimensions to be loaded into graph
- * @returns {Array}
- */
-selectedDimensions: computed(
-  'topDimensions',
-  'topDimensions.@each.isSelected',
-  function() {
-    const topDimensions = this.get('topDimensions');
-    return topDimensions ? this.get('topDimensions').filterBy('isSelected') : [];
-  }
-),
-
-actions: {
-    /**
-     * Enable reaction to dimension toggling in graph legend component
-     * @method onSelection
-     * @return {undefined}
-     */
-    onSelection(selectedDimension) {
-      const { isSelected } = selectedDimension;
-      Ember.set(selectedDimension, 'isSelected', !isSelected);
+  /**
+   * Standard legend settings for graph
+   */
+  legendText: {
+    dotted: {
+      text: 'WoW'
+    },
+    solid: {
+      text: 'Observed'
     }
-}
+  },
+
+  /**
+   * All selected dimensions to be loaded into graph
+   * @returns {Array}
+   */
+  selectedDimensions: computed(
+    'topDimensions',
+    'topDimensions.@each.isSelected',
+    function() {
+      const topDimensions = this.get('topDimensions');
+      return topDimensions ? this.get('topDimensions').filterBy('isSelected') : [];
+    }
+  ),
+
+  actions: {
+      /**
+       * Enable reaction to dimension toggling in graph legend component
+       * @method onSelection
+       * @return {undefined}
+       */
+      onSelection(selectedDimension) {
+        const { isSelected } = selectedDimension;
+        Ember.set(selectedDimension, 'isSelected', !isSelected);
+      }
+  }
 
 });

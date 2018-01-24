@@ -11,7 +11,7 @@
           Import a Metric From InGraphs
         {{/link-to}}
       </div>
-      <label for="select-metric" class="control-label te-label required">Search for a Metric</label>
+      <label for="select-metric" class="control-label te-label te-label--taller required">Search for a Metric</label>
       {{#power-select
         search=(perform searchMetricsList)
         selected=selectedMetricOption
@@ -35,7 +35,7 @@
     {{/if}}
 
     <div class="col-xs-6 col-sm-4">
-      <label for="select-granularity" class="control-label te-label">Desired Granularity</label>
+      <label for="select-granularity" class="control-label te-label te-label--taller">Desired Granularity</label>
       {{#power-select
         options=metricGranularityOptions
         selected=selectedGranularity
@@ -52,7 +52,7 @@
     </div>
 
     <div class="col-xs-6">
-      <label for="select-filters" class="control-label te-label required">Filters (optional)</label>
+      <label for="select-filters" class="control-label te-label te-label--taller required">Filters (optional)</label>
       {{filter-select
         options=filters
         selected=selectedFilters
@@ -63,7 +63,7 @@
     </div>
 
     <div class="col-xs-6">
-      <label for="select-dimension" class="control-label te-label">Dimension (optional)</label>
+      <label for="select-dimension" class="control-label te-label te-label--taller">Dimension (optional)</label>
       {{#power-select
         classNames="te-input"
         options=dimensions
@@ -126,7 +126,7 @@
 
     {{!-- Field: Pattern --}}
     <div class="col-xs-{{if isNewUx '3' '6'}}">
-      <label for="select-pattern" class="control-label te-label required">Pattern of Interest *</label>
+      <label for="select-pattern" class="control-label te-label te-label--taller required">Pattern of Interest *</label>
       {{#power-select
         loadingMessage="Waiting for the server...."
         triggerId="select-pattern"
@@ -148,7 +148,7 @@
     {{!-- Field: Sensitivity with mode option --}}
     {{#if isNewUx}}
       <div class="te-form__vertical-block col-xs-12">
-        <label for="select-sensitivity" class="control-label te-label required">Sensitivity (optional)</label>
+        <label for="select-sensitivity" class="control-label te-label te-label--taller required">Sensitivity (optional)</label>
         <div class="te-form__indent-block--custom">
           <span class="te-form__list-label">When</span>
           <div class="te-form__tune-field">
@@ -193,7 +193,7 @@
       </div>
     {{else}}
       <div class="col-xs-6">
-        <label for="select-sensitivity" class="control-label te-label required">
+        <label for="select-sensitivity" class="control-label te-label te-label--taller required">
           Sensitivity (optional)
           <span>
             <i class="glyphicon glyphicon-question-sign"></i>
@@ -225,7 +225,7 @@
     {{!-- Field: Weekly Effect --}}
     {{#if (eq selectedGranularity 'DAYS')}}
       <div class="col-xs-6">
-        <label for="select-effect" class="control-label te-label required">
+        <label for="select-effect" class="control-label te-label te-label--taller required">
           Weekly Seasonality *
           <span>
             <i class="glyphicon glyphicon-question-sign"></i>
@@ -244,7 +244,7 @@
           onToggle=(action (mut selectedWeeklyEffect))
           as |toggle|}}
             {{#toggle.label value=selectedWeeklyEffect}}
-              <span class="te-label te-label--flush">{{if selectedWeeklyEffect 'True' 'False'}}</span>
+              <span class="te-label te-label--taller te-label te-label--taller--flush">{{if selectedWeeklyEffect 'True' 'False'}}</span>
             {{/toggle.label}}
             {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
         {{/x-toggle}}
@@ -260,9 +260,9 @@
 
     {{!-- Field: Alert Name --}}
     <div class="col-xs-12">
-      <label for="anomaly-form-function-name" class="control-label te-label required">
+      <label for="anomaly-form-function-name" class="control-label te-label te-label--taller required">
         Alert Name *
-        <div class="te-form__sub-label">Please follow this naming convention: <span class="te-form__sub-label--strong">productName_metricName_dimensionName_other</span></div>
+        <div class="te-form__sub-label">Please follow this naming convention: <span class="te-form__sub-label--strong">applicationName_metricName_dimensionName_other</span></div>
       </label>
       {{#if isAlertNameDuplicate}}
         <div class="te-form__alert--warning alert-warning">Warning: <strong>{{alertFunctionName}}</strong> already exists. Please try another name.</div>
@@ -281,7 +281,7 @@
 
     {{!-- Field: App Name --}}
     <div class="col-xs-12">
-      <label for="anomaly-form-app-name" class="control-label te-label required">Related Application, Product or Team *</label>
+      <label for="anomaly-form-app-name" class="control-label te-label te-label--taller required">Related Application, Product or Team *</label>
        {{#power-select
           options=allApplicationNames
           selected=selectedAppName
@@ -301,7 +301,7 @@
 
     {{!-- Field: Select Existing Subscription Group --}}
     <div class="col-sm-6">
-      <label for="config-group" class="control-label te-label">Add This Alert To An Existing Subscription Group</label>
+      <label for="config-group" class="control-label te-label te-label--taller">Add This Alert To An Existing Subscription Group</label>
       {{#power-select
         options=filteredConfigGroups
         selected=selectedConfigGroup
@@ -321,7 +321,7 @@
     </div>
     {{!--  Fields for new alert group creation --}}
     <div class="col-sm-6">
-      <label for="config-group-new-name" class="control-label te-label"><strong>Or</strong> Provide A New Subscription Group Name</label>
+      <label for="config-group-new-name" class="control-label te-label te-label--taller"><strong>Or</strong> Provide A New Subscription Group Name</label>
       {{#if isGroupNameDuplicate}}
         <div class="te-form__alert--warning alert-warning">Warning: <strong>{{newConfigGroupName}}</strong> already exists. Please try another name.</div>
       {{/if}}
@@ -358,7 +358,7 @@
     {{/if}}
     {{!-- Field: new alert group recipient emails --}}
     <div class="col-xs-12">
-      <label for="config-group" class="control-label te-label">
+      <label for="config-group" class="control-label te-label te-label--taller">
         Add Alert Notification Recipients *
         <div class="te-form__sub-label">Current recipients: <span class="te-form__sub-label--strong">{{if selectedGroupRecipients selectedGroupRecipients "None"}}</span></div>
       </label>

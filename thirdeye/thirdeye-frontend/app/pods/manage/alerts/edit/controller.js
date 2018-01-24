@@ -86,7 +86,7 @@ export default Ember.Controller.extend({
    * If a dimension has been selected, the metric data object will contain subdimensions.
    * This method calls for dimension ranking by metric, filters for the selected dimension,
    * and returns a sorted list of graph-ready dimension objects.
-   * @method getTopDimensions
+   * @method topDimensions
    * @return {Array} dimensionList: array of graphable dimensions
    */
   topDimensions: Ember.computed(

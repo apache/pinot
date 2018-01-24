@@ -20,34 +20,51 @@ export default Controller.extend({
 
   /**
    * Set initial view values
+   * @method initialize
+   * @return {undefined}
    */
-  filterBy: 'All',
-  isGraphReady: false,
-  isTunePreviewActive: false,
-  isTuneSaveSuccess: false,
-  isTuneSaveFailure: false,
-  selectedSeverityOption: 'Percentage of Change',
-  selectedTunePattern: 'None',
-  customPercentChange: '30',
-  selectedTuneType: 'current',
-  customMttdChange: '5',
-  predefinedRanges: {},
-  today: moment(),
-  selectedSortMode: '',
-  sortColumnStartUp: false,
-  sortColumnScoreUp: false,
-  sortColumnChangeUp: false,
-  sortColumnResolutionUp: false,
+  initialize() {
+    this.setProperties({
+      filterBy: 'All',
+      isGraphReady: false,
+      isTunePreviewActive: false,
+      isTuneSaveSuccess: false,
+      isTuneSaveFailure: false,
+      selectedSeverityOption: 'Percentage of Change',
+      selectedTunePattern: 'None',
+      customPercentChange: '30',
+      selectedTuneType: 'current',
+      customMttdChange: '5',
+      predefinedRanges: {},
+      today: moment(),
+      selectedSortMode: '',
+      sortColumnStartUp: false,
+      sortColumnScoreUp: false,
+      sortColumnChangeUp: false,
+      sortColumnResolutionUp: false
+    });
+  },
 
   /**
    * Severity display options (power-select) and values
+   * @type {Object}
    */
-  severityMap: {
-    'Percentage of Change': 'weight',
-    'Absolute Value of Change': 'deviation',
-    'Site Wide Impact': 'site_wide_impact'
-  },
+  severityMap: computed('alertData', function() {
+    const severityObj = {
+      'Percentage of Change': 'weight',
+      'Absolute Value of Change': 'deviation'
+    };
+    // make site wide impact available only for alerts with the following condition
+    if (this.get('alertData.toCalculateGlobalMetric') !== false) {
+      severityObj['Site Wide Impact'] = 'site_wide_impact';
+    }
+    return severityObj;
+  }),
 
+  /**
+   * Severity power-select options
+   * @type {Array}
+   */
   tuneSeverityOptions: computed('severityMap', function() {
     return Object.keys(this.get('severityMap'));
   }),
@@ -62,6 +79,10 @@ export default Controller.extend({
     'Down Only': 'DOWN'
   },
 
+  /**
+   * Returns selectable pattern options for power-select
+   * @type {Array}
+   */
   tunePatternOptions: computed('patternMap', function() {
     return Object.keys(this.get('patternMap'));
   }),
@@ -77,6 +98,14 @@ export default Controller.extend({
   },
 
   /**
+   * Conditional formatting for tuning fields
+   * @type {Boolean}
+   */
+  isTuneAmountPercent: computed('selectedSeverityOption', function() {
+    return this.get('selectedSeverityOption') !== 'Absolute Value of Change';
+  }),
+
+  /**
    * Builds the new autotune filter from custom tuning options
    * @type {String}
    */
@@ -86,16 +115,21 @@ export default Controller.extend({
     'customMttdChange',
     'selectedTunePattern',
     function() {
-      const severityMap = this.get('severityMap');
-      const patternMap = this.get('patternMap');
-      const selectedPattern = this.get('selectedTunePattern');
-      const selectedSeverity = this.get('selectedSeverityOption');
+      const {
+        severityMap,
+        patternMap,
+        customPercentChange: amountChange,
+        selectedTunePattern: selectedPattern,
+        selectedSeverityOption: selectedSeverity
+      } = this.getProperties('severityMap', 'patternMap', 'customPercentChange', 'selectedTunePattern', 'selectedSeverityOption');
+      const isPercent = selectedSeverity === 'Percentage of Change';
       const mttdVal = Number(this.get('customMttdChange')).toFixed(2);
-      const severityThresholdVal = (Number(this.get('customPercentChange'))/100).toFixed(2);
+      const severityThresholdVal = isPercent ? (Number(amountChange)/100).toFixed(2) : amountChange;
       const featureString = `window_size_in_hour,${severityMap[selectedSeverity]}`;
       const mttdString = `window_size_in_hour=${mttdVal};${severityMap[selectedSeverity]}=${severityThresholdVal}`;
       const patternString = patternMap[selectedPattern] ? `&pattern=${encodeURIComponent(patternMap[selectedPattern])}` : '';
-      return `&features=${encodeURIComponent(featureString)}&mttd=${encodeURIComponent(mttdString)}${patternString}`;
+      const configString = `&features=${encodeURIComponent(featureString)}&mttd=${encodeURIComponent(mttdString)}${patternString}`;
+      return { configString, severityVal: severityThresholdVal };
     }
   ),
 
@@ -168,11 +202,17 @@ export default Controller.extend({
    * @type {Object}
    */
   anomalyStats: computed(
+    'customPercentChange',
+    'selectedSeverityOption',
     'alertEvalMetrics',
     'alertEvalMetrics.projected',
     function() {
-      const evalMetrics = this.get('alertEvalMetrics');
-      return buildAnomalyStats(evalMetrics, 'tune');
+      const {
+        alertEvalMetrics: evalMetrics,
+        customPercentChange: severity
+      } = this.getProperties('alertEvalMetrics', 'customPercentChange');
+      const isPercent = !this.get('selectedSeverityOption').includes('Absolute');
+      return buildAnomalyStats(evalMetrics, 'tune', severity, isPercent);
     }
   ),
 
@@ -192,6 +232,7 @@ export default Controller.extend({
       } = this.getProperties('anomalyData', 'filterBy', 'selectedSortMode');
       let filterKey = '';
       let filteredAnomalies = anomalies;
+      let num = 1;
 
       switch (activeFilter) {
         case 'True Anomalies':
@@ -204,8 +245,8 @@ export default Controller.extend({
           filterKey = 'New Trend';
           break;
         default:
-          filterKey = ''
-      };
+          filterKey = '';
+      }
 
       // Filter anomalies in table according to filterkey
       if (activeFilter !== 'All') {
@@ -218,6 +259,14 @@ export default Controller.extend({
         } else {
           filteredAnomalies = filteredAnomalies.sortBy(this.get('sortMap')[sortKey]).reverse();
         }
+      }
+
+      // Number the list
+      if (this.get('isTunePreviewActive')) {
+        filteredAnomalies.forEach((anomaly) => {
+          Ember.set(anomaly, 'index', num);
+          num++;
+        });
       }
 
       return filteredAnomalies;
@@ -287,7 +336,6 @@ export default Controller.extend({
 
     /**
      * Save the currently loaded tuning options
-     * @method onSubmitTuning
      */
     onSubmitTuning() {
       const tuneId = this.get('alertEvalMetrics.autotuneId');
@@ -295,19 +343,11 @@ export default Controller.extend({
     },
 
     /**
-     * Enable preview button
-     */
-    onUpdateTuneType() {
-      // TODO: if needed, handle enable/disable of preview button here
-      // this.set('isPreviewDisabled', false);
-    },
-
-    /**
      * Handle "reset" click - reload the model
      */
     onResetPage() {
-      this.set('isTunePreviewActive', false);
-      this.send('resetPage');
+      this.initialize();
+      this.set('alertEvalMetrics.projected', this.get('originalProjectedMetrics'));
     },
 
     /**
@@ -346,7 +386,7 @@ export default Controller.extend({
       } else {
         this.set('selectedSortMode', `${sortKey}:down`);
       }
-      //On sort, set table to first pagination page
+      // On sort, set table to first pagination page
       this.set('currentPage', 1);
     },
 
@@ -359,6 +399,8 @@ export default Controller.extend({
       this.set('isTunePreviewActive', true);
       if (isTuneTypeCustom) {
         this.send('triggerTuningSequence', this.get('customTuneQueryString'));
+      } else {
+        this.set('alertEvalMetrics.projected', this.get('originalProjectedMetrics'));
       }
     }
   }

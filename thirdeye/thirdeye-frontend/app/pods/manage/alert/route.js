@@ -106,6 +106,10 @@ export default Route.extend({
       if (transition.targetName === 'manage.alert.index') {
         this.refresh();
       }
+    },
+
+    error(error, transition) {
+      this.controller.set('isLoadError', true);
     }
   }
 

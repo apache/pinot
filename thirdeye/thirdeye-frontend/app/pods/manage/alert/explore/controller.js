@@ -287,7 +287,7 @@ export default Controller.extend({
     'baselineOptions',
     function() {
       const activeOpName = this.get('baselineOptions').filter(item => item.isActive)[0].name;
-      const displayName = (activeOpName !== 'Predicted') ? `Current/${activeOpName}` : activeOpName;
+      const displayName = `Current/${activeOpName}`;
       return displayName;
     }
   ),
@@ -536,7 +536,7 @@ export default Controller.extend({
       // in order to avoid strange overflow effects.
       Ember.run.later(() => {
         this.set('renderModalContent', true);
-      })
+      });
     },
 
     /**
@@ -566,7 +566,7 @@ export default Controller.extend({
       if (isValidSelection) {
         anomalyData.forEach((anomaly) => {
           const wow = anomaly.wowData;
-          const wowDetails = wow.compareResults.find(res => res.compareMode === wowObj.name);
+          const wowDetails = wow.compareResults.find(res => res.compareMode.toLowerCase() === wowObj.name.toLowerCase());
           let curr = anomaly.current;
           let base = anomaly.baseline;
           let change = anomaly.changeRate;
@@ -577,7 +577,7 @@ export default Controller.extend({
             change = wowDetails.change.toFixed(2);
           }
 
-          Ember.setProperties( anomaly, {
+          Ember.setProperties(anomaly, {
             shownCurrent: curr,
             shownBaseline: base,
             shownChangeRate: change
