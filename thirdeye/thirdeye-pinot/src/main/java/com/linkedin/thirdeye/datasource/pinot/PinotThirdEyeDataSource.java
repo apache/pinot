@@ -382,6 +382,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
             countMap.put(compositeGroupKey, 0);
           }
           final int aggCount = countMap.get(compositeGroupKey);
+          countMap.put(compositeGroupKey, aggCount + 1);
 
           // aggregation of multiple values
           rowValues[groupKeys.length + position + i] = String.valueOf(
@@ -392,7 +393,6 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
                   metricFunction.getFunctionName()
               ));
 
-          countMap.put(compositeGroupKey, aggCount + 1);
         }
       }
       position ++;
@@ -403,12 +403,12 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
   }
 
-  private static double reduce(double aggregate, double value, int count, MetricAggFunction aggFunction) {
+  static double reduce(double aggregate, double value, int prevCount, MetricAggFunction aggFunction) {
     switch(aggFunction) {
       case SUM:
         return aggregate + value;
       case AVG:
-        return (aggregate + value) / (count + 1);
+        return (aggregate * prevCount + value) / (prevCount + 1);
       case MAX:
         return Math.max(aggregate, value);
       case COUNT:
