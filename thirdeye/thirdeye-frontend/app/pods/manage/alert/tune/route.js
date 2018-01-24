@@ -92,7 +92,7 @@ const tuningPromiseHash = (startDate, endDate, tuneId, alertId, severity = defau
 
   return {
     projectedMttd: fetch(projectedMttdUrl).then(checkStatus),
-    projectedEval: fetch(projectedUrl).then(checkStatus), // NOTE: ensure API returns JSON
+    projectedEval: fetch(projectedUrl).then(checkStatus),
     idListA: fetch(anomaliesUrlA).then(checkStatus),
     idListB: fetch(anomaliesUrlB).then(checkStatus)
   };
@@ -152,7 +152,7 @@ export default Route.extend({
     // Prepare endpoints for the initial eval, mttd, projected metrics calls
     const tuneParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
     const tuneIdUrl = `/detection-job/autotune/filter/${id}?${tuneParams}`;
-    const evalUrl = `/detection-jobx/eval/filter/${id}?${tuneParams}&isProjected=TRUE`;
+    const evalUrl = `/detection-job/eval/filter/${id}?${tuneParams}&isProjected=TRUE`;
     const mttdUrl = `/detection-job/eval/mttd/${id}?severity=${defaultSeverity}`;
     const initialPromiseHash = {
       current: fetch(evalUrl).then(checkStatus),
