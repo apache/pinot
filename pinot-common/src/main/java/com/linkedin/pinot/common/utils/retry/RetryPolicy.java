@@ -28,7 +28,8 @@ public interface RetryPolicy {
    * attempts exhausted.
    *
    * @param operation The operation to attempt, which returns true on success and false on failure.
-   * @throws Exception
+   * @throws AttemptsExceededException
+   * @throws RetriableOperationException
    */
-  void attempt(Callable<Boolean> operation) throws Exception;
+  void attempt(Callable<Boolean> operation) throws AttemptsExceededException, RetriableOperationException;
 }

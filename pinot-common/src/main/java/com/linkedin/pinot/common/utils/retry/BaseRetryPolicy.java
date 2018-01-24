@@ -33,16 +33,20 @@ public abstract class BaseRetryPolicy implements RetryPolicy {
   protected abstract long getNextDelayMs();
 
   @Override
-  public void attempt(Callable<Boolean> operation) throws Exception {
+  public void attempt(Callable<Boolean> operation) throws AttemptsExceededException, RetriableOperationException {
     int numAttempts = 0;
     while (numAttempts < _maxNumAttempts) {
-      if (operation.call()) {
-        // Succeeded
-        return;
-      } else {
-        // Failed
-        numAttempts++;
-        Thread.sleep(getNextDelayMs());
+      try {
+        if (operation.call()) {
+          // Succeeded
+          return;
+        } else {
+          // Failed
+          numAttempts++;
+          Thread.sleep(getNextDelayMs());
+        }
+      } catch (Exception e) {
+        throw new RetriableOperationException(e);
       }
     }
     throw new AttemptsExceededException("Operation failed after " + _maxNumAttempts + " attempts");
