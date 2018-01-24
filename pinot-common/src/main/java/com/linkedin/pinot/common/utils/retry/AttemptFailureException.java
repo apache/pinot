@@ -15,13 +15,20 @@
  */
 package com.linkedin.pinot.common.utils.retry;
 
-/**
- * The <code>AttemptsExceededException</code> indicates that the operation did not succeed within maximum number of
- * attempts.
- */
-public class AttemptsExceededException extends AttemptFailureException {
+import java.util.concurrent.Callable;
 
-  public AttemptsExceededException(String message) {
+
+/**
+ * The <code>AttemptFailureException</code> indicates that the {@link RetryPolicy#attempt(Callable)} failed because of
+ * either operation throwing an exception or running out of attempts.
+ */
+public class AttemptFailureException extends Exception {
+
+  public AttemptFailureException(String message) {
     super(message);
+  }
+
+  public AttemptFailureException(Throwable cause) {
+    super(cause);
   }
 }
