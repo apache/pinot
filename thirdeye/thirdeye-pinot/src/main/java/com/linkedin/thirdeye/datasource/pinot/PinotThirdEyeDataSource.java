@@ -11,6 +11,7 @@ import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -26,6 +27,7 @@ import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -297,7 +299,8 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
     }
 
     int position = 0;
-    LinkedHashMap<String, String[]> dataMap = new LinkedHashMap<>();
+    Map<String, String[]> dataMap = new HashMap<>();
+    Map<String, Integer> countMap = new HashMap<>();
     for (Entry<MetricFunction, List<ThirdEyeResultSet>> entry : metricFunctionToResultSetList.entrySet()) {
 
       MetricFunction metricFunction = entry.getKey();
@@ -366,6 +369,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
             groupKeyBuilder.append(grpKey).append("|");
           }
           String compositeGroupKey = groupKeyBuilder.toString();
+
           String[] rowValues = dataMap.get(compositeGroupKey);
           if (rowValues == null) {
             rowValues = new String[numCols];
@@ -373,9 +377,22 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
             System.arraycopy(groupKeys, 0, rowValues, 0, groupKeys.length);
             dataMap.put(compositeGroupKey, rowValues);
           }
-          rowValues[groupKeys.length + position + i] =
-              String.valueOf(Double.parseDouble(rowValues[groupKeys.length + position + i])
-                  + Double.parseDouble(resultSet.getString(r, 0)));
+
+          if (!countMap.containsKey(compositeGroupKey)) {
+            countMap.put(compositeGroupKey, 0);
+          }
+          final int aggCount = countMap.get(compositeGroupKey);
+          countMap.put(compositeGroupKey, aggCount + 1);
+
+          // aggregation of multiple values
+          rowValues[groupKeys.length + position + i] = String.valueOf(
+              reduce(
+                  Double.parseDouble(rowValues[groupKeys.length + position + i]),
+                  Double.parseDouble(resultSet.getString(r, 0)),
+                  aggCount,
+                  metricFunction.getFunctionName()
+              ));
+
         }
       }
       position ++;
@@ -386,6 +403,20 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
   }
 
+  static double reduce(double aggregate, double value, int prevCount, MetricAggFunction aggFunction) {
+    switch(aggFunction) {
+      case SUM:
+        return aggregate + value;
+      case AVG:
+        return (aggregate * prevCount + value) / (prevCount + 1);
+      case MAX:
+        return Math.max(aggregate, value);
+      case COUNT:
+        return aggregate + 1;
+      default:
+        throw new IllegalArgumentException(String.format("Unknown aggregation function '%s'", aggFunction));
+    }
+  }
 
   @Override
   public List<String> getDatasets() throws Exception {
