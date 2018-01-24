@@ -19,7 +19,6 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.DataManager;
-import com.linkedin.pinot.common.exception.PermanentDownloadException;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -30,7 +29,6 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import com.linkedin.pinot.core.segment.index.loader.V3RemoveIndexException;
 import java.io.File;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
@@ -47,38 +45,18 @@ public class SegmentFetcherAndLoader {
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final DataManager _dataManager;
 
-  private final int _segmentLoadMaxRetryCount;
-  private final long _segmentLoadMinRetryDelayMs; // Min delay (in msecs) between retries
-
   public SegmentFetcherAndLoader(DataManager dataManager, ZkHelixPropertyStore<ZNRecord> propertyStore,
       Configuration pinotHelixProperties) throws Exception {
     _propertyStore = propertyStore;
     _dataManager = dataManager;
-    int maxRetries = Integer.parseInt(CommonConstants.Server.DEFAULT_SEGMENT_LOAD_MAX_RETRY_COUNT);
-    try {
-      maxRetries =
-          pinotHelixProperties.getInt(CommonConstants.Server.CONFIG_OF_SEGMENT_LOAD_MAX_RETRY_COUNT, maxRetries);
-    } catch (Exception e) {
-      // Keep the default value
-    }
-    _segmentLoadMaxRetryCount = maxRetries;
 
-    long minRetryDelayMillis = Long.parseLong(CommonConstants.Server.DEFAULT_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS);
-    try {
-      minRetryDelayMillis =
-          pinotHelixProperties.getLong(CommonConstants.Server.CONFIG_OF_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS,
-              minRetryDelayMillis);
-    } catch (Exception e) {
-      // Keep the default value
-    }
-    _segmentLoadMinRetryDelayMs = minRetryDelayMillis;
     Configuration segmentFetcherFactoryConfig =
         pinotHelixProperties.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
 
     SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
   }
 
-  public void addOrReplaceOfflineSegment(String tableName, String segmentId, boolean retryOnFailure) {
+  public void addOrReplaceOfflineSegment(String tableName, String segmentId) {
     OfflineSegmentZKMetadata newSegmentZKMetadata =
         ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableName, segmentId);
     Preconditions.checkNotNull(newSegmentZKMetadata);
@@ -146,59 +124,13 @@ public class SegmentFetcherAndLoader {
         } else {
           LOGGER.info("Trying to refresh segment {} of table {} with new data.", segmentId, tableName);
         }
-        int retryCount;
-        int maxRetryCount = 1;
-        if (retryOnFailure) {
-          maxRetryCount = _segmentLoadMaxRetryCount;
-        }
-        for (retryCount = 0; retryCount < maxRetryCount; ++retryCount) {
-          long attemptStartTime = System.currentTimeMillis();
-          try {
-            final String uri = newSegmentZKMetadata.getDownloadUrl();
-            final String localSegmentDir = downloadSegmentToLocal(uri, tableName, segmentId);
-            final SegmentMetadata segmentMetadata = new SegmentMetadataImpl(new File(localSegmentDir));
-            _dataManager.addOfflineSegment(tableName, segmentId, new File(localSegmentDir));
-            LOGGER.info("Downloaded segment {} of table {} crc {} from controller", segmentId, tableName,
-                segmentMetadata.getCrc());
-
-            // Successfully loaded the segment, break out of the retry loop
-            break;
-          } catch (PermanentDownloadException e) {
-            LOGGER.error("Caught exception while loading segment {} (table {}), attempt {} of {}. Aborting", segmentId,
-                tableName, (retryCount + 1), maxRetryCount, e);
-            Utils.rethrowException(e);
-          } catch (Exception e) {
-            long attemptDurationMillis = System.currentTimeMillis() - attemptStartTime;
-            LOGGER.warn(
-                "Caught exception while loading segment " + segmentId + "(table " + tableName + "), attempt " + (
-                    retryCount + 1) + " of " + maxRetryCount, e);
-
-            // Do we need to wait for the next retry attempt?
-            if (retryCount < maxRetryCount - 1) {
-              // Exponentially back off, wait for (minDuration + attemptDurationMillis) *
-              // 1.0..(2^retryCount)+1.0
-              double maxRetryDurationMultiplier = Math.pow(2.0, (retryCount + 1));
-              double retryDurationMultiplier = Math.random() * maxRetryDurationMultiplier + 1.0;
-              long waitTime = (long) ((_segmentLoadMinRetryDelayMs + attemptDurationMillis) * retryDurationMultiplier);
-
-              LOGGER.warn("Waiting for " + TimeUnit.MILLISECONDS.toSeconds(waitTime) + " seconds to retry(" + segmentId
-                  + " of table " + tableName);
-              long waitEndTime = System.currentTimeMillis() + waitTime;
-              while (System.currentTimeMillis() < waitEndTime) {
-                try {
-                  Thread.sleep(Math.max(System.currentTimeMillis() - waitEndTime, 1L));
-                } catch (InterruptedException ie) {
-                  // Ignore spurious wakeup
-                }
-              }
-            }
-          }
-        }
-        if (retryCount == maxRetryCount) {
-          throw new RuntimeException(
-              "Failed to download and load segment " + segmentId + " (table " + tableName + " after " + retryCount
-                  + " retries");
-        }
+        String uri = newSegmentZKMetadata.getDownloadUrl();
+        // Retry will be done here.
+        String localSegmentDir = downloadSegmentToLocal(uri, tableName, segmentId);
+        SegmentMetadata segmentMetadata = new SegmentMetadataImpl(new File(localSegmentDir));
+        _dataManager.addOfflineSegment(tableName, segmentId, new File(localSegmentDir));
+        LOGGER.info("Downloaded segment {} of table {} crc {} from controller", segmentId, tableName,
+            segmentMetadata.getCrc());
       } else {
         LOGGER.info("Got already loaded segment {} of table {} crc {} again, will do nothing.", segmentId, tableName,
             localSegmentMetadata.getCrc());
@@ -239,7 +171,11 @@ public class SegmentFetcherAndLoader {
       SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempTarFile);
       LOGGER.info("Downloaded tarred segment: {} for table: {} from: {} to: {}, file length: {}", segmentName,
           tableName, uri, tempTarFile, tempTarFile.length());
+
+      // If an exception is thrown when untarring, it means the tar file is broken OR not found after the retry.
+      // Thus, there's no need to retry again.
       TarGzCompressionUtils.unTar(tempTarFile, tempSegmentDir);
+
       File[] files = tempSegmentDir.listFiles();
       Preconditions.checkState(files != null && files.length == 1);
       File tempIndexDir = files[0];
