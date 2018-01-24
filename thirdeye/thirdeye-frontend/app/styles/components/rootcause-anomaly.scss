@@ -71,7 +71,7 @@
 
   &__stats-wrapper {
     display: flex;
-    margin: 16px 0;
+    margin: 16px 0 0;
   }
 
   &__stats {
@@ -147,5 +147,9 @@
 
   &__feedback {
     padding: 0 24px 24px;
+  }
+
+  &__body {
+    padding: 0px 24px 24px 24px;
   }
 }

@@ -1,7 +1,7 @@
 import Component from "@ember/component";
 import { computed, setProperties, getProperties, get } from '@ember/object';
 import moment from 'moment';
-import { humanizeFloat, filterPrefix, toOffsetUrn, humanizeChange, toColorDirection, isInverse } from 'thirdeye-frontend/helpers/utils';
+import { humanizeFloat, filterPrefix, toOffsetUrn, humanizeChange, toColorDirection, isInverse, toEventLabel, toMetricLabel } from 'thirdeye-frontend/helpers/utils';
 import { equal, reads } from '@ember/object/computed';
 
 const ROOTCAUSE_HIDDEN_DEFAULT = 'default';
@@ -47,6 +47,7 @@ export default Component.extend({
 
   /**
    * Array of human readable anomaly options for users to select
+   * @type {string}
    */
   options: Object.keys(ANOMALY_OPTIONS_MAPPING),
 
@@ -73,6 +74,23 @@ export default Component.extend({
   ),
 
   /**
+   * Metric urn for anomaly topic metric
+   * @type {string}
+   */
+  metricUrn: computed(
+    'anomalyUrns',
+    function () {
+      const { anomalyUrns } = getProperties(this, 'anomalyUrns');
+
+      const metricUrns = filterPrefix(anomalyUrns, 'thirdeye:metric:');
+
+      if (!metricUrns) { return; }
+
+      return metricUrns[0];
+    }
+  ),
+
+  /**
    * Information about an anomaly displayed in the overview regarding its id, metric, dimensions, alert name, and duration
    * @type {Object}
    */
@@ -88,92 +106,105 @@ export default Component.extend({
     }
   ),
 
-  //
-  // anomaly properties for display
-  //
-
   /**
    * Anomaly function (alert) name
+   * @type {string}
    */
   functionName: reads('anomaly.attributes.function.firstObject'),
 
   /**
-   * Anomaly metric name
+   * Anomaly metric name from anomaly attributes
+   * @type {string}
    */
   metric: reads('anomaly.attributes.metric.firstObject'),
 
   /**
    * Anomaly metric dataset name
+   * @type {string}
    */
   dataset: reads('anomaly.attributes.dataset.firstObject'),
 
   /**
    * Anomaly feedback status
+   * @type {string}
    */
   status: reads('anomaly.attributes.status.firstObject'),
 
   /**
+   * Anomaly baseline as computed by anomaly function
+   * @type {Float}
+   */
+  baseline: reads('anomaly.attributes.baseline.firstObject'),
+
+  /**
    * Anomaly unique identifier
+   * @type {string}
    */
   anomalyId: computed('anomaly', function () {
     return get(this, 'anomaly').urn.split(':')[3];
   }),
 
   /**
-   * Anomaly duration
+   * Anomaly issue type for grouped anomaly (not supported yet)
+   * @type {string}
    */
-  duration: computed('anomaly', function () {
+  issueType: null, // TODO
+
+  /**
+   * Formatted metric label of anomaly topic metric
+   * @type {string}
+   */
+  metricLabel: computed(
+    'anomalyUrns',
+    'entities',
+    function () {
+      const { anomalyUrns, entities } = getProperties(this, 'anomalyUrns', 'entities');
+
+      const metricUrns = filterPrefix(anomalyUrns, 'thirdeye:metric:');
+
+      if (!metricUrns) { return; }
+
+      const metricUrn = metricUrns[0];
+
+      return toMetricLabel(metricUrn, entities);
+    }
+  ),
+
+  /**
+   * Formatted anomaly start time
+   * @type {string}
+   */
+  startFormatted: computed('anomaly', function () {
+    return moment(get(this, 'anomaly').start).format('MMM D YYYY, hh:mm a');
+  }),
+
+  /**
+   * Formatted anomaly end time
+   * @type {string}
+   */
+  endFormatted: computed('anomaly', function () {
+    return moment(get(this, 'anomaly').end).format('MMM D YYYY, hh:mm a');
+  }),
+
+  /**
+   * Formatted anomaly duration
+   * @type {string}
+   */
+  durationFormatted: computed('anomaly', function () {
     const anomaly = get(this, 'anomaly');
     return moment.duration(anomaly.end - anomaly.start).humanize();
   }),
 
   /**
-   * Anomaly metric dimensions/filters
+   * Default state for hide/expand panel
+   * @type {boolean}
    */
-  dimensions: computed('anomaly', function () {
-    const attr = get(this, 'anomaly').attributes;
-    const dimNames = attr.dimensions || [];
-    const dimValues = dimNames.reduce((agg, dimName) => { agg[dimName] = attr[dimName][0]; return agg; }, {});
-    return dimNames.sort().map(dimName => dimValues[dimName]).join(', ');
-  }),
-
-  issueType: null, // TODO
-
-  metricFormatted: computed(
-    'dataset',
-    'metric',
-    function () {
-      const { dataset, metric } =
-        getProperties(this, 'dataset', 'metric');
-      return `${dataset}::${metric}`;
-    }
-  ),
-
-  dimensionsFormatted: computed('anomaly', function () {
-    const dimensions = get(this, 'dimensions');
-    return dimensions ? ` (${dimensions})` : '';
-  }),
-
-  changeFormatted: computed('change', function () {
-    const change = get(this, 'change');
-    const prefix = change > 0 ? '+' : '';
-    return `${prefix}${humanizeFloat(change * 100)}%`;
-  }),
-
-  startFormatted: computed('anomaly', function () {
-    return moment(get(this, 'anomaly').start).format('MMM D YYYY, hh:mm a');
-  }),
-
-  endFormatted: computed('anomaly', function () {
-    return moment(get(this, 'anomaly').end).format('MMM D YYYY, hh:mm a');
-  }),
-
-  //
-  // expand / hide anomaly header
-  //
-
   requiresFeedback: equal('status', 'NO_FEEDBACK'),
 
+  /**
+   * Toggle for hide/expand panel
+   * @type {boolean}
+   */
   isHidden: computed(
     'requiresFeedback',
     'isHiddenUser',
@@ -226,33 +257,44 @@ export default Component.extend({
     'aggregates',
     'anomalyUrns',
     'entities',
+    'baseline',
     function () {
-      const { aggregates, anomalyUrns, entities } =
-        getProperties(this, 'aggregates', 'anomalyUrns', 'entities');
+      const { metricUrn, entities } = getProperties(this, 'metricUrn', 'entities');
 
-      const metricUrns = filterPrefix(anomalyUrns, 'thirdeye:metric:');
-
-      if (!metricUrns) { return; }
-
-      // NOTE: supports single metric only
-      const metricUrn = metricUrns[0];
+      const curr = this._getAggregate('current');
 
       const anomalyInfo = {};
-
       [...this.offsets].forEach(offset => {
-        const offsetAggregate = aggregates[toOffsetUrn(metricUrn, offset)];
-      const change = aggregates[toOffsetUrn(metricUrn, 'current')] / offsetAggregate - 1;
+        const value = this._getAggregate(offset);
+        const change = curr / value - 1;
 
-      anomalyInfo[offset] = {
-        value: offsetAggregate, // numerical value to display
-        change: humanizeChange(change), // text of % change with + or - sign
-        direction: toColorDirection(change, isInverse(metricUrn, entities))
-      };
-    });
+        anomalyInfo[offset] = {
+          value, // numerical value to display
+          change: humanizeChange(change), // text of % change with + or - sign
+          direction: toColorDirection(change, isInverse(metricUrn, entities))
+        };
+      });
 
       return anomalyInfo;
     }
   ),
+
+  /**
+   * Returns the aggregate value for a given offset. Handles computed baseline special case.
+   *
+   * @param {string} offset metric offset
+   * @return {Float} aggregate value for offset
+   * @private
+   */
+  _getAggregate(offset) {
+    const { metricUrn, aggregates, baseline } = getProperties(this, 'metricUrn', 'aggregates', 'baseline');
+
+    if (offset === 'baseline') {
+      return baseline;
+    }
+
+    return aggregates[toOffsetUrn(metricUrn, offset)];
+  },
 
   actions: {
     /**
