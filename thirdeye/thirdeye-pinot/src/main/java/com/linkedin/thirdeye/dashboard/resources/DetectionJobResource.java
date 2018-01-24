@@ -76,6 +76,7 @@ public class DetectionJobResource {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private final AlertFilterAutotuneFactory alertFilterAutotuneFactory;
   private final AlertFilterFactory alertFilterFactory;
+  private EmailResource emailResource;
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -85,6 +86,15 @@ public class DetectionJobResource {
   public static final String AUTOTUNE_MTTD_KEY = "mttd";
   private static final String COMMA_SEPARATOR = ",";
   private static final String SIGN_TEST_WINDOW_SIZE = "signTestWindowSize";
+
+  /**
+   * TODO: Remove the constructor
+   */
+  public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory,
+      AlertFilterAutotuneFactory alertFilterAutotuneFactory, EmailResource emailResource) {
+    this(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory);
+    this.emailResource = emailResource;
+  }
 
   public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory,
       AlertFilterAutotuneFactory alertFilterAutotuneFactory) {
@@ -221,20 +231,108 @@ public class DetectionJobResource {
   }
 
   /**
-   * Breaks down the given range into consecutive monitoring windows as per function definition
-   * Regenerates anomalies for each window separately
-   *
-   * As the anomaly result regeneration is a heavy job, we move the function from Dashboard to worker
-   * @param id an anomaly function id
-   * @param startTimeIso The start time of the monitoring window (in ISO Format), ex: 2016-5-23T00:00:00Z
-   * @param endTimeIso The start time of the monitoring window (in ISO Format)
-   * @param isForceBackfill false to resume backfill from the latest left off
-   * @param speedup
-   *      whether this backfill should speedup with 7-day window. The assumption is that the functions are using
-   *      WoW-based algorithm, or Seasonal Data Model.
-   * @return HTTP response of this request with a job execution id
-   * @throws Exception
+   * The wrapper endpoint to do first time replay, tuning and send out notification to user
+   * TODO: Remove this wrapper method after funciton onboard is ready on FE
+   * @param id anomaly function id
+   * @param startTimeIso start time of replay
+   * @param endTimeIso end time of replay
+   * @param isForceBackfill whether force back fill or not, default is true
+   * @param isRemoveAnomaliesInWindow whether need to remove exsiting anomalies within replay time window, default is false
+   * @param speedup whether use speedUp or not
+   * @param userDefinedPattern tuning parameter, user defined pattern can be "UP", "DOWN", or "UP&DOWN"
+   * @param sensitivity sensitivity level for initial tuning
+   * @param fromAddr email notification from address, if blank uses fromAddr of ThirdEyeConfiguration
+   * @param toAddr email notification to address
+   * @param teHost thirdeye host, if black uses thirdeye host configured in ThirdEyeConfiguration
+   * @param smtpHost smtp host if black uses smtpHost configured in ThirdEyeConfiguration
+   * @param smtpPort smtp port if black uses smtpPort configured in ThirdEyeConfiguration
+   * @param phantomJsPath phantomJSpath
+   * @return
    */
+  @POST
+  @Path("/{id}/notifyreplaytuning")
+  public Response triggerReplayTuningAndNotification(@PathParam("id") @NotNull final long id,
+      @QueryParam("start") @NotNull String startTimeIso, @QueryParam("end") @NotNull String endTimeIso,
+      @QueryParam("force") @DefaultValue("true") String isForceBackfill,
+      @QueryParam("removeAnomaliesInWindow") @DefaultValue("false") final Boolean isRemoveAnomaliesInWindow,
+      @QueryParam("speedup") @DefaultValue("false") final Boolean speedup,
+      @QueryParam("userDefinedPattern") @DefaultValue("UP") String userDefinedPattern,
+      @QueryParam("sensitivity") @DefaultValue("MEDIUM") final String sensitivity, @QueryParam("from") String fromAddr,
+      @QueryParam("to") String toAddr,
+      @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
+      @QueryParam("smtpPort") Integer smtpPort, @QueryParam("phantomJsPath") String phantomJsPath) {
+
+    if (emailResource == null) {
+      LOG.error("Unable to proceed this function without email resource");
+      return Response.status(Status.EXPECTATION_FAILED).entity("No email resource").build();
+    }
+    // run replay, update function with jobId
+    long jobId;
+    try {
+      Response response =
+          generateAnomaliesInRange(id, startTimeIso, endTimeIso, isForceBackfill, speedup, isRemoveAnomaliesInWindow);
+      Map<Long, Long> entity = (Map<Long, Long>) response.getEntity();
+      jobId = entity.get(id);
+    } catch (Exception e) {
+      return Response.status(Status.BAD_REQUEST).entity("Failed to start replay!").build();
+    }
+
+    long startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
+    long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
+    JobStatus jobStatus = detectionJobScheduler.waitForJobDone(jobId);
+    int numReplayedAnomalies = 0;
+    if (!jobStatus.equals(JobStatus.COMPLETED)) {
+      //TODO: cleanup done tasks and replay results under this failed job
+      // send email to internal
+      String replayFailureSubject =
+          new StringBuilder("Replay failed on metric: " + anomalyFunctionDAO.findById(id).getMetric()).toString();
+      String replayFailureText = new StringBuilder("Failed on Function: " + id + "with Job Id: " + jobId).toString();
+      emailResource.sendEmailWithText(null, null, replayFailureSubject, replayFailureText,
+          smtpHost, smtpPort);
+      return Response.status(Status.BAD_REQUEST).entity("Replay job error with job status: {}" + jobStatus).build();
+    } else {
+      numReplayedAnomalies =
+          mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, id, false).size();
+      LOG.info("Replay completed with {} anomalies generated.", numReplayedAnomalies);
+    }
+
+    // create initial tuning and apply filter
+    Response initialAutotuneResponse =
+        initiateAlertFilterAutoTune(id, startTimeIso, endTimeIso, "AUTOTUNE", userDefinedPattern, sensitivity, "", "");
+    if (initialAutotuneResponse.getEntity() != null) {
+      updateAlertFilterToFunctionSpecByAutoTuneId(Long.valueOf(initialAutotuneResponse.getEntity().toString()));
+      LOG.info("Initial alert filter applied");
+    } else {
+      LOG.info("AutoTune doesn't applied");
+    }
+
+    // send out email
+    String subject = new StringBuilder(
+        "Replay results for " + anomalyFunctionDAO.findById(id).getFunctionName() + " is ready for review!").toString();
+
+    emailResource.generateAndSendAlertForFunctions(startTime, endTime, String.valueOf(id), fromAddr, toAddr, subject,
+        false, true, teHost, smtpHost, smtpPort, phantomJsPath);
+    LOG.info("Sent out email");
+
+    return Response.ok("Replay, Tuning and Notification finished!").build();
+  }
+
+
+  /**
+     * Breaks down the given range into consecutive monitoring windows as per function definition
+     * Regenerates anomalies for each window separately
+     *
+     * As the anomaly result regeneration is a heavy job, we move the function from Dashboard to worker
+     * @param id an anomaly function id
+     * @param startTimeIso The start time of the monitoring window (in ISO Format), ex: 2016-5-23T00:00:00Z
+     * @param endTimeIso The start time of the monitoring window (in ISO Format)
+     * @param isForceBackfill false to resume backfill from the latest left off
+     * @param speedup
+     *      whether this backfill should speedup with 7-day window. The assumption is that the functions are using
+     *      WoW-based algorithm, or Seasonal Data Model.
+     * @return HTTP response of this request with a job execution id
+     * @throws Exception
+     */
   @POST
   @Path("/{id}/replay")
   public Response generateAnomaliesInRange(@PathParam("id") @NotNull final long id,
