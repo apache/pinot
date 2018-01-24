@@ -88,7 +88,6 @@ export default Route.extend({
     const isEditModeActive = destination.includes('edit') || destination.includes('tune');
     const pattern = alertData.alertFilter ? alertData.alertFilter.pattern : 'N/A';
     const granularity = alertData.bucketSize && alertData.bucketUnit ? `${alertData.bucketSize}_${alertData.bucketUnit}` : 'N/A';
-
     Object.assign(alertData, { pattern, granularity });
 
     controller.setProperties({

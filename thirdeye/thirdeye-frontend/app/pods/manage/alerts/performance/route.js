@@ -125,8 +125,8 @@ const standardDeviation = (values) => {
  */
 const calculateRate = (anomalies, subset) => {
   let percentage = 0;
-  if (anomalies && anomalies.tot && subset && subset.tot) {
-    percentage = (subset.tot * 100) / anomalies.tot;
+  if (anomalies && subset) {
+    percentage = (subset * 100) / anomalies;
   }
   return Number(percentage.toFixed());
 };
@@ -198,6 +198,7 @@ export default Ember.Route.extend({
 
           // Get array of keys from first record
           let metricKeys = Object.keys(groupData[0].data);
+          let getTotalValue = (key) => Ember.getWithDefault(avgData, key, 0);
           count++;
 
           // Look at each anomaly's perf object keys. For our "roundable" fields, get derived data
@@ -224,9 +225,15 @@ export default Ember.Route.extend({
             avgData[key].values = allValues;
           });
 
-          // Make custom calculations
-          avgData['responseRate'] = avgData['responseRate'] ? calculateRate(avgData['totalAlerts'], avgData['totalResponses']) : 'N/A';
-          avgData['precision'] = avgData['precision'] ? calculateRate(avgData['totalAlerts'], avgData['trueAnomalies']) : 'N/A';
+          // Gather totals and make custom calculations
+          let pTrue = getTotalValue('trueAnomalies.tot');
+          let pNew = getTotalValue('newTrend.tot');
+          let pFalse = getTotalValue('falseAlarm.tot');
+          let rResponses = getTotalValue('totalResponses.tot');
+          let rTotal = getTotalValue('totalAlerts.tot');
+          let precisionTotal = pTrue + pNew + pFalse;
+          avgData['responseRate'] = avgData['responseRate'] ? calculateRate(rTotal, rResponses) : 'N/A';
+          avgData['precision'] = avgData['precision'] ? calculateRate(precisionTotal, pTrue + pNew) : 'N/A';
 
           // Add perf data to application groups array
           newGroupArr.push({
@@ -252,23 +259,8 @@ export default Ember.Route.extend({
         });
 
       })
-      .catch((err) => {
+      .catch(() => {
         controller.set('isDataLoadingError', true);
       });
-  },
-
-  /**
-   * Model hook for the create alert route.
-   * @method resetController
-   * @param {Object} controller - active controller
-   * @param {Boolean} isExiting - exit status
-   * @param {Object} transition - transition obj
-   * @return {undefined}
-   */
-  resetController(controller, isExiting) {
-    this._super(...arguments);
-    if (isExiting) {
-      controller.clearAll();
-    }
   }
 });

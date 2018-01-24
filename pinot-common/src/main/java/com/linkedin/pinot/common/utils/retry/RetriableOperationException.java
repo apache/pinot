@@ -16,12 +16,11 @@
 package com.linkedin.pinot.common.utils.retry;
 
 /**
- * The <code>AttemptsExceededException</code> indicates that the operation did not succeed within maximum number of
- * attempts.
+ * The <code>RetriableOperationException</code> indicates that the retriable operation threw an exception.
  */
-public class AttemptsExceededException extends AttemptFailureException {
+public class RetriableOperationException extends AttemptFailureException {
 
-  public AttemptsExceededException(String message) {
-    super(message);
+  public RetriableOperationException(Throwable cause) {
+    super(cause);
   }
 }

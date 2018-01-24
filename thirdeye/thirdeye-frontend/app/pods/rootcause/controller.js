@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toOffsetUrn, toColor, checkStatus, toFilters, appendFilters } from 'thirdeye-frontend/helpers/utils';
+import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toOffsetUrn, toColor, checkStatus, toFilters, appendFilters, dateFormatFull } from 'thirdeye-frontend/helpers/utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
 import _ from 'lodash';
@@ -16,6 +16,8 @@ const ROOTCAUSE_SERVICE_TIMESERIES = 'timeseries';
 const ROOTCAUSE_SERVICE_AGGREGATES = 'aggregates';
 const ROOTCAUSE_SERVICE_BREAKDOWNS = 'breakdowns';
 
+const ROOTCAUSE_SESSION_TIMER_INTERVAL = 300000;
+
 // TODO: Update module import to comply by new Ember standards
 
 export default Ember.Controller.extend({
@@ -26,9 +28,11 @@ export default Ember.Controller.extend({
   ],
 
   //
-  // route errors
+  // notifications
   //
   routeErrors: null, // Set
+
+  sessionUpdateWarning: null, // string
 
   //
   // services
@@ -42,6 +46,8 @@ export default Ember.Controller.extend({
   aggregatesService: Ember.inject.service('rootcause-aggregates-cache'),
 
   breakdownsService: Ember.inject.service('rootcause-breakdowns-cache'),
+
+  sessionService: Ember.inject.service('rootcause-session-datasource'),
 
   //
   // user selection
@@ -131,6 +137,8 @@ export default Ember.Controller.extend({
       activeTab: ROOTCAUSE_TAB_METRICS,
       timeseriesMode: 'absolute'
     });
+
+    Ember.run.later(this, this._onCheckSessionTimer, ROOTCAUSE_SESSION_TIMER_INTERVAL);
   },
 
   /**
@@ -363,6 +371,51 @@ export default Ember.Controller.extend({
     };
   },
 
+  /**
+   * Fetches the current session state from the backend and issues a notification if it has been updated
+   *
+   * @private
+   */
+  _checkSession() {
+    const { sessionId, sessionUpdatedTime, sessionService } =
+      this.getProperties('sessionId', 'sessionUpdatedTime', 'sessionService');
+
+    if (!sessionId) { return; }
+
+    sessionService
+      .loadAsync(sessionId)
+      .then((res) => {
+        if (res.updated > sessionUpdatedTime) {
+          this.setProperties({
+            sessionUpdateWarning: `This investigation (${sessionId}) was updated by ${res.updatedBy} on ${moment(res.updated).format(dateFormatFull)}. Please refresh the page.`
+          })
+        }
+      })
+      .catch((error) => {
+        const { routeErrors } = this.getProperties('routeErrors');
+        routeErrors.add('Could not check investigation state automatically');
+        this.setProperties({ routeErrors: new Set(routeErrors) });
+      });
+  },
+
+  /**
+   * Timer function checking the current session state
+   *
+   * @private
+   */
+  _onCheckSessionTimer() {
+    const { sessionId } = this.getProperties('sessionId');
+
+    // debounce: do not run if destroyed
+    if (this.isDestroyed) { return; }
+
+    Ember.run.debounce(this, this._onCheckSessionTimer, ROOTCAUSE_SESSION_TIMER_INTERVAL);
+
+    if (!sessionId) { return; }
+
+    this._checkSession();
+  },
+
   //
   // Actions
   //
@@ -464,17 +517,24 @@ export default Ember.Controller.extend({
      * @returns {undefined}
      */
     onSessionSave() {
-      const jsonString = JSON.stringify(this._makeSession());
+      const { sessionService } = this.getProperties('sessionService');
+
+      const session = this._makeSession();
       const sessionUpdatedBy = this.get('authService.data.authenticated.name'); // fetch ldap of current user
 
-      return fetch(`/session/`, { method: 'POST', body: jsonString })
-        .then(checkStatus)
-        .then(res => this.setProperties({
+      return sessionService
+        .saveAsync(session)
+        .then((res) => this.setProperties({
           sessionId: res,
           sessionUpdatedBy,
-          sessionUpdatedTime: moment().format('LLLL'),
+          sessionUpdatedTime: moment().valueOf(),
           sessionModified: false
-        }));
+        }))
+        .catch((error) => {
+          const { routeErrors } = this.getProperties('routeErrors');
+          routeErrors.add('Could not save investigation');
+          this.setProperties({ routeErrors: new Set(routeErrors) });
+        });
     },
 
     /**
@@ -483,20 +543,29 @@ export default Ember.Controller.extend({
      * @returns {undefined}
      */
     onSessionCopy() {
-      const { sessionId } = this.getProperties('sessionId');
+      const { sessionId, sessionService } = this.getProperties('sessionId', 'sessionService');
 
       const session = this._makeSession();
+
+      // copy, reference old session
       delete session['id'];
       session['previousId'] = sessionId;
 
-      const jsonString = JSON.stringify(session);
+      const sessionUpdatedBy = this.get('authService.data.authenticated.name'); // fetch ldap of current user
 
-      return fetch(`/session/`, { method: 'POST', body: jsonString })
-        .then(checkStatus)
-        .then(res => this.setProperties({
+      return sessionService
+        .saveAsync(session)
+        .then((res) => this.setProperties({
           sessionId: res,
+          sessionUpdatedBy,
+          sessionUpdatedTime: moment().valueOf(),
           sessionModified: false
-        }));
+        }))
+        .catch((error) => {
+          const { routeErrors } = this.getProperties('routeErrors');
+          routeErrors.add('Could not copy investigation');
+          this.setProperties({ routeErrors: new Set(routeErrors) });
+        });
     },
 
     /**

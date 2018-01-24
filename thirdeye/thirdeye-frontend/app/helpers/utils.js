@@ -46,6 +46,8 @@ export const eventColorMapping = {
   anomaly: 'teal'
 };
 
+export const dateFormatFull = 'ddd, MMM D YYYY, h:mm a';
+
 /**
  * The Promise returned from fetch() won't reject on HTTP error status even if the response is an HTTP 404 or 500.
  * This helps us define a custom response handler.
@@ -263,6 +265,24 @@ export function toMetricLabel(urn, entities) {
   const filterString = filters.length ? ` (${filters.join(', ')})` : '';
 
   return `${metricName}${filterString}`;
+}
+
+/**
+ * Returns a human-readable label for an event urn
+ *
+ * @param {string} urn event urn
+ * @param {Object} entities entities cache
+ * @returns {string} human-readable event label
+ */
+export function toEventLabel(urn, entities) {
+  let label = entities[urn].label;
+
+  if (urn.includes('anomaly')) {
+    const [, id] = urn.split(':anomaly:');
+    label = `#${id} ${label}`;
+  }
+
+  return label;
 }
 
 /**
@@ -594,5 +614,6 @@ export default Ember.Helper.helper({
   eventColorMapping,
   parseProps,
   postProps,
-  toIso
+  toIso,
+  dateFormatFull
 });

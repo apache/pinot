@@ -11,6 +11,10 @@
     padding: 0;
   }
 
+  &--cover {
+    z-index: 100;
+  }
+
   &__title {
     font-size: 16px; 
     font-weight: 600;

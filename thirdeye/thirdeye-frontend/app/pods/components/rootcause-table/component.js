@@ -1,6 +1,7 @@
 import Ember from 'ember';
 import _ from 'lodash';
 import moment from 'moment';
+import { toEventLabel } from 'thirdeye-frontend/helpers/utils';
 
 export default Ember.Component.extend({
   columns: null, // []
@@ -41,11 +42,11 @@ export default Ember.Component.extend({
 
       values.forEach((value) => {
         value.humanStart = moment(value.start).format(format);
-
         // If this is an ongoing event
         if (value.end <= 0) {
           value.duration = 'ongoing';
         } else {
+          value.label = toEventLabel(value.urn, this.get('records'));
           let timeDiff = value.end - value.start;
           let duration = moment.duration(timeDiff).days();
           value.duration = duration > 1 ? `${duration} days` : `${duration} day`;

@@ -39,6 +39,10 @@
     display: flex;
     align-items: center;
   }
+
+  &--flushed {
+    padding: 0;
+  }
 }
 
 .thirdeye-link-secondary {
