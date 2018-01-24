@@ -387,7 +387,7 @@ public class AnomalyReportGenerator {
   }
 
   private String getAnomalyURL(MergedAnomalyResultDTO anomalyResultDTO, String dashboardUrl) {
-    String urlPart = "/thirdeye#investigate?anomalyId=";
+    String urlPart = "/app/#/rootcause?anomalyId=";
     return dashboardUrl + urlPart;
   }
 
