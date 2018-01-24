@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.onboard.tasks;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardJob;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnBoardJobRunner;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardTask;
@@ -31,6 +32,7 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   public static final String FUNCTION_FACTORY = "functionFactory";
   public static final String ALERT_FILTER_FACTORY = "alertFilterFactory";
   public static final String ALERT_FILTER_AUTOTUNE_FACTORY = "alertFilterAutotuneFactory";
+  public static final String NOTIFY_IF_FAILS = "notifyIfFails";
   public static final String FUNCTION_NAME = "functionName";
   public static final String COLLECTION_NAME = "collection";
   public static final String METRIC_NAME = "metric";
@@ -78,6 +80,7 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   protected AlertFilterFactory alertFilterFactory;
 
   public static final String MISSING_PARAMETER_ERROR_MESSAGE_TEMPLATE = "Require parameter field: %s";
+  public static final Boolean DEFAULT_NOTIFY_IF_FAILS = Boolean.FALSE;
 
   public DefaultDetectionOnboardJob(String jobName, Map<String, String> properties) {
     super(jobName, properties);
@@ -112,6 +115,10 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     }
 
     Map<String, String> taskConfigs = new HashMap<>();
+    taskConfigs.put (SMTP_HOST, this.properties.get(SMTP_HOST));
+    taskConfigs.put (SMTP_PORT, this.properties.get(SMTP_PORT));
+    taskConfigs.put (DEFAULT_ALERT_SENDER_ADDRESS, this.properties.get(DEFAULT_ALERT_SENDER_ADDRESS));
+    taskConfigs.put (DEFAULT_ALERT_RECEIVER_ADDRESS, this.properties.get(DEFAULT_ALERT_RECEIVER_ADDRESS));
 
     String taskPrefix = DataPreparationOnboardingTask.TASK_NAME + ".";
     taskConfigs.put(taskPrefix + ABORT_ON_FAILURE, Boolean.TRUE.toString());
@@ -273,5 +280,9 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     detectionOnboardTasks.add(new AlertFilterAutoTuneOnboardingTask());
     detectionOnboardTasks.add(new NotificationOnboardingTask());
     return detectionOnboardTasks;
+  }
+
+  public static String getAbortOnFailure() {
+    return ABORT_ON_FAILURE;
   }
 }
