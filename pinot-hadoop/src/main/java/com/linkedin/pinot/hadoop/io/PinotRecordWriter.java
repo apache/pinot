@@ -2,6 +2,7 @@ package com.linkedin.pinot.hadoop.io;
 
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.hadoop.job.JobConfigConstants;
 
@@ -58,8 +59,9 @@ public class PinotRecordWriter<K, V> extends RecordWriter<K, V> {
         _handler.close();
         File dir = new File(_baseDataDir);
         _segmentConfig.setSegmentName(PinotOutputFormat.getSegmentName(context));
+        SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
         for (File f : dir.listFiles()) {
-            createSegment(f.getPath());
+            createSegment(f.getPath(), driver);
         }
 
         final FileSystem fs = FileSystem.get(new Configuration());
@@ -77,12 +79,11 @@ public class PinotRecordWriter<K, V> extends RecordWriter<K, V> {
         clean(PinotOutputFormat.getTempSegmentDir(context));
     }
 
-    private void createSegment(String inputFile) {
+    private void createSegment(String inputFile, SegmentIndexCreationDriver driver) {
         try {
             _segmentConfig.setInputFilePath(inputFile);
-            SegmentIndexCreationDriverImpl _driver = new SegmentIndexCreationDriverImpl();
-            _driver.init(_segmentConfig);
-            _driver.build();
+            driver.init(_segmentConfig);
+            driver.build();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -94,7 +95,7 @@ public class PinotRecordWriter<K, V> extends RecordWriter<K, V> {
         if (!f.exists()) {
             f.mkdirs();
         }
-        return String.format("%s/%s%s", localTarDir, _segmentConfig.getSegmentName(), JobConfigConstants.TARGZ);
+        return localTarDir + "/" + _segmentConfig.getSegmentName() + JobConfigConstants.TARGZ;
     }
 
     private void clean(String baseDir) {
