@@ -520,12 +520,16 @@ export default Ember.Controller.extend({
 
       return sessionService
         .saveAsync(session)
-        .then((res) => this.setProperties({
-          sessionId: res,
-          sessionUpdatedBy,
-          sessionUpdatedTime: moment().valueOf(),
-          sessionModified: false
-        }))
+        .then((res) => {
+          const sessionId = res;
+          this.setProperties({
+            sessionId,
+            sessionUpdatedBy,
+            sessionUpdatedTime: moment().valueOf(),
+            sessionModified: false
+          });
+          this.transitionToRoute({ queryParams: { sessionId, anomalyId: null, metricId: null }});
+        })
         .catch((error) => {
           const { routeErrors } = this.getProperties('routeErrors');
           routeErrors.add('Could not save investigation');
@@ -551,12 +555,16 @@ export default Ember.Controller.extend({
 
       return sessionService
         .saveAsync(session)
-        .then((res) => this.setProperties({
-          sessionId: res,
-          sessionUpdatedBy,
-          sessionUpdatedTime: moment().valueOf(),
-          sessionModified: false
-        }))
+        .then((res) => {
+          const sessionId = res;
+          this.setProperties({
+            sessionId,
+            sessionUpdatedBy,
+            sessionUpdatedTime: moment().valueOf(),
+            sessionModified: false
+          });
+          this.transitionToRoute({ queryParams: { sessionId, anomalyId: null, metricId: null }});
+        })
         .catch((error) => {
           const { routeErrors } = this.getProperties('routeErrors');
           routeErrors.add('Could not copy investigation');
