@@ -1,7 +1,7 @@
 {{#if anomaly}}
   <div class="row card-container card-container--box-shadow">
     <div class="rootcause-anomaly__header">
-      <span class="rootcause-anomaly__title">Anomaly Overview</span>
+      <span class="rootcause-anomaly__title">Anomaly #{{anomalyId}} {{functionName}}</span>
       {{#each-in anomalyLinks as |type url|}}
         <span class="rootcause-anomaly__link">
           <a target="_blank" href="{{url}}">{{type}}</a>
@@ -16,52 +16,26 @@
         </a>
       </div>
     </div>
+
     {{#unless isHidden}}
-      <div class="card-container__body">
-        <div class="row">
-          <div class="col-xs-2">
-            <span class="rootcause-anomaly__props-label">Anomaly ID</span>
-          </div>
-          <div class="col-xs-10">
-            <span class="rootcause-anomaly__props-value">{{anomalyId}}</span>
-          </div>
-        </div>
+      <div class="rootcause-anomaly__body">
         <div class="row">
           <div class="col-xs-2">
             <span class="rootcause-anomaly__props-label">Metric</span>
           </div>
           <div class="col-xs-10">
             <span class="rootcause-anomaly__props-value">
-              <span class="rootcause-anomaly__props-value--strong">{{metric}}</span>
-              from
-              <span class="rootcause-anomaly__props-value--strong">{{dataset}}</span>
+              <span class="rootcause-anomaly__props-value">{{metricLabel}}</span>
             </span>
           </div>
         </div>
 
         <div class="row">
           <div class="col-xs-2 rootcause-anomaly__props-label">
-            <span>Dimensions</span>
-          </div>
-          <div class="col-xs-10">
-            <span class="rootcause-anomaly__props-value">{{dimensionsFormatted}}</span>
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="col-xs-2 rootcause-anomaly__props-label">
-            <span>Alert Name</span>
-          </div>
-          <div class="col-xs-10">
-            <span class="rootcause-anomaly__props-value">{{functionName}}</span>
-          </div>
-        </div>
-        <div class="row">
-          <div class="col-xs-2 rootcause-anomaly__props-label">
             <span>Time &amp; Duration</span>
           </div>
           <div class="col-xs-10">
-            <span class="rootcause-anomaly__props-value">{{startFormatted}} - {{endFormatted}} ({{duration}})</span>
+            <span class="rootcause-anomaly__props-value">{{startFormatted}} - {{endFormatted}} ({{durationFormatted}})</span>
           </div>
         </div>
 
@@ -77,52 +51,47 @@
               </span>
             </div>
           {{/each}}
-          {{#if issueType}}
-            <div class="rootcause-anomaly__stats">
-              <span class="rootcause-anomaly__stats-label">Issue Type</span>
-              <span class="rootcause-anomaly__stats-value">{{issueType}}</span>
-            </div>
-          {{/if}}
         </div>
       </div>
     {{/unless}}
-    <div class="rootcause-anomaly__feedback">
-      <div class="rootcause-anomaly__feedback__header">
-        <span class="rootcause-anomaly__title rootcause-anomaly__title--small">Is this an anomaly?</span>
-        <span>
-          <i class="glyphicon glyphicon-question-sign"></i>
-          {{#tooltip-on-element class="te-tooltip te-tooltip--large te-tooltip--cover" as |popover|}}
-          <div class="te-tooltip__header">
-            <span class="te-tooltip__title">What do the options mean?</span>
-          </div>
-          <div class="te-tooltip__body te-tooltip__body--large">
-            <div>
-              <span class="te-tooltip__title te-tooltip__title--small">True Anomaly</span>
-            </div>
-            <p>Similar anomalies should continue to be detected.</p>
-            <div>
-              <span class="te-tooltip__title te-tooltip__title--small">False Alarm</span>
-            </div>
-            <p>Similar anomalies should not be detected.</p>
-            <div>
-              <span class="te-tooltip__title te-tooltip__title--small">True but new trend</span>
-            </div>
-            <p>Anomaly is expected and metric is experiencing a non-temporary change. Similar anomalies should be ignored.</p>
-            <div>
-              <span class="te-tooltip__title">Why is this important?</span>
-            </div>
-            <p>This will help us improve detection performance and reduce false alarms.</p>
-          </div>
-          {{/tooltip-on-element}}
-        </span>
-      </div>
-      <div class="rootcause-anomaly__radio-button-list">
-        {{#each options as |option|}}
-        <div class="rootcause-anomaly__radio-button-item">
-          {{#radio-button value=option groupValue=status changed=(action "onFeedback")}}
-          <span class="te-radio__option">{{get optionsMapping option}}</span>
-          {{/radio-button}}
+
+    <div class="rootcause-anomaly__body">
+      <div class="row">
+        <div class="col-xs-2 rootcause-anomaly__title rootcause-anomaly__title--small">
+          Is this an anomaly?
+          <span>
+            <i class="glyphicon glyphicon-question-sign"></i>
+            {{#tooltip-on-element class="te-tooltip te-tooltip--large te-tooltip--cover" as |popover|}}
+              <div class="te-tooltip__header">
+                <span class="te-tooltip__title">What do the options mean?</span>
+              </div>
+              <div class="te-tooltip__body te-tooltip__body--large">
+                <div>
+                  <span class="te-tooltip__title te-tooltip__title--small">True Anomaly</span>
+                </div>
+                <p>Similar anomalies should continue to be detected.</p>
+                <div>
+                  <span class="te-tooltip__title te-tooltip__title--small">False Alarm</span>
+                </div>
+                <p>Similar anomalies should not be detected.</p>
+                <div>
+                  <span class="te-tooltip__title te-tooltip__title--small">True but new trend</span>
+                </div>
+                <p>Anomaly is expected and metric is experiencing a non-temporary change. Similar anomalies should be ignored.</p>
+                <div>
+                  <span class="te-tooltip__title">Why is this important?</span>
+                </div>
+                <p>This will help us improve detection performance and reduce false alarms.</p>
+              </div>
+            {{/tooltip-on-element}}
+          </span>
         </div>
+        {{#each options as |option|}}
+          <div class="col-xs-2 rootcause-anomaly__radio-button-item">
+            {{#radio-button value=option groupValue=status changed=(action "onFeedback")}}
+              <span class="te-radio__option">{{get optionsMapping option}}</span>
+            {{/radio-button}}
+          </div>
         {{/each}}
       </div>
     </div>

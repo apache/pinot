@@ -257,7 +257,7 @@ export function toMetricUrn(urn) {
  */
 export function toMetricLabel(urn, entities) {
   let metricName = urn;
-  if (entities && entities[urn]) {
+  if (urn && entities && entities[urn]) {
     metricName = entities[urn].label.split("::")[1].split("_").join(' ');
   }
 
@@ -275,6 +275,10 @@ export function toMetricLabel(urn, entities) {
  * @returns {string} human-readable event label
  */
 export function toEventLabel(urn, entities) {
+  if (!urn || !entities || !entities[urn]) {
+    return urn;
+  }
+
   let label = entities[urn].label;
 
   if (urn.includes('anomaly')) {
