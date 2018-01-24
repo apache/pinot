@@ -82,6 +82,14 @@ body {
 
   &__indent-block {
     margin-left: 20px;
+
+    &--custom {
+      display: block;
+    }
+  }
+
+  &__vertical-block {
+    margin-top: 4px;
   }
 
   &__list-label {
@@ -106,7 +114,7 @@ body {
     margin: 5px 0 5px 5px;
 
     &--amount {
-      width: 45px;
+      width: 70px;
     }
   }
 
@@ -162,6 +170,10 @@ body {
 
   &--small {
     margin-bottom: 2px;
+  }
+
+  &--taller {
+    margin-top: 3px;
   }
 }
 
@@ -250,7 +262,6 @@ body {
     display: inline-block;
     color: app-shade(black, 7);
     margin: 0;
-    width: 289px;
 
     .daterangepicker-input {
       background: none;
@@ -258,6 +269,7 @@ body {
       box-shadow: none;
       padding: 3px 5px;
       height: auto;
+      width: auto;
     }
   }
 
@@ -301,6 +313,10 @@ body {
 }
 
 .te-horizontal-cards {
+  &--hidden {
+    visibility: hidden;
+  }
+
   &__container {
     display: flex;
     justify-content: flex-end;
@@ -379,6 +395,10 @@ body {
     &--hide {
       visibility: hidden;
     }
+
+    &--stronger {
+      font-weight: bold;
+    }
   }
 
   &__card-number {
@@ -387,7 +407,8 @@ body {
   }
 
   &__card-units {
-    font-size: 20px;
+    font-size: 18px;
+    margin-left: -3px;
 
     &--small {
       font-size: 14px;
@@ -505,6 +526,12 @@ body {
     &--smaller {
       font-size: 12px;
       margin-left: -2px;
+    }
+
+    &--shadow {
+      position: absolute;
+      color: app-shade(black, 2);
+      margin-left: -18px;
     }
   }
 
@@ -648,7 +675,7 @@ body {
 
     &--solo {
       color: app-shade(black, 9);
-      width: 130px;
+      width: 117px;
     }
   }
 
@@ -661,6 +688,8 @@ body {
 
   &__value-solo {
     color: app-shade(black, 5);
+    word-wrap: break-word;
+    max-width: 340px;
   }
 
   &__title-group {

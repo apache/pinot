@@ -12,18 +12,6 @@ import { checkStatus } from 'thirdeye-frontend/helpers/utils';
 export default Controller.extend({
 
   /**
-   * Default text value for the anomaly graph legend
-   */
-  legendText: {
-    dotted: {
-      text: 'WoW'
-    },
-    solid: {
-      text: 'Observed'
-    }
-  },
-
-  /**
    * Array to define alerts table columns for selected config group
    */
   alertsTableColumns: [
@@ -61,8 +49,13 @@ export default Controller.extend({
   isNewConfigGroupSaved: false, // to trigger end-of-process cues
   isProcessingForm: false, // to trigger submit disable
   updatedRecipients: [], // placeholder for all email recipients
-  isGraphVisible: true, // we will hide it when transitioning to a new route to avoid errors
   isExiting: false, // exit detection
+
+  /**
+   * The config group that the current alert belongs to
+   * @type {Object}
+   */
+  originalConfigGroup: computed.reads('model.originalConfigGroup'),
 
   /**
    * Returns the list of existing config groups and updates it if a new one is added.
@@ -82,57 +75,6 @@ export default Controller.extend({
       }
     }
   ),
-
-  /**
-   * If a dimension has been selected, the metric data object will contain subdimensions.
-   * This method calls for dimension ranking by metric, filters for the selected dimension,
-   * and returns a sorted list of graph-ready dimension objects.
-   * @method getTopDimensions
-   * @return {Array} dimensionList: array of graphable dimensions
-   */
-  topDimensions: computed(
-    'metricDimensions',
-    'alertDimension',
-    'metricData',
-    function() {
-      const maxSize = 5;
-      const selectedDimension = this.get('alertDimension');
-      const scoredDimensions = this.get('metricDimensions');
-      const colors = ['orange', 'teal', 'purple', 'red', 'green', 'pink'];
-      const dimensionObj = this.get('metricData.subDimensionContributionMap') || {};
-      const filteredDimensions =  _.filter(scoredDimensions, (dimension) => {
-        return dimension.label.split('=')[0] === selectedDimension;
-      });
-      const topDimensions = filteredDimensions.sortBy('score').reverse().slice(0, maxSize);
-      const topDimensionLabels = [...new Set(topDimensions.map(key => key.label.split('=')[1]))];
-      let dimensionList = [];
-      let colorIndex = 0;
-
-      // Build the array of subdimension objects for the selected dimension
-      topDimensionLabels.forEach((subDimension) => {
-        if (dimensionObj[subDimension] && subDimension !== '') {
-          dimensionList.push({
-            name: subDimension,
-            metricName: subDimension,
-            color: colors[colorIndex],
-            baselineValues: dimensionObj[subDimension].baselineValues,
-            currentValues: dimensionObj[subDimension].currentValues
-          });
-          colorIndex++;
-        }
-      });
-
-      // Return sorted list of dimension objects
-      return dimensionList;
-    }
-  ),
-
-  /**
-   * We only want to display the custom legend if the alert has a value for dimension exploration
-   * @method showGraphLegend
-   * @return {Boolean}
-   */
-  showGraphLegend: Ember.computed.notEmpty('alertDimension'),
 
   /**
    * Returns the appropriate subtitle for selected config group monitored alerts
@@ -235,10 +177,16 @@ export default Controller.extend({
     'alertGroupNewRecipient',
     'isExiting',
     function() {
-      if (this.get('isExiting')) {
+      const {
+        isExiting,
+        alertGroupNewRecipient,
+        selectedConfigGroupRecipients
+      } = this.getProperties('isExiting', 'alertGroupNewRecipient', 'selectedConfigGroupRecipients');
+
+      if (isExiting) {
         return false;
       } else {
-        return Ember.isEmpty(this.get('selectedConfigGroupRecipients')) && Ember.isEmpty(this.get('alertGroupNewRecipient'));
+        return Ember.isEmpty(selectedConfigGroupRecipients) && Ember.isEmpty(alertGroupNewRecipient);
       }
     }
   ),
@@ -284,7 +232,7 @@ export default Controller.extend({
    */
   prepareFunctions(configGroup, newId = 0) {
     const newFunctionList = [];
-    const existingFunctionList = configGroup.emailConfig ? configGroup.emailConfig.functionIds : [];
+    const existingFunctionList = _.has(configGroup, 'emailConfig') ? configGroup.emailConfig.functionIds : [];
     let cnt = 0;
 
     // Build object for each function(alert) to display in results table
@@ -354,16 +302,11 @@ export default Controller.extend({
       isEditAlertSuccess: false,
       isNewConfigGroupSaved: false,
       isProcessingForm: false,
-      isGraphVisible: false,
       isActive: false,
       isLoadError: false,
       alertGroupNewRecipient: null,
       newConfigGroupName: null,
       updatedRecipients: [],
-      metricData: null,
-      alertDimension: null,
-      metricDimensions: null,
-      metricName: null,
       granularity: null,
       alertFilters: null,
       alertConfigGroups: null,
@@ -388,7 +331,7 @@ export default Controller.extend({
      * @return {undefined}
      */
     validateAlertName(name) {
-      const originalName = this.get('model.alertData.functionName');
+      const originalName = this.get('alertFunctionName');
       let isDuplicateName = false;
       if (name === originalName) { return; }
 
@@ -474,7 +417,7 @@ export default Controller.extend({
      */
     onSelectConfigGroup(selectedObj) {
       const emails = selectedObj.recipients || '';
-      const configGroupSwitched = selectedObj.name !== this.get('model.originalConfigGroup.name');
+      const configGroupSwitched = selectedObj.name !== this.get('originalConfigGroup.name');
 
       this.setProperties({
         selectedConfigGroup: selectedObj,
@@ -516,21 +459,47 @@ export default Controller.extend({
      * @returns {Promise}
      */
     onSubmit() {
-      const currentId = this.get('alertId');
-      const postFunctionBody = this.get('model.alertData');
-      const newGroupName = this.get('newConfigGroupName');
-      const newEmails = this.get('alertGroupNewRecipient');
-      const oldEmails = this.get('selectedConfigGroupRecipients');
+      const {
+        isActive,
+        alertId: currentId,
+        originalConfigGroup,
+        isEditedConfigGroup,
+        isNewConfigGroup,
+        alertFunctionName,
+        alertData: postFunctionBody,
+        newConfigGroupName: newGroupName,
+        alertGroupNewRecipient: newEmails,
+        selectedApplication,
+        selectedConfigGroupRecipients: oldEmails,
+        newConfigGroupObj,
+        selectedConfigGroup,
+        isDuplicateEmail
+      } = this.getProperties(
+        'isActive',
+        'alertId',
+        'originalConfigGroup',
+        'isEditedConfigGroup',
+        'isNewConfigGroup',
+        'alertFunctionName',
+        'alertData',
+        'newConfigGroupName',
+        'alertGroupNewRecipient',
+        'selectedApplication',
+        'selectedConfigGroupRecipients',
+        'newConfigGroupObj',
+        'selectedConfigGroup',
+        'isDuplicateEmail'
+      );
+
       const configUrl = `/thirdeye/entity?entityType=ALERT_CONFIG`;
       const alertUrl = `/thirdeye/entity?entityType=ANOMALY_FUNCTION`;
-      const originalConfigGroup = this.get('model.originalConfigGroup');
-      const newApplication = this.get('selectedApplication.application');
+      const newApplication = selectedApplication ? selectedApplication.application : '';
       const newEmailsArr = newEmails ? newEmails.replace(/ /g, '').split(',') : [];
       const existingEmailsArr = oldEmails ? oldEmails.replace(/ /g, '').split(',') : [];
       const newRecipientsArr = newEmailsArr.length ? existingEmailsArr.concat(newEmailsArr) : existingEmailsArr;
       const cleanRecipientsArr = newRecipientsArr.filter(e => String(e).trim()).join(',');
-      const postConfigBody = newGroupName ? this.get('newConfigGroupObj') : this.get('selectedConfigGroup');
-      const groupAlertIdArray = postConfigBody.emailConfig ? postConfigBody.emailConfig.functionIds.concat([currentId]) : [];
+      const postConfigBody = newGroupName ? newConfigGroupObj : selectedConfigGroup;
+      const groupAlertIdArray = postConfigBody && postConfigBody.emailConfig ? postConfigBody.emailConfig.functionIds.concat([currentId]) : [];
       const dedupedGroupAlertIdArray = groupAlertIdArray.length ? Array.from(new Set(groupAlertIdArray)) : [currentId];
       const emailError = !this.isEmailValid(newEmailsArr);
       let postProps = {};
@@ -542,11 +511,11 @@ export default Controller.extend({
       });
 
       // Exit quietly (showing warning) in the event of error
-      if (emailError || this.get('isDuplicateEmail')) { return; }
+      if (emailError || isDuplicateEmail) { return; }
 
       // Assign these fresh editable values to the Alert object currently being edited
-      Ember.set(postFunctionBody, 'functionName', this.get('alertFunctionName'));
-      Ember.set(postFunctionBody, 'isActive', this.get('isActive'));
+      Ember.set(postFunctionBody, 'functionName', alertFunctionName);
+      Ember.set(postFunctionBody, 'isActive', isActive);
 
       // Prepare the POST payload to save an edited Alert object
       postProps = {
@@ -556,19 +525,18 @@ export default Controller.extend({
       };
 
       // Step 1: Save any edits to the Alert entity in our DB
-      return fetch(alertUrl, postProps)
-        .then((res) => checkStatus(res, 'post'))
+      return fetch(alertUrl, postProps).then((res) => checkStatus(res, 'post'))
         .then((saveAlertResponse) => {
 
           // Step 2: If any edits were made to the Notification Group, prep a POST object to save Config entity
-          if (this.get('isEditedConfigGroup')) {
+          if (isEditedConfigGroup) {
 
             // Whether its a new Config object or existing, assign new user-supplied values to these props:
             Ember.set(postConfigBody, 'application', newApplication);
             Ember.set(postConfigBody, 'recipients', cleanRecipientsArr);
 
             // Make sure current Id is part of new config array
-            if (postConfigBody.emailConfig) {
+            if (postConfigBody && postConfigBody.emailConfig) {
               postConfigBody.emailConfig.functionIds = dedupedGroupAlertIdArray;
             } else {
               postConfigBody.emailConfig = { functionIds: dedupedGroupAlertIdArray };
@@ -588,7 +556,7 @@ export default Controller.extend({
                 });
 
                 // If the user switched config groups or created a new one, remove Alert Id from previous group
-                if (this.get('isNewConfigGroup')) {
+                if (isNewConfigGroup && originalConfigGroup) {
                   _.pull(originalConfigGroup.emailConfig.functionIds, currentId);
                   postProps.body = JSON.stringify(originalConfigGroup);
                   return fetch(configUrl, postProps)
@@ -600,7 +568,7 @@ export default Controller.extend({
                       if (Ember.isPresent(newGroupName)) {
                         this.setProperties({
                           isNewConfigGroupSaved: true,
-                          selectedConfigGroup: this.get('newConfigGroupObj')
+                          selectedConfigGroup: newConfigGroupObj
                         });
                       }
                       this.confirmEditSuccess();
