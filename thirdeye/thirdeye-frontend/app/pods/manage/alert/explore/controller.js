@@ -65,7 +65,7 @@ export default Controller.extend({
       sortColumnScoreUp: false,
       sortColumnChangeUp: false,
       sortColumnResolutionUp: false,
-      checkReplayInterval: 5000,
+      checkReplayInterval: 120000, // 2min
       selectedDimension: 'All Dimensions',
       selectedResolution: 'All Resolutions',
       dateRangeToRender: [30, 10, 5],
@@ -76,7 +76,7 @@ export default Controller.extend({
     // Start checking for replay to end if an ID was given
     if (this.get('isReplayPending')) {
       Ember.run.later(() => {
-        this.checkReplayStatus(this.get('replayId'));
+        this.set('isReplayPending', false);
       }, this.get('checkReplayInterval'));
     }
   },
@@ -381,7 +381,7 @@ export default Controller.extend({
    * Send a POST request to the report anomaly API (2-step process)
    * http://go/te-ss-alert-flow-api
    * @method reportAnomaly
-   * @param {String} id - The anomaly id
+   * @param {String} id - The alert id
    * @param {Object} data - The input values from 'report new anomaly' modal
    * @return {Promise}
    */

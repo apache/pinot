@@ -42,6 +42,7 @@ export default Controller.extend({
   isEmailError: false,
   isDuplicateEmail: false,
   showGraphLegend: false,
+  redirectToAlertPage: true,
   metricGranularityOptions: [],
   topDimensions: [],
   originalDimensions: [],
@@ -471,13 +472,15 @@ export default Controller.extend({
                 isMetricDataLoading: false,
                 topDimensions: orderedDimensions
               });
+            })
+            .catch(() => {
+              this.set('isMetricDataLoading', false);
             });
-        } else {
-          this.set('isMetricDataLoading', false);
         }
         // Metric has data. now sending new data to graph.
         this.setProperties({
           isMetricSelected: true,
+          isMetricDataLoading: false,
           showGraphLegend: Ember.isPresent(selectedDimension),
           selectedMetric: Object.assign(metricData, { color: 'blue' })
         });
@@ -554,14 +557,15 @@ export default Controller.extend({
   },
 
   /**
-   * Replay Flow Step 2 - Replay cloned function
-   * @method callReplayStart
-   * @param {Number} clonedId - id of the cloned function
-   * @param {Object} startTime - replay start time stamp
-   * @param {Object} endTime - replay end time stamp
-   * @return {Ember.RSVP.Promise}
+   * Generate the URL needed to trigger replay for new alert
+   * @method buildReplayUrl
+   * @param {Number} functionId - the newly created function's id
+   * @return {String}
    */
-  callReplayStart(functionId, startTime, endTime) {
+  buildReplayUrl(functionId) {
+    const replayDateFormat = "YYYY-MM-DDTHH:mm:ss.SSS[Z]";
+    const startTime = buildDateEod(1, 'month').format(replayDateFormat);
+    const endTime = buildDateEod(1, 'day').format(replayDateFormat);
     const granularity = this.get('graphConfig.granularity').toLowerCase();
     const speedUp = !(granularity.includes('hour') || granularity.includes('day'));
     const recipients = this.get('selectedConfigGroup.recipients');
@@ -569,44 +573,9 @@ export default Controller.extend({
     const selectedPattern = this.get('selectedPattern');
     const pattern = this.optionMap.pattern[selectedPattern];
 
-    const url = `/detection-job/${functionId}/notifyreplaytuning?start=${startTime}` +
+    return `/detection-job/${functionId}/notifyreplaytuning?start=${startTime}` +
       `&end=${endTime}&speedup=${speedUp}&userDefinedPattern=${pattern}&sensitivity=${sensitivity}` +
       `&removeAnomaliesInWindow=true&removeAnomaliesInWindow=true&to=${recipients}`;
-
-    return fetch(url, { method: 'post' })
-      .then((res) => checkStatus(res, 'post'))
-      .catch((error) => {
-        this.setProperties({
-          isReplayStatusError: true,
-          isReplayStatusPending: false,
-          bsAlertBannerType: 'danger',
-          replayStatusClass: 'te-form__banner--failure',
-          failureMessage: `The replay sequence has been interrupted. (${error})`
-        });
-      });
-  },
-
-  /**
-   * Sends a request to begin advanced replay for a metric. The replay will fetch new
-   * time-series data based on user-selected sensitivity settings.
-   * @method triggerReplay
-   * @param {Number} newFuncId - the id for the newly created function (alert)
-   * @return {Ember.RSVP.Promise}
-   */
-  triggerReplay(newFuncId) {
-    const replayDateFormat = "YYYY-MM-DDTHH:mm:ss.SSS[Z]";
-    const startTime = buildDateEod(1, 'month').format(replayDateFormat);
-    const endTime = buildDateEod(1, 'day').format(replayDateFormat);
-    const that = this;
-
-    // Set banner to 'pending' state
-    this.setProperties({
-      isReplayStarted: true,
-      isReplayStatusPending: true
-    });
-
-    // Begin triggering of replay sequence
-    return this.callReplayStart(newFuncId, startTime, endTime);
   },
 
   /**
@@ -703,10 +672,27 @@ export default Controller.extend({
     'alertGroupNewRecipient',
     'isAlertNameDuplicate',
     'isGroupNameDuplicate',
+    'isProcessingForm',
     function() {
       let isDisabled = false;
-      const requiredFields = this.get('requiredFields');
-      const groupRecipients = this.get('selectedConfigGroup.recipients');
+      const {
+        requiredFields,
+        isProcessingForm,
+        newConfigGroupName,
+        isAlertNameDuplicate,
+        isGroupNameDuplicate,
+        alertGroupNewRecipient,
+        selectedConfigGroup: groupRecipients,
+      } = this.getProperties(
+        'requiredFields',
+        'isProcessingForm',
+        'newConfigGroupName',
+        'isAlertNameDuplicate',
+        'isGroupNameDuplicate',
+        'alertGroupNewRecipient',
+        'selectedConfigGroup'
+      );
+      const hasRecipients = _.has(groupRecipients, 'recipients');
       // Any missing required field values?
       for (var field of requiredFields) {
         if (Ember.isBlank(this.get(field))) {
@@ -714,16 +700,19 @@ export default Controller.extend({
         }
       }
       // Enable submit if either of these field values are present
-      if (Ember.isBlank(this.get('selectedConfigGroup')) && Ember.isBlank(this.get('newConfigGroupName'))) {
+      if (Ember.isBlank(groupRecipients) && Ember.isBlank(newConfigGroupName)) {
         isDisabled = true;
       }
-
       // Duplicate alert Name or group name
-      if (this.get('isAlertNameDuplicate') || this.get('isGroupNameDuplicate')) {
+      if (isAlertNameDuplicate || isGroupNameDuplicate) {
         isDisabled = true;
       }
       // For alert group email recipients, require presence only if group recipients is empty
-      if (Ember.isBlank(this.get('alertGroupNewRecipient')) && !groupRecipients) {
+      if (Ember.isBlank(alertGroupNewRecipient) && !hasRecipients) {
+        isDisabled = true;
+      }
+      // Disable after submit clicked
+      if (isProcessingForm) {
         isDisabled = true;
       }
       return isDisabled;
@@ -1233,12 +1222,11 @@ export default Controller.extend({
 
       // This object contains the data for the new alert function, with default fillers
       const {
+        redirectToAlertPage,
         newAlertProperties: newFunctionObj,
         selectedGroupRecipients: oldEmails,
         alertGroupNewRecipient: newEmails
-      } = this.getProperties('newAlertProperties', 'selectedGroupRecipients', 'alertGroupNewRecipient');
-
-      const redirectToAlertPage = this.get('isNewUx');
+      } = this.getProperties('redirectToAlertPage', 'newAlertProperties', 'selectedGroupRecipients', 'alertGroupNewRecipient');
       const newEmailsArr = newEmails ? newEmails.replace(/ /g, '').split(',') : [];
       const existingEmailsArr = oldEmails ? oldEmails.replace(/ /g, '').split(',') : [];
       const newRecipientsArr = newEmailsArr.length ? existingEmailsArr.concat(newEmailsArr) : existingEmailsArr;
@@ -1284,44 +1272,10 @@ export default Controller.extend({
         finalConfigObj.emailConfig.functionIds.push(newFunctionId);
 
         // Finally, save our Alert Config Groupg
-        this.saveThirdEyeEntity(finalConfigObj, 'ALERT_CONFIG').then(alertResult => {
-          // Display success confirmations including new alert Id and recipients
-          this.setProperties({
-            selectedGroupRecipients: finalConfigObj.recipients.replace(/,+/g, ', '),
-            isCreateAlertSuccess: true,
-            finalFunctionId: newFunctionId
-          });
-          // Confirm group creation if not in group edit mode
-          if (!isEditGroupMode) {
-            this.set('isCreateGroupSuccess', true);
-          }
-          // Display function added to group confirmation
-          this.prepareFunctions(finalConfigObj, newFunctionId).then(functionData => {
-            this.set('selectedGroupFunctions', functionData);
-          });
-
-          // Now, disable form
-          this.setProperties({
-            isFormDisabled: true,
-            isMetricSelected: false,
-            isMetricDataInvalid: false
-          });
-          this.set('newFuncId', newFunctionId);
-          return this.triggerReplay(newFunctionId);
-        }).then((replayId) => {
-
-          if (!this.get('isReplayStatusError')) {
-            this.setProperties({
-              isReplayStatusSuccess: true,
-              isReplayStatusPending: false,
-              replayStatusClass: 'te-form__banner--success'
-            });
-          }
-
-          // Redirect to onboarding page to trigger wrapper
-          if (redirectToAlertPage) {
-            this.transitionToRoute('manage.alert', this.get('newFuncId'), { queryParams: { replayId }});
-          }
+        this.saveThirdEyeEntity(finalConfigObj, 'ALERT_CONFIG')
+          .then(alertResult => {
+            // Start the replay sequence and transition to Alert Page
+            this.send('triggerReplaySequence', newFunctionId);
         // If Alert Group edit/create fails, remove the orphaned anomaly Id
         }).catch((error) => {
           this.setAlertCreateErrorState(error);
