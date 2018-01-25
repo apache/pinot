@@ -18,14 +18,16 @@ package com.linkedin.pinot.core.data.readers;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
+
+import org.codehaus.jackson.JsonFactory;
+import org.codehaus.jackson.JsonParser;
+import org.codehaus.jackson.map.ObjectMapper;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
-import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.map.ObjectMapper;
 
 
 /**
@@ -35,12 +37,17 @@ public class JSONRecordReader implements RecordReader {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final Schema _schema;
-  private final JsonParser _parser;
-
+  private JsonParser _parser;
+  private File _dataFile;
   private Iterator<Map> _iterator;
 
   public JSONRecordReader(File dataFile, Schema schema) throws IOException {
     _schema = schema;
+    _dataFile = dataFile;
+    init(_dataFile);
+  }
+
+  private void init(File dataFile) throws IOException {
     _parser = new JsonFactory().createJsonParser(RecordReaderUtils.getFileReader(dataFile));
     try {
       _iterator = OBJECT_MAPPER.readValues(_parser, Map.class);
@@ -84,7 +91,7 @@ public class JSONRecordReader implements RecordReader {
 
   @Override
   public void rewind() throws IOException {
-    _iterator = OBJECT_MAPPER.readValues(_parser, Map.class);
+    init(_dataFile);
   }
 
   @Override

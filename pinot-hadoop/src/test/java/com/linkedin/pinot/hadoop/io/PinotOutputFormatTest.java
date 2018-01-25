@@ -31,7 +31,6 @@ import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -51,32 +50,34 @@ public class PinotOutputFormatTest {
     private Configuration conf;
     private PinotOutputFormat outputFormat;
     private File outputTempDir;
+    private String segmentTarPath;
 
-    @BeforeClass
-    public void setUp() throws IOException {
+    private void init(String indexType) throws IOException {
         conf = new Configuration();
         job = Job.getInstance(conf);
         fakeTaskAttemptContext = mock(TaskAttemptContext.class);
         outputFormat = new PinotOutputFormat();
-        outputTempDir = Files.createTempDirectory(PinotOutputFormatTest.class.getName() + "_io_output").toFile();
-        File workingTempDir = Files.createTempDirectory(PinotOutputFormatTest.class.getName() + "_io_working_dir").toFile();
+        outputTempDir = Files.createTempDirectory(PinotOutputFormatTest.class.getName() + indexType + "_io_output").toFile();
+        File workingTempDir = Files.createTempDirectory(PinotOutputFormatTest.class.getName() + indexType + "_io_working_dir").toFile();
         // output path
         Path outDir = new Path(outputTempDir.getAbsolutePath());
         PinotOutputFormat.setOutputPath(job, outDir);
         // file format
         PinotOutputFormat.setFileFormat(job, "json");
         PinotOutputFormat.setTableName(job, "emp");
-        PinotOutputFormat.setSegmentName(job, "segment_one");
+        PinotOutputFormat.setSegmentName(job, indexType + "segment_one");
         PinotOutputFormat.setTempSegmentDir(job, workingTempDir.getAbsolutePath());
 
         Schema schema = Schema.fromString(getSchema());
         PinotOutputFormat.setSchema(job, schema);
         PinotOutputFormat.setNumThreads(job, 10);
-        mockTaskAttemptContext();
+        mockTaskAttemptContext(indexType);
+        segmentTarPath = "_temporary/0/_temporary/attempt_foo_task_" + indexType + "_0123_r_000002_2/part-r-00002/segmentTar";
+
     }
 
-    private void mockTaskAttemptContext() {
-        TaskAttemptID fakeTaskId = new TaskAttemptID(new TaskID("foo_task", 123, TaskType.REDUCE, 2), 2);
+    private void mockTaskAttemptContext(String indexType) {
+        TaskAttemptID fakeTaskId = new TaskAttemptID(new TaskID("foo_task_" + indexType, 123, TaskType.REDUCE, 2), 2);
         when(fakeTaskAttemptContext.getTaskAttemptID())
                 .thenReturn(fakeTaskId);
         when(fakeTaskAttemptContext.getConfiguration()).thenReturn(job.getConfiguration());
@@ -85,60 +86,26 @@ public class PinotOutputFormatTest {
 
     @Test
     public void verifyStarIndex() throws Exception {
-        int days = 2000;
-        int sal = 20;
-        PinotOutputFormat.setEnableStarTreeIndex(job, true);
-        RecordWriter<Object, byte[]> writer = outputFormat.getRecordWriter(fakeTaskAttemptContext);
-        ObjectMapper mapper = new ObjectMapper();
-        Map<Integer, Emp> inputMap = new HashMap<>();
-        for (int i = 0; i < 100; i++) {
-            String name = "name " + i;
-            Emp e = new Emp(i, name, days + i, sal + i);
-            byte[] b = mapper.writeValueAsBytes(e);
-            writer.write(null, b);
-            inputMap.put(i, e);
-        }
-        writer.close(fakeTaskAttemptContext);
-
-        String segmentTarPath = "_temporary/0/_temporary/attempt_foo_task_0123_r_000002_2/part-r-00002/segmentTar";
-        File segmentTarOutput = new File(outputTempDir, segmentTarPath);
-        File untarOutput = Files.createTempDirectory(PinotOutputFormatTest.class.getName() + "_segmentUnTar").toFile();
-        for (File tarFile : segmentTarOutput.listFiles()) {
-            TarGzCompressionUtils.unTar(tarFile, untarOutput);
-        }
-
-        File outputDir = new File(untarOutput, PinotOutputFormat.getSegmentName(fakeTaskAttemptContext));
-        RecordReader recordReader = new PinotSegmentRecordReader(outputDir, Schema.fromString(getSchema()));
-        GenericRow row = new GenericRow();
-        Map<Integer, GenericRow> resultMap = new HashMap<>();
-        while (recordReader.hasNext()) {
-            row = recordReader.next(row);
-            resultMap.put((Integer) row.getValue("id"), row);
-            row.clear();
-        }
-
-        Assert.assertEquals(resultMap.size(), inputMap.size());
-        // more data validation.
+        runPinotOutputFormatTest(true, "star");
     }
 
     @Test
     public void verifyRawIndex() throws Exception {
-        int days = 2000;
-        int sal = 20;
-        PinotOutputFormat.setEnableStarTreeIndex(job, false);
-        RecordWriter<Object, byte[]> writer = outputFormat.getRecordWriter(fakeTaskAttemptContext);
-        ObjectMapper mapper = new ObjectMapper();
-        Map<Integer, Emp> inputMap = new HashMap<>();
-        for (int i = 0; i < 100; i++) {
-            String name = "name " + i;
-            Emp e = new Emp(i, name, days + i, sal + i);
-            byte[] b = mapper.writeValueAsBytes(e);
-            writer.write(null, b);
-            inputMap.put(i, e);
-        }
-        writer.close(fakeTaskAttemptContext);
+        runPinotOutputFormatTest(false, "raw");
+    }
 
-        String segmentTarPath = "_temporary/0/_temporary/attempt_foo_task_0123_r_000002_2/part-r-00002/segmentTar";
+    private void runPinotOutputFormatTest(boolean isStarTree, String indexType) throws Exception {
+        init(indexType);
+        if (isStarTree) {
+            PinotOutputFormat.setEnableStarTreeIndex(job, true);
+        } else {
+            PinotOutputFormat.setEnableStarTreeIndex(job, false);
+        }
+        Map<Integer, Emp> inputMap = addTestData();
+        validate(inputMap);
+    }
+
+    private void validate(Map<Integer, Emp> inputMap) throws Exception {
         File segmentTarOutput = new File(outputTempDir, segmentTarPath);
         File untarOutput = Files.createTempDirectory(PinotOutputFormatTest.class.getName() + "_segmentUnTar").toFile();
         for (File tarFile : segmentTarOutput.listFiles()) {
@@ -147,17 +114,31 @@ public class PinotOutputFormatTest {
 
         File outputDir = new File(untarOutput, PinotOutputFormat.getSegmentName(fakeTaskAttemptContext));
         RecordReader recordReader = new PinotSegmentRecordReader(outputDir, Schema.fromString(getSchema()));
-        GenericRow row = new GenericRow();
         Map<Integer, GenericRow> resultMap = new HashMap<>();
         while (recordReader.hasNext()) {
-            row = recordReader.next(row);
-            System.out.println(row);
+            GenericRow row = recordReader.next();
             resultMap.put((Integer) row.getValue("id"), row);
-            row.clear();
         }
 
         Assert.assertEquals(resultMap.size(), inputMap.size());
-        // more data validation.
+        Assert.assertEquals(resultMap.get(8).getValue("name"), inputMap.get(8).name);
+    }
+
+    private Map<Integer, Emp> addTestData() throws IOException, InterruptedException {
+        int days = 2000;
+        int sal = 20;
+        RecordWriter<Object, byte[]> writer = outputFormat.getRecordWriter(fakeTaskAttemptContext);
+        ObjectMapper mapper = new ObjectMapper();
+        Map<Integer, Emp> inputMap = new HashMap<>();
+        for (int i = 0; i < 10; i++) {
+            String name = "name " + i;
+            Emp e = new Emp(i, name, days + i, sal + i);
+            byte[] b = mapper.writeValueAsBytes(e);
+            writer.write(null, b);
+            inputMap.put(i, e);
+        }
+        writer.close(fakeTaskAttemptContext);
+        return inputMap;
     }
 
 
