@@ -465,9 +465,6 @@ AnomalyResultView.prototype = {
       }
     });
 
-
-    $(`#investigate-button-${index}`).click(investigateParams, this.dataEventHandler.bind(this));
-
     var rootCauseAnalysisParams = {
       metric : anomaly.metric,
       currentStart : anomaly.currentStart,
