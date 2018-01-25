@@ -45,7 +45,6 @@ export function humanizeChange(f) {
   return `${f > 0 ? '+' : ''}${(Math.round(f * 1000) / 10.0).toFixed(1)}%`;
 }
 
-
 /**
  * Helps with shorthand for repetitive date generation
  */
