@@ -46,9 +46,10 @@ public class PinotRecordWriter<K, V> extends RecordWriter<K, V> {
     private long MAX_FILE_SIZE = 64 * 1000000L;
     private final Path _workDir;
     private final String _baseDataDir;
+    private DataWriteSupport _dataWriteSupport;
 
 
-    public PinotRecordWriter(SegmentGeneratorConfig segmentConfig, TaskAttemptContext context, Path workDir) {
+    public PinotRecordWriter(SegmentGeneratorConfig segmentConfig, TaskAttemptContext context, Path workDir, DataWriteSupport dataWriteSupport) {
         _context = context;
         _segmentConfig = segmentConfig;
         _workDir = workDir;
@@ -59,6 +60,8 @@ public class PinotRecordWriter<K, V> extends RecordWriter<K, V> {
         try {
             _handler = new FileHandler(_baseDataDir, filename, extension, MAX_FILE_SIZE);
             _handler.open(true);
+            _dataWriteSupport = dataWriteSupport;
+            _dataWriteSupport.init(segmentConfig, context);
         } catch (Exception e) {
             throw new RuntimeException("Error initialize PinotRecordReader", e);
         }
@@ -66,11 +69,13 @@ public class PinotRecordWriter<K, V> extends RecordWriter<K, V> {
 
     @Override
     public void write(K key, V value) throws IOException, InterruptedException {
-        _handler.write((byte[]) value);
+        byte[] b = _dataWriteSupport.write(value);
+        _handler.write(b);
     }
 
     @Override
     public void close(TaskAttemptContext context) throws IOException, InterruptedException {
+        _dataWriteSupport.close(context);
         _handler.close();
         File dir = new File(_baseDataDir);
         _segmentConfig.setSegmentName(PinotOutputFormat.getSegmentName(context));

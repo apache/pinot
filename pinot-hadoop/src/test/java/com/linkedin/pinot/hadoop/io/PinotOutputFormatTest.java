@@ -29,7 +29,6 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -56,14 +55,12 @@ public class PinotOutputFormatTest {
         conf = new Configuration();
         job = Job.getInstance(conf);
         fakeTaskAttemptContext = mock(TaskAttemptContext.class);
-        outputFormat = new PinotOutputFormat();
+        outputFormat = new JsonPinotOutputFormat();
         outputTempDir = Files.createTempDirectory(PinotOutputFormatTest.class.getName() + indexType + "_io_output").toFile();
         File workingTempDir = Files.createTempDirectory(PinotOutputFormatTest.class.getName() + indexType + "_io_working_dir").toFile();
         // output path
         Path outDir = new Path(outputTempDir.getAbsolutePath());
         PinotOutputFormat.setOutputPath(job, outDir);
-        // file format
-        PinotOutputFormat.setFileFormat(job, "json");
         PinotOutputFormat.setTableName(job, "emp");
         PinotOutputFormat.setSegmentName(job, indexType + "segment_one");
         PinotOutputFormat.setTempSegmentDir(job, workingTempDir.getAbsolutePath());
@@ -127,14 +124,14 @@ public class PinotOutputFormatTest {
     private Map<Integer, Emp> addTestData() throws IOException, InterruptedException {
         int days = 2000;
         int sal = 20;
-        RecordWriter<Object, byte[]> writer = outputFormat.getRecordWriter(fakeTaskAttemptContext);
-        ObjectMapper mapper = new ObjectMapper();
+        RecordWriter<Object, Emp> writer = outputFormat.getRecordWriter(fakeTaskAttemptContext);
+       // ObjectMapper mapper = new ObjectMapper();
         Map<Integer, Emp> inputMap = new HashMap<>();
         for (int i = 0; i < 10; i++) {
             String name = "name " + i;
             Emp e = new Emp(i, name, days + i, sal + i);
-            byte[] b = mapper.writeValueAsBytes(e);
-            writer.write(null, b);
+            //byte[] b = mapper.writeValueAsBytes(e);
+            writer.write(null, e);
             inputMap.put(i, e);
         }
         writer.close(fakeTaskAttemptContext);
@@ -201,5 +198,4 @@ public class PinotOutputFormatTest {
                 "  \"schemaName\" : \"emp\"\n" +
                 "}";
     }
-
 }

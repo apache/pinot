@@ -23,6 +23,7 @@ import com.linkedin.pinot.startree.hll.HllConfig;
 import com.linkedin.pinot.startree.hll.HllConstants;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -78,6 +79,12 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
     // Parallelism while generating segments, default is 1.
     public static final String NUM_THREADS = "pinot.num.threads";
 
+    public static final String DATA_WRITE_SUPPORT_CLASS = "pinot.data.write.support.class";
+    /*
+    The max file size of the intermediate data file written by the RecordWriter
+     */
+    public static final String DATA_FILE_MAX_SIZE = "pinot.data.file.max.size";
+
 
     static {
         for (FileFormat f : FileFormat.values()) {
@@ -90,14 +97,15 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
     }
 
     public static void setFileFormat(Job job, String fileFormat) {
-        checkValidFileFormat(fileFormat);
         job.getConfiguration().set(PinotOutputFormat.FILE_FORMAT, fileFormat);
     }
 
     public static FileFormat getFileFormat(JobContext job) {
         String fileFormat = job.getConfiguration().get(PinotOutputFormat.FILE_FORMAT);
-        checkValidFileFormat(fileFormat);
-        return fileFormatMap.get(fileFormat);
+        if(fileFormat == null) {
+            throw new RuntimeException("Pinot input file format not set");
+        }
+        return getFileFormat(fileFormat.toLowerCase());
     }
 
     public static void setTempSegmentDir(Job job, String segmentDir) {
@@ -200,17 +208,53 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
         return context.getConfiguration().getInt(PinotOutputFormat.NUM_THREADS, 1);
     }
 
-    private static void checkValidFileFormat(String fileFormat) {
-        if (!fileFormatMap.containsKey(fileFormat)) {
+    public static void setDataWriteSupportClass(Job job, Class<? extends DataWriteSupport> writeSupportClass) {
+        job.getConfiguration().set(PinotOutputFormat.DATA_WRITE_SUPPORT_CLASS, writeSupportClass.getName());
+    }
+
+    public static Class<?> getDataWriteSupportClass(JobContext context) {
+        String className = context.getConfiguration().get(PinotOutputFormat.DATA_WRITE_SUPPORT_CLASS);
+        if(className == null) {
+            throw new RuntimeException("pinot data write support class not set");
+        }
+        try {
+            return context.getConfiguration().getClassByName(className);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static FileFormat getFileFormat(String fileFormat) {
+        if (fileFormat == null || !fileFormatMap.containsKey(fileFormat)) {
             throw new RuntimeException("Given file format " + fileFormat + " is not valid. supported file formats are " + fileFormatMap.keySet().toString());
         }
+        return fileFormatMap.get(fileFormat);
     }
 
     @Override
     public RecordWriter<K, V> getRecordWriter(TaskAttemptContext context) throws IOException, InterruptedException {
+        configure(context.getConfiguration());
+        final DataWriteSupport dataWriteSupport = getDataWriteSupport(context);
         initSegmentConfig(context);
         Path workDir = getDefaultWorkFile(context, "");
-        return new PinotRecordWriter<>(_segmentConfig, context, workDir);
+        return new PinotRecordWriter<>(_segmentConfig, context, workDir, dataWriteSupport);
+    }
+
+    /**
+     * The {@link #configure(Configuration)} method called before initialize the  {@link RecordWriter}
+     * Any implementation of {@link PinotOutputFormat} can use it to set additional configuration properties.
+     * @param conf
+     */
+    public void configure(Configuration conf) {
+
+    }
+
+    private DataWriteSupport getDataWriteSupport(TaskAttemptContext context) {
+        try {
+            return (DataWriteSupport)PinotOutputFormat.getDataWriteSupportClass(context).newInstance();
+        } catch (Exception e) {
+            throw new RuntimeException("Error initialize data write support class", e);
+        }
     }
 
     private void initSegmentConfig(JobContext context) throws IOException {
