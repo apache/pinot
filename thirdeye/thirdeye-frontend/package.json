@@ -59,8 +59,6 @@
     "ember-redux-shim": "^2.1.0",
     "ember-redux-thunk-shim": "^1.1.2",
     "ember-resolver": "^4.0.0",
-    "ember-scroll-to": "^0.6.4",
-    "ember-scroll-to-mk2": "^2.0.0",
     "ember-scroll-to-target": "^0.0.3",
     "ember-simple-auth": "^1.4.0",
     "ember-source": "~2.16.0",
