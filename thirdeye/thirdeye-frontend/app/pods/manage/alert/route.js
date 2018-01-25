@@ -3,7 +3,7 @@
  * @module manage/alert/route
  * @exports manage alert model
  */
-import Ember from 'ember';
+import RSVP from 'rsvp';
 import fetch from 'fetch';
 import Route from '@ember/routing/route';
 import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
@@ -43,7 +43,7 @@ export default Route.extend({
 
     // Fetch all the basic alert data needed in manage.alert subroutes
     // TODO: apply calls from go/te-ss-alert-flow-api (see below)
-    return Ember.RSVP.hash({
+    return RSVP.hash({
       id,
       replayId,
       destination: transition.targetName,

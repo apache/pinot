@@ -1,4 +1,4 @@
-import Ember from 'Ember';
+import Ember from 'ember';
 import _ from 'lodash';
 import moment from 'moment';
 
