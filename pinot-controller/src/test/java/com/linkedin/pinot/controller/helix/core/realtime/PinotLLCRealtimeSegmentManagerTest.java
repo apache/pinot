@@ -35,6 +35,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineSt
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
@@ -122,8 +123,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
       partitionSet.add(i);
     }
 
-    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, DUMMY_HOST,
-        null, true, 1000000);
+    TableConfig tableConfig = makeTableConfig(rtTableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, topic);
+    KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
+
+    segmentManager.setupHelixEntries(tableConfig, kafkaStreamMetadata, nPartitions, instances, null, true);
 
     Map<String, List<String>> assignmentMap = segmentManager._partitionAssignment.getListFields();
     Assert.assertEquals(assignmentMap.size(), nPartitions);
@@ -170,8 +173,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final String startOffset = KAFKA_OFFSET;
 
     IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, nReplicas);
-    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset,
-        DUMMY_HOST, idealState, !existingIS, 1000000);
+    TableConfig tableConfig = makeTableConfig(rtTableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, topic);
+    KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
+    segmentManager.setupHelixEntries(tableConfig, kafkaStreamMetadata, nPartitions, instances, idealState, !existingIS);
 
     final String actualRtTableName = segmentManager._realtimeTableName;
     final Map<String, List<String>> idealStateEntries = segmentManager._idealStateEntries;
@@ -232,18 +236,18 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<String> instances = getInstanceList(3);
     final String startOffset = KAFKA_OFFSET;
 
+    TableConfig tableConfig = makeTableConfig(rtTableName, 3, KAFKA_OFFSET, DUMMY_HOST, topic);
+    KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
     IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, 10);
     try {
-      segmentManager.setupHelixEntries(topic, rtTableName, 8, instances, 3, startOffset, DUMMY_HOST, idealState, false,
-          10000);
+      segmentManager.setupHelixEntries(tableConfig, kafkaStreamMetadata, 8, instances, idealState, false);
       Assert.fail("Did not get expected exception when setting up helix with existing segments in propertystore");
     } catch (RuntimeException e) {
       // Expected
     }
 
     try {
-      segmentManager.setupHelixEntries(topic, rtTableName, 8, instances, 3, startOffset, DUMMY_HOST, idealState, true,
-          10000);
+      segmentManager.setupHelixEntries(tableConfig, kafkaStreamMetadata, 8, instances, idealState, true);
       Assert.fail("Did not get expected exception when setting up helix with existing segments in propertystore");
     } catch (RuntimeException e) {
       // Expected
@@ -266,8 +270,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final String startOffset = KAFKA_OFFSET;
 
     IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, nReplicas);
-    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, DUMMY_HOST, idealState,
-        !existingIS, 10000);
+    TableConfig tableConfig = makeTableConfig(rtTableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, topic);
+    KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
+    segmentManager.setupHelixEntries(tableConfig, kafkaStreamMetadata, nPartitions, instances, idealState,
+        !existingIS);
     // Now commit the first segment of partition 6.
     final int committingPartition = 6;
     final long nextOffset = 3425666L;
@@ -310,8 +316,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final String startOffset = KAFKA_OFFSET;
 
     IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, nReplicas);
-    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, DUMMY_HOST, idealState,
-        !existingIS, 10000);
+    TableConfig tableConfig = makeTableConfig(rtTableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, topic);
+    KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
+    segmentManager.setupHelixEntries(tableConfig, kafkaStreamMetadata, nPartitions, instances, idealState,
+        !existingIS);
     // Now commit the first segment of partition 6.
     final int committingPartition = 6;
     final long nextOffset = 3425666L;
@@ -379,17 +387,42 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Assert.assertEquals(oldsegStateMap.get(s3), PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
   }
 
+  private KafkaStreamMetadata makeKafkaStreamMetadata(String topicName, String autoOffsetReset, String bootstrapHosts) {
+    KafkaStreamMetadata kafkaStreamMetadata = mock(KafkaStreamMetadata.class);
+    Map<String, String> consumerPropertiesMap = new HashMap<>();
+    consumerPropertiesMap.put(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET, autoOffsetReset);
+    consumerPropertiesMap.put(CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE, "simple");
+    consumerPropertiesMap.put(CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST, bootstrapHosts);
+    when(kafkaStreamMetadata.getKafkaConsumerProperties()).thenReturn(consumerPropertiesMap);
+    when(kafkaStreamMetadata.getKafkaTopicName()).thenReturn(topicName);
+    when(kafkaStreamMetadata.getBootstrapHosts()).thenReturn(bootstrapHosts);
+    when(kafkaStreamMetadata.getConsumerFactoryName()).thenReturn(SimpleConsumerFactory.class.getName());
+    return kafkaStreamMetadata;
+  }
+
   // Make a tableconfig that returns the topic name and nReplicas per partition as we need it.
-  private TableConfig makeTableConfig(int nReplicas, String topic) {
+  private TableConfig makeTableConfig(String tableName, int nReplicas, String autoOffsetReset, String bootstrapHosts, String topicName) {
     TableConfig mockTableConfig = mock(TableConfig.class);
+    when(mockTableConfig.getTableName()).thenReturn(tableName);
     SegmentsValidationAndRetentionConfig mockValidationConfig = mock(SegmentsValidationAndRetentionConfig.class);
     when(mockValidationConfig.getReplicasPerPartition()).thenReturn(Integer.toString(nReplicas));
+    when(mockValidationConfig.getReplicasPerPartitionNumber()).thenReturn(nReplicas);
     when(mockTableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
     Map<String, String> streamConfigMap = new HashMap<>(1);
-    String consumerTypesCsv =streamConfigMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
+    /*
+    streamConfigMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
             CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), "simple");
     streamConfigMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-        CommonConstants.Helix.DataSource.Realtime.Kafka.TOPIC_NAME), topic);
+        CommonConstants.Helix.DataSource.Realtime.Kafka.TOPIC_NAME), topicName);
+        */
+
+    streamConfigMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX, CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), "simple");
+    streamConfigMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX, CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX,
+        CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET), autoOffsetReset);
+
+    final String bootstrapHostConfigKey = CommonConstants.Helix.DataSource.STREAM_PREFIX + "." + CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST;
+    streamConfigMap.put(bootstrapHostConfigKey, bootstrapHosts);
+
     IndexingConfig mockIndexConfig = mock(IndexingConfig.class);
     when(mockIndexConfig.getStreamConfigs()).thenReturn(streamConfigMap);
     when(mockTableConfig.getIndexingConfig()).thenReturn(mockIndexConfig);
@@ -431,41 +464,41 @@ public class PinotLLCRealtimeSegmentManagerTest {
       partitionSet.add(i);
     }
 
+    TableConfig tableConfig = makeTableConfig(rtTableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, topic);
+    KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
     // Setup initial entries
-    segmentManager.setupHelixEntries(topic, rtTableName, nKafkaPartitions, instances, nReplicas, startOffset, DUMMY_HOST,
-        null, true, 1000);
+    segmentManager.setupHelixEntries(tableConfig, kafkaStreamMetadata, nKafkaPartitions, instances, null, true);
 
     ZNRecord partitionAssignment = segmentManager._partitionAssignment;
     segmentManager._currentKafkaPartitionCount = nKafkaPartitions;
     segmentManager._currentInstanceList = instances;
 
     // Call to update the partition list should do nothing.
-    TableConfig tableConfig = makeTableConfig(nReplicas, topic);
-    segmentManager.updateKafkaPartitionsIfNecessary(rtTableName, tableConfig);
+    segmentManager.updateKafkaPartitionsIfNecessary(tableConfig);
     Assert.assertTrue(segmentManager._partitionAssignment == partitionAssignment);
 
     // Change the number of kafka partitions to 9, and we should generate a new partition assignment
     nKafkaPartitions = 9;
     segmentManager._currentKafkaPartitionCount = nKafkaPartitions;
-    segmentManager.updateKafkaPartitionsIfNecessary(rtTableName, tableConfig);
+    segmentManager.updateKafkaPartitionsIfNecessary(tableConfig);
     partitionAssignment = validatePartitionAssignment(segmentManager, nKafkaPartitions, nReplicas);
 
     // Now reduce the number of instances and, we should not be updating anything.
     segmentManager._currentInstanceList = getInstanceList(nInstances-1);
-    segmentManager.updateKafkaPartitionsIfNecessary(rtTableName, tableConfig);
+    segmentManager.updateKafkaPartitionsIfNecessary(tableConfig);
     Assert.assertTrue(partitionAssignment == segmentManager._partitionAssignment);
 
     // Change the number of servers to 1 more, and we should update it again.
     nInstances++;
     segmentManager._currentInstanceList = getInstanceList(nInstances);
-    segmentManager.updateKafkaPartitionsIfNecessary(rtTableName, tableConfig);
+    segmentManager.updateKafkaPartitionsIfNecessary(tableConfig);
     Assert.assertTrue(partitionAssignment != segmentManager._partitionAssignment);
     partitionAssignment = validatePartitionAssignment(segmentManager, nKafkaPartitions, nReplicas);
 
     // Change the replica count to one more, and we should update the assignment
     nReplicas++;
-    tableConfig = makeTableConfig(nReplicas, topic);
-    segmentManager.updateKafkaPartitionsIfNecessary(rtTableName, tableConfig);
+    tableConfig = makeTableConfig(rtTableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, topic);
+    segmentManager.updateKafkaPartitionsIfNecessary(tableConfig);
     Assert.assertTrue(partitionAssignment != segmentManager._partitionAssignment);
     partitionAssignment = validatePartitionAssignment(segmentManager, nKafkaPartitions, nReplicas);
 
@@ -474,7 +507,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String server1 = segmentManager._currentInstanceList.get(0);
     segmentManager._currentInstanceList.set(0, server1 + "_new");
     Assert.assertEquals(nInstances, segmentManager._currentInstanceList.size());
-    segmentManager.updateKafkaPartitionsIfNecessary(rtTableName, tableConfig);
+    segmentManager.updateKafkaPartitionsIfNecessary(tableConfig);
     Assert.assertTrue(partitionAssignment != segmentManager._partitionAssignment);
     partitionAssignment = validatePartitionAssignment(segmentManager, nKafkaPartitions, nReplicas);
   }
@@ -505,8 +538,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName,
         nReplicas);
-    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, DUMMY_HOST,
-        idealState, false, 10000);
+    // For the setupHelix method, the kafka offset config specified here cannot be "smallest" or "largest", otherwise
+    // the kafka consumer wrapper tries to connect to Kafka and fetch patitions. We set it to "testDummy" value here.
+    TableConfig tableConfig = makeTableConfig(rtTableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, topic);
+    KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
+
+    segmentManager.setupHelixEntries(tableConfig, kafkaStreamMetadata, nPartitions, instances, idealState, false);
     // Add another segment for each partition
     long now = System.currentTimeMillis();
     List<String> existingSegments = new ArrayList<>(segmentManager._idealStateEntries.keySet());
@@ -545,16 +582,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
       }
     }
 
-    Map<String, String> streamPropMap = new HashMap<>(1);
-    streamPropMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-        CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), "simple");
-    streamPropMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-        CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX,
-        CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET), tableConfigStartOffset);
-    TableConfig tableConfig = mock(TableConfig.class);
-    IndexingConfig indexingConfig = mock(IndexingConfig.class);
-    when(indexingConfig.getStreamConfigs()).thenReturn(streamPropMap);
-    when(tableConfig.getIndexingConfig()).thenReturn(indexingConfig);
+    // Now we make another tableconfig that has the correct offset property ("smallest" or "largest")
+    // which works correctly with the createConsumingSegment method.
+    TableConfig tableConfig2 = makeTableConfig(rtTableName, nReplicas, tableConfigStartOffset, DUMMY_HOST, topic);
+
     Set<Integer> nonConsumingPartitions = new HashSet<>(1);
     nonConsumingPartitions.add(partitionToBeFixed);
     nonConsumingPartitions.add(partitionWithHigherOffset);
@@ -564,7 +595,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     existingSegments = new ArrayList<>(segmentManager._idealStateEntries.keySet());
     segmentManager._paths.clear();
     segmentManager._records.clear();
-    segmentManager.createConsumingSegment(rtTableName, nonConsumingPartitions, existingSegments, tableConfig);
+    segmentManager.createConsumingSegment(rtTableName, nonConsumingPartitions, existingSegments, tableConfig2);
     Assert.assertEquals(segmentManager._paths.size(), 3);
     Assert.assertEquals(segmentManager._records.size(), 3);
     Assert.assertEquals(segmentManager._oldSegmentNameStr.size(), 3);
@@ -697,8 +728,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
       final String startOffset = KAFKA_OFFSET;
 
       FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(false, null);
-      segmentManager.setupHelixEntries(topic, realtimeTableName, nPartitions, instances, nReplicas, startOffset,
-          DUMMY_HOST, idealState, false, 10000);
+      TableConfig tableConfig = makeTableConfig(realtimeTableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, topic);
+      KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
+      segmentManager.setupHelixEntries(tableConfig, kafkaStreamMetadata, nPartitions, instances, idealState, false);
       ZNRecord partitionAssignment = segmentManager.getKafkaPartitionAssignment(realtimeTableName);
 
       for (int p = 0; p < nPartitions; p++) {
@@ -793,8 +825,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<String> instances = getInstanceList(nInstances);
 
     IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, nReplicas);
-    segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, KAFKA_OFFSET, DUMMY_HOST, idealState,
-        !existingIS, 10000);
+    TableConfig tableConfig = makeTableConfig(rtTableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, topic);
+    KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
+    segmentManager.setupHelixEntries(tableConfig, kafkaStreamMetadata, nPartitions, instances, idealState,
+        !existingIS);
   }
 
   static class FakePinotLLCRealtimeSegmentManagerII extends FakePinotLLCRealtimeSegmentManager {
@@ -932,13 +966,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected void setupInitialSegments(String realtimeTableName, ZNRecord partitionAssignment, String topicName, String startOffset, String bootstrapHostList,
-        IdealState idealState, boolean create, int nReplicas, int flushSize) {
-      _realtimeTableName = realtimeTableName;
+    protected void setupInitialSegments(TableConfig tableConfig, KafkaStreamMetadata kafkaStreamMetadata, ZNRecord partitionAssignment,
+        IdealState idealState, boolean create, int flushSize) {
+      _realtimeTableName = tableConfig.getTableName();
       _partitionAssignment = partitionAssignment;
-      _startOffset = startOffset;
+      _startOffset = kafkaStreamMetadata.getKafkaConsumerProperties().get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
       if (_setupInitialSegments) {
-        super.setupInitialSegments(realtimeTableName, partitionAssignment, topicName, startOffset, bootstrapHostList, idealState, create, nReplicas, flushSize);
+        super.setupInitialSegments(tableConfig, kafkaStreamMetadata, partitionAssignment, idealState, create, flushSize);
       }
     }
 
