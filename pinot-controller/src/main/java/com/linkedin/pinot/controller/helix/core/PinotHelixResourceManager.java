@@ -82,6 +82,7 @@ import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey;
@@ -1406,7 +1407,19 @@ public class PinotHelixResourceManager {
       return new PinotResourceManagerResponse("Error: Table " + tableName + " not found.", false);
     }
     _helixAdmin.enableResource(_helixClusterName, tableName, status);
-    return (status) ? new PinotResourceManagerResponse("Table " + tableName + " successfully enabled.", true)
+
+    // If enabling a resource, also reset segments in error state for that resource
+    boolean resetSuccessful = false;
+    if (status) {
+      try {
+        _helixAdmin.resetResource(_helixClusterName, Collections.singletonList(tableName));
+        resetSuccessful = true;
+      } catch (HelixException e) {
+        LOGGER.warn("Caught exception while resetting resource {}, ignoring.", e, tableName);
+      }
+    }
+
+    return (status) ? new PinotResourceManagerResponse("Table " + tableName + " successfully enabled. (reset success = " + resetSuccessful + ")", true)
         : new PinotResourceManagerResponse("Table " + tableName + " successfully disabled.", true);
   }
 
