@@ -1,6 +1,7 @@
 import Helper from '@ember/component/helper';
 import { htmlSafe } from '@ember/string';
-import { filterPrefix, toBaselineUrn, toCurrentUrn, toMetricLabel, toEventLabel, humanizeFloat, humanizeChange, toColorDirection, isInverse } from 'thirdeye-frontend/helpers/utils';
+import { filterPrefix, toBaselineUrn, toCurrentUrn, toMetricLabel, toEventLabel, toColorDirection, isInverse } from 'thirdeye-frontend/helpers/rca-utils';
+import { humanizeChange, humanizeFloat } from 'thirdeye-frontend/helpers/utils';
 import moment from 'moment';
 import d3 from 'd3';
 
@@ -128,7 +129,7 @@ export default Helper.extend({
                 </span>
               </div>
               <div class="te-tooltip__item--indent te-tooltip__item--small">
-                <span>Current/Baseline: </span> 
+                <span>Current/Baseline: </span>
                 <span class="te-tooltip__value">${values[urn].current} / ${values[urn].baseline}</span>
               </div>
             `;

@@ -1,8 +1,5 @@
 import Ember from 'ember';
 import moment from 'moment';
-import fetch from 'fetch';
-import { toFilters, toFilterMap, filterPrefix, toCurrentUrn, toBaselineUrn, appendFilters } from 'thirdeye-frontend/helpers/utils';
-import _ from 'lodash'
 
 /**
  * Date format the date picker component expects

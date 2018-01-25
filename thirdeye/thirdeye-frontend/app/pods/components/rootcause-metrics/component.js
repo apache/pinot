@@ -1,5 +1,6 @@
 import Ember from 'ember';
-import { toCurrentUrn, toBaselineUrn, toOffsetUrn, hasPrefix, filterPrefix, toMetricLabel, makeSortable, humanizeChange, isInverse, toColorDirection } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, toOffsetUrn, hasPrefix, filterPrefix, toMetricLabel, makeSortable, isInverse, toColorDirection } from 'thirdeye-frontend/helpers/rca-utils';
+import { humanizeChange } from 'thirdeye-frontend/helpers/utils';
 
 const ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC = 'metric';
 const ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET = 'dataset';

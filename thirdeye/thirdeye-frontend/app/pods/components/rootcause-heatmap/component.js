@@ -1,6 +1,7 @@
 import Ember from 'ember';
 import { getProperties, computed } from '@ember/object';
-import { toCurrentUrn, toBaselineUrn, filterPrefix, toMetricLabel, appendFilters, humanizeChange, isInverse, isAdditive } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, appendFilters, isInverse, isAdditive } from 'thirdeye-frontend/helpers/rca-utils';
+import { humanizeChange } from 'thirdeye-frontend/helpers/utils';
 import _ from 'lodash';
 
 const ROOTCAUSE_ROLLUP_MODE_CHANGE = 'change';
