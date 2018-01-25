@@ -48,7 +48,6 @@ import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.SchemaUtils;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.TenantRole;
-import com.linkedin.pinot.common.utils.ZkUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
@@ -162,7 +161,7 @@ public class PinotHelixResourceManager {
     _helixZkManager = HelixSetupUtils.setup(_helixClusterName, _helixZkURL, _instanceId, _isUpdateStateModel);
     Preconditions.checkNotNull(_helixZkManager);
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
-    _propertyStore = ZkUtils.getZkPropertyStore(_helixZkManager, _helixClusterName);
+    _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
     _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_localDiskDir, _helixAdmin, _helixClusterName, _propertyStore);
@@ -1482,23 +1481,22 @@ public class PinotHelixResourceManager {
     return res;
   }
 
-  public ZNRecord getOfflineSegmentMetadataZnRecord(String offlineTableName, String segmentName) {
-    return ZKMetadataProvider.getOfflineSegmentMetadataZnRecord(_propertyStore, offlineTableName, segmentName);
+  public ZNRecord getSegmentMetadataZnRecord(String tableNameWithType, String segmentName) {
+    return ZKMetadataProvider.getZnRecord(_propertyStore,
+        ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName));
+  }
+
+  public boolean updateZkMetadata(@Nonnull OfflineSegmentZKMetadata segmentMetadata, int expectedVersion) {
+    return ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, segmentMetadata, expectedVersion);
+  }
+
+  public boolean updateZkMetadata(@Nonnull OfflineSegmentZKMetadata segmentMetadata) {
+    return ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, segmentMetadata);
   }
 
   @Nonnull
-  public boolean updateZkMetadataAtomically(@Nonnull OfflineSegmentZKMetadata segmentMetadata, int version) {
-    return ZKMetadataProvider.setOfflineSegmentZKMetadataOnlyIfCorrectVersion(_propertyStore, segmentMetadata, version);
-  }
-
-  @Nonnull
-  public void updateZkMetadata(@Nonnull OfflineSegmentZKMetadata segmentMetadata) {
-    ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, segmentMetadata);
-  }
-
-  @Nonnull
-  public PinotResourceManagerResponse refreshSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull OfflineSegmentZKMetadata offlineSegmentZKMetadata,
-      @Nonnull String downloadUrl) {
+  public PinotResourceManagerResponse refreshSegment(@Nonnull SegmentMetadata segmentMetadata,
+      @Nonnull OfflineSegmentZKMetadata offlineSegmentZKMetadata, @Nonnull String downloadUrl) {
     PinotResourceManagerResponse res = new PinotResourceManagerResponse();
 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
@@ -1616,7 +1614,6 @@ public class PinotHelixResourceManager {
    * it will not get the message.
    *
    * @param segmentZKMetadata is the metadata of the newly arrived segment.
-   * @return true if message has been sent to at least one instance of the server hosting the segment.
    */
   private void sendSegmentRefreshMessage(OfflineSegmentZKMetadata segmentZKMetadata) {
     final String segmentName = segmentZKMetadata.getSegmentName();

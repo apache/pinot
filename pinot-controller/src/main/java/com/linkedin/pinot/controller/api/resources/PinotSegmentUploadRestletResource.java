@@ -423,7 +423,7 @@ public class PinotSegmentUploadRestletResource {
     }
 
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
-    ZNRecord znRecord = _pinotHelixResourceManager.getOfflineSegmentMetadataZnRecord(offlineTableName, segmentName);
+    ZNRecord znRecord = _pinotHelixResourceManager.getSegmentMetadataZnRecord(offlineTableName, segmentName);
 
     // Brand new segment, not refresh, directly add the segment
     if (znRecord == null) {
@@ -472,7 +472,7 @@ public class PinotSegmentUploadRestletResource {
 
       // Lock the segment by setting the upload start time in ZK
       existingSegmentZKMetadata.setSegmentUploadStartTime(System.currentTimeMillis());
-      if (!_pinotHelixResourceManager.updateZkMetadataAtomically(existingSegmentZKMetadata, znRecord.getVersion())) {
+      if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata, znRecord.getVersion())) {
         throw new ControllerApplicationException(LOGGER, "Failed to lock the segment, retry later",
             Response.Status.CONFLICT);
       }
