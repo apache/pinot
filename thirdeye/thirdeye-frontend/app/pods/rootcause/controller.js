@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toOffsetUrn, toColor, checkStatus, toFilters, appendFilters, dateFormatFull } from 'thirdeye-frontend/helpers/utils';
+import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toOffsetUrn, toColor, toFilters, appendFilters, dateFormatFull } from 'thirdeye-frontend/helpers/rca-utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
 import _ from 'lodash';

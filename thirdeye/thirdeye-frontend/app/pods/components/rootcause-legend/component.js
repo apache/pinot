@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toCurrentUrn, toBaselineUrn, filterPrefix, hasPrefix, toFilters, toEntities, toMetricLabel, toEventLabel } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, hasPrefix, toMetricLabel, toEventLabel } from 'thirdeye-frontend/helpers/rca-utils';
 
 export default Ember.Component.extend({
   entities: null, // {}

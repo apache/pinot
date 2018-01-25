@@ -1,5 +1,6 @@
 import Ember from 'ember';
-import { checkStatus, filterObject, filterPrefix, toBaselineRange, toFilters, toColor } from 'thirdeye-frontend/helpers/utils';
+import { filterObject, filterPrefix, toBaselineRange, toColor } from 'thirdeye-frontend/helpers/rca-utils';
+import { checkStatus } from 'thirdeye-frontend/helpers/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 

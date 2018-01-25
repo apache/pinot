@@ -1,7 +1,8 @@
 import Ember from 'ember';
 import fetch from 'fetch';
-import { filterPrefix, checkStatus, toFilters, stripTail, toFilterMap, appendFilters, fromFilterMap, toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/helpers/utils';
-import _ from 'lodash'
+import { filterPrefix, toFilters, stripTail, toFilterMap, appendFilters, fromFilterMap, toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/helpers/rca-utils';
+import { checkStatus } from 'thirdeye-frontend/helpers/utils';
+import _ from 'lodash';
 
 export default Ember.Component.extend({
   selectedUrn: null,
