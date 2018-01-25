@@ -1274,22 +1274,6 @@ export default Controller.extend({
         // Finally, save our Alert Config Groupg
         this.saveThirdEyeEntity(finalConfigObj, 'ALERT_CONFIG')
           .then(alertResult => {
-            // Display success confirmations including new alert Id and recipients
-            this.setProperties({
-              selectedGroupRecipients: finalConfigObj.recipients.replace(/,+/g, ', '),
-              finalFunctionId: newFunctionId
-            });
-            // Display function added to group confirmation
-            this.prepareFunctions(finalConfigObj, newFunctionId).then(functionData => {
-              this.set('selectedGroupFunctions', functionData);
-            });
-            // Now, disable form
-            this.setProperties({
-              newFuncId: newFunctionId,
-              isFormDisabled: true,
-              isMetricSelected: false,
-              isMetricDataInvalid: false
-            });
             // Start the replay sequence and transition to Alert Page
             this.send('triggerReplaySequence', newFunctionId);
         // If Alert Group edit/create fails, remove the orphaned anomaly Id
