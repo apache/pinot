@@ -988,10 +988,12 @@ public class AnomaliesResource {
     anomalyDetails.setAnomalyRegionEnd(timeSeriesDateFormatter.print(newAnomalyRegionEnd));
     anomalyDetails.setCurrent(ThirdEyeUtils.getRoundedValue(mergedAnomaly.getAvgCurrentVal()));
     anomalyDetails.setBaseline(ThirdEyeUtils.getRoundedValue(mergedAnomaly.getAvgBaselineVal()));
+    anomalyDetails.setAnomalyResultSource(mergedAnomaly.getAnomalyResultSource().toString());
     anomalyDetails.setAnomalyFunctionId(anomalyFunction.getId());
     anomalyDetails.setAnomalyFunctionName(anomalyFunction.getFunctionName());
     anomalyDetails.setAnomalyFunctionType(anomalyFunction.getType());
     anomalyDetails.setAnomalyFunctionProps(anomalyFunction.getProperties());
+
     // Combine dimension map and filter set to construct a new filter set for the time series query of this anomaly
     Multimap<String, String> newFilterSet = generateFilterSetForTimeSeriesQuery(mergedAnomaly);
     try {
