@@ -32,6 +32,14 @@
     }}
   {{/if}}
 
+  {{scroll-to
+    label="click to scroll down"
+    target='#rootcause-tabs'
+    tagName='a'
+    classNames="rca-scroll-icon"
+    duration=1000
+  }}
+
   <div class="row card-container card-container--box-shadow">
     <div class="card-container__header card-container__header--no-border card-container__header--flush-bottom">
       <span class="card-container__title">Root cause Analysis</span>
@@ -138,7 +146,7 @@
       </div>
 
       {{#if context.urns.size}}
-        <div class="card-container__header">
+        <div id="rootcause-tabs" class="card-container__header">
           <div class="card-container__subnav">
             <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "metrics") "thirdeye-link--active "}}" {{action (mut activeTab)
               "metrics"}}>

@@ -2753,6 +2753,13 @@ ember-fetch@^2.1.0, "ember-fetch@^2.1.0 || ^3.0.0":
     node-fetch "^2.0.0-alpha.3"
     whatwg-fetch "^2.0.3"
 
+ember-get-config@^0.2.4:
+  version "0.2.4"
+  resolved "https://registry.yarnpkg.com/ember-get-config/-/ember-get-config-0.2.4.tgz#118492a2a03d73e46004ed777928942021fe1ecd"
+  dependencies:
+    broccoli-file-creator "^1.1.1"
+    ember-cli-babel "^6.3.0"
+
 ember-get-config@0.2.1:
   version "0.2.1"
   resolved "https://registry.yarnpkg.com/ember-get-config/-/ember-get-config-0.2.1.tgz#a1325cceefcb4534c78fc6ccb2be87a3feda6817"
@@ -2962,6 +2969,28 @@ ember-runtime-enumerable-includes-polyfill@^2.0.0:
   dependencies:
     ember-cli-babel "^6.0.0"
     ember-cli-version-checker "^1.1.6"
+
+ember-scroll-to:
+  version "0.6.4"
+  resolved "https://registry.yarnpkg.com/ember-scroll-to/-/ember-scroll-to-0.6.4.tgz#aabf0e683db1d9eaf2d1b09e33a2e6691fcf77f4"
+  dependencies:
+    ember-cli-babel "^5.1.6"
+    ember-cli-htmlbars "^1.0.3"
+
+ember-scroll-to-mk2:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/ember-scroll-to-mk2/-/ember-scroll-to-mk2-2.0.0.tgz#c0a90696683f03d3d18badd791d994176ef333dc"
+  dependencies:
+    ember-cli-babel "^6.6.0"
+    ember-cli-htmlbars "^2.0.1"
+    ember-get-config "^0.2.4"
+
+ember-scroll-to-target:
+  version "0.0.3"
+  resolved "https://registry.yarnpkg.com/ember-scroll-to-target/-/ember-scroll-to-target-0.0.3.tgz#3341029a5b67fa6f9d2a39db64796df0787f5655"
+  dependencies:
+    ember-cli-babel "^5.1.7"
+    ember-cli-htmlbars "^1.1.1"
 
 ember-simple-auth@^1.4.0:
   version "1.4.0"

@@ -134,3 +134,17 @@
 .rca-body {
   min-height: 1000px;
 }
+
+.rca-scroll-icon {
+  position: fixed;
+  right: 32px;
+  height: 80px;
+  width: 80px;
+  border-radius: 80px;
+  background: grey;
+  color: white;
+  padding-left: 24px;
+  padding-top: 12px;
+  text-decoration: none;
+  z-index: 10;
+}
