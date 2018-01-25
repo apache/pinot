@@ -391,11 +391,7 @@ export default Ember.Controller.extend({
           })
         }
       })
-      .catch((error) => {
-        const { routeErrors } = this.getProperties('routeErrors');
-        routeErrors.add('Could not check investigation state automatically');
-        this.setProperties({ routeErrors: new Set(routeErrors) });
-      });
+      .catch(error => undefined);
   },
 
   /**
