@@ -14,6 +14,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
@@ -56,9 +57,13 @@ public class DetectionOnBoardJobRunner implements Runnable {
     this.taskTimeOutSize = taskTimeOutSize;
     this.taskTimeOutUnit = taskTimeOutUnit;
     Configuration configuration = jobContext.getConfiguration();
-    smtpConfiguration = new SmtpConfiguration();
-    smtpConfiguration.setSmtpHost(configuration.getString(DefaultDetectionOnboardJob.SMTP_HOST));
-    smtpConfiguration.setSmtpPort(configuration.getInt(DefaultDetectionOnboardJob.SMTP_PORT));
+    if (configuration.containsKey(DefaultDetectionOnboardJob.SMTP_HOST)) {
+      smtpConfiguration = new SmtpConfiguration();
+      smtpConfiguration.setSmtpHost(configuration.getString(DefaultDetectionOnboardJob.SMTP_HOST));
+      smtpConfiguration.setSmtpPort(configuration.getInt(DefaultDetectionOnboardJob.SMTP_PORT));
+    } else {
+      smtpConfiguration = null;
+    }
     failureNotificationSender = configuration.getString(DefaultDetectionOnboardJob.DEFAULT_ALERT_SENDER_ADDRESS);
     failureNotificationReceiver = configuration.getString(DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER_ADDRESS);
     notifyIfFails = configuration.getBoolean(DefaultDetectionOnboardJob.NOTIFY_IF_FAILS,
@@ -111,10 +116,17 @@ public class DetectionOnBoardJobRunner implements Runnable {
       if (abortOnFailure && !TaskConstants.TaskStatus.COMPLETED.equals(taskStatus.getTaskStatus())) {
         jobStatus.setJobStatus(JobConstants.JobStatus.FAILED);
         LOG.error("Failed to execute job {}.", jobContext.getJobName());
-        try {
-          sendFailureEmail();
-        } catch (JobExecutionException e) {
-          LOG.warn("Unable to send failure emails");
+        if (notifyIfFails) {
+          if (smtpConfiguration == null || StringUtils.isBlank(failureNotificationSender)
+              || StringUtils.isBlank(failureNotificationReceiver)) {
+            LOG.warn("SmtpConfiguration, and email sender/recipients cannot be null or empty");
+          } else {
+            try {
+              sendFailureEmail();
+            } catch (JobExecutionException e) {
+              LOG.warn("Unable to send failure emails");
+            }
+          }
         }
         return;
       }
