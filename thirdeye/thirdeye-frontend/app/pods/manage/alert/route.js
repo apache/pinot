@@ -3,7 +3,7 @@
  * @module manage/alert/route
  * @exports manage alert model
  */
-import RSVP from 'rsvp';
+import Ember from 'ember';
 import fetch from 'fetch';
 import Route from '@ember/routing/route';
 import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';

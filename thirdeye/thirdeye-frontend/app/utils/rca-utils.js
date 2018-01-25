@@ -1,4 +1,3 @@
-import Ember from 'ember';
 import moment from 'moment';
 import _ from 'lodash';
 
@@ -495,7 +494,7 @@ export function findLabelMapping(label, config) {
   return labelMapping;
 }
 
-export default Ember.Helper.helper({
+export default {
   isIterable,
   makeIterable,
   filterObject,
@@ -523,4 +522,4 @@ export default Ember.Helper.helper({
   colorMapping,
   eventColorMapping,
   dateFormatFull
-});
+};

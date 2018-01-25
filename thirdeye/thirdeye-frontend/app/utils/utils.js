@@ -1,4 +1,3 @@
-import Ember from 'ember';
 import moment from 'moment';
 
 /**
@@ -91,11 +90,11 @@ export function toIso(dateStr) {
   return moment(Number(dateStr)).toISOString();
 }
 
-export default Ember.Helper.helper({
+export default {
   checkStatus,
   humanizeFloat,
   humanizeChange,
   parseProps,
   postProps,
   toIso
-});
+};
