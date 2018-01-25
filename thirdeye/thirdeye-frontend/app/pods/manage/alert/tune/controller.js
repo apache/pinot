@@ -6,7 +6,7 @@
 import Controller from '@ember/controller';
 import moment from 'moment';
 import { computed } from '@ember/object';
-import { buildDateEod } from 'thirdeye-frontend/helpers/utils';
+import { buildDateEod } from 'thirdeye-frontend/utils/utils';
 import { buildAnomalyStats } from 'thirdeye-frontend/helpers/manage-alert-utils';
 
 export default Controller.extend({

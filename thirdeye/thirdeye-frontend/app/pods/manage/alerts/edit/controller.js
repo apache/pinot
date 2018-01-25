@@ -6,7 +6,7 @@
 import fetch from 'fetch';
 import Ember from 'ember';
 import _ from 'lodash';
-import { checkStatus } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
 export default Ember.Controller.extend({
 

@@ -6,7 +6,7 @@
 import RSVP from 'rsvp';
 import fetch from 'fetch';
 import Route from '@ember/routing/route';
-import { checkStatus, buildDateEod } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
 
 // Setup for query param behavior
 const queryParamsConfig = {

@@ -3,7 +3,7 @@ import fetch from 'fetch';
 import moment from 'moment';
 import RSVP from 'rsvp';
 import _ from 'lodash';
-import { checkStatus, buildDateEod, parseProps } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, buildDateEod, parseProps } from 'thirdeye-frontend/utils/utils';
 
 export default Ember.Route.extend({
   model(params) {

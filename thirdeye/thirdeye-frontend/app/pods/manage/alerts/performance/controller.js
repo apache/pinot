@@ -7,7 +7,7 @@ import fetch from 'fetch';
 import Ember from 'ember';
 import _ from 'lodash';
 import { computed } from '@ember/object';
-import { checkStatus, buildDateEod } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
 import Controller from '@ember/controller';
 
 export default Controller.extend({

@@ -1,8 +1,8 @@
 import Ember from 'ember';
 import moment from 'moment';
 import d3 from 'd3';
-import buildTooltip from 'thirdeye-frontend/helpers/build-tooltip';
-import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, toMetricLabel, colorMapping } from 'thirdeye-frontend/helpers/rca-utils';
+import buildTooltip from 'thirdeye-frontend/utils/build-tooltip';
+import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, toMetricLabel, colorMapping } from 'thirdeye-frontend/utils/rca-utils';
 
 const TIMESERIES_MODE_ABSOLUTE = 'absolute';
 const TIMESERIES_MODE_RELATIVE = 'relative';

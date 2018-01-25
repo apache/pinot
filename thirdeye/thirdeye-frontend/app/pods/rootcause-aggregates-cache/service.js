@@ -1,6 +1,6 @@
 import Ember from 'ember';
-import { toAbsoluteRange, toFilters, toFilterMap } from 'thirdeye-frontend/helpers/rca-utils';
-import { checkStatus } from 'thirdeye-frontend/helpers/utils';
+import { toAbsoluteRange, toFilters, toFilterMap } from 'thirdeye-frontend/utils/rca-utils';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 

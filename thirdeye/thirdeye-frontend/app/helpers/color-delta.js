@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { toColorDirection } from 'thirdeye-frontend/helpers/rca-utils';
+import { toColorDirection } from 'thirdeye-frontend/utils/rca-utils';
 
 /**
  * Template helper that computes the color

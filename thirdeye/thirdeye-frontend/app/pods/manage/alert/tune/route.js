@@ -6,7 +6,7 @@
 import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
-import { checkStatus, postProps, buildDateEod, toIso } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, postProps, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
 import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups } from 'thirdeye-frontend/helpers/manage-alert-utils';
 
 /**

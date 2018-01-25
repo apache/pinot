@@ -6,7 +6,7 @@
 import Ember from 'ember';
 import fetch from 'fetch';
 import RSVP from 'rsvp';
-import { postProps, checkStatus } from 'thirdeye-frontend/helpers/utils';
+import { postProps, checkStatus } from 'thirdeye-frontend/utils/utils';
 
 export default Ember.Route.extend({
   queryParams: {

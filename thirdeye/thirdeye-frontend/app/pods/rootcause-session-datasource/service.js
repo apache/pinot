@@ -1,6 +1,6 @@
 import Service from '@ember/service';
 import fetch from 'fetch';
-import { checkStatus } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
 export default Service.extend({
   loadAsync(sessionId) {

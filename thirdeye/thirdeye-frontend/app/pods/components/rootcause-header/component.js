@@ -1,6 +1,7 @@
 import Component from '@ember/component';
 import { get, getProperties, computed } from '@ember/object';
-import { dateFormatFull } from 'thirdeye-frontend/helpers/rca-utils';
+import { dateFormatFull } from 'thirdeye-frontend/utils/rca-utils';
+import moment from 'moment';
 
 export default Component.extend({
   classNames: ['rootcause-header'],

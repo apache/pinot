@@ -9,7 +9,7 @@ import _ from 'lodash';
 import Controller from '@ember/controller';
 import { computed } from '@ember/object';
 import { task, timeout } from 'ember-concurrency';
-import { checkStatus, buildDateEod } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
 
 export default Controller.extend({
   /**

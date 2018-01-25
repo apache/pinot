@@ -1,7 +1,7 @@
 import Base from 'ember-simple-auth/authenticators/base';
 import fetch from 'fetch';
 import Ember from 'ember';
-import { checkStatus } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import RSVP from 'rsvp';
 
 export default Base.extend({

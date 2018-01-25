@@ -1,6 +1,6 @@
 import Ember from 'ember';
 import fetch from 'fetch';
-import { toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/helpers/rca-utils';
+import { toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/utils/rca-utils';
 import { task, timeout } from 'ember-concurrency';
 import _ from 'lodash';
 
