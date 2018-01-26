@@ -43,19 +43,12 @@ export default Ember.Route.extend(ApplicationRouteMixin, {
   },
 
   /**
-   * Redirect route after authentication
-   * @override ApplicationRouteMixin.routeAfterAuthentication
-   */
-  routeAfterAuthentication: 'rca',
-
-  /**
    * Augments sessionAuthenticated.
    * @override ApplicationRouteMixin.sessionAuthenticated
    */
   sessionAuthenticated() {
     this._super(...arguments);
 
-    this.transitionTo('rca');
   },
 
   /**
