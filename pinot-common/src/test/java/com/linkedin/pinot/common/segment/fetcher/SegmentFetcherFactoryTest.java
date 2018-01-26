@@ -26,8 +26,8 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
+
 
 public class SegmentFetcherFactoryTest {
 
@@ -56,14 +56,16 @@ public class SegmentFetcherFactoryTest {
     SegmentFetcherFactory.getPreloadSegmentFetchers().put("https", mockHttpsFetcher);
     SegmentFetcherFactory.getPreloadSegmentFetchers().put(replacableProto, replacableFetcher);
 
-    SegmentFetcherFactory.initSegmentFetcherFactory(conf.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
+    SegmentFetcherFactory.initSegmentFetcherFactory(
+        conf.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
     ArgumentCaptor<Configuration> captor = ArgumentCaptor.forClass(Configuration.class);
     verify(mockHdfsFetcher).init(captor.capture());
     Assert.assertEquals(captor.getValue().getString("hadoop.conf.path"), "file:///somewhere/folder");
     Assert.assertEquals(captor.getValue().getString("other"), null);
     Assert.assertTrue(SegmentFetcherFactory.containsProtocol("test"));
-    Assert.assertEquals(((TestSegmentFetcher)SegmentFetcherFactory.getPreloadSegmentFetchers().get("test")).init_called, 1);
-    ReplacedFetcher fetcher = (ReplacedFetcher)SegmentFetcherFactory.getPreloadSegmentFetchers().get(replacableProto);
+    Assert.assertEquals(
+        ((TestSegmentFetcher) SegmentFetcherFactory.getPreloadSegmentFetchers().get("test")).init_called, 1);
+    ReplacedFetcher fetcher = (ReplacedFetcher) SegmentFetcherFactory.getPreloadSegmentFetchers().get(replacableProto);
     Assert.assertEquals(fetcher.getInitCalled(), 1);
   }
 
@@ -72,34 +74,49 @@ public class SegmentFetcherFactoryTest {
     Configuration configuration = new PropertiesConfiguration();
     configuration.addProperty("https.ssl.server.enable-verification", "false");
     SegmentFetcherFactory.initSegmentFetcherFactory(configuration);
-    Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("hdfs:///something/wer") instanceof HdfsSegmentFetcher);
-    Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("http://something:wer:") instanceof HttpSegmentFetcher);
+    Assert.assertTrue(
+        SegmentFetcherFactory.getSegmentFetcherBasedOnURI("hdfs:///something/wer") instanceof HdfsSegmentFetcher);
+    Assert.assertTrue(
+        SegmentFetcherFactory.getSegmentFetcherBasedOnURI("http://something:wer:") instanceof HttpSegmentFetcher);
     Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("https://") instanceof HttpsSegmentFetcher);
-    Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("file://a/asdf/wer/fd/e") instanceof LocalFileSegmentFetcher);
-    Assert.assertNull(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("abc:///something"));
+    Assert.assertTrue(
+        SegmentFetcherFactory.getSegmentFetcherBasedOnURI("file://a/asdf/wer/fd/e") instanceof LocalFileSegmentFetcher);
   }
 
   @Test
   public void testGetSegmentFetcherBasedOnURIFailed() throws Exception {
     Configuration configuration = new PropertiesConfiguration();
     SegmentFetcherFactory.initSegmentFetcherFactory(configuration);
-    // If HttpsSegmentFetcher is not configured correctly, it fails to initialize.
-    Assert.assertNull(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("https://"));
     try {
       SegmentFetcherFactory.getSegmentFetcherBasedOnURI("");
-    } catch (UnsupportedOperationException ex) {
-      return;
+      Assert.fail();
+    } catch (UnsupportedOperationException e) {
+      // Expected
     }
-    Assert.fail();
+    try {
+      SegmentFetcherFactory.getSegmentFetcherBasedOnURI("abc:///something");
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      // Expected
+    }
+    try {
+      // If HttpsSegmentFetcher is not configured correctly, it fails to initialize.
+      SegmentFetcherFactory.getSegmentFetcherBasedOnURI("https://");
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      // Expected
+    }
   }
 
   public static class ReplacedFetcher implements SegmentFetcher {
 
-    public int initCalled= 0;
+    public int initCalled = 0;
+
     @Override
     public void init(Configuration configs) {
       initCalled++;
     }
+
     public int getInitCalled() {
       return initCalled;
     }

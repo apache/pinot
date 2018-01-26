@@ -21,6 +21,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -126,9 +127,14 @@ public class SegmentFetcherFactory {
     return SEGMENT_FETCHER_MAP.containsKey(protocol);
   }
 
+  @Nonnull
   public static SegmentFetcher getSegmentFetcherBasedOnURI(String uri) {
     String protocol = getProtocolFromUri(uri);
-    return SEGMENT_FETCHER_MAP.get(protocol);
+    SegmentFetcher segmentFetcher = SEGMENT_FETCHER_MAP.get(protocol);
+    if (segmentFetcher == null) {
+      throw new IllegalStateException("No segment fetcher registered for protocol: " + protocol);
+    }
+    return segmentFetcher;
   }
 
   private static String getProtocolFromUri(String uri) {

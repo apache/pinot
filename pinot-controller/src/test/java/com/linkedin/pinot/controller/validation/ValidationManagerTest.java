@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -40,7 +39,6 @@ import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.startree.hll.HllConstants;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -159,39 +157,27 @@ public class ValidationManagerTest {
   @Test
   public void testPushTimePersistence() throws Exception {
     DummyMetadata metadata = new DummyMetadata(TEST_TABLE_NAME);
+    String rawTableName = metadata.getTableName();
+    String segmentName = metadata.getName();
 
     _pinotHelixResourceManager.addNewSegment(metadata, "http://dummy/");
-
-    Thread.sleep(1000);
-
-    OfflineSegmentZKMetadata offlineSegmentZKMetadata = ZKMetadataProvider.getOfflineSegmentZKMetadata(
-        _pinotHelixResourceManager.getPropertyStore(), metadata.getTableName(), metadata.getName());
-
-    SegmentMetadata fetchedMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
-    long pushTime = fetchedMetadata.getPushTime();
-
+    OfflineSegmentZKMetadata offlineSegmentZKMetadata =
+        _pinotHelixResourceManager.getOfflineSegmentZKMetadata(rawTableName, segmentName);
+    long pushTime = offlineSegmentZKMetadata.getPushTime();
     // Check that the segment has been pushed in the last 30 seconds
-    Assert.assertTrue(System.currentTimeMillis() - pushTime < 30000);
-
+    Assert.assertTrue(System.currentTimeMillis() - pushTime < 30_000);
     // Check that there is no refresh time
-    Assert.assertEquals(fetchedMetadata.getRefreshTime(), Long.MIN_VALUE);
+    Assert.assertEquals(offlineSegmentZKMetadata.getRefreshTime(), Long.MIN_VALUE);
 
     // Refresh the segment
-    metadata.setCrc("anotherfakecrc");
+    metadata.setCrc(Long.toString(System.currentTimeMillis()));
     _pinotHelixResourceManager.refreshSegment(metadata, offlineSegmentZKMetadata, "http://dummy/");
 
-    Thread.sleep(1000);
-
-    offlineSegmentZKMetadata = ZKMetadataProvider.getOfflineSegmentZKMetadata(
-        _pinotHelixResourceManager.getPropertyStore(), metadata.getTableName(), metadata.getName());
-    fetchedMetadata = new SegmentMetadataImpl(offlineSegmentZKMetadata);
-
+    offlineSegmentZKMetadata = _pinotHelixResourceManager.getOfflineSegmentZKMetadata(rawTableName, segmentName);
     // Check that the segment still has the same push time
-    Assert.assertEquals(fetchedMetadata.getPushTime(), pushTime);
-
+    Assert.assertEquals(offlineSegmentZKMetadata.getPushTime(), pushTime);
     // Check that the refresh time is in the last 30 seconds
-    Assert.assertTrue(System.currentTimeMillis() - fetchedMetadata.getRefreshTime() < 30000);
-
+    Assert.assertTrue(System.currentTimeMillis() - offlineSegmentZKMetadata.getRefreshTime() < 30_000L);
   }
 
   @Test

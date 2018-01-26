@@ -38,7 +38,6 @@ import com.linkedin.pinot.controller.api.access.AccessControl;
 import com.linkedin.pinot.controller.api.access.AccessControlFactory;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
-import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.controller.util.TableSizeReader;
 import com.linkedin.pinot.controller.validation.StorageQuotaChecker;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -52,7 +51,6 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URLDecoder;
-import java.text.ParseException;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -271,9 +269,7 @@ public class PinotSegmentUploadRestletResource {
       FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
       String tempSegmentName = "tmp-" + System.nanoTime();
       tempTarredSegmentFile = new File(provider.getFileUploadTmpDir(), tempSegmentName);
-      tempTarredSegmentFile.deleteOnExit();
       tempSegmentDir = new File(provider.getTmpUntarredPath(), tempSegmentName);
-      tempSegmentDir.deleteOnExit();
 
       // Get upload type
       String uploadTypeStr = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
@@ -285,7 +281,6 @@ public class PinotSegmentUploadRestletResource {
       }
 
       String downloadURI = null;
-      boolean found = false;
       switch (uploadType) {
         case JSON:
         case URI:
@@ -293,11 +288,8 @@ public class PinotSegmentUploadRestletResource {
           try {
             downloadURI = getDownloadUri(uploadType, headers, segmentJsonStr);
           } catch (Exception e) {
-            String errorMsg =
-                String.format("Failed to get download Uri for upload file type: %s, with error %s", uploadType,
-                    e.getMessage());
-            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
-            throw new ControllerApplicationException(LOGGER, errorMsg, Response.Status.BAD_REQUEST);
+            throw new ControllerApplicationException(LOGGER, "Failed to get download URI", Response.Status.BAD_REQUEST,
+                e);
           }
 
           // Get segment fetcher based on the download URI
@@ -305,24 +297,12 @@ public class PinotSegmentUploadRestletResource {
           try {
             segmentFetcher = SegmentFetcherFactory.getSegmentFetcherBasedOnURI(downloadURI);
           } catch (Exception e) {
-            String errorMsg = String.format("Failed to get SegmentFetcher from download Uri: %s", downloadURI);
-            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
-            throw new ControllerApplicationException(LOGGER, errorMsg, Response.Status.INTERNAL_SERVER_ERROR);
+            throw new ControllerApplicationException(LOGGER,
+                "Failed to get segment fetcher for download URI: " + downloadURI, Response.Status.BAD_REQUEST, e);
           }
 
-          // Download segment tar to local.
-          tempTarredSegmentFile.deleteOnExit();
-          try {
-            segmentFetcher.fetchSegmentToLocal(downloadURI, tempTarredSegmentFile);
-          } catch (Exception e) {
-            String errorMsg = String.format("Failed to fetch segment tar from download Uri: %s to %s", downloadURI,
-                tempTarredSegmentFile.toString());
-            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
-            throw new ControllerApplicationException(LOGGER, errorMsg, Response.Status.INTERNAL_SERVER_ERROR);
-          }
-          if (tempTarredSegmentFile.length() > 0) {
-            found = true;
-          }
+          // Download segment tar file to local
+          segmentFetcher.fetchSegmentToLocal(downloadURI, tempTarredSegmentFile);
           break;
 
         case TAR:
@@ -335,10 +315,6 @@ public class PinotSegmentUploadRestletResource {
           try (InputStream inputStream = bodyPart.getValueAs(InputStream.class);
               FileOutputStream outputStream = new FileOutputStream(tempTarredSegmentFile)) {
             IOUtils.copyLarge(inputStream, outputStream);
-            outputStream.flush();
-          }
-          if (tempTarredSegmentFile.length() > 0) {
-            found = true;
           }
           break;
 
@@ -346,33 +322,29 @@ public class PinotSegmentUploadRestletResource {
           throw new UnsupportedOperationException("Unsupported upload type: " + uploadType);
       }
 
-      if (found) {
-        // Found the data file
+      // While there is TarGzCompressionUtils.unTarOneFile, we use unTar here to unpack all files
+      // in the segment in order to ensure the segment is not corrupted
+      TarGzCompressionUtils.unTar(tempTarredSegmentFile, tempSegmentDir);
+      File[] files = tempSegmentDir.listFiles();
+      Preconditions.checkState(files != null && files.length == 1);
+      File indexDir = files[0];
 
-        // While there is TarGzCompressionUtils.unTarOneFile, we use unTar here to unpack all files
-        // in the segment in order to ensure the segment is not corrupted
-        TarGzCompressionUtils.unTar(tempTarredSegmentFile, tempSegmentDir);
-        File[] files = tempSegmentDir.listFiles();
-        Preconditions.checkState(files != null && files.length == 1);
-        File indexDir = files[0];
+      SegmentMetadata segmentMetadata = new SegmentMetadataImpl(indexDir);
+      String segmentName = segmentMetadata.getName();
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
+      String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
+      LOGGER.info("Processing upload request for segment: {} of table: {} from client: {}", segmentName,
+          offlineTableName, clientAddress);
+      uploadSegment(indexDir, segmentMetadata, tempTarredSegmentFile, downloadURI, provider,
+          enableParallelPushProtection, headers);
 
-        SegmentMetadata segmentMetadata = new SegmentMetadataImpl(indexDir);
-        String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
-        LOGGER.info("Processing upload request for segment '{}' from client '{}'", segmentMetadata.getName(),
-            clientAddress);
-        uploadSegment(indexDir, segmentMetadata, tempTarredSegmentFile, downloadURI, provider,
-            enableParallelPushProtection, headers);
-        return new SuccessResponse("success"); // Current APIs return an empty status string on success.
-      } else {
-        // Some problem happened, sent back a simple line of text.
-        String errorMsg = "No file was uploaded";
-        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
-        throw new ControllerApplicationException(LOGGER, errorMsg, Response.Status.INTERNAL_SERVER_ERROR);
-      }
+      return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + offlineTableName);
     } catch (WebApplicationException e) {
       throw e;
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER, "Caught internal server exception while uploading segment",
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     } finally {
       FileUtils.deleteQuietly(tempTarredSegmentFile);
       FileUtils.deleteQuietly(tempSegmentDir);
@@ -396,44 +368,48 @@ public class PinotSegmentUploadRestletResource {
    *   </li>
    * </ul>
    */
-  private PinotResourceManagerResponse uploadSegment(File indexDir, SegmentMetadata segmentMetadata,
-      File tempTarredSegmentFile, String downloadUrl, FileUploadPathProvider provider,
-      boolean enableParallelPushProtection, HttpHeaders headers) throws IOException, JSONException, ParseException {
-    String tableName = segmentMetadata.getTableName();
+  private void uploadSegment(File indexDir, SegmentMetadata segmentMetadata, File tempTarredSegmentFile,
+      String downloadUrl, FileUploadPathProvider provider, boolean enableParallelPushProtection, HttpHeaders headers)
+      throws IOException, JSONException {
+    String rawTableName = segmentMetadata.getTableName();
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     String segmentName = segmentMetadata.getName();
     TableConfig offlineTableConfig =
-        ZKMetadataProvider.getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), tableName);
+        ZKMetadataProvider.getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), offlineTableName);
 
     if (offlineTableConfig == null) {
-      throw new ControllerApplicationException(LOGGER, "Missing table: " + tableName, Response.Status.NOT_FOUND);
+      throw new ControllerApplicationException(LOGGER, "Failed to find table config for table: " + offlineTableName,
+          Response.Status.NOT_FOUND);
     }
 
+    // Check quota
     StorageQuotaChecker.QuotaCheckerResponse quotaResponse =
         checkStorageQuota(indexDir, segmentMetadata, offlineTableConfig);
     if (!quotaResponse.isSegmentWithinQuota) {
-      // this is not an "error" hence we don't increment segment upload errors
-      String errStr = "Rejecting segment upload for table: " + tableName + "segment: " + segmentName + "reason: {}"
-          + quotaResponse.reason;
-      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.FORBIDDEN);
+      throw new ControllerApplicationException(LOGGER,
+          "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: "
+              + quotaResponse.reason, Response.Status.FORBIDDEN);
     }
 
+    // Check time range
     if (!isSegmentTimeValid(segmentMetadata)) {
-      String errStr = "Invalid segment start/end time";
-      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.NOT_ACCEPTABLE);
+      throw new ControllerApplicationException(LOGGER,
+          "Invalid segment start/end time for segment: " + segmentName + " of table: " + offlineTableName,
+          Response.Status.NOT_ACCEPTABLE);
     }
 
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
     ZNRecord znRecord = _pinotHelixResourceManager.getSegmentMetadataZnRecord(offlineTableName, segmentName);
 
     // Brand new segment, not refresh, directly add the segment
     if (znRecord == null) {
       if (downloadUrl == null) {
-        downloadUrl = moveSegmentToPermanentDirectory(provider, tableName, segmentName, tempTarredSegmentFile);
+        downloadUrl = moveSegmentToPermanentDirectory(provider, rawTableName, segmentName, tempTarredSegmentFile);
       }
       _pinotHelixResourceManager.addNewSegment(segmentMetadata, downloadUrl);
-      return PinotResourceManagerResponse.SUCCESS_RESPONSE;
+      return;
     }
 
+    // Segment already exists, refresh if necessary
     OfflineSegmentZKMetadata existingSegmentZKMetadata = new OfflineSegmentZKMetadata(znRecord);
     long existingCrc = existingSegmentZKMetadata.getCrc();
 
@@ -445,42 +421,47 @@ public class PinotSegmentUploadRestletResource {
         expectedCrc = Long.parseLong(expectedCrcStr);
       } catch (NumberFormatException e) {
         throw new ControllerApplicationException(LOGGER,
-            "Caught exception while parsing IF-MATCH CRC: " + expectedCrcStr, Response.Status.PRECONDITION_FAILED, e);
+            "Caught exception for segment: " + segmentName + " of table: " + offlineTableName
+                + " while parsing IF-MATCH CRC: \"" + expectedCrcStr + "\"", Response.Status.PRECONDITION_FAILED);
       }
       if (expectedCrc != existingCrc) {
         throw new ControllerApplicationException(LOGGER,
-            "Expected CRC: " + expectedCrc + " does not match existing CRC: " + existingCrc,
-            Response.Status.PRECONDITION_FAILED);
+            "For segment: " + segmentName + " of table: " + offlineTableName + ", expected CRC: " + expectedCrc
+                + " does not match existing CRC: " + existingCrc, Response.Status.PRECONDITION_FAILED);
       }
     }
 
-    // Check segment upload start time when parallel push protection get enabled
+    // Check segment upload start time when parallel push protection enabled
     if (enableParallelPushProtection) {
       // When segment upload start time is larger than 0, that means another upload is in progress
       long segmentUploadStartTime = existingSegmentZKMetadata.getSegmentUploadStartTime();
       if (segmentUploadStartTime > 0) {
         if (System.currentTimeMillis() - segmentUploadStartTime > _controllerConf.getSegmentUploadTimeoutInMillis()) {
           // Last segment upload does not finish properly, replace the segment
-          LOGGER.error("Table: {}, segment: {} was not properly uploaded, replacing it", tableName, segmentName);
+          LOGGER.error("Segment: {} of table: {} was not properly uploaded, replacing it", segmentName,
+              offlineTableName);
           _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_SEGMENT_UPLOAD_TIMEOUT_EXCEEDED, 1L);
         } else {
           // Another segment upload is in progress
-          throw new ControllerApplicationException(LOGGER, "Another segment upload is in progress, retry later",
-              Response.Status.CONFLICT);
+          throw new ControllerApplicationException(LOGGER,
+              "Another segment upload is in progress for segment: " + segmentName + " of table: " + offlineTableName
+                  + ", retry later", Response.Status.CONFLICT);
         }
       }
 
       // Lock the segment by setting the upload start time in ZK
       existingSegmentZKMetadata.setSegmentUploadStartTime(System.currentTimeMillis());
       if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata, znRecord.getVersion())) {
-        throw new ControllerApplicationException(LOGGER, "Failed to lock the segment, retry later",
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to lock the segment: " + segmentName + " of table: " + offlineTableName + ", retry later",
             Response.Status.CONFLICT);
       }
     }
 
     // Reset segment upload start time to unlock the segment later
+    // NOTE: reset this value even if parallel push protection is not enabled so that segment can recover in case
+    // previous segment upload did not finish properly and the parallel push protection is turned off
     existingSegmentZKMetadata.setSegmentUploadStartTime(-1);
-    boolean metadataRewritten = false;
 
     try {
       // Modify the custom map in segment ZK metadata
@@ -498,31 +479,26 @@ public class PinotSegmentUploadRestletResource {
       existingSegmentZKMetadata.setCustomMap(
           segmentZKMetadataCustomMapModifier.modifyMap(existingSegmentZKMetadata.getCustomMap()));
 
-      PinotResourceManagerResponse response;
+      // Update ZK metadata and refresh the segment if necessary
       long newCrc = Long.valueOf(segmentMetadata.getCrc());
-      if (newCrc != existingCrc) {
-        if (downloadUrl == null) {
-          downloadUrl = moveSegmentToPermanentDirectory(provider, tableName, segmentName, tempTarredSegmentFile);
-        }
-        // If refreshSegment returns without an exception, it should have already written to zk
-        response = _pinotHelixResourceManager.refreshSegment(segmentMetadata, existingSegmentZKMetadata, downloadUrl);
-      } else {
+      if (newCrc == existingCrc) {
         // New segment is the same as the existing one, only update ZK metadata without refresh the segment
-        _pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata);
-        response = PinotResourceManagerResponse.SUCCESS_RESPONSE;
+        if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata)) {
+          throw new RuntimeException(
+              "Failed to update ZK metadata for segment: " + segmentName + " of table: " + offlineTableName);
+        }
+      } else {
+        // New segment is different with the existing one, update ZK metadata and refresh the segment
+        if (downloadUrl == null) {
+          downloadUrl = moveSegmentToPermanentDirectory(provider, rawTableName, segmentName, tempTarredSegmentFile);
+        }
+        _pinotHelixResourceManager.refreshSegment(segmentMetadata, existingSegmentZKMetadata, downloadUrl);
       }
-      metadataRewritten = true;
-
-      if (!response.isSuccessful()) {
-        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
-        throw new ControllerApplicationException(LOGGER, "Error uploading segment",
-            Response.Status.INTERNAL_SERVER_ERROR);
+    } catch (Exception e) {
+      if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata)) {
+        LOGGER.error("Failed to update ZK metadata for segment: {} of table: {}", segmentName, offlineTableName);
       }
-      return response;
-    } finally {
-      if (enableParallelPushProtection && !metadataRewritten) {
-        _pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata);
-      }
+      throw e;
     }
   }
 
@@ -535,8 +511,8 @@ public class PinotSegmentUploadRestletResource {
     return ControllerConf.constructDownloadUrl(tableName, segmentName, provider.getVip());
   }
 
-  private String getDownloadUri(FileUploadDownloadClient.FileUploadType uploadType, HttpHeaders headers, String segmentJsonStr)
-      throws Exception {
+  private String getDownloadUri(FileUploadDownloadClient.FileUploadType uploadType, HttpHeaders headers,
+      String segmentJsonStr) throws Exception {
     switch (uploadType) {
       case URI:
         return headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
