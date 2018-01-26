@@ -70,7 +70,9 @@ import java.util.concurrent.TimeUnit;
 import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
+import javax.servlet.ServletRegistration;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.eclipse.jetty.proxy.ProxyServlet;
 import org.eclipse.jetty.servlets.CrossOriginFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -151,6 +153,14 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new AutoOnboardResource(config));
     env.jersey().register(new ConfigResource(DAO_REGISTRY.getConfigDAO()));
     env.jersey().register(new RootCauseSessionResource(DAO_REGISTRY.getRootcauseSessionDAO(), new ObjectMapper()));
+
+    if (config.getOnboardingHost() != null) {
+      LOG.info("Setting up onboarding proxy for '{}'", config.getOnboardingHost());
+      ServletRegistration.Dynamic proxy = env.servlets().addServlet("detection-onboard", ProxyServlet.Transparent.class);
+      proxy.setInitParameter("proxyTo", config.getOnboardingHost());
+      proxy.setInitParameter("prefix", "/detection-onboard");
+      proxy.addMapping("/detection-onboard/*");
+    }
 
     env.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
