@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
@@ -65,7 +66,9 @@ public class ContinuumAnomalyFetcher extends BaseAnomalyFetcher {
     }
 
     // filter out alert candidates by snapshot
-    for (MergedAnomalyResultDTO mergedAnomaly : alertCandidates) {
+    Iterator<MergedAnomalyResultDTO> alertCandidatesIterator = alertCandidates.iterator();
+    while (alertCandidatesIterator.hasNext()) {
+      MergedAnomalyResultDTO mergedAnomaly = alertCandidatesIterator.next();
       if (mergedAnomaly.getStartTime() > alertSnapShot.getLastNotifyTime()) {
         // this anomaly start after last notify time, pass without check
         continue;
@@ -78,7 +81,7 @@ public class ContinuumAnomalyFetcher extends BaseAnomalyFetcher {
         long metricLastNotifyTime = alertSnapShot.getLatestStatus(snapshot, snapshotKey).getLastNotifyTime();
         if (mergedAnomaly.getStartTime() < metricLastNotifyTime &&
             metricLastNotifyTime < current.minus(realertFrequency).getMillis()) {
-          alertCandidates.remove(mergedAnomaly);
+          alertCandidatesIterator.remove();
         }
       }
     }
