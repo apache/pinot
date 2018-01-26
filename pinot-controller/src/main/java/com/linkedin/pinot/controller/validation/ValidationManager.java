@@ -254,7 +254,7 @@ public class ValidationManager {
     }
     // Make this call after other validations (so that we verify that we are consistent against the existing partition
     // assignment). This call may end up changing the kafka partition assignment for the table.
-    _llcRealtimeSegmentManager.updateKafkaPartitionsIfNecessary(realtimeTableName, tableConfig);
+    _llcRealtimeSegmentManager.updateKafkaPartitionsIfNecessary(tableConfig);
   }
 
   // For offline segment pushes, validate that there are no missing segments, and update metrics

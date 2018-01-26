@@ -190,6 +190,7 @@ public class PinotTableIdealStateBuilder {
     final List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName,
         realtimeServerTenant);
     boolean create = false;
+    // Validate replicasPerPartition here.
     final String replicasPerPartitionStr = realtimeTableConfig.getValidationConfig().getReplicasPerPartition();
     if (replicasPerPartitionStr == null || replicasPerPartitionStr.isEmpty()) {
       throw new RuntimeException("Null or empty value for replicasPerPartition, expected a number");
@@ -207,14 +208,10 @@ public class PinotTableIdealStateBuilder {
     }
     LOGGER.info("Assigning partitions to instances for simple consumer for table {}", realtimeTableName);
     final KafkaStreamMetadata kafkaMetadata = new KafkaStreamMetadata(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
-    final String topicName = kafkaMetadata.getKafkaTopicName();
     final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
     final int nPartitions = getPartitionCount(kafkaMetadata);
     LOGGER.info("Assigning {} partitions to instances for simple consumer for table {}", nPartitions, realtimeTableName);
-    segmentManager.setupHelixEntries(topicName, realtimeTableName, nPartitions, realtimeInstances, nReplicas,
-        kafkaMetadata.getKafkaConsumerProperties().get(Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET),
-        kafkaMetadata.getBootstrapHosts(), idealState, create,
-        PinotLLCRealtimeSegmentManager.getLLCRealtimeTableFlushSize(realtimeTableConfig));
+    segmentManager.setupHelixEntries(realtimeTableConfig, kafkaMetadata, nPartitions, realtimeInstances, idealState, create);
   }
 
   public static int getPartitionCount(KafkaStreamMetadata kafkaMetadata) {

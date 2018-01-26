@@ -210,39 +210,26 @@ public class PinotLLCRealtimeSegmentManager {
    * The topic name is being used as a dummy helix resource name. We do not read or write to zk in this
    * method.
    */
-  public void setupHelixEntries(final String topicName, final String realtimeTableName, int nPartitions,
-      final List<String> instanceNames, int nReplicas, String initialOffset, String bootstrapHosts, IdealState
-      idealState, boolean create, int flushSize) {
+  public void setupHelixEntries(TableConfig tableConfig, KafkaStreamMetadata kafkaStreamMetadata, int nPartitions, final List<String> instanceNames,
+      IdealState idealState, boolean create) {
+
+    final int nReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
+    final String topicName = kafkaStreamMetadata.getKafkaTopicName();
+    final String realtimeTableName = tableConfig.getTableName();
+    final int flushSize = PinotLLCRealtimeSegmentManager.getLLCRealtimeTableFlushSize(tableConfig);
+    String realtimeServerTenant =
+        ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tableConfig.getTenantConfig().getServer());
+//    final List<String> instanceNames = _helixAdmin.getInstancesInClusterWithTag(_clusterName, realtimeServerTenant);
+    final String initialOffset = kafkaStreamMetadata.getKafkaConsumerProperties().get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
+
     if (nReplicas > instanceNames.size()) {
       throw new PinotHelixResourceManager.InvalidTableConfigException("Replicas requested(" + nReplicas + ") cannot fit within number of instances(" +
           instanceNames.size() + ") for table " + realtimeTableName + " topic " + topicName);
     }
-    /*
-     Due to a bug in auto-rebalance (https://issues.apache.org/jira/browse/HELIX-631)
-     we do the kafka partition allocation with local code in this class.
-    {
-      final String resourceName = topicName;
-
-      List<String> partitions = new ArrayList<>(nPartitions);
-      for (int i = 0; i < nPartitions; i++) {
-        partitions.add(Integer.toString(i));
-      }
-
-      LinkedHashMap<String, Integer> states = new LinkedHashMap<>(2);
-      states.put("OFFLINE", 0);
-      states.put("ONLINE", nReplicas);
-
-      AutoRebalanceStrategy strategy = new AutoRebalanceStrategy(resourceName, partitions, states);
-      znRecord = strategy.computePartitionAssignment(instanceNames, new HashMap<String, Map<String, String>>(0), instanceNames);
-      znRecord.setMapFields(new HashMap<String, Map<String, String>>(0));
-    }
-    */
-
     // Allocate kafka partitions across server instances.
-    ZNRecord znRecord = generatePartitionAssignment(topicName, nPartitions, instanceNames, nReplicas);
+    ZNRecord znRecord = generatePartitionAssignment(tableConfig, topicName, nPartitions, instanceNames);
     writeKafkaPartitionAssignment(realtimeTableName, znRecord);
-    setupInitialSegments(realtimeTableName, znRecord, topicName, initialOffset, bootstrapHosts, idealState, create,
-        nReplicas, flushSize);
+    setupInitialSegments(tableConfig, kafkaStreamMetadata, znRecord, idealState, create, flushSize);
   }
 
   // Remove all trace of LLC for this table.
@@ -278,8 +265,12 @@ public class PinotLLCRealtimeSegmentManager {
     return _propertyStore.get(path, null, AccessOption.PERSISTENT);
   }
 
-  protected void setupInitialSegments(String realtimeTableName, ZNRecord partitionAssignment, String topicName, String
-      initialOffset, String bootstrapHosts, IdealState idealState, boolean create, int nReplicas, int flushSize) {
+  protected void setupInitialSegments(TableConfig tableConfig, KafkaStreamMetadata kafkaStreamMetadata, ZNRecord partitionAssignment,
+      IdealState idealState, boolean create, int flushSize) {
+    final String realtimeTableName = tableConfig.getTableName();
+    final int nReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
+    final String initialOffset = kafkaStreamMetadata.getKafkaConsumerProperties().get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
+
     List<String> currentSegments = getExistingSegments(realtimeTableName);
     // Make sure that there are no low-level segments existing.
     if (currentSegments != null) {
@@ -312,14 +303,6 @@ public class PinotLLCRealtimeSegmentManager {
       final String segName = llcSegmentName.getSegmentName();
 
       metadata.setCreationTime(now);
-
-      KafkaStreamMetadata kafkaStreamMetadata = null;
-      try {
-        kafkaStreamMetadata = new KafkaStreamMetadata(_tableConfigCache.getTableConfig(realtimeTableName).getIndexingConfig().getStreamConfigs());
-      } catch (Exception e) {
-        LOGGER.error("Problem getting stream configs for table {}", rawTableName);
-        throw new RuntimeException(e);
-      }
 
       final long startOffset = getPartitionOffset(initialOffset, i, kafkaStreamMetadata);
       LOGGER.info("Setting start offset for segment {} to {}", segName, startOffset);
@@ -1160,10 +1143,10 @@ public class PinotLLCRealtimeSegmentManager {
    * Update the kafka partitions as necessary to accommodate changes in number of replicas, number of tenants or
    * number of kafka partitions. As new segments are assigned, they will obey the new kafka partition assignment.
    *
-   * @param realtimeTableName name of the realtime table
    * @param tableConfig tableConfig from propertystore
    */
-  public void updateKafkaPartitionsIfNecessary(String realtimeTableName, TableConfig tableConfig) {
+  public void updateKafkaPartitionsIfNecessary(TableConfig tableConfig) {
+    final String realtimeTableName = tableConfig.getTableName();
     final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
     final Map<String, List<String>> partitionToServersMap = partitionAssignment.getListFields();
     final KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
@@ -1223,7 +1206,7 @@ public class PinotLLCRealtimeSegmentManager {
     } else {
       _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.SHORT_OF_LIVE_INSTANCES, 0);
     }
-    ZNRecord newPartitionAssignment = generatePartitionAssignment(kafkaStreamMetadata.getKafkaTopicName(), currentPartitionCount, currentInstances, currentReplicaCount);
+    ZNRecord newPartitionAssignment = generatePartitionAssignment(tableConfig, kafkaStreamMetadata.getKafkaTopicName(), currentPartitionCount, currentInstances);
     writeKafkaPartitionAssignment(realtimeTableName, newPartitionAssignment);
     LOGGER.info("Successfully updated Kafka partition assignment for table {}", realtimeTableName);
   }
@@ -1249,19 +1232,42 @@ public class PinotLLCRealtimeSegmentManager {
      }
    }
    */
-  private ZNRecord generatePartitionAssignment(String topicName, int nPartitions, List<String> instanceNames,
-      int nReplicas) {
+  private ZNRecord generatePartitionAssignment(TableConfig tableConfig, String topicName, int nPartitions,
+      List<String> instanceNames) {
+    final int nReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
     ZNRecord znRecord = new ZNRecord(topicName);
-    int serverId = 0;
-    for (int p = 0; p < nPartitions; p++) {
-      List<String> instances = new ArrayList<>(nReplicas);
-      for (int r = 0; r < nReplicas; r++) {
-        instances.add(instanceNames.get(serverId++));
-        if (serverId == instanceNames.size()) {
-          serverId = 0;
-        }
+    /*
+     Due to a bug in auto-rebalance (https://issues.apache.org/jira/browse/HELIX-631)
+     we do the kafka partition allocation with local code in this class.
+    {
+      final String resourceName = topicName;
+
+      List<String> partitions = new ArrayList<>(nPartitions);
+      for (int i = 0; i < nPartitions; i++) {
+        partitions.add(Integer.toString(i));
       }
-      znRecord.setListField(Integer.toString(p), instances);
+
+      LinkedHashMap<String, Integer> states = new LinkedHashMap<>(2);
+      states.put("OFFLINE", 0);
+      states.put("ONLINE", nReplicas);
+
+      AutoRebalanceStrategy strategy = new AutoRebalanceStrategy(resourceName, partitions, states);
+      znRecord = strategy.computePartitionAssignment(instanceNames, instanceNames, new HashMap<String, Map<String, String>>(0), null);
+      znRecord.setMapFields(new HashMap<String, Map<String, String>>(0));
+    }
+    */
+    {
+      int serverId = 0;
+      for (int p = 0; p < nPartitions; p++) {
+        List<String> instances = new ArrayList<>(nReplicas);
+        for (int r = 0; r < nReplicas; r++) {
+          instances.add(instanceNames.get(serverId++));
+          if (serverId == instanceNames.size()) {
+            serverId = 0;
+          }
+        }
+        znRecord.setListField(Integer.toString(p), instances);
+      }
     }
     return znRecord;
   }
