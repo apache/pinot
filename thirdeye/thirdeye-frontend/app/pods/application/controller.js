@@ -27,6 +27,12 @@ export default Ember.Controller.extend({
       isCustomLink: false
     },
     {
+      className: 'rootcause',
+      link: 'rootcause',
+      title: 'Root Cause Analysis (beta)',
+      isCustomLink: false
+    },
+    {
       className: 'manage',
       link: 'manage.alerts',
       title: 'Manage'

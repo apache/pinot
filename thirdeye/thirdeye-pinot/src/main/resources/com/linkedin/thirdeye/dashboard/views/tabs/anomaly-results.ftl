@@ -24,8 +24,8 @@
               <span class="anomaly-result-metric">{{metric}}</span> from <span class="anomaly-result-dataset">{{dataset}}</span>
               <div>&num;{{anomalyId}}</div>
             </div>
-            <div id="investigate-button-{{anomalyIndex}}">
-              <a href="/thirdeye#investigate?anomalyId={{anomalyId}}" type="button" class="btn thirdeye-btn pull-right">Investigate</a>
+            <div>
+              <a href="/app/#/rootcause?anomalyId={{anomalyId}}" type="button" class="btn thirdeye-btn pull-right">Investigate</a>
             </div>
           </div>
 
