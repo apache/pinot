@@ -123,6 +123,10 @@
       <groupId>joda-time</groupId>
       <artifactId>joda-time</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-proxy</artifactId>
+    </dependency>
 
     <!-- dataframe specific -->
     <dependency>
