@@ -227,7 +227,7 @@ public class PinotLLCRealtimeSegmentManager {
           instanceNames.size() + ") for table " + realtimeTableName + " topic " + topicName);
     }
     // Allocate kafka partitions across server instances.
-    ZNRecord znRecord = generatePartitionAssignment(tableConfig, topicName, nPartitions, instanceNames, nReplicas);
+    ZNRecord znRecord = generatePartitionAssignment(tableConfig, topicName, nPartitions, instanceNames);
     writeKafkaPartitionAssignment(realtimeTableName, znRecord);
     setupInitialSegments(tableConfig, kafkaStreamMetadata, znRecord, idealState, create, flushSize);
   }
@@ -1206,7 +1206,7 @@ public class PinotLLCRealtimeSegmentManager {
     } else {
       _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.SHORT_OF_LIVE_INSTANCES, 0);
     }
-    ZNRecord newPartitionAssignment = generatePartitionAssignment(tableConfig, kafkaStreamMetadata.getKafkaTopicName(), currentPartitionCount, currentInstances, currentReplicaCount);
+    ZNRecord newPartitionAssignment = generatePartitionAssignment(tableConfig, kafkaStreamMetadata.getKafkaTopicName(), currentPartitionCount, currentInstances);
     writeKafkaPartitionAssignment(realtimeTableName, newPartitionAssignment);
     LOGGER.info("Successfully updated Kafka partition assignment for table {}", realtimeTableName);
   }
@@ -1232,8 +1232,8 @@ public class PinotLLCRealtimeSegmentManager {
      }
    }
    */
-  private ZNRecord generatePartitionAssignment(TableConfig tableConfig, String topicName, int nPartitions, List<String> instanceNames,
-      int nReplicasNU) {
+  private ZNRecord generatePartitionAssignment(TableConfig tableConfig, String topicName, int nPartitions,
+      List<String> instanceNames) {
     final int nReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
     ZNRecord znRecord = new ZNRecord(topicName);
     /*
