@@ -51,7 +51,7 @@ public class SegmentFetcherAndLoader {
   private final long _segmentLoadMinRetryDelayMs; // Min delay (in msecs) between retries
 
   public SegmentFetcherAndLoader(DataManager dataManager, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      Configuration pinotHelixProperties) {
+      Configuration pinotHelixProperties) throws Exception {
     _propertyStore = propertyStore;
     _dataManager = dataManager;
     int maxRetries = Integer.parseInt(CommonConstants.Server.DEFAULT_SEGMENT_LOAD_MAX_RETRY_COUNT);
@@ -75,7 +75,7 @@ public class SegmentFetcherAndLoader {
     Configuration segmentFetcherFactoryConfig =
         pinotHelixProperties.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
 
-    SegmentFetcherFactory.initSegmentFetcherFactory(segmentFetcherFactoryConfig);
+    SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
   }
 
   public void addOrReplaceOfflineSegment(String tableName, String segmentId, boolean retryOnFailure) {
@@ -100,7 +100,8 @@ public class SegmentFetcherAndLoader {
           LOGGER.info("Segment {} of table {} found on disk, attempting to load it", segmentId, tableName);
           try {
             localSegmentMetadata = new SegmentMetadataImpl(indexDir);
-            LOGGER.info("Found segment {} of table {} with crc {} on disk", segmentId, tableName, localSegmentMetadata.getCrc());
+            LOGGER.info("Found segment {} of table {} with crc {} on disk", segmentId, tableName,
+                localSegmentMetadata.getCrc());
           } catch (Exception e) {
             // The localSegmentDir should help us get the table name,
             LOGGER.error("Failed to load segment metadata from {}. Deleting it.", indexDir, e);
@@ -168,8 +169,9 @@ public class SegmentFetcherAndLoader {
             Utils.rethrowException(e);
           } catch (Exception e) {
             long attemptDurationMillis = System.currentTimeMillis() - attemptStartTime;
-            LOGGER.warn("Caught exception while loading segment " + segmentId + "(table " + tableName + "), attempt "
-                + (retryCount + 1) + " of " + maxRetryCount, e);
+            LOGGER.warn(
+                "Caught exception while loading segment " + segmentId + "(table " + tableName + "), attempt " + (
+                    retryCount + 1) + " of " + maxRetryCount, e);
 
             // Do we need to wait for the next retry attempt?
             if (retryCount < maxRetryCount - 1) {
@@ -177,11 +179,10 @@ public class SegmentFetcherAndLoader {
               // 1.0..(2^retryCount)+1.0
               double maxRetryDurationMultiplier = Math.pow(2.0, (retryCount + 1));
               double retryDurationMultiplier = Math.random() * maxRetryDurationMultiplier + 1.0;
-              long waitTime =
-                  (long) ((_segmentLoadMinRetryDelayMs + attemptDurationMillis) * retryDurationMultiplier);
+              long waitTime = (long) ((_segmentLoadMinRetryDelayMs + attemptDurationMillis) * retryDurationMultiplier);
 
-              LOGGER.warn("Waiting for " + TimeUnit.MILLISECONDS.toSeconds(waitTime)
-                  + " seconds to retry(" + segmentId + " of table " + tableName);
+              LOGGER.warn("Waiting for " + TimeUnit.MILLISECONDS.toSeconds(waitTime) + " seconds to retry(" + segmentId
+                  + " of table " + tableName);
               long waitEndTime = System.currentTimeMillis() + waitTime;
               while (System.currentTimeMillis() < waitEndTime) {
                 try {
@@ -199,7 +200,8 @@ public class SegmentFetcherAndLoader {
                   + " retries");
         }
       } else {
-        LOGGER.info("Got already loaded segment {} of table {} crc {} again, will do nothing.", segmentId, tableName, localSegmentMetadata.getCrc());
+        LOGGER.info("Got already loaded segment {} of table {} crc {} again, will do nothing.", segmentId, tableName,
+            localSegmentMetadata.getCrc());
       }
     } catch (final Exception e) {
       LOGGER.error("Cannot load segment : " + segmentId + " for table " + tableName, e);
@@ -234,7 +236,7 @@ public class SegmentFetcherAndLoader {
     File tempTarFile = new File(tempDir, segmentName + ".tar.gz");
     File tempSegmentDir = new File(tempDir, segmentName);
     try {
-      SegmentFetcherFactory.getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempTarFile);
+      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempTarFile);
       LOGGER.info("Downloaded tarred segment: {} for table: {} from: {} to: {}, file length: {}", segmentName,
           tableName, uri, tempTarFile, tempTarFile.length());
       TarGzCompressionUtils.unTar(tempTarFile, tempSegmentDir);

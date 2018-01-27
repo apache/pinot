@@ -90,7 +90,8 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
     try {
       // Download the tarred segment file
       File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile");
-      SegmentFetcherFactory.getSegmentFetcherBasedOnURI(downloadURL)
+      SegmentFetcherFactory.getInstance()
+          .getSegmentFetcherBasedOnURI(downloadURL)
           .fetchSegmentToLocal(downloadURL, tarredSegmentFile);
 
       // Un-tar the segment file
