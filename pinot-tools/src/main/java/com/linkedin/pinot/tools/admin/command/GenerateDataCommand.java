@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.FieldSpec.FieldRole;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.Schema.SchemaBuilder;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
@@ -124,15 +125,18 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
 
     List<String> columns = new LinkedList<String>();
     final HashMap<String, DataType> dataTypes = new HashMap<String, DataType>();
+    final HashMap<String, FieldRole> fieldRoles = new HashMap<String, FieldRole>();
     final HashMap<String, FieldType> fieldTypes = new HashMap<String, FieldType>();
     final HashMap<String, TimeUnit> timeUnits = new HashMap<String, TimeUnit>();
 
     final HashMap<String, Integer> cardinality = new HashMap<String, Integer>();
     final HashMap<String, IntRange> range = new HashMap<String, IntRange>();
 
-    buildCardinalityRangeMaps(_schemaAnnFile, cardinality, range);
-    final DataGeneratorSpec spec = buildDataGeneratorSpec(schema, columns, dataTypes, fieldTypes,
-        timeUnits, cardinality, range);
+    final HashMap<String, IntRange> lengthRange = new HashMap<String, IntRange>();
+
+    buildCardinalityRangeRolLengthRangeMaps(_schemaAnnFile, cardinality, range, fieldRoles, lengthRange);
+    final DataGeneratorSpec spec = buildDataGeneratorSpec(schema, columns, dataTypes, fieldRoles, fieldTypes,
+        timeUnits, cardinality, range, lengthRange);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);
@@ -141,8 +145,8 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
     return true;
   }
 
-  private void buildCardinalityRangeMaps(String file, HashMap<String, Integer> cardinality,
-      HashMap<String, IntRange> range) throws JsonParseException, JsonMappingException, IOException {
+  private void buildCardinalityRangeRolLengthRangeMaps(String file, HashMap<String, Integer> cardinality,
+      HashMap<String, IntRange> range, HashMap<String, FieldRole> fieldRoles, HashMap<String, IntRange> lengthRange ) throws JsonParseException, JsonMappingException, IOException {
     List<SchemaAnnotation> saList;
 
     if (file == null) {
@@ -161,13 +165,18 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
       } else {
         cardinality.put(column, sa.getCardinality());
       }
+
+      fieldRoles.put(column,sa.getFieldRole());
+      lengthRange.put(column,new IntRange(sa.getMinLength(),sa.getMaxLength()));
+
     }
   }
 
+
   private DataGeneratorSpec buildDataGeneratorSpec(Schema schema, List<String> columns,
-      HashMap<String, DataType> dataTypes, HashMap<String, FieldType> fieldTypes,
-      HashMap<String, TimeUnit> timeUnits, HashMap<String, Integer> cardinality,
-      HashMap<String, IntRange> range) {
+                                                   HashMap<String, DataType> dataTypes, HashMap<String, FieldSpec.FieldRole> fieldRoles, HashMap<String, FieldType> fieldTypes,
+                                                   HashMap<String, TimeUnit> timeUnits, HashMap<String, Integer> cardinality,
+                                                   HashMap<String, IntRange> range, HashMap<String, IntRange> lengthRange) {
     for (final FieldSpec fs : schema.getAllFieldSpecs()) {
       String col = fs.getName();
 
@@ -181,7 +190,6 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
             cardinality.put(col, 1000);
           }
           break;
-
         case METRIC:
           if (!range.containsKey(col)) {
             range.put(col, new IntRange(1, 1000));
@@ -201,14 +209,16 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
       }
     }
 
-    return new DataGeneratorSpec(columns, cardinality, range, dataTypes, fieldTypes,
-        timeUnits, FileFormat.AVRO, _outDir, _overwrite);
+    return new DataGeneratorSpec(columns, cardinality, range, lengthRange, dataTypes, fieldRoles, fieldTypes,
+            timeUnits, FileFormat.AVRO, _outDir, _overwrite);
   }
 
   public static void main(String[] args) throws JsonGenerationException, JsonMappingException, IOException {
+
+
     SchemaBuilder schemaBuilder = new SchemaBuilder();
 
-    schemaBuilder.addSingleValueDimension("name", DataType.STRING);
+    schemaBuilder.addSingleValueDimension("name", DataType.STRING, "ID");
     schemaBuilder.addSingleValueDimension("age", DataType.INT);
     schemaBuilder.addMetric("percent", DataType.FLOAT);
     schemaBuilder.addTime("days", TimeUnit.DAYS, DataType.LONG);

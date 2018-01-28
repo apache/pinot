@@ -32,6 +32,7 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.FieldSpec.FieldRole;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
@@ -72,7 +73,7 @@ public class DataGenerator {
 
       if (genSpec.getCardinalityMap().containsKey(column)) {
         generators.put(column,
-            GeneratorFactory.getGeneratorFor(dataType, genSpec.getCardinalityMap().get(column)));
+            GeneratorFactory.getGeneratorFor(dataType, genSpec.getCardinalityMap().get(column),genSpec.getFieldRolesMap().get(column),genSpec.getLengthRangeMap().get(column)));
 
       } else if (genSpec.getRangeMap().containsKey(column)) {
         IntRange range = genSpec.getRangeMap().get(column);
@@ -141,6 +142,7 @@ public class DataGenerator {
   public static void main(String[] args) throws IOException, JSONException {
     final String[] columns = { "column1"};
     final Map<String, DataType> dataTypes = new HashMap<String, DataType>();
+    final Map<String, FieldRole> feildRoles = new HashMap<String, FieldRole>();
     final Map<String, FieldType> fieldTypes = new HashMap<String, FieldType>();
     final Map<String, TimeUnit> timeUnits = new HashMap<String, TimeUnit>();
 
@@ -148,12 +150,13 @@ public class DataGenerator {
     final Map<String, IntRange> range = new HashMap<String, IntRange>();
 
     for (final String col : columns) {
-      dataTypes.put(col, DataType.STRING_ID);
+      dataTypes.put(col, DataType.STRING);
       fieldTypes.put(col, FieldType.DIMENSION);
+      feildRoles.put(col, FieldRole.ID);
       cardinality.put(col, 1000);
     }
     final DataGeneratorSpec spec = new DataGeneratorSpec(Arrays.asList(columns), cardinality,
-        range, dataTypes, fieldTypes, timeUnits, FileFormat.AVRO, "/tmp/out", true);
+        range, dataTypes, feildRoles, fieldTypes, timeUnits, FileFormat.AVRO, "/tmp/out", true);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);

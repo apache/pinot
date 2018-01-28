@@ -1,7 +1,39 @@
 [
   {
-    "column" : "ProfileID",
+    "column" : "ID",
     "range" : false,
-    "cardinality" : 100000
+    "cardinality" : 100000,
+    "fieldRole" : "ID",
+    "minLength" : 16,
+    "maxLength" : 64
+  },
+  {
+    "column" : "Headline",
+    "range" : false,
+    "cardinality" : 50000,
+    "minLength" : 32,
+    "maxLength" : 512
+  },
+  {
+    "column" : "Position",
+    "range" : false,
+    "cardinality" : 10000,
+    "minLength" : 64,
+    "maxLength" : 256
+  },
+  {
+    "column" : "Company",
+    "range" : false,
+    "cardinality" : 5000,
+    "minLength" : 16,
+    "maxLength" : 32
+  },
+  {
+    "column" : "Skills",
+    "range" : false,
+    "cardinality" : 20000,
+    "minLength" : 256,
+    "maxLength" : 512
   }
+
 ]

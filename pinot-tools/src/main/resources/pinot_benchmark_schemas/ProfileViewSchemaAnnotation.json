@@ -1,0 +1,14 @@
+[
+  {
+    "column" : "ViewStartTime",
+    "range" : true,
+    "rangeStart" : 1483228800,
+    "rangeEnd"   : 1485907200
+  },
+  {
+    "column" : "ReviewTime",
+    "range" : true,
+    "rangeStart" : 1,
+    "rangeEnd"   : 1800
+  }
+]

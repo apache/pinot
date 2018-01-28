@@ -1,39 +1,40 @@
 {
   "metricFieldSpecs": [
     {
-      "dataType" : "INT",
-      "name" : "ArticleReadTime"
+      "singleValueField" : true,
+      "dataType": "LONG",
+      "name" : "ReadStartTime"
     },
     {
       "singleValueField" : true,
-      "dataType" : "INT",
+      "dataType": "INT",
       "name" : "TimeSpent"
     }
   ],
   "dimensionFieldSpecs": [
     {
       "singleValueField" : true,
-      "dataType" : "String",
+      "dataType": "STRING",
       "name" : "ReaderProfileId"
     },
     {
       "singleValueField" : true,
-      "dataType" : "STRING",
-      "name" : "ViewerHeadline"
+      "dataType": "STRING",
+      "name" : "ReaderHeadline"
     },
     {
       "singleValueField" : true,
-      "dataType" : "STRING",
-      "name" : "ViewerPosition"
+      "dataType": "STRING",
+      "name" : "ReaderPosition"
     },
     {
       "singleValueField" : true,
-      "dataType" : "STRING",
+      "dataType": "STRING",
       "name" : "ArticleID"
     },
     {
       "singleValueField" : true,
-      "dataType" : "STRING",
+      "dataType": "STRING",
       "name" : "ArticleUrl"
     },
     {
@@ -49,13 +50,18 @@
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "ArticleWriter"
+      "name": "ArticleAuthor"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
       "name": "ArticleCompany"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "ArticleTopic"
     }
   ],
-  "schemaName": "ReadArticleSchema"
+  "schemaName": "ArticleReadSchema"
 }

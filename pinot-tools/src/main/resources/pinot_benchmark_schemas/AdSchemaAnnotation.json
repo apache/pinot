@@ -1,32 +1,45 @@
 [
   {
-    "column" : "AdID",
+    "column" : "ID",
     "range" : false,
-    "cardinality" : 100000
+    "cardinality" : 100000,
+    "fieldRole" : "ID",
+    "minLength" : 16,
+    "maxLength" : 64
   },
   {
-    "column" : "AdUrl",
+    "column" : "Url",
     "range" : false,
-    "cardinality" : 100000
+    "cardinality" : 100000,
+    "minLength" : 32,
+    "maxLength" : 256
   },
   {
-    "column" : "AdTitle",
+    "column" : "Title",
     "range" : false,
-    "cardinality" : 50000
+    "cardinality" : 10000,
+    "minLength" : 32,
+    "maxLength" : 128
   },
   {
-    "column" : "AdText",
+    "column" : "Text",
     "range" : false,
-    "cardinality" : 100000
+    "cardinality" : 100000,
+    "minLength" : 128,
+    "maxLength" : 512
   },
   {
-    "column" : "AdCompany",
+    "column" : "Company",
     "range" : false,
-    "cardinality" : 5000
+    "cardinality" : 5000,
+    "minLength" : 16,
+    "maxLength" : 32
   },
   {
-    "column" : "AdCampaign",
+    "column" : "Campaign",
     "range" : false,
-    "cardinality" : 1000
+    "cardinality" : 1000,
+    "minLength" : 16,
+    "maxLength" : 64
   }
 ]

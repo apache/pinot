@@ -421,6 +421,11 @@ public final class Schema {
       return this;
     }
 
+    public SchemaBuilder addSingleValueDimension(@Nonnull String dimensionName, @Nonnull DataType dataType, String dataRole) {
+      _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, dataRole));
+      return this;
+    }
+
     public SchemaBuilder addSingleValueDimension(@Nonnull String dimensionName, @Nonnull DataType dataType,
         @Nonnull Object defaultNullValue) {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, defaultNullValue));

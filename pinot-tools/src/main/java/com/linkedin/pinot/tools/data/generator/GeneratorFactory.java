@@ -15,8 +15,10 @@
  */
 package com.linkedin.pinot.tools.data.generator;
 
+import com.linkedin.pinot.common.data.FieldSpec.FieldRole;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.utils.DataTable;
+import org.apache.commons.lang.math.IntRange;
 
 
 /**
@@ -38,12 +40,16 @@ public class GeneratorFactory {
     if (type == DataType.STRING) {
       return new StringGenerator(cardinality);
     }
-    if (type == DataType.STRING_ID)
-    {
-      return  new StringIDGenerator(cardinality);
+    return new NumberGenerator(cardinality, type, false);
+  }
+
+  public static Generator getGeneratorFor(DataType type, int cardinality, FieldRole fieldRole, IntRange lengthRange) {
+    if (type == DataType.STRING) {
+      return new StringGenerator(cardinality, fieldRole, lengthRange);
     }
     return new NumberGenerator(cardinality, type, false);
   }
+
 
   public static Generator getGeneratorFor(DataType dataType, int start, int end) {
     Generator generator;

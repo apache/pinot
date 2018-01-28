@@ -4,33 +4,38 @@
   "dimensionFieldSpecs": [
     {
       "singleValueField" : true,
-      "dataType" : "STRING_ID",
-      "name" : "ArticleID"
-    },
-    {
-      "singleValueField" : true,
-      "dataType" : "STRING",
-      "name" : "ArticleUrl"
+      "dataType": "STRING",
+      "name" : "ID"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "ArticleTitle"
+      "name" : "Url"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "ArticleAbstract"
+      "name": "Title"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "ArticleWriter"
+      "name": "Abstract"
     },
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "ArticleCompany"
+      "name": "Author"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "Company"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "Topic"
     }
   ],
   "schemaName": "ArticleSchema"

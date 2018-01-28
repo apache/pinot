@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.data.generator;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -25,6 +26,7 @@ import org.apache.commons.lang.math.IntRange;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.FieldSpec.FieldRole;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 
 
@@ -37,7 +39,9 @@ public class DataGeneratorSpec {
   private final Map<String, Integer> cardinalityMap;
   private final Map<String, IntRange> rangeMap;
 
+  private final Map<String, IntRange> lengthRangeMap;
   private final Map<String, DataType> dataTypesMap;
+  private final Map<String, FieldRole> fieldRolesMap;
   private final Map<String, FieldType> fieldTypesMap;
   private final Map<String, TimeUnit> timeUnitMap;
 
@@ -47,8 +51,9 @@ public class DataGeneratorSpec {
 
   public DataGeneratorSpec() {
     this(new ArrayList<String>(), new HashMap<String, Integer>(), new HashMap<String, IntRange>(),
-        new HashMap<String, DataType>(), new HashMap<String, FieldType>(), new HashMap<String, TimeUnit>(),
-        FileFormat.AVRO, "/tmp/dataGen", true);
+            new HashMap<String, IntRange>(),
+        new HashMap<String, DataType>(), new HashMap<String, FieldRole>(), new HashMap<String, FieldType>(),
+            new HashMap<String, TimeUnit>(), FileFormat.AVRO, "/tmp/dataGen", true);
   }
 
   public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap,
@@ -58,17 +63,71 @@ public class DataGeneratorSpec {
     this.columns = columns;
     this.cardinalityMap = cardinalityMap;
     this.rangeMap = rangeMap;
+
+    this.lengthRangeMap = null;
+
     outputFileFormat = format;
     this.outputDir = outputDir;
     overrideOutDir = override;
 
     this.dataTypesMap = dataTypesMap;
+    this.fieldRolesMap = null;
+    this.fieldTypesMap = fieldTypesMap;
+    this.timeUnitMap = timeUnitMap;
+  }
+
+  public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap,
+                           Map<String, IntRange> rangeMap, Map<String, DataType> dataTypesMap,  Map<String, FieldRole> fieldRolesMap,
+                           Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
+                           FileFormat format, String outputDir, boolean override) {
+    this.columns = columns;
+    this.cardinalityMap = cardinalityMap;
+    this.rangeMap = rangeMap;
+
+    this.lengthRangeMap = null;
+
+    outputFileFormat = format;
+    this.outputDir = outputDir;
+    overrideOutDir = override;
+
+    this.dataTypesMap = dataTypesMap;
+    this.fieldRolesMap = fieldRolesMap;
+    this.fieldTypesMap = fieldTypesMap;
+    this.timeUnitMap = timeUnitMap;
+  }
+
+  public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap, Map<String, IntRange> rangeMap,
+                           Map<String, IntRange> lengthRangeMap,
+                           Map<String, DataType> dataTypesMap,  Map<String, FieldRole> fieldRolesMap,
+                           Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
+                           FileFormat format, String outputDir, boolean override) {
+    this.columns = columns;
+    this.cardinalityMap = cardinalityMap;
+    this.rangeMap = rangeMap;
+
+    this.lengthRangeMap = lengthRangeMap;
+
+    outputFileFormat = format;
+    this.outputDir = outputDir;
+    overrideOutDir = override;
+
+    this.dataTypesMap = dataTypesMap;
+    this.fieldRolesMap = fieldRolesMap;
     this.fieldTypesMap = fieldTypesMap;
     this.timeUnitMap = timeUnitMap;
   }
 
   public Map<String, DataType> getDataTypesMap() {
     return dataTypesMap;
+  }
+
+  public Map<String, FieldRole> getFieldRolesMap() {
+    return fieldRolesMap;
+  }
+
+  public Map<String, IntRange> getLengthRangeMap()
+  {
+    return  lengthRangeMap;
   }
 
   public Map<String, FieldType> getFieldTypesMap() {

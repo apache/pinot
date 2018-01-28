@@ -1,26 +1,31 @@
 {
-  "metricFieldSpecs": [
+  "metricFieldSpecs" : [
   ],
-  "dimensionFieldSpecs": [
-     {
-       "singleValueField" : true,
-       "dataType" : "STRING",
-       "name" : "ProfileId"
+  "dimensionFieldSpecs" : [
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "ID"
     },
     {
       "singleValueField" : true,
-      "dataType": "STRING",
-      "name": "Company"
+      "dataType" : "STRING",
+      "name" : "Company"
     },
     {
       "singleValueField" : true,
-      "dataType": "STRING",
-      "name": "Headline"
+      "dataType" : "STRING",
+      "name" : "Headline"
     },
     {
       "singleValueField" : true,
-      "dataType": "STRING",
-      "name": "Position"
+      "dataType" : "STRING",
+      "name" : "Position"
+    },
+    {
+      "singleValueField" : true,
+      "dataType" : "STRING",
+      "name" : "Skills"
     }
   ],
   "schemaName": "ProfileSchema"

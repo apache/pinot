@@ -2,34 +2,34 @@
   "metricFieldSpecs": [
     {
       "singleValueField" : true,
-      "dataType" : "LONG",
+      "dataType": "LONG",
       "name" : "ClickTime"
     }
   ],
   "dimensionFieldSpecs": [
     {
       "singleValueField" : true,
-      "dataType" : "STRING",
+      "dataType": "STRING",
       "name" : "ViewerProfileId"
     },
     {
       "singleValueField" : true,
-      "dataType" : "STRING",
+      "dataType": "STRING",
       "name" : "ViewerHeadline"
     },
     {
       "singleValueField" : true,
-      "dataType" : "STRING",
+      "dataType": "STRING",
       "name" : "ViewerPosition"
     },
     {
       "singleValueField" : true,
-      "dataType" : "STRING",
+      "dataType": "STRING",
       "name" : "AdID"
     },
     {
       "singleValueField" : true,
-      "dataType" : "STRING",
+      "dataType": "STRING",
       "name" : "AdUrl"
     },
     {

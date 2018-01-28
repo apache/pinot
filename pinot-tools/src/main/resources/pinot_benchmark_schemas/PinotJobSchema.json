@@ -1,7 +1,7 @@
 {
   "metricFieldSpecs": [
     {
-      "dataType" : "LONG",
+      "dataType": "LONG",
       "name" : "jobPostTime"
     },
     {

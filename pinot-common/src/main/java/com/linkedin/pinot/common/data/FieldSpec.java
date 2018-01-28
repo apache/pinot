@@ -70,6 +70,7 @@ public abstract class FieldSpec {
     _stringDefaultNullValue = defaultNullValue.toString();
   }
 
+
   @Nonnull
   public abstract FieldType getFieldType();
 
@@ -198,6 +199,11 @@ public abstract class FieldSpec {
     METRIC,
     TIME,
     DATE_TIME
+  }
+
+  public enum FieldRole {
+    TYPICAL,
+    ID
   }
 
   /**

@@ -1,6 +1,6 @@
 [
   {
-    "column" : "AdPostTime",
+    "column" : "ClickTime",
     "range" : true,
     "rangeStart" : 1483228800,
     "rangeEnd"   : 1508873892

@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.tools.data.generator;
 
+import com.linkedin.pinot.common.data.FieldSpec.FieldRole;
+
+
 public class SchemaAnnotation {
   String _column;
   boolean _range;
@@ -22,6 +25,10 @@ public class SchemaAnnotation {
   private int _cardinality;
   private int _rangeStart;
   private int _rangeEnd;
+  private FieldRole _fieldRole = FieldRole.TYPICAL;
+  private  int _minLength = 10;
+  private  int _maxLength = 100;
+
 
   public SchemaAnnotation() {
   }
@@ -36,6 +43,12 @@ public class SchemaAnnotation {
     _rangeStart = rangeStart;
     _rangeEnd = rangeEnd;
   }
+
+  public SchemaAnnotation(String column, FieldRole fieldRole) {
+    _column = column;
+    _fieldRole = fieldRole;
+  }
+
 
   public String getColumn() {
     return _column;
@@ -75,5 +88,32 @@ public class SchemaAnnotation {
 
   public void setRangeEnd(int rangeEnd) {
     _rangeEnd = rangeEnd;
+  }
+
+  public void setFieldRole(FieldRole fieldRole)
+  {
+    _fieldRole = fieldRole;
+
+  }
+  public void setMinLength(int minLength)
+  {
+    _minLength = minLength;
+  }
+  public void setMaxLength(int maxLength)
+  {
+    _maxLength = maxLength;
+  }
+  public FieldRole getFieldRole() {
+     return _fieldRole;
+  }
+
+  public  int getMinLength()
+  {
+    return _minLength;
+  }
+
+  public int getMaxLength()
+  {
+    return _maxLength;
   }
 }
