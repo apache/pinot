@@ -17,6 +17,8 @@
 package com.linkedin.pinot.controller.helix.core.rebalance;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
+import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyEnum;
 import org.apache.helix.HelixManager;
 
 
@@ -48,9 +50,13 @@ public class RebalanceSegmentStrategyFactory {
   }
 
   public RebalanceSegmentStrategy getRebalanceSegmentsStrategy(TableConfig tableConfig) {
-
-    // TODO: based on table config pick the right Rebalancer
-    return new DefaultRebalanceSegmentStrategy(_helixManager);
+    // If we use replica group segment assignment strategy, we pick the replica group rebalancer
+    String segmentAssignmentStrategy = tableConfig.getValidationConfig().getSegmentAssignmentStrategy();
+    switch (SegmentAssignmentStrategyEnum.valueOf(segmentAssignmentStrategy)) {
+      case ReplicaGroupSegmentAssignmentStrategy:
+        return new ReplicaGroupRebalanceSegmentStrategy(_helixManager);
+      default:
+        return new DefaultRebalanceSegmentStrategy(_helixManager);
+    }
   }
-
 }

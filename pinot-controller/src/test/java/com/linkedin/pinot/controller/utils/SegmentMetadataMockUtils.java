@@ -17,8 +17,14 @@ package com.linkedin.pinot.controller.utils;
 
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.lang.math.IntRange;
 import org.mockito.Mockito;
 
+import static org.mockito.Mockito.*;
 
 public class SegmentMetadataMockUtils {
   private SegmentMetadataMockUtils() {
@@ -54,5 +60,22 @@ public class SegmentMetadataMockUtils {
     Mockito.when(realtimeSegmentZKMetadata.getSegmentName()).thenReturn(segmentName);
     Mockito.when(realtimeSegmentZKMetadata.getTotalRawDocs()).thenReturn(numTotalDocs);
     return realtimeSegmentZKMetadata;
+  }
+
+  public static SegmentMetadata mockSegmentMetadataWithPartitionInfo(String tableName, String segmentName,
+      String columnName, int partitionNumber) {
+    ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
+    List<IntRange> partitionRanges = new ArrayList<>();
+    partitionRanges.add(new IntRange(partitionNumber));
+    when(columnMetadata.getPartitionRanges()).thenReturn(partitionRanges);
+
+    SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
+    if (columnName != null) {
+      when(segmentMetadata.getColumnMetadataFor(columnName)).thenReturn(columnMetadata);
+    }
+    when(segmentMetadata.getTableName()).thenReturn(tableName);
+    when(segmentMetadata.getName()).thenReturn(segmentName);
+    when(segmentMetadata.getCrc()).thenReturn("0");
+    return segmentMetadata;
   }
 }
