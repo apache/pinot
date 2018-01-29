@@ -11,8 +11,9 @@ export default Controller.extend({
    * When replay id is received it indicates that we need to check replay status
    * before displaying alert function performance data.
    */
-  queryParams: ['replayId'],
-  replayId: null,
+  queryParams: ['jobId', 'functionName'],
+  jobId: null,
+  functionName: null,
 
   actions: {
 
