@@ -13,12 +13,6 @@ let requestCanContinue = true;
 let onboardStartTime = {};
 
 export default Route.extend({
-  queryParams: {
-    newUx: {
-      refreshModel: false,
-      replace: true
-    }
-  },
 
   /**
    * Model hook for the create alert route.
@@ -28,7 +22,6 @@ export default Route.extend({
   model(params, transition) {
     return RSVP.hash({
       // Fetch all alert group configurations
-      isNewUx: transition.queryParams.newUx || false,
       allConfigGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(res => res.json()),
       allAppNames: fetch('/thirdeye/entity/APPLICATION').then(res => res.json())
     });

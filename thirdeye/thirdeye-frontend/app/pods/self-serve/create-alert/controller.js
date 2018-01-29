@@ -12,11 +12,6 @@ import { task, timeout } from 'ember-concurrency';
 import { checkStatus, buildDateEod, postProps } from 'thirdeye-frontend/helpers/utils';
 
 export default Controller.extend({
-  /**
-   * Be ready to receive trigger for loading new ux with redirect to alert page
-   */
-  queryParams: ['newUx'],
-  newUx: null,
 
   /**
    * Initialized alert creation page settings
@@ -59,17 +54,11 @@ export default Controller.extend({
   },
 
   /**
-   * Change this to activate new alert anomaly page redirect
-   */
-  isNewUx: Ember.computed.reads('model.isNewUx'),
-
-  /**
    * Component property initial settings
    */
   filters: {},
   graphConfig: {},
   selectedFilters: JSON.stringify({}),
-  selectedSensitivity: null,
   selectedWeeklyEffect: true,
 
   /**
@@ -109,11 +98,6 @@ export default Controller.extend({
    * Options for patterns of interest field. These may eventually load from the backend.
    */
   patternsOfInterest: ['Up and Down', 'Up only', 'Down only'],
-
-  /**
-   * Options for sensitivity field, previously 'Robust', 'Medium', 'Sensitive'
-   */
-  sensitivityOptions: ['Robust (Low)', 'Medium', 'Sensitive (High)'],
 
   /**
    * Mapping user readable pattern and sensitivity to DB values
@@ -795,7 +779,6 @@ export default Controller.extend({
       selectedMetricOption: null,
       selectedPattern: null,
       selectedGranularity: null,
-      selectedSensitivity: null,
       selectedWeeklyEffect: true,
       selectedDimension: null,
       alertFunctionName: null,
