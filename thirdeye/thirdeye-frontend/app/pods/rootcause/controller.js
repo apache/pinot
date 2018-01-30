@@ -346,6 +346,24 @@ export default Ember.Controller.extend({
   ),
 
   /**
+   * Sets the transient rca session properties after saving
+   *
+   * @param sessionId rca session id
+   * @private
+   */
+  _updateSession(sessionId) {
+    const sessionUpdatedBy = this.get('authService.data.authenticated.name'); // fetch ldap of current user
+
+    this.setProperties({
+      sessionId,
+      sessionUpdatedBy,
+      sessionUpdatedTime: moment().valueOf(),
+      sessionModified: false
+    });
+    this.transitionToRoute({ queryParams: { sessionId, anomalyId: null, metricId: null }});
+  },
+
+  /**
    * Serializes the current controller state for persistence as rca session
    *
    * @returns serialized rca session state
@@ -520,12 +538,7 @@ export default Ember.Controller.extend({
 
       return sessionService
         .saveAsync(session)
-        .then((res) => this.setProperties({
-          sessionId: res,
-          sessionUpdatedBy,
-          sessionUpdatedTime: moment().valueOf(),
-          sessionModified: false
-        }))
+        .then(sessionId => this._updateSession(sessionId))
         .catch((error) => {
           const { routeErrors } = this.getProperties('routeErrors');
           routeErrors.add('Could not save investigation');
@@ -551,12 +564,7 @@ export default Ember.Controller.extend({
 
       return sessionService
         .saveAsync(session)
-        .then((res) => this.setProperties({
-          sessionId: res,
-          sessionUpdatedBy,
-          sessionUpdatedTime: moment().valueOf(),
-          sessionModified: false
-        }))
+        .then(sessionId => this._updateSession(sessionId))
         .catch((error) => {
           const { routeErrors } = this.getProperties('routeErrors');
           routeErrors.add('Could not copy investigation');
