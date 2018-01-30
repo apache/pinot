@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.alert.commons.EmailContentFormatterFactory;
 import com.linkedin.thirdeye.alert.commons.EmailEntity;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatter;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
+import com.linkedin.thirdeye.alert.content.EmailContentFormatterContext;
 import com.linkedin.thirdeye.alert.feed.AnomalyFeed;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
@@ -285,7 +286,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
 
         EmailEntity emailEntity = emailContentFormatter
             .getEmailEntity(alertConfig, recipientsForThisGroup, emailSubjectBuilder.toString(),
-                groupedAnomalyDTO.getId(), groupName, anomalyResultListOfGroup);
+                groupedAnomalyDTO.getId(), groupName, anomalyResultListOfGroup, new EmailContentFormatterContext());
         EmailHelper.sendEmailWithEmailEntity(emailEntity, thirdeyeConfig.getSmtpConfiguration());
         // Update notified flag
         if (alertGrouper instanceof DummyAlertGrouper) {

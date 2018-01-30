@@ -128,10 +128,10 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
 
   @Override
   public EmailEntity getEmailEntity(AlertConfigDTO alertConfigDTO, String recipients, String subject,
-      Long groupId, String groupName, Collection<AnomalyResult> anomalies) {
+      Long groupId, String groupName, Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
     Map<String, Object> templateData =
         getTemplateData(alertConfigDTO, groupId, groupName, anomalies);
-    updateTemplateDataByAnomalyResults(templateData, anomalies);
+    updateTemplateDataByAnomalyResults(templateData, anomalies, context);
     if (org.apache.commons.lang3.StringUtils.isNotBlank(groupName)) {
       subject = subject + " - " + groupName;
     }
@@ -144,7 +144,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
    * @param anomalies
    */
   protected abstract void updateTemplateDataByAnomalyResults(Map<String, Object> templateData,
-      Collection<AnomalyResult> anomalies);
+      Collection<AnomalyResult> anomalies, EmailContentFormatterContext context);
 
   /**
    * Add the auxiliary email information into parameter map

@@ -4,6 +4,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.alert.commons.EmailEntity;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatter;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
+import com.linkedin.thirdeye.alert.content.EmailContentFormatterContext;
 import com.linkedin.thirdeye.alert.content.OnboardingNotificationEmailContentFormatter;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
@@ -115,10 +116,15 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
     String subject = String.format("Replay results for %s is ready for review!",
         DAORegistry.getInstance().getAnomalyFunctionDAO().findById(functionId).getFunctionName());
 
-    EmailContentFormatter emailContentFormatter = new OnboardingNotificationEmailContentFormatter(start, end);
+    EmailContentFormatter emailContentFormatter = new OnboardingNotificationEmailContentFormatter();
+    // construct context
+    EmailContentFormatterContext context = new EmailContentFormatterContext();
+    context.setStart(start);
+    context.setEnd(end);
+
     emailContentFormatter.init(new Properties(), emailFormatterConfig);
     EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, alertConfig.getRecipients(),
-        subject, null, "", filteredAnomalyResults);
+        subject, null, "", filteredAnomalyResults, context);
     try {
       EmailHelper.sendEmailWithEmailEntity(emailEntity, smtpConfiguration);
     } catch (EmailException e) {

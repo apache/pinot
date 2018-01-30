@@ -93,7 +93,7 @@ public class TestMultipleAnomaliesEmailContentFormatter {
     EmailContentFormatter contentFormatter = new MultipleAnomaliesEmailContentFormatter();
     contentFormatter.init(new Properties(), EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(thirdeyeAnomalyConfig));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(alertConfigDTO, "a@b.com", TEST,
-        null, "", anomalies);
+        null, "", anomalies, null);
 
     String htmlPath = ClassLoader.getSystemResource("test-multiple-anomalies-email-content-formatter.html").getPath();
     BufferedReader br = new BufferedReader(new FileReader(htmlPath));

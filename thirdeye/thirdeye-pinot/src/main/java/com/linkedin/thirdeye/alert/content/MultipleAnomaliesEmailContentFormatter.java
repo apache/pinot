@@ -54,7 +54,7 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
 
   @Override
   protected void updateTemplateDataByAnomalyResults(Map<String, Object> templateData,
-      Collection<AnomalyResult> anomalies) {
+      Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
     DateTime windowStart = DateTime.now();
     DateTime windowEnd = new DateTime(0);
 

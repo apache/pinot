@@ -32,7 +32,7 @@ public interface EmailContentFormatter {
    * @return
    */
   EmailEntity getEmailEntity(AlertConfigDTO alertConfigDTO, String recipients, String subject,
-      Long groupId, String groupName, Collection<AnomalyResult> anomalies);
+      Long groupId, String groupName, Collection<AnomalyResult> anomalies, EmailContentFormatterContext context);
 
   /**
    * Cleanup any temporary data

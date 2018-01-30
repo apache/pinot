@@ -97,7 +97,7 @@ public class TestOnboardingNotificationContentFormatter {
     EmailContentFormatter contentFormatter = new OnboardingNotificationEmailContentFormatter();
     contentFormatter.init(new Properties(), EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(thirdeyeAnomalyConfig));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(alertConfigDTO, "a@b.com", TEST,
-        null, "", anomalies);
+        null, "", anomalies, new EmailContentFormatterContext());
 
     String htmlPath = ClassLoader.getSystemResource("test-onboard-notification-email-content-formatter.html").getPath();
     BufferedReader br = new BufferedReader(new FileReader(htmlPath));
