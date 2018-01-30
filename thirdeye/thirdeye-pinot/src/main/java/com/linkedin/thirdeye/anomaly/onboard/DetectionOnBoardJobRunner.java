@@ -1,8 +1,12 @@
 package com.linkedin.thirdeye.anomaly.onboard;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
+import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
+import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -10,13 +14,19 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
+import org.apache.commons.mail.EmailException;
+import org.apache.commons.mail.HtmlEmail;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class DetectionOnBoardJobRunner implements Runnable {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionOnBoardJobRunner.class);
   private final ExecutorService executorService = Executors.newSingleThreadExecutor();
+  private final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   public static final String ABORT_ON_FAILURE= "abortOnFailure";
   private final DetectionOnboardJobContext jobContext;
@@ -24,6 +34,10 @@ public class DetectionOnBoardJobRunner implements Runnable {
   private final DetectionOnboardJobStatus jobStatus;
   private final int taskTimeOutSize;
   private final TimeUnit taskTimeOutUnit;
+  private final SmtpConfiguration smtpConfiguration;
+  private final String failureNotificationSender;
+  private final String failureNotificationReceiver;
+  private final boolean notifyIfFails;
 
   public DetectionOnBoardJobRunner(DetectionOnboardJobContext jobContext, List<DetectionOnboardTask> tasks,
       DetectionOnboardJobStatus jobStatus) {
@@ -42,6 +56,18 @@ public class DetectionOnBoardJobRunner implements Runnable {
     this.jobStatus = jobStatus;
     this.taskTimeOutSize = taskTimeOutSize;
     this.taskTimeOutUnit = taskTimeOutUnit;
+    Configuration configuration = jobContext.getConfiguration();
+    if (configuration.containsKey(DefaultDetectionOnboardJob.SMTP_HOST)) {
+      smtpConfiguration = new SmtpConfiguration();
+      smtpConfiguration.setSmtpHost(configuration.getString(DefaultDetectionOnboardJob.SMTP_HOST));
+      smtpConfiguration.setSmtpPort(configuration.getInt(DefaultDetectionOnboardJob.SMTP_PORT));
+    } else {
+      smtpConfiguration = null;
+    }
+    failureNotificationSender = configuration.getString(DefaultDetectionOnboardJob.DEFAULT_ALERT_SENDER_ADDRESS);
+    failureNotificationReceiver = configuration.getString(DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER_ADDRESS);
+    notifyIfFails = configuration.getBoolean(DefaultDetectionOnboardJob.NOTIFY_IF_FAILS,
+        DefaultDetectionOnboardJob.DEFAULT_NOTIFY_IF_FAILS);
   }
 
   @Override
@@ -90,9 +116,44 @@ public class DetectionOnBoardJobRunner implements Runnable {
       if (abortOnFailure && !TaskConstants.TaskStatus.COMPLETED.equals(taskStatus.getTaskStatus())) {
         jobStatus.setJobStatus(JobConstants.JobStatus.FAILED);
         LOG.error("Failed to execute job {}.", jobContext.getJobName());
+        if (notifyIfFails) {
+          if (smtpConfiguration == null || StringUtils.isBlank(failureNotificationSender)
+              || StringUtils.isBlank(failureNotificationReceiver)) {
+            LOG.warn("SmtpConfiguration, and email sender/recipients cannot be null or empty");
+          } else {
+            try {
+              sendFailureEmail();
+            } catch (JobExecutionException e) {
+              LOG.warn("Unable to send failure emails");
+            }
+          }
+        }
         return;
       }
     }
     jobStatus.setJobStatus(JobConstants.JobStatus.COMPLETED);
+  }
+
+  private void sendFailureEmail() throws JobExecutionException {
+    HtmlEmail email = new HtmlEmail();
+    String subject = String
+        .format("[ThirdEye Onboarding Job] FAILED Onboarding Job Id=%d for config %s", jobContext.getJobId(),
+            jobContext.getJobName());
+    String jobStatusString;
+    try {
+      jobStatusString = OBJECT_MAPPER.writeValueAsString(jobStatus);
+    } catch (IOException e) {
+      LOG.warn("Unable to parse job context {}", jobContext);
+      jobStatusString = jobStatus.toString();
+    }
+    String textBody = String
+        .format("<h1>Job Status</h1><p>%s</p>", jobStatusString);
+    try {
+      EmailHelper
+          .sendEmailWithTextBody(email, smtpConfiguration, subject, textBody,
+              failureNotificationSender, failureNotificationReceiver);
+    } catch (EmailException e) {
+      throw new JobExecutionException(e);
+    }
   }
 }

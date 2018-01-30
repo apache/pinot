@@ -167,13 +167,14 @@ public class HierarchicalAnomaliesEmailContentFormatter extends BaseEmailContent
     String exploredDimensions = anomalyFunction.getExploreDimensions();
     // Add WoW number
     if (presentSeasonalValues) {
-      try {
-        for (COMPARE_MODE compareMode : COMPARE_MODE.values()) {
-          double avgValues = getAvgComparisonBaseline(anomaly, compareMode, anomaly.getStartTime(), anomaly.getEndTime());
-          anomalyReport.setSeasonalValues(compareMode, avgValues, anomaly.getAvgCurrentVal());
+      for (COMPARE_MODE compareMode : COMPARE_MODE.values()) {
+        double avgValues = Double.NaN;
+        try {
+          avgValues = getAvgComparisonBaseline(anomaly, compareMode, anomaly.getStartTime(), anomaly.getEndTime());
+        } catch (Exception e) {
+          LOG.warn("Unable to fetch wow information for {}.", anomalyFunction);
         }
-      } catch (Exception e) {
-        LOG.warn("Unable to fetch wow information for {}.", anomalyFunction);
+        anomalyReport.setSeasonalValues(compareMode, avgValues, anomaly.getAvgCurrentVal());
       }
     }
     if (StringUtils.isBlank(exploredDimensions)) {

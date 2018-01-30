@@ -22,9 +22,9 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.Configuration;
@@ -168,6 +168,16 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     AnomalyFunctionDTO anomalyFunction = null;
     try {
       AnomalyFunctionDTO defaultFunctionSpec = getDefaultFunctionSpecByTimeGranularity(dataGranularity);
+
+      // Merge user properties with default properties; the user assigned property can override default property
+      Properties userAssignedFunctionProperties = com.linkedin.thirdeye.datalayer.util.StringUtils
+          .decodeCompactedProperties(configuration.getString(PROPERTIES, ""));
+      Properties defaultFunctionProperties = com.linkedin.thirdeye.datalayer.util.StringUtils
+          .decodeCompactedProperties(defaultFunctionSpec.getProperties());
+      for (Map.Entry propertyEntry : userAssignedFunctionProperties.entrySet()) {
+        defaultFunctionProperties.setProperty((String) propertyEntry.getKey(), (String) propertyEntry.getValue());
+      }
+
       Response response = anomalyResource.createAnomalyFunction(configuration.getString(COLLECTION_NAME),
           configuration.getString(FUNCTION_NAME), configuration.getString(METRIC_NAME),
           configuration.getString(METRIC_FUNCTION, defaultMetricFunction),
@@ -177,7 +187,8 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
           configuration.getString(WINDOW_DELAY, DEFAULT_WINDOW_DELAY),
           configuration.getString(CRON_EXPRESSION, defaultFunctionSpec.getCron()), configuration.getString(WINDOW_DELAY_UNIT),
           configuration.getString(EXPLORE_DIMENSION), configuration.getString(FILTERS),
-          configuration.getString(DATA_GRANULARITY), configuration.getString(PROPERTIES, ""),
+          configuration.getString(DATA_GRANULARITY),
+          com.linkedin.thirdeye.datalayer.util.StringUtils.encodeCompactedProperties(defaultFunctionProperties),
           configuration.getBoolean(IS_ACTIVE, DEFAULT_IS_ACTIVE));
       if (Response.Status.OK.equals(response.getStatusInfo())) {
         long functionId = Long.valueOf(response.getEntity().toString());
@@ -238,24 +249,28 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
         anomalyFunctionSpec.setCron("0 0 0 * * ?");
         anomalyFunctionSpec.setWindowSize(6);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
+        anomalyFunctionSpec.setProperties("");
         break;
       case HOURS:
         anomalyFunctionSpec.setType("REGRESSION_GAUSSIAN_SCAN");
         anomalyFunctionSpec.setCron("0 0 14 1/1 * ? *");
         anomalyFunctionSpec.setWindowSize(84);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
+        anomalyFunctionSpec.setProperties("");
         break;
       case DAYS:
         anomalyFunctionSpec.setType("SPLINE_REGRESSION_VANILLA");
         anomalyFunctionSpec.setCron("0 0 14 1/1 * ? *");
         anomalyFunctionSpec.setWindowSize(1);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.DAYS);
+        anomalyFunctionSpec.setProperties("");
         break;
       default:
         anomalyFunctionSpec.setType("WEEK_OVER_WEEK_RULE");
         anomalyFunctionSpec.setCron("0 0 0 * * ?");
         anomalyFunctionSpec.setWindowSize(6);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
+        anomalyFunctionSpec.setProperties("");
         break;
     }
     return anomalyFunctionSpec;
