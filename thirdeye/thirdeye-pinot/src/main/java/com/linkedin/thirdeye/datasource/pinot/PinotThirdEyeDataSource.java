@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.http.HttpHost;
@@ -364,11 +365,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
           } else {
             groupKeys = new String[] {};
           }
-          StringBuilder groupKeyBuilder = new StringBuilder("");
-          for (String grpKey : groupKeys) {
-            groupKeyBuilder.append(grpKey).append("|");
-          }
-          String compositeGroupKey = groupKeyBuilder.toString();
+          String compositeGroupKey = StringUtils.join(groupKeys, "|");
 
           String[] rowValues = dataMap.get(compositeGroupKey);
           if (rowValues == null) {
@@ -378,11 +375,12 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
             dataMap.put(compositeGroupKey, rowValues);
           }
 
-          if (!countMap.containsKey(compositeGroupKey)) {
-            countMap.put(compositeGroupKey, 0);
+          String countKey = compositeGroupKey + "|" + position;
+          if (!countMap.containsKey(countKey)) {
+            countMap.put(countKey, 0);
           }
-          final int aggCount = countMap.get(compositeGroupKey);
-          countMap.put(compositeGroupKey, aggCount + 1);
+          final int aggCount = countMap.get(countKey);
+          countMap.put(countKey, aggCount + 1);
 
           // aggregation of multiple values
           rowValues[groupKeys.length + position + i] = String.valueOf(
