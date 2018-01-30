@@ -67,7 +67,6 @@ public class PinotOutputFormatTest {
 
         Schema schema = Schema.fromString(getSchema());
         PinotOutputFormat.setSchema(job, schema);
-        PinotOutputFormat.setNumThreads(job, 10);
         mockTaskAttemptContext(indexType);
         segmentTarPath = "_temporary/0/_temporary/attempt_foo_task_" + indexType + "_0123_r_000002_2/part-r-00002/segmentTar";
 
@@ -125,12 +124,10 @@ public class PinotOutputFormatTest {
         int days = 2000;
         int sal = 20;
         RecordWriter<Object, Emp> writer = outputFormat.getRecordWriter(fakeTaskAttemptContext);
-       // ObjectMapper mapper = new ObjectMapper();
         Map<Integer, Emp> inputMap = new HashMap<>();
         for (int i = 0; i < 10; i++) {
             String name = "name " + i;
             Emp e = new Emp(i, name, days + i, sal + i);
-            //byte[] b = mapper.writeValueAsBytes(e);
             writer.write(null, e);
             inputMap.put(i, e);
         }

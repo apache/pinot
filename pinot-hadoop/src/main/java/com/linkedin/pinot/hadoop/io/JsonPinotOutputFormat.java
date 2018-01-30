@@ -15,46 +15,98 @@
  */
 package com.linkedin.pinot.hadoop.io;
 
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumReader;
+import org.apache.avro.io.DatumWriter;
+import org.apache.avro.io.Decoder;
+import org.apache.avro.io.DecoderFactory;
+import org.apache.avro.io.EncoderFactory;
+import org.apache.avro.io.JsonEncoder;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.JobContext;
 import org.codehaus.jackson.map.ObjectMapper;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
 
+/**
+ * OutputFormat implementation for Json source
+ * @param <K>
+ * @param <V>
+ */
 public class JsonPinotOutputFormat<K, V extends Serializable> extends PinotOutputFormat<K, V> {
+
+    public static final String JSON_READER_CLASS = "json.reader.class";
 
     @Override
     public void configure(Configuration conf) {
-        conf.set(PinotOutputFormat.DATA_WRITE_SUPPORT_CLASS, JsonDataWriteSupport.class.getName());
-        conf.set(PinotOutputFormat.FILE_FORMAT, FileFormat.JSON.name());
+        conf.set(PinotOutputFormat.PINOT_RECORD_SERIALIZATION_CLASS, JsonPinotRecordSerialization.class.getName());
     }
 
-    public static class JsonDataWriteSupport<V> implements DataWriteSupport<V> {
+    public static void setJsonReaderClass(JobContext context, Class<?> clazz) {
+        context.getConfiguration().set(JSON_READER_CLASS, clazz.getName());
+    }
 
-        ObjectMapper _mapper;
+    public static String getJsonReaderClass(Configuration conf) {
+        if (conf.get(JSON_READER_CLASS) == null) {
+            throw new RuntimeException("Json reader class not set");
+        }
+        return conf.get(JSON_READER_CLASS);
+    }
+
+    public static class JsonPinotRecordSerialization<T> implements PinotRecordSerialization<T> {
+
+        private ObjectMapper _mapper;
+        private Schema _schema;
+        private DatumReader<GenericData.Record> _reader;
+        private DatumWriter<GenericRecord> _writer;
+        private Configuration _conf;
+        private ByteArrayOutputStream _outputStream;
 
         @Override
-        public void init(SegmentGeneratorConfig segmentConfig, TaskAttemptContext context) {
+        public void init(Configuration conf, Schema schema) {
+            _schema = schema;
+            _conf = conf;
+            _reader = new GenericDatumReader(_schema);
+            _writer = new GenericDatumWriter(_schema);
             _mapper = new ObjectMapper();
+            _outputStream = new ByteArrayOutputStream();
         }
 
         @Override
-        public byte[] write(V v) {
+        public PinotRecord serialize(T t) throws IOException {
+            Decoder decoder = DecoderFactory.get().jsonDecoder(_schema, _mapper.writeValueAsString(t));
+            return new PinotRecord(_reader.read(null, decoder));
+        }
+
+        @Override
+        public T deserialize(PinotRecord record) throws IOException {
+            _outputStream.reset();
+            JsonEncoder encoder = EncoderFactory.get().jsonEncoder(_schema, _outputStream);
+            _writer.write(record.get(), encoder);
+            encoder.flush();
+            return _mapper.readValue(_outputStream.toByteArray(), initReader(_conf));
+        }
+
+        @Override
+        public void close() {
+
+        }
+
+        private Class<T> initReader(Configuration conf) {
             try {
-                return _mapper.writeValueAsBytes(v);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+                return (Class<T>) Class.forName(getJsonReaderClass(conf));
+            } catch (Exception e) {
+                throw new RuntimeException("Error initializing json reader class", e);
             }
         }
 
-        @Override
-        public void close(TaskAttemptContext context) {
 
-        }
     }
 
 }

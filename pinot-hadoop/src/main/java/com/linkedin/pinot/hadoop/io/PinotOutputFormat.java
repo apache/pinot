@@ -34,17 +34,17 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 
+/**
+ * Generic Pinot Output Format implementation.
+ * @param <K>
+ * @param <V>
+ */
 public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
 
-    private static Map<String, FileFormat> fileFormatMap = new HashMap<>();
-    private final SegmentGeneratorConfig _segmentConfig;
 
-    // Input data format. valid types are <AVRO/CSV/JSON/Thrift>
-    public static final String FILE_FORMAT = "pinot.file.format";
+    private final SegmentGeneratorConfig _segmentConfig;
 
     // Pinot temp directory to create segment.
     public static final String TEMP_SEGMENT_DIR = "pinot.temp.segment.dir";
@@ -76,36 +76,11 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
     // Suffix for the derived HLL columns
     public static final String HLL_SUFFIX = "pinot.hll.suffix";
 
-    // Parallelism while generating segments, default is 1.
-    public static final String NUM_THREADS = "pinot.num.threads";
+    public static final String PINOT_RECORD_SERIALIZATION_CLASS = "pinot.record.serialization.class";
 
-    public static final String DATA_WRITE_SUPPORT_CLASS = "pinot.data.write.support.class";
-    /*
-    The max file size of the intermediate data file written by the RecordWriter
-     */
-    public static final String DATA_FILE_MAX_SIZE = "pinot.data.file.max.size";
-
-
-    static {
-        for (FileFormat f : FileFormat.values()) {
-            fileFormatMap.put(f.name().toLowerCase(), f);
-        }
-    }
 
     public PinotOutputFormat() {
         _segmentConfig = new SegmentGeneratorConfig();
-    }
-
-    public static void setFileFormat(Job job, String fileFormat) {
-        job.getConfiguration().set(PinotOutputFormat.FILE_FORMAT, fileFormat);
-    }
-
-    public static FileFormat getFileFormat(JobContext job) {
-        String fileFormat = job.getConfiguration().get(PinotOutputFormat.FILE_FORMAT);
-        if(fileFormat == null) {
-            throw new RuntimeException("Pinot input file format not set");
-        }
-        return getFileFormat(fileFormat.toLowerCase());
     }
 
     public static void setTempSegmentDir(Job job, String segmentDir) {
@@ -200,21 +175,13 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
         return context.getConfiguration().get(PinotOutputFormat.HLL_SUFFIX, HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX);
     }
 
-    public static void setNumThreads(Job job, int numThreads) {
-        job.getConfiguration().setInt(PinotOutputFormat.NUM_THREADS, numThreads);
-    }
-
-    public static int getNumThreads(JobContext context) {
-        return context.getConfiguration().getInt(PinotOutputFormat.NUM_THREADS, 1);
-    }
-
-    public static void setDataWriteSupportClass(Job job, Class<? extends DataWriteSupport> writeSupportClass) {
-        job.getConfiguration().set(PinotOutputFormat.DATA_WRITE_SUPPORT_CLASS, writeSupportClass.getName());
+    public static void setDataWriteSupportClass(Job job, Class<? extends PinotRecordSerialization> pinotSerialization) {
+        job.getConfiguration().set(PinotOutputFormat.PINOT_RECORD_SERIALIZATION_CLASS, pinotSerialization.getName());
     }
 
     public static Class<?> getDataWriteSupportClass(JobContext context) {
-        String className = context.getConfiguration().get(PinotOutputFormat.DATA_WRITE_SUPPORT_CLASS);
-        if(className == null) {
+        String className = context.getConfiguration().get(PinotOutputFormat.PINOT_RECORD_SERIALIZATION_CLASS);
+        if (className == null) {
             throw new RuntimeException("pinot data write support class not set");
         }
         try {
@@ -224,41 +191,34 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
         }
     }
 
-    private static FileFormat getFileFormat(String fileFormat) {
-        if (fileFormat == null || !fileFormatMap.containsKey(fileFormat)) {
-            throw new RuntimeException("Given file format " + fileFormat + " is not valid. supported file formats are " + fileFormatMap.keySet().toString());
-        }
-        return fileFormatMap.get(fileFormat);
-    }
-
     @Override
     public RecordWriter<K, V> getRecordWriter(TaskAttemptContext context) throws IOException, InterruptedException {
         configure(context.getConfiguration());
-        final DataWriteSupport dataWriteSupport = getDataWriteSupport(context);
+        final PinotRecordSerialization dataWriteSupport = getDataWriteSupport(context);
         initSegmentConfig(context);
         Path workDir = getDefaultWorkFile(context, "");
         return new PinotRecordWriter<>(_segmentConfig, context, workDir, dataWriteSupport);
     }
 
     /**
-     * The {@link #configure(Configuration)} method called before initialize the  {@link RecordWriter}
-     * Any implementation of {@link PinotOutputFormat} can use it to set additional configuration properties.
-     * @param conf
+     * The {@link #configure(Configuration)} method called before initialize the  {@link
+     * RecordWriter} Any implementation of {@link PinotOutputFormat} can use it to set additional
+     * configuration properties.
      */
     public void configure(Configuration conf) {
 
     }
 
-    private DataWriteSupport getDataWriteSupport(TaskAttemptContext context) {
+    private PinotRecordSerialization getDataWriteSupport(TaskAttemptContext context) {
         try {
-            return (DataWriteSupport)PinotOutputFormat.getDataWriteSupportClass(context).newInstance();
+            return (PinotRecordSerialization) PinotOutputFormat.getDataWriteSupportClass(context).newInstance();
         } catch (Exception e) {
             throw new RuntimeException("Error initialize data write support class", e);
         }
     }
 
     private void initSegmentConfig(JobContext context) throws IOException {
-        _segmentConfig.setFormat(PinotOutputFormat.getFileFormat(context));
+        _segmentConfig.setFormat(FileFormat.AVRO);
         _segmentConfig.setOutDir(PinotOutputFormat.getTempSegmentDir(context) + "/segmentDir");
         _segmentConfig.setOverwrite(true);
         _segmentConfig.setTableName(PinotOutputFormat.getTableName(context));

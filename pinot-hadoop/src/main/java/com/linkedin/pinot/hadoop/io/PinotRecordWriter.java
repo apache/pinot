@@ -19,8 +19,15 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.core.util.AvroUtils;
 import com.linkedin.pinot.hadoop.job.JobConfigConstants;
 
+import org.apache.avro.Schema;
+import org.apache.avro.file.DataFileConstants;
+import org.apache.avro.file.DataFileWriter;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.avro.io.DatumWriter;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -39,29 +46,34 @@ public class PinotRecordWriter<K, V> extends RecordWriter<K, V> {
 
     private final static Logger LOGGER = LoggerFactory.getLogger(PinotRecordWriter.class);
 
-    private final TaskAttemptContext _context;
     private final SegmentGeneratorConfig _segmentConfig;
-    private FileHandler _handler;
-    // default max file size
-    private long MAX_FILE_SIZE = 64 * 1000000L;
     private final Path _workDir;
     private final String _baseDataDir;
-    private DataWriteSupport _dataWriteSupport;
+    private PinotRecordSerialization _pinotRecordSerialization;
+    /**
+     * A writer for the Avro container file.
+     */
+    private final DataFileWriter<GenericData.Record> _mAvroFileWriter;
 
 
-    public PinotRecordWriter(SegmentGeneratorConfig segmentConfig, TaskAttemptContext context, Path workDir, DataWriteSupport dataWriteSupport) {
-        _context = context;
+    public PinotRecordWriter(SegmentGeneratorConfig segmentConfig, TaskAttemptContext context, Path workDir, PinotRecordSerialization pinotRecordSerialization) {
         _segmentConfig = segmentConfig;
         _workDir = workDir;
         _baseDataDir = PinotOutputFormat.getTempSegmentDir(context) + "/data";
         String filename = PinotOutputFormat.getTableName(context);
-        String extension = PinotOutputFormat.getFileFormat(context).name().toLowerCase();
-
+        Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(segmentConfig.getSchema());
+        File f = new File(_baseDataDir, filename + ".avro");
+        DatumWriter<GenericData.Record> datumWriter = new GenericDatumWriter(avroSchema);
+        _mAvroFileWriter = new DataFileWriter(datumWriter);
         try {
-            _handler = new FileHandler(_baseDataDir, filename, extension, MAX_FILE_SIZE);
-            _handler.open(true);
-            _dataWriteSupport = dataWriteSupport;
-            _dataWriteSupport.init(segmentConfig, context);
+            _mAvroFileWriter.setSyncInterval(DataFileConstants.DEFAULT_SYNC_INTERVAL);
+            if (!f.exists()) {
+                f.getParentFile().mkdirs();
+                f.createNewFile();
+            }
+            _mAvroFileWriter.create(avroSchema, f);
+            _pinotRecordSerialization = pinotRecordSerialization;
+            _pinotRecordSerialization.init(context.getConfiguration(), avroSchema);
         } catch (Exception e) {
             throw new RuntimeException("Error initialize PinotRecordReader", e);
         }
@@ -69,14 +81,14 @@ public class PinotRecordWriter<K, V> extends RecordWriter<K, V> {
 
     @Override
     public void write(K key, V value) throws IOException, InterruptedException {
-        byte[] b = _dataWriteSupport.write(value);
-        _handler.write(b);
+        PinotRecord record = _pinotRecordSerialization.serialize(value);
+        _mAvroFileWriter.append(record.get());
     }
 
     @Override
     public void close(TaskAttemptContext context) throws IOException, InterruptedException {
-        _dataWriteSupport.close(context);
-        _handler.close();
+        _pinotRecordSerialization.close();
+        _mAvroFileWriter.close();
         File dir = new File(_baseDataDir);
         _segmentConfig.setSegmentName(PinotOutputFormat.getSegmentName(context));
         SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
@@ -118,6 +130,10 @@ public class PinotRecordWriter<K, V> extends RecordWriter<K, V> {
         return localTarDir + "/" + _segmentConfig.getSegmentName() + JobConfigConstants.TARGZ;
     }
 
+    /**
+     * delete the temp files
+     * @param baseDir
+     */
     private void clean(String baseDir) {
         File f = new File(baseDir);
         if (f.exists()) {

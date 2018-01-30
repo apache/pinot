@@ -15,16 +15,28 @@
  */
 package com.linkedin.pinot.hadoop.io;
 
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.hadoop.conf.Configuration;
 
-import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import java.io.IOException;
 
-public interface DataWriteSupport<T> {
+public interface PinotRecordSerialization<T> {
 
-    void init(SegmentGeneratorConfig segmentConfig, TaskAttemptContext context);
+    /**
+     * init method, called during the {@link PinotRecordWriter()} object creation
+     */
+    void init(Configuration conf, org.apache.avro.Schema schema);
 
-    byte[] write(T t);
+    /**
+     * Serialize object to {@link PinotRecord}, called during the {@link
+     * PinotRecordWriter#write(Object, Object)}
+     */
+    PinotRecord serialize(T t) throws IOException;
 
-    void close(TaskAttemptContext context);
+    /**
+     * Deserialize {@link PinotRecord} to Object.
+     */
+    T deserialize(PinotRecord record) throws IOException;
+
+    void close();
 
 }
