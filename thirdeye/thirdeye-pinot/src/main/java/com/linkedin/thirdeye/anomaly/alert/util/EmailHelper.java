@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.alert.commons.EmailEntity;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
@@ -204,7 +205,7 @@ public abstract class EmailHelper {
   }
 
 
-  public static void sendFailureEmailForScreenshot(String anomalyId, Throwable t, ThirdEyeAnomalyConfiguration thirdeyeConfig)
+  public static void sendFailureEmailForScreenshot(String anomalyId, Throwable t, ThirdEyeConfiguration thirdeyeConfig)
       throws JobExecutionException {
     HtmlEmail email = new HtmlEmail();
     String subject = String

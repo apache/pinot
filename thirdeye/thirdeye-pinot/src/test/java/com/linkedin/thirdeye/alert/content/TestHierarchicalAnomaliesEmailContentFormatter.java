@@ -123,7 +123,7 @@ public class TestHierarchicalAnomaliesEmailContentFormatter {
     AlertConfigDTO alertConfigDTO = DaoTestUtils.getTestAlertConfiguration("Test Config");
 
     EmailContentFormatter contentFormatter = new HierarchicalAnomaliesEmailContentFormatter();
-    contentFormatter.init(new Properties(), thirdeyeAnomalyConfig);
+    contentFormatter.init(new Properties(), EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(thirdeyeAnomalyConfig));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(alertConfigDTO, "a@b.com", TEST,
         null, "", anomalies);
 

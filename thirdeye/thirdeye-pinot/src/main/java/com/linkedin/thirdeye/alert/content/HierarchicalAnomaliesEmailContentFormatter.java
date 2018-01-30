@@ -54,7 +54,7 @@ public class HierarchicalAnomaliesEmailContentFormatter extends BaseEmailContent
   }
 
   @Override
-  public void init(Properties properties, ThirdEyeAnomalyConfiguration configuration) {
+  public void init(Properties properties, EmailContentFormatterConfiguration configuration) {
     super.init(properties, configuration);
     this.emailTemplate = properties.getProperty(EMAIL_TEMPLATE, DEFAULT_EMAIL_TEMPLATE);
     useLatestAnomaly = Boolean.valueOf(properties.getProperty(USE_LATEST_ANOMALY_INFORMATION, DEFAULT_USE_LATEST_ANOMALY_INFORMATION));
@@ -162,7 +162,7 @@ public class HierarchicalAnomaliesEmailContentFormatter extends BaseEmailContent
    */
   private AnomalyReportEntity putAnomaliesIntoRootOrLeaf(MergedAnomalyResultDTO anomaly,
       List<AnomalyReportEntity> rootAnomalyDetail, SortedMap<String, List<AnomalyReportEntity>> leafAnomalyDetail){
-    AnomalyReportEntity anomalyReport = generateAnomalyReportEntity(anomaly, THIRDEYE_CONFIG.getDashboardHost());
+    AnomalyReportEntity anomalyReport = generateAnomalyReportEntity(anomaly, EMAIL_FORMATTER_CONFIG.getDashboardHost());
     AnomalyFunctionDTO anomalyFunction = anomaly.getFunction();
     String exploredDimensions = anomalyFunction.getExploreDimensions();
     // Add WoW number

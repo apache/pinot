@@ -1,9 +1,7 @@
 package com.linkedin.thirdeye.alert.content;
 
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
-import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -28,7 +26,7 @@ public class OnboardingNotificationEmailContentFormatter extends BaseEmailConten
   }
 
   @Override
-  public void init(Properties properties, ThirdEyeAnomalyConfiguration configuration) {
+  public void init(Properties properties, EmailContentFormatterConfiguration configuration) {
     super.init(properties, configuration);
     this.emailTemplate = properties.getProperty(EMAIL_TEMPLATE, DEFAULT_EMAIL_TEMPLATE);
   }

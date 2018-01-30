@@ -91,7 +91,7 @@ public class TestMultipleAnomaliesEmailContentFormatter {
     AlertConfigDTO alertConfigDTO = DaoTestUtils.getTestAlertConfiguration("Test Config");
 
     EmailContentFormatter contentFormatter = new MultipleAnomaliesEmailContentFormatter();
-    contentFormatter.init(new Properties(), thirdeyeAnomalyConfig);
+    contentFormatter.init(new Properties(), EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(thirdeyeAnomalyConfig));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(alertConfigDTO, "a@b.com", TEST,
         null, "", anomalies);
 

@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.onboard.tasks;
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.alert.commons.EmailEntity;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatter;
+import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
 import com.linkedin.thirdeye.alert.content.OnboardingNotificationEmailContentFormatter;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
@@ -102,20 +103,20 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
     }
 
     // Set up thirdeye config
-    ThirdEyeAnomalyConfiguration thirdeyeConfig = new ThirdEyeAnomalyConfiguration();
-    thirdeyeConfig.setSmtpConfiguration(smtpConfiguration);
-    thirdeyeConfig.setDashboardHost(taskConfigs.getString(THIRDEYE_DASHBOARD_HOST));
-    thirdeyeConfig.setPhantomJsPath(taskConfigs.getString(PHANTON_JS_PATH));
-    thirdeyeConfig.setRootDir(taskConfigs.getString(ROOT_DIR));
-    thirdeyeConfig.setFailureFromAddress(taskConfigs.getString(DEFAULT_ALERT_SENDER_ADDRESS));
-    thirdeyeConfig.setFailureToAddress(taskConfigs.getString(DEFAULT_ALERT_RECEIVER_ADDRESS));
+    EmailContentFormatterConfiguration emailFormatterConfig = new EmailContentFormatterConfiguration();
+    emailFormatterConfig.setSmtpConfiguration(smtpConfiguration);
+    emailFormatterConfig.setDashboardHost(taskConfigs.getString(THIRDEYE_DASHBOARD_HOST));
+    emailFormatterConfig.setPhantomJsPath(taskConfigs.getString(PHANTON_JS_PATH));
+    emailFormatterConfig.setRootDir(taskConfigs.getString(ROOT_DIR));
+    emailFormatterConfig.setFailureFromAddress(taskConfigs.getString(DEFAULT_ALERT_SENDER_ADDRESS));
+    emailFormatterConfig.setFailureToAddress(taskConfigs.getString(DEFAULT_ALERT_RECEIVER_ADDRESS));
 
     // Email Subject
     String subject = String.format("Replay results for %s is ready for review!",
         DAORegistry.getInstance().getAnomalyFunctionDAO().findById(functionId).getFunctionName());
 
     EmailContentFormatter emailContentFormatter = new OnboardingNotificationEmailContentFormatter();
-    emailContentFormatter.init(new Properties(), thirdeyeConfig);
+    emailContentFormatter.init(new Properties(), emailFormatterConfig);
     EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, alertConfig.getRecipients(),
         subject, null, "", filteredAnomalyResults);
     try {

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.alert.util;
 
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -13,8 +14,6 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-
 public class EmailScreenshotHelper {
 
   private static final String TEMP_PATH = "/tmp/graph";
@@ -23,8 +22,7 @@ public class EmailScreenshotHelper {
   private static final Logger LOG = LoggerFactory.getLogger(EmailScreenshotHelper.class);
   private static final ExecutorService executorService = Executors.newCachedThreadPool();
 
-
-  public static String takeGraphScreenShot(final String anomalyId, final ThirdEyeAnomalyConfiguration configuration) throws JobExecutionException {
+  public static String takeGraphScreenShot(final String anomalyId, final ThirdEyeConfiguration configuration) throws JobExecutionException {
 
     Callable<String> callable = new Callable<String>() {
       public String call() throws Exception {
@@ -43,7 +41,7 @@ public class EmailScreenshotHelper {
     return result;
   }
 
-  private static String takeScreenshot(String anomalyId, ThirdEyeAnomalyConfiguration configuration) throws Exception {
+  private static String takeScreenshot(String anomalyId, ThirdEyeConfiguration configuration) throws Exception {
 
     String imgRoute = configuration.getDashboardHost() + "/app/#/screenshot/" + anomalyId;
     LOG.info("imgRoute {}", imgRoute);

@@ -95,7 +95,7 @@ public class TestOnboardingNotificationContentFormatter {
     alertConfigDAO.save(alertConfigDTO);
 
     EmailContentFormatter contentFormatter = new OnboardingNotificationEmailContentFormatter();
-    contentFormatter.init(new Properties(), thirdeyeAnomalyConfig);
+    contentFormatter.init(new Properties(), EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(thirdeyeAnomalyConfig));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(alertConfigDTO, "a@b.com", TEST,
         null, "", anomalies);
 
