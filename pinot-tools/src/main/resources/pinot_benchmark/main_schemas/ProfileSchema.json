@@ -9,8 +9,13 @@
     },
     {
       "singleValueField" : true,
+      "dataType" : "INT",
+      "name" : "Strength"
+    },
+    {
+      "singleValueField" : true,
       "dataType" : "STRING",
-      "name" : "Company"
+      "name" : "WorkPlace"
     },
     {
       "singleValueField" : true,

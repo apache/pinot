@@ -9,6 +9,11 @@
       "singleValueField" : true,
       "dataType": "INT",
       "name" : "TimeSpent"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "INT",
+      "name" : "ReaderStrength"
     }
   ],
   "dimensionFieldSpecs": [

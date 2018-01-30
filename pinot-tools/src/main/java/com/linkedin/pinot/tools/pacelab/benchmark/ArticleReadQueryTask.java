@@ -34,41 +34,27 @@ public class ArticleReadQueryTask extends QueryTask {
         Properties config = getConfig();
         String[] queries = getQueries();
 
-        long maxTimestamp = Long.parseLong(config.getProperty("max_timestamp"));
-        long minTimestamp = Long.parseLong(config.getProperty("min_timestamp"));
-        int minRanking = Integer.parseInt(config.getProperty("min_ranking"));
-        int maxRanking = Integer.parseInt(config.getProperty("max_ranking"));
+        long minReadStartTime = Long.parseLong(config.getProperty("minReadStartTime"));
+        long maxReadStartTime = Long.parseLong(config.getProperty("maxReadStartTime"));
 
 
-        long timestampRange = maxTimestamp - minTimestamp + 1;
-        int rankingRange = maxRanking - minRanking + 1;
-        long timestamp = minTimestamp + (int)(Math.random() * timestampRange);
 
-        String query;
+        String query = "";
         switch (queryId) {
             case 0:
-                query = String.format(queries[queryId], timestamp);
+                //query = String.format(queries[queryId], );
                 runQuery(query);
                 break;
             case 1:
-                int ranking = minRanking + (int)(Math.random() * rankingRange);
-                query = String.format(queries[queryId], timestamp, ranking);
+                //query = String.format(queries[queryId],);
                 runQuery(query);
                 break;
             case 2:
-                int lowerBound = minRanking + (int)(Math.random() * rankingRange);
-                int higherBound = minRanking + (int)(Math.random() * rankingRange);
-                if (lowerBound > higherBound) {
-                    //swap them
-                    int temp = lowerBound;
-                    lowerBound = higherBound;
-                    higherBound = temp;
-                }
-                query = String.format(queries[queryId], timestamp, lowerBound, higherBound);
+                //query = String.format(queries[queryId], );
                 runQuery(query);
                 break;
             case 3:
-                query = String.format(queries[queryId], timestamp);
+                //query = String.format(queries[queryId], );
                 runQuery(query);
                 break;
         }

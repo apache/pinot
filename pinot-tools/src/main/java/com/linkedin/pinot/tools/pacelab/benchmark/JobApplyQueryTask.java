@@ -36,46 +36,25 @@ public class JobApplyQueryTask extends QueryTask {
         Properties config = getConfig();
         String[] queries = getQueries();
 
-        long max_timestamp = Long.parseLong(config.getProperty("max_timestamp"));
-        long min_timestamp = Long.parseLong(config.getProperty("min_timestamp"));
-        int min_experience = Integer.parseInt(config.getProperty("min_experience"));
-        int max_experience = Integer.parseInt(config.getProperty("max_experience"));
-        int select_max_limit = Integer.parseInt(config.getProperty("select_max_limit"));
-        int select_min_limit = Integer.parseInt(config.getProperty("select_min_limit"));
-        int groupby_max_limit = Integer.parseInt(config.getProperty("groupby_max_limit"));
-        int groupby_min_limit = Integer.parseInt(config.getProperty("groupby_min_limit"));
+        long maxApplyStartTime= Long.parseLong(config.getProperty("minApplyStartTime"));
+        long minApplyStartTime = Long.parseLong(config.getProperty("maxApplyStartTime"));
 
-        long timestampRange = max_timestamp - min_timestamp + 1;
-        int experienceRange = max_experience - min_experience + 1;
-        long timestamp = min_timestamp + (int)(Math.random() * timestampRange);
-        int select_limit = select_min_limit + (int)(Math.random() * (select_max_limit - select_min_limit));
-        int groupby_limit = groupby_min_limit + (int)(Math.random() * (groupby_max_limit - groupby_min_limit));
-
-        String query;
+        String query = "";
         switch (queryId) {
             case 0:
-                query = String.format(queries[queryId], timestamp, select_limit);
+                //query = String.format(queries[queryId], "");
                 runQuery(query);
                 break;
             case 1:
-                int experience = min_experience + (int)(Math.random() * experienceRange);
-                query = String.format(queries[queryId], timestamp, experience, groupby_limit);
+                //query = String.format(queries[queryId], );
                 runQuery(query);
                 break;
             case 2:
-                int lowerBound = min_experience + (int)(Math.random() * experienceRange);
-                int higherBound = min_experience + (int)(Math.random() * experienceRange);
-                if (lowerBound > higherBound) {
-                    //swap them
-                    int temp = lowerBound;
-                    lowerBound = higherBound;
-                    higherBound = temp;
-                }
-                query = String.format(queries[queryId], timestamp, lowerBound, higherBound, groupby_limit);
+                //query = String.format(queries[queryId], );
                 runQuery(query);
                 break;
             case 3:
-                query = String.format(queries[queryId], timestamp, groupby_limit);
+                //query = String.format(queries[queryId], );
                 runQuery(query);
                 break;
         }

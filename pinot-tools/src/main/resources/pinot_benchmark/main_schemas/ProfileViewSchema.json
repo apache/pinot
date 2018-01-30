@@ -8,6 +8,16 @@
       "singleValueField" : true,
       "dataType": "INT",
       "name" : "ReviewTime"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "INT",
+      "name" : "ViewerProfileStrength"
+    },
+    {
+      "singleValueField": true,
+      "dataType": "INT",
+      "name": "ViewedProfileStrength"
     }
   ],
   "dimensionFieldSpecs": [
@@ -19,7 +29,7 @@
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "ViewerCompany"
+      "name": "ViewerWorkplace"
     },
     {
       "singleValueField" : true,
@@ -35,6 +45,11 @@
       "singleValueField" : true,
       "dataType": "STRING",
       "name" : "ViewedProfileId"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "ViewedProfileWorkplace"
     },
     {
       "singleValueField" : true,

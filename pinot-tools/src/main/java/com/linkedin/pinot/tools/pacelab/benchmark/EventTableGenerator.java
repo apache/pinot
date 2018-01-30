@@ -226,11 +226,14 @@ public class EventTableGenerator {
 
             outRecord.put("ViewStartTime", eventTimeGenerator.next());
             outRecord.put("ReviewTime",timeSpentGenerator.next());
+            outRecord.put("ViewerProfileStrength",  viewerProfile.getValue("Strength"));
+            outRecord.put("ViewedProfileStrength", viewedProfile.getValue("Strength"));
             outRecord.put("ViewerProfileId", viewerProfile.getValue("ID"));
-            outRecord.put("ViewerCompany", viewerProfile.getValue("Company"));
+            outRecord.put("ViewerWorkPlace", viewerProfile.getValue("WorkPlace"));
             outRecord.put("ViewerHeadline", viewerProfile.getValue("Headline"));
             outRecord.put("ViewerPosition", viewerProfile.getValue("Position"));
             outRecord.put("ViewedProfileId", viewedProfile.getValue("ID"));
+            outRecord.put("ViewedProfileWorkPlace", viewerProfile.getValue("ViewedProfileWorkPlace"));
             outRecord.put("ViewedProfileHeadline", viewedProfile.getValue("Headline"));
             outRecord.put("ViewedProfilePosition", viewedProfile.getValue("Position"));
             outRecord.put("WereProfilesConnected", randomYesOrNo());
@@ -369,6 +372,7 @@ public class EventTableGenerator {
 
             outRecord.put("ReadStartTime", eventTimeGenerator.next());
             outRecord.put("TimeSepnt", timeSpentGenerator.next());
+            outRecord.put("ReaderStrength", readerProfile.getValue("Strength"));
             outRecord.put("ReaderProfileId", readerProfile.getValue("ID"));
             outRecord.put("ReaderHeadline", readerProfile.getValue("Headline"));
             outRecord.put("ReaderPosition", readerProfile.getValue("Position"));

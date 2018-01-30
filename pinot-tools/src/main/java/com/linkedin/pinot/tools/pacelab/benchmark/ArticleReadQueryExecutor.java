@@ -26,9 +26,14 @@ public class ArticleReadQueryExecutor extends QueryExecutor{
         String[] queries = {
                 "SELECT * FROM ArticleRead" +
                     " WHERE  ReadStartTime > %d AND ReadStartTime < %d LIMIT %d",
-                "?",
-                "?",
-                "?"
+                "SELECT COUNT(*) FROM ArticleRead" +
+                    " WHERE ReadStartTime > %d AND ReadStartTime < %d AND ReaderProfileId = %d LIMIT %d",
+                "SELECT AVG(), MIN(), MAX(), AVG(), MIN(), MAX() FROM ArticleReadd" +
+                    " WHERE ReadStartTime > %d AND ReadStartTime < %d" +
+                    " GROUP BY ArticleTopic",
+                "SELECT COUNT(*) FROM ArticleRead" +
+                    " WHERE ReadStartTime > %d AND ReadStartTime < %d" +
+                    " GROUP BY ArticleAuthor, ArticleTitle, ReaderStrength"
         };
         return queries;
     }

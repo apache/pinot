@@ -24,13 +24,17 @@ public class ProfileViewQueryExecutor extends QueryExecutor{
 
     private static String[] getQueries() {
         String[] queries = {
-                "SELECT * from ProfileView" +
-                    " WHERE ViewStartTime > %d AND ViewStartTime < %d limit %d",
+                "SELECT * FROM ProfileView" +
+                    " WHERE ViewStartTime > %d AND ViewStartTime < %d LIMIT %d",
                 "SELECT count(*) from ProfileView" +
                     " WHERE ViewStartTime > %d AND ViewStartTime < %d" +
-                    " ViewedProfileId = %d",
-                "?",
-                "?"
+                    " ViewedProfileId = %d LIMIT %d",
+                "SELECT COUNT(*), AVG(ReviewTime), MAX(ReviewTime), MIN(ReviewTime), AVG(ViewedProfileStrength), MAX(ViewedProfileStrength), MIN(ViewedProfileStrength) FROM ProfileView " +
+                    " WHERE ViewStartTime > %d AND ViewStartTime < %d " +
+                    " GROUP BY ViewerPosition LIMIT %d",
+                "SELECT COUNT(*) FROM ProfileView" +
+                    " WHERE ViewStartTime > %d AND ViewStartTime < %d" +
+                    " GROUP BY ViewerWorkPlace, ViewerPosition, ViewedProfileWorkPlace, ViewedProfilePosition LIMIT %d"
         };
         return queries;
     }
