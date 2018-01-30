@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.integration.tests;
+package com.linkedin.pinot.tools.pacelab.benchmark;
 
 import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
 
@@ -39,10 +39,7 @@ public abstract class QueryExecutor {
 
     public static List<QueryExecutor> getTableExecutors() {
         List<QueryExecutor> queryExecutors = new ArrayList<>();
-        queryExecutors.add(JobQueryExecutor.getInstance());
-       // queryExecutors.add(AdsQueryExecutor.getInstance());
-       // queryExecutors.add(ArticlesQueryExecutor.getInstance());
-       // queryExecutors.add(ViewsQueryExecutor.getInstance());
+        queryExecutors.add(JobApplyQueryExecutor.getInstance());
         return queryExecutors;
     }
 

@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.integration.tests;
-
-import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
+package com.linkedin.pinot.tools.pacelab.benchmark;
 
 import java.util.Properties;
 
-public class AdsQueryTask extends QueryTask {
+public class ArticleReadQueryTask extends QueryTask {
 
-    public AdsQueryTask(Properties config, String[] queries) {
+    public ArticleReadQueryTask(Properties config, String[] queries) {
         setConfig(config);
         setQueries(queries);
     }
@@ -30,6 +28,7 @@ public class AdsQueryTask extends QueryTask {
     public void run() {
         super.run();
     }
+
 
     public void generateAndRunQuery(int queryId) throws Exception {
         Properties config = getConfig();
@@ -75,5 +74,4 @@ public class AdsQueryTask extends QueryTask {
         }
 
     }
-
 }

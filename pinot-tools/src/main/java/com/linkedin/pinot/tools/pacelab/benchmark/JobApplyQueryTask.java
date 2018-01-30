@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.integration.tests;
+package com.linkedin.pinot.tools.pacelab.benchmark;
 
-import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
+import com.linkedin.pinot.tools.pacelab.benchmark.QueryTask;
 
 import java.util.Properties;
 
-public class JobQueryTask extends QueryTask {
+public class JobApplyQueryTask extends QueryTask {
 
-    public JobQueryTask(Properties config, String[] queries) {
+    public JobApplyQueryTask(Properties config, String[] queries) {
         setConfig(config);
         setQueries(queries);
     }

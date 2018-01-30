@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.integration.tests;
-
-import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
+package com.linkedin.pinot.tools.pacelab.benchmark;
 
 import java.util.Properties;
 
-public class ArticlesQueryTask extends QueryTask {
+public class ProfileViewQueryTask extends QueryTask {
 
-    public ArticlesQueryTask(Properties config, String[] queries) {
+    public ProfileViewQueryTask(Properties config, String[] queries) {
         setConfig(config);
         setQueries(queries);
     }
@@ -38,12 +36,12 @@ public class ArticlesQueryTask extends QueryTask {
 
         long maxTimestamp = Long.parseLong(config.getProperty("max_timestamp"));
         long minTimestamp = Long.parseLong(config.getProperty("min_timestamp"));
-        int minRanking = Integer.parseInt(config.getProperty("min_ranking"));
-        int maxRanking = Integer.parseInt(config.getProperty("max_ranking"));
+        int minWeeklyChange = Integer.parseInt(config.getProperty("min_weekly_change"));
+        int maxWeeklyChange = Integer.parseInt(config.getProperty("max_weekly_change"));
 
 
         long timestampRange = maxTimestamp - minTimestamp + 1;
-        int rankingRange = maxRanking - minRanking + 1;
+        int rankingRange = maxWeeklyChange - minWeeklyChange + 1;
         long timestamp = minTimestamp + (int)(Math.random() * timestampRange);
 
         String query;
@@ -53,13 +51,13 @@ public class ArticlesQueryTask extends QueryTask {
                 runQuery(query);
                 break;
             case 1:
-                int ranking = minRanking + (int)(Math.random() * rankingRange);
+                int ranking = minWeeklyChange + (int)(Math.random() * rankingRange);
                 query = String.format(queries[queryId], timestamp, ranking);
                 runQuery(query);
                 break;
             case 2:
-                int lowerBound = minRanking + (int)(Math.random() * rankingRange);
-                int higherBound = minRanking + (int)(Math.random() * rankingRange);
+                int lowerBound = minWeeklyChange + (int)(Math.random() * rankingRange);
+                int higherBound = minWeeklyChange + (int)(Math.random() * rankingRange);
                 if (lowerBound > higherBound) {
                     //swap them
                     int temp = lowerBound;

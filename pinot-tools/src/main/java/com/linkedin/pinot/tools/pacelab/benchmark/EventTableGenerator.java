@@ -24,7 +24,6 @@ import com.linkedin.pinot.core.data.extractors.FieldExtractor;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.tools.admin.command.EventTableCreationCommand;
 import com.linkedin.pinot.tools.data.generator.RangeIntGenerator;
 import com.linkedin.pinot.tools.data.generator.RangeLongGenerator;
 import com.linkedin.pinot.tools.data.generator.SchemaAnnotation;
@@ -32,8 +31,6 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.math.IntRange;
-import org.apache.commons.lang.math.LongRange;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
 import org.json.JSONArray;
@@ -52,21 +49,21 @@ public class EventTableGenerator {
     private String _outDir;
     private boolean _overwrite = true;
     private int _numRecords = 10;
-    final String _profileSchemaFile = "pinot_benchmark_schemas/ProfileSchema.json";
-    final String _profileViewSchemaFile = "pinot_benchmark_schemas/ProfileViewSchema.json";
-    final String _profileViewSchemaAnnFile = "pinot_benchmark_schemas/ProfileViewSchemaAnnotation.json";
+    final String _profileSchemaFile = "pinot_benchmark/main_schemas/ProfileSchema.json";
+    final String _profileViewSchemaFile = "pinot_benchmark/main_schemas/ProfileViewSchema.json";
+    final String _profileViewSchemaAnnFile = "pinot_benchmark/main_schemas/ProfileViewSchemaAnnotation.json";
 
-    final String _adSchemaFile = "pinot_benchmark_schemas/AdSchema.json";
-    final String _adClickSchemaFile = "pinot_benchmark_schemas/AdClickSchema.json";
-    final String _adClickSchemaAnnFile = "pinot_benchmark_schemas/AdClickSchemaAnnotation.json";
+    final String _adSchemaFile = "pinot_benchmark/main_schemas/AdSchema.json";
+    final String _adClickSchemaFile = "pinot_benchmark/main_schemas/AdClickSchema.json";
+    final String _adClickSchemaAnnFile = "pinot_benchmark/main_schemas/AdClickSchemaAnnotation.json";
 
-    final String _jobSchemaFile = "pinot_benchmark_schemas/JobSchema.json";
-    final String _jobApplySchemaFile = "pinot_benchmark_schemas/JobApplySchema.json";
-    final String _jobApplySchemaAnnFile = "pinot_benchmark_schemas/JobApplySchemaAnnotation.json";
+    final String _jobSchemaFile = "pinot_benchmark/main_schemas/JobSchema.json";
+    final String _jobApplySchemaFile = "pinot_benchmark/main_schemas/JobApplySchema.json";
+    final String _jobApplySchemaAnnFile = "pinot_benchmark/main_schemas/JobApplySchemaAnnotation.json";
 
-    final String _articleSchemaFile = "pinot_benchmark_schemas/ArticleSchema.json";
-    final String _articleReadSchemaFile = "pinot_benchmark_schemas/ArticleReadSchema.json";
-    final String _articleReadSchemaAnnFile = "pinot_benchmark_schemas/ArticleReadSchemaAnnotation.json";
+    final String _articleSchemaFile = "pinot_benchmark/main_schemas/ArticleSchema.json";
+    final String _articleReadSchemaFile = "pinot_benchmark/main_schemas/ArticleReadSchema.json";
+    final String _articleReadSchemaAnnFile = "pinot_benchmark/main_schemas/ArticleReadSchemaAnnotation.json";
 
     public EventTableGenerator(String dataDir, String outDir)
     {

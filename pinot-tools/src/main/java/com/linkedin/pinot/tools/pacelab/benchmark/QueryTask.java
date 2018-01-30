@@ -13,15 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.integration.tests;
+package com.linkedin.pinot.tools.pacelab.benchmark;
 
 import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
-import org.json.JSONObject;
 
 import java.util.Properties;
 import java.util.Random;
-
-import static com.linkedin.pinot.tools.Quickstart.prettyPrintResponse;
 
 public class QueryTask implements Runnable{
     private Properties config;
