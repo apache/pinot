@@ -17,8 +17,8 @@
         <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color:white; border:1px solid #E9E9E9; border-radius: 2px; width: 100%;">
           <tr>
             <td style="padding: 0px 80px 24px 80px; background-color: #FFF; color: #FFF; text-align: center" colspan="2">
-              <p style="font-size: 20px; font-weight: 500; margin-bottom: 8px; color: #1D1D1D">You will now  receive alerts from ${functionName} ALERT CONFIG NAME:${alertConfigName} -!!! This is wrong!!!</p>
-              <p style="font-size: 16px; font-weight: 300; 	color: #1D1D1D;">This alert would have detected ${anomalyCount} anomalies in the past 30 days.</p>
+              <p style="font-size: 20px; font-weight: 500; margin-bottom: 8px; color: #1D1D1D">You will now  receive alerts from ${functionName} ALERT CONFIG NAME:${alertConfigName}</p>
+              <p style="font-size: 16px; font-weight: 300; 	color: #1D1D1D;">This alert would have detected ${anomalyCount} anomalies in the past ${repalyDays} days.</p>
             </td>
           </tr>
           <tr>

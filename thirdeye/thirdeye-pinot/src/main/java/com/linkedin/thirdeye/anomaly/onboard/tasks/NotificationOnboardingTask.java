@@ -115,7 +115,7 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
     String subject = String.format("Replay results for %s is ready for review!",
         DAORegistry.getInstance().getAnomalyFunctionDAO().findById(functionId).getFunctionName());
 
-    EmailContentFormatter emailContentFormatter = new OnboardingNotificationEmailContentFormatter();
+    EmailContentFormatter emailContentFormatter = new OnboardingNotificationEmailContentFormatter(start, end);
     emailContentFormatter.init(new Properties(), emailFormatterConfig);
     EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, alertConfig.getRecipients(),
         subject, null, "", filteredAnomalyResults);

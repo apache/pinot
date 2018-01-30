@@ -10,6 +10,8 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.lang.StringUtils;
+import org.joda.time.DateTime;
+import org.joda.time.Days;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,8 +23,17 @@ public class OnboardingNotificationEmailContentFormatter extends BaseEmailConten
   public static final String DEFAULT_NULL_STRING_VALUE = "N/A";
   public static final String ALERT_FILTER_PATTERN_KEY = DetectionJobResource.AUTOTUNE_PATTERN_KEY;
   public static final String ALERT_CONFIG_NAME = "alertConfigName";
+  public static final int DEFAULT_ONBOARDING_REPLAY_DAYS = 30;
+
+  private int onboardingReplayDays = DEFAULT_ONBOARDING_REPLAY_DAYS;
 
   public OnboardingNotificationEmailContentFormatter() {
+  }
+
+  public OnboardingNotificationEmailContentFormatter(DateTime start, DateTime end) {
+    if (start != null && end != null) {
+      onboardingReplayDays = Days.daysBetween(start, end).getDays();
+    }
   }
 
   @Override
@@ -55,6 +66,7 @@ public class OnboardingNotificationEmailContentFormatter extends BaseEmailConten
     templateData.put("metrics", anomalyFunctionSpec.getMetric());
     templateData.put("filters", returnValueOrDefault(anomalyFunctionSpec.getFilters(), DEFAULT_NULL_STRING_VALUE));
     templateData.put("dimensionDrillDown", returnValueOrDefault(anomalyFunctionSpec.getExploreDimensions(), DEFAULT_NULL_STRING_VALUE));
+    templateData.put("repalyDays", Integer.toString(onboardingReplayDays));
     String alertPattern = DEFAULT_NULL_STRING_VALUE;
     Map<String, String> alertFilter = anomalyFunctionSpec.getAlertFilter();
     if (alertFilter != null && alertFilter.containsKey(ALERT_FILTER_PATTERN_KEY)) {
