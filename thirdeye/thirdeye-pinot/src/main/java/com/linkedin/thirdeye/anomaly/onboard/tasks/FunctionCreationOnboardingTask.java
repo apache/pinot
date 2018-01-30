@@ -249,21 +249,21 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
         anomalyFunctionSpec.setCron("0 0 0 * * ?");
         anomalyFunctionSpec.setWindowSize(6);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
-        anomalyFunctionSpec.setProperties("signTestWindowSize=24;anomalyRemovalThreshold=0.6;baseline=w/3wAvg;decayRate=0.5;signTestStepSize=1;slidingWindowWidth=8;confidenceLevel=0.99");
+        anomalyFunctionSpec.setProperties("");
         break;
       case HOURS:
         anomalyFunctionSpec.setType("REGRESSION_GAUSSIAN_SCAN");
         anomalyFunctionSpec.setCron("0 0 14 1/1 * ? *");
         anomalyFunctionSpec.setWindowSize(84);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
-        anomalyFunctionSpec.setProperties("metricTimezone=America/Los_Angeles;anomalyRemovalThreshold=1.0;scanMinWindowSize=1;continuumOffsetUnit=3600000;scanUseBootstrap=true;scanNumSimulations=500;scanTargetNumAnomalies=1;continuumOffsetSize=1440;scanMaxWindowSize=48;pValueThreshold=0.01;scanStepSize=1");
+        anomalyFunctionSpec.setProperties("");
         break;
       case DAYS:
         anomalyFunctionSpec.setType("SPLINE_REGRESSION_VANILLA");
         anomalyFunctionSpec.setCron("0 0 14 1/1 * ? *");
         anomalyFunctionSpec.setWindowSize(1);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.DAYS);
-        anomalyFunctionSpec.setProperties("continuumOffsetSize=90;continuumOffsetUnit=86400000;pValueThreshold=0.05;applyLogTransform=true;weeklyEffectRemovedInPrediction=false;");
+        anomalyFunctionSpec.setProperties("");
         break;
       default:
         anomalyFunctionSpec.setType("WEEK_OVER_WEEK_RULE");
