@@ -91,7 +91,7 @@ public class EntityManagerResource {
     List<AbstractDTO> results = new ArrayList<>();
     switch (entityType) {
     case ANOMALY_FUNCTION:
-      results.addAll(anomalyFunctionManager.findAllActiveFunctions());
+      results.addAll(anomalyFunctionManager.findAll());
       break;
     case DATASET_CONFIG:
       List<DatasetConfigDTO> allDatasets = datasetConfigManager.findAll();
