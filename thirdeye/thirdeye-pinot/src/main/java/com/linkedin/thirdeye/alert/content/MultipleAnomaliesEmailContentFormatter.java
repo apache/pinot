@@ -95,7 +95,7 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
       String feedbackVal = getFeedbackValue(feedback);
 
       AnomalyReportEntity anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
-          getAnomalyURL(anomaly, EMAIL_FORMATTER_CONFIG.getDashboardHost()),
+          getAnomalyURL(anomaly, emailContentFormatterConfiguration.getDashboardHost()),
           ThirdEyeUtils.getRoundedValue(anomaly.getAvgBaselineVal()),
           ThirdEyeUtils.getRoundedValue(anomaly.getAvgCurrentVal()),
           0d,
@@ -148,7 +148,8 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
     if (anomalyDetails.size() == 1) {
       AnomalyReportEntity singleAnomaly = anomalyDetails.get(0);
       try {
-        imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), EMAIL_FORMATTER_CONFIG);
+        imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(),
+            emailContentFormatterConfiguration);
       } catch (Exception e) {
         LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
       }

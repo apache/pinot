@@ -102,7 +102,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
   protected Period postEventCrawlOffset;
   protected String imgPath = null;
   protected EventDataProviderManager EVENT_DATA_PROVIDER;
-  protected EmailContentFormatterConfiguration EMAIL_FORMATTER_CONFIG;
+  protected EmailContentFormatterConfiguration emailContentFormatterConfiguration;
 
 
   @Override
@@ -121,7 +121,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     if (properties.getProperty(POST_EVENT_CRAWL_OFFSET) != null) {
       this.postEventCrawlOffset = Period.parse(properties.getProperty(POST_EVENT_CRAWL_OFFSET));
     }
-    this.EMAIL_FORMATTER_CONFIG = configuration;
+    this.emailContentFormatterConfiguration = configuration;
     EVENT_DATA_PROVIDER = EventDataProviderManager.getInstance();
     EVENT_DATA_PROVIDER.registerEventDataProvider(EventType.HOLIDAY.toString(), new HolidayEventProvider());
   }
@@ -200,7 +200,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     templateData.put("alertConfigName", alertConfigDTO.getName());
     templateData.put("includeSummary", includeSummary);
     templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
-    templateData.put("dashboardHost", EMAIL_FORMATTER_CONFIG.getDashboardHost());
+    templateData.put("dashboardHost", emailContentFormatterConfiguration.getDashboardHost());
     if (groupId != null) {
       templateData.put("isGroupedAnomaly", true);
       templateData.put("groupId", Long.toString(groupId));
@@ -467,7 +467,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
    */
   protected Double getAvgComparisonBaseline(MergedAnomalyResultDTO anomaly, COMPARE_MODE compareMode,
       long start, long end) throws Exception{
-    AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(EMAIL_FORMATTER_CONFIG.getFunctionConfigPath());
+    AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(emailContentFormatterConfiguration.getFunctionConfigPath());
     AnomalyFunctionDTO anomalyFunction = anomaly.getFunction();
     DatasetConfigDTO datasetConfigDTO = DAORegistry.getInstance().getDatasetConfigDAO()
         .findByDataset(anomalyFunction.getCollection());

@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.alert.content;
 
 import com.google.common.base.Joiner;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
@@ -162,7 +161,7 @@ public class HierarchicalAnomaliesEmailContentFormatter extends BaseEmailContent
    */
   private AnomalyReportEntity putAnomaliesIntoRootOrLeaf(MergedAnomalyResultDTO anomaly,
       List<AnomalyReportEntity> rootAnomalyDetail, SortedMap<String, List<AnomalyReportEntity>> leafAnomalyDetail){
-    AnomalyReportEntity anomalyReport = generateAnomalyReportEntity(anomaly, EMAIL_FORMATTER_CONFIG.getDashboardHost());
+    AnomalyReportEntity anomalyReport = generateAnomalyReportEntity(anomaly, emailContentFormatterConfiguration.getDashboardHost());
     AnomalyFunctionDTO anomalyFunction = anomaly.getFunction();
     String exploredDimensions = anomalyFunction.getExploreDimensions();
     // Add WoW number
