@@ -99,17 +99,19 @@ public class ServerSegmentCompletionProtocolHandler {
     return postSegmentToVip(request, createFileParts(segmentName, segmentTarFile), controllerVipUrl);
   }
 
-  public SegmentCompletionProtocol.Response segmentCommitEnd(long offset, final String segmentName, String segmentLocation) {
+  public SegmentCompletionProtocol.Response segmentCommitEnd(long offset, final String segmentName, String segmentLocation,
+      long memoryUsed) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName).withSegmentLocation(segmentLocation);
+    params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName)
+        .withSegmentLocation(segmentLocation).withMemoryUsed(memoryUsed);
     SegmentCompletionProtocol.SegmentCommitEndRequest request = new SegmentCompletionProtocol.SegmentCommitEndRequest(params);
 
     return doHttp(request, null);
   }
 
-  public SegmentCompletionProtocol.Response segmentCommit(long offset, final String segmentName, final File segmentTarFile) {
+  public SegmentCompletionProtocol.Response segmentCommit(long offset, final String segmentName, long memoryUsed, final File segmentTarFile) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName);
+    params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName).withMemoryUsed(memoryUsed);
     SegmentCompletionProtocol.SegmentCommitRequest request = new SegmentCompletionProtocol.SegmentCommitRequest(params);
 
     return doHttp(request, createFileParts(segmentName, segmentTarFile));
