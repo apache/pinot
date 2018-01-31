@@ -319,7 +319,7 @@ export default Route.extend({
     // Initial value setup for displayed option lists
     let subD = {};
     let anomalyData = [];
-    const notCreateError = jobId !== 0;
+    const notCreateError = jobId !== -1;
     const resolutionOptions = ['All Resolutions'];
     const dimensionOptions = ['All Dimensions'];
     const wowOptions = ['Wow', 'Wo2W', 'Wo3W', 'Wo4W'];
@@ -348,8 +348,8 @@ export default Route.extend({
       alertEvalMetrics,
       activeRangeStart: config.startStamp,
       activeRangeEnd: config.endStamp,
-      isReplayPending: Ember.isPresent(model.jobId),
-      isMetricDataLoading: true
+      isMetricDataLoading: true,
+      isReplayPending: Ember.isPresent(model.jobId) && model.jobId !== -1
     });
 
     // Kick off controller defaults and replay status check

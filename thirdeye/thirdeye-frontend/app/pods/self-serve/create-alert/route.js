@@ -7,9 +7,9 @@ import Ember from 'ember';
 import fetch from 'fetch';
 import RSVP from 'rsvp';
 import Route from '@ember/routing/route';
+import { task, timeout } from 'ember-concurrency';
 import { postProps, checkStatus } from 'thirdeye-frontend/helpers/utils';
 
-let requestCanContinue = true;
 let onboardStartTime = {};
 
 export default Route.extend({
@@ -39,7 +39,7 @@ export default Route.extend({
     this._super(...arguments);
     if (isExiting) {
       controller.clearAll();
-      requestCanContinue = false;
+      this.get('checkJobCreateStatus').cancelAll();
     }
   },
 
@@ -56,46 +56,47 @@ export default Route.extend({
   },
 
   /**
-   * Pings the job-info endpoint to check status of an ongoing replay job.
+   * Concurrenty task to ping the job-info endpoint to check status of an ongoing replay job.
    * If there is no progress after a set time, we display an error message.
-   * @method checkReplayStatus
    * @param {Number} jobId - the id for the newly triggered replay job
+   * @param {String} functionName - user-provided new function name (used to validate creation)
    * @return {undefined}
    */
-  checkJobCreateStatus(jobId, functionName) {
+  checkJobCreateStatus: task(function * (jobId, functionName) {
+    yield timeout(2000);
     const checkStatusUrl = `/detection-onboard/get-status?jobId=${jobId}`;
     const alertByNameUrl = `/data/autocomplete/functionByName?name=${functionName}`;
 
-    // In replay status check, continue to display "pending" banner unless we have success.
-    fetch(checkStatusUrl).then(checkStatus)
+    // In replay status check, continue to display "pending" banner unless we have success or create job takes more than 10 seconds.
+    return fetch(checkStatusUrl).then(checkStatus)
       .then((jobStatus) => {
         const createStatusObj = _.has(jobStatus, 'taskStatuses') ? jobStatus.taskStatuses.find(status => status.taskName === 'FunctionAlertCreation') : null;
         const isCreateComplete = createStatusObj ? createStatusObj.taskStatus.toLowerCase() === 'completed' : false;
-        // stop trying if more than 10 seconds has elapsed - call job creation failed.
-        let requestCanContinue = Number(moment.duration(moment().diff(onboardStartTime)).asSeconds().toFixed(0)) > 10;
+        let continuePolling = Number(moment.duration(moment().diff(onboardStartTime)).asSeconds().toFixed(0)) > 10;
 
         if (isCreateComplete) {
+          // alert function is created. Redirect to alert page.
           fetch(alertByNameUrl).then(checkStatus)
             .then((newAlert) => {
-              this.controller.set('isProcessingForm', false);
               const isPresent = Ember.isArray(newAlert) && newAlert.length === 1;
-              const alertId = isPresent ? newAlert[0].id : 0;
+              const alertId = isPresent ? newAlert[0].id : -1;
+              this.controller.set('isProcessingForm', false);
               this.jumpToAlertPage(alertId, jobId, functionName);
             });
-        } else if (requestCanContinue) {
-          Ember.run.later(() => {
-            this.checkJobCreateStatus(jobId, functionName);
-          }, 3000);
+        } else if (continuePolling) {
+          // alert creation is still pending. check again.
+          this.get('checkJobCreateStatus').perform(jobId, functionName);
         } else {
-          // too much time has passed. Show create failure
+          // too much time has passed. Show create failure.
           this.controller.set('isProcessingForm', false);
-          this.jumpToAlertPage(0, 0, functionName);
+          this.jumpToAlertPage(-1, -1, functionName);
         }
       })
       .catch((err) => {
-        this.jumpToAlertPage(0, 0, functionName);
+        // in the event of either call failing, display alert page error state.
+        this.jumpToAlertPage(-1, -1, functionName);
       });
-  },
+  }),
 
   actions: {
     /**
@@ -119,11 +120,11 @@ export default Route.extend({
 
       fetch(onboardUrl, postProps('')).then(checkStatus)
         .then((result) => {
-          this.checkJobCreateStatus(result.jobId, newName);
+          this.get('checkJobCreateStatus').perform(result.jobId, newName);
         })
         .catch((err) => {
           // Error state will be handled on alert page
-          this.jumpToAlertPage(0, 0, newName);
+          this.jumpToAlertPage(-1, -1, newName);
         });
     }
   }

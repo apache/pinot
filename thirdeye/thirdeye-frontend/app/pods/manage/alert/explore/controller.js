@@ -307,7 +307,7 @@ export default Controller.extend({
   /**
    * Pings the job-info endpoint to check status of an ongoing replay job.
    * If there is no progress after a set time, we display an error message.
-   * TODO: Set error message on timeout
+   * TODO: Refactor method to use concurrency task instead of run.later
    * @method checkReplayStatus
    * @param {Number} jobId - the id for the newly triggered replay job
    * @return {fetch promise}
@@ -335,7 +335,7 @@ export default Controller.extend({
         const replayStatus = replayStatusObj ? replayStatusObj.taskStatus.toLowerCase() : '';
         const bodyString = `${intro}jobId: ${jobId}${br}alertId: ${alertId}${br}functionName: ${functionName}${br}${br}error: ${replayErr}`
 
-        if (replayStatus === 'complete') {
+        if (replayStatus === 'completed') {
           this.set('isReplayPending', false);
           this.transitionToRoute('manage.alert', alertId, { queryParams: { jobId: null }});
         } else if (replayStatus === 'failed') {

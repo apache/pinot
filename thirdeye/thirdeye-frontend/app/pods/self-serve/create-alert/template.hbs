@@ -148,7 +148,7 @@
     <div class="te-form__vertical-block col-xs-12">
       <label for="select-sensitivity" class="control-label te-label te-label--taller required">Sensitivity (optional)</label>
       <div class="te-form__indent-block--custom">
-        <span class="te-form__list-label">When</span>
+        <label for="alert-tune-severity" class="te-form__list-label">When</label>
         <div class="te-form__tune-field">
           {{#power-select
             triggerId="alert-tune-severity"
@@ -165,7 +165,7 @@
             {{severity}}
           {{/power-select}}
         </div>
-        <span class="te-form__list-label">is >=</span>
+        <label for="custom-tune-percent" class="te-form__list-label">is >=</label>
         <div class="te-form__tune-field te-form__tune-field--amount">
           {{input
             type="text"
@@ -176,7 +176,7 @@
           }}
         </div>
         <span class="te-form__list-label--suffix">{{sensitivityUnits}}, </span>
-        <span class="te-form__list-label">MTTD should be no more than</span>
+        <label for="custom-tune-mttd" class="te-form__list-label">MTTD should be no more than</label>
         <div class="te-form__tune-field te-form__tune-field--amount">
           {{input
             type="text"
@@ -205,6 +205,7 @@
         {{#x-toggle
           value=selectedWeeklyEffect
           classNames="te-toggle te-toggle--form te-toggle--left"
+          id="select-effect"
           theme='ios'
           showLabels=true
           name="splitViewToggle"

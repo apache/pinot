@@ -28,7 +28,7 @@ export default Route.extend({
 
     // Enter default 'explore' route with defaults loaded in URI
     // An alert Id of 0 means there is an alert creation error to display
-    if (transition.targetName === 'manage.alert.index' && Number(id) !== 0) {
+    if (transition.targetName === 'manage.alert.index' && Number(id) !== -1) {
       this.transitionTo('manage.alert.explore', id, { queryParams: {
         duration: durationDefault,
         startDate: startDateDefault,
@@ -49,7 +49,7 @@ export default Route.extend({
       id,
       jobId,
       functionName: functionName || 'Unknown',
-      isLoadError: Number(id) === 0,
+      isLoadError: Number(id) === -1,
       destination: transition.targetName,
       alertData: fetch(`/onboard/function/${id}`).then(checkStatus),
       email: fetch(`/thirdeye/email/function/${id}`).then(checkStatus),
