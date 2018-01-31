@@ -3,8 +3,8 @@ import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
-import { toCurrentUrn, toBaselineUrn, filterPrefix, appendFilters, toFilters, dateFormatFull } from 'thirdeye-frontend/helpers/rca-utils';
-import { checkStatus } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, appendFilters, toFilters, dateFormatFull } from 'thirdeye-frontend/utils/rca-utils';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
 
 const queryParamsConfig = {

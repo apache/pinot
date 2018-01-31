@@ -7,7 +7,7 @@ import fetch from 'fetch';
 import _ from 'lodash';
 import Controller from '@ember/controller';
 import { computed } from '@ember/object';
-import { checkStatus } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
 export default Controller.extend({
 

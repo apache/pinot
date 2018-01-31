@@ -1,7 +1,7 @@
 import Ember from 'ember';
 import ApplicationRouteMixin from 'ember-simple-auth/mixins/application-route-mixin';
 import fetch from 'fetch';
-import { checkStatus } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import config from 'thirdeye-frontend/config/environment';
 
 export default Ember.Route.extend(ApplicationRouteMixin, {

@@ -6,7 +6,7 @@
 import RSVP from 'rsvp';
 import fetch from 'fetch';
 import Route from '@ember/routing/route';
-import { checkStatus, buildDateEod } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
 
 // Setup for query param behavior
 const queryParamsConfig = {
@@ -43,7 +43,7 @@ export default Route.extend({
 
     // Fetch all the basic alert data needed in manage.alert subroutes
     // TODO: apply calls from go/te-ss-alert-flow-api (see below)
-    return Ember.RSVP.hash({
+    return RSVP.hash({
       id,
       replayId,
       destination: transition.targetName,

@@ -3,11 +3,12 @@
  * @module manage/alert/edit/explore
  * @exports manage/alert/edit/explore
  */
+import Ember from 'ember';
 import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
-import { checkStatus, postProps, buildDateEod, toIso } from 'thirdeye-frontend/helpers/utils';
-import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups } from 'thirdeye-frontend/helpers/manage-alert-utils';
+import { checkStatus, postProps, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
+import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 /**
  * Basic alert page defaults
