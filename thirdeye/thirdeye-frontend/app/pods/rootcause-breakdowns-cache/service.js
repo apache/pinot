@@ -76,6 +76,8 @@ export default Ember.Service.extend({
   _extractBreakdowns(incoming, urn) {
     // NOTE: only supports single time range
     const breakdowns = {};
+    breakdowns[urn] = {}; // default
+
     Object.keys(incoming).forEach(range => {
       Object.keys(incoming[range]).forEach(mid => {
         breakdowns[urn] = incoming[range][mid];
