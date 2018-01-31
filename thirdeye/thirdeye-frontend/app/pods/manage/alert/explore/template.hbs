@@ -291,7 +291,7 @@
       {{#if (not isReplayStatusError)}}<div class="te-alert-page-pending__loader"></div>{{/if}}
       <p class="te-alert-page-pending__text">
         {{#if isReplayStatusError}}
-          Your alert failed to set up. Please contact <a href="mailto:ask_thirdeye@linkedin.com">ask_thirdeye@linkedin.com</a>
+          Your alert <span class="stronger">{{functionName}}</span> was created, but data replay has failed.<br>Please contact <a class="thirdeye-link-secondary" target="_blank" href="{{replayErrorMailtoStr}}">ask_thirdeye@linkedin.com</a>
         {{else}}
           This may take a while (up to a few minutes) <br/>We will send you an email when it's done!
         {{/if}}

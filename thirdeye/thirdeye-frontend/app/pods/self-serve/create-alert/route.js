@@ -6,15 +6,13 @@
 import Ember from 'ember';
 import fetch from 'fetch';
 import RSVP from 'rsvp';
+import Route from '@ember/routing/route';
+import { task, timeout } from 'ember-concurrency';
 import { postProps, checkStatus } from 'thirdeye-frontend/utils/utils';
 
-export default Ember.Route.extend({
-  queryParams: {
-    newUx: {
-      refreshModel: false,
-      replace: true
-    }
-  },
+let onboardStartTime = {};
+
+export default Route.extend({
 
   /**
    * Model hook for the create alert route.
@@ -24,7 +22,6 @@ export default Ember.Route.extend({
   model(params, transition) {
     return RSVP.hash({
       // Fetch all alert group configurations
-      isNewUx: transition.queryParams.newUx || false,
       allConfigGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(res => res.json()),
       allAppNames: fetch('/thirdeye/entity/APPLICATION').then(res => res.json())
     });
@@ -42,8 +39,64 @@ export default Ember.Route.extend({
     this._super(...arguments);
     if (isExiting) {
       controller.clearAll();
+      this.get('checkJobCreateStatus').cancelAll();
     }
   },
+
+  /**
+   * Transition to Alert Page with query params related to alert creation job
+   * @method jumpToAlertPage
+   * @param {Number} alertId - Id of alert just created
+   * @param {Number} jobId - Id of alert creation job
+   * @param {String} functionName - name of new alert function
+   * @return {undefined}
+   */
+  jumpToAlertPage(alertId, jobId, functionName) {
+    this.transitionTo('manage.alert', alertId, { queryParams: { jobId, functionName }});
+  },
+
+  /**
+   * Concurrenty task to ping the job-info endpoint to check status of an ongoing replay job.
+   * If there is no progress after a set time, we display an error message.
+   * @param {Number} jobId - the id for the newly triggered replay job
+   * @param {String} functionName - user-provided new function name (used to validate creation)
+   * @return {undefined}
+   */
+  checkJobCreateStatus: task(function * (jobId, functionName) {
+    yield timeout(2000);
+    const checkStatusUrl = `/detection-onboard/get-status?jobId=${jobId}`;
+    const alertByNameUrl = `/data/autocomplete/functionByName?name=${functionName}`;
+
+    // In replay status check, continue to display "pending" banner unless we have success or create job takes more than 10 seconds.
+    return fetch(checkStatusUrl).then(checkStatus)
+      .then((jobStatus) => {
+        const createStatusObj = _.has(jobStatus, 'taskStatuses') ? jobStatus.taskStatuses.find(status => status.taskName === 'FunctionAlertCreation') : null;
+        const isCreateComplete = createStatusObj ? createStatusObj.taskStatus.toLowerCase() === 'completed' : false;
+        let continuePolling = Number(moment.duration(moment().diff(onboardStartTime)).asSeconds().toFixed(0)) > 10;
+
+        if (isCreateComplete) {
+          // alert function is created. Redirect to alert page.
+          fetch(alertByNameUrl).then(checkStatus)
+            .then((newAlert) => {
+              const isPresent = Ember.isArray(newAlert) && newAlert.length === 1;
+              const alertId = isPresent ? newAlert[0].id : -1;
+              this.controller.set('isProcessingForm', false);
+              this.jumpToAlertPage(alertId, jobId, functionName);
+            });
+        } else if (continuePolling) {
+          // alert creation is still pending. check again.
+          this.get('checkJobCreateStatus').perform(jobId, functionName);
+        } else {
+          // too much time has passed. Show create failure.
+          this.controller.set('isProcessingForm', false);
+          this.jumpToAlertPage(-1, -1, functionName);
+        }
+      })
+      .catch((err) => {
+        // in the event of either call failing, display alert page error state.
+        this.jumpToAlertPage(-1, -1, functionName);
+      });
+  }),
 
   actions: {
     /**
@@ -55,22 +108,25 @@ export default Ember.Route.extend({
     },
 
     /**
-    * Trigger alert replay sequence after create has finished
-    * @param {Number} alertId - Id of newly created alert function
+    * Trigger onboarding sequence starting with alert creation. Once triggered,
+    * we must look up the new alert Id as confirmation.
+    * @param {Object} data - contains request query params for alert creation job
     * @method triggerReplaySequence
     */
-    triggerReplaySequence(alertId) {
-      const replayUrl = this.controller.buildReplayUrl(alertId);
-      fetch(replayUrl, postProps('')).then(checkStatus)
-        .then((replayId) => {
-          this.transitionTo('manage.alert', alertId, { queryParams: { replayId }});
+    triggerOnboardingJob(data) {
+      const onboardUrl = `/detection-onboard/create-job?jobName=${data.jobName}&payload=${encodeURIComponent(data.payload)}`;
+      const newName = JSON.parse(data.payload).functionName;
+      let onboardStartTime = moment();
+
+      fetch(onboardUrl, postProps('')).then(checkStatus)
+        .then((result) => {
+          this.get('checkJobCreateStatus').perform(result.jobId, newName);
         })
-        // In the event of failure to trigger, transition anyway, without replay Id
-        // The new API will handle notifying users of job failures.
-        .catch(() => {
-          this.transitionTo('manage.alert', alertId, { queryParams: { replayId: 0 }});
+        .catch((err) => {
+          // Error state will be handled on alert page
+          this.jumpToAlertPage(-1, -1, newName);
         });
     }
-  },
+  }
 
 });

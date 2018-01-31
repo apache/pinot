@@ -16,36 +16,40 @@ const queryParamsConfig = {
 
 export default Route.extend({
   queryParams: {
-    replayId: queryParamsConfig
+    jobId: queryParamsConfig
   },
 
   beforeModel(transition) {
     const id = transition.params['manage.alert'].alertId;
-    const replayId = transition.queryParams.replayId;
+    const { jobId, functionName } = transition.queryParams;
     const durationDefault = '1m';
     const startDateDefault = buildDateEod(1, 'month').valueOf();
     const endDateDefault = buildDateEod(1, 'day');
 
     // Enter default 'explore' route with defaults loaded in URI
-    if (transition.targetName === 'manage.alert.index') {
+    // An alert Id of 0 means there is an alert creation error to display
+    if (transition.targetName === 'manage.alert.index' && Number(id) !== -1) {
       this.transitionTo('manage.alert.explore', id, { queryParams: {
         duration: durationDefault,
         startDate: startDateDefault,
         endDate: endDateDefault,
-        replayId
+        functionName,
+        jobId
       }});
     }
   },
 
   model(params, transition) {
-    const { alertId: id, replayId } = params;
+    const { alertId: id, jobId, functionName } = params;
     if (!id) { return; }
 
     // Fetch all the basic alert data needed in manage.alert subroutes
-    // TODO: apply calls from go/te-ss-alert-flow-api (see below)
-    return RSVP.hash({
+    // Apply calls from go/te-ss-alert-flow-api
+    return Ember.RSVP.hash({
       id,
-      replayId,
+      jobId,
+      functionName: functionName || 'Unknown',
+      isLoadError: Number(id) === -1,
       destination: transition.targetName,
       alertData: fetch(`/onboard/function/${id}`).then(checkStatus),
       email: fetch(`/thirdeye/email/function/${id}`).then(checkStatus),
@@ -68,17 +72,22 @@ export default Route.extend({
       id,
       alertData,
       pathInfo,
-      replayId,
+      jobId,
+      isLoadError,
+      functionName,
       destination,
       allConfigGroups
     } = model;
+
+    const newAlertData = !alertData ? {} : alertData;
+    let errorText = '';
 
     // Itereate through config groups to enhance all alerts with extra properties (group name, application)
     allConfigGroups.forEach((config) => {
       let groupFunctionIds = config.emailConfig && config.emailConfig.functionIds ? config.emailConfig.functionIds : [];
       let foundMatch = groupFunctionIds.find(funcId => funcId === Number(id));
       if (foundMatch) {
-        Object.assign(alertData, {
+        Object.assign(newAlertData, {
           application: config.application,
           group: config.name
         });
@@ -86,18 +95,26 @@ export default Route.extend({
     });
 
     const isEditModeActive = destination.includes('edit') || destination.includes('tune');
-    const pattern = alertData.alertFilter ? alertData.alertFilter.pattern : 'N/A';
-    const granularity = alertData.bucketSize && alertData.bucketUnit ? `${alertData.bucketSize}_${alertData.bucketUnit}` : 'N/A';
-    Object.assign(alertData, { pattern, granularity });
+    const pattern = newAlertData.alertFilter ? newAlertData.alertFilter.pattern : 'N/A';
+    const granularity = newAlertData.bucketSize && newAlertData.bucketUnit ? `${newAlertData.bucketSize}_${newAlertData.bucketUnit}` : 'N/A';
+    Object.assign(newAlertData, { pattern, granularity });
+
+    // We do not have a valid alertId. Set error state.
+    if (isLoadError) {
+      Object.assign(newAlertData, { functionName, isActive: false });
+      errorText = `We were not able to confirm alert creation: alert name ${functionName.toUpperCase()} not found in DB`;
+    }
 
     controller.setProperties({
       id,
-      alertData,
       pathInfo,
-      replayId,
+      errorText,
+      isLoadError,
+      functionName,
       isEditModeActive,
+      alertData: newAlertData,
       isOverViewModeActive: !isEditModeActive,
-      isReplayPending: Ember.isPresent(replayId)
+      isReplayPending: Ember.isPresent(jobId)
     });
   },
 
@@ -108,6 +125,7 @@ export default Route.extend({
       }
     },
 
+    // Sub-route errors will bubble up to this
     error(error, transition) {
       this.controller.set('isLoadError', true);
     }

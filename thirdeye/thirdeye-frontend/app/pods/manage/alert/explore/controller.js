@@ -48,6 +48,7 @@ export default Controller.extend({
       predefinedRanges: {},
       missingAnomalyProps: {},
       selectedSortMode: '',
+      replayErrorMailtoStr: '',
       selectedTimeRange: '',
       selectedFilters: JSON.stringify({}),
       openReportModal: false,
@@ -59,13 +60,14 @@ export default Controller.extend({
       isReportFailure: false,
       isPageLoadFailure: false,
       isReplayModeWrapper: true,
+      isReplayStatusError: false,
       isAnomalyArrayChanged: false,
       requestCanContinue: true,
       sortColumnStartUp: false,
       sortColumnScoreUp: false,
       sortColumnChangeUp: false,
       sortColumnResolutionUp: false,
-      checkReplayInterval: 120000, // 2min
+      checkReplayInterval: 2000, // 2 seconds
       selectedDimension: 'All Dimensions',
       selectedResolution: 'All Resolutions',
       dateRangeToRender: [30, 10, 5],
@@ -73,11 +75,9 @@ export default Controller.extend({
       pageSize: 10
     });
 
-    // Start checking for replay to end if an ID was given
+    // Start checking for replay to end if a jobId is present
     if (this.get('isReplayPending')) {
-      Ember.run.later(() => {
-        this.set('isReplayPending', false);
-      }, this.get('checkReplayInterval'));
+      this.checkReplayStatus(this.get('jobId'));
     }
   },
 
@@ -307,24 +307,46 @@ export default Controller.extend({
   /**
    * Pings the job-info endpoint to check status of an ongoing replay job.
    * If there is no progress after a set time, we display an error message.
-   * TODO: Set error message on timeout
+   * TODO: Refactor method to use concurrency task instead of run.later
    * @method checkReplayStatus
    * @param {Number} jobId - the id for the newly triggered replay job
    * @return {fetch promise}
    */
   checkReplayStatus(jobId) {
-    const checkStatusUrl = `/thirdeye-admin/job-info/job/${jobId}/status`;
+    const checkStatusUrl = `/detection-onboard/get-status?jobId=${jobId}`;
+    const {
+      alertId,
+      functionName,
+      requestCanContinue,
+      checkReplayInterval
+    } = this.getProperties('alertId', 'functionName', 'requestCanContinue', 'checkReplayInterval');
+    const br = `\r\n`;
+    const subject = 'TE Self-Serve Create Alert Issue';
+    const intro = `TE Team, please look into a replay error for...${br}${br}`;
+    const mailtoString = `mailto:ask_thirdeye@linkedin.com?subject=${encodeURIComponent(subject)}&body=`;
 
-    // In replay status check, continue to display "pending" banner unless we have success.
+    // In replay status check, continue to display "pending" banner unless we have known success or failure.
     fetch(checkStatusUrl).then(checkStatus)
-      .then((status) => {
-        if (status.toLowerCase() === 'completed') {
+      .then((jobStatus) => {
+        const replayStatusObj = _.has(jobStatus, 'taskStatuses')
+          ? jobStatus.taskStatuses.find(status => status.taskName === 'FunctionReplay')
+          : null;
+        const replayErr = replayStatusObj ? replayStatusObj.message : 'N/A';
+        const replayStatus = replayStatusObj ? replayStatusObj.taskStatus.toLowerCase() : '';
+        const bodyString = `${intro}jobId: ${jobId}${br}alertId: ${alertId}${br}functionName: ${functionName}${br}${br}error: ${replayErr}`
+
+        if (replayStatus === 'completed') {
           this.set('isReplayPending', false);
-          this.transitionToRoute('manage.alert', this.get('alertId'), { queryParams: { replayId: null }});
-        } else if (this.get('requestCanContinue')) {
+          this.transitionToRoute('manage.alert', alertId, { queryParams: { jobId: null }});
+        } else if (replayStatus === 'failed') {
+          this.setProperties({
+            isReplayStatusError: true,
+            replayErrorMailtoStr: mailtoString + encodeURIComponent(bodyString)
+          });
+        } else if (requestCanContinue) {
           Ember.run.later(() => {
             this.checkReplayStatus(jobId);
-          }, this.get('checkReplayInterval'));
+          }, checkReplayInterval);
         }
       });
   },

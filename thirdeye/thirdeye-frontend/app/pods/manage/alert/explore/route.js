@@ -153,7 +153,7 @@ export default Route.extend({
   },
 
   beforeModel(transition) {
-    const { duration, startDate, replayId } = transition.queryParams;
+    const { duration, startDate, jobId } = transition.queryParams;
 
     // Default to 1 month of anomalies to show if no dates present in query params
     if (!duration || !startDate) {
@@ -161,13 +161,13 @@ export default Route.extend({
         duration: durationDefault,
         startDate: startDateDefault,
         endDate: endDateDefault,
-        replayId
+        jobId
       }});
     }
   },
 
   model(params, transition) {
-    const { id, alertData, replayId } = this.modelFor('manage.alert');
+    const { id, alertData, jobId, functionName } = this.modelFor('manage.alert');
     if (!id) { return; }
 
     const {
@@ -193,7 +193,8 @@ export default Route.extend({
         Object.assign(alertEvalMetrics.current, { mttd: alertEvalMetrics.mttd});
         return {
           id,
-          replayId,
+          jobId,
+          functionName,
           alertData,
           duration,
           startDate,
@@ -214,7 +215,7 @@ export default Route.extend({
     const {
       id: alertId,
       alertData,
-      replayId,
+      jobId,
       startDate,
       endDate,
       duration,
@@ -295,7 +296,8 @@ export default Route.extend({
 
     const {
       id,
-      replayId,
+      jobId,
+      functionName,
       alertData,
       anomalyIds,
       email,
@@ -317,6 +319,7 @@ export default Route.extend({
     // Initial value setup for displayed option lists
     let subD = {};
     let anomalyData = [];
+    const notCreateError = jobId !== -1;
     const resolutionOptions = ['All Resolutions'];
     const dimensionOptions = ['All Dimensions'];
     const wowOptions = ['Wow', 'Wo2W', 'Wo3W', 'Wo4W'];
@@ -331,7 +334,8 @@ export default Route.extend({
     // Prime the controller
     controller.setProperties({
       loadError,
-      replayId,
+      jobId,
+      functionName,
       alertId: id,
       isMetricDataInvalid: false,
       anomalyDataUrl,
@@ -344,67 +348,68 @@ export default Route.extend({
       alertEvalMetrics,
       activeRangeStart: config.startStamp,
       activeRangeEnd: config.endStamp,
-      isReplayPending: Ember.isPresent(model.replayId),
-      isReplayStatusError: model.replayId === 'err',
-      isMetricDataLoading: true
+      isMetricDataLoading: true,
+      isReplayPending: Ember.isPresent(model.jobId) && model.jobId !== -1
     });
 
     // Kick off controller defaults and replay status check
     controller.initialize();
 
     // Fetch all anomalies we have Ids for. Enhance the data and populate power-select filter options.
-    fetchCombinedAnomalies(anomalyIds)
-      .then((rawAnomalyData) => {
-        anomalyData = enhanceAnomalies(rawAnomalyData);
-        resolutionOptions.push(...new Set(anomalyData.map(record => record.anomalyFeedback)));
-        dimensionOptions.push(...new Set(anomalyData.map(anomaly => anomaly.dimensionString)));
-        controller.setProperties({
-          anomaliesLoaded: true,
-          anomalyData,
-          resolutionOptions,
-          dimensionOptions
-        });
-        return fetch(metricDataUrl).then(checkStatus);
-      })
-      // Fetch and load graph metric data
-      .then((metricData) => {
-        subD = metricData.subDimensionContributionMap;
-        Object.assign(metricData, { color: metricDataColor });
-        controller.setProperties({
-          alertDimension,
-          topDimensions: [],
-          metricData,
-          isMetricDataLoading: exploreDimensions ? true : false
-        });
-        return this.fetchCombinedAnomalyChangeData(anomalyData);
-      })
-      // Load and display rest of options once data is loaded ('2week', 'Last Week')
-      .then((wowData) => {
-        anomalyData.forEach((anomaly) => {
-          anomaly.wowData = wowData[anomaly.anomalyId] || {};
-        });
-        controller.setProperties({
-          anomalyData,
-          baselineOptions: [baselineOptions[0], ...newWowList]
-        });
-        // If alert has dimensions set, load them into graph
-        if (exploreDimensions) {
-          return fetch(topDimensionsUrl).then(checkStatus).then((allDimensions) => {
-            const newtopDimensions = getTopDimensions(subD, allDimensions, alertDimension);
-            controller.setProperties({
-              topDimensions: newtopDimensions,
-              isMetricDataLoading: false
-            });
+    if (notCreateError) {
+      fetchCombinedAnomalies(anomalyIds)
+        .then((rawAnomalyData) => {
+          anomalyData = enhanceAnomalies(rawAnomalyData);
+          resolutionOptions.push(...new Set(anomalyData.map(record => record.anomalyFeedback)));
+          dimensionOptions.push(...new Set(anomalyData.map(anomaly => anomaly.dimensionString)));
+          controller.setProperties({
+            anomaliesLoaded: true,
+            anomalyData,
+            resolutionOptions,
+            dimensionOptions
           });
-        }
-      })
-      .catch((errors) => {
-        controller.setProperties({
-          isMetricDataInvalid: true,
-          isMetricDataLoading: false,
-          graphMessageText: 'Error loading metric data'
+          return fetch(metricDataUrl).then(checkStatus);
+        })
+        // Fetch and load graph metric data
+        .then((metricData) => {
+          subD = metricData.subDimensionContributionMap;
+          Object.assign(metricData, { color: metricDataColor });
+          controller.setProperties({
+            alertDimension,
+            topDimensions: [],
+            metricData,
+            isMetricDataLoading: exploreDimensions ? true : false
+          });
+          return this.fetchCombinedAnomalyChangeData(anomalyData);
+        })
+        // Load and display rest of options once data is loaded ('2week', 'Last Week')
+        .then((wowData) => {
+          anomalyData.forEach((anomaly) => {
+            anomaly.wowData = wowData[anomaly.anomalyId] || {};
+          });
+          controller.setProperties({
+            anomalyData,
+            baselineOptions: [baselineOptions[0], ...newWowList]
+          });
+          // If alert has dimensions set, load them into graph
+          if (exploreDimensions) {
+            return fetch(topDimensionsUrl).then(checkStatus).then((allDimensions) => {
+              const newtopDimensions = getTopDimensions(subD, allDimensions, alertDimension);
+              controller.setProperties({
+                topDimensions: newtopDimensions,
+                isMetricDataLoading: false
+              });
+            });
+          }
+        })
+        .catch((errors) => {
+          controller.setProperties({
+            isMetricDataInvalid: true,
+            isMetricDataLoading: false,
+            graphMessageText: 'Error loading metric data'
+          });
         });
-      });
+    }
   },
 
   resetController(controller, isExiting) {

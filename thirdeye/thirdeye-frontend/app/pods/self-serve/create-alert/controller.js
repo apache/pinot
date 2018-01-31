@@ -12,11 +12,6 @@ import { task, timeout } from 'ember-concurrency';
 import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
 
 export default Controller.extend({
-  /**
-   * Be ready to receive trigger for loading new ux with redirect to alert page
-   */
-  queryParams: ['newUx'],
-  newUx: null,
 
   /**
    * Initialized alert creation page settings
@@ -59,17 +54,11 @@ export default Controller.extend({
   },
 
   /**
-   * Change this to activate new alert anomaly page redirect
-   */
-  isNewUx: Ember.computed.reads('model.isNewUx'),
-
-  /**
    * Component property initial settings
    */
   filters: {},
   graphConfig: {},
   selectedFilters: JSON.stringify({}),
-  selectedSensitivity: null,
   selectedWeeklyEffect: true,
 
   /**
@@ -109,11 +98,6 @@ export default Controller.extend({
    * Options for patterns of interest field. These may eventually load from the backend.
    */
   patternsOfInterest: ['Up and Down', 'Up only', 'Down only'],
-
-  /**
-   * Options for sensitivity field, previously 'Robust', 'Medium', 'Sensitive'
-   */
-  sensitivityOptions: ['Robust (Low)', 'Medium', 'Sensitive (High)'],
 
   /**
    * Mapping user readable pattern and sensitivity to DB values
@@ -181,13 +165,14 @@ export default Controller.extend({
 
       const requiredProps = ['customMttdChange', 'customPercentChange', 'selectedSeverityOption'];
       const isCustomFilterPossible = requiredProps.every(val => Ember.isPresent(this.get(val)));
-      const filterObj = { pattern: patternMap[selectedPattern] };
+      const filterObj = {
+        pattern: patternMap[selectedPattern],
+        isCustom: isCustomFilterPossible
+      };
 
       if (isCustomFilterPossible) {
         const mttdVal = Number(customMttdChange).toFixed(2);
         const severityThresholdVal = (Number(customPercentChange)/100).toFixed(2);
-        // NOTE: finalStr will be used in next iteration
-        // const finalStr = `&features=${encodeURIComponent(featureString)}&mttd=${encodeURIComponent(mttdString)}${patternString}`;
         Object.assign(filterObj, {
           features: `window_size_in_hour,${severityMap[selectedSeverity]}`,
           mttd: `window_size_in_hour=${mttdVal};${severityMap[selectedSeverity]}=${severityThresholdVal}`
@@ -211,29 +196,6 @@ export default Controller.extend({
   ),
 
   /**
-   * Setting default sensitivity if selectedSensitivity is undefined
-   * @returns {String}
-   */
-  sensitivityWithDefault: computed(
-    'selectedSensitivity',
-    'selectedGranularity',
-    function() {
-      let {
-        selectedSensitivity,
-        selectedGranularity
-      } =  this.getProperties('selectedSensitivity', 'selectedGranularity');
-
-      if (!selectedSensitivity) {
-        const isDailyOrHourly = ['DAYS', 'HOURS'].includes(selectedGranularity);
-        selectedSensitivity = isDailyOrHourly ? 'Sensitive (High)' : 'Medium';
-      }
-
-      return this.optionMap.sensitivity[selectedSensitivity];
-    }
-  ),
-
-  weeklyEffectOptions: [true, false],
-  /**
    * Application name field options loaded from our model.
    */
   allApplicationNames: Ember.computed.reads('model.allAppNames'),
@@ -254,34 +216,6 @@ export default Controller.extend({
     const url = `/data/autocomplete/metric?name=${metric}`;
     return fetch(url).then(checkStatus);
   }),
-
-  /**
-   * Pseudo-encodes the querystring params to be posted. NOTE: URI encoders cannot be used
-   * here because they will encode the 'cron' property value, which causes the request to fail.
-   * Previously tried ${encodeURI(key)}=${encodeURI(paramsObj[key])}
-   * @method toQueryString
-   * @param {Object} paramsObj - the object we are flattening and url-encoding
-   * @return {String}
-   */
-  toQueryString(paramsObj) {
-    return Object
-      .keys(paramsObj)
-      .map(key => `${key}=${paramsObj[key]}`)
-      .join('&');
-  },
-
-  /**
-   * Sets error message to alert create error state and disables form
-   * @method setAlertCreateErrorState
-   * @returns {undefined}
-   */
-  setAlertCreateErrorState(error) {
-    // TODO: Log alert creation errors with Piwik
-    this.setProperties({
-      isCreateAlertError: true,
-      isFormDisabled: true
-    });
-  },
 
   /**
    * Determines if a metric should be filtered out
@@ -356,55 +290,9 @@ export default Controller.extend({
       granularity,
       filters
     } = config;
+
     const url = `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=${granularity}&filters=${encodeURIComponent(filters)}`;
     return fetch(url).then(checkStatus);
-  },
-
-  /**
-   * Send a POST request to the entity endpoint to create a new record.
-   * @method saveThirdEyeEntity
-   * @param {Object} alertData - The record being saved (in this case, a new alert config group)
-   * @param {String} entityType - The type of entity being saved
-   * @return {Promise}
-   */
-  saveThirdEyeEntity(alertData, entityType) {
-    const postProps = {
-      method: 'post',
-      body: JSON.stringify(alertData),
-      headers: { 'content-type': 'Application/Json' }
-    };
-    const url = '/thirdeye/entity?entityType=' + entityType;
-    return fetch(url, postProps).then((res) => checkStatus(res, 'post'));
-  },
-
-  /**
-   * Send a POST request to the new function create endpoint.
-   * @method saveThirdEyeFunction
-   * @param {Object} functionData - The new function to save
-   * @return {Promise}
-   */
-  saveThirdEyeFunction(functionData) {
-    const postProps = {
-      method: 'post',
-      headers: { 'content-type': 'Application/Json' }
-    };
-    const url = '/dashboard/anomaly-function?' + this.toQueryString(functionData);
-    return fetch(url, postProps).then(checkStatus);
-  },
-
-  /**
-   * Send a DELETE request to the function delete endpoint.
-   * @method removeThirdEyeFunction
-   * @param {Object} functionId - The id of the alert to remove
-   * @return {Promise}
-   */
-  removeThirdEyeFunction(functionId) {
-    const postProps = {
-      method: 'delete',
-      headers: { 'content-type': 'text/plain' }
-    };
-    const url = '/dashboard/anomaly-function?id=' + functionId;
-    return fetch(url, postProps).then(checkStatus);
   },
 
   /**
@@ -543,39 +431,6 @@ export default Controller.extend({
           resolve(dimensionList);
         });
     });
-  },
-
-  /**
-   * Replay Flow Step 1 - Clones an alert function in preparation for replay.
-   * @method callCloneAlert
-   * @param {Number} functionId - the newly created function's id
-   * @return {Ember.RSVP.Promise}
-   */
-  callCloneAlert(functionId) {
-    const url = `/onboard/function/${functionId}/clone/cloned`;
-    return fetch(url, { method: 'post' }).then((res) => checkStatus(res, 'post'));
-  },
-
-  /**
-   * Generate the URL needed to trigger replay for new alert
-   * @method buildReplayUrl
-   * @param {Number} functionId - the newly created function's id
-   * @return {String}
-   */
-  buildReplayUrl(functionId) {
-    const replayDateFormat = "YYYY-MM-DDTHH:mm:ss.SSS[Z]";
-    const startTime = buildDateEod(1, 'month').format(replayDateFormat);
-    const endTime = buildDateEod(1, 'day').format(replayDateFormat);
-    const granularity = this.get('graphConfig.granularity').toLowerCase();
-    const speedUp = !(granularity.includes('hour') || granularity.includes('day'));
-    const recipients = this.get('selectedConfigGroup.recipients');
-    const sensitivity = this.get('sensitivityWithDefault');
-    const selectedPattern = this.get('selectedPattern');
-    const pattern = this.optionMap.pattern[selectedPattern];
-
-    return `/detection-job/${functionId}/notifyreplaytuning?start=${startTime}` +
-      `&end=${endTime}&speedup=${speedUp}&userDefinedPattern=${pattern}&sensitivity=${sensitivity}` +
-      `&removeAnomaliesInWindow=true&removeAnomaliesInWindow=true&to=${recipients}`;
   },
 
   /**
@@ -755,92 +610,6 @@ export default Controller.extend({
   },
 
   /**
-   * Build the new alert properties based on granularity presets. This will make replay possible.
-   * @method newAlertProperties
-   * @param {String} alertFunctionName - new function name
-   * @param {Object} selectedMetricOption - the selected metric's properties
-   * @return {Object} New function object
-   */
-  newAlertProperties: computed(
-    'alertFunctionName',
-    'selectedMetricOption',
-    'selectedDimension',
-    'selectedFilters',
-    'selectedPattern',
-    'selectedGranularity',
-    'selectedWeeklyEffect',
-    'sensitivityWithDefault',
-    function() {
-      let gkey = '';
-      let mergedProps = {};
-      const granularity = this.get('graphConfig.granularity').toLowerCase();
-      const pattern = encodeURIComponent(this.get('selectedPattern'));
-      const sensitivity = encodeURIComponent(this.get('sensitivityWithDefault'));
-
-      const {
-        selectedFilters,
-        selectedDimension,
-        selectedWeeklyEffect: weeklyEffect
-      } = this.getProperties('selectedFilters', 'selectedDimension', 'selectedWeeklyEffect');
-
-      const settingsByGranularity = {
-        common: {
-          functionName: this.get('alertFunctionName') || this.get('alertFunctionName').trim(),
-          metric: this.get('selectedMetricOption.name'),
-          dataset: this.get('selectedMetricOption.dataset'),
-          dataGranularity: this.get('selectedGranularity'),
-          metricFunction: 'SUM',
-          isActive: true
-        },
-        minute: {
-          type: 'CONFIDENCE_INTERVAL_SIGN_TEST',
-          windowSize: 6,
-          windowUnit: 'HOURS',
-          properties: 'signTestWindowSize=24;anomalyRemovalThreshold=0.6;baseline=w/3wAvg;decayRate=0.5;signTestStepSize=1;slidingWindowWidth=8;confidenceLevel=0.99'
-        },
-        hour: {
-          type: 'REGRESSION_GAUSSIAN_SCAN',
-          windowSize: 84,
-          windowUnit: 'HOURS',
-          windowDelay: 0,
-          windowDelayUnit: 'HOURS',
-          cron: '0%200%2014%201%2F1%20*%20%3F%20*',
-          properties: 'metricTimezone=America/Los_Angeles;anomalyRemovalThreshold=1.0;scanMinWindowSize=1;continuumOffsetUnit=3600000;scanUseBootstrap=true;scanNumSimulations=500;scanTargetNumAnomalies=1;continuumOffsetSize=1440;scanMaxWindowSize=48;pValueThreshold=0.01;scanStepSize=1'
-        },
-        day: {
-          type: 'SPLINE_REGRESSION_VANILLA',
-          windowSize: 1,
-          windowUnit: 'DAYS',
-          windowDelay: 0,
-          windowDelayUnit: 'DAYS',
-          cron: '0%200%2014%201%2F1%20*%20%3F%20*',
-          properties: `continuumOffsetSize=90;continuumOffsetUnit=86400000;pValueThreshold=0.05;applyLogTransform=true;weeklyEffectRemovedInPrediction=false;weeklyEffectModeled=${weeklyEffect}`
-        }
-      };
-
-      // Set granularity types
-      if (granularity.includes('minute') || granularity.includes('5-minute')) { gkey = 'minute'; }
-      if (granularity.includes('hour')) { gkey = 'hour'; }
-      if (granularity.includes('day')) { gkey = 'day'; }
-
-      // Add filter and dimension choices if available
-      if (Ember.isPresent(selectedFilters)) {
-        settingsByGranularity.common.filters = selectedFilters;
-      }
-      if (Ember.isPresent(selectedDimension)) {
-        settingsByGranularity.common.exploreDimension = selectedDimension;
-      }
-
-      // Append extra props to preserve in the alert record
-      if (gkey) {
-        settingsByGranularity[gkey].properties += `;pattern=${encodeURIComponent(pattern)};sensitivity=${encodeURIComponent(sensitivity)}`;
-      }
-
-      return Object.assign(settingsByGranularity.common, settingsByGranularity[gkey]);
-    }
-  ),
-
-  /**
    * Filter all existing alert groups down to only those that are active and belong to the
    * currently selected application team.
    * @method filteredConfigGroups
@@ -907,6 +676,92 @@ export default Controller.extend({
   ),
 
   /**
+   * Builds the new alert settings to be sent to the alert creation task manager
+   * @type {Object}
+   */
+  onboardFunctionPayload: computed(
+    'alertFunctionName',
+    'selectedMetricOption',
+    'selectedDimension',
+    'selectedFilters',
+    'selectedPattern',
+    'selectedGranularity',
+    'selectedWeeklyEffect',
+    'selectedConfigGroup',
+    'newConfigGroupName',
+    'alertGroupNewRecipient',
+    'selectedApplication',
+    'alertFilterObj',
+    function() {
+      const {
+        alertFunctionName: functionName,
+        selectedMetricOption,
+        selectedDimension,
+        selectedFilters,
+        selectedPattern,
+        selectedGranularity,
+        selectedWeeklyEffect,
+        selectedConfigGroup,
+        newConfigGroupName,
+        alertGroupNewRecipient,
+        selectedApplication,
+        alertFilterObj
+      } = this.getProperties(
+        'alertFunctionName',
+        'selectedMetricOption',
+        'selectedDimension',
+        'selectedFilters',
+        'selectedPattern',
+        'selectedGranularity',
+        'selectedWeeklyEffect',
+        'selectedConfigGroup',
+        'newConfigGroupName',
+        'alertGroupNewRecipient',
+        'selectedApplication',
+        'alertFilterObj'
+      );
+
+      const jobName = `${functionName}:${selectedMetricOption.id}`;
+      const newAlertObj = {
+        functionName,
+        collection: selectedMetricOption.dataset,
+        metric: selectedMetricOption.name,
+        alertRecipients: alertGroupNewRecipient,
+        dataGranularity: selectedGranularity,
+        pattern: alertFilterObj.pattern,
+        application: selectedApplication
+      };
+
+      // Prepare config group property for new alert object and add it
+      const isGroupExisting = selectedConfigGroup && Ember.isNone(newConfigGroupName);
+      const subscriptionGroupKey = isGroupExisting ? 'alertId' : 'alertName';
+      const subscriptionGroupValue = isGroupExisting ? selectedConfigGroup.id.toString() : newConfigGroupName;
+      newAlertObj[subscriptionGroupKey] = subscriptionGroupValue;
+
+      // Do we have custom sensitivity settings to add?
+      if (alertFilterObj.isCustom) {
+        Object.assign(newAlertObj, { features: alertFilterObj.features, mttd: alertFilterObj.mttd });
+      }
+
+      // Add filters property if present
+      if (selectedFilters.length > 2) {
+        Object.assign(newAlertObj, { filters: encodeURIComponent(selectedFilters) });
+      }
+
+      // Add dimensions if present
+      if (selectedDimension) {
+        Object.assign(newAlertObj, { exploreDimensions: selectedDimension });
+      }
+
+      return {
+        jobName,
+        payload: JSON.stringify(newAlertObj)
+      };
+
+    }
+  ),
+
+  /**
    * Reset the form... clear all important fields
    * @method clearAll
    * @return {undefined}
@@ -924,7 +779,6 @@ export default Controller.extend({
       selectedMetricOption: null,
       selectedPattern: null,
       selectedGranularity: null,
-      selectedSensitivity: null,
       selectedWeeklyEffect: true,
       selectedDimension: null,
       alertFunctionName: null,
@@ -1198,93 +1052,30 @@ export default Controller.extend({
     },
 
     /**
-     * User hits submit... Buckle up - we're going for a ride! What we have to do here is:
-     *  1. Make sure all fields are validated (done inline and with computed props)
-     *  2. Disable submit button
-     *  3. Send a new 'alert function' create request, which should return a new function ID
-     *  4. Add this Id to the 'Alert Config Group' for notifications
-     *  5. Send a Edit or Create request for the Alert Config Group based on user's choice
-     *  6. Trigger metric replay (new time-based query to DB for anomaly detection tuning)
-     *  7. Notify user of result
+     * Check for email errors before triggering onboarding job
      * @method onSubmit
      * @return {undefined}
      */
     onSubmit() {
-      // This object contains the data for the new config group
-      const newConfigObj = {
-        active: true,
-        emailConfig: { "functionIds": [] },
-        recipients: this.get('alertGroupNewRecipient'),
-        name: this.get('selectedConfigGroup.name') || this.get('newConfigGroupName').trim(),
-        application: this.get('selectedAppName').application || null,
-        cronExpression: '0 0/5 * 1/1 * ? *'
-      };
-
-      // This object contains the data for the new alert function, with default fillers
       const {
-        redirectToAlertPage,
-        newAlertProperties: newFunctionObj,
-        selectedGroupRecipients: oldEmails,
-        alertGroupNewRecipient: newEmails
-      } = this.getProperties('redirectToAlertPage', 'newAlertProperties', 'selectedGroupRecipients', 'alertGroupNewRecipient');
+        isDuplicateEmail,
+        onboardFunctionPayload,
+        alertGroupNewRecipient: newEmails,
+      } = this.getProperties('isDuplicateEmail', 'onboardFunctionPayload', 'alertGroupNewRecipient');
       const newEmailsArr = newEmails ? newEmails.replace(/ /g, '').split(',') : [];
-      const existingEmailsArr = oldEmails ? oldEmails.replace(/ /g, '').split(',') : [];
-      const newRecipientsArr = newEmailsArr.length ? existingEmailsArr.concat(newEmailsArr) : existingEmailsArr;
-      const cleanRecipientsArr = newRecipientsArr.filter(e => String(e).trim()).join(',');
-      const emailError = !this.isEmailValid(newEmailsArr);
-
-      // Are we in edit or create mode for config group?
-      const isEditGroupMode = this.get('isAlertGroupEditModeActive');
-
-      // A reference to whichever 'alert config' object will be sent. Let's default to the new one
-      let finalConfigObj = newConfigObj;
+      const isEmailError = !this.isEmailValid(newEmailsArr);
 
       this.setProperties({
+        isEmailError,
         isProcessingForm: true,
-        isEmptyEmail: !this.isEmailPresent(newEmailsArr),
-        isEmailError: emailError
+        isEmptyEmail: !this.isEmailPresent(newEmailsArr)
       });
 
       // Exit quietly (showing warning) in the event of error
-      if (emailError || this.get('isDuplicateEmail')) { return; }
+      if (isEmailError || isDuplicateEmail) { return; }
 
-      // URL encode filters to avoid API issues
-      newFunctionObj.filters = encodeURIComponent(newFunctionObj.filters);
-
-      // Add selected severity options to alert function
-      newFunctionObj.alertFilter = this.get('alertFilterObj');
-
-      // First, save our new alert function.
-      this.saveThirdEyeFunction(newFunctionObj).then(newFunctionId => {
-
-        // Add new email recipients if we are dealing with an existing Alert Group
-        if (isEditGroupMode) {
-          let recipientsArr = [];
-          if (this.selectedConfigGroup.recipients.length) {
-            recipientsArr = this.selectedConfigGroup.recipients.split(',');
-          }
-          recipientsArr.push(this.alertGroupNewRecipient);
-          this.selectedConfigGroup.recipients = recipientsArr.join();
-          finalConfigObj = this.selectedConfigGroup;
-        }
-
-        // Add our new Alert Function Id to the Alert Config Object
-        finalConfigObj.emailConfig.functionIds.push(newFunctionId);
-
-        // Finally, save our Alert Config Groupg
-        this.saveThirdEyeEntity(finalConfigObj, 'ALERT_CONFIG')
-          .then(alertResult => {
-            // Start the replay sequence and transition to Alert Page
-            this.send('triggerReplaySequence', newFunctionId);
-        // If Alert Group edit/create fails, remove the orphaned anomaly Id
-        }).catch((error) => {
-          this.setAlertCreateErrorState(error);
-          this.removeThirdEyeFunction(newFunctionId);
-        });
-      // Alert creation call has failed
-      }).catch((error) => {
-        this.setAlertCreateErrorState(error);
-      });
+      // Begin onboarding tasks
+      this.send('triggerOnboardingJob', onboardFunctionPayload);
     }
   }
 });
