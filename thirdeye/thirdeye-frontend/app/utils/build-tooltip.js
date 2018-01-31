@@ -115,7 +115,7 @@ export default Helper.extend({
     /** TODO: abstract the js out of the template */
     return htmlSafe(`
       <div class="te-tooltip">
-        <h5 class="te-tooltip__header">${humanTimeStamp} (PDT)</h5>
+        <h5 class="te-tooltip__header">${humanTimeStamp} (local)</h5>
         <div class="te-tooltip__body">
           ${metricUrns.map((urn) => {
             return `
