@@ -15,101 +15,77 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
 import java.io.File;
+import java.lang.reflect.Constructor;
+import java.net.URISyntaxException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.mockito.ArgumentCaptor;
 import org.testng.Assert;
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
-import static org.mockito.Mockito.*;
 
 
 public class SegmentFetcherFactoryTest {
+  private SegmentFetcherFactory _segmentFetcherFactory;
 
-  @BeforeTest
-  public void setUp() {
-    SegmentFetcherFactory.getPreloadSegmentFetchers().clear();
+  @BeforeMethod
+  public void setUp() throws Exception {
+    // Use reflection to get a new segment fetcher factory
+    Constructor<SegmentFetcherFactory> constructor = SegmentFetcherFactory.class.getDeclaredConstructor();
+    constructor.setAccessible(true);
+    _segmentFetcherFactory = constructor.newInstance();
   }
 
   @Test
-  public void testInitSegmentFetcherFactory() throws Exception {
-    SegmentFetcher mockHdfsFetcher = mock(SegmentFetcher.class);
-    SegmentFetcher mockHttpFetcher = mock(SegmentFetcher.class);
-    SegmentFetcher mockHttpsFetcher = mock(SegmentFetcher.class);
-    SegmentFetcher replacableFetcher = mock(SegmentFetcher.class);
-    final String replacableProto = "replacable";
+  public void testDefaultSegmentFetcherFactory() throws Exception {
+    _segmentFetcherFactory.init(new PropertiesConfiguration());
+    Assert.assertTrue(_segmentFetcherFactory.containsProtocol("file"));
+    Assert.assertTrue(_segmentFetcherFactory.containsProtocol("http"));
+    Assert.assertFalse(_segmentFetcherFactory.containsProtocol("https"));
+    Assert.assertFalse(_segmentFetcherFactory.containsProtocol("hdfs"));
+  }
 
-    Configuration conf = new PropertiesConfiguration();
-    conf.addProperty("something", "abc");
-    conf.addProperty("pinot.server.segment.fetcher.hdfs.hadoop.conf.path", "file:///somewhere/folder");
-    conf.addProperty("pinot.server.segment.fetcher.http.other", "otherconfig");
-    conf.addProperty("pinot.server.segment.fetcher.http2.more_other", "some-other");
-    conf.addProperty("pinot.server.segment.fetcher.test.class", TestSegmentFetcher.class.getName());
-    conf.addProperty("pinot.server.segment.fetcher." + replacableProto + ".class", ReplacedFetcher.class.getName());
-    SegmentFetcherFactory.getPreloadSegmentFetchers().put("hdfs", mockHdfsFetcher);
-    SegmentFetcherFactory.getPreloadSegmentFetchers().put("http", mockHttpFetcher);
-    SegmentFetcherFactory.getPreloadSegmentFetchers().put("https", mockHttpsFetcher);
-    SegmentFetcherFactory.getPreloadSegmentFetchers().put(replacableProto, replacableFetcher);
+  @Test
+  public void testCustomizedSegmentFetcherFactory() throws Exception {
+    Configuration config = new PropertiesConfiguration();
+    config.addProperty("something", "abc");
+    config.addProperty("protocols", Arrays.asList("http", "https", "test"));
+    config.addProperty("http.other", "some config");
+    config.addProperty("https.class", NoOpFetcher.class.getName());
+    config.addProperty("test.class", TestSegmentFetcher.class.getName());
+    _segmentFetcherFactory.init(config);
 
-    SegmentFetcherFactory.initSegmentFetcherFactory(
-        conf.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
-    ArgumentCaptor<Configuration> captor = ArgumentCaptor.forClass(Configuration.class);
-    verify(mockHdfsFetcher).init(captor.capture());
-    Assert.assertEquals(captor.getValue().getString("hadoop.conf.path"), "file:///somewhere/folder");
-    Assert.assertEquals(captor.getValue().getString("other"), null);
-    Assert.assertTrue(SegmentFetcherFactory.containsProtocol("test"));
-    Assert.assertEquals(
-        ((TestSegmentFetcher) SegmentFetcherFactory.getPreloadSegmentFetchers().get("test")).init_called, 1);
-    ReplacedFetcher fetcher = (ReplacedFetcher) SegmentFetcherFactory.getPreloadSegmentFetchers().get(replacableProto);
-    Assert.assertEquals(fetcher.getInitCalled(), 1);
+    Assert.assertTrue(_segmentFetcherFactory.containsProtocol("http"));
+    Assert.assertTrue(_segmentFetcherFactory.containsProtocol("https"));
+    Assert.assertTrue(_segmentFetcherFactory.containsProtocol("test"));
+    SegmentFetcher testSegmentFetcher = _segmentFetcherFactory.getSegmentFetcherBasedOnURI("test://something");
+    Assert.assertTrue(testSegmentFetcher instanceof TestSegmentFetcher);
+    Assert.assertEquals(((TestSegmentFetcher) testSegmentFetcher).getInitCalled(), 1);
   }
 
   @Test
   public void testGetSegmentFetcherBasedOnURI() throws Exception {
-    Configuration configuration = new PropertiesConfiguration();
-    configuration.addProperty("https.ssl.server.enable-verification", "false");
-    SegmentFetcherFactory.initSegmentFetcherFactory(configuration);
-    Assert.assertTrue(
-        SegmentFetcherFactory.getSegmentFetcherBasedOnURI("hdfs:///something/wer") instanceof HdfsSegmentFetcher);
-    Assert.assertTrue(
-        SegmentFetcherFactory.getSegmentFetcherBasedOnURI("http://something:wer:") instanceof HttpSegmentFetcher);
-    Assert.assertTrue(SegmentFetcherFactory.getSegmentFetcherBasedOnURI("https://") instanceof HttpsSegmentFetcher);
-    Assert.assertTrue(
-        SegmentFetcherFactory.getSegmentFetcherBasedOnURI("file://a/asdf/wer/fd/e") instanceof LocalFileSegmentFetcher);
-  }
+    _segmentFetcherFactory.init(new PropertiesConfiguration());
 
-  @Test
-  public void testGetSegmentFetcherBasedOnURIFailed() throws Exception {
-    Configuration configuration = new PropertiesConfiguration();
-    SegmentFetcherFactory.initSegmentFetcherFactory(configuration);
+    Assert.assertTrue(
+        _segmentFetcherFactory.getSegmentFetcherBasedOnURI("http://something:wer:") instanceof HttpSegmentFetcher);
+    Assert.assertTrue(_segmentFetcherFactory.getSegmentFetcherBasedOnURI(
+        "file://a/asdf/wer/fd/e") instanceof LocalFileSegmentFetcher);
+
+    Assert.assertNull(_segmentFetcherFactory.getSegmentFetcherBasedOnURI("abc:///something"));
+    Assert.assertNull(_segmentFetcherFactory.getSegmentFetcherBasedOnURI("https://something"));
     try {
-      SegmentFetcherFactory.getSegmentFetcherBasedOnURI("");
+      _segmentFetcherFactory.getSegmentFetcherBasedOnURI("https:");
       Assert.fail();
-    } catch (UnsupportedOperationException e) {
-      // Expected
-    }
-    try {
-      SegmentFetcherFactory.getSegmentFetcherBasedOnURI("abc:///something");
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      // Expected
-    }
-    try {
-      // If HttpsSegmentFetcher is not configured correctly, it fails to initialize.
-      SegmentFetcherFactory.getSegmentFetcherBasedOnURI("https://");
-      Assert.fail();
-    } catch (IllegalStateException e) {
+    } catch (URISyntaxException e) {
       // Expected
     }
   }
 
-  public static class ReplacedFetcher implements SegmentFetcher {
-
+  public static class TestSegmentFetcher implements SegmentFetcher {
     public int initCalled = 0;
 
     @Override
@@ -127,7 +103,7 @@ public class SegmentFetcherFactoryTest {
 
     @Override
     public Set<String> getProtectedConfigKeys() {
-      return Collections.<String>emptySet();
+      return Collections.emptySet();
     }
   }
 }

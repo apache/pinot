@@ -240,7 +240,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
         new File(_indexDir, "tmp-" + segmentName + "." + String.valueOf(System.currentTimeMillis()));
     File tempFile = new File(_indexDir, segmentName + ".tar.gz");
     try {
-      SegmentFetcherFactory.getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempFile);
+      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempFile);
       _logger.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, tempFile, tempFile.length());
       TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
       _logger.info("Uncompressed file {} into tmp dir {}", tempFile, tempSegmentFolder);

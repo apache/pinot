@@ -109,8 +109,8 @@ public class MinionStarter {
     minionContext.setMinionVersion("1.0");
 
     LOGGER.info("initializing segment fetchers for all protocols");
-    SegmentFetcherFactory.initSegmentFetcherFactory(
-        _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
+    SegmentFetcherFactory.getInstance()
+        .init(_config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
 
     // Join the Helix cluster
     LOGGER.info("Joining the Helix cluster");

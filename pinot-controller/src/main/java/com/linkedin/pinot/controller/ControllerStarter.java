@@ -116,7 +116,8 @@ public class ControllerStarter {
     // Start all components
     try {
       LOGGER.info("initializing segment fetchers for all protocols");
-      SegmentFetcherFactory.initSegmentFetcherFactory(config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
+      SegmentFetcherFactory.getInstance()
+          .init(config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
 
       LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
       helixResourceManager.start();

@@ -50,6 +50,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
+import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.util.Date;
 import java.util.List;
@@ -295,10 +296,14 @@ public class PinotSegmentUploadRestletResource {
           // Get segment fetcher based on the download URI
           SegmentFetcher segmentFetcher;
           try {
-            segmentFetcher = SegmentFetcherFactory.getSegmentFetcherBasedOnURI(downloadURI);
-          } catch (Exception e) {
+            segmentFetcher = SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(downloadURI);
+          } catch (URISyntaxException e) {
             throw new ControllerApplicationException(LOGGER,
-                "Failed to get segment fetcher for download URI: " + downloadURI, Response.Status.BAD_REQUEST, e);
+                "Caught exception while parsing download URI: " + downloadURI, Response.Status.BAD_REQUEST, e);
+          }
+          if (segmentFetcher == null) {
+            throw new ControllerApplicationException(LOGGER,
+                "Failed to get segment fetcher for download URI: " + downloadURI, Response.Status.BAD_REQUEST);
           }
 
           // Download segment tar file to local
