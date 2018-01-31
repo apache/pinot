@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.dashboard.resource;
 
-import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dashboard.resources.v2.TimeSeriesResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.TimeSeriesLoader;
 import com.linkedin.thirdeye.dataframe.DataFrame;
@@ -43,7 +42,7 @@ public class TimeSeriesResourceTest {
   @Test
   public void testBasic() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "0", RANGE, null, null, null, null);
+        "0", RANGE, null, null, null, null, "0");
 
     Assert.assertEquals(out.size(), 1);
     Assert.assertTrue(out.containsKey(RANGE));
@@ -61,7 +60,7 @@ public class TimeSeriesResourceTest {
   @Test
   public void testTranformationCumulative() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "0", RANGE, null, null, "cumulative", null);
+        "0", RANGE, null, null, "cumulative", null, "0");
     Map<String, List<? extends Number>> ts = out.get(RANGE);
 
     Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
@@ -71,7 +70,7 @@ public class TimeSeriesResourceTest {
   @Test
   public void testTranformationDifference() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "0", RANGE, null, null, "difference", null);
+        "0", RANGE, null, null, "difference", null, "0");
     Map<String, List<? extends Number>> ts = out.get(RANGE);
 
     Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
@@ -81,7 +80,7 @@ public class TimeSeriesResourceTest {
   @Test
   public void testTranformationFillForward() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "0", RANGE, null, null, "fillforward", null);
+        "0", RANGE, null, null, "fillforward", null, "0");
     Map<String, List<? extends Number>> ts = out.get(RANGE);
 
     Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
@@ -91,7 +90,7 @@ public class TimeSeriesResourceTest {
   @Test
   public void testTranformationFillZero() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "0", RANGE, null, null, "fillzero", null);
+        "0", RANGE, null, null, "fillzero", null, "0");
     Map<String, List<? extends Number>> ts = out.get(RANGE);
 
     Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
@@ -101,7 +100,7 @@ public class TimeSeriesResourceTest {
   @Test
   public void testTranformationChange() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "2", RANGE, null, null, "change", null);
+        "2", RANGE, null, null, "change", null, "0");
     Map<String, List<? extends Number>> ts = out.get(RANGE);
 
     Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
@@ -111,7 +110,7 @@ public class TimeSeriesResourceTest {
   @Test
   public void testTranformationOffset() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "9", RANGE, null, null, "offset", null);
+        "9", RANGE, null, null, "offset", null, "0");
     Map<String, List<? extends Number>> ts = out.get(RANGE);
 
     Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
@@ -121,7 +120,7 @@ public class TimeSeriesResourceTest {
   @Test
   public void testTranformationRelative() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "1", RANGE, null, null, "relative", null);
+        "1", RANGE, null, null, "relative", null, "0");
     Map<String, List<? extends Number>> ts = out.get(RANGE);
 
     Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
@@ -131,7 +130,7 @@ public class TimeSeriesResourceTest {
   @Test
   public void testTranformationLog() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "0", RANGE, null, null, "log", null);
+        "0", RANGE, null, null, "log", null, "0");
     Map<String, List<? extends Number>> ts = out.get(RANGE);
 
     Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
@@ -140,13 +139,13 @@ public class TimeSeriesResourceTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testTranformationChangeNoGranularityFail() throws Exception {
-    this.resource.getTimeSeries("0", RANGE, null, null, "timestamp", null);
+    this.resource.getTimeSeries("0", RANGE, null, null, "timestamp", null, "0");
   }
 
   @Test
   public void testMultiTranformation() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "2", RANGE, null, null, "change,fillforward,cumulative", null);
+        "2", RANGE, null, null, "change,fillforward,cumulative", null, "0");
     Map<String, List<? extends Number>> ts = out.get(RANGE);
 
     Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 10L, 20L, 30L, 40L, 50L));
@@ -156,7 +155,7 @@ public class TimeSeriesResourceTest {
   @Test
   public void testAggregationSingleRange() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "0,1", RANGE, null, null, null, "sum");
+        "0,1", RANGE, null, null, null, "sum", "0");
 
     Map<String, List<? extends Number>> ts = out.get("sum");
 
@@ -168,7 +167,7 @@ public class TimeSeriesResourceTest {
   @Test
   public void testAggregationMultiRange() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "0,1", RANGE + ",20:80", null, null, null, "sum");
+        "0,1", RANGE + ",20:80", null, null, null, "sum", "0");
 
     Map<String, List<? extends Number>> ts = out.get("sum");
 
@@ -179,18 +178,18 @@ public class TimeSeriesResourceTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testAggregationMultiRangeDifferentLengthFail() throws Exception {
-    this.resource.getTimeSeries("0,1", RANGE + ",20:90", null, null, null, "sum");
+    this.resource.getTimeSeries("0,1", RANGE + ",20:90", null, null, null, "sum", "0");
   }
 
   @Test
   public void testNoAggregationMultiRangeDifferentLengthPass() throws Exception {
-    this.resource.getTimeSeries("0,1", RANGE + ",20:90", null, null, null, null);
+    this.resource.getTimeSeries("0,1", RANGE + ",20:90", null, null, null, null, "0");
   }
 
   @Test
   public void testMultiAggregationMultiRange() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "0,1", RANGE + ",20:80", null, null, null, "sum,product");
+        "0,1", RANGE + ",20:80", null, null, null, "sum,product", "0");
 
     Map<String, List<? extends Number>> ts = out.get("sum");
     Assert.assertEquals(ts.get(COL_TIME), Arrays.asList(0L, 1L, 2L, 3L, 4L, 5L));
@@ -207,7 +206,7 @@ public class TimeSeriesResourceTest {
   @Test
   public void testMultiTransformationMultiAggregationMultiRange() throws Exception {
     Map<String, Map<String, List<? extends Number>>> out = this.resource.getTimeSeries(
-        "0,1", RANGE + ",20:80", null, null, "fillforward,cumulative", "sum,product");
+        "0,1", RANGE + ",20:80", null, null, "fillforward,cumulative", "sum,product", "0");
 
     // 0: 1d, 0d, -1d, 0d, 1d, null
     // 1: 2d, 1d,  0d, 1d, 2d, null

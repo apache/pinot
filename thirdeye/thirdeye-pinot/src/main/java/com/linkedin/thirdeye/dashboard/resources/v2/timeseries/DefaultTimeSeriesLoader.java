@@ -34,8 +34,8 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
    */
   @Override
   public DataFrame load(MetricSlice slice) throws Exception {
-    LOG.info("Loading timeseries for metric id {} time range {}:{} with filters '{}' and granularity {}",
-        slice.getMetricId(), slice.getStart(), slice.getEnd(), slice.getFilters(), slice.getGranularity());
+    LOG.info("Loading timeseries for metric id {} time range {}:{} with filters '{}', granularity {}, and offset: {}",
+        slice.getMetricId(), slice.getStart(), slice.getEnd(), slice.getFilters(), slice.getGranularity(), slice.getGranularityOffset());
 
     TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
     ThirdEyeResponse response = this.cache.getQueryResult(rc.getRequest());

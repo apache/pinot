@@ -13,6 +13,8 @@ import com.google.common.collect.Range;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeRange;
 import org.joda.time.Hours;
+import org.joda.time.tz.DateTimeZoneBuilder;
+
 
 /**
  * Not to be confused with {@link TimeRange}. This class handles splitting time windows into
@@ -90,7 +92,11 @@ public class TimeRangeUtils {
     int index = -1;
     switch (granularity.getUnit()) {
     case DAYS:
-      Days d = Days.daysBetween(start.toLocalDate(), current.toLocalDate());
+      // HACK: start holds implicit time zone offset
+      int offset = (int) (start.getMillis() - start.withTimeAtStartOfDay().getMillis());
+      DateTimeZone tz = DateTimeZone.forOffsetMillis(offset);
+
+      Days d = Days.daysBetween(start.toDateTime(tz), current.toDateTime(tz));
       index = d.getDays() / granularity.getSize();
       break;
     default:
