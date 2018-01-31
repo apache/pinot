@@ -32,6 +32,7 @@ $(document).ready(function() {
             createNavClickHandler();
         })
         .fail(function() {
-            window.location.replace('/app/#/login');
+            var fromUrl = encodeURIComponent(window.location.href);
+            window.location.replace('/app/#/login?fromUrl=' + fromUrl);
         });
 });
