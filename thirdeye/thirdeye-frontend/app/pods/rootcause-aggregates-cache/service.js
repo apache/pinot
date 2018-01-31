@@ -76,7 +76,7 @@ export default Ember.Service.extend({
   _extractAggregates(incoming, urn) {
     // NOTE: only supports single time range
     const aggregates = {};
-    aggregates[urn] = parseFloat('NaN'); // default
+    aggregates[urn] = Number.NaN; // default
 
     Object.keys(incoming).forEach(range => {
       Object.keys(incoming[range]).forEach(mid => {
