@@ -7,8 +7,8 @@ import fetch from 'fetch';
 import moment from 'moment';
 import Controller from '@ember/controller';
 import { computed } from '@ember/object';
-import { checkStatus, postProps, buildDateEod } from 'thirdeye-frontend/helpers/utils';
-import { buildAnomalyStats } from 'thirdeye-frontend/helpers/manage-alert-utils';
+import { checkStatus, postProps, buildDateEod } from 'thirdeye-frontend/utils/utils';
+import { buildAnomalyStats } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Controller.extend({
   /**

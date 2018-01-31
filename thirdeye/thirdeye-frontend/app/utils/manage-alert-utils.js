@@ -1,4 +1,5 @@
-import { helper } from '@ember/component/helper';
+import Ember from 'ember';
+import _ from 'lodash';
 import moment from 'moment';
 
 /**
@@ -279,7 +280,7 @@ export function buildAnomalyStats(alertEvalMetrics, mode, severity = '30', isPer
   return anomalyStats;
 }
 
-export default helper(
+export default {
   formatEvalMetric,
   toIdGroups,
   pluralizeTime,
@@ -288,4 +289,4 @@ export default helper(
   setUpTimeRangeOptions,
   buildAnomalyStats,
   evalObj
-);
+};

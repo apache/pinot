@@ -1,7 +1,7 @@
 import Ember from 'ember';
 import _ from 'lodash';
 import moment from 'moment';
-import { toEventLabel } from 'thirdeye-frontend/helpers/rca-utils';
+import { toEventLabel } from 'thirdeye-frontend/utils/rca-utils';
 
 export default Ember.Component.extend({
   columns: null, // []

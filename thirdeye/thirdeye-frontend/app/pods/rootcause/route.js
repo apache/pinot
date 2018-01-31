@@ -3,8 +3,8 @@ import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
-import { toCurrentUrn, toBaselineUrn, filterPrefix, appendFilters, toFilters, dateFormatFull } from 'thirdeye-frontend/helpers/rca-utils';
-import { checkStatus } from 'thirdeye-frontend/helpers/utils';
+import { toCurrentUrn, toBaselineUrn, filterPrefix, appendFilters, toFilters, dateFormatFull } from 'thirdeye-frontend/utils/rca-utils';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
 
 const queryParamsConfig = {
@@ -12,63 +12,20 @@ const queryParamsConfig = {
   replace: false
 };
 
-/**
- * Helper function that checks if a query param
- * key/value pair is valid
- * @param {*} key   - query param key
- * @param {*} value - query param value
- * @return {Boolean}
- */
-const isValid = (key, value) => {
-  switch(key) {
-    case 'granularity':
-      return ['5_MINUTES', '15_MINUTES', '1_HOURS', '3_HOURS', '1_DAYS', '7_DAYS'].includes(value);
-    case 'filters':
-      return value && value.length;
-    case 'compareMode':
-      return ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'];
-    case 'metricId':
-      return !value || (Number.isInteger(value) && parseInt(value) >= 0);
-    case 'anomalyId':
-      return !value || (Number.isInteger(value) && parseInt(value) >= 0);
-    case 'shareId':
-      return true;
-    case 'metricUrn':
-      return !value || value.startsWith('thirdeye:metric:');
-    case 'anomalyUrn':
-      return !value || value.startsWith('thirdeye:event:anomaly:');
-    case 'share':
-      return !value || JSON.parse(value);
-    default:
-      return moment(+value).isValid();
-  }
-};
-
-// TODO: move this to a utils file (DRYER)
-const _filterToUrn = (filters) => {
-  const urns = [];
-  const filterObject = JSON.parse(filters);
-  Object.keys(filterObject)
-    .forEach((key) => {
-      const filterUrns = filterObject[key]
-        .map(dimension => `thirdeye:dimension:${key}:${dimension}:provided`);
-      urns.push(...filterUrns);
-    });
-
-  return urns;
-};
-
 export default Ember.Route.extend(AuthenticatedRouteMixin, {
   queryParams: {
     metricId: queryParamsConfig,
-    anomalyId: queryParamsConfig,
-    sessionId: queryParamsConfig
+    sessionId: queryParamsConfig,
+    anomalyId: {
+      refreshModel: true,
+      replace: false
+    }
   },
 
   model(params) {
     const { metricId, anomalyId, sessionId } = params;
 
-    let metricUrn, anomalyUrn, session, anomalyContext;
+    let metricUrn, anomalyUrn, session, anomalyContext, anomalySessions;
 
     if (metricId) {
       metricUrn = `thirdeye:metric:${metricId}`;
@@ -84,6 +41,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
     if (anomalyUrn) {
       anomalyContext = fetch(`/rootcause/raw?framework=anomalyContext&urns=${anomalyUrn}`).then(checkStatus).catch(res => undefined);
+      anomalySessions = fetch(`/session/query?anomalyId=${anomalyId}`).then(checkStatus).catch(res => undefined);
     }
 
     return RSVP.hash({
@@ -93,7 +51,8 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       metricUrn,
       anomalyUrn,
       session,
-      anomalyContext
+      anomalyContext,
+      anomalySessions
     });
   },
 
@@ -101,46 +60,48 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     const maxTime = moment().startOf('hour').valueOf();
 
     const defaultParams = {
-      filters: JSON.stringify({}),
-      granularity: '1_HOURS',
       anomalyRangeStart:  moment(maxTime).subtract(3, 'hours').valueOf(),
       anomalyRangeEnd: moment(maxTime).valueOf(),
       analysisRangeStart: moment(maxTime).endOf('day').subtract(1, 'week').valueOf() + 1,
       analysisRangeEnd: moment(maxTime).endOf('day').valueOf() + 1,
+      granularity: '1_HOURS',
       compareMode: 'WoW'
     };
-    let { queryParams } = transition;
 
-    const validParams = Object.keys(queryParams)
-      .filter((param) => {
-        const value = queryParams[param];
-        return value && isValid(param, value);
-      })
-      .reduce((hash, key) => {
-        hash[key] = queryParams[key];
-        return hash;
-      }, {});
+    // default params
+    const { queryParams } = transition;
+    const newModel = Object.assign(model, { ...defaultParams, ...queryParams });
 
-    return Object.assign(
-      model,
-      { queryParams: { ...defaultParams, ...validParams }}
-    );
+    // load latest saved session for anomaly
+    const { anomalySessions } = model;
+    if (!_.isEmpty(anomalySessions)) {
+      const mostRecent = _.last(_.sortBy(anomalySessions, 'updated'));
+
+      Object.assign(newModel, {
+        anomalyId: null,
+        anomalyUrn: null,
+        anomalyContext: null,
+        sessionId: mostRecent.id,
+        session: mostRecent
+      });
+
+      // NOTE: apparently this does not abort the ongoing transition
+      this.transitionTo({ queryParams: { sessionId: mostRecent.id, anomalyId: null } });
+    }
+
+    return newModel;
   },
 
   setupController(controller, model) {
     this._super(...arguments);
 
     const {
-      filters,
-      granularity,
       analysisRangeStart,
       analysisRangeEnd,
+      granularity,
       compareMode,
       anomalyRangeStart,
-      anomalyRangeEnd
-    } = model.queryParams;
-
-    let {
+      anomalyRangeEnd,
       anomalyId,
       metricId,
       sessionId,
@@ -174,7 +135,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     // metric-initialized context
     if (metricId && metricUrn) {
       context = {
-        urns: new Set([metricUrn, ..._filterToUrn(filters)]),
+        urns: new Set([metricUrn]),
         anomalyRange,
         analysisRange,
         granularity,
@@ -190,10 +151,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       if (!_.isEmpty(anomalyContext)) {
         const contextUrns = anomalyContext.map(e => e.urn);
 
-        const baseMetricUrns = filterPrefix(contextUrns, 'thirdeye:metric:');
-        const dimensionUrns = filterPrefix(contextUrns, 'thirdeye:dimension:');
-
-        const metricUrns = baseMetricUrns.map(urn => appendFilters(urn, toFilters(dimensionUrns)));
+        const metricUrns = filterPrefix(contextUrns, 'thirdeye:metric:');
 
         const anomalyRangeUrns = filterPrefix(contextUrns, 'thirdeye:timerange:anomaly:');
         const analysisRangeUrns = filterPrefix(contextUrns, 'thirdeye:timerange:analysis:');

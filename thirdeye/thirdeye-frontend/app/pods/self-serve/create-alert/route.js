@@ -8,7 +8,7 @@ import fetch from 'fetch';
 import RSVP from 'rsvp';
 import Route from '@ember/routing/route';
 import { task, timeout } from 'ember-concurrency';
-import { postProps, checkStatus } from 'thirdeye-frontend/helpers/utils';
+import { postProps, checkStatus } from 'thirdeye-frontend/utils/utils';
 
 let onboardStartTime = {};
 

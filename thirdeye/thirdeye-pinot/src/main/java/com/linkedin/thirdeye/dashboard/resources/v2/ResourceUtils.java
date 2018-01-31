@@ -57,6 +57,10 @@ public class ResourceUtils {
       String sourceName = externalLinkEntry.getKey();
       String urlTemplate = externalLinkEntry.getValue();
 
+      if (sourceName == null || urlTemplate == null) {
+        continue;
+      }
+
       putExternalLinkTimeContext(mergedAnomaly.getStartTime(), mergedAnomaly.getEndTime(), sourceName, context, externalLinkTimeGranularity);
 
       StrSubstitutor strSubstitutor = new StrSubstitutor(context);
@@ -102,6 +106,10 @@ public class ResourceUtils {
     for (Map.Entry<String, String> externalLinkEntry : urlTemplates.entrySet()) {
       String sourceName = externalLinkEntry.getKey();
       String urlTemplate = externalLinkEntry.getValue();
+
+      if (sourceName == null || urlTemplate == null) {
+        continue;
+      }
 
       putExternalLinkTimeContext(slice.getStart(), slice.getEnd(), sourceName, context, externalLinkTimeGranularity);
 
