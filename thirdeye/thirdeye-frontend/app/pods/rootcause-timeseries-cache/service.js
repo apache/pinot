@@ -3,6 +3,7 @@ import { toAbsoluteRange, toFilters, toFilterMap } from 'thirdeye-frontend/utils
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
+import moment from 'moment';
 
 export default Ember.Service.extend({
   timeseries: null, // {}
@@ -100,10 +101,11 @@ export default Ember.Service.extend({
     const metricId = urn.split(':')[3];
     const metricFilters = toFilters([urn]);
     const filters = toFilterMap(metricFilters);
+    const granularityOffset = moment.tz.zone(moment.tz.guess()).offset(moment()) * 60000;
 
     const filterString = encodeURIComponent(JSON.stringify(filters));
 
-    const url = `/timeseries/query?metricIds=${metricId}&ranges=${range[0]}:${range[1]}&filters=${filterString}&granularity=${context.granularity}`;
+    const url = `/timeseries/query?metricIds=${metricId}&ranges=${range[0]}:${range[1]}&filters=${filterString}&granularity=${context.granularity}&granularityOffset=${granularityOffset}`;
     return fetch(url)
       .then(checkStatus)
       .then(res => this._extractTimeseries(res, urn))
