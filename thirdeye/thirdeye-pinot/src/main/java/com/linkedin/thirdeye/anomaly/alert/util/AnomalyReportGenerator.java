@@ -45,6 +45,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
+import javax.activation.URLDataSource;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -282,6 +283,7 @@ public class AnomalyReportGenerator {
         }
       }
 
+      // graph embed
       String imgPath = null;
       String cid = "";
       if (anomalyReports.size() == 1) {
@@ -296,6 +298,16 @@ public class AnomalyReportGenerator {
         }
       }
       templateData.put("cid", cid);
+
+      // logo embed
+      String logoCid = "";
+      try {
+        URLDataSource dataSource = new URLDataSource(getClass().getClassLoader().getResource("assets/img/Lightbulb.png"));
+        logoCid = email.embed(dataSource, "logo");
+      } catch (Exception e) {
+        LOG.error("Exception while embedding logo", e);
+      }
+      templateData.put("logoCid", logoCid);
 
       buildEmailTemplateAndSendAlert(templateData, configuration.getSmtpConfiguration(), subject,
           emailRecipients, alertConfig.getFromAddress(), email);
