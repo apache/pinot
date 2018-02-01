@@ -134,7 +134,7 @@ export default Ember.Controller.extend({
       hoverUrns: new Set(),
       filteredUrns: new Set(),
       activeTab: ROOTCAUSE_TAB_METRICS,
-      timeseriesMode: 'absolute'
+      timeseriesMode: 'split'
     });
 
     Ember.run.later(this, this._onCheckSessionTimer, ROOTCAUSE_SESSION_TIMER_INTERVAL);
