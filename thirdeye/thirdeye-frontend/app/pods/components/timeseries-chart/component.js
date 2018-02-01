@@ -89,7 +89,7 @@ export default Ember.Component.extend({
     const cache = this.get('_seriesCache') || {};
     const series = this.get('series') || {};
     const colorMapping = this.get('colorMapping');
-    const { axis, legend, tooltip } = this.getProperties('axis', 'legend', 'tooltip');
+    const { axis, legend, tooltip, focusedId } = this.getProperties('axis', 'legend', 'tooltip', 'focusedId');
 
     const seriesKeys = Object.keys(series).sort();
 
@@ -131,8 +131,8 @@ export default Ember.Component.extend({
     const axes = {};
     loadKeys.filter(sid => 'axis' in series[sid]).forEach(sid => axes[sid] = series[sid].axis);
 
-    const config = { unload, xs, columns, types, regions, tooltip, colors, axis, axes, legend };
-
+    const config = { unload, xs, columns, types, regions, tooltip, focusedId , colors, axis, axes, legend };
+    debugger;
     return config;
   },
 
@@ -149,6 +149,27 @@ export default Ember.Component.extend({
 
     const series = this.get('series') || {};
     this.set('_seriesCache', _.cloneDeep(series));
+  },
+  focusedId: null,
+
+  onFocusChange: Ember.observer('focusedId', function() {
+    const id = this.get('focusedId');
+
+    if (id) {
+      this._focus(id);
+    } else {
+      this._revert();
+    }
+  }),
+
+  _focus(id) {
+    debugger;
+    this.get('_chart').focus(id);
+  },
+
+  _revert(id) {
+    debugger;
+    this.get('_chart').revert();
   },
 
   _updateChart() {
@@ -186,6 +207,7 @@ export default Ember.Component.extend({
     config.axis = diffConfig.axis;
     config.regions = diffConfig.regions;
     config.tooltip = diffConfig.tooltip;
+    config.focusedId = diffConfig.focusedId;
     config.legend = diffConfig.legend;
     config.subchart = this.get('subchart');
     config.zoom = this.get('zoom');
@@ -194,6 +216,7 @@ export default Ember.Component.extend({
     config.line = this.get('line');
 
     this.set('_chart', c3.generate(config));
+    debugger;
     this._updateCache();
   }
 });

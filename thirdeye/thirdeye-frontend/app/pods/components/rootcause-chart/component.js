@@ -26,6 +26,8 @@ export default Ember.Component.extend({
 
   classNames: ['rootcause-chart'],
 
+  focusedId: null,
+
   init() {
     this._super(...arguments);
     this.set('timeseriesMode', TIMESERIES_MODE_ABSOLUTE);

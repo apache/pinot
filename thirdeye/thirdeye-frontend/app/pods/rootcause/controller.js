@@ -233,6 +233,8 @@ export default Ember.Controller.extend({
    */
   aggregates: Ember.computed.reads('aggregatesService.aggregates'),
 
+  focusedId: null,
+
   /**
    * Subscribed breakdowns cache
    */
@@ -449,6 +451,14 @@ export default Ember.Controller.extend({
         selectedUrns: new Set(selectedUrns),
         sessionModified: true
       });
+    },
+
+    onLegendHover(urn) {
+      if (urn) {
+        var [app, metric, id] = urn.split(':')
+        urn = ['frontendgit', metric, 'current', id].join(':');
+      }
+      this.set('focusedId', urn);
     },
 
     /**

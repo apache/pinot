@@ -13,6 +13,7 @@ export default Ember.Component.extend({
   onSelection: null, // function (Set, bool)
 
   classNames: ['rootcause-legend'],
+  // onHover: () => {},
 
   validUrns: Ember.computed(
     'entities',
@@ -98,6 +99,15 @@ export default Ember.Component.extend({
   },
 
   actions: {
+    onMouseEnter(urn) {
+      this.attrs.onMouseEnter(urn);
+    },
+
+    onMouseLeave(){
+      this.attrs.onMouseLeave(null);
+    },
+    
+
     toggleVisibility(urn) {
       const { onVisibility, invisibleUrns } = this.getProperties('onVisibility', 'invisibleUrns');
       if (onVisibility) {
