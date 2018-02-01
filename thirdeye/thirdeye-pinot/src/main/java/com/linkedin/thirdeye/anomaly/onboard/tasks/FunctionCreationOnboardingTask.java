@@ -220,6 +220,15 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       alertConfig = alertConfigDAO.findById(configuration.getLong(ALERT_ID));
       EmailConfig emailConfig = alertConfig.getEmailConfig();
       emailConfig.getFunctionIds().add(anomalyFunction.getId());
+
+      // Add recipients to existing alert group
+      String recipients = configuration.getString(ALERT_TO);
+      if (StringUtils.isNotBlank(recipients)) {
+        if (StringUtils.isNotBlank(alertConfig.getRecipients())) {
+          recipients = recipients + "," + alertConfig.getRecipients();
+        }
+        alertConfig.setRecipients(recipients);
+      }
       alertConfigDAO.update(alertConfig);
     } else {
       alertConfig = new AlertConfigDTO();
