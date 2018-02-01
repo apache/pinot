@@ -9,7 +9,8 @@
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "schemaName": "airlineStats",
-    "replication": "1"
+    "replication": "1",
+    "replicasPerPartition": "1"
   },
   "tenants": {
     "broker": "airline_broker",
@@ -19,13 +20,15 @@
     "loadMode": "MMAP",
     "streamConfigs": {
       "streamType": "kafka",
-      "stream.kafka.consumer.type": "highLevel",
-      "stream.kafka.topic.name": "airlineStatsEvents",
+      "stream.kafka.consumer.type": "simple",
+      "stream.kafka.topic.name": "flights-realtime",
       "stream.kafka.decoder.class.name": "com.linkedin.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder",
       "stream.kafka.hlc.zk.connect.string": "localhost:2191/kafka",
       "stream.kafka.zk.broker.url": "localhost:2191/kafka",
+      "stream.kafka.broker.list": "localhost:19092",
       "realtime.segment.flush.threshold.time": "3600000",
-      "realtime.segment.flush.threshold.size": "50000"
+      "realtime.segment.flush.threshold.size": "50000",
+      "stream.kafka.consumer.prop.auto.offset.reset": "smallest"
     }
   },
   "metadata": {
