@@ -407,7 +407,7 @@ export default Ember.Controller.extend({
         if (res.updated > sessionUpdatedTime) {
           this.setProperties({
             sessionUpdateWarning: `This investigation (${sessionId}) was updated by ${res.updatedBy} on ${moment(res.updated).format(dateFormatFull)}. Please refresh the page.`
-          })
+          });
         }
       })
       .catch(error => undefined);
@@ -455,8 +455,12 @@ export default Ember.Controller.extend({
 
     onLegendHover(urn) {
       if (urn) {
-        var [app, metric, id] = urn.split(':')
-        urn = ['frontend', metric, 'current', id].join(':');
+        if (urn.includes('metric')) {
+          var [app, metric, id] = urn.split(':');
+          urn = ['frontend', metric, 'current', id].join(':');
+        } else if (urn.includes('event')) {
+          console.log(urn, 'thirdeye:event:anomaly:24033121');
+        }
       }
       console.log("hovering", urn);
       this.set('focusedId', urn);

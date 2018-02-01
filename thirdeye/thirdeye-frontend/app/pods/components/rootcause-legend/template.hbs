@@ -30,9 +30,9 @@
 
   {{#if hasEvents}}
     {{#each-in events as |type eventList|}}
-      <ul class="rootcause-legend__list">
+      <ul class="rootcause-legend__list" onMouseLeave={{action "onMouseLeave"}}>
         {{#each-in eventList as |urn label|}}
-          <li class="rootcause-legend__item">
+          <li class="rootcause-legend__item" onMouseEnter={{action "onMouseEnter" urn}}>
             <div class="rootcause-legend__label-group {{if (set-has invisibleUrns urn) 'rootcause-legend__label-group--inactive'}}" {{action
               "toggleVisibility" urn}}>
               <div class="rootcause-legend__indicator rootcause-legend__indicator--flush">
