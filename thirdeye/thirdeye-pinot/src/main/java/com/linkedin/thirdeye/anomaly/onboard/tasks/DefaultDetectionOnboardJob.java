@@ -264,7 +264,12 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     taskConfigs.put (taskPrefix + PHANTON_JS_PATH, this.properties.get(PHANTON_JS_PATH));
     taskConfigs.put (taskPrefix + ROOT_DIR, this.properties.get(ROOT_DIR));
 
-    return new MapConfiguration(taskConfigs);
+    /*
+    Set the DelimiterParsingDisabled to be true to avoid configuration automatically parse property with comma to list
+     */
+    MapConfiguration mapConfiguration =  new MapConfiguration(taskConfigs);
+    mapConfiguration.setDelimiterParsingDisabled(true);
+    return mapConfiguration;
   }
 
   /**

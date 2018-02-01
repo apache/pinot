@@ -43,7 +43,7 @@ public class AlertFilterAutoTuneOnboardingTask extends BaseDetectionOnboardTask 
   public static final String HOLIDAY_STARTS = DefaultDetectionOnboardJob.HOLIDAY_STARTS;
   public static final String HOLIDAY_ENDS = DefaultDetectionOnboardJob.HOLIDAY_ENDS;
 
-  public static final String DEFAULT_AUTOTUNE_PATTERN = "Up,Down";
+  public static final String DEFAULT_AUTOTUNE_PATTERN = "UP,DOWN";
   public static final String DEFAULT_AUTOTUNE_TYPE = "AUTOTUNE";
 
   public static final String DEFAULT_BACKFILL_PERIOD = FunctionReplayOnboardingTask.DEFAULT_BACKFILL_PERIOD;
