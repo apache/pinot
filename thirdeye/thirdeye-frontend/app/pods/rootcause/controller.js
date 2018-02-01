@@ -456,8 +456,9 @@ export default Ember.Controller.extend({
     onLegendHover(urn) {
       if (urn) {
         var [app, metric, id] = urn.split(':')
-        urn = ['frontendgit', metric, 'current', id].join(':');
+        urn = ['frontend', metric, 'current', id].join(':');
       }
+      console.log("hovering", urn);
       this.set('focusedId', urn);
     },
 
