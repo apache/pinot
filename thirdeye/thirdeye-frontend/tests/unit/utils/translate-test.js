@@ -11,7 +11,7 @@ test('translate function translates a value given a dictionary', function(assert
   };
 
   assert.equal(translate(dictionary, '1_DAYS'), '1 day');
-  assert.equal(translate(dictionary, '1_HOURS'), '1 day');
+  assert.equal(translate(dictionary, '1_HOURS'), '1 hour');
   assert.equal(translate(dictionary, '4_DAYS'), '4 days');
   assert.equal(translate(dictionary, 'Not in the dictionary'), undefined);
 });
