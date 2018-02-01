@@ -4,6 +4,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardTask;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardExecutionContext;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardTaskContext;
+import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
@@ -227,6 +228,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
         if (StringUtils.isNotBlank(alertConfig.getRecipients())) {
           recipients = recipients + "," + alertConfig.getRecipients();
         }
+        recipients = EmailUtils.getValidEmailAddresses(recipients);
         alertConfig.setRecipients(recipients);
       }
       alertConfigDAO.update(alertConfig);
@@ -242,6 +244,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       if (configuration.containsKey(ALERT_TO)) {
         alertRecipients = alertRecipients + "," + configuration.getString(ALERT_TO);
       }
+      alertRecipients = EmailUtils.getValidEmailAddresses(alertRecipients);
       alertConfig.setApplication(configuration.getString(ALERT_APPLICATION));
       alertConfig.setRecipients(alertRecipients);
       alertConfig.setCronExpression(configuration.getString(ALERT_CRON, DEFAULT_ALERT_CRON));
