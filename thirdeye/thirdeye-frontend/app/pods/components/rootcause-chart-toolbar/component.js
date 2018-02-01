@@ -1,7 +1,7 @@
 import Component from '@ember/component';
 import moment from 'moment';
 import { computed, get, set, getProperties, setProperties } from '@ember/object';
-import { translate } from 'thirdeye-frontend/utils/utils';
+import translate from 'thirdeye-frontend/utils/translate';
 
 /**
  * Mapping between translated human-readable granularity values and values that are named on the backend
