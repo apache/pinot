@@ -4,6 +4,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 
@@ -70,5 +71,23 @@ public final class MetricSlice {
 
   public static MetricSlice from(long metricId, long start, long end, Multimap<String, String> filters, TimeGranularity granularity) {
     return new MetricSlice(metricId, start, end, filters, granularity);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    MetricSlice that = (MetricSlice) o;
+    return metricId == that.metricId && start == that.start && end == that.end && Objects.equals(filters, that.filters)
+        && Objects.equals(granularity, that.granularity);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(metricId, start, end, filters, granularity);
   }
 }
