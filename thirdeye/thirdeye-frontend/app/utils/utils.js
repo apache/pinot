@@ -90,11 +90,27 @@ export function toIso(dateStr) {
   return moment(Number(dateStr)).toISOString();
 }
 
+/**
+ * Translates a value to make it human readable based on a given dictionary
+ * @param {Object} mapping - a dictionary that maps a non-human readable word to its intended translation
+ * @param {String} value - value to translate
+ * @example
+ * mapping = {
+ *  '1 hour': '1_HOURS',
+ *  '1 day': '1_DAYS'
+ * }
+ * value = '1_HOURS'
+ */
+export function translate(mapping, value) {
+  return Object.keys(mapping).find(key => value === mapping[key]);
+}
+
 export default {
   checkStatus,
   humanizeFloat,
   humanizeChange,
   parseProps,
   postProps,
-  toIso
+  toIso,
+  translate
 };
