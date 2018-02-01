@@ -3,9 +3,6 @@ package com.linkedin.thirdeye.alert.content;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.alert.commons.EmailEntity;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailScreenshotHelper;
 import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
@@ -15,19 +12,15 @@ import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +46,7 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
   }
 
   @Override
-  public void init(Properties properties, ThirdEyeAnomalyConfiguration configuration) {
+  public void init(Properties properties, EmailContentFormatterConfiguration configuration) {
     super.init(properties, configuration);
     this.emailTemplate = properties.getProperty(EMAIL_TEMPLATE, DEFAULT_EMAIL_TEMPLATE);
     this.eventDAO = DAORegistry.getInstance().getEventDAO();
@@ -61,7 +54,7 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
 
   @Override
   protected void updateTemplateDataByAnomalyResults(Map<String, Object> templateData,
-      Collection<AnomalyResult> anomalies) {
+      Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
     DateTime windowStart = DateTime.now();
     DateTime windowEnd = new DateTime(0);
 
@@ -102,7 +95,7 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
       String feedbackVal = getFeedbackValue(feedback);
 
       AnomalyReportEntity anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
-          getAnomalyURL(anomaly, THIRDEYE_CONFIG.getDashboardHost()),
+          getAnomalyURL(anomaly, emailContentFormatterConfiguration.getDashboardHost()),
           ThirdEyeUtils.getRoundedValue(anomaly.getAvgBaselineVal()),
           ThirdEyeUtils.getRoundedValue(anomaly.getAvgCurrentVal()),
           0d,
@@ -155,7 +148,8 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
     if (anomalyDetails.size() == 1) {
       AnomalyReportEntity singleAnomaly = anomalyDetails.get(0);
       try {
-        imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), THIRDEYE_CONFIG);
+        imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(),
+            emailContentFormatterConfiguration);
       } catch (Exception e) {
         LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
       }

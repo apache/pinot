@@ -5,6 +5,8 @@ import com.linkedin.thirdeye.alert.commons.AnomalyFeedFactory;
 import com.linkedin.thirdeye.alert.commons.EmailContentFormatterFactory;
 import com.linkedin.thirdeye.alert.commons.EmailEntity;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatter;
+import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
+import com.linkedin.thirdeye.alert.content.EmailContentFormatterContext;
 import com.linkedin.thirdeye.alert.feed.AnomalyFeed;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
@@ -272,16 +274,19 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           LOG.error("User-assigned Email Formatter Config {} is not available. Use default instead.", alertConfig.getEmailFormatterConfig());
           emailContentFormatter = EmailContentFormatterFactory.fromClassName(DEFAULT_EMAIL_FORMATTER_TYPE);
         }
+        EmailContentFormatterConfiguration emailContemtFormatterConfig = EmailContentFormatterConfiguration
+            .fromThirdEyeAnomalyConfiguration(thirdeyeConfig);
         if (emailFormatterConfig != null && StringUtils.isNotBlank(emailFormatterConfig.getProperties())) {
           emailContentFormatter.init(com.linkedin.thirdeye.datalayer.util.
-              StringUtils.decodeCompactedProperties(emailFormatterConfig.getProperties()), thirdeyeConfig);
+              StringUtils.decodeCompactedProperties(emailFormatterConfig.getProperties()), emailContemtFormatterConfig
+              );
         } else {
-          emailContentFormatter.init(new Properties(), thirdeyeConfig);
+          emailContentFormatter.init(new Properties(), emailContemtFormatterConfig);
         }
 
         EmailEntity emailEntity = emailContentFormatter
             .getEmailEntity(alertConfig, recipientsForThisGroup, emailSubjectBuilder.toString(),
-                groupedAnomalyDTO.getId(), groupName, anomalyResultListOfGroup);
+                groupedAnomalyDTO.getId(), groupName, anomalyResultListOfGroup, new EmailContentFormatterContext());
         EmailHelper.sendEmailWithEmailEntity(emailEntity, thirdeyeConfig.getSmtpConfiguration());
         // Update notified flag
         if (alertGrouper instanceof DummyAlertGrouper) {

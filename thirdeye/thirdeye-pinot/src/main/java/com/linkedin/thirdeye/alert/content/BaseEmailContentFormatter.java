@@ -7,9 +7,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.Multimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.alert.commons.EmailEntity;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.util.DataReportHelper;
-import com.linkedin.thirdeye.anomaly.alert.util.EmailScreenshotHelper;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
@@ -57,7 +55,6 @@ import java.util.TimeZone;
 import java.util.regex.Pattern;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.StringUtils;
-import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -105,11 +102,11 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
   protected Period postEventCrawlOffset;
   protected String imgPath = null;
   protected EventDataProviderManager EVENT_DATA_PROVIDER;
-  protected ThirdEyeAnomalyConfiguration THIRDEYE_CONFIG;
+  protected EmailContentFormatterConfiguration emailContentFormatterConfiguration;
 
 
   @Override
-  public void init(Properties properties, ThirdEyeAnomalyConfiguration configuration) {
+  public void init(Properties properties, EmailContentFormatterConfiguration configuration) {
     this.includeSentAnomaliesOnly = Boolean.valueOf(
         properties.getProperty(INCLUDE_SENT_ANOMALY_ONLY, DEFAULT_INCLUDE_SENT_ANOMALY_ONLY));
     this.includeSummary = Boolean.valueOf(
@@ -124,17 +121,17 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     if (properties.getProperty(POST_EVENT_CRAWL_OFFSET) != null) {
       this.postEventCrawlOffset = Period.parse(properties.getProperty(POST_EVENT_CRAWL_OFFSET));
     }
-    this.THIRDEYE_CONFIG = configuration;
+    this.emailContentFormatterConfiguration = configuration;
     EVENT_DATA_PROVIDER = EventDataProviderManager.getInstance();
     EVENT_DATA_PROVIDER.registerEventDataProvider(EventType.HOLIDAY.toString(), new HolidayEventProvider());
   }
 
   @Override
   public EmailEntity getEmailEntity(AlertConfigDTO alertConfigDTO, String recipients, String subject,
-      Long groupId, String groupName, Collection<AnomalyResult> anomalies) {
+      Long groupId, String groupName, Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
     Map<String, Object> templateData =
         getTemplateData(alertConfigDTO, groupId, groupName, anomalies);
-    updateTemplateDataByAnomalyResults(templateData, anomalies);
+    updateTemplateDataByAnomalyResults(templateData, anomalies, context);
     if (org.apache.commons.lang3.StringUtils.isNotBlank(groupName)) {
       subject = subject + " - " + groupName;
     }
@@ -147,7 +144,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
    * @param anomalies
    */
   protected abstract void updateTemplateDataByAnomalyResults(Map<String, Object> templateData,
-      Collection<AnomalyResult> anomalies);
+      Collection<AnomalyResult> anomalies, EmailContentFormatterContext context);
 
   /**
    * Add the auxiliary email information into parameter map
@@ -203,7 +200,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     templateData.put("alertConfigName", alertConfigDTO.getName());
     templateData.put("includeSummary", includeSummary);
     templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
-    templateData.put("dashboardHost", THIRDEYE_CONFIG.getDashboardHost());
+    templateData.put("dashboardHost", emailContentFormatterConfiguration.getDashboardHost());
     if (groupId != null) {
       templateData.put("isGroupedAnomaly", true);
       templateData.put("groupId", Long.toString(groupId));
@@ -470,7 +467,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
    */
   protected Double getAvgComparisonBaseline(MergedAnomalyResultDTO anomaly, COMPARE_MODE compareMode,
       long start, long end) throws Exception{
-    AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(THIRDEYE_CONFIG.getFunctionConfigPath());
+    AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(emailContentFormatterConfiguration.getFunctionConfigPath());
     AnomalyFunctionDTO anomalyFunction = anomaly.getFunction();
     DatasetConfigDTO datasetConfigDTO = DAORegistry.getInstance().getDatasetConfigDAO()
         .findByDataset(anomalyFunction.getCollection());

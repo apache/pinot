@@ -5,9 +5,11 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.alert.commons.EmailEntity;
+import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
@@ -204,8 +206,14 @@ public abstract class EmailHelper {
   }
 
 
-  public static void sendFailureEmailForScreenshot(String anomalyId, Throwable t, ThirdEyeAnomalyConfiguration thirdeyeConfig)
+  public static void sendFailureEmailForScreenshot(String anomalyId, Throwable t, ThirdEyeConfiguration thirdeyeConfig)
       throws JobExecutionException {
+    sendFailureEmailForScreenshot(anomalyId, t, thirdeyeConfig.getSmtpConfiguration(), thirdeyeConfig.getFailureFromAddress(),
+        thirdeyeConfig.getFailureToAddress());
+  }
+
+  public static void sendFailureEmailForScreenshot(String anomalyId, Throwable t, SmtpConfiguration smtpConfiguration,
+    String failureFromAddress, String failureToAddress) throws JobExecutionException {
     HtmlEmail email = new HtmlEmail();
     String subject = String
         .format("[ThirdEye Anomaly Detector] FAILED SCREENSHOT FOR ANOMALY ID=%s", anomalyId);
@@ -213,8 +221,7 @@ public abstract class EmailHelper {
         .format("Anomaly ID:%s; Exception:%s", anomalyId, ExceptionUtils.getStackTrace(t));
     try {
       EmailHelper
-          .sendEmailWithTextBody(email, thirdeyeConfig.getSmtpConfiguration(), subject, textBody,
-              thirdeyeConfig.getFailureFromAddress(), thirdeyeConfig.getFailureToAddress());
+          .sendEmailWithTextBody(email, smtpConfiguration, subject, textBody, failureFromAddress, failureToAddress);
     } catch (EmailException e) {
       LOG.error("Exception in sending email for failed screenshot", e);
     }

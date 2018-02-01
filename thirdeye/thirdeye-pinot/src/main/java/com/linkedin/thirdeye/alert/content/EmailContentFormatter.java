@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.alert.content;
 
 import com.linkedin.thirdeye.alert.commons.EmailEntity;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import java.util.Collection;
@@ -20,7 +19,7 @@ public interface EmailContentFormatter {
    * @param properties
    * @param configuration
    */
-  void init(Properties properties, ThirdEyeAnomalyConfiguration configuration);
+  void init(Properties properties, EmailContentFormatterConfiguration configuration);
 
   /**
    * Get the email entity for the list of anomaly results.
@@ -33,7 +32,7 @@ public interface EmailContentFormatter {
    * @return
    */
   EmailEntity getEmailEntity(AlertConfigDTO alertConfigDTO, String recipients, String subject,
-      Long groupId, String groupName, Collection<AnomalyResult> anomalies);
+      Long groupId, String groupName, Collection<AnomalyResult> anomalies, EmailContentFormatterContext context);
 
   /**
    * Cleanup any temporary data

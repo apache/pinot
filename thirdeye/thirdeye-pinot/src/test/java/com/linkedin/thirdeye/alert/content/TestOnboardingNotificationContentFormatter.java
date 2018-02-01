@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskDriverConfiguration;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
@@ -30,19 +31,21 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class TestMultipleAnomaliesEmailContentFormatter {
+public class TestOnboardingNotificationContentFormatter {
   private static final String TEST = "test";
   private int id = 0;
   private String dashboardHost = "http://localhost:8080/dashboard";
   private DAOTestBase testDAOProvider;
   private AnomalyFunctionManager anomalyFunctionDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
+  private AlertConfigManager alertConfigDAO;
   @BeforeClass
   public void beforeClass(){
     testDAOProvider = DAOTestBase.getInstance();
     DAORegistry daoRegistry = DAORegistry.getInstance();
     anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
     mergedAnomalyResultDAO = daoRegistry.getMergedAnomalyResultDAO();
+    alertConfigDAO = daoRegistry.getAlertConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
@@ -89,13 +92,14 @@ public class TestMultipleAnomaliesEmailContentFormatter {
     anomalies.add(anomaly);
 
     AlertConfigDTO alertConfigDTO = DaoTestUtils.getTestAlertConfiguration("Test Config");
+    alertConfigDAO.save(alertConfigDTO);
 
-    EmailContentFormatter contentFormatter = new MultipleAnomaliesEmailContentFormatter();
+    EmailContentFormatter contentFormatter = new OnboardingNotificationEmailContentFormatter();
     contentFormatter.init(new Properties(), EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(thirdeyeAnomalyConfig));
     EmailEntity emailEntity = contentFormatter.getEmailEntity(alertConfigDTO, "a@b.com", TEST,
-        null, "", anomalies, null);
+        null, "", anomalies, new EmailContentFormatterContext());
 
-    String htmlPath = ClassLoader.getSystemResource("test-multiple-anomalies-email-content-formatter.html").getPath();
+    String htmlPath = ClassLoader.getSystemResource("test-onboard-notification-email-content-formatter.html").getPath();
     BufferedReader br = new BufferedReader(new FileReader(htmlPath));
     StringBuilder htmlContent = new StringBuilder();
     for(String line = br.readLine(); line != null; line = br.readLine()) {
@@ -110,4 +114,5 @@ public class TestMultipleAnomaliesEmailContentFormatter {
     Assert.assertEquals(emailHtml.replaceAll("\\s", ""),
         htmlContent.toString().replaceAll("\\s", ""));
   }
+
 }

@@ -1,15 +1,30 @@
 package com.linkedin.thirdeye.anomaly.onboard.tasks;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.thirdeye.alert.commons.EmailEntity;
+import com.linkedin.thirdeye.alert.content.EmailContentFormatter;
+import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
+import com.linkedin.thirdeye.alert.content.EmailContentFormatterContext;
+import com.linkedin.thirdeye.alert.content.OnboardingNotificationEmailContentFormatter;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
+import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardTask;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardExecutionContext;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.dashboard.resources.EmailResource;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.mail.EmailException;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +70,7 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
 
     Preconditions.checkNotNull(alertFilterFactory);
 
+    Preconditions.checkNotNull(executionContext.getExecutionResult(ALERT_CONFIG));
     Preconditions.checkNotNull(executionContext.getExecutionResult(ANOMALY_FUNCTION_CONFIG));
     Preconditions.checkNotNull(executionContext.getExecutionResult(NOTIFICATION_START));
     Preconditions.checkNotNull(executionContext.getExecutionResult(NOTIFICATION_END));
@@ -71,20 +87,55 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
     DateTime start = (DateTime) executionContext.getExecutionResult(NOTIFICATION_START);
     DateTime end = (DateTime) executionContext.getExecutionResult(NOTIFICATION_END);
 
-
+    // Get alert config from previous output
     AlertConfigDTO alertConfig = (AlertConfigDTO) executionContext.getExecutionResult(ALERT_CONFIG);
 
     SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
     smtpConfiguration.setSmtpHost(taskConfigs.getString(SMTP_HOST));
     smtpConfiguration.setSmtpPort(taskConfigs.getInt(SMTP_PORT));
-    EmailResource emailResource = new EmailResource(smtpConfiguration, alertFilterFactory,
-        taskConfigs.getString(DEFAULT_ALERT_SENDER_ADDRESS), taskConfigs.getString(DEFAULT_ALERT_RECEIVER_ADDRESS),
-        taskConfigs.getString(THIRDEYE_DASHBOARD_HOST), taskConfigs.getString(PHANTON_JS_PATH), taskConfigs.getString(ROOT_DIR));
+
+    MergedAnomalyResultManager mergeAnomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+    List<MergedAnomalyResultDTO> anomalyCandidates = mergeAnomalyDAO
+        .findByStartTimeInRangeAndFunctionId(start.getMillis(), end.getMillis(), functionId, true);
+    anomalyCandidates = AlertFilterHelper.applyFiltrationRule(anomalyCandidates, alertFilterFactory);
+    List<AnomalyResult> filteredAnomalyResults = new ArrayList<>();
+    for (MergedAnomalyResultDTO anomaly : anomalyCandidates) {
+      filteredAnomalyResults.add(anomaly);
+    }
+
+    // Set up thirdeye config
+    EmailContentFormatterConfiguration emailFormatterConfig = new EmailContentFormatterConfiguration();
+    emailFormatterConfig.setSmtpConfiguration(smtpConfiguration);
+    emailFormatterConfig.setDashboardHost(taskConfigs.getString(THIRDEYE_DASHBOARD_HOST));
+    emailFormatterConfig.setPhantomJsPath(taskConfigs.getString(PHANTON_JS_PATH));
+    emailFormatterConfig.setRootDir(taskConfigs.getString(ROOT_DIR));
+    emailFormatterConfig.setFailureFromAddress(taskConfigs.getString(DEFAULT_ALERT_SENDER_ADDRESS));
+    emailFormatterConfig.setFailureToAddress(taskConfigs.getString(DEFAULT_ALERT_RECEIVER_ADDRESS));
+
+    // Email Subject
     String subject = String.format("Replay results for %s is ready for review!",
         DAORegistry.getInstance().getAnomalyFunctionDAO().findById(functionId).getFunctionName());
-    emailResource.generateAndSendAlertForFunctions(start.getMillis(), end.getMillis(), String.valueOf(functionId),
-        alertConfig.getFromAddress(), alertConfig.getRecipients(), subject, false, true,
-        taskConfigs.getString(THIRDEYE_DASHBOARD_HOST), smtpConfiguration.getSmtpHost(), smtpConfiguration.getSmtpPort(),
-        taskConfigs.getString(PHANTON_JS_PATH));
+
+    EmailContentFormatter emailContentFormatter = new OnboardingNotificationEmailContentFormatter();
+    // construct context
+    EmailContentFormatterContext context = new EmailContentFormatterContext();
+    context.setStart(start);
+    context.setEnd(end);
+
+    emailContentFormatter.init(new Properties(), emailFormatterConfig);
+    EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, alertConfig.getRecipients(),
+        subject, null, "", filteredAnomalyResults, context);
+    try {
+      EmailHelper.sendEmailWithEmailEntity(emailEntity, smtpConfiguration);
+    } catch (EmailException e) {
+      LOG.error("Unable to send out email to recipients");
+      throw new IllegalStateException("Unable to send out email to recipients");
+    }
+
+    // Update Notified flag
+    for (MergedAnomalyResultDTO notifiedAnomaly : anomalyCandidates) {
+      notifiedAnomaly.setNotified(true);
+      mergeAnomalyDAO.update(notifiedAnomaly);
+    }
   }
 }
