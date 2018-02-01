@@ -204,7 +204,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
 
     // Assign Default Alert Filter
     Map<String, String> alertFilter = new HashMap<>();
-    alertFilter.put(ALERT_FILTER_PATTERN, TaskConfigurationUtils.getString(configuration, ALERT_FILTER_PATTERN, DEFAULT_ALERT_FILTER_PATTERN, ","));
+    alertFilter.put(ALERT_FILTER_PATTERN, configuration.getString(ALERT_FILTER_PATTERN, DEFAULT_ALERT_FILTER_PATTERN));
     alertFilter.put(ALERT_FILTER_TYPE, configuration.getString(ALERT_FILTER_TYPE, DEFAULT_ALERT_FILTER_TYPE));
     if (configuration.containsKey(ALERT_FILTER_FEATURES)) {
       alertFilter.put(ALERT_FILTER_FEATURES, configuration.getString(ALERT_FILTER_FEATURES));

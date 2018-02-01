@@ -87,7 +87,7 @@ public class AlertFilterAutoTuneOnboardingTask extends BaseDetectionOnboardTask 
             taskConfiguration.getString(HOLIDAY_STARTS, ""), taskConfiguration.getString(HOLIDAY_ENDS, ""),
             taskConfiguration.getString(AUTOTUNE_FEATURES),
             taskConfiguration.getString(AUTOTUNE_MTTD),
-            TaskConfigurationUtils.getString(taskConfiguration, AUTOTUNE_PATTERN, DEFAULT_AUTOTUNE_PATTERN, ","));
+            taskConfiguration.getString(AUTOTUNE_PATTERN, DEFAULT_AUTOTUNE_PATTERN));
 
     if (autotuneResponse.getEntity() != null) {
       List<Long> autotuneIds;
