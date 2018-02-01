@@ -1,9 +1,10 @@
 import Ember from 'ember';
 import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toOffsetUrn, toFilters, appendFilters, dateFormatFull } from 'thirdeye-frontend/utils/rca-utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
-import config from 'thirdeye-frontend/mocks/filterBarConfig';
+import filterBarConfig from 'thirdeye-frontend/mocks/filterBarConfig';
 import fetch from 'fetch';
 import moment from 'moment';
+import config from 'thirdeye-frontend/config/environment';
 
 const ROOTCAUSE_TAB_DIMENSIONS = 'dimensions';
 const ROOTCAUSE_TAB_METRICS = 'metrics';
@@ -122,7 +123,7 @@ export default Ember.Controller.extend({
   /**
    * side-bar filter config
    */
-  filterConfig: config, // {}
+  filterConfig: filterBarConfig, // {}
 
   /**
    * Default settings
@@ -137,7 +138,10 @@ export default Ember.Controller.extend({
       timeseriesMode: 'split'
     });
 
-    Ember.run.later(this, this._onCheckSessionTimer, ROOTCAUSE_SESSION_TIMER_INTERVAL);
+    // This is a flag for the acceptance test for rootcause to prevent it from timing out because of this run loop
+    if (config.environment !== 'test') {
+      Ember.run.later(this, this._onCheckSessionTimer, this.get('rootcauseTimerInterval'));
+    }
   },
 
   /**
