@@ -1,5 +1,18 @@
 import Component from '@ember/component';
 import moment from 'moment';
+import { computed, get, set, getProperties, setProperties } from '@ember/object';
+
+/**
+ * Mapping between translated human-readable granularity values and values that are named on the backend
+ * @type {Object}
+ */
+const granularityMapping = {
+  '5 Minutes': '5_MINUTES',
+  '15 Minutes': '15_MINUTES',
+  '1 Hour': '1_HOURS',
+  '3 Hours': '3_HOURS',
+  '1 Day': '1_DAYS'
+};
 
 export default Component.extend({
 
@@ -27,7 +40,17 @@ export default Component.extend({
     'Last 28 days': [moment().subtract(27, 'days').startOf('day'), moment().endOf('day')]
   },
 
-  granularityOptions: ['5_MINUTES', '15_MINUTES', '1_HOURS', '3_HOURS', '1_DAYS'],
+  /**
+   * Mapping of granularity values translated from backend
+   * @type {Object}
+   */
+  granularityMapping: granularityMapping,
+
+  /**
+   * Dropdown options for granularity
+   * @type {String[]} - array of string values of options
+   */
+  granularityOptions: Object.keys(granularityMapping),
 
   compareModeOptions: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'],
 
@@ -42,12 +65,31 @@ export default Component.extend({
 
   granularity: null, // ""
 
+  /**
+   * Selected value in the granularity dropdown
+   * @type {String}
+   */
+  selectedOption: computed('granularity', function() {
+    const keys = Object.keys(this.granularityMapping);
+    let selected = '';
+
+    // Find the key in granularityMapping whose value matches the granularity
+    keys.some(key => {
+      const value = this.granularityMapping[key];
+      if (value === get(this, 'granularity')) {
+        selected = key;
+      }
+    });
+
+    return selected;
+  }),
+
   compareMode: null, // ""
 
   didReceiveAttrs() {
-    const { context } = this.getProperties('context');
+    const { context } = getProperties(this, 'context');
 
-    this.setProperties({
+    setProperties(this, {
       analysisRangeStart: moment(context.analysisRange[0]),
       analysisRangeEnd: moment(context.analysisRange[1]),
       granularity: context.granularity,
@@ -56,41 +98,47 @@ export default Component.extend({
   },
 
   actions: {
-   onContext() {
-     const { context, onContext, analysisRangeStart, analysisRangeEnd, granularity, compareMode } =
-       this.getProperties('onContext', 'context', 'analysisRangeStart', 'analysisRangeEnd', 'granularity', 'compareMode');
+    onContext() {
+      const { context, onContext, analysisRangeStart, analysisRangeEnd, granularity, compareMode } =
+        getProperties(this, 'onContext', 'context', 'analysisRangeStart', 'analysisRangeEnd', 'granularity', 'compareMode');
 
-     const newContext = Object.assign({}, context, {
-       analysisRange: [moment(analysisRangeStart).valueOf(), moment(analysisRangeEnd).valueOf()],
-       granularity,
-       compareMode
-     });
+      const newContext = Object.assign({}, context, {
+        analysisRange: [moment(analysisRangeStart).valueOf(), moment(analysisRangeEnd).valueOf()],
+        granularity,
+        compareMode
+      });
 
-     onContext(newContext)
-   },
+      onContext(newContext);
+    },
 
-   onChart() {
-      const { onChart, timeseriesMode } = this.getProperties('onChart', 'timeseriesMode');
+    onChart() {
+      const { onChart, timeseriesMode } = getProperties(this, 'onChart', 'timeseriesMode');
       onChart(timeseriesMode);
     },
 
     onAnalysisRange(start, end) {
-      this.setProperties({ analysisRangeStart: start, analysisRangeEnd: end });
+      setProperties(this, { analysisRangeStart: start, analysisRangeEnd: end });
       this.send('onContext');
     },
 
+    /**
+     * On selecting a granularity, sets the granularity and update the context
+     * @param {String} granularity - selected granularity in the non-translated form (i.e. 1_HOURS)
+     * @return {undefined}
+     */
     onGranularity(granularity) {
-      this.setProperties({ granularity });
+      const translatedGranularity = this.granularityMapping[granularity];
+      set(this, 'granularity', translatedGranularity);
       this.send('onContext');
     },
 
     onCompareMode(compareMode) {
-      this.setProperties({ compareMode });
+      setProperties(this, { compareMode });
       this.send('onContext');
     },
 
     onTimeseriesMode(timeseriesMode) {
-      this.setProperties({ timeseriesMode });
+      setProperties(this, { timeseriesMode });
       this.send('onChart');
     }
   }
