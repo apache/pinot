@@ -125,7 +125,7 @@ export function setUpTimeRangeOptions(datesKeys, duration) {
     value: 'custom',
     start: null,
     isActive: !datesKeys.includes(duration)
-  }
+  };
 
   const dateKeyMap = new Map([
     [ '1m', ['Last 30 Days', 1, 'month'] ],
@@ -137,7 +137,7 @@ export function setUpTimeRangeOptions(datesKeys, duration) {
   datesKeys.forEach((value) => {
     let currVal = dateKeyMap.get(value);
     let name = currVal[0];
-    let start = moment().subtract(currVal[1], currVal[2]).endOf('day').utc()
+    let start = moment().subtract(currVal[1], currVal[2]).endOf('day').utc();
     let isActive = duration === value;
     newRangeArr.push({ name, value, start, isActive });
   });

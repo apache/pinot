@@ -1,6 +1,6 @@
 {{#if isDataLoading}}
   <div class="te-alert-page-pending">
-    <img src="assets/images/te-alert-{{if isDataLoadingError "error" "pending"}}.png" class="te-alert-page-pending__image {{if isDataLoadingError "te-alert-page-pending__image--error"}}" alt="alertData.Setup is Processing">
+    <img src="{{rootURL}}assets/images/te-alert-{{if isDataLoadingError "error" "pending"}}.png" class="te-alert-page-pending__image {{if isDataLoadingError "te-alert-page-pending__image--error"}}" alt="alertData.Setup is Processing">
     <h2 class="te-alert-page-pending__title">{{if isDataLoadingError "Oops, something went wrong." "Aggregating anomaly performance data..."}}</h2>
     {{#if (not isDataLoadingError)}}<div class="te-alert-page-pending__loader"></div>{{/if}}
     <p class="te-alert-page-pending__text">

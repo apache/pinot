@@ -286,7 +286,7 @@
   {{else}}
 
     <div class="te-alert-page-pending">
-      <img src="assets/images/te-alert-{{if isReplayStatusError "error" "pending"}}.png" class="te-alert-page-pending__image {{if isReplayStatusError "te-alert-page-pending__image--error"}}" alt="alertData.Setup is Processing">
+      <img src="{{rootURL}}assets/images/te-alert-{{if isReplayStatusError "error" "pending"}}.png" class="te-alert-page-pending__image {{if isReplayStatusError "te-alert-page-pending__image--error"}}" alt="alertData.Setup is Processing">
       <h2 class="te-alert-page-pending__title">{{if isReplayStatusError "Oops, something went wrong." "Setting up your alert"}}</h2>
       {{#if (not isReplayStatusError)}}<div class="te-alert-page-pending__loader"></div>{{/if}}
       <p class="te-alert-page-pending__text">

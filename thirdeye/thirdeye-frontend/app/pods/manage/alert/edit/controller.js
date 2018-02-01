@@ -3,10 +3,14 @@
  * @module manage/alert/edit
  * @exports manage/alert/edit
  */
-import fetch from 'fetch';
 import _ from 'lodash';
+import RSVP from 'rsvp';
+import fetch from 'fetch';
 import Controller from '@ember/controller';
-import { computed } from '@ember/object';
+import { later } from "@ember/runloop";
+import { computed, set } from '@ember/object';
+import { getWithDefault } from '@ember/object';
+import { isEmpty, isPresent } from "@ember/utils";
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
 export default Controller.extend({
@@ -139,8 +143,8 @@ export default Controller.extend({
     'updatedRecipients',
     function() {
       const newRecipients = this.get('updatedRecipients');
-      const originalRecipients = Ember.getWithDefault(this, 'selectedConfigGroup.recipients', []);
-      const finalRecipients = Ember.isPresent(newRecipients) ? newRecipients : originalRecipients;
+      const originalRecipients = getWithDefault(this, 'selectedConfigGroup.recipients', []);
+      const finalRecipients = isPresent(newRecipients) ? newRecipients : originalRecipients;
       return finalRecipients.replace(/,+$/g, '').replace(/,/g, ', ');
     }
   ),
@@ -186,7 +190,7 @@ export default Controller.extend({
       if (isExiting) {
         return false;
       } else {
-        return Ember.isEmpty(selectedConfigGroupRecipients) && Ember.isEmpty(alertGroupNewRecipient);
+        return isEmpty(selectedConfigGroupRecipients) && isEmpty(alertGroupNewRecipient);
       }
     }
   ),
@@ -196,7 +200,7 @@ export default Controller.extend({
    * @method isSubmitDisabled
    * @return {Boolean} show/hide submit
    */
-  isSubmitDisabled: Ember.computed.or('{isEmptyEmail,isEmailError,isDuplicateEmail,isProcessingForm}'),
+  isSubmitDisabled: computed.or('{isEmptyEmail,isEmailError,isDuplicateEmail,isProcessingForm}'),
 
   /**
    * Fetches an alert function record by name.
@@ -228,7 +232,7 @@ export default Controller.extend({
    * @method prepareFunctions
    * @param {Object} configGroup - the currently selected alert config group
    * @param {Object} newId - conditional param to help us tag any function that was "just added"
-   * @return {Ember.RSVP.Promise} A new list of functions (alerts)
+   * @return {RSVP.Promise} A new list of functions (alerts)
    */
   prepareFunctions(configGroup, newId = 0) {
     const newFunctionList = [];
@@ -236,7 +240,7 @@ export default Controller.extend({
     let cnt = 0;
 
     // Build object for each function(alert) to display in results table
-    return new Ember.RSVP.Promise((resolve) => {
+    return new RSVP.Promise((resolve) => {
       existingFunctionList.forEach((functionId) => {
         this.fetchFunctionById(functionId).then(functionData => {
           newFunctionList.push({
@@ -278,7 +282,7 @@ export default Controller.extend({
    */
   confirmEditSuccess() {
     this.set('isEditAlertSuccess', true);
-    Ember.run.later(this, function() {
+    later(this, function() {
       this.clearAll();
       this.transitionToRoute('manage.alerts');
     }, 2000);
@@ -514,8 +518,8 @@ export default Controller.extend({
       if (emailError || isDuplicateEmail) { return; }
 
       // Assign these fresh editable values to the Alert object currently being edited
-      Ember.set(postFunctionBody, 'functionName', alertFunctionName);
-      Ember.set(postFunctionBody, 'isActive', isActive);
+      set(postFunctionBody, 'functionName', alertFunctionName);
+      set(postFunctionBody, 'isActive', isActive);
 
       // Prepare the POST payload to save an edited Alert object
       postProps = {
@@ -532,8 +536,8 @@ export default Controller.extend({
           if (isEditedConfigGroup) {
 
             // Whether its a new Config object or existing, assign new user-supplied values to these props:
-            Ember.set(postConfigBody, 'application', newApplication);
-            Ember.set(postConfigBody, 'recipients', cleanRecipientsArr);
+            set(postConfigBody, 'application', newApplication);
+            set(postConfigBody, 'recipients', cleanRecipientsArr);
 
             // Make sure current Id is part of new config array
             if (postConfigBody && postConfigBody.emailConfig) {
@@ -565,7 +569,7 @@ export default Controller.extend({
 
                       // If save successful, update new config group name before model refresh (avoid big data delay)
                       this.set('updatedRecipients', cleanRecipientsArr);
-                      if (Ember.isPresent(newGroupName)) {
+                      if (isPresent(newGroupName)) {
                         this.setProperties({
                           isNewConfigGroupSaved: true,
                           selectedConfigGroup: newConfigGroupObj

@@ -5,7 +5,7 @@
  */
 import Controller from '@ember/controller';
 import moment from 'moment';
-import { computed } from '@ember/object';
+import { computed, set } from '@ember/object';
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
 import { buildAnomalyStats } from 'thirdeye-frontend/utils/manage-alert-utils';
 
@@ -264,7 +264,7 @@ export default Controller.extend({
       // Number the list
       if (this.get('isTunePreviewActive')) {
         filteredAnomalies.forEach((anomaly) => {
-          Ember.set(anomaly, 'index', num);
+          set(anomaly, 'index', num);
           num++;
         });
       }
@@ -302,8 +302,8 @@ export default Controller.extend({
           activeRangeEnd: moment(defaultEndDate).format(rangeFormat)
         });
         // Reset options and highlight selected one
-        timeRangeOptions.forEach(op => Ember.set(op, 'isActive', false));
-        Ember.set(rangeOption, 'isActive', true);
+        timeRangeOptions.forEach(op => set(op, 'isActive', false));
+        set(rangeOption, 'isActive', true);
         // Reload model according to new timerange
         this.transitionToRoute({ queryParams: {
           duration: rangeOption.value,
@@ -323,8 +323,8 @@ export default Controller.extend({
       const timeRangeOptions = this.get('timeRangeOptions');
       const currOption = timeRangeOptions.find(option => option.value === 'custom');
       // Toggle time reange button states to highlight the current one
-      timeRangeOptions.forEach(op => Ember.set(op, 'isActive', false));
-      Ember.set(currOption, 'isActive', true);
+      timeRangeOptions.forEach(op => set(op, 'isActive', false));
+      set(currOption, 'isActive', true);
       // Reload model according to new timerange
       this.transitionToRoute({ queryParams: {
         mode: 'explore',

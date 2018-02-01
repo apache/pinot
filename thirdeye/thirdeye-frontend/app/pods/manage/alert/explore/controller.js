@@ -3,10 +3,14 @@
  * @module manage/alert/explore
  * @exports manage/alert/explore
  */
+import _ from 'lodash';
 import fetch from 'fetch';
 import moment from 'moment';
+import { set } from "@ember/object";
+import { later } from "@ember/runloop";
 import Controller from '@ember/controller';
 import { computed } from '@ember/object';
+import { isPresent } from "@ember/utils";
 import { checkStatus, postProps, buildDateEod } from 'thirdeye-frontend/utils/utils';
 import { buildAnomalyStats } from 'thirdeye-frontend/utils/manage-alert-utils';
 
@@ -333,7 +337,7 @@ export default Controller.extend({
           : null;
         const replayErr = replayStatusObj ? replayStatusObj.message : 'N/A';
         const replayStatus = replayStatusObj ? replayStatusObj.taskStatus.toLowerCase() : '';
-        const bodyString = `${intro}jobId: ${jobId}${br}alertId: ${alertId}${br}functionName: ${functionName}${br}${br}error: ${replayErr}`
+        const bodyString = `${intro}jobId: ${jobId}${br}alertId: ${alertId}${br}functionName: ${functionName}${br}${br}error: ${replayErr}`;
 
         if (replayStatus === 'completed') {
           this.set('isReplayPending', false);
@@ -344,7 +348,7 @@ export default Controller.extend({
             replayErrorMailtoStr: mailtoString + encodeURIComponent(bodyString)
           });
         } else if (requestCanContinue) {
-          Ember.run.later(() => {
+          later(() => {
             this.checkReplayStatus(jobId);
           }, checkReplayInterval);
         }
@@ -411,7 +415,7 @@ export default Controller.extend({
     const reportUrl = `/anomalies/reportAnomaly/${id}?`;
     const updateUrl = `/anomalies/updateFeedbackRange/${data.startTime}/${data.endTime}/${id}?feedbackType=${data.feedbackType}`;
     const requiredProps = ['data.startTime', 'data.endTime', 'data.feedbackType'];
-    const missingData = !requiredProps.every(prop => Ember.isPresent(prop));
+    const missingData = !requiredProps.every(prop => isPresent(prop));
     let queryStringUrl = reportUrl;
 
     if (missingData) {
@@ -473,7 +477,7 @@ export default Controller.extend({
      */
     onChangeAnomalyResponse(anomalyRecord, selectedResponse, inputObj) {
       const responseObj = this.get('anomalyResponseObj').find(res => res.name === selectedResponse);
-      Ember.set(inputObj, 'selected', selectedResponse);
+      set(inputObj, 'selected', selectedResponse);
 
       // Save anomaly feedback
       this.updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value)
@@ -483,16 +487,16 @@ export default Controller.extend({
             .then((res) => {
               const filterMap = res.searchFilters ? res.searchFilters.statusFilterMap : null;
               if (filterMap && filterMap.hasOwnProperty(responseObj.status)) {
-                Ember.set(anomalyRecord, 'anomalyFeedback', selectedResponse);
-                Ember.set(anomalyRecord, 'showResponseSaved', true);
+                set(anomalyRecord, 'anomalyFeedback', selectedResponse);
+                set(anomalyRecord, 'showResponseSaved', true);
               } else {
                 return Promise.reject(new Error('Response not saved'));
               }
             }); // verifyAnomalyFeedback
         }) // updateAnomalyFeedback
         .catch((err) => {
-          Ember.set(anomalyRecord, 'showResponseFailed', true);
-          Ember.set(anomalyRecord, 'showResponseSaved', false);
+          set(anomalyRecord, 'showResponseFailed', true);
+          set(anomalyRecord, 'showResponseSaved', false);
         });
     },
 
@@ -556,7 +560,7 @@ export default Controller.extend({
       });
       // We need the C3/D3 graph to render after its containing parent elements are rendered
       // in order to avoid strange overflow effects.
-      Ember.run.later(() => {
+      later(() => {
         this.set('renderModalContent', true);
       });
     },
@@ -599,7 +603,7 @@ export default Controller.extend({
             change = wowDetails.change.toFixed(2);
           }
 
-          Ember.setProperties(anomaly, {
+          this.setProperties(anomaly, {
             shownCurrent: curr,
             shownBaseline: base,
             shownChangeRate: change
