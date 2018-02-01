@@ -43,6 +43,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
@@ -59,9 +60,9 @@ import org.slf4j.LoggerFactory;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentGeneratorConfig {
   public enum TimeColumnType {
-    EPOCH,
-    SIMPLE_DATE
+    EPOCH, SIMPLE_DATE
   }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
 
   private Map<String, String> _customProperties = new HashMap<>();
@@ -432,17 +433,27 @@ public class SegmentGeneratorConfig {
     return _enableStarTreeIndex;
   }
 
-  /**
-   * Enable star tree generation.
-   * @param starTreeIndexSpec Indexing spec for star tree. If null, then default values are used.
-   */
-  public void enableStarTreeIndex(StarTreeIndexSpec starTreeIndexSpec) {
-    _enableStarTreeIndex = true;
-    _starTreeIndexSpec = starTreeIndexSpec;
+  public void setEnableStarTreeIndex(boolean enableStarTreeIndex) {
+    _enableStarTreeIndex = enableStarTreeIndex;
   }
 
   public StarTreeIndexSpec getStarTreeIndexSpec() {
     return _starTreeIndexSpec;
+  }
+
+  public void setStarTreeIndexSpec(StarTreeIndexSpec starTreeIndexSpec) {
+    _starTreeIndexSpec = starTreeIndexSpec;
+  }
+
+  /**
+   * Enable star tree generation with the given indexing spec.
+   * <p>NOTE: DO NOT remove the setter and getter for these two fields, they are required for ser/de.
+   *
+   * @param starTreeIndexSpec Optional indexing spec for star tree
+   */
+  public void enableStarTreeIndex(@Nullable StarTreeIndexSpec starTreeIndexSpec) {
+    setEnableStarTreeIndex(true);
+    setStarTreeIndexSpec(starTreeIndexSpec);
   }
 
   public HllConfig getHllConfig() {
@@ -460,7 +471,8 @@ public class SegmentGeneratorConfig {
     if (_segmentName != null) {
       return new DefaultSegmentNameGenerator(_segmentName);
     }
-    return new DefaultSegmentNameGenerator(getTimeColumnName(), getTableName(), getSegmentNamePostfix(), getSequenceId());
+    return new DefaultSegmentNameGenerator(getTimeColumnName(), getTableName(), getSegmentNamePostfix(),
+        getSequenceId());
   }
 
   public void setSegmentNameGenerator(SegmentNameGenerator segmentNameGenerator) {
@@ -502,8 +514,7 @@ public class SegmentGeneratorConfig {
    * @throws IOException
    */
   @Deprecated
-  public void loadConfigFiles()
-      throws IOException {
+  public void loadConfigFiles() throws IOException {
     ObjectMapper objectMapper = new ObjectMapper();
 
     Schema schema;
