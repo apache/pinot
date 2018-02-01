@@ -366,6 +366,24 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get all realtime tables with given server tenant name
+   *
+   * @return List of Pinot realtime table names
+   */
+  @Nonnull
+  public List<String> getAllRealtimeTablesWithServerTenant(String serverTenantName) {
+    List<String> allRealtimeTables = getAllRealtimeTables();
+    List<String> realtimeTablesWithServerTenant = new ArrayList<>();
+    for (String realtimeTable : allRealtimeTables) {
+      TableConfig tableConfig = getTableConfig(realtimeTable);
+      if (tableConfig.getTenantConfig().getServer().equals(serverTenantName)) {
+        realtimeTablesWithServerTenant.add(realtimeTable);
+      }
+    }
+    return realtimeTablesWithServerTenant;
+  }
+
+  /**
    * Get all Pinot raw table names.
    *
    * @return Set of Pinot raw table names

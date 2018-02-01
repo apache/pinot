@@ -185,6 +185,12 @@ public class PinotTableIdealStateBuilder {
 
   public static void buildLowLevelRealtimeIdealStateFor(String realtimeTableName, TableConfig realtimeTableConfig,
       HelixAdmin helixAdmin, String helixClusterName, IdealState idealState) {
+
+    /**
+     * TODO: Introduce config/class which given a tableConfig, will return the right instances by reading the tenant config
+     * This will be useful once we introduce consuming servers,
+     * as tables could either be using consuming instances or all server instances, depending on the tenant config
+     **/
     String realtimeServerTenant =
         ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(realtimeTableConfig.getTenantConfig().getServer());
     final List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName,
@@ -211,7 +217,7 @@ public class PinotTableIdealStateBuilder {
     final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
     final int nPartitions = getPartitionCount(kafkaMetadata);
     LOGGER.info("Assigning {} partitions to instances for simple consumer for table {}", nPartitions, realtimeTableName);
-    segmentManager.setupHelixEntries(realtimeTableConfig, kafkaMetadata, nPartitions, realtimeInstances, idealState, create);
+    segmentManager.setupHelixEntries(realtimeTableConfig, kafkaMetadata, realtimeInstances, idealState, create);
   }
 
   public static int getPartitionCount(KafkaStreamMetadata kafkaMetadata) {
