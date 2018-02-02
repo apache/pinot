@@ -599,11 +599,11 @@ public class PinotLLCRealtimeSegmentManager {
    * @param rawTableName Raw table name
    * @param committingSegmentNameStr Committing segment name
    * @param nextOffset The offset with which the next segment should start.
-   * @param memoryUsed The memory used by committing segment
+   * @param memoryUsedBytes The memory used by committing segment
    * @return
    */
   public boolean commitSegmentMetadata(String rawTableName, final String committingSegmentNameStr, long nextOffset,
-      long memoryUsed) {
+      long memoryUsedBytes) {
     final long now = System.currentTimeMillis();
     final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
 

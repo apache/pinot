@@ -1100,7 +1100,7 @@ public class SegmentCompletionTest {
 
     @Override
          public boolean commitSegmentMetadata(String rawTableName, String committingSegmentName, long nextOffset,
-        long memoryUsed) {
+        long memoryUsedBytes) {
       _segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
       _segmentMetadata.setEndOffset(nextOffset);
       _segmentMetadata.setDownloadUrl(

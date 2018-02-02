@@ -268,7 +268,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final boolean existingIS = false;
     List<String> instances = getInstanceList(nInstances);
     final String startOffset = KAFKA_OFFSET;
-    final long memoryUsed = 1000;
+    final long memoryUsedBytes = 1000;
 
     IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, nReplicas);
     TableConfig tableConfig = makeTableConfig(rtTableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, topic);
@@ -283,20 +283,20 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._records.clear();
     segmentManager.IS_CONNECTED = false;
     boolean status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(),
-        nextOffset, memoryUsed);
+        nextOffset, memoryUsedBytes);
     Assert.assertFalse(status);
     Assert.assertEquals(segmentManager._nCallsToUpdateHelix, 0);  // Idealstate not updated
     Assert.assertEquals(segmentManager._paths.size(), 0);   // propertystore not updated
     segmentManager.IS_CONNECTED = true;
     segmentManager.IS_LEADER = false;
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(),
-        nextOffset, memoryUsed);
+        nextOffset, memoryUsedBytes);
     Assert.assertFalse(status);
     Assert.assertEquals(segmentManager._nCallsToUpdateHelix, 0);  // Idealstate not updated
     Assert.assertEquals(segmentManager._paths.size(), 0);   // propertystore not updated
     segmentManager.IS_LEADER = true;
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(),
-        nextOffset, memoryUsed);
+        nextOffset, memoryUsedBytes);
     Assert.assertTrue(status);
     Assert.assertEquals(segmentManager._nCallsToUpdateHelix, 1);  // Idealstate updated
     Assert.assertEquals(segmentManager._paths.size(), 2);   // propertystore updated

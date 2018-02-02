@@ -100,18 +100,19 @@ public class ServerSegmentCompletionProtocolHandler {
   }
 
   public SegmentCompletionProtocol.Response segmentCommitEnd(long offset, final String segmentName, String segmentLocation,
-      long memoryUsed) {
+      long memoryUsedBytes) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName)
-        .withSegmentLocation(segmentLocation).withMemoryUsed(memoryUsed);
+        .withSegmentLocation(segmentLocation).withMemoryUsedBytes(memoryUsedBytes);
     SegmentCompletionProtocol.SegmentCommitEndRequest request = new SegmentCompletionProtocol.SegmentCommitEndRequest(params);
 
     return doHttp(request, null);
   }
 
-  public SegmentCompletionProtocol.Response segmentCommit(long offset, final String segmentName, long memoryUsed, final File segmentTarFile) {
+  public SegmentCompletionProtocol.Response segmentCommit(long offset, final String segmentName, long memoryUsedBytes,
+      final File segmentTarFile) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName).withMemoryUsed(memoryUsed);
+    params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName).withMemoryUsedBytes(memoryUsedBytes);
     SegmentCompletionProtocol.SegmentCommitRequest request = new SegmentCompletionProtocol.SegmentCommitRequest(params);
 
     return doHttp(request, createFileParts(segmentName, segmentTarFile));
