@@ -10,12 +10,12 @@
   {{/if}}
   <div class="col-xs-4 pull-right">
     <ul class="rootcause-metric__display-view">
-      <li class="rootcause-metric__display-view--{{if (eq selectedView "card") "active"}}" {{action "selectView" 'card'}}>
-        Card
-      </li>
-      <li>|</li>
       <li class="rootcause-metric__display-view--{{if (eq selectedView "table") "active"}}" {{action "selectView" 'table'}}>
         Table
+      </li>
+      <li>|</li>
+      <li class="rootcause-metric__display-view--{{if (eq selectedView "card") "active"}}" {{action "selectView" 'card'}}>
+        Card
       </li>
     </ul>
   </div>

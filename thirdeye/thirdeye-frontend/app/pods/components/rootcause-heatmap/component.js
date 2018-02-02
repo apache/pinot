@@ -44,7 +44,7 @@ export default Ember.Component.extend({
   /**
    * Selected heatmap mode
    */
-  selectedMode: Object.keys(ROOTCAUSE_MODE_MAPPING)[0],
+  selectedMode: Object.keys(ROOTCAUSE_MODE_MAPPING)[1],
 
   /**
    * Lists out all heatmap mode options
