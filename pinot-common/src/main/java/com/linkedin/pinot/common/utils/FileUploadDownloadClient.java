@@ -297,7 +297,6 @@ public class FileUploadDownloadClient implements Closeable {
   public String sendSegmentCompletionProtocolRequest(String url, int socketTimeoutMs) throws IOException, HttpErrorStatusException {
     HttpUriRequest request = getSegmentCompletionUriRequest(url, socketTimeoutMs);
     return sendSegmentCompletionProtocolRequest(request);
-
   }
 
   private String sendSegmentCompletionProtocolRequest(HttpUriRequest request) throws IOException, HttpErrorStatusException {
