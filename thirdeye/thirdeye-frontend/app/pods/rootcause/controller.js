@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toOffsetUrn, toFilters, appendFilters, dateFormatFull, urnToChartId } from 'thirdeye-frontend/utils/rca-utils';
+import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toOffsetUrn, toFilters, appendFilters, dateFormatFull } from 'thirdeye-frontend/utils/rca-utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
 import fetch from 'fetch';
@@ -97,9 +97,9 @@ export default Ember.Controller.extend({
   timeseriesMode: null, // ""
 
   /**
-   * Id of the currently focused entity in the legend component
+   * urn of the currently focused entity in the legend component
    */
-  focusedId: null,
+  focusedUrn: null,
 
   //
   // session data
@@ -462,11 +462,7 @@ export default Ember.Controller.extend({
      * @param {String} urn
      */
     onLegendHover(urn) {
-      let id;
-      if (urn) {
-        id = urnToChartId(urn);
-      }
-      this.set('focusedId', id);
+      this.set('focusedUrn', urn);
     },
 
     /**

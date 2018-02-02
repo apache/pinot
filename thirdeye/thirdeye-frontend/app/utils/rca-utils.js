@@ -499,6 +499,8 @@ export function findLabelMapping(label, config) {
  * by the c3-library .focus method
  */
 export function urnToChartId(urn) {
+  if (!urn) return;
+
   if (urn.includes('metric')) {
     var [, metric, id, ...filters] = urn.split(':');
     urn = ['frontend', metric, 'current', id].join(':');

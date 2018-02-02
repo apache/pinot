@@ -2,7 +2,7 @@ import Ember from 'ember';
 import moment from 'moment';
 import d3 from 'd3';
 import buildTooltip from 'thirdeye-frontend/utils/build-tooltip';
-import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, toMetricLabel, colorMapping } from 'thirdeye-frontend/utils/rca-utils';
+import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, toMetricLabel, colorMapping, urnToChartId } from 'thirdeye-frontend/utils/rca-utils';
 
 const TIMESERIES_MODE_ABSOLUTE = 'absolute';
 const TIMESERIES_MODE_RELATIVE = 'relative';
@@ -30,7 +30,17 @@ export default Ember.Component.extend({
    * id of the entity to be focused on the chart
    * @type {String}
    */
-  focusedId: null,
+  focusedUrn: null,
+
+  /**
+   * Translate an urn into a chart id
+   * @returns {String|null}
+   */
+  focusedId: Ember.computed('focusedUrn', function() {
+    const urn = this.get('focusedUrn');
+
+    return urnToChartId(urn);
+  }),
 
   init() {
     this._super(...arguments);
