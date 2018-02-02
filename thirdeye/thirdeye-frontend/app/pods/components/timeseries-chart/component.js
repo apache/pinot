@@ -157,9 +157,9 @@ export default Ember.Component.extend({
   },
 
   /**
-   * Triggers focus or revert when focusedID changes
+   * Updates the focused entity on the chart
    */
-  onFocusChange: Ember.observer('focusedId', function() {
+  _updateFocusedEntity: function() {
     const id = this.get('focusedId');
 
     if (id) {
@@ -167,7 +167,7 @@ export default Ember.Component.extend({
     } else {
       this._revert();
     }
-  }),
+  },
 
   /**
    * Focuses the entity associated with the provided id
@@ -199,6 +199,8 @@ export default Ember.Component.extend({
     this._super(...arguments);
     const series = this.get('series') || {};
     const cache = this.get('cache') || {};
+
+    this._updateFocusedEntity();
 
     if (!_.isEqual(series, cache)) {
       Ember.run.debounce(this, this._updateChart, 300);
