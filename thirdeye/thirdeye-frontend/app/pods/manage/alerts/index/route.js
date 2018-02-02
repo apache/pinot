@@ -50,5 +50,15 @@ export default Ember.Route.extend({
         resultsActive: true
       });
     }
+  },
+
+  actions: {
+    /**
+    * Refresh route's model.
+    * @method refreshModel
+    */
+    refreshModel() {
+      this.refresh();
+    }
   }
 });
