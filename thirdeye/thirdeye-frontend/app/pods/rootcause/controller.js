@@ -140,7 +140,7 @@ export default Ember.Controller.extend({
 
     // This is a flag for the acceptance test for rootcause to prevent it from timing out because of this run loop
     if (config.environment !== 'test') {
-      Ember.run.later(this, this._onCheckSessionTimer, this.get('rootcauseTimerInterval'));
+      Ember.run.later(this, this._onCheckSessionTimer, ROOTCAUSE_SESSION_TIMER_INTERVAL);
     }
   },
 
