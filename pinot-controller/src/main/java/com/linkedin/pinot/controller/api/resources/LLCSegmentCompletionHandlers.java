@@ -182,6 +182,7 @@ public class LLCSegmentCompletionHandlers {
     if (instanceId == null || segmentName == null || offset == -1 || segmentLocation == null) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}, segmentLocation={}",
           offset, segmentName, instanceId, segmentLocation);
+      // TODO: memoryUsedInBytes = 0 if not present in params. Add validation when we start using it
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
 
