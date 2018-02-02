@@ -269,8 +269,8 @@ public class PinotLLCRealtimeSegmentManager {
     return _propertyStore.get(path, null, AccessOption.PERSISTENT);
   }
 
-  protected void setupInitialSegments(TableConfig tableConfig, KafkaStreamMetadata kafkaStreamMetadata,
-      ZNRecord partitionAssignment, IdealState idealState, boolean create, int flushSize) {
+  protected void setupInitialSegments(TableConfig tableConfig, KafkaStreamMetadata kafkaStreamMetadata, ZNRecord partitionAssignment,
+      IdealState idealState, boolean create, int flushSize) {
     final String realtimeTableName = tableConfig.getTableName();
     final int nReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
     final String initialOffset = kafkaStreamMetadata.getKafkaConsumerProperties().get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
