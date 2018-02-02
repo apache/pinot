@@ -1299,7 +1299,7 @@ public class PinotLLCRealtimeSegmentManager {
     int nReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
 
     // get kafka partition count for all tables in same tenant
-    Map<String, Integer> expectedNumPartitions = new HashMap<>();
+    Map<String, Integer> expectedNumPartitions = new HashMap<>(allTableConfigsInTenant.size());
     for (Map.Entry<String, TableConfig> entry : allTableConfigsInTenant.entrySet()) {
       int kafkaPartitionCount = getKafkaPartitionCount(entry.getValue());
       expectedNumPartitions.put(entry.getKey(), kafkaPartitionCount);
@@ -1425,7 +1425,7 @@ public class PinotLLCRealtimeSegmentManager {
       Map<String, Integer> nPartitions, int nReplicas, List<String> instanceNames,
       Map<String, ZNRecord> currentPartitionAssignment) {
 
-    Map<String, ZNRecord> tableNameToPartitionAssignment = new HashMap<>();
+    Map<String, ZNRecord> tableNameToPartitionAssignment = new HashMap<>(tablesForAutoRebalance.size());
 
     // get the current partitions across all tables
     Map<String, Map<String, String>> currentPartitions = new HashMap<>();
