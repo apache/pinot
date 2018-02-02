@@ -18,8 +18,8 @@ const ROOTCAUSE_ROLE_TAIL = 'tail';
 const ROOTCAUSE_ROLLUP_RANGE = [0, 20];
 
 const ROOTCAUSE_MODE_MAPPING = {
-  'Change in Contribution': ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_DIFF,
   'Percentage Change': ROOTCAUSE_ROLLUP_MODE_CHANGE,
+  'Change in Contribution': ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_DIFF,
   'Contribution to Overall Change': ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_TO_DIFF
 };
 
@@ -44,7 +44,7 @@ export default Ember.Component.extend({
   /**
    * Selected heatmap mode
    */
-  selectedMode: Object.keys(ROOTCAUSE_MODE_MAPPING)[0],
+  selectedMode: Object.keys(ROOTCAUSE_MODE_MAPPING)[1],
 
   /**
    * Lists out all heatmap mode options
