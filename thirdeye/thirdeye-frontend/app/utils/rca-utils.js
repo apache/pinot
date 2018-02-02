@@ -494,23 +494,6 @@ export function findLabelMapping(label, config) {
   return labelMapping;
 }
 
-/**
- * Converts an urn into a id that's readable
- * by the c3-library .focus method
- */
-export function urnToChartId(urn) {
-  if (!urn) return;
-
-  if (urn.includes('metric')) {
-    var [, metric, id, ...filters] = urn.split(':');
-    urn = ['frontend', metric, 'current', id].join(':');
-    if (filters.length) {
-      urn += `:${filters.join(':')}`;
-    }
-  }
-  return urn;
-}
-
 export default {
   isIterable,
   makeIterable,
@@ -538,6 +521,5 @@ export default {
   appendFilters,
   colorMapping,
   eventColorMapping,
-  dateFormatFull,
-  urnToChartId
+  dateFormatFull
 };

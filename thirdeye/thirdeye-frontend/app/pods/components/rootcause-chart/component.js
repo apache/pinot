@@ -2,7 +2,7 @@ import Ember from 'ember';
 import moment from 'moment';
 import d3 from 'd3';
 import buildTooltip from 'thirdeye-frontend/utils/build-tooltip';
-import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, toMetricLabel, colorMapping, urnToChartId } from 'thirdeye-frontend/utils/rca-utils';
+import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, toMetricLabel, colorMapping } from 'thirdeye-frontend/utils/rca-utils';
 
 const TIMESERIES_MODE_ABSOLUTE = 'absolute';
 const TIMESERIES_MODE_RELATIVE = 'relative';
@@ -39,7 +39,7 @@ export default Ember.Component.extend({
   focusedId: Ember.computed('focusedUrn', function() {
     const urn = this.get('focusedUrn');
 
-    return urnToChartId(urn);
+    return this._urnToChartId(urn);
   }),
 
   init() {
@@ -507,5 +507,24 @@ export default Ember.Component.extend({
       onHover(outputUrns, d);
       return outputUrns;
     }
+  },
+
+  /**
+   * Converts an urn into a id that's readable
+   * by the c3-library .focus method
+   * @param {String} urn focused entity's urn
+   * @private
+   */
+  _urnToChartId(urn) {
+    if (!urn) return;
+
+    if (urn.includes('metric')) {
+      var [, metric, id, ...filters] = urn.split(':');
+      urn = ['frontend', metric, 'current', id].join(':');
+      if (filters.length) {
+        urn += `:${filters.join(':')}`;
+      }
+    }
+    return urn;
   }
 });
