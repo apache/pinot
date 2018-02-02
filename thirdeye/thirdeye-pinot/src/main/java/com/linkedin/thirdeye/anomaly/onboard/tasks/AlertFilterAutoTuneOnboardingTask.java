@@ -93,7 +93,7 @@ public class AlertFilterAutoTuneOnboardingTask extends BaseDetectionOnboardTask 
             taskConfiguration.getString(AUTOTUNE_FEATURES), taskConfiguration.getString(AUTOTUNE_MTTD),
             taskConfiguration.getString(AUTOTUNE_PATTERN, DEFAULT_AUTOTUNE_PATTERN),
             taskConfiguration.getString(AUTOTUNE_PATTERN_ONLY,
-                String.valueOf(Strings.isNullOrEmpty(taskConfiguration.getString(AUTOTUNE_MTTD)))));
+                Boolean.toString(Strings.isNullOrEmpty(taskConfiguration.getString(AUTOTUNE_MTTD)))));
 
     if (autotuneResponse.getEntity() != null) {
       List<Long> autotuneIds;
