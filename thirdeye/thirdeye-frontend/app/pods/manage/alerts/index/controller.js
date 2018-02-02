@@ -4,12 +4,13 @@
  * @exports alerts controller
  */
 import Ember from 'ember';
-import { task, timeout } from 'ember-concurrency';
 import fetch from 'fetch';
 import _ from 'lodash';
+import { task, timeout } from 'ember-concurrency';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
 export default Ember.Controller.extend({
-  queryParams: ['selectedSearchMode', 'alertId'],
+  queryParams: ['selectedSearchMode', 'alertId', 'testMode'],
   /**
    * Alerts Search Mode options
    */
@@ -24,6 +25,11 @@ export default Ember.Controller.extend({
    * True when results appear
    */
   resultsActive: false,
+
+  /**
+   * Used to surface newer features pre-launch
+   */
+  testMode: null,
 
   /**
    * Default Search Mode
@@ -246,6 +252,24 @@ export default Ember.Controller.extend({
           }
         }
       }
+    },
+
+    /**
+     * Send a DELETE request to the function delete endpoint.
+     * TODO: Include DELETE postProps in common util function
+     * @method removeThirdEyeFunction
+     * @param {Number} functionId - The id of the alert to remove
+     * @return {Promise}
+     */
+    removeThirdEyeFunction(functionId) {
+      const postProps = {
+        method: 'delete',
+        headers: { 'content-type': 'text/plain' }
+      };
+      const url = '/dashboard/anomaly-function?id=' + functionId;
+      fetch(url, postProps).then(checkStatus).then(() => {
+        this.send('refreshModel');
+      });
     },
 
     // Handles UI mode change

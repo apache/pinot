@@ -325,6 +325,7 @@ export default Controller.extend({
       checkReplayInterval
     } = this.getProperties('alertId', 'functionName', 'requestCanContinue', 'checkReplayInterval');
     const br = `\r\n`;
+    const replayStatusArr = ['completed', 'timeout'];
     const subject = 'TE Self-Serve Create Alert Issue';
     const intro = `TE Team, please look into a replay error for...${br}${br}`;
     const mailtoString = `mailto:ask_thirdeye@linkedin.com?subject=${encodeURIComponent(subject)}&body=`;
@@ -339,8 +340,9 @@ export default Controller.extend({
         const replayStatus = replayStatusObj ? replayStatusObj.taskStatus.toLowerCase() : '';
         const bodyString = `${intro}jobId: ${jobId}${br}alertId: ${alertId}${br}functionName: ${functionName}${br}${br}error: ${replayErr}`;
 
-        if (replayStatus === 'completed') {
+        if (replayStatusArr.includes(replayStatus)) {
           this.set('isReplayPending', false);
+          this.send('refreshModel');
           this.transitionToRoute('manage.alert', alertId, { queryParams: { jobId: null }});
         } else if (replayStatus === 'failed') {
           this.setProperties({

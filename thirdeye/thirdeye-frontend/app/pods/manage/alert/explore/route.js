@@ -439,6 +439,12 @@ export default Route.extend({
   },
 
   actions: {
+    /**
+    * Refresh route's model.
+    */
+    refreshModel() {
+      this.refresh();
+    },
 
     /**
      * Handle any errors occurring in model/afterModel in parent route
