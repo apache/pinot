@@ -111,6 +111,8 @@ public class TestOnboardingNotificationContentFormatter {
     Field field = email.getClass().getDeclaredField("html");
     field.setAccessible(true);
     String emailHtml = field.get(email).toString();
+    emailHtml = emailHtml.replaceAll("cid:[\\w]+", "cid:xqpuddlgzr");
+
     Assert.assertEquals(emailHtml.replaceAll("\\s", ""),
         htmlContent.toString().replaceAll("\\s", ""));
   }
