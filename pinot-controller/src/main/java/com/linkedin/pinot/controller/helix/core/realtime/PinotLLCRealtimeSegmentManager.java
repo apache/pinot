@@ -1403,11 +1403,13 @@ public class PinotLLCRealtimeSegmentManager {
       Map<String, ZNRecord> currentPartitionAssignment) {
 
     Map<String, ZNRecord> tableNameToPartitionAssignment = new HashMap<>(tablesForAutoRebalance.size());
+    final String partitionJoiner = "_";
 
-    // construct current partitions map
     Map<String, Map<String, String>> currentPartitions = new HashMap<>();
+    List<String> newPartitions = new ArrayList<>();
     for (String realtimeTableName : tablesForAutoRebalance) {
 
+      // construct current partitions map
       ZNRecord partitionAssignmentZNode = currentPartitionAssignment.get(realtimeTableName);
       if (partitionAssignmentZNode != null) {
 
@@ -1415,7 +1417,7 @@ public class PinotLLCRealtimeSegmentManager {
         for (Map.Entry<String, List<String>> partitionEntry : partitionToInstances.entrySet()) {
           String partitionNumber = partitionEntry.getKey();
           List<String> partitionInstances = partitionEntry.getValue();
-          String key = realtimeTableName + "_" + partitionNumber;
+          String key = realtimeTableName + partitionJoiner + partitionNumber;
           Map<String, String> value = new HashMap<>();
           for (String instance : partitionInstances) {
             value.put(instance, "ONLINE");
@@ -1423,14 +1425,11 @@ public class PinotLLCRealtimeSegmentManager {
           currentPartitions.put(key, value);
         }
       }
-    }
 
-    // construct new partitions list
-    List<String> newPartitions = new ArrayList<>();
-    for (String realtimeTableName : tablesForAutoRebalance) {
+      // construct new partitions list
       int p = nPartitions.get(realtimeTableName);
       for (int i = 0; i < p; i++) {
-        newPartitions.add(realtimeTableName + "_" + Integer.toString(i));
+        newPartitions.add(realtimeTableName + partitionJoiner + Integer.toString(i));
       }
     }
 
@@ -1449,7 +1448,7 @@ public class PinotLLCRealtimeSegmentManager {
     Map<String, List<String>> listFields = partitionAssignmentAcrossAllTables.getListFields();
     for (Map.Entry<String, List<String>> entry : listFields.entrySet()) {
       String partitionName = entry.getKey();
-      int lastIndex = partitionName.lastIndexOf("_");
+      int lastIndex = partitionName.lastIndexOf(partitionJoiner);
       String tableName = partitionName.substring(0, lastIndex);
       String partitionNumber = partitionName.substring(lastIndex + 1);
 
