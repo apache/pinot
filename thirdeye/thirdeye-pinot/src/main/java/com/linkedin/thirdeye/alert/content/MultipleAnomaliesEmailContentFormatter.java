@@ -3,7 +3,7 @@ package com.linkedin.thirdeye.alert.content;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.anomaly.alert.util.EmailScreenshotHelper;
+import com.linkedin.thirdeye.alert.content.imageEmbed.AnomalyEmailImageEmbed;
 import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
@@ -42,7 +42,6 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
 
 
   public MultipleAnomaliesEmailContentFormatter(){
-
   }
 
   @Override
@@ -148,8 +147,7 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
     if (anomalyDetails.size() == 1) {
       AnomalyReportEntity singleAnomaly = anomalyDetails.get(0);
       try {
-        imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(),
-            emailContentFormatterConfiguration);
+        emailImageEmbed = new AnomalyEmailImageEmbed(Long.valueOf(singleAnomaly.getAnomalyId()), "cid", emailContentFormatterConfiguration);
       } catch (Exception e) {
         LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
       }

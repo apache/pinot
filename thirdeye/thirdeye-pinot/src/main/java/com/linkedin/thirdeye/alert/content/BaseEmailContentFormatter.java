@@ -7,6 +7,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.Multimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.alert.commons.EmailEntity;
+import com.linkedin.thirdeye.alert.content.imageEmbed.EmailImageEmbed;
 import com.linkedin.thirdeye.anomaly.alert.util.DataReportHelper;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
@@ -101,6 +102,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
   protected String imgPath = null;
   protected EventDataProviderManager EVENT_DATA_PROVIDER;
   protected EmailContentFormatterConfiguration emailContentFormatterConfiguration;
+  protected EmailImageEmbed emailImageEmbed;
 
 
   @Override
@@ -234,15 +236,15 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     }
 
     HtmlEmail email = new HtmlEmail();
-    String cid = "";
-    try {
-      if (org.apache.commons.lang3.StringUtils.isNotBlank(imgPath)) {
-        cid = email.embed(new File(imgPath));
+    if (emailImageEmbed != null) {
+      String cid = "";
+      try {
+        cid = emailImageEmbed.embed(email);
+      } catch (Exception e) {
+        LOG.error("Exception while embedding screenshot for anomaly", e);
       }
-    } catch (Exception e) {
-      LOG.error("Exception while embedding screenshot for anomaly", e);
+      paramMap.put(emailImageEmbed.getName(), cid);
     }
-    paramMap.put("cid", cid);
 
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     EmailEntity emailEntity = new EmailEntity();
@@ -527,12 +529,13 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
 
   @Override
   public void cleanup() {
-    if (org.apache.commons.lang3.StringUtils.isNotBlank(imgPath)) {
-      try {
-        Files.deleteIfExists(new File(imgPath).toPath());
-      } catch (IOException e) {
-        LOG.error("Exception in deleting screenshot {}", imgPath, e);
+    try {
+      if (emailImageEmbed != null) {
+        emailImageEmbed.cleanup();
+        emailImageEmbed = null;
       }
+    } catch (IOException e) {
+      LOG.error("Exception in deleting screenshot {}", imgPath, e);
     }
   }
 

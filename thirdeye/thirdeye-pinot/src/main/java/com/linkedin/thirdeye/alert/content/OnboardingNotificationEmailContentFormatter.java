@@ -1,16 +1,18 @@
 package com.linkedin.thirdeye.alert.content;
 
+import com.linkedin.thirdeye.alert.content.imageEmbed.FileEmailImageEmbed;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import java.io.FileNotFoundException;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Properties;
+import javax.activation.URLDataSource;
 import org.apache.commons.lang.StringUtils;
-import org.joda.time.DateTime;
 import org.joda.time.Days;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +25,11 @@ public class OnboardingNotificationEmailContentFormatter extends BaseEmailConten
   public static final String DEFAULT_NULL_STRING_VALUE = "N/A";
   public static final String ALERT_FILTER_PATTERN_KEY = DetectionJobResource.AUTOTUNE_PATTERN_KEY;
   public static final String ALERT_CONFIG_NAME = "alertConfigName";
+  public static final String IMAGE_EMBED = "imageEmbed";
+  public static final String DEFAULT_IMAGE_EMBED = "assets/img/Lightbulb.png";
   public static final int DEFAULT_ONBOARDING_REPLAY_DAYS = 30;
+
+  private String imageEmbedPath;
 
   public OnboardingNotificationEmailContentFormatter() {
   }
@@ -32,6 +38,7 @@ public class OnboardingNotificationEmailContentFormatter extends BaseEmailConten
   public void init(Properties properties, EmailContentFormatterConfiguration configuration) {
     super.init(properties, configuration);
     this.emailTemplate = properties.getProperty(EMAIL_TEMPLATE, DEFAULT_EMAIL_TEMPLATE);
+    this.imageEmbedPath = properties.getProperty(IMAGE_EMBED, DEFAULT_IMAGE_EMBED);
   }
   /**
    * The actual function that convert anomalies into parameter map
@@ -82,6 +89,13 @@ public class OnboardingNotificationEmailContentFormatter extends BaseEmailConten
     }
     templateData.put("application", returnValueOrDefault(alertConfig.getApplication(), DEFAULT_NULL_STRING_VALUE));
     templateData.put("recipients", returnValueOrDefault(alertConfig.getRecipients(), DEFAULT_NULL_STRING_VALUE));
+
+    // Embed figures
+    try {
+      emailImageEmbed = new FileEmailImageEmbed(imageEmbedPath, "logoCid");
+    } catch (FileNotFoundException e) {
+      throw new IllegalArgumentException(e.fillInStackTrace());
+    }
   }
 
   private String returnValueOrDefault(String value, String defaultValue) {
