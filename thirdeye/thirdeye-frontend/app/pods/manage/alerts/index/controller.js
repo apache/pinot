@@ -248,6 +248,23 @@ export default Ember.Controller.extend({
       }
     },
 
+    /**
+     * Send a DELETE request to the function delete endpoint.
+     * @method removeThirdEyeFunction
+     * @param {Number} functionId - The id of the alert to remove
+     * @return {Promise}
+     */
+    removeThirdEyeFunction(functionId) {
+      const postProps = {
+        method: 'delete',
+        headers: { 'content-type': 'text/plain' }
+      };
+      const url = '/dashboard/anomaly-function?id=' + functionId;
+      fetch(url, postProps).then(checkStatus).then((result) => {
+        this.transitionToRoute('manage.alerts');
+      });
+    },
+
     // Handles UI mode change
     onSearchModeChange(mode) {
       if (mode === 'All Alerts') {

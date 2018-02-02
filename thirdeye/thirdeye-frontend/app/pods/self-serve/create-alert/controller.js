@@ -21,6 +21,7 @@ export default Controller.extend({
   isValidated: false,
   isMetricSelected: false,
   isFormDisabled: false,
+  isDimensionError: false,
   isMetricDataInvalid: false,
   isCreateAlertSuccess: false,
   isCreateGroupSuccess: false,
@@ -337,6 +338,7 @@ export default Controller.extend({
 
     // Update graph, and related fields
     this.setProperties({
+      isDimensionError: false,
       graphConfig: graphConfig,
       selectedGranularity: granularity,
       isFilterSelectDisabled: isEmpty(filters)
@@ -359,18 +361,19 @@ export default Controller.extend({
                 isMetricSelected: true,
                 isFetchingDimensions: false,
                 isDimensionFetchDone: true,
-                isMetricDataLoading: false,
-                topDimensions: orderedDimensions
+                isMetricDataLoading: false
               });
-            })
-            .catch(() => {
-              this.set('isMetricDataLoading', false);
+              // Update graph only if we have new dimension data
+              if (orderedDimensions.length) {
+                this.set('topDimensions', orderedDimensions);
+              }
             });
+        } else {
+          this.set('isMetricDataLoading', false);
         }
         // Metric has data. now sending new data to graph.
         this.setProperties({
           isMetricSelected: true,
-          isMetricDataLoading: false,
           showGraphLegend: isPresent(selectedDimension),
           selectedMetric: Object.assign(metricData, { color: 'blue' })
         });
@@ -431,6 +434,13 @@ export default Controller.extend({
           }
           // Return sorted list of dimension objects
           resolve(dimensionList);
+        })
+        .catch(() => {
+          this.setProperties({
+            isDimensionError: true,
+            isMetricDataLoading: false
+          });
+          resolve([]);
         });
     });
   },
@@ -602,13 +612,13 @@ export default Controller.extend({
    * @return {Boolean}
    */
   isEmailPresent(emailArr) {
-    let isPresent = true;
+    let isEmailPresent = true;
 
     if (this.get('selectedConfigGroup') || this.get('newConfigGroupName')) {
-      isPresent = isPresent(this.get('selectedGroupRecipients')) || isPresent(emailArr);
+      isEmailPresent = isPresent(this.get('selectedGroupRecipients')) || isPresent(emailArr);
     }
 
-    return isPresent;
+    return isEmailPresent;
   },
 
   /**
@@ -728,7 +738,6 @@ export default Controller.extend({
         functionName,
         collection: selectedMetricOption.dataset,
         metric: selectedMetricOption.name,
-        alertRecipients: alertGroupNewRecipient,
         dataGranularity: selectedGranularity,
         pattern: alertFilterObj.pattern,
         application: selectedApplication
@@ -740,6 +749,11 @@ export default Controller.extend({
       const subscriptionGroupValue = isGroupExisting ? selectedConfigGroup.id.toString() : newConfigGroupName;
       newAlertObj[subscriptionGroupKey] = subscriptionGroupValue;
 
+      // Conditionally send recipients property
+      if (alertGroupNewRecipient) {
+        Object.assign(newAlertObj, { alertRecipients: alertGroupNewRecipient });
+      }
+
       // Do we have custom sensitivity settings to add?
       if (alertFilterObj.isCustom) {
         Object.assign(newAlertObj, { features: alertFilterObj.features, mttd: alertFilterObj.mttd });
@@ -747,7 +761,7 @@ export default Controller.extend({
 
       // Add filters property if present
       if (selectedFilters.length > 2) {
-        Object.assign(newAlertObj, { filters: encodeURIComponent(selectedFilters) });
+        Object.assign(newAlertObj, { filters: selectedFilters });
       }
 
       // Add dimensions if present
@@ -776,6 +790,7 @@ export default Controller.extend({
       isEmptyEmail: false,
       isFormDisabled: false,
       isMetricSelected: false,
+      isDimensionError: false,
       isMetricDataInvalid: false,
       isSelectMetricError: false,
       selectedMetricOption: null,
@@ -895,11 +910,20 @@ export default Controller.extend({
     onSelectDimension(selectedDimension) {
       this.setProperties({
         selectedDimension,
-        isMetricDataLoading: true,
-        isFetchingDimensions: true,
         isDimensionFetchDone: false
       });
-      this.triggerGraphFromMetric(this.get('selectedMetricOption'));
+      if (selectedDimension === 'All') {
+        this.setProperties({
+          topDimensions: [],
+          isFetchingDimensions: false
+        });
+      } else {
+        this.setProperties({
+          isMetricDataLoading: true,
+          isFetchingDimensions: true
+        });
+        this.triggerGraphFromMetric(this.get('selectedMetricOption'));
+      }
     },
 
     /**

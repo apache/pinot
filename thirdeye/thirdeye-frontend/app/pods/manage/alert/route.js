@@ -23,8 +23,8 @@ export default Route.extend({
   beforeModel(transition) {
     const id = transition.params['manage.alert'].alertId;
     const { jobId, functionName } = transition.queryParams;
-    const durationDefault = '1m';
-    const startDateDefault = buildDateEod(1, 'month').valueOf();
+    const durationDefault = '3m';
+    const startDateDefault = buildDateEod(3, 'month').valueOf();
     const endDateDefault = buildDateEod(1, 'day');
 
     // Enter default 'explore' route with defaults loaded in URI

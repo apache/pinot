@@ -7,7 +7,7 @@ import fetch from 'fetch';
 import RSVP from 'rsvp';
 import _ from 'lodash';
 import moment from 'moment';
-import { isArray } from "@ember/array"
+import { isArray } from "@ember/array";
 import Route from '@ember/routing/route';
 import { task, timeout } from 'ember-concurrency';
 import { postProps, checkStatus } from 'thirdeye-frontend/utils/utils';
@@ -23,7 +23,6 @@ export default Route.extend({
    */
   model(params, transition) {
     return RSVP.hash({
-      // Fetch all alert group configurations
       allConfigGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(res => res.json()),
       allAppNames: fetch('/thirdeye/entity/APPLICATION').then(res => res.json())
     });
@@ -53,7 +52,8 @@ export default Route.extend({
    * @return {undefined}
    */
   jumpToAlertPage(alertId, jobId, functionName) {
-    this.transitionTo('manage.alert', alertId, { queryParams: { jobId, functionName }});
+    const queryParams = { jobId, functionName };
+    this.transitionTo('manage.alert', alertId, { queryParams });
   },
 
   /**

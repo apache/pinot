@@ -83,7 +83,11 @@
     <div class="col-xs-12">
       <div class="te-graph-alert {{if (not isMetricSelected) 'te-graph-alert--pending'}}">
         {{#if (or isFetchingDimensions isDimensionFetchDone)}}
-          <div class="te-form__super-label">...{{if isDimensionFetchDone 'Displaying' 'Loading'}} top 5 contributing subDimensions for <strong>{{selectedDimension}}</strong></div>
+          {{#if isDimensionError}}
+            <div class="te-form__super-label">... error loading subDimensions for <strong>{{selectedDimension}}</strong></div>
+          {{else}}
+            <div class="te-form__super-label">...{{if isDimensionFetchDone 'Displaying' 'Loading'}} top 5 contributing subDimensions for <strong>{{selectedDimension}}</strong></div>
+          {{/if}}
         {{/if}}
         {{#if isMetricDataLoading}}
           <div class="spinner-wrapper--self-serve">{{ember-spinner}}</div>
