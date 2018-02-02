@@ -96,7 +96,7 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
 
     MergedAnomalyResultManager mergeAnomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
     List<MergedAnomalyResultDTO> anomalyCandidates = mergeAnomalyDAO
-        .findByStartTimeInRangeAndFunctionId(start.getMillis(), end.getMillis(), functionId, true);
+        .findByFunctionId(functionId, true);
     anomalyCandidates = AlertFilterHelper.applyFiltrationRule(anomalyCandidates, alertFilterFactory);
     List<AnomalyResult> filteredAnomalyResults = new ArrayList<>();
     for (MergedAnomalyResultDTO anomaly : anomalyCandidates) {
