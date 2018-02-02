@@ -61,7 +61,7 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
 
   @Override
   public int getRawDocCount() {
-    return _realtimeSegment.getRawDocumentCount();
+    return _realtimeSegment.getNumDocsIndexed();
   }
 
   @Override

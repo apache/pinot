@@ -30,7 +30,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -48,6 +47,7 @@ import org.slf4j.LoggerFactory;
  * <p>In pinot, we store data using 5 <code>DataType</code>s: INT, LONG, FLOAT, DOUBLE, STRING. All other
  * <code>DataType</code>s will be converted to one of them.
  */
+@SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class Schema {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
@@ -148,7 +148,6 @@ public final class Schema {
     }
   }
 
-  @Nullable
   public TimeFieldSpec getTimeFieldSpec() {
     return _timeFieldSpec;
   }
@@ -159,7 +158,7 @@ public final class Schema {
    * @param timeFieldSpec
    */
   @Deprecated
-  public void setTimeFieldSpec(@Nullable TimeFieldSpec timeFieldSpec) {
+  public void setTimeFieldSpec(TimeFieldSpec timeFieldSpec) {
     if (timeFieldSpec != null) {
       addField(timeFieldSpec);
     }
@@ -261,13 +260,11 @@ public final class Schema {
   }
 
   @JsonIgnore
-  @Nullable
   public FieldSpec getFieldSpecFor(@Nonnull String columnName) {
     return _fieldSpecMap.get(columnName);
   }
 
   @JsonIgnore
-  @Nullable
   public MetricFieldSpec getMetricSpec(@Nonnull String metricName) {
     FieldSpec fieldSpec = _fieldSpecMap.get(metricName);
     if (fieldSpec != null && fieldSpec.getFieldType() == FieldType.METRIC) {
@@ -277,7 +274,6 @@ public final class Schema {
   }
 
   @JsonIgnore
-  @Nullable
   public DimensionFieldSpec getDimensionSpec(@Nonnull String dimensionName) {
     FieldSpec fieldSpec = _fieldSpecMap.get(dimensionName);
     if (fieldSpec != null && fieldSpec.getFieldType() == FieldType.DIMENSION) {
@@ -287,7 +283,6 @@ public final class Schema {
   }
 
   @JsonIgnore
-  @Nullable
   public DateTimeFieldSpec getDateTimeSpec(@Nonnull String dateTimeName) {
     FieldSpec fieldSpec = _fieldSpecMap.get(dateTimeName);
     if (fieldSpec != null && fieldSpec.getFieldType() == FieldType.DATE_TIME) {
@@ -315,19 +310,16 @@ public final class Schema {
   }
 
   @JsonIgnore
-  @Nullable
   public String getTimeColumnName() {
     return (_timeFieldSpec != null) ? _timeFieldSpec.getName() : null;
   }
 
   @JsonIgnore
-  @Nullable
   public TimeUnit getIncomingTimeUnit() {
     return (_timeFieldSpec != null) ? _timeFieldSpec.getIncomingGranularitySpec().getTimeType() : null;
   }
 
   @JsonIgnore
-  @Nullable
   public TimeUnit getOutgoingTimeUnit() {
     return (_timeFieldSpec != null) ? _timeFieldSpec.getOutgoingGranularitySpec().getTimeType() : null;
   }

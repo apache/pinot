@@ -72,7 +72,7 @@ public class RealtimeSegmentImplTest {
         schema.getSchemaName(), new ServerMetrics(new MetricsRegistry()));
 
     // Segment should be empty
-    Assert.assertEquals(realtimeSegment.getRawDocumentCount(), 0);
+    Assert.assertEquals(realtimeSegment.getNumDocsIndexed(), 0);
 
     Map<String, Object> genericRowContents = new HashMap<>();
     genericRowContents.put("dimension", "potato");
@@ -84,18 +84,18 @@ public class RealtimeSegmentImplTest {
     // Add a valid row
     boolean notFull = realtimeSegment.index(row);
     Assert.assertEquals(notFull, true);
-    Assert.assertEquals(realtimeSegment.getRawDocumentCount(), 1);
+    Assert.assertEquals(realtimeSegment.getNumDocsIndexed(), 1);
 
     // Add an invalid row
     genericRowContents.put("metric", null);
     notFull = realtimeSegment.index(row);
     Assert.assertEquals(notFull, true);
-    Assert.assertEquals(realtimeSegment.getRawDocumentCount(), 1);
+    Assert.assertEquals(realtimeSegment.getNumDocsIndexed(), 1);
 
     // Add another valid row
     genericRowContents.put("metric", 2222L);
     notFull = realtimeSegment.index(row);
     Assert.assertEquals(notFull, true);
-    Assert.assertEquals(realtimeSegment.getRawDocumentCount(), 2);
+    Assert.assertEquals(realtimeSegment.getNumDocsIndexed(), 2);
   }
 }

@@ -34,14 +34,14 @@ public class RealtimeSegmentRecordReader implements RecordReader {
 
   public RealtimeSegmentRecordReader(RealtimeSegmentImpl realtimeSegment, Schema schema) {
     _realtimeSegment = realtimeSegment;
-    _numDocs = realtimeSegment.getAggregateDocumentCount();
+    _numDocs = realtimeSegment.getNumDocsIndexed();
     _schema = schema;
     _sortedDocIdIterationOrder = null;
   }
 
   public RealtimeSegmentRecordReader(RealtimeSegmentImpl realtimeSegment, Schema schema, String sortedColumn) {
     _realtimeSegment = realtimeSegment;
-    _numDocs = realtimeSegment.getAggregateDocumentCount();
+    _numDocs = realtimeSegment.getNumDocsIndexed();
     _schema = schema;
     _sortedDocIdIterationOrder = realtimeSegment.getSortedDocIdIterationOrderWithSortedColumn(sortedColumn);
   }
@@ -63,9 +63,9 @@ public class RealtimeSegmentRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse) {
     if (_sortedDocIdIterationOrder == null) {
-      return _realtimeSegment.getRawValueRowAt(_nextDocId++, reuse);
+      return _realtimeSegment.getRecord(_nextDocId++, reuse);
     } else {
-      return _realtimeSegment.getRawValueRowAt(_sortedDocIdIterationOrder[_nextDocId++], reuse);
+      return _realtimeSegment.getRecord(_sortedDocIdIterationOrder[_nextDocId++], reuse);
     }
   }
 
