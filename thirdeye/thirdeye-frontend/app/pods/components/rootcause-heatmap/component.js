@@ -18,8 +18,8 @@ const ROOTCAUSE_ROLE_TAIL = 'tail';
 const ROOTCAUSE_ROLLUP_RANGE = [0, 20];
 
 const ROOTCAUSE_MODE_MAPPING = {
-  'Percentage Change': ROOTCAUSE_ROLLUP_MODE_CHANGE,
   'Change in Contribution': ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_DIFF,
+  'Percentage Change': ROOTCAUSE_ROLLUP_MODE_CHANGE,
   'Contribution to Overall Change': ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_TO_DIFF
 };
 
