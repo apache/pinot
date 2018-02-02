@@ -15,6 +15,7 @@ import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventFilter;
 import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.anomaly.events.HolidayEventProvider;
+import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.api.DimensionMap;
@@ -54,7 +55,6 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.regex.Pattern;
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.mail.HtmlEmail;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -90,8 +90,6 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
   public static final String DEFAULT_TIME_ZONE = "America/Los_Angeles";
   public static final String DEFAULT_EVENT_CRAWL_OFFSET = "P2D";
 
-  public static Pattern EMAIL_REGEX_PATTERN = Pattern.compile(
-      "\\b[\\w.%-]+@[-.\\w]+\\.[A-Za-z]{2,4}\\b", Pattern.CASE_INSENSITIVE);
   public static final String EVENT_FILTER_COUNTRY = "countryCode";
 
   protected DateTimeZone dateTimeZone;
@@ -260,7 +258,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunnerV2.CHARSET);
 
       emailEntity.setFrom(fromEmail);
-      emailEntity.setTo(getValidEmailAddresses(emailRecipients));
+      emailEntity.setTo(EmailUtils.getValidEmailAddresses(emailRecipients));
       emailEntity.setSubject(subject);
       email.setHtmlMsg(alertEmailHtml);
       emailEntity.setContent(email);
@@ -268,41 +266,6 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       Throwables.propagate(e);
     }
     return emailEntity;
-  }
-
-  /**
-   * Return a list of valid email addresses
-   * @param emails
-   * @return
-   */
-  public static String getValidEmailAddresses(String emails) {
-    StringBuilder emailAddressBuilder = new StringBuilder();
-    List<String> invalidEmailAddresses = new ArrayList<>();
-    if (StringUtils.isBlank(emails)) {
-      return null;
-    } else {
-      String[] emailArr = emails.split(",");
-      for (String email : emailArr) {
-        if (isValidEmailAddress(email)) {
-          emailAddressBuilder.append(email + ",");
-        } else {
-          invalidEmailAddresses.add(email);
-        }
-      }
-    }
-    if (invalidEmailAddresses.size() > 0) {
-      LOG.warn("Found invalid email addresses, please verify the email addresses: {}", invalidEmailAddresses);
-    }
-    return emailAddressBuilder.deleteCharAt(emailAddressBuilder.length() - 1).toString();
-  }
-
-  /**
-   * Check if given email is a valid email
-   * @param email
-   * @return
-   */
-  public static boolean isValidEmailAddress(String email) {
-    return EMAIL_REGEX_PATTERN.matcher(email).matches();
   }
 
   /**
