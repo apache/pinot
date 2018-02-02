@@ -660,7 +660,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
 
     SegmentCompletionProtocol.Response commitEndResponse =  _protocolHandler.segmentCommitEnd(_currentOffset,
-        _segmentNameStr, segmentCommitUploadResponse.getSegmentLocation());
+        _segmentNameStr, segmentCommitUploadResponse.getSegmentLocation(), _memoryManager.getTotalMemBytes());
     if (!commitEndResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS))  {
       segmentLogger.warn("CommitEnd failed  with response {}", commitEndResponse.toJsonString());
       return SegmentCompletionProtocol.RESP_FAILED;
@@ -693,7 +693,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   protected SegmentCompletionProtocol.Response postSegmentCommitMsg(File segmentTarFile) {
     SegmentCompletionProtocol.Response response = _protocolHandler.segmentCommit(_currentOffset, _segmentNameStr,
-        segmentTarFile);
+        _memoryManager.getTotalMemBytes(), segmentTarFile);
     if (!response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
       segmentLogger.warn("Commit failed  with response {}", response.toJsonString());
     }

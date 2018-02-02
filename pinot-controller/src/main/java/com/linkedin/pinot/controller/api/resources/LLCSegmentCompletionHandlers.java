@@ -176,16 +176,19 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_LOCATION) String segmentLocation,
-      @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset
+      @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
+      @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes
   ) {
     if (instanceId == null || segmentName == null || offset == -1 || segmentLocation == null) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}, segmentLocation={}",
           offset, segmentName, instanceId, segmentLocation);
+      // TODO: memoryUsedInBytes = 0 if not present in params. Add validation when we start using it
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
 
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
-    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset).withSegmentLocation(segmentLocation);
+    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset)
+        .withSegmentLocation(segmentLocation).withMemoryUsedBytes(memoryUsedBytes);
     LOGGER.info("Processing segmentCommitEnd:{}", requestParams.toString());
 
     final boolean isSuccess = true;
@@ -206,10 +209,11 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
+      @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
       FormDataMultiPart multiPart
   ) {
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
-    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset);
+    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset).withMemoryUsedBytes(memoryUsedBytes);
     LOGGER.info("Processing segmentCommit:{}", requestParams.toString());
 
     final SegmentCompletionManager segmentCompletionManager = SegmentCompletionManager.getInstance();

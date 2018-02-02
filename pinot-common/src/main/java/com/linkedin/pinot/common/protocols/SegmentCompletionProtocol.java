@@ -110,6 +110,7 @@ public class SegmentCompletionProtocol {
   public static final String PARAM_SEGMENT_NAME = "name";
   public static final String PARAM_OFFSET = "offset";
   public static final String PARAM_INSTANCE_ID = "instance";
+  public static final String PARAM_MEMORY_USED_BYTES = "memoryUsedBytes";
   public static final String PARAM_REASON = "reason";
   public static final String PARAM_EXTRA_TIME_SEC = "extraTimeSec"; // Sent by servers to request additional time to build
   public static final String PARAM_ROW_COUNT = "rowCount"; // Sent by servers to indicate the number of rows read so far
@@ -179,6 +180,7 @@ public class SegmentCompletionProtocol {
       private long _waitTimeMillis;
       private int _extraTimeSec;
       private String _segmentLocation;
+      private long _memoryUsedBytes;
 
       public Params() {
         _offset = -1L;
@@ -189,6 +191,7 @@ public class SegmentCompletionProtocol {
         _waitTimeMillis = -1;
         _extraTimeSec = -1;
         _segmentLocation = null;
+        _memoryUsedBytes = -1;
       }
 
       public Params withOffset(long offset) {
@@ -235,6 +238,11 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
+      public Params withMemoryUsedBytes(long memoryUsedBytes) {
+        _memoryUsedBytes = memoryUsedBytes;
+        return this;
+      }
+
       public String getSegmentName() {
         return _segmentName;
       }
@@ -271,15 +279,19 @@ public class SegmentCompletionProtocol {
         return _segmentLocation;
       }
 
+      public long getMemoryUsedBytes() { return _memoryUsedBytes; }
+
       public String toString() {
-        return "Offset: " + _offset + ",Segment name: " + _segmentName
+        return "Offset: " + _offset
+            + ",Segment name: " + _segmentName
             + ",Instance Id: " + _instanceId
             + ",Reason: " + _reason
             + ",NumRows: " + _numRows
             + ",BuildTimeMillis: " + _buildTimeMillis
             + ",WaitTimeMillis: " + _waitTimeMillis
             + ",ExtraTimeSec: " + _extraTimeSec
-            + ",SegmentLocation: " + _segmentLocation;
+            + ",SegmentLocation: " + _segmentLocation
+            + ",Memory Used Bytes: " + _memoryUsedBytes;
       }
     }
   }

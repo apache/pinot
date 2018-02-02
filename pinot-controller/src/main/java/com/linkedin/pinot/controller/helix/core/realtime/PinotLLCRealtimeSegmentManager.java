@@ -599,9 +599,11 @@ public class PinotLLCRealtimeSegmentManager {
    * @param rawTableName Raw table name
    * @param committingSegmentNameStr Committing segment name
    * @param nextOffset The offset with which the next segment should start.
+   * @param memoryUsedBytes The memory used by committing segment
    * @return
    */
-  public boolean commitSegmentMetadata(String rawTableName, final String committingSegmentNameStr, long nextOffset) {
+  public boolean commitSegmentMetadata(String rawTableName, final String committingSegmentNameStr, long nextOffset,
+      long memoryUsedBytes) {
     final long now = System.currentTimeMillis();
     final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
 
@@ -618,6 +620,7 @@ public class PinotLLCRealtimeSegmentManager {
       return false;
     }
 
+    // TODO: set number of rows to end consumption in new segment metadata, based on memory used and number of rows from old segment
     oldSegMetadata.setEndOffset(nextOffset);
     oldSegMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     oldSegMetadata.setDownloadUrl(

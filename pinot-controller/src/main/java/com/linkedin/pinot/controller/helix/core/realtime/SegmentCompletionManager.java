@@ -283,12 +283,13 @@ public class SegmentCompletionManager {
     final String segmentNameStr = reqParams.getSegmentName();
     final String instanceId = reqParams.getInstanceId();
     final long offset = reqParams.getOffset();
+    final long memoryUsedBytes = reqParams.getMemoryUsedBytes();
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
     SegmentCompletionFSM fsm = null;
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-      response = fsm.segmentCommitEnd(instanceId, offset, success, isSplitCommit, segmentLocation);
+      response = fsm.segmentCommitEnd(instanceId, offset, success, isSplitCommit, segmentLocation, memoryUsedBytes);
     } catch (Exception e) {
       // Return failed response
     }
@@ -582,7 +583,8 @@ public class SegmentCompletionManager {
      * We can get this call only when the state is COMMITTER_UPLOADING. Also, the instanceId should be equal to
      * the _winner.
      */
-    public SegmentCompletionProtocol.Response segmentCommitEnd(String instanceId, long offset, boolean success, boolean isSplitCommit, String segmentLocation) {
+    public SegmentCompletionProtocol.Response segmentCommitEnd(String instanceId, long offset, boolean success,
+        boolean isSplitCommit, String segmentLocation, long memoryUsedBytes) {
       synchronized (this) {
         if (_excludedServerStateMap.contains(instanceId)) {
           LOGGER.warn("Not accepting commitEnd from {} since it had stoppd consuming", instanceId);
@@ -600,7 +602,7 @@ public class SegmentCompletionManager {
           return abortAndReturnFailed();
 
         }
-        SegmentCompletionProtocol.Response response = commitSegment(instanceId, offset, isSplitCommit, segmentLocation);
+        SegmentCompletionProtocol.Response response = commitSegment(instanceId, offset, isSplitCommit, segmentLocation, memoryUsedBytes);
         if (!response.equals(SegmentCompletionProtocol.RESP_COMMIT_SUCCESS)) {
           return abortAndReturnFailed();
         } else {
@@ -976,7 +978,7 @@ public class SegmentCompletionManager {
     }
 
     private SegmentCompletionProtocol.Response commitSegment(String instanceId, long offset, boolean isSplitCommit,
-        String segmentLocation) {
+        String segmentLocation, long memoryUsedBytes) {
       boolean success;
       if (!_state.equals(State.COMMITTER_UPLOADING)) {
         // State changed while we were out of sync. return a failed commit.
@@ -994,7 +996,7 @@ public class SegmentCompletionManager {
         }
       }
       success = _segmentManager.commitSegmentMetadata(_segmentName.getTableName(), _segmentName.getSegmentName(),
-          _winningOffset);
+          _winningOffset, memoryUsedBytes);
       if (success) {
         _state = State.COMMITTED;
         LOGGER.info("Committed segment {} at offset {} winner {}", _segmentName.getSegmentName(), offset, instanceId);
