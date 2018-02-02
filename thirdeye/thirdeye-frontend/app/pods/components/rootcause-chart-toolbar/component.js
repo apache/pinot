@@ -1,6 +1,7 @@
 import Component from '@ember/component';
 import moment from 'moment';
 import { computed, get, set, getProperties, setProperties } from '@ember/object';
+import translate from 'thirdeye-frontend/utils/translate';
 
 /**
  * Mapping between translated human-readable granularity values and values that are named on the backend
@@ -70,18 +71,7 @@ export default Component.extend({
    * @type {String}
    */
   selectedOption: computed('granularity', function() {
-    const keys = Object.keys(this.granularityMapping);
-    let selected = '';
-
-    // Find the key in granularityMapping whose value matches the granularity
-    keys.some(key => {
-      const value = this.granularityMapping[key];
-      if (value === get(this, 'granularity')) {
-        selected = key;
-      }
-    });
-
-    return selected;
+    return translate(this.granularityMapping, get(this, 'granularity'));
   }),
 
   compareMode: null, // ""
