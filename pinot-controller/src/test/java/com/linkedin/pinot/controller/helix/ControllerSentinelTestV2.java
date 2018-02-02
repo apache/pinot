@@ -16,11 +16,10 @@
 package com.linkedin.pinot.controller.helix;
 
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
+import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
 import java.io.IOException;
 import org.json.JSONException;
 import org.testng.Assert;
@@ -71,7 +70,7 @@ public class ControllerSentinelTestV2 extends ControllerTest {
     for (int i = 0; i < 10; ++i) {
       Assert.assertEquals(
           _helixAdmin.getResourceIdealState(_helixClusterName, tableName + "_OFFLINE").getNumPartitions(), i);
-      addOneOfflineSegment(tableName);
+      _helixResourceManager.addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(tableName), "downloadUrl");
       Assert.assertEquals(
           _helixAdmin.getResourceIdealState(_helixClusterName, tableName + "_OFFLINE").getNumPartitions(), i + 1);
     }
@@ -92,10 +91,5 @@ public class ControllerSentinelTestV2 extends ControllerTest {
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
         ControllerTenantNameBuilder.getOfflineTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME))
         .size(), 20);
-  }
-
-  private void addOneOfflineSegment(String resourceName) {
-    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName);
-    _helixResourceManager.addNewSegment(segmentMetadata, "downloadUrl");
   }
 }

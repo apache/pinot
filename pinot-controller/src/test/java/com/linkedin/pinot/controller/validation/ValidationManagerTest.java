@@ -18,12 +18,9 @@ package com.linkedin.pinot.controller.validation;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
@@ -38,8 +35,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineSt
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.startree.hll.HllConstants;
+import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -47,7 +43,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -73,11 +68,11 @@ import static org.mockito.Mockito.*;
 public class ValidationManagerTest {
   private String HELIX_CLUSTER_NAME = "TestValidationManager";
 
-  private String ZK_STR = ZkStarter.DEFAULT_ZK_STR;
-  private String CONTROLLER_INSTANCE_NAME = "localhost_11984";
-  private String TEST_TABLE_NAME = "testTable";
-  private String TEST_TABLE_TWO = "testTable2";
-
+  private static final String ZK_STR = ZkStarter.DEFAULT_ZK_STR;
+  private static final String CONTROLLER_INSTANCE_NAME = "localhost_11984";
+  private static final String TEST_TABLE_NAME = "testTable";
+  private static final String TEST_TABLE_TWO = "testTable2";
+  private static final String TEST_SEGMENT_NAME = "testSegment";
 
   private ZkClient _zkClient;
 
@@ -88,14 +83,14 @@ public class ValidationManagerTest {
   private HelixManager _helixManager;
 
   @BeforeClass
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZK_STR);
     Thread.sleep(1000);
 
     _pinotHelixResourceManager =
-        new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 1000L, true, /*isUpdateStateModel=*/false);
+        new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 1000L, true, /*isUpdateStateModel=*/
+            false);
     _pinotHelixResourceManager.start();
 
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
@@ -124,8 +119,9 @@ public class ValidationManagerTest {
 
     IdealState idealState = HelixHelper.getBrokerIdealStates(helixAdmin, HELIX_CLUSTER_NAME);
     // Ensure that the broker resource is not rebuilt.
-    Assert.assertTrue(idealState.getInstanceSet(partitionName).equals(
-        _pinotHelixResourceManager.getAllInstancesForBrokerTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME)));
+    Assert.assertTrue(idealState.getInstanceSet(partitionName)
+        .equals(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(
+            ControllerTenantNameBuilder.DEFAULT_TENANT_NAME)));
     _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(partitionName);
 
     // Add another table that needs to be rebuilt
@@ -145,24 +141,24 @@ public class ValidationManagerTest {
         ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
     idealState = HelixHelper.getBrokerIdealStates(helixAdmin, HELIX_CLUSTER_NAME);
     // Assert that the two don't equal before the call to rebuild the broker resource.
-    Assert.assertTrue(!idealState.getInstanceSet(partitionNameTwo).equals(
-        _pinotHelixResourceManager.getAllInstancesForBrokerTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME)));
+    Assert.assertTrue(!idealState.getInstanceSet(partitionNameTwo)
+        .equals(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(
+            ControllerTenantNameBuilder.DEFAULT_TENANT_NAME)));
     _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(partitionNameTwo);
     idealState = HelixHelper.getBrokerIdealStates(helixAdmin, HELIX_CLUSTER_NAME);
     // Assert that the two do equal after being rebuilt.
-    Assert.assertTrue(idealState.getInstanceSet(partitionNameTwo).equals(
-        _pinotHelixResourceManager.getAllInstancesForBrokerTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME)));
+    Assert.assertTrue(idealState.getInstanceSet(partitionNameTwo)
+        .equals(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(
+            ControllerTenantNameBuilder.DEFAULT_TENANT_NAME)));
   }
 
   @Test
   public void testPushTimePersistence() throws Exception {
-    DummyMetadata metadata = new DummyMetadata(TEST_TABLE_NAME);
-    String rawTableName = metadata.getTableName();
-    String segmentName = metadata.getName();
+    SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
 
-    _pinotHelixResourceManager.addNewSegment(metadata, "http://dummy/");
+    _pinotHelixResourceManager.addNewSegment(segmentMetadata, "http://dummy/");
     OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-        _pinotHelixResourceManager.getOfflineSegmentZKMetadata(rawTableName, segmentName);
+        _pinotHelixResourceManager.getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     long pushTime = offlineSegmentZKMetadata.getPushTime();
     // Check that the segment has been pushed in the last 30 seconds
     Assert.assertTrue(System.currentTimeMillis() - pushTime < 30_000);
@@ -170,10 +166,11 @@ public class ValidationManagerTest {
     Assert.assertEquals(offlineSegmentZKMetadata.getRefreshTime(), Long.MIN_VALUE);
 
     // Refresh the segment
-    metadata.setCrc(Long.toString(System.currentTimeMillis()));
-    _pinotHelixResourceManager.refreshSegment(metadata, offlineSegmentZKMetadata, "http://dummy/");
+    Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
+    _pinotHelixResourceManager.refreshSegment(segmentMetadata, offlineSegmentZKMetadata, "http://dummy/");
 
-    offlineSegmentZKMetadata = _pinotHelixResourceManager.getOfflineSegmentZKMetadata(rawTableName, segmentName);
+    offlineSegmentZKMetadata =
+        _pinotHelixResourceManager.getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     // Check that the segment still has the same push time
     Assert.assertEquals(offlineSegmentZKMetadata.getPushTime(), pushTime);
     // Check that the refresh time is in the last 30 seconds
@@ -182,58 +179,37 @@ public class ValidationManagerTest {
 
   @Test
   public void testTotalDocumentCountOffline() throws Exception {
-
-    // Create a bunch of dummy segments
-    String testTableName = "TestTableTotalDocCountTest";
-    DummyMetadata metadata1 = new DummyMetadata(testTableName, 10);
-    DummyMetadata metadata2 = new DummyMetadata(testTableName, 20);
-    DummyMetadata metadata3 = new DummyMetadata(testTableName, 30);
-
-    // Add them to a list
-    List<SegmentMetadata> segmentMetadataList = new ArrayList<SegmentMetadata>();
-    segmentMetadataList.add(metadata1);
-    segmentMetadataList.add(metadata2);
-    segmentMetadataList.add(metadata3);
-
+    List<SegmentMetadata> segmentMetadataList = new ArrayList<>();
+    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, 10));
+    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, 20));
+    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, 30));
     Assert.assertEquals(ValidationManager.computeOfflineTotalDocumentInSegments(segmentMetadataList), 60);
-
   }
 
   @Test
   public void testTotalDocumentCountRealTime() throws Exception {
-
     // Create a bunch of dummy segments
-    String testTableName = "TestTableTotalDocCountTest";
-    final String group1 = testTableName + "_REALTIME_1466446700000_34";
-    final String group2 = testTableName + "_REALTIME_1466446700000_17";
+    final String group1 = TEST_TABLE_NAME + "_REALTIME_1466446700000_34";
+    final String group2 = TEST_TABLE_NAME + "_REALTIME_1466446700000_17";
     String segmentName1 = new HLCSegmentName(group1, "0", "1").getSegmentName();
     String segmentName2 = new HLCSegmentName(group1, "0", "2").getSegmentName();
     String segmentName3 = new HLCSegmentName(group1, "0", "3").getSegmentName();
     String segmentName4 = new HLCSegmentName(group2, "0", "3").getSegmentName();
 
-    DummyMetadata metadata1 = new DummyMetadata(testTableName, segmentName1, 10);
-    DummyMetadata metadata2 = new DummyMetadata(testTableName, segmentName2, 20);
-    DummyMetadata metadata3 = new DummyMetadata(testTableName, segmentName3, 30);
-
+    List<SegmentMetadata> segmentMetadataList = new ArrayList<>();
+    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, segmentName1, 10));
+    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, segmentName2, 20));
+    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, segmentName3, 30));
     // This should get ignored in the count as it belongs to a different group id
-    DummyMetadata metadata4 = new DummyMetadata(testTableName, segmentName4, 20);
-
-    // Add them to a list
-    List<SegmentMetadata> segmentMetadataList = new ArrayList<SegmentMetadata>();
-    segmentMetadataList.add(metadata1);
-    segmentMetadataList.add(metadata2);
-    segmentMetadataList.add(metadata3);
-    segmentMetadataList.add(metadata4);
+    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, segmentName4, 20));
 
     Assert.assertEquals(ValidationManager.computeRealtimeTotalDocumentInSegments(segmentMetadataList, true), 60);
 
     // Now add some low level segment names
-    String segmentName5 = new LLCSegmentName(testTableName, 1, 0, 1000).getSegmentName();
-    String segmentName6 = new LLCSegmentName(testTableName, 2, 27, 10000).getSegmentName();
-    DummyMetadata metadata5 = new DummyMetadata(testTableName, segmentName5, 10);
-    DummyMetadata metadata6 = new DummyMetadata(testTableName, segmentName6, 5);
-    segmentMetadataList.add(metadata5);
-    segmentMetadataList.add(metadata6);
+    String segmentName5 = new LLCSegmentName(TEST_TABLE_NAME, 1, 0, 1000).getSegmentName();
+    String segmentName6 = new LLCSegmentName(TEST_TABLE_NAME, 2, 27, 10000).getSegmentName();
+    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, segmentName5, 10));
+    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, segmentName6, 5));
 
     // Only the LLC segments should get counted.
     Assert.assertEquals(ValidationManager.computeRealtimeTotalDocumentInSegments(segmentMetadataList, false), 15);
@@ -253,67 +229,58 @@ public class ValidationManagerTest {
     ValidationManager.countMissingSegments(new long[1], TimeUnit.DAYS);
 
     // Should be no missing segments on two consecutive days
-    Assert.assertEquals(ValidationManager.countMissingSegments(new long[] { new DateTime(2014, 1, 1, 22, 0).toInstant()
-        .getMillis(), new DateTime(2014, 1, 2, 22, 0).toInstant().getMillis(), }, TimeUnit.DAYS), 0);
+    Assert.assertEquals(ValidationManager.countMissingSegments(
+        new long[]{new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 2, 22,
+            0).toInstant().getMillis(),}, TimeUnit.DAYS), 0);
 
     // Should be no missing segments on five consecutive days
-    Assert
-        .assertEquals(ValidationManager.countMissingSegments(
-            new long[] { new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 2, 22, 0)
-                .toInstant()
-                .getMillis(), new DateTime(2014, 1, 3, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 4, 22, 0)
-                    .toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 0).toInstant().getMillis(), },
+    Assert.assertEquals(ValidationManager.countMissingSegments(
+        new long[]{new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 2, 22,
+            0).toInstant().getMillis(), new DateTime(2014, 1, 3, 22, 0).toInstant().getMillis(), new DateTime(2014, 1,
+            4, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 0).toInstant().getMillis(),},
         TimeUnit.DAYS), 0);
 
     // Should be no missing segments on five consecutive days, even if the interval between them isn't exactly 24 hours
-    Assert
-        .assertEquals(ValidationManager.countMissingSegments(
-            new long[] { new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 2, 21, 0)
-                .toInstant()
-                .getMillis(), new DateTime(2014, 1, 3, 23, 0).toInstant().getMillis(), new DateTime(2014, 1, 4, 21, 5)
-                    .toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(), },
+    Assert.assertEquals(ValidationManager.countMissingSegments(
+        new long[]{new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 2, 21,
+            0).toInstant().getMillis(), new DateTime(2014, 1, 3, 23, 0).toInstant().getMillis(), new DateTime(2014, 1,
+            4, 21, 5).toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),},
         TimeUnit.DAYS), 0);
 
     // Should be no missing segments on five consecutive days, even if there is a duplicate segment
     Assert.assertEquals(ValidationManager.countMissingSegments(
-        new long[] { new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 2, 21, 0)
-            .toInstant().getMillis(), new DateTime(2014, 1, 3, 22, 0).toInstant()
-                .getMillis(), new DateTime(2014, 1, 3, 23, 0).toInstant().getMillis(), new DateTime(2014, 1, 4, 21, 5)
-                    .toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(), },
-        TimeUnit.DAYS), 0);
+        new long[]{new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 2, 21,
+            0).toInstant().getMillis(), new DateTime(2014, 1, 3, 22, 0).toInstant().getMillis(), new DateTime(2014, 1,
+            3, 23, 0).toInstant().getMillis(), new DateTime(2014, 1, 4, 21, 5).toInstant().getMillis(), new DateTime(
+            2014, 1, 5, 22, 15).toInstant().getMillis(),}, TimeUnit.DAYS), 0);
 
     // Should be exactly one missing segment
-    Assert.assertEquals(
-        ValidationManager.countMissingSegments(new long[] { new DateTime(2014, 1, 1, 22, 0).toInstant()
-            .getMillis(), new DateTime(2014, 1, 2, 21, 0).toInstant().getMillis(), new DateTime(2014, 1, 4, 21, 5)
-                .toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(), },
-            TimeUnit.DAYS),
-        1);
+    Assert.assertEquals(ValidationManager.countMissingSegments(
+        new long[]{new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 2, 21,
+            0).toInstant().getMillis(), new DateTime(2014, 1, 4, 21, 5).toInstant().getMillis(), new DateTime(2014, 1,
+            5, 22, 15).toInstant().getMillis(),}, TimeUnit.DAYS), 1);
 
     // Should be one missing segment, even if there is a duplicate segment
-    Assert
-        .assertEquals(ValidationManager.countMissingSegments(
-            new long[] { new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 3, 22, 0)
-                .toInstant()
-                .getMillis(), new DateTime(2014, 1, 3, 23, 0).toInstant().getMillis(), new DateTime(2014, 1, 4, 21, 5)
-                    .toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(), },
+    Assert.assertEquals(ValidationManager.countMissingSegments(
+        new long[]{new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 3, 22,
+            0).toInstant().getMillis(), new DateTime(2014, 1, 3, 23, 0).toInstant().getMillis(), new DateTime(2014, 1,
+            4, 21, 5).toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),},
         TimeUnit.DAYS), 1);
 
     // Should be two missing segments
-    Assert
-        .assertEquals(
-            ValidationManager.countMissingSegments(
-                new long[] { new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 3, 23, 0)
-                    .toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(), },
-        TimeUnit.DAYS), 2);
+    Assert.assertEquals(ValidationManager.countMissingSegments(
+        new long[]{new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 3, 23,
+            0).toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),}, TimeUnit.DAYS), 2);
 
     // Should be three missing segments
-    Assert.assertEquals(ValidationManager.countMissingSegments(new long[] { new DateTime(2014, 1, 1, 22, 0).toInstant()
-        .getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(), }, TimeUnit.DAYS), 3);
+    Assert.assertEquals(ValidationManager.countMissingSegments(
+        new long[]{new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 5, 22,
+            15).toInstant().getMillis(),}, TimeUnit.DAYS), 3);
 
     // Should be three missing segments
-    Assert.assertEquals(ValidationManager.countMissingSegments(new long[] { new DateTime(2014, 1, 1, 22, 25).toInstant()
-        .getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(), }, TimeUnit.DAYS), 3);
+    Assert.assertEquals(ValidationManager.countMissingSegments(
+        new long[]{new DateTime(2014, 1, 1, 22, 25).toInstant().getMillis(), new DateTime(2014, 1, 5, 22,
+            15).toInstant().getMillis(),}, TimeUnit.DAYS), 3);
   }
 
   @Test
@@ -398,24 +365,33 @@ public class ValidationManagerTest {
     LLCSegmentName p1s1 = new LLCSegmentName(tableName, 1, 1, msSinceEpoch);
 
     IdealState idealstate = PinotTableIdealStateBuilder.buildEmptyIdealStateFor(realtimeTableName, 3);
-    idealstate.setPartitionState(p0s0.getSegmentName(), S1, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
-    idealstate.setPartitionState(p0s0.getSegmentName(), S2, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
-    idealstate.setPartitionState(p0s0.getSegmentName(), S3, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+    idealstate.setPartitionState(p0s0.getSegmentName(), S1,
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+    idealstate.setPartitionState(p0s0.getSegmentName(), S2,
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+    idealstate.setPartitionState(p0s0.getSegmentName(), S3,
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
 //    idealstate.setPartitionState(p0s1.getSegmentName(), S1, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
 //    idealstate.setPartitionState(p0s1.getSegmentName(), S2, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
 //    idealstate.setPartitionState(p0s1.getSegmentName(), S3, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-    idealstate.setPartitionState(p1s0.getSegmentName(), S1, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
-    idealstate.setPartitionState(p1s0.getSegmentName(), S2, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
-    idealstate.setPartitionState(p1s0.getSegmentName(), S3, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
-    idealstate.setPartitionState(p1s1.getSegmentName(), S1, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-    idealstate.setPartitionState(p1s1.getSegmentName(), S2, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-    idealstate.setPartitionState(p1s1.getSegmentName(), S3, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    idealstate.setPartitionState(p1s0.getSegmentName(), S1,
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+    idealstate.setPartitionState(p1s0.getSegmentName(), S2,
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+    idealstate.setPartitionState(p1s0.getSegmentName(), S3,
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+    idealstate.setPartitionState(p1s1.getSegmentName(), S1,
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    idealstate.setPartitionState(p1s1.getSegmentName(), S2,
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    idealstate.setPartitionState(p1s1.getSegmentName(), S3,
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
     helixAdmin.addResource(HELIX_CLUSTER_NAME, realtimeTableName, idealstate);
 
     FakeValidationMetrics validationMetrics = new FakeValidationMetrics();
 
-    ValidationManager validationManager = new ValidationManager(validationMetrics, _pinotHelixResourceManager, new ControllerConf(),
-        _segmentManager);
+    ValidationManager validationManager =
+        new ValidationManager(validationMetrics, _pinotHelixResourceManager, new ControllerConf(), _segmentManager);
     Map<String, String> streamConfigs = new HashMap<String, String>(4);
     streamConfigs.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
         CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), "highLevel,simple");
@@ -453,212 +429,10 @@ public class ValidationManagerTest {
     public FakeValidationMetrics() {
       super(null);
     }
+
     @Override
     public void updateNonConsumingPartitionCountMetric(final String tableName, final int count) {
       partitionCount = count;
-    }
-  }
-
-  private class DummyMetadata implements SegmentMetadata {
-    private String _resourceName;
-    private String _indexType;
-    private Duration _timeGranularity;
-    private Interval _interval;
-    private String _crc;
-    private String _version;
-    private Schema _schema;
-    private String _shardingKey;
-    private String _segmentName;
-    private long _indexCreationTime;
-    private long _pushTime;
-    private long _refreshTime;
-    private int _totalDocs;
-    private String _indexDir;
-
-    public DummyMetadata(String resourceName) {
-      _resourceName = resourceName;
-      _segmentName = resourceName + "_" + System.currentTimeMillis();
-      _crc = System.currentTimeMillis() + "";
-    }
-
-    public DummyMetadata(String resourceName, int totalDocsInSegment) {
-      _resourceName = resourceName;
-      _segmentName = resourceName + "_" + System.currentTimeMillis();
-      _crc = System.currentTimeMillis() + "";
-      _totalDocs = totalDocsInSegment;
-    }
-
-    public DummyMetadata(String resourceName, String segmentName, int totalDocsInSegment) {
-      _resourceName = resourceName;
-      _segmentName = segmentName;
-      _crc = System.currentTimeMillis() + "";
-      _totalDocs = totalDocsInSegment;
-    }
-
-    @Override
-    public String getIndexDir() {
-      return _indexDir;
-    }
-
-    @Override
-    public String getName() {
-      return _segmentName;
-    }
-
-    @Override
-    public Map<String, String> toMap() {
-      return new HashMap<String, String>();
-    }
-
-    @Override
-    public int getTotalDocs() {
-      return _totalDocs;
-    }
-
-    @Override
-    public int getTotalRawDocs() {
-      return _totalDocs;
-    }
-
-    @Override
-    public long getIndexCreationTime() {
-      return _indexCreationTime;
-    }
-
-    @Override
-    public long getPushTime() {
-      return _pushTime;
-    }
-
-    @Override
-    public long getRefreshTime() {
-      return _refreshTime;
-    }
-
-    @Override
-    public String getTableName() {
-      return _resourceName;
-    }
-
-    @Override
-    public String getIndexType() {
-      return _indexType;
-    }
-
-    @Override
-    public String getTimeColumn() {
-      return null;
-    }
-
-    @Override
-    public long getStartTime() {
-      return Long.MAX_VALUE;
-    }
-
-    @Override
-    public long getEndTime() {
-      return Long.MIN_VALUE;
-    }
-
-    @Override
-    public TimeUnit getTimeUnit() {
-      return null;
-    }
-
-    @Override
-    public Duration getTimeGranularity() {
-      return _timeGranularity;
-    }
-
-    @Override
-    public Interval getTimeInterval() {
-      return _interval;
-    }
-
-    @Override
-    public String getCrc() {
-      return _crc;
-    }
-
-    public void setCrc(String crc) {
-      _crc = crc;
-    }
-
-    @Override
-    public String getVersion() {
-      return _version;
-    }
-
-    @Override
-    public Schema getSchema() {
-      return _schema;
-    }
-
-    @Override
-    public String getShardingKey() {
-      return _shardingKey;
-    }
-
-    @Override
-    public boolean hasDictionary(String columnName) {
-      return false;
-    }
-
-    @Override
-    public boolean close() {
-      // TODO Auto-generated method stub
-      return false;
-    }
-
-    @Override
-    public boolean hasStarTree() {
-      return false;
-    }
-
-    @Nullable
-    @Override
-    public StarTreeMetadata getStarTreeMetadata() {
-      return null;
-    }
-
-    @Override
-    public String getForwardIndexFileName(String column) {
-      // TODO Auto-generated method stub
-      return null;
-    }
-
-    @Override
-    public String getDictionaryFileName(String column) {
-      // TODO Auto-generated method stub
-      return null;
-    }
-
-    @Override
-    public String getBitmapInvertedIndexFileName(String column) {
-      // TODO Auto-generated method stub
-      return null;
-    }
-
-    @Nullable
-    @Override
-    public String getCreatorName() {
-      return null;
-    }
-
-    @Override
-    public char getPaddingCharacter() {
-      return V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
-    }
-
-    @Override
-    public int getHllLog2m() {
-      return HllConstants.DEFAULT_LOG2M;
-    }
-
-    @Nullable
-    @Override
-    public String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType) {
-      return null;
     }
   }
 }

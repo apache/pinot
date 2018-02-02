@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -245,7 +246,7 @@ public final class Schema {
 
   @JsonIgnore
   @Nonnull
-  public Collection<String> getColumnNames() {
+  public Set<String> getColumnNames() {
     return _fieldSpecMap.keySet();
   }
 

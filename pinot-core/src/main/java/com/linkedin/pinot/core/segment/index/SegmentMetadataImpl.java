@@ -23,7 +23,6 @@ import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
-import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
@@ -417,11 +416,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
-  public String getIndexType() {
-    return IndexType.COLUMNAR.toString();
-  }
-
-  @Override
   public String getTimeColumn() {
     return _timeColumn;
   }
@@ -493,25 +487,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public String getName() {
     return _segmentName;
-  }
-
-  @Override
-  public Map<String, String> toMap() {
-    final Map<String, String> ret = new HashMap<String, String>();
-    ret.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, getTableName());
-    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(getTotalDocs()));
-    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION, getVersion());
-    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, getName());
-    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CRC, getCrc());
-    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CREATION_TIME, getIndexCreationTime() + "");
-    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME,
-        _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME));
-    ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME,
-        _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME));
-    ret.put(V1Constants.MetadataKeys.Segment.TIME_UNIT,
-        _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.TIME_UNIT));
-
-    return ret;
   }
 
   @Override

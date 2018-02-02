@@ -32,7 +32,6 @@ import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -113,7 +112,7 @@ class SegmentQueryProcessor {
       if (brokerRequest.isSetSelections()) {
         List<String> columns = brokerRequest.getSelections().getSelectionColumns();
         if (columns.contains("*")) {
-          columns = Arrays.asList(_indexSegment.getColumnNames());
+          columns = new ArrayList<>(_indexSegment.getColumnNames());
         }
         List<Pair> selectionColumns = new ArrayList<>();
         Set<String> columSet = new HashSet<>();

@@ -25,7 +25,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
-import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
+import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
 import java.util.HashMap;
 import java.util.Map;
 import org.testng.Assert;
@@ -44,19 +44,18 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
     startZk();
     startController();
 
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(
-        getHelixClusterName(), ZK_SERVER, 1, true);
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(
-        getHelixClusterName(), ZK_SERVER, 1, true);
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZK_SERVER, 1, true);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZK_SERVER, 1,
+        true);
 
     while (_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size() == 0) {
       Thread.sleep(100);
     }
 
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(
-        getHelixClusterName(), "DefaultTenant_OFFLINE").size(), 1);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(
-        getHelixClusterName(), "DefaultTenant_BROKER").size(), 1);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size(),
+        1);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
+        1);
   }
 
   @AfterClass
@@ -84,8 +83,9 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
 
     // Upload Segments
     for (int i = 0; i < 5; ++i) {
-      SegmentMetadata metadata = addOneSegment(TABLE_NAME);
-      segmentMetadataTable.put(metadata.getName(), metadata);
+      SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME);
+      _helixResourceManager.addNewSegment(segmentMetadata, "downloadUrl");
+      segmentMetadataTable.put(segmentMetadata.getName(), segmentMetadata);
     }
 
     // Get crc info from API and check that they are correct.
@@ -93,8 +93,9 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
 
     // Add more segments
     for (int i = 0; i < 5; ++i) {
-      SegmentMetadata metadata = addOneSegment(TABLE_NAME);
-      segmentMetadataTable.put(metadata.getName(), metadata);
+      SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME);
+      _helixResourceManager.addNewSegment(segmentMetadata, "downloadUrl");
+      segmentMetadataTable.put(segmentMetadata.getName(), segmentMetadata);
     }
 
     // Get crc info from API and check that they are correct.
@@ -118,11 +119,5 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
       Assert.assertEquals(crcMap.get(segmentName), metadata.getCrc());
     }
     Assert.assertEquals(crcMap.size(), expectedSize);
-  }
-
-  private SegmentMetadata addOneSegment(String resourceName) {
-    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(resourceName);
-    _helixResourceManager.addNewSegment(segmentMetadata, "downloadUrl");
-    return segmentMetadata;
   }
 }

@@ -21,7 +21,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
+import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.testng.Assert;
@@ -69,7 +69,7 @@ public class ControllerInstanceToggleTest extends ControllerTest {
 
     // Add segments
     for (int i = 0; i < NUM_INSTANCES; i++) {
-      _helixResourceManager.addNewSegment(new SimpleSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
+      _helixResourceManager.addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME), "downloadUrl");
       Assert.assertEquals(_helixAdmin.getResourceIdealState(_helixClusterName, OFFLINE_TABLE_NAME).getNumPartitions(),
           i + 1);
     }

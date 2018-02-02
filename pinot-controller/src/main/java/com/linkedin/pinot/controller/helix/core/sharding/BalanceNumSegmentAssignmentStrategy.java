@@ -44,33 +44,28 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
   @Override
   public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
       String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
-    String serverTenantName;
-    String tableName;
-    if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
-      tableName = TableNameBuilder.REALTIME.tableNameWithType(segmentMetadata.getTableName());
-      serverTenantName = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName);
-    } else {
-      tableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
-      serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
-    }
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
+    String serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
 
-    List<String> selectedInstances = new ArrayList<String>();
-    Map<String, Integer> currentNumSegmentsPerInstanceMap = new HashMap<String, Integer>();
-    List<String> allTaggedInstances = HelixHelper.getEnabledInstancesWithTag(helixAdmin, helixClusterName, serverTenantName);
+    List<String> selectedInstances = new ArrayList<>();
+    Map<String, Integer> currentNumSegmentsPerInstanceMap = new HashMap<>();
+    List<String> allTaggedInstances =
+        HelixHelper.getEnabledInstancesWithTag(helixAdmin, helixClusterName, serverTenantName);
 
     for (String instance : allTaggedInstances) {
       currentNumSegmentsPerInstanceMap.put(instance, 0);
     }
 
     // Count number of segments assigned to each instance
-    IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, tableName);
+    IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, offlineTableName);
     if (idealState != null) {
       for (String partitionName : idealState.getPartitionSet()) {
-        Map<String, String> instanceToStateMap =  idealState.getInstanceStateMap(partitionName);
+        Map<String, String> instanceToStateMap = idealState.getInstanceStateMap(partitionName);
         if (instanceToStateMap != null) {
           for (String instanceName : instanceToStateMap.keySet()) {
             if (currentNumSegmentsPerInstanceMap.containsKey(instanceName)) {
-              currentNumSegmentsPerInstanceMap.put(instanceName, currentNumSegmentsPerInstanceMap.get(instanceName) + 1);
+              currentNumSegmentsPerInstanceMap.put(instanceName,
+                  currentNumSegmentsPerInstanceMap.get(instanceName) + 1);
             }
             // else, ignore. Do not add servers, that are not tagged, to the map
             // By this approach, new segments will not be allotted to the server if tags changed
@@ -81,9 +76,9 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
 
     // Select up to numReplicas instances with the fewest segments assigned
     PriorityQueue<Number2ObjectPair<String>> priorityQueue =
-        new PriorityQueue<Number2ObjectPair<String>>(numReplicas, Pairs.getDescendingnumber2ObjectPairComparator());
+        new PriorityQueue<>(numReplicas, Pairs.getDescendingnumber2ObjectPairComparator());
     for (String key : currentNumSegmentsPerInstanceMap.keySet()) {
-      priorityQueue.add(new Number2ObjectPair<String>(currentNumSegmentsPerInstanceMap.get(key), key));
+      priorityQueue.add(new Number2ObjectPair<>(currentNumSegmentsPerInstanceMap.get(key), key));
       if (priorityQueue.size() > numReplicas) {
         priorityQueue.poll();
       }

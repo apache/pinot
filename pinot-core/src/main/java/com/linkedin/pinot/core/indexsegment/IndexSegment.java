@@ -18,59 +18,56 @@ package com.linkedin.pinot.core.indexsegment;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.startree.StarTree;
+import java.util.Set;
 
 
-/**
- * This is the interface of index segment. The index type of index segment
- * should be one of the supported {@link com.linkedin.pinot.core.indexsegment.IndexType
- * IndexType}.
- *
- *
- */
 public interface IndexSegment {
-  /**
-   * @return
-   */
-  public IndexType getIndexType();
 
   /**
-   * @return
-   */
-  public String getSegmentName();
-
-  /**
-   * @return
-   */
-  public String getAssociatedDirectory();
-
-  /**
-   * @return SegmentMetadata
-   */
-  public SegmentMetadata getSegmentMetadata();
-
-  /**
+   * Returns the name of the segment.
    *
-   * @param columnName
-   * @return
+   * @return Segment name
+   */
+  String getSegmentName();
+
+  /**
+   * Returns the {@link SegmentMetadata} of the segment.
+   *
+   * @return Segment metadata
+   */
+  SegmentMetadata getSegmentMetadata();
+
+  /**
+   * Returns all the columns inside the segment.
+   *
+   * @return Set of column names
+   */
+  Set<String> getColumnNames();
+
+  /**
+   * Returns the {@link DataSource} for the given column.
+   *
+   * @param columnName Column name
+   * @return Data source for the given column
    */
   DataSource getDataSource(String columnName);
 
   /**
-   * @return
+   * Returns the {@link StarTree} index if it exists, or null if it does not exist.
+   *
+   * @return Star-tree index
    */
-  String[] getColumnNames();
-
-  /**
-   * Destroy segment in memory and close file handler if in memory mapped mode
-   */
-  public void destroy();
-
-  /** Returns the StarTree index structure, or null if it does not exist */
   StarTree getStarTree();
 
   /**
-   * Get the total size of the segment in bytes
+   * Returns the total size of the segment in bytes.
+   *
+   * @return Size of the segment in bytes
    */
-
   long getDiskSizeBytes();
+
+  /**
+   * Destroys segment in memory and closes file handlers if in MMAP mode.
+   */
+  void destroy();
 }

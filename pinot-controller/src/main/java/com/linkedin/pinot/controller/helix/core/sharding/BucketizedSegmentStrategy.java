@@ -15,19 +15,17 @@
  */
 package com.linkedin.pinot.controller.helix.core.sharding;
 
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
 
 
 /**
@@ -41,25 +39,21 @@ public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {
   @Override
   public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
       String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
-    String serverTenantName = null;
-    if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
-      serverTenantName = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName);
-    } else {
-      serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
-    }
+    String serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
 
     List<String> allInstances = HelixHelper.getEnabledInstancesWithTag(helixAdmin, helixClusterName, serverTenantName);
-    List<String> selectedInstanceList = new ArrayList<String>();
+    List<String> selectedInstanceList = new ArrayList<>();
     if (segmentMetadata.getShardingKey() != null) {
       for (String instance : allInstances) {
-        if (HelixHelper.getInstanceConfigsMapFor(instance, helixClusterName, helixAdmin).get("shardingKey")
+        if (HelixHelper.getInstanceConfigsMapFor(instance, helixClusterName, helixAdmin)
+            .get("shardingKey")
             .equalsIgnoreCase(segmentMetadata.getShardingKey())) {
           selectedInstanceList.add(instance);
         }
       }
       LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
-          + segmentMetadata.getTableName() + ", selected instances: "
-          + Arrays.toString(selectedInstanceList.toArray()));
+          + segmentMetadata.getTableName() + ", selected instances: " + Arrays.toString(
+          selectedInstanceList.toArray()));
       return selectedInstanceList;
     } else {
       throw new RuntimeException("Segment missing sharding key!");

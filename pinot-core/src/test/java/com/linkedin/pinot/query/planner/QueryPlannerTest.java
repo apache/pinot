@@ -15,10 +15,7 @@
  */
 package com.linkedin.pinot.query.planner;
 
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.query.planner.FixedNumJobsQueryPlannerImpl;
 import com.linkedin.pinot.core.query.planner.FixedNumOfSegmentsPerJobQueryPlannerImpl;
 import com.linkedin.pinot.core.query.planner.JobVertex;
@@ -26,103 +23,52 @@ import com.linkedin.pinot.core.query.planner.ParallelQueryPlannerImpl;
 import com.linkedin.pinot.core.query.planner.QueryPlan;
 import com.linkedin.pinot.core.query.planner.QueryPlanner;
 import com.linkedin.pinot.core.query.planner.SequentialQueryPlannerImpl;
-import com.linkedin.pinot.core.startree.StarTree;
 import java.util.ArrayList;
 import java.util.List;
+import org.mockito.Mockito;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.*;
 
 
 public class QueryPlannerTest {
+  private static final int NUM_SEGMENTS = 100;
 
-  public List<IndexSegment> _indexSegmentList = null;
-  public int _numOfSegmentDataManagers = 100;
+  private List<IndexSegment> _indexSegments;
 
   @BeforeMethod
   public void init() {
-    _indexSegmentList = new ArrayList<IndexSegment>();
-    for (int i = 0; i < _numOfSegmentDataManagers; ++i) {
-      _indexSegmentList.add(new IndexSegment() {
-
-        @Override
-        public String getSegmentName() {
-          // TODO Auto-generated method stub
-          return null;
-        }
-
-        @Override
-        public SegmentMetadata getSegmentMetadata() {
-          // TODO Auto-generated method stub
-          return null;
-        }
-
-        @Override
-        public IndexType getIndexType() {
-          // TODO Auto-generated method stub
-          return null;
-        }
-
-        @Override
-        public DataSource getDataSource(String columnName) {
-          // TODO Auto-generated method stub
-          return null;
-        }
-
-        @Override
-        public String getAssociatedDirectory() {
-          // TODO Auto-generated method stub
-          return null;
-        }
-
-        @Override
-        public String[] getColumnNames() {
-          // TODO Auto-generated method stub
-          return null;
-        }
-
-        @Override
-        public void destroy() {
-          // TODO Auto-generated method stub
-        }
-
-        @Override
-        public StarTree getStarTree() {
-          return null;
-        }
-
-        @Override
-        public long getDiskSizeBytes() {
-          return 0;
-        }
-      });
+    _indexSegments = new ArrayList<>(NUM_SEGMENTS);
+    IndexSegment indexSegment = Mockito.mock(IndexSegment.class);
+    for (int i = 0; i < NUM_SEGMENTS; i++) {
+      _indexSegments.add(indexSegment);
     }
   }
 
   @Test
   public void testParallelQueryPlanner() {
-    final QueryPlanner queryPlanner = new ParallelQueryPlannerImpl();
-    final QueryPlan plan = queryPlanner.computeQueryPlan(null, _indexSegmentList);
-    final List<JobVertex> roots = plan.getVirtualRoot().getSuccessors();
-    assertEquals(_numOfSegmentDataManagers, roots.size());
+    QueryPlanner queryPlanner = new ParallelQueryPlannerImpl();
+    QueryPlan plan = queryPlanner.computeQueryPlan(null, _indexSegments);
+    List<JobVertex> roots = plan.getVirtualRoot().getSuccessors();
+    assertEquals(roots.size(), NUM_SEGMENTS);
   }
 
   @Test
   public void testSequentialQueryPlanner() {
-    final QueryPlanner queryPlanner = new SequentialQueryPlannerImpl();
-    final QueryPlan plan = queryPlanner.computeQueryPlan(null, _indexSegmentList);
-    final List<JobVertex> roots = plan.getVirtualRoot().getSuccessors();
-    assertEquals(1, roots.size());
-    assertEquals(_numOfSegmentDataManagers, roots.get(0).getIndexSegmentList().size());
+    QueryPlanner queryPlanner = new SequentialQueryPlannerImpl();
+    QueryPlan plan = queryPlanner.computeQueryPlan(null, _indexSegments);
+    List<JobVertex> roots = plan.getVirtualRoot().getSuccessors();
+    assertEquals(roots.size(), 1);
+    assertEquals(roots.get(0).getIndexSegmentList().size(), NUM_SEGMENTS);
   }
 
   @Test
   public void testFixedJobsQueryPlanner() {
-    for (int numJobs = 1; numJobs <= _numOfSegmentDataManagers; ++numJobs) {
+    for (int numJobs = 1; numJobs <= NUM_SEGMENTS; ++numJobs) {
       int totalSegments = 0;
       final QueryPlanner queryPlanner = new FixedNumJobsQueryPlannerImpl(numJobs);
-      final QueryPlan plan = queryPlanner.computeQueryPlan(null, _indexSegmentList);
+      final QueryPlan plan = queryPlanner.computeQueryPlan(null, _indexSegments);
       final List<JobVertex> roots = plan.getVirtualRoot().getSuccessors();
       assertEquals(roots.size(), numJobs);
 
@@ -131,17 +77,17 @@ public class QueryPlannerTest {
         roots.remove(0);
         assertEquals(roots.size(), i);
       }
-      assertEquals(_numOfSegmentDataManagers, totalSegments);
+      assertEquals(totalSegments, NUM_SEGMENTS);
     }
   }
 
   @Test
   public void testFixedSegmentsPerJobQueryPlanner() {
-    for (int numSegment = 1; numSegment <= _numOfSegmentDataManagers; ++numSegment) {
+    for (int numSegment = 1; numSegment <= NUM_SEGMENTS; ++numSegment) {
       int totalSegments = 0;
-      final int numJobs = (int) Math.ceil((double) _numOfSegmentDataManagers / (double) numSegment);
+      final int numJobs = (int) Math.ceil((double) NUM_SEGMENTS / (double) numSegment);
       final QueryPlanner queryPlanner = new FixedNumOfSegmentsPerJobQueryPlannerImpl(numSegment);
-      final QueryPlan plan = queryPlanner.computeQueryPlan(null, _indexSegmentList);
+      final QueryPlan plan = queryPlanner.computeQueryPlan(null, _indexSegments);
       final List<JobVertex> roots = plan.getVirtualRoot().getSuccessors();
       assertEquals(roots.size(), numJobs);
       for (int i = numJobs - 1; i >= 0; --i) {
@@ -149,7 +95,7 @@ public class QueryPlannerTest {
         roots.remove(0);
         assertEquals(roots.size(), i);
       }
-      assertEquals(_numOfSegmentDataManagers, totalSegments);
+      assertEquals(totalSegments, NUM_SEGMENTS);
     }
   }
 }
