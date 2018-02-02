@@ -8,16 +8,15 @@ moduleForAcceptance('Acceptance | rootcause');
 
 test('empty state of rootcause page should have a placeholder and no tabs', async (assert) => {
   await visit('/rootcause');
+
   assert.equal(
     currentURL(),
     '/rootcause',
     'link is correct');
-
   assert.ok(
     find(PLACEHOLDER).get(0),
     'placeholder exists'
   );
-
   assert.notOk(
     find(TABS).get(0),
     'tabs do not exist'
