@@ -23,6 +23,12 @@ export default Ember.Component.extend({
   },
 
   /**
+   * Id of the entity to focus
+   * @type {String}
+   */
+  focusedId: null,
+
+  /**
    * default height property for the chart
    * May be overridden
    */
@@ -131,8 +137,7 @@ export default Ember.Component.extend({
     const axes = {};
     loadKeys.filter(sid => 'axis' in series[sid]).forEach(sid => axes[sid] = series[sid].axis);
 
-    const config = { unload, xs, columns, types, regions, tooltip, focusedId , colors, axis, axes, legend };
-    debugger;
+    const config = { unload, xs, columns, types, regions, tooltip, focusedId, colors, axis, axes, legend };
     return config;
   },
 
@@ -150,8 +155,10 @@ export default Ember.Component.extend({
     const series = this.get('series') || {};
     this.set('_seriesCache', _.cloneDeep(series));
   },
-  focusedId: null,
 
+  /**
+   * Triggers focus or revert when focusedID changes
+   */
   onFocusChange: Ember.observer('focusedId', function() {
     const id = this.get('focusedId');
 
@@ -162,13 +169,20 @@ export default Ember.Component.extend({
     }
   }),
 
+  /**
+   * Focuses the entity associated with the provided id
+   * @private
+   * @param {String} id
+   */
   _focus(id) {
-    debugger;
     this.get('_chart').focus(id);
   },
 
-  _revert(id) {
-    debugger;
+  /**
+   * Reverts the chart back to its original state
+   * @private
+   */
+  _revert() {
     this.get('_chart').revert();
   },
 
@@ -216,7 +230,6 @@ export default Ember.Component.extend({
     config.line = this.get('line');
 
     this.set('_chart', c3.generate(config));
-    debugger;
     this._updateCache();
   }
 });

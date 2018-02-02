@@ -26,6 +26,10 @@ export default Ember.Component.extend({
 
   classNames: ['rootcause-chart'],
 
+  /**
+   * id of the entity to be focused on the chart
+   * @type {String}
+   */
   focusedId: null,
 
   init() {

@@ -1,5 +1,5 @@
 import Ember from 'ember';
-import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toOffsetUrn, toFilters, appendFilters, dateFormatFull } from 'thirdeye-frontend/utils/rca-utils';
+import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toOffsetUrn, toFilters, appendFilters, dateFormatFull, urnToChartId } from 'thirdeye-frontend/utils/rca-utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import config from 'thirdeye-frontend/mocks/filterBarConfig';
 import fetch from 'fetch';
@@ -95,6 +95,11 @@ export default Ember.Controller.extend({
    * display mode for timeseries chart
    */
   timeseriesMode: null, // ""
+
+  /**
+   * Id of the currently focused entity in the legend component
+   */
+  focusedId: null,
 
   //
   // session data
@@ -232,8 +237,6 @@ export default Ember.Controller.extend({
    * Subscribed aggregates cache
    */
   aggregates: Ember.computed.reads('aggregatesService.aggregates'),
-
-  focusedId: null,
 
   /**
    * Subscribed breakdowns cache
@@ -453,17 +456,17 @@ export default Ember.Controller.extend({
       });
     },
 
+    /**
+     * Closure action passed into the legend component
+     * to handle the hover interactivity
+     * @param {String} urn
+     */
     onLegendHover(urn) {
+      let id;
       if (urn) {
-        if (urn.includes('metric')) {
-          var [app, metric, id] = urn.split(':');
-          urn = ['frontend', metric, 'current', id].join(':');
-        } else if (urn.includes('event')) {
-          console.log(urn, 'thirdeye:event:anomaly:24033121');
-        }
+        id = urnToChartId(urn);
       }
-      console.log("hovering", urn);
-      this.set('focusedId', urn);
+      this.set('focusedId', id);
     },
 
     /**
