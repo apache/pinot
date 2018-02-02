@@ -3,6 +3,7 @@ import alertConfig from 'thirdeye-frontend/mocks/alertConfig';
 import entityApplication from 'thirdeye-frontend/mocks/entityApplication';
 import metric from 'thirdeye-frontend/mocks/metric';
 import timeseriesCompare from 'thirdeye-frontend/mocks/timeseriesCompare';
+import { onboardJobStatus, onboardJobCreate } from 'thirdeye-frontend/mocks/detectionOnboard';
 
 export default function() {
 
@@ -123,6 +124,44 @@ export default function() {
    */
   this.get(`/data/maxDataTime/metricId/${metric[0].id}`, () => {
     return 1509051599998;
+  });
+
+  /**
+   * Returns metric granularity.
+   */
+  this.get(`/data/agg/granularity/metric/${metric[0].id}`, () => {
+    return [ "5_MINUTES", "HOURS", "DAYS" ];
+  });
+
+  /**
+   * Returns available filters on this metric
+   */
+  this.get(`/data/autocomplete/filters/metric/${metric[0].id}`, () => {
+    return {
+      "container" : [ "container1", "container2" ],
+      "fabric" : [ "prod-xyz1", "prod-xyz2", "prod-xyz3" ]
+    };
+  });
+
+  /**
+   * Returns available dimensions for this metric
+   */
+  this.get(`/data/autocomplete/dimensions/metric/${metric[0].id}`, () => {
+    return [ "All", "fabric", "container", "host" ];
+  });
+
+  /**
+   * Returns job status
+   */
+  this.post(`/detection-onboard/get-status`, (schema, request) => {
+    return onboardJobStatus;
+  });
+
+  /**
+   * Returns job id
+   */
+  this.post(`/detection-onboard/create-job`, (schema, request) => {
+    return onboardJobCreate;
   });
 
   /**

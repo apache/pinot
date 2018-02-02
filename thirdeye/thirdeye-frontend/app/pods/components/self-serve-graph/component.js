@@ -22,7 +22,7 @@
  */
 
 import Component from '@ember/component';
-import { computed } from '@ember/object';
+import { computed, set } from '@ember/object';
 
 export default Component.extend({
 
@@ -64,15 +64,15 @@ export default Component.extend({
   ),
 
   actions: {
-      /**
-       * Enable reaction to dimension toggling in graph legend component
-       * @method onSelection
-       * @return {undefined}
-       */
-      onSelection(selectedDimension) {
-        const { isSelected } = selectedDimension;
-        Ember.set(selectedDimension, 'isSelected', !isSelected);
-      }
+    /**
+     * Enable reaction to dimension toggling in graph legend component
+     * @method onSelection
+     * @return {undefined}
+     */
+    onSelection(selectedDimension) {
+      const { isSelected } = selectedDimension;
+      set(selectedDimension, 'isSelected', !isSelected);
+    }
   }
 
 });

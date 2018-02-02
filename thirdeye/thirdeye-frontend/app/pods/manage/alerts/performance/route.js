@@ -4,9 +4,8 @@
  * @exports alert create model
  */
 import Ember from 'ember';
-import fetch from 'fetch';
 import RSVP from 'rsvp';
-import { checkStatus, buildDateEod, parseProps, postProps } from 'thirdeye-frontend/utils/utils';
+import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
 
 /**
  * If true, this reduces the list of alerts per app to 2 for a quick demo.

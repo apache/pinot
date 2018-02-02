@@ -3,9 +3,11 @@
  * @module self-serve/create/route
  * @exports alert create model
  */
-import Ember from 'ember';
 import fetch from 'fetch';
 import RSVP from 'rsvp';
+import _ from 'lodash';
+import moment from 'moment';
+import { isArray } from "@ember/array"
 import Route from '@ember/routing/route';
 import { task, timeout } from 'ember-concurrency';
 import { postProps, checkStatus } from 'thirdeye-frontend/utils/utils';
@@ -32,7 +34,6 @@ export default Route.extend({
    * @method resetController
    * @param {Object} controller - active controller
    * @param {Boolean} isExiting - exit status
-   * @param {Object} transition - transition obj
    * @return {undefined}
    */
   resetController(controller, isExiting) {
@@ -78,7 +79,7 @@ export default Route.extend({
           // alert function is created. Redirect to alert page.
           fetch(alertByNameUrl).then(checkStatus)
             .then((newAlert) => {
-              const isPresent = Ember.isArray(newAlert) && newAlert.length === 1;
+              const isPresent = isArray(newAlert) && newAlert.length === 1;
               const alertId = isPresent ? newAlert[0].id : -1;
               this.controller.set('isProcessingForm', false);
               this.jumpToAlertPage(alertId, jobId, functionName);

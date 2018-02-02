@@ -1,4 +1,5 @@
 import Ember from 'ember';
+import _ from 'lodash';
 import { toCurrentUrn, toBaselineUrn, toOffsetUrn, hasPrefix, filterPrefix, toMetricLabel, makeSortable, isInverse, toColorDirection } from 'thirdeye-frontend/utils/rca-utils';
 import { humanizeChange } from 'thirdeye-frontend/utils/utils';
 

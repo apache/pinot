@@ -5,6 +5,7 @@
  */
 import RSVP from 'rsvp';
 import fetch from 'fetch';
+import { isPresent } from "@ember/utils";
 import Route from '@ember/routing/route';
 import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
 
@@ -45,7 +46,7 @@ export default Route.extend({
 
     // Fetch all the basic alert data needed in manage.alert subroutes
     // Apply calls from go/te-ss-alert-flow-api
-    return Ember.RSVP.hash({
+    return RSVP.hash({
       id,
       jobId,
       functionName: functionName || 'Unknown',
@@ -114,7 +115,7 @@ export default Route.extend({
       isEditModeActive,
       alertData: newAlertData,
       isOverViewModeActive: !isEditModeActive,
-      isReplayPending: Ember.isPresent(jobId)
+      isReplayPending: isPresent(jobId)
     });
   },
 

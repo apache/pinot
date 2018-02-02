@@ -203,7 +203,7 @@ export default Route.extend({
       })
       // Got errors?
       .catch((error) => {
-        return Ember.RSVP.reject({ loadError, location: `${this.routeName}:afterModel`, calls: tuningPromiseHash });
+        return Ember.RSVP.reject({ error, location: `${this.routeName}:afterModel`, calls: tuningPromiseHash });
       });
   },
 

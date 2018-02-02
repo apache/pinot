@@ -3,12 +3,14 @@
  * @module self-serve/create/controller
  * @exports create
  */
+import RSVP from "rsvp";
+import _ from 'lodash';
 import fetch from 'fetch';
 import moment from 'moment';
-import _ from 'lodash';
 import Controller from '@ember/controller';
-import { computed } from '@ember/object';
+import { computed, set } from '@ember/object';
 import { task, timeout } from 'ember-concurrency';
+import { isPresent, isEmpty, isNone, isBlank } from "@ember/utils";
 import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
 
 export default Controller.extend({
@@ -164,7 +166,7 @@ export default Controller.extend({
       } = this.getProperties('selectedPattern', 'customMttdChange', 'customPercentChange', 'selectedSeverityOption');
 
       const requiredProps = ['customMttdChange', 'customPercentChange', 'selectedSeverityOption'];
-      const isCustomFilterPossible = requiredProps.every(val => Ember.isPresent(this.get(val)));
+      const isCustomFilterPossible = requiredProps.every(val => isPresent(this.get(val)));
       const filterObj = {
         pattern: patternMap[selectedPattern],
         isCustom: isCustomFilterPossible
@@ -198,12 +200,12 @@ export default Controller.extend({
   /**
    * Application name field options loaded from our model.
    */
-  allApplicationNames: Ember.computed.reads('model.allAppNames'),
+  allApplicationNames: computed.reads('model.allAppNames'),
 
   /**
    * The list of all existing alert configuration groups.
    */
-  allAlertsConfigGroups: Ember.computed.reads('model.allConfigGroups'),
+  allAlertsConfigGroups: computed.reads('model.allConfigGroups'),
 
   /**
    * Handler for search by function name - using ember concurrency (task)
@@ -261,7 +263,7 @@ export default Controller.extend({
    * Note: these requests can fail silently and any empty response will fall back on defaults.
    * @method fetchMetricData
    * @param {Number} metricId - Id for the selected metric
-   * @return {Ember.RSVP.promise}
+   * @return {RSVP.promise}
    */
   fetchMetricData(metricId) {
     const promiseHash = {
@@ -270,7 +272,7 @@ export default Controller.extend({
       filters: fetch(`/data/autocomplete/filters/metric/${metricId}`).then(res => checkStatus(res, 'get', true)),
       dimensions: fetch(`/data/autocomplete/dimensions/metric/${metricId}`).then(res => checkStatus(res, 'get', true))
     };
-    return Ember.RSVP.hash(promiseHash);
+    return RSVP.hash(promiseHash);
   },
 
   /**
@@ -337,7 +339,7 @@ export default Controller.extend({
     this.setProperties({
       graphConfig: graphConfig,
       selectedGranularity: granularity,
-      isFilterSelectDisabled: Ember.isEmpty(filters)
+      isFilterSelectDisabled: isEmpty(filters)
     });
 
     // Fetch new graph metric data
@@ -369,7 +371,7 @@ export default Controller.extend({
         this.setProperties({
           isMetricSelected: true,
           isMetricDataLoading: false,
-          showGraphLegend: Ember.isPresent(selectedDimension),
+          showGraphLegend: isPresent(selectedDimension),
           selectedMetric: Object.assign(metricData, { color: 'blue' })
         });
       }
@@ -404,7 +406,7 @@ export default Controller.extend({
     let filteredDimensions = [];
     let colorIndex = 0;
 
-    return new Ember.RSVP.Promise((resolve) => {
+    return new RSVP.Promise((resolve) => {
       fetch(url).then(checkStatus)
         .then((scoredDimensions) => {
           // Select scored dimensions belonging the selected one
@@ -439,7 +441,7 @@ export default Controller.extend({
    * @method prepareFunctions
    * @param {Object} configGroup - the currently selected alert config group
    * @param {Object} newId - conditional param to help us tag any function that was "just added"
-   * @return {Ember.RSVP.Promise} A new list of functions (alerts)
+   * @return {RSVP.Promise} A new list of functions (alerts)
    */
   prepareFunctions(configGroup, newId = 0) {
     const newFunctionList = [];
@@ -447,7 +449,7 @@ export default Controller.extend({
     let cnt = 0;
 
     // Build object for each function(alert) to display in results table
-    return new Ember.RSVP.Promise((resolve) => {
+    return new RSVP.Promise((resolve) => {
       for (var functionId of existingFunctionList) {
         this.fetchFunctionById(functionId).then(functionData => {
           newFunctionList.push({
@@ -480,7 +482,7 @@ export default Controller.extend({
     'selectedConfigGroup',
     'newConfigGroupName',
     function() {
-      return this.get('selectedConfigGroup') && Ember.isNone(this.get('newConfigGroupName'));
+      return this.get('selectedConfigGroup') && isNone(this.get('newConfigGroupName'));
     }
   ),
 
@@ -493,7 +495,7 @@ export default Controller.extend({
     'filters',
     'isMetricSelected',
     function() {
-      return (!this.get('isMetricSelected') || Ember.isEmpty(this.get('filters')));
+      return (!this.get('isMetricSelected') || isEmpty(this.get('filters')));
     }
   ),
 
@@ -506,7 +508,7 @@ export default Controller.extend({
     'granularities',
     'isMetricSelected',
     function() {
-      return (!this.get('isMetricSelected') || Ember.isEmpty(this.get('granularities')));
+      return (!this.get('isMetricSelected') || isEmpty(this.get('granularities')));
     }
   ),
 
@@ -537,7 +539,7 @@ export default Controller.extend({
         isAlertNameDuplicate,
         isGroupNameDuplicate,
         alertGroupNewRecipient,
-        selectedConfigGroup: groupRecipients,
+        selectedConfigGroup: groupRecipients
       } = this.getProperties(
         'requiredFields',
         'isProcessingForm',
@@ -550,12 +552,12 @@ export default Controller.extend({
       const hasRecipients = _.has(groupRecipients, 'recipients');
       // Any missing required field values?
       for (var field of requiredFields) {
-        if (Ember.isBlank(this.get(field))) {
+        if (isBlank(this.get(field))) {
           isDisabled = true;
         }
       }
       // Enable submit if either of these field values are present
-      if (Ember.isBlank(groupRecipients) && Ember.isBlank(newConfigGroupName)) {
+      if (isBlank(groupRecipients) && isBlank(newConfigGroupName)) {
         isDisabled = true;
       }
       // Duplicate alert Name or group name
@@ -563,7 +565,7 @@ export default Controller.extend({
         isDisabled = true;
       }
       // For alert group email recipients, require presence only if group recipients is empty
-      if (Ember.isBlank(alertGroupNewRecipient) && !hasRecipients) {
+      if (isBlank(alertGroupNewRecipient) && !hasRecipients) {
         isDisabled = true;
       }
       // Disable after submit clicked
@@ -603,7 +605,7 @@ export default Controller.extend({
     let isPresent = true;
 
     if (this.get('selectedConfigGroup') || this.get('newConfigGroupName')) {
-      isPresent = Ember.isPresent(this.get('selectedGroupRecipients')) || Ember.isPresent(emailArr);
+      isPresent = isPresent(this.get('selectedGroupRecipients')) || isPresent(emailArr);
     }
 
     return isPresent;
@@ -621,9 +623,9 @@ export default Controller.extend({
     function() {
       const appName = this.get('selectedApplication');
       const activeGroups = this.get('allAlertsConfigGroups').filterBy('active');
-      const groupsWithAppName = activeGroups.filter(group => Ember.isPresent(group.application));
+      const groupsWithAppName = activeGroups.filter(group => isPresent(group.application));
 
-      if (Ember.isPresent(appName)) {
+      if (isPresent(appName)) {
         return groupsWithAppName.filter(group => group.application.toLowerCase().includes(appName));
       } else {
         return activeGroups;
@@ -733,7 +735,7 @@ export default Controller.extend({
       };
 
       // Prepare config group property for new alert object and add it
-      const isGroupExisting = selectedConfigGroup && Ember.isNone(newConfigGroupName);
+      const isGroupExisting = selectedConfigGroup && isNone(newConfigGroupName);
       const subscriptionGroupKey = isGroupExisting ? 'alertId' : 'alertName';
       const subscriptionGroupValue = isGroupExisting ? selectedConfigGroup.id.toString() : newConfigGroupName;
       newAlertObj[subscriptionGroupKey] = subscriptionGroupValue;
@@ -939,7 +941,7 @@ export default Controller.extend({
       this.setProperties({
         selectedConfigGroup: selectedObj,
         newConfigGroupName: null,
-        isEmptyEmail: Ember.isEmpty(emails),
+        isEmptyEmail: isEmpty(emails),
         selectedGroupRecipients: emails.split(',').filter(e => String(e).trim()).join(', ')
       });
       this.prepareFunctions(selectedObj).then(functionData => {
@@ -989,7 +991,7 @@ export default Controller.extend({
         newConfigGroupName: name,
         selectedConfigGroup: null,
         selectedGroupRecipients: null,
-        isEmptyEmail: Ember.isEmpty(this.get('alertGroupNewRecipient'))
+        isEmptyEmail: isEmpty(this.get('alertGroupNewRecipient'))
       });
     },
 
@@ -1011,7 +1013,7 @@ export default Controller.extend({
         isEmailError: false,
         isProcessingForm: false,
         isEditedConfigGroup: true,
-        isEmptyEmail: Ember.isPresent(this.get('newConfigGroupName')) && !emailInput.length
+        isEmptyEmail: isPresent(this.get('newConfigGroupName')) && !emailInput.length
       });
 
       // Check for duplicates
@@ -1048,7 +1050,7 @@ export default Controller.extend({
      */
     onSelection(selectedDimension) {
       const { isSelected } = selectedDimension;
-      Ember.set(selectedDimension, 'isSelected', !isSelected);
+      set(selectedDimension, 'isSelected', !isSelected);
     },
 
     /**
@@ -1060,7 +1062,7 @@ export default Controller.extend({
       const {
         isDuplicateEmail,
         onboardFunctionPayload,
-        alertGroupNewRecipient: newEmails,
+        alertGroupNewRecipient: newEmails
       } = this.getProperties('isDuplicateEmail', 'onboardFunctionPayload', 'alertGroupNewRecipient');
       const newEmailsArr = newEmails ? newEmails.replace(/ /g, '').split(',') : [];
       const isEmailError = !this.isEmailValid(newEmailsArr);

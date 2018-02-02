@@ -3,10 +3,12 @@
  * @module manage/alert/edit/explore
  * @exports manage/alert/edit/explore
  */
+import RSVP from "rsvp";
 import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
 import { checkStatus, postProps, parseProps, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
+import { isPresent, isEmpty, isNone, isBlank } from "@ember/utils";
 import { enhanceAnomalies, toIdGroups, setUpTimeRangeOptions, getTopDimensions } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 /**
@@ -54,7 +56,7 @@ const anomalyResponseObj = [
  * Fetches all anomaly data for found anomalies - downloads all 'pages' of data from server
  * in order to handle sorting/filtering on the entire set locally. Start/end date are not used here.
  * @param {Array} anomalyIds - list of all found anomaly ids
- * @returns {Ember.RSVP promise}
+ * @returns {RSVP promise}
  */
 const fetchCombinedAnomalies = (anomalyIds) => {
   if (anomalyIds.length) {
@@ -62,11 +64,11 @@ const fetchCombinedAnomalies = (anomalyIds) => {
     const anomalyPromiseHash = idGroups.map((group, index) => {
       let idStringParams = `anomalyIds=${encodeURIComponent(idGroups[index].toString())}`;
       let getAnomalies = fetch(`/anomalies/search/anomalyIds/0/0/${index + 1}?${idStringParams}`).then(checkStatus);
-      return Ember.RSVP.resolve(getAnomalies);
+      return RSVP.resolve(getAnomalies);
     });
-    return Ember.RSVP.all(anomalyPromiseHash);
+    return RSVP.all(anomalyPromiseHash);
   } else {
-    return Ember.RSVP.resolve([]);
+    return RSVP.resolve([]);
   }
 };
 
@@ -188,7 +190,7 @@ export default Route.extend({
       mttd: fetch(mttdUrl).then(checkStatus)
     };
 
-    return Ember.RSVP.hash(performancePromiseHash)
+    return RSVP.hash(performancePromiseHash)
       .then((alertEvalMetrics) => {
         Object.assign(alertEvalMetrics.current, { mttd: alertEvalMetrics.mttd});
         return {
@@ -205,7 +207,7 @@ export default Route.extend({
       })
       // Catch is not mandatory here due to our error action, but left it to add more context.
       .catch((error) => {
-        return Ember.RSVP.reject({ error, location: `${this.routeName}:model`, calls: performancePromiseHash });
+        return RSVP.reject({ error, location: `${this.routeName}:model`, calls: performancePromiseHash });
       });
   },
 
@@ -266,7 +268,7 @@ export default Route.extend({
       anomalyIds: fetch(anomaliesUrl).then(checkStatus)
     };
 
-    return Ember.RSVP.hash(anomalyPromiseHash)
+    return RSVP.hash(anomalyPromiseHash)
       .then((data) => {
         const totalAnomalies = data.anomalyIds.length;
         Object.assign(model.alertEvalMetrics.projected, { mttd: data.projectedMttd });
@@ -287,7 +289,7 @@ export default Route.extend({
       })
       // Catch is not mandatory here due to our error action, but left it to add more context
       .catch((err) => {
-        return Ember.RSVP.reject({ err, location: `${this.routeName}:afterModel`, calls: anomalyPromiseHash });
+        return RSVP.reject({ err, location: `${this.routeName}:afterModel`, calls: anomalyPromiseHash });
       });
   },
 
@@ -349,7 +351,7 @@ export default Route.extend({
       activeRangeStart: config.startStamp,
       activeRangeEnd: config.endStamp,
       isMetricDataLoading: true,
-      isReplayPending: Ember.isPresent(model.jobId) && model.jobId !== -1
+      isReplayPending: isPresent(model.jobId) && model.jobId !== -1
     });
 
     // Kick off controller defaults and replay status check
@@ -423,7 +425,7 @@ export default Route.extend({
   /**
    * Fetches change rate data for each available anomaly id
    * @method fetchCombinedAnomalyChangeData
-   * @returns {Ember.RSVP promise}
+   * @returns {RSVP promise}
    */
   fetchCombinedAnomalyChangeData(anomalyData) {
     let promises = {};
@@ -433,7 +435,7 @@ export default Route.extend({
       promises[id] = fetch(`/anomalies/${id}`).then(checkStatus);
     });
 
-    return Ember.RSVP.hash(promises);
+    return RSVP.hash(promises);
   },
 
   actions: {
