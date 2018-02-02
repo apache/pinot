@@ -1,5 +1,4 @@
 import { test } from 'qunit';
-import { visit, click, find, fillIn } from 'ember-native-dom-helpers';
 import moduleForAcceptance from 'thirdeye-frontend/tests/helpers/module-for-acceptance';
 
 moduleForAcceptance('Acceptance | edit alert');

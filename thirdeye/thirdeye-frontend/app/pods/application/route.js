@@ -33,6 +33,8 @@ export default Ember.Route.extend(ApplicationRouteMixin, {
 
   /**
    * if the app is in test mode, have the sessions automatically authenticated
+   * TODO: This is a hack. In future tests, this should be removed and use authenticateSession() instead
+   * https://github.com/simplabs/ember-simple-auth/issues/727
    * @method afterModel
    * @return {undefined}
    */
