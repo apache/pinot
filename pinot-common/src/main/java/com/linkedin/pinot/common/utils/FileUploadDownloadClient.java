@@ -24,6 +24,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.StringWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
@@ -164,6 +165,13 @@ public class FileUploadDownloadClient implements Closeable {
     return requestBuilder.build();
   }
 
+  private static HttpUriRequest getSegmentCompletionUriRequest(String uri, int socketTimeoutMs) {
+    RequestBuilder requestBuilder = RequestBuilder.get(uri)
+        .setVersion(HttpVersion.HTTP_1_1);
+    setTimeout(requestBuilder, socketTimeoutMs);
+    return requestBuilder.build();
+  }
+
   private static HttpUriRequest getSendSegmentJsonRequest(URI uri, String jsonString, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
     RequestBuilder requestBuilder = RequestBuilder.post(uri)
@@ -278,6 +286,32 @@ public class FileUploadDownloadClient implements Closeable {
   public int uploadSegment(URI uri, String segmentName, File segmentFile, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs) throws Exception {
     return sendRequest(getUploadSegmentRequest(uri, segmentName, segmentFile, headers, parameters, socketTimeoutMs));
+  }
+
+  public String uploadSegment(String url, String segmentName, File segmentFile, int socketTimeoutMs) throws IOException, HttpErrorStatusException {
+    URI uri = URI.create(url);
+    HttpUriRequest request = getUploadSegmentRequest(uri, segmentName, segmentFile, null, null, socketTimeoutMs);
+    return sendSegmentCompletionProtocolRequest(request);
+  }
+
+  public String sendSegmentCompletionProtocolRequest(String url, int socketTimeoutMs) throws IOException, HttpErrorStatusException {
+    HttpUriRequest request = getSegmentCompletionUriRequest(url, socketTimeoutMs);
+    return sendSegmentCompletionProtocolRequest(request);
+
+  }
+
+  private String sendSegmentCompletionProtocolRequest(HttpUriRequest request) throws IOException, HttpErrorStatusException {
+    try (CloseableHttpResponse response = _httpClient.execute(request)) {
+      StatusLine statusLine = response.getStatusLine();
+      int statusCode = statusLine.getStatusCode();
+      if (statusCode >= 300) {
+        throw new HttpErrorStatusException(getErrorMessage(request, response), statusCode);
+      }
+      StringWriter writer = new StringWriter();
+      HttpEntity entity = response.getEntity();
+      IOUtils.copy(entity.getContent(), writer, "UTF-8");
+      return writer.toString();
+    }
   }
 
   /**
