@@ -122,15 +122,14 @@
                 <span class="te-search-results__tag te-search-results__tag--list {{if alert.isActive "te-search-results__tag--active"}}">
                   {{if alert.isActive "Active" "Inactive"}}
                 </span>
-                {{#link-to "manage.alert.explore" alert.id}}
-                  <span title={{alert.functionName}}>{{alert.functionName}}</span>
-                {{/link-to}}
+                {{!-- TODO: add {{#link-to "manage.alert.explore" alert.id}} when ready for new edit/tune flow --}}
+                <span title={{alert.functionName}}>{{alert.functionName}}</span>
               </div>
             </div>
-            {{!-- TODO: Enable if we decide to delay launch of new edit/tune flow --}}
-            {{!-- <div class="te-search-results__edit-button">
+            {{!-- TODO: remove this when enabling new edit/tune flow --}}
+            <div class="te-search-results__edit-button">
               {{#link-to "manage.alerts.edit" alert.id}}<span class="glyphicon glyphicon-pencil"></span>{{/link-to}}
-            </div> --}}
+            </div>
           </div>
           <ul class="te-search-results__list te-search-results__list--details-block row">
             <div class="col-xs-12 col-sm-5">
