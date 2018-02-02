@@ -22,21 +22,25 @@
 </div>
 
 {{#if (eq selectedView "card")}}
-  {{#each urns as |urn|}}
-    <div class="col-lg-2 col-md-3 col-xs-6 rootcause-metric__card
-      {{if (set-has selectedUrns urn) "rootcause-metric__card--selected"}}"
-      {{action "toggleSelection" urn}}>
-      <div class="rootcause-metric__title">
-        <span class="rootcause-metric__name">{{get-safe metrics urn}}</span>
-        <span class="rootcause-metric__dataset">{{get-safe datasets urn}}</span>
+  <div class="row">
+    {{#each urns as |urn|}}
+      <div class="col-lg-3 col-md-4 col-xs-6">
+        <div class="rootcause-metric__card
+          {{if (set-has selectedUrns urn) "rootcause-metric__card--selected"}}"
+          {{action "toggleSelection" urn}}>
+          <div class="rootcause-metric__title">
+            <span class="rootcause-metric__name">{{get-safe metrics urn}}</span>
+            <span class="rootcause-metric__dataset">{{get-safe datasets urn}}</span>
+          </div>
+          <span class="rootcause-metric__change rootcause-metric__change--{{get-safe directions urn}}">
+            {{get-safe changesFormatted urn}}
+          </span>
+        </div>
       </div>
-      <span class="rootcause-metric__change rootcause-metric__change--{{get-safe directions urn}}">
-        {{get-safe changesFormatted urn}}
-      </span>
-    </div>
-  {{else}}
-    No Metrics.
-  {{/each}}
+    {{else}}
+      No Metrics.
+    {{/each}}
+  </div>
 {{else}}
   {{metrics-table
     urns=urns
