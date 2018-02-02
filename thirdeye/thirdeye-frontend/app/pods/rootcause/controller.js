@@ -96,6 +96,11 @@ export default Ember.Controller.extend({
    */
   timeseriesMode: null, // ""
 
+  /**
+   * urn of the currently focused entity in the legend component
+   */
+  focusedUrn: null,
+
   //
   // session data
   //
@@ -405,7 +410,7 @@ export default Ember.Controller.extend({
         if (res.updated > sessionUpdatedTime) {
           this.setProperties({
             sessionUpdateWarning: `This investigation (${sessionId}) was updated by ${res.updatedBy} on ${moment(res.updated).format(dateFormatFull)}. Please refresh the page.`
-          })
+          });
         }
       })
       .catch(error => undefined);
@@ -449,6 +454,15 @@ export default Ember.Controller.extend({
         selectedUrns: new Set(selectedUrns),
         sessionModified: true
       });
+    },
+
+    /**
+     * Closure action passed into the legend component
+     * to handle the hover interactivity
+     * @param {String} urn
+     */
+    onLegendHover(urn) {
+      this.set('focusedUrn', urn);
     },
 
     /**

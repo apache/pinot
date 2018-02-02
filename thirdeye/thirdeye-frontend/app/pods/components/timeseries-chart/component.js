@@ -23,6 +23,12 @@ export default Ember.Component.extend({
   },
 
   /**
+   * Id of the entity to focus
+   * @type {String}
+   */
+  focusedId: null,
+
+  /**
    * default height property for the chart
    * May be overridden
    */
@@ -89,7 +95,7 @@ export default Ember.Component.extend({
     const cache = this.get('_seriesCache') || {};
     const series = this.get('series') || {};
     const colorMapping = this.get('colorMapping');
-    const { axis, legend, tooltip } = this.getProperties('axis', 'legend', 'tooltip');
+    const { axis, legend, tooltip, focusedId } = this.getProperties('axis', 'legend', 'tooltip', 'focusedId');
 
     const seriesKeys = Object.keys(series).sort();
 
@@ -131,8 +137,7 @@ export default Ember.Component.extend({
     const axes = {};
     loadKeys.filter(sid => 'axis' in series[sid]).forEach(sid => axes[sid] = series[sid].axis);
 
-    const config = { unload, xs, columns, types, regions, tooltip, colors, axis, axes, legend };
-
+    const config = { unload, xs, columns, types, regions, tooltip, focusedId, colors, axis, axes, legend };
     return config;
   },
 
@@ -151,6 +156,36 @@ export default Ember.Component.extend({
     this.set('_seriesCache', _.cloneDeep(series));
   },
 
+  /**
+   * Updates the focused entity on the chart
+   */
+  _updateFocusedEntity: function() {
+    const id = this.get('focusedId');
+
+    if (id) {
+      this._focus(id);
+    } else {
+      this._revert();
+    }
+  },
+
+  /**
+   * Focuses the entity associated with the provided id
+   * @private
+   * @param {String} id
+   */
+  _focus(id) {
+    this.get('_chart').focus(id);
+  },
+
+  /**
+   * Reverts the chart back to its original state
+   * @private
+   */
+  _revert() {
+    this.get('_chart').revert();
+  },
+
   _updateChart() {
     const diffConfig = this._makeDiffConfig();
     const chart = this.get('_chart');
@@ -164,6 +199,8 @@ export default Ember.Component.extend({
     this._super(...arguments);
     const series = this.get('series') || {};
     const cache = this.get('cache') || {};
+
+    this._updateFocusedEntity();
 
     if (!_.isEqual(series, cache)) {
       Ember.run.debounce(this, this._updateChart, 300);
@@ -186,6 +223,7 @@ export default Ember.Component.extend({
     config.axis = diffConfig.axis;
     config.regions = diffConfig.regions;
     config.tooltip = diffConfig.tooltip;
+    config.focusedId = diffConfig.focusedId;
     config.legend = diffConfig.legend;
     config.subchart = this.get('subchart');
     config.zoom = this.get('zoom');

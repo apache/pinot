@@ -45,6 +45,8 @@
               invisibleUrns=invisibleUrns
               onVisibility=(action "onVisibility")
               onSelection=(action "onSelection")
+              onMouseEnter=(action "onLegendHover")
+              onMouseLeave=(action "onLegendHover")
             }}
             <div class="rootcause-wrapper__chart">
               <div class="row rootcause-wrapper__toolbar">
@@ -65,6 +67,7 @@
                 selectedUrns=chartSelectedUrns
                 timeseries=timeseries
                 timeseriesMode=timeseriesMode
+                focusedUrn=focusedUrn
                 context=context
                 onHover=(action "chartOnHover")
               }}
