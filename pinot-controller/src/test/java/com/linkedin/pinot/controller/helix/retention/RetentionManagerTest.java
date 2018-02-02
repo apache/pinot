@@ -17,33 +17,23 @@ package com.linkedin.pinot.controller.helix.retention;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.controller.helix.core.SegmentDeletionManager;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.startree.hll.HllConstants;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.joda.time.Duration;
@@ -61,20 +51,20 @@ import static org.mockito.Mockito.*;
 
 
 public class RetentionManagerTest {
-
   private final static String HELIX_CLUSTER_NAME = "TestRetentionManager";
 
   private final String TEST_TABLE_NAME = "testTable";
   private final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME);
   private final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(TEST_TABLE_NAME);
 
-  private void testDifferentTimeUnits(final String pastTimeStamp, TimeUnit timeUnit, final long dayAfterTomorrowTimeStamp) throws Exception {
+  private void testDifferentTimeUnits(long pastTimeStamp, TimeUnit timeUnit, long dayAfterTomorrowTimeStamp)
+      throws Exception {
     List<OfflineSegmentZKMetadata> metadataList = new ArrayList<>();
     // Create metadata for 10 segments really old, that will be removed by the retention manager.
     final int numOlderSegments = 10;
     List<String> removedSegments = new ArrayList<>();
     for (int i = 0; i < numOlderSegments; ++i) {
-      SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl(pastTimeStamp, pastTimeStamp, timeUnit.toString());
+      SegmentMetadata segmentMetadata = mockSegmentMetadata(pastTimeStamp, pastTimeStamp, timeUnit);
       OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
       ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
       metadataList.add(offlineSegmentZKMetadata);
@@ -82,8 +72,8 @@ public class RetentionManagerTest {
     }
     // Create metadata for 5 segments that will not be removed.
     for (int i = 0; i < 5; ++i) {
-      SegmentMetadata segmentMetadata = getTimeSegmentMetadataImpl(String.valueOf(dayAfterTomorrowTimeStamp),
-          String.valueOf(dayAfterTomorrowTimeStamp), timeUnit.toString());
+      SegmentMetadata segmentMetadata =
+          mockSegmentMetadata(dayAfterTomorrowTimeStamp, dayAfterTomorrowTimeStamp, timeUnit);
       OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
       ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
       metadataList.add(offlineSegmentZKMetadata);
@@ -115,15 +105,15 @@ public class RetentionManagerTest {
   public void testRetentionWithMinutes() throws Exception {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long minutesSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60;
-    final String pastMinsSinceEpoch = "22383360";
-    testDifferentTimeUnits(pastMinsSinceEpoch, TimeUnit.MINUTES, minutesSinceEpochTimeStamp);
+    final long pastMinutesSinceEpoch = 22383360L;
+    testDifferentTimeUnits(pastMinutesSinceEpoch, TimeUnit.MINUTES, minutesSinceEpochTimeStamp);
   }
 
   @Test
   public void testRetentionWithSeconds() throws Exception {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long secondsSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60;
-    final String pastSecondsSinceEpoch = "1343001600";
+    final long pastSecondsSinceEpoch = 1343001600L;
     testDifferentTimeUnits(pastSecondsSinceEpoch, TimeUnit.SECONDS, secondsSinceEpochTimeStamp);
   }
 
@@ -131,7 +121,7 @@ public class RetentionManagerTest {
   public void testRetentionWithMillis() throws Exception {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long millisSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60 * 1000;
-    final String pastMillisSinceEpoch = "1343001600000";
+    final long pastMillisSinceEpoch = 1343001600000L;
     testDifferentTimeUnits(pastMillisSinceEpoch, TimeUnit.MILLISECONDS, millisSinceEpochTimeStamp);
   }
 
@@ -139,14 +129,14 @@ public class RetentionManagerTest {
   public void testRetentionWithHours() throws Exception {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long hoursSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24;
-    final String pastHoursSinceEpoch = "373056";
+    final long pastHoursSinceEpoch = 373056L;
     testDifferentTimeUnits(pastHoursSinceEpoch, TimeUnit.HOURS, hoursSinceEpochTimeStamp);
   }
 
   @Test
   public void testRetentionWithDays() throws Exception {
     final long daysSinceEpochTimeStamp = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
-    final String pastDaysSinceEpoch = "15544";
+    final long pastDaysSinceEpoch = 15544L;
     testDifferentTimeUnits(pastDaysSinceEpoch, TimeUnit.DAYS, daysSinceEpochTimeStamp);
   }
 
@@ -158,8 +148,7 @@ public class RetentionManagerTest {
         .build();
   }
 
-  private TableConfig createRealtimeTableConfig1(int replicaCount)
-      throws IOException, JSONException {
+  private TableConfig createRealtimeTableConfig1(int replicaCount) throws IOException, JSONException {
     return new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(TEST_TABLE_NAME)
         .setLLC(true)
         .setRetentionTimeUnit("DAYS")
@@ -168,8 +157,8 @@ public class RetentionManagerTest {
         .build();
   }
 
-  private void setupPinotHelixResourceManager(TableConfig tableConfig,
-      final List<String> removedSegments, PinotHelixResourceManager resourceManager) throws Exception {
+  private void setupPinotHelixResourceManager(TableConfig tableConfig, final List<String> removedSegments,
+      PinotHelixResourceManager resourceManager) throws Exception {
     final String tableNameWithType = tableConfig.getTableName();
     when(resourceManager.isLeader()).thenReturn(true);
     when(resourceManager.getAllTables()).thenReturn(Collections.singletonList(tableNameWithType));
@@ -179,8 +168,7 @@ public class RetentionManagerTest {
     // run of the retention manager
     doAnswer(new Answer() {
       @Override
-      public Void answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
+      public Void answer(InvocationOnMock invocationOnMock) throws Throwable {
         return null;
       }
     }).when(deletionManager).removeAgedDeletedSegments(anyInt());
@@ -190,10 +178,9 @@ public class RetentionManagerTest {
     // are exactly the same as the ones we expect to be deleted.
     doAnswer(new Answer() {
       @Override
-      public Object answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
+      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
         Object[] args = invocationOnMock.getArguments();
-        String tableNameArg = (String)args[0];
+        String tableNameArg = (String) args[0];
         Assert.assertEquals(tableNameArg, tableNameWithType);
         List<String> segmentListArg = (List<String>) args[1];
         Assert.assertEquals(segmentListArg.size(), removedSegments.size());
@@ -215,7 +202,8 @@ public class RetentionManagerTest {
 
     TableConfig tableConfig = createRealtimeTableConfig1(replicaCount);
     List<String> removedSegments = new ArrayList<>();
-    PinotHelixResourceManager pinotHelixResourceManager = setupSegmentMetadata(tableConfig, now, initialNumSegments, removedSegments);
+    PinotHelixResourceManager pinotHelixResourceManager =
+        setupSegmentMetadata(tableConfig, now, initialNumSegments, removedSegments);
     setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager);
 
     RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, 100000);
@@ -234,7 +222,8 @@ public class RetentionManagerTest {
     retentionManager.stop();
   }
 
-  private PinotHelixResourceManager setupSegmentMetadata(TableConfig tableConfig, final long now, final int nSegments, List<String> segmentsToBeDeleted) throws  Exception {
+  private PinotHelixResourceManager setupSegmentMetadata(TableConfig tableConfig, final long now, final int nSegments,
+      List<String> segmentsToBeDeleted) throws Exception {
     final int replicaCount = Integer.valueOf(tableConfig.getValidationConfig().getReplicasPerPartition());
 
     List<RealtimeSegmentZKMetadata> allSegments = new ArrayList<>();
@@ -301,190 +290,19 @@ public class RetentionManagerTest {
     return segmentMetadata;
   }
 
-  private SegmentMetadata getTimeSegmentMetadataImpl(final String startTime, final String endTime,
-      final String timeUnit) {
-    if (startTime == null || endTime == null || timeUnit == null) {
-      long startTimeValue = System.currentTimeMillis();
-      return getTimeSegmentMetadataImpl(startTimeValue + "", startTimeValue + "", TimeUnit.MILLISECONDS.toString());
-    }
-
-    final long creationTime = System.currentTimeMillis();
-    final String segmentName = TEST_TABLE_NAME + creationTime;
-
-    SegmentMetadata segmentMetadata = new SegmentMetadata() {
-      TimeUnit segmentTimeUnit = TimeUtils.timeUnitFromString(timeUnit);
-      Duration _timeGranularity = new Duration(segmentTimeUnit.toMillis(1));
-      Interval _timeInterval = new Interval(segmentTimeUnit.toMillis(Long.parseLong(startTime)),
-          segmentTimeUnit.toMillis(Long.parseLong(endTime)));
-
-      @Override
-      public Map<String, String> toMap() {
-        final Map<String, String> ret = new HashMap<String, String>();
-        ret.put(V1Constants.MetadataKeys.Segment.TABLE_NAME, getTableName());
-        ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS, String.valueOf(getTotalDocs()));
-        ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION, getVersion());
-        ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_NAME, getName());
-        ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CRC, getCrc());
-        ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_CREATION_TIME, getIndexCreationTime() + "");
-        ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME, startTime);
-        ret.put(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME, endTime);
-        ret.put(V1Constants.MetadataKeys.Segment.TIME_UNIT, timeUnit);
-
-        return ret;
-      }
-
-      @Override
-      public String getVersion() {
-        return SegmentVersion.v1.toString();
-      }
-
-      @Override
-      public int getTotalDocs() {
-        return 0;
-      }
-
-      @Override
-      public int getTotalRawDocs() {
-        return 0;
-      }
-
-      @Override
-      public Interval getTimeInterval() {
-        return _timeInterval;
-      }
-
-      @Override
-      public Duration getTimeGranularity() {
-        return _timeGranularity;
-      }
-
-      @Override
-      public String getShardingKey() {
-        return null;
-      }
-
-      @Override
-      public Schema getSchema() {
-        return null;
-      }
-
-      @Override
-      public String getTableName() {
-        return TEST_TABLE_NAME;
-      }
-
-      @Override
-      public String getName() {
-        return segmentName;
-      }
-
-      @Override
-      public String getIndexType() {
-        return "offline";
-      }
-
-      @Override
-      public String getTimeColumn() {
-        return null;
-      }
-
-      @Override
-      public long getStartTime() {
-        return Long.valueOf(startTime);
-      }
-
-      @Override
-      public long getEndTime() {
-        return Long.valueOf(endTime);
-      }
-
-      @Override
-      public TimeUnit getTimeUnit() {
-        return segmentTimeUnit;
-      }
-
-      @Override
-      public String getIndexDir() {
-        return null;
-      }
-
-      @Override
-      public long getIndexCreationTime() {
-        return creationTime;
-      }
-
-      @Override
-      public String getCrc() {
-        return creationTime + "";
-      }
-
-      @Override
-      public long getPushTime() {
-        return Long.MIN_VALUE;
-      }
-
-      @Override
-      public long getRefreshTime() {
-        return Long.MIN_VALUE;
-      }
-
-      @Override
-      public boolean hasDictionary(String columnName) {
-        return false;
-      }
-
-      @Override
-      public boolean hasStarTree() {
-        return false;
-      }
-
-      @Override
-      public StarTreeMetadata getStarTreeMetadata() {
-        return null;
-      }
-
-      @Override
-      public boolean close() {
-        return false;
-      }
-
-      @Override
-      public String getForwardIndexFileName(String column) {
-        throw new UnsupportedOperationException("getForwardIndexFileName not supported in " + this.getClass());
-      }
-
-      @Override
-      public String getDictionaryFileName(String column) {
-        throw new UnsupportedOperationException("getDictionaryFileName not supported in " + this.getClass());
-      }
-
-      @Override
-      public String getBitmapInvertedIndexFileName(String column) {
-        throw new UnsupportedOperationException("getBitmapInvertedIndexFileName not supported in " + this.getClass());
-      }
-
-      @Nullable
-      @Override
-      public String getCreatorName() {
-        return null;
-      }
-
-      @Override
-      public char getPaddingCharacter() {
-        return V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
-      }
-
-      @Override
-      public int getHllLog2m() {
-        return HllConstants.DEFAULT_LOG2M;
-      }
-
-      @Nullable
-      @Override
-      public String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType) {
-        return null;
-      }
-    };
+  private SegmentMetadata mockSegmentMetadata(long startTime, long endTime, TimeUnit timeUnit) {
+    long creationTime = System.currentTimeMillis();
+    SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
+    when(segmentMetadata.getTableName()).thenReturn(TEST_TABLE_NAME);
+    when(segmentMetadata.getName()).thenReturn(TEST_TABLE_NAME + creationTime);
+    when(segmentMetadata.getIndexCreationTime()).thenReturn(creationTime);
+    when(segmentMetadata.getCrc()).thenReturn(Long.toString(creationTime));
+    when(segmentMetadata.getStartTime()).thenReturn(startTime);
+    when(segmentMetadata.getEndTime()).thenReturn(endTime);
+    when(segmentMetadata.getTimeUnit()).thenReturn(timeUnit);
+    when(segmentMetadata.getTimeInterval()).thenReturn(
+        new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime)));
+    when(segmentMetadata.getTimeGranularity()).thenReturn(new Duration(timeUnit.toMillis(1)));
     return segmentMetadata;
   }
 }

@@ -26,7 +26,6 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
@@ -46,6 +45,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
@@ -356,18 +356,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   }
 
   @Override
-  public IndexType getIndexType() {
-    throw new UnsupportedOperationException("not implemented");
-  }
-
-  @Override
   public String getSegmentName() {
     return segmentName;
-  }
-
-  @Override
-  public String getAssociatedDirectory() {
-    throw new UnsupportedOperationException("not implemented");
   }
 
   @Override
@@ -384,8 +374,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   }
 
   @Override
-  public String[] getColumnNames() {
-    return dataSchema.getColumnNames().toArray(new String[0]);
+  public Set<String> getColumnNames() {
+    return dataSchema.getColumnNames();
   }
 
   @Override

@@ -110,9 +110,9 @@ public class NoDictionaryGroupKeyGeneratorTest {
    * @throws Exception
    */
   @Test
-  public void testMultiColumnGroupKeyGenerator()
-      throws Exception {
-    testGroupKeyGenerator(_indexSegment.getColumnNames(), DATA_TYPES);
+  public void testMultiColumnGroupKeyGenerator() throws Exception {
+    Set<String> columnNames = _indexSegment.getColumnNames();
+    testGroupKeyGenerator(columnNames.toArray(new String[columnNames.size()]), DATA_TYPES);
   }
 
   /**

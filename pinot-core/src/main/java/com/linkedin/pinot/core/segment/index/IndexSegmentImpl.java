@@ -22,7 +22,6 @@ import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
@@ -35,6 +34,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,18 +68,8 @@ public class IndexSegmentImpl implements IndexSegment {
   }
 
   @Override
-  public IndexType getIndexType() {
-    return IndexType.COLUMNAR;
-  }
-
-  @Override
   public String getSegmentName() {
     return segmentMetadata.getName();
-  }
-
-  @Override
-  public String getAssociatedDirectory() {
-    return segmentDirectory.getPath().toString();
   }
 
   @Override
@@ -93,8 +83,8 @@ public class IndexSegmentImpl implements IndexSegment {
   }
 
   @Override
-  public String[] getColumnNames() {
-    return segmentMetadata.getSchema().getColumnNames().toArray(new String[0]);
+  public Set<String> getColumnNames() {
+    return segmentMetadata.getSchema().getColumnNames();
   }
 
   @Override

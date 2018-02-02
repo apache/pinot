@@ -126,8 +126,20 @@
       <artifactId>jcabi-log</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-common</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-controller</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
       <scope>test</scope>

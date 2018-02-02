@@ -23,7 +23,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
-import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
+import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.HashMap;
@@ -38,6 +38,7 @@ import org.testng.annotations.Test;
 public class TableViewsTest extends ControllerTest {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String OFFLINE_TABLE_NAME = "offlineTable";
+  private static final String OFFLINE_SEGMENT_NAME = "offlineSegment";
   private static final String HYBRID_TABLE_NAME = "hybridTable";
   private static final int NUM_BROKER_INSTANCES = 3;
   private static final int NUM_SERVER_INSTANCES = 4;
@@ -58,7 +59,8 @@ public class TableViewsTest extends ControllerTest {
             .setNumReplicas(2)
             .build();
     _helixResourceManager.addTable(tableConfig);
-    _helixResourceManager.addNewSegment(new SimpleSegmentMetadata(OFFLINE_TABLE_NAME), "downloadUrl");
+    _helixResourceManager.addNewSegment(
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, OFFLINE_SEGMENT_NAME), "downloadUrl");
 
     // Create the hybrid table
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(HYBRID_TABLE_NAME)
@@ -79,8 +81,7 @@ public class TableViewsTest extends ControllerTest {
     long endTime = System.currentTimeMillis() + 10_000L;
     while (System.currentTimeMillis() < endTime) {
       Thread.sleep(100L);
-      TableViews.TableView
-          tableView = getTableView(OFFLINE_TABLE_NAME, TableViews.EXTERNALVIEW, null);
+      TableViews.TableView tableView = getTableView(OFFLINE_TABLE_NAME, TableViews.EXTERNALVIEW, null);
       if ((tableView.offline == null) || (tableView.offline.size() != 1)) {
         continue;
       }
@@ -117,27 +118,23 @@ public class TableViewsTest extends ControllerTest {
 
   @Test(dataProvider = "viewProvider")
   public void testOfflineTableState(String view) throws Exception {
-    TableViews.TableView
-        tableView = getTableView(OFFLINE_TABLE_NAME, view, null);
+    TableViews.TableView tableView = getTableView(OFFLINE_TABLE_NAME, view, null);
     Assert.assertNotNull(tableView.offline);
     Assert.assertEquals(tableView.offline.size(), 1);
     Assert.assertNull(tableView.realtime);
 
-    for (Map.Entry<String, Map<String, String>> segmentMapEntry : tableView.offline.entrySet()) {
-      Assert.assertTrue(segmentMapEntry.getKey().startsWith("SimpleSegment"));
-      Map<String, String> serverMap = segmentMapEntry.getValue();
-      Assert.assertEquals(serverMap.size(), 2);
-      for (Map.Entry<String, String> serverMapEntry : serverMap.entrySet()) {
-        Assert.assertTrue(serverMapEntry.getKey().startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE));
-        Assert.assertEquals(serverMapEntry.getValue(), "ONLINE");
-      }
+    Map<String, String> serverMap = tableView.offline.get(OFFLINE_SEGMENT_NAME);
+    Assert.assertNotNull(serverMap);
+    Assert.assertEquals(serverMap.size(), 2);
+    for (Map.Entry<String, String> serverMapEntry : serverMap.entrySet()) {
+      Assert.assertTrue(serverMapEntry.getKey().startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE));
+      Assert.assertEquals(serverMapEntry.getValue(), "ONLINE");
     }
   }
 
   @Test(dataProvider = "viewProvider")
   public void testHybridTableState(String state) throws Exception {
-    TableViews.TableView
-        tableView = getTableView(HYBRID_TABLE_NAME, state, "realtime");
+    TableViews.TableView tableView = getTableView(HYBRID_TABLE_NAME, state, "realtime");
     Assert.assertNull(tableView.offline);
     Assert.assertNotNull(tableView.realtime);
     Assert.assertEquals(tableView.realtime.size(), NUM_SERVER_INSTANCES);
