@@ -9,9 +9,9 @@ import java.util.Map;
 
 
 public class BaselineOffset implements Baseline {
-  final int offset;
+  final long offset;
 
-  public BaselineOffset(int offset) {
+  private BaselineOffset(long offset) {
     this.offset = offset;
   }
 
@@ -20,6 +20,18 @@ public class BaselineOffset implements Baseline {
     return Collections.singletonList(slice
         .withStart(slice.getStart() + offset)
         .withEnd(slice.getEnd() + offset));
+  }
+
+  @Override
+  public Map<MetricSlice, DataFrame> filter(MetricSlice slice, Map<MetricSlice, DataFrame> data) {
+    MetricSlice pattern = from(slice).get(0);
+    DataFrame value = data.get(pattern);
+
+    if (!data.containsKey(pattern)) {
+      return Collections.emptyMap();
+    }
+
+    return Collections.singletonMap(pattern, value);
   }
 
   @Override
@@ -36,6 +48,11 @@ public class BaselineOffset implements Baseline {
 
     input.addSeries(COL_TIME, input.getLongs(COL_TIME).subtract(this.offset));
 
+
     return new DataFrame(COL_TIME, BaselineUtil.makeTimestamps(slice)).addSeries(input, COL_VALUE);
+  }
+
+  public static BaselineOffset fromOffset(long offset) {
+    return new BaselineOffset(offset);
   }
 }

@@ -12,5 +12,6 @@ public interface Baseline {
   String COL_VALUE = DataFrameUtils.COL_VALUE;
 
   List<MetricSlice> from(MetricSlice slice);
+  Map<MetricSlice, DataFrame> filter(MetricSlice slice, Map<MetricSlice, DataFrame> data);
   DataFrame compute(MetricSlice slice, Map<MetricSlice, DataFrame> data);
 }

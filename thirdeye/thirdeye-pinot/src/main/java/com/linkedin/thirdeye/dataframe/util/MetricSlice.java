@@ -6,6 +6,8 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang.builder.ToStringBuilder;
+import org.apache.commons.lang.builder.ToStringStyle;
 
 
 public final class MetricSlice {
@@ -89,5 +91,10 @@ public final class MetricSlice {
   @Override
   public int hashCode() {
     return Objects.hash(metricId, start, end, filters, granularity);
+  }
+
+  @Override
+  public String toString() {
+    return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
   }
 }

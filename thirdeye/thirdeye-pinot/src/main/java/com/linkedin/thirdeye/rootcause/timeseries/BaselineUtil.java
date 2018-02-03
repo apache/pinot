@@ -12,6 +12,10 @@ public class BaselineUtil {
   public static LongSeries makeTimestamps(MetricSlice slice) {
     // NOTE: requires aligned slice!
 
+    if (slice.getGranularity().toMillis() <= 0) {
+      return LongSeries.buildFrom(slice.getStart());
+    }
+
     final long start = slice.getStart();
     final long interval = slice.getGranularity().toMillis();
     final int count = (int) ((slice.getEnd() - slice.getStart()) / interval);

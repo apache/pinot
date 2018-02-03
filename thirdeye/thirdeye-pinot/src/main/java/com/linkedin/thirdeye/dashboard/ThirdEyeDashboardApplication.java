@@ -7,10 +7,10 @@ import com.linkedin.thirdeye.anomaly.onboard.FunctionOnboardingResource;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.auth.AuthCookieSerializer;
 import com.linkedin.thirdeye.auth.Credentials;
+import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
 import com.linkedin.thirdeye.auth.ThirdEyeAuthenticatorDisabled;
 import com.linkedin.thirdeye.auth.ThirdEyeAuthenticatorLdap;
 import com.linkedin.thirdeye.auth.ThirdEyePrincipal;
-import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.dashboard.configs.AuthConfiguration;
 import com.linkedin.thirdeye.dashboard.configs.ResourceConfiguration;
@@ -40,13 +40,16 @@ import com.linkedin.thirdeye.dashboard.resources.v2.ConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.DataResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.EventResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEntityFormatter;
+import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseMetricResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseSessionResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.TimeSeriesResource;
+import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.DefaultAggregationLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.DefaultEntityFormatter;
 import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.FormatterLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.DefaultTimeSeriesLoader;
+import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.TimeSeriesLoader;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -142,10 +145,6 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new OverrideConfigResource());
     env.jersey().register(new DataResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory));
-    env.jersey().register(new TimeSeriesResource(Executors.newCachedThreadPool(),
-        new DefaultTimeSeriesLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache())));
-    env.jersey().register(new AggregationResource(Executors.newCachedThreadPool(),
-        new DefaultAggregationLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache())));
     env.jersey().register(new OnboardResource());
     env.jersey().register(new EventResource(config));
     env.jersey().register(new DataCompletenessResource(DAO_REGISTRY.getDataCompletenessConfigDAO()));
@@ -153,8 +152,14 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new OnboardDatasetMetricResource());
     env.jersey().register(new AutoOnboardResource(config));
     env.jersey().register(new ConfigResource(DAO_REGISTRY.getConfigDAO()));
-    env.jersey().register(new RootCauseSessionResource(DAO_REGISTRY.getRootcauseSessionDAO(), new ObjectMapper()));
     env.jersey().register(new FunctionOnboardingResource());
+
+    TimeSeriesLoader timeSeriesLoader = new DefaultTimeSeriesLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache());
+    AggregationLoader aggregationLoader = new DefaultAggregationLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache());
+    env.jersey().register(new RootCauseSessionResource(DAO_REGISTRY.getRootcauseSessionDAO(), new ObjectMapper()));
+    env.jersey().register(new TimeSeriesResource(Executors.newCachedThreadPool(), timeSeriesLoader));
+    env.jersey().register(new AggregationResource(Executors.newCachedThreadPool(), aggregationLoader));
+    env.jersey().register(new RootCauseMetricResource(Executors.newCachedThreadPool(), aggregationLoader, timeSeriesLoader, DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO()));
 
     if (config.getOnboardingHost() != null) {
       LOG.info("Setting up onboarding proxy for '{}'", config.getOnboardingHost());

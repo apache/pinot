@@ -5,35 +5,19 @@ import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 
 public class BaselineAggregate implements Baseline {
-  enum Type {
-    SUM(DoubleSeries.SUM),
-    PRODUCT(DoubleSeries.PRODUCT),
-    MEAN(DoubleSeries.MEAN),
-    MEDIAN(DoubleSeries.MEDIAN),
-    MIN(DoubleSeries.MIN),
-    MAX(DoubleSeries.MAX),
-    STD(DoubleSeries.STD);
-
-    final Series.DoubleFunction function;
-
-    Type(Series.DoubleFunction function) {
-      this.function = function;
-    }
-
-    public Series.DoubleFunction getFunction() {
-      return function;
-    }
-  }
-
-  final Type type;
+  final BaselineType type;
   final List<Long> offsets;
 
-  public BaselineAggregate(Type type, List<Long> offsets) {
+  private BaselineAggregate(BaselineType type, List<Long> offsets) {
     this.type = type;
     this.offsets = offsets;
   }
@@ -47,6 +31,20 @@ public class BaselineAggregate implements Baseline {
           .withEnd(slice.getEnd()+ offset));
     }
     return slices;
+  }
+
+  @Override
+  public Map<MetricSlice, DataFrame> filter(MetricSlice slice, Map<MetricSlice, DataFrame> data) {
+    Map<MetricSlice, DataFrame> output = new HashMap<>();
+    Set<MetricSlice> patterns = new HashSet<>(from(slice));
+
+    for (Map.Entry<MetricSlice, DataFrame> entry : data.entrySet()) {
+      if (patterns.contains(entry.getKey())) {
+        output.put(entry.getKey(), entry.getValue());
+      }
+    }
+
+    return output;
   }
 
   @Override
@@ -79,5 +77,24 @@ public class BaselineAggregate implements Baseline {
     joined.addSeries(COL_VALUE, joined.map(this.type.function, arrNames));
 
     return joined;
+  }
+
+  public static BaselineAggregate fromOffsets(BaselineType type, List<Long> offsets) {
+    return new BaselineAggregate(type, offsets);
+  }
+
+  public static BaselineAggregate fromWeekOverWeek(BaselineType type, int numWeeks) {
+    return fromWeekOverWeek(type, numWeeks, 0);
+  }
+
+  public static BaselineAggregate fromWeekOverWeek(BaselineType type, int numWeeks, int offsetWeeks) {
+    List<Long> offsets = new ArrayList<>();
+
+    for (int i = 0; i < numWeeks; i++) {
+      long offset = -1 * (i + offsetWeeks) * TimeUnit.DAYS.toMillis(7);
+      offsets.add(offset);
+    }
+
+    return new BaselineAggregate(type, offsets);
   }
 }
