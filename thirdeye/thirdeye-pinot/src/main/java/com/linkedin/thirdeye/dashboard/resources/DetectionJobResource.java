@@ -84,7 +84,7 @@ public class DetectionJobResource {
   public static final String AUTOTUNE_FEATURE_KEY = "features";
   public static final String AUTOTUNE_PATTERN_KEY = "pattern";
   public static final String AUTOTUNE_MTTD_KEY = "mttd";
-  private static final String COMMA_SEPARATOR = ",";
+  public static final String AUTOTUNE_PATTERN_ONLY = "tunePatternOnly";
   private static final String SIGN_TEST_WINDOW_SIZE = "signTestWindowSize";
 
   /**
@@ -606,7 +606,8 @@ public class DetectionJobResource {
       @QueryParam("end") String endTimeIso, @QueryParam("autoTuneType") @DefaultValue("AUTOTUNE") String autoTuneType,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
       @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds, @QueryParam("tuningFeatures") String features,
-      @QueryParam("mttd") String mttd, @QueryParam("pattern") String pattern) {
+      @QueryParam("mttd") String mttd, @QueryParam("pattern") String pattern,
+      @QueryParam("tunePatternOnly") String tunePatternOnly) {
 
     long startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
     long endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
@@ -660,6 +661,14 @@ public class DetectionJobResource {
       String previousMttd = autotuneProperties.getProperty(AUTOTUNE_MTTD_KEY);
       LOG.info("The previous mttd for autotune is {}; now changed to {}", previousMttd, mttd);
       autotuneProperties.setProperty(AUTOTUNE_MTTD_KEY, mttd);
+      autotuneConfig.setTuningProps(autotuneProperties);
+    }
+
+    // if specified "tunePatternOnly"
+    if (StringUtils.isNotBlank(tunePatternOnly)) {
+      String previousTunePatternOnly = autotuneProperties.getProperty(AUTOTUNE_PATTERN_ONLY);
+      LOG.info("The previous tunePatternOnly for autotune is {}; now changed to {}", previousTunePatternOnly, tunePatternOnly);
+      autotuneProperties.setProperty(AUTOTUNE_PATTERN_ONLY, tunePatternOnly);
       autotuneConfig.setTuningProps(autotuneProperties);
     }
 

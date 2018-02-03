@@ -38,7 +38,10 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
+import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
@@ -213,6 +216,19 @@ public class AnomalyResource {
     }
 
     return anomalyResults;
+  }
+
+  // Get anomaly score
+  @GET
+  @Path("/anomalies/score/{anomaly_merged_result_id}")
+  public double getAnomalyScore(@NotNull @PathParam("anomaly_merged_result_id") long mergedAnomalyId) {
+    MergedAnomalyResultDTO mergedAnomaly = anomalyMergedResultDAO.findById(mergedAnomalyId);
+    BaseAlertFilter alertFilter = new DummyAlertFilter();
+    if (mergedAnomaly != null) {
+      AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(mergedAnomaly.getFunctionId());
+      alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
+    }
+    return alertFilter.getProbability(mergedAnomaly);
   }
 
   //View raw anomalies for collection

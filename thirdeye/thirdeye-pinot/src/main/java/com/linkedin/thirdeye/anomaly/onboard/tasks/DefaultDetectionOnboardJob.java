@@ -58,6 +58,7 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   public static final String ALERT_CONFIG = "alertConfig";
   public static final String AUTOTUNE_PATTERN = DetectionJobResource.AUTOTUNE_PATTERN_KEY;
   public static final String AUTOTUNE_TYPE = "autoTuneType";
+  public static final String AUTOTUNE_PATTERN_ONLY = DetectionJobResource.AUTOTUNE_PATTERN_ONLY;
   public static final String AUTOTUNE_FEATURES = DetectionJobResource.AUTOTUNE_FEATURE_KEY;
   public static final String AUTOTUNE_MTTD = DetectionJobResource.AUTOTUNE_MTTD_KEY;
   public static final String HOLIDAY_STARTS = "holidayStarts";

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.email.filter;
 
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Properties;
@@ -90,5 +91,14 @@ public abstract class BaseAlertFilter implements AlertFilter {
    */
   public double getAlertFilterMTTD (double severity) {
     return 0.0;
+  }
+
+  /**
+   * get probability score given anomalyResult based on current alert filter
+   * @param anomalyResult Merged anomaly result
+   * @return probability to be true anomaly
+   */
+  public double getProbability (MergedAnomalyResultDTO anomalyResult) {
+    return Double.NaN;
   }
 }
