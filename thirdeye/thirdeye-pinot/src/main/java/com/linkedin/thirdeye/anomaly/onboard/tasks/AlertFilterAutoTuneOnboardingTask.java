@@ -83,8 +83,8 @@ public class AlertFilterAutoTuneOnboardingTask extends BaseDetectionOnboardTask 
     AnomalyFunctionDTO anomalyFunctionSpec =
         (AnomalyFunctionDTO) executionContext.getExecutionResult(ANOMALY_FUNCTION_CONFIG);
     long functionId = anomalyFunctionSpec.getId();
-    DateTime start = (DateTime) executionContext.getExecutionResult(BACKFILL_START);
-    DateTime end = (DateTime) executionContext.getExecutionResult(BACKFILL_END);
+    DateTime start = ((DateTime) executionContext.getExecutionResult(BACKFILL_START)).minusDays(1);
+    DateTime end = ((DateTime) executionContext.getExecutionResult(BACKFILL_END)).plusDays(1);
 
     Response autotuneResponse = detectionJobResource.
         tuneAlertFilter(Long.toString(functionId), start.toString(), end.toString(),
