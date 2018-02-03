@@ -3,6 +3,8 @@
   "tableType": "OFFLINE",
   "segmentsConfig": {
     "segmentPushType": "APPEND",
+    "timeColumnName": "ReadStartTime",
+    "timeType": "MILLISECONDS",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "schemaName": "ArticleReadSchema",
     "replication": "1"

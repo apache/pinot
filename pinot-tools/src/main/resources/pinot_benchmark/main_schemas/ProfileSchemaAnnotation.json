@@ -28,7 +28,7 @@
     "maxLength" : 256
   },
   {
-    "column" : "Company",
+    "column" : "WorkPlace",
     "range" : false,
     "cardinality" : 5000,
     "minLength" : 16,

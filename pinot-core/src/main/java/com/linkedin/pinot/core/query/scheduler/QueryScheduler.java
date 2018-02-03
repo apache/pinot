@@ -160,11 +160,14 @@ public abstract class QueryScheduler {
         name());
       */
 
-    LOGGER.info("RequestProcessed${},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+    //String segmentList= request.getInstanceRequest().getSearchSegments().toString();
+
+    LOGGER.info("RequestProcessed${},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             System.currentTimeMillis(),
             request.getInstanceRequest().getRequestId(),
             request.getTableName(),
             request.getInstanceRequest().getSearchSegments().size(),
+            request.getInstanceRequest().getSearchSegments().toString(),
             request.getSegmentCountAfterPruning(),
             getMetadataValue(resultMeta, DataTable.EXECUTOR_CPU_TIME),
             timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),

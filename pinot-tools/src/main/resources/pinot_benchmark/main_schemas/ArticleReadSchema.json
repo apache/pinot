@@ -2,11 +2,6 @@
   "metricFieldSpecs": [
     {
       "singleValueField" : true,
-      "dataType": "LONG",
-      "name" : "ReadStartTime"
-    },
-    {
-      "singleValueField" : true,
       "dataType": "INT",
       "name" : "TimeSpent"
     },
@@ -68,5 +63,12 @@
       "name": "ArticleTopic"
     }
   ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "SECONDS",
+      "dataType": "LONG",
+      "name": "ReadStartTime"
+    }
+  },
   "schemaName": "ArticleReadSchema"
 }

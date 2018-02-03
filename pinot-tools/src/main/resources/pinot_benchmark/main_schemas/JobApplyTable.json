@@ -3,6 +3,8 @@
   "tableType": "OFFLINE",
   "segmentsConfig": {
     "segmentPushType": "APPEND",
+    "timeColumnName": "ApplyStartTime",
+    "timeType": "MILLISECONDS",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "schemaName": "JobApplySchema",
     "replication": "1"

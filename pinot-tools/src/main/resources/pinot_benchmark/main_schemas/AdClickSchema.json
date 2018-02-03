@@ -2,8 +2,8 @@
   "metricFieldSpecs": [
     {
       "singleValueField" : true,
-      "dataType": "LONG",
-      "name" : "ClickTime"
+      "dataType": "INT",
+      "name" : "ViewerStrength"
     }
   ],
   "dimensionFieldSpecs": [
@@ -53,5 +53,12 @@
       "name": "AdCampaign"
     }
   ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "SECONDS",
+      "dataType": "LONG",
+      "name": "ClickTime"
+    }
+  },
   "schemaName": "AdClickSchema"
 }

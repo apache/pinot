@@ -15,13 +15,18 @@
  */
 package com.linkedin.pinot.tools.pacelab.benchmark;
 
+import com.linkedin.pinot.core.data.GenericRow;
+import org.apache.commons.lang.math.LongRange;
+
+import java.util.List;
 import java.util.Properties;
 
 public class ArticleReadQueryTask extends QueryTask {
 
-    public ArticleReadQueryTask(Properties config, String[] queries) {
+    public ArticleReadQueryTask(Properties config, String[] queries, String dataDir) {
         setConfig(config);
         setQueries(queries);
+        setDataDir(dataDir);
     }
 
     @Override
@@ -31,30 +36,41 @@ public class ArticleReadQueryTask extends QueryTask {
 
 
     public void generateAndRunQuery(int queryId) throws Exception {
+        EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
         Properties config = getConfig();
         String[] queries = getQueries();
 
-        long minReadStartTime = Long.parseLong(config.getProperty("minReadStartTime"));
-        long maxReadStartTime = Long.parseLong(config.getProperty("maxReadStartTime"));
+        long minReadStartTime = Long.parseLong(config.getProperty("MinReadStartTime"));
+        long maxReadStartTime = Long.parseLong(config.getProperty("MaxReadStartTime"));
 
+        double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
+        LongRange timeRange = CommonTools.getZipfRandomTimeRange(minReadStartTime,maxReadStartTime,zipfS);
 
+        int selectLimit = CommonTools.getSelectLimt(config);
+        int groupByLimit = Integer.parseInt(config.getProperty("GroupByLimit"));
+
+        //List<GenericRow> profileTable = eventTableGenerator.readProfileTable();
+        //GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(profileTable);
+
+        List<GenericRow> articleTable = eventTableGenerator.readArticleTable();
+        GenericRow randomArticle = eventTableGenerator.getRandomGenericRow(articleTable);
 
         String query = "";
         switch (queryId) {
             case 0:
-                //query = String.format(queries[queryId], );
+                query = String.format(queries[queryId], minReadStartTime, maxReadStartTime, selectLimit);
                 runQuery(query);
                 break;
             case 1:
-                //query = String.format(queries[queryId],);
+                query = String.format(queries[queryId], minReadStartTime, maxReadStartTime, randomArticle.getValue("ID"));
                 runQuery(query);
                 break;
             case 2:
-                //query = String.format(queries[queryId], );
+                query = String.format(queries[queryId], minReadStartTime, maxReadStartTime, groupByLimit);
                 runQuery(query);
                 break;
             case 3:
-                //query = String.format(queries[queryId], );
+                query = String.format(queries[queryId], minReadStartTime, maxReadStartTime, groupByLimit);
                 runQuery(query);
                 break;
         }

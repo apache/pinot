@@ -16,18 +16,16 @@
 
 package com.linkedin.pinot.tools.admin.command;
 
-import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.tools.Command;
 import com.linkedin.pinot.tools.pacelab.benchmark.EventTableGenerator;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class EventTableCreationCommand extends AbstractBaseAdminCommand implements Command {
+public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCommand implements Command {
     private static final Logger LOGGER = LoggerFactory.getLogger(CreateSegmentCommand.class);
     @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Directory containing the data.")
     private String _dataDir;
-
 
     @Option(name = "-outDir", required = false, metaVar = "<string>", usage = "Name of output directory.")
     private String _outDir;
@@ -35,26 +33,29 @@ public class EventTableCreationCommand extends AbstractBaseAdminCommand implemen
     @Option(name = "-overwrite", required = false, usage = "Overwrite existing output directory.")
     private boolean _overwrite = false;
 
-    public EventTableCreationCommand setDataDir(String dataDir) {
+    @Option(name = "-numRecords", required = true, metaVar = "<int>", usage = "Number of records to generate.")
+    private int _numRecords = 1000;
+
+    public PinotBenchmarkEventTableCreationCommand setDataDir(String dataDir) {
         _dataDir = dataDir;
         return this;
     }
 
 
-    public EventTableCreationCommand setOutDir(String outDir) {
+    public PinotBenchmarkEventTableCreationCommand setOutDir(String outDir) {
         _outDir = outDir;
         return this;
     }
 
 
-    public EventTableCreationCommand setOverwrite(boolean overwrite) {
+    public PinotBenchmarkEventTableCreationCommand setOverwrite(boolean overwrite) {
         _overwrite = overwrite;
         return this;
     }
 
     @Override
     public boolean execute() throws Exception {
-        EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir,_outDir);
+        EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir,_outDir, _numRecords);
         eventTableGenerator.generateProfileViewTable();
         eventTableGenerator.generateAdClickTable();
         eventTableGenerator.generateArticleReadTable();

@@ -15,13 +15,19 @@
  */
 package com.linkedin.pinot.tools.pacelab.benchmark;
 
+import com.linkedin.pinot.core.data.GenericRow;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.lang.math.LongRange;
+
+import java.util.List;
 import java.util.Properties;
 
 public class AdClickQueryTask extends QueryTask {
 
-    public AdClickQueryTask(Properties config, String[] queries) {
+    public AdClickQueryTask(Properties config, String[] queries, String dataDir) {
         setConfig(config);
         setQueries(queries);
+        setDataDir(dataDir);
     }
 
     @Override
@@ -30,44 +36,42 @@ public class AdClickQueryTask extends QueryTask {
     }
 
     public void generateAndRunQuery(int queryId) throws Exception {
+        EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
         Properties config = getConfig();
         String[] queries = getQueries();
 
-        long maxTimestamp = Long.parseLong(config.getProperty("max_timestamp"));
-        long minTimestamp = Long.parseLong(config.getProperty("min_timestamp"));
-        int minRanking = Integer.parseInt(config.getProperty("min_ranking"));
-        int maxRanking = Integer.parseInt(config.getProperty("max_ranking"));
+        long minClickTime = Long.parseLong(config.getProperty("MinClickTime"));
+        long maxClickTime = Long.parseLong(config.getProperty("MaxClickTime"));
 
+        double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
+        LongRange timeRange = CommonTools.getZipfRandomTimeRange(minClickTime,maxClickTime,zipfS);
 
-        long timestampRange = maxTimestamp - minTimestamp + 1;
-        int rankingRange = maxRanking - minRanking + 1;
-        long timestamp = minTimestamp + (int)(Math.random() * timestampRange);
+        int selectLimit = CommonTools.getSelectLimt(config);
+        int groupByLimit = Integer.parseInt(config.getProperty("GroupByLimit"));
 
-        String query;
+        //List<GenericRow> profileTable = eventTableGenerator.readProfileTable();
+        //GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(profileTable);
+
+        List<GenericRow> adTable = eventTableGenerator.readAdTable();
+        GenericRow randomAd = eventTableGenerator.getRandomGenericRow(adTable);
+
+        String query = "";
         switch (queryId) {
             case 0:
-                query = String.format(queries[queryId], timestamp);
+                query = String.format(queries[queryId], minClickTime, maxClickTime, selectLimit);
                 runQuery(query);
                 break;
             case 1:
-                int ranking = minRanking + (int)(Math.random() * rankingRange);
-                query = String.format(queries[queryId], timestamp, ranking);
+
+                query = String.format(queries[queryId], minClickTime, maxClickTime, randomAd.getValue("ID"));
                 runQuery(query);
                 break;
             case 2:
-                int lowerBound = minRanking + (int)(Math.random() * rankingRange);
-                int higherBound = minRanking + (int)(Math.random() * rankingRange);
-                if (lowerBound > higherBound) {
-                    //swap them
-                    int temp = lowerBound;
-                    lowerBound = higherBound;
-                    higherBound = temp;
-                }
-                query = String.format(queries[queryId], timestamp, lowerBound, higherBound);
+                query = String.format(queries[queryId], minClickTime, maxClickTime, groupByLimit);
                 runQuery(query);
                 break;
             case 3:
-                query = String.format(queries[queryId], timestamp);
+                query = String.format(queries[queryId], minClickTime, maxClickTime, groupByLimit);
                 runQuery(query);
                 break;
         }

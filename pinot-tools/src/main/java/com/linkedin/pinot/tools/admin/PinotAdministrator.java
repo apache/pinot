@@ -65,7 +65,7 @@ public class PinotAdministrator {
       @SubCommand(name = "MoveReplicaGroup", impl = MoveReplicaGroup.class),
       @SubCommand(name = "CreateDataAndSegment", impl = SegmentCreationCommand.class),
       @SubCommand(name = "UploadSegmentPeriodically", impl = SegmentUploaderCommand.class),
-      @SubCommand(name = "GenerateEventTableData", impl = EventTableCreationCommand.class),
+      @SubCommand(name = "PinotBenchmarkGenerateEventTableData", impl = PinotBenchmarkEventTableCreationCommand.class),
       @SubCommand(name = "PinotBenchmarkGenerateQueries", impl= PinotBenchmarkQueryGeneratorCommand.class)
   })
   Command _subCommand;

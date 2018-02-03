@@ -37,18 +37,22 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import javax.annotation.Nonnull;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+
+import java.net.URL;
 
 public class EventTableGenerator {
     private String _dataDir;
     private String _outDir;
     private boolean _overwrite = true;
-    private int _numRecords = 10;
+    private int _numRecords = 10000;
     final String _profileSchemaFile = "pinot_benchmark/main_schemas/ProfileSchema.json";
     final String _profileViewSchemaFile = "pinot_benchmark/main_schemas/ProfileViewSchema.json";
     final String _profileViewSchemaAnnFile = "pinot_benchmark/main_schemas/ProfileViewSchemaAnnotation.json";
@@ -65,13 +69,53 @@ public class EventTableGenerator {
     final String _articleReadSchemaFile = "pinot_benchmark/main_schemas/ArticleReadSchema.json";
     final String _articleReadSchemaAnnFile = "pinot_benchmark/main_schemas/ArticleReadSchemaAnnotation.json";
 
-    public EventTableGenerator(String dataDir, String outDir)
+    public EventTableGenerator(String dataDir)
+    {
+        _dataDir = dataDir;
+    }
+    public EventTableGenerator(String dataDir, String outDir, int numRecords)
     {
         _dataDir = dataDir;
         _outDir = outDir;
+        _numRecords = numRecords;
     }
 
-    private String getTableDataDirectory(String tableName)
+    public  List<GenericRow> readProfileTable() throws Exception
+    {
+        String profileDataFile = getTableDataDirectory("profile");
+        ClassLoader classLoader = LatencyBasedLoadMetric.class.getClassLoader();
+        String profileSchemaFile = getFileFromResourceUrl(classLoader.getResource(_profileSchemaFile));
+        List<GenericRow> profileTable = readBaseTableData(profileSchemaFile,profileDataFile);
+        return profileTable;
+    }
+    public  List<GenericRow> readJobTable() throws Exception
+    {
+        String jobDataFile = getTableDataDirectory("job");
+        ClassLoader classLoader = LatencyBasedLoadMetric.class.getClassLoader();
+        String jobSchemaFile = getFileFromResourceUrl(classLoader.getResource(_jobSchemaFile));
+        List<GenericRow> jobTable = readBaseTableData(jobSchemaFile,jobDataFile);
+        return jobTable;
+    }
+
+    public  List<GenericRow> readAdTable() throws Exception
+    {
+        String adDataFile = getTableDataDirectory("ad");
+        ClassLoader classLoader = LatencyBasedLoadMetric.class.getClassLoader();
+        String adSchemaFile = getFileFromResourceUrl(classLoader.getResource(_adSchemaFile));
+        List<GenericRow> adTable = readBaseTableData(adSchemaFile,adDataFile);
+        return adTable;
+    }
+
+    public  List<GenericRow> readArticleTable() throws Exception
+    {
+        String articleDataFile = getTableDataDirectory("article");
+        ClassLoader classLoader = LatencyBasedLoadMetric.class.getClassLoader();
+        String articleSchemaFile = getFileFromResourceUrl(classLoader.getResource(_articleReadSchemaAnnFile));
+        List<GenericRow> articleTable = readBaseTableData(articleSchemaFile,articleDataFile);
+        return articleTable;
+    }
+
+    public String getTableDataDirectory(String tableName)
     {
         String  tableDatDir;
         if(_dataDir.endsWith("/"))
@@ -104,7 +148,7 @@ public class EventTableGenerator {
         return  files[0].getAbsolutePath();
     }
 
-    private List<GenericRow> readBaseTableData(String schemaFile, String dataFile) throws Exception
+    public List<GenericRow> readBaseTableData(String schemaFile, String dataFile) throws Exception
     {
          List<GenericRow> tableData = new ArrayList<GenericRow>();
 
@@ -195,14 +239,32 @@ public class EventTableGenerator {
 
     }
 
+    public static String getFileFromResourceUrl(@Nonnull URL resourceUrl) {
+        // For maven cross package use case, we need to extract the resource from jar to a temporary directory.
+        String resourceUrlStr = resourceUrl.toString();
+        if (resourceUrlStr.contains("jar!")) {
+            try {
+                String extension = resourceUrlStr.substring(resourceUrlStr.lastIndexOf('.'));
+                File tempFile = File.createTempFile("pinot-test-temp", extension);
+                String tempFilePath = tempFile.getAbsolutePath();
+                //LOGGER.info("Extracting from " + resourceUrlStr + " to " + tempFilePath);
+                FileUtils.copyURLToFile(resourceUrl, tempFile);
+                return tempFilePath;
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        } else {
+            return resourceUrl.getFile();
+        }
+    }
 
     public boolean generateProfileViewTable() throws Exception
     {
 
-        ClassLoader classLoader = LatencyBasedLoadMetric.class.getClassLoader();
-        String profileSchemaFile = classLoader.getResource(_profileSchemaFile).getFile();
-        String profileViewSchemaFile = classLoader.getResource(_profileViewSchemaFile).getFile();
-        String profileViewSchemaAnn = classLoader.getResource(_profileViewSchemaAnnFile).getFile();
+        ClassLoader classLoader = EventTableGenerator.class.getClassLoader();
+        String profileSchemaFile = getFileFromResourceUrl(classLoader.getResource(_profileSchemaFile));
+        String profileViewSchemaFile = getFileFromResourceUrl(classLoader.getResource(_profileViewSchemaFile));
+        String profileViewSchemaAnn = getFileFromResourceUrl(classLoader.getResource(_profileViewSchemaAnnFile));
 
         String profileDataFile = getTableDataDirectory("profile");
         List<GenericRow> profileTable = readBaseTableData(profileSchemaFile,profileDataFile);
@@ -247,11 +309,11 @@ public class EventTableGenerator {
 
     public boolean generateAdClickTable() throws Exception
     {
-        ClassLoader classLoader = LatencyBasedLoadMetric.class.getClassLoader();
-        String profileSchemaFile = classLoader.getResource(_profileSchemaFile).getFile();
-        String adSchemaFile = classLoader.getResource(_adSchemaFile).getFile();
-        String adClickSchemaAnn = classLoader.getResource(_adClickSchemaAnnFile).getFile();
-        String adClickSchemaFile = classLoader.getResource(_adClickSchemaFile).getFile();
+        ClassLoader classLoader = EventTableGenerator.class.getClassLoader();
+        String profileSchemaFile = getFileFromResourceUrl(classLoader.getResource(_profileSchemaFile));
+        String adSchemaFile = getFileFromResourceUrl(classLoader.getResource(_adSchemaFile));
+        String adClickSchemaAnn = getFileFromResourceUrl(classLoader.getResource(_adClickSchemaAnnFile));
+        String adClickSchemaFile = getFileFromResourceUrl(classLoader.getResource(_adClickSchemaFile));
 
         String profileDataFile = getTableDataDirectory("profile");
         List<GenericRow> profileTable = readBaseTableData(profileSchemaFile,profileDataFile);
@@ -274,6 +336,7 @@ public class EventTableGenerator {
             GenericRow adInfo = getRandomGenericRow(adTable);
 
             outRecord.put("ClickTime", eventTimeGenerator.next());
+            outRecord.put("ViewerStrength", viewerProfile.getValue("Strength"));
             outRecord.put("ViewerProfileId", viewerProfile.getValue("ID"));
             outRecord.put("ViewerHeadline", viewerProfile.getValue("Headline"));
             outRecord.put("ViewerPosition", viewerProfile.getValue("Position"));
@@ -293,11 +356,11 @@ public class EventTableGenerator {
 
     public boolean generateJobApplyTable() throws Exception
     {
-        ClassLoader classLoader = LatencyBasedLoadMetric.class.getClassLoader();
-        String profileSchemaFile = classLoader.getResource(_profileSchemaFile).getFile();
-        String jobSchemaFile = classLoader.getResource(_jobSchemaFile).getFile();
-        String jobApplySchemaAnn = classLoader.getResource(_jobApplySchemaAnnFile).getFile();
-        String jobApplySchemaFile = classLoader.getResource(_jobApplySchemaFile).getFile();
+        ClassLoader classLoader = EventTableGenerator.class.getClassLoader();
+        String profileSchemaFile = getFileFromResourceUrl(classLoader.getResource(_profileSchemaFile));
+        String jobSchemaFile = getFileFromResourceUrl(classLoader.getResource(_jobSchemaFile));
+        String jobApplySchemaAnn = getFileFromResourceUrl(classLoader.getResource(_jobApplySchemaAnnFile));
+        String jobApplySchemaFile = getFileFromResourceUrl(classLoader.getResource(_jobApplySchemaFile));
 
         String profileDataFile = getTableDataDirectory("profile");
         List<GenericRow> profileTable = readBaseTableData(profileSchemaFile,profileDataFile);
@@ -342,11 +405,11 @@ public class EventTableGenerator {
 
     public boolean generateArticleReadTable() throws Exception
     {
-        ClassLoader classLoader = LatencyBasedLoadMetric.class.getClassLoader();
-        String profileSchemaFile = classLoader.getResource(_profileSchemaFile).getFile();
-        String articleSchemaFile = classLoader.getResource(_articleSchemaFile).getFile();
-        String articleReadSchemaAnn = classLoader.getResource(_articleReadSchemaAnnFile).getFile();
-        String articleReadSchemaFile = classLoader.getResource(_articleReadSchemaFile).getFile();
+        ClassLoader classLoader = EventTableGenerator.class.getClassLoader();
+        String profileSchemaFile = getFileFromResourceUrl(classLoader.getResource(_profileSchemaFile));
+        String articleSchemaFile = getFileFromResourceUrl(classLoader.getResource(_articleSchemaFile));
+        String articleReadSchemaAnn = getFileFromResourceUrl(classLoader.getResource(_articleReadSchemaAnnFile));
+        String articleReadSchemaFile = getFileFromResourceUrl(classLoader.getResource(_articleReadSchemaFile));
 
         String profileDataFile = getTableDataDirectory("profile");
         List<GenericRow> profileTable = readBaseTableData(profileSchemaFile,profileDataFile);
@@ -371,7 +434,7 @@ public class EventTableGenerator {
             GenericRow articleInfo = getRandomGenericRow(articleTable);
 
             outRecord.put("ReadStartTime", eventTimeGenerator.next());
-            outRecord.put("TimeSepnt", timeSpentGenerator.next());
+            outRecord.put("TimeSpent", timeSpentGenerator.next());
             outRecord.put("ReaderStrength", readerProfile.getValue("Strength"));
             outRecord.put("ReaderProfileId", readerProfile.getValue("ID"));
             outRecord.put("ReaderHeadline", readerProfile.getValue("Headline"));
@@ -402,7 +465,7 @@ public class EventTableGenerator {
             return "NO";
     }
 
-    private GenericRow getRandomGenericRow(List<GenericRow> rowList)
+    public GenericRow getRandomGenericRow(List<GenericRow> rowList)
     {
         int size = rowList.size();
         Random randGen = new Random(System.currentTimeMillis());

@@ -1,10 +1,6 @@
 {
   "metricFieldSpecs": [
     {
-      "dataType": "LONG",
-      "name" : "ViewStartTime"
-    },
-    {
       "singleValueField" : true,
       "dataType": "INT",
       "name" : "ReviewTime"
@@ -29,7 +25,7 @@
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "ViewerWorkplace"
+      "name": "ViewerWorkPlace"
     },
     {
       "singleValueField" : true,
@@ -49,7 +45,7 @@
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "ViewedProfileWorkplace"
+      "name": "ViewedProfileWorkPlace"
     },
     {
       "singleValueField" : true,
@@ -67,5 +63,12 @@
       "name": "WereProfilesConnected"
     }
   ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "SECONDS",
+      "dataType": "LONG",
+      "name": "ViewStartTime"
+    }
+  },
   "schemaName": "ProfileViewSchema"
 }

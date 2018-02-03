@@ -3,6 +3,8 @@
   "tableType": "OFFLINE",
   "segmentsConfig": {
     "segmentPushType": "APPEND",
+    "timeColumnName": "ClickTime",
+    "timeType": "MILLISECONDS",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "schemaName": "AdClickSchema",
     "replication": "1"

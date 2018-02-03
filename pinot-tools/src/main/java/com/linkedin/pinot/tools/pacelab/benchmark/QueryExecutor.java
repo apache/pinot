@@ -28,9 +28,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public abstract class QueryExecutor {
-    Properties config;
-    private PostQueryCommand postQueryCommand;
-    private int testDuration;
+    protected Properties config;
+    protected PostQueryCommand postQueryCommand;
+    protected int testDuration;
+    protected String _dataDir;
 
     public static QueryExecutor getInstance(){
         return null;
@@ -39,13 +40,14 @@ public abstract class QueryExecutor {
 
     public static List<QueryExecutor> getTableExecutors() {
         List<QueryExecutor> queryExecutors = new ArrayList<>();
-        queryExecutors.add(JobApplyQueryExecutor.getInstance());
+        //queryExecutors.add(JobApplyQueryExecutor.getInstance());
+        queryExecutors.add(ProfileViewQueryExecutor.getInstance());
         return queryExecutors;
     }
 
     public void start() throws InterruptedException {
         loadConfig();
-        int threadCnt = Integer.parseInt(config.getProperty("threads"));
+        int threadCnt = Integer.parseInt(config.getProperty("ThreadCount"));
         ExecutorService threadPool = Executors.newFixedThreadPool(threadCnt);
         QueryTask queryTask = getTask(config);
         queryTask.setPostQueryCommand(this.postQueryCommand);
@@ -79,5 +81,13 @@ public abstract class QueryExecutor {
 
     public void setTestDuration(int testDuration) {
         this.testDuration = testDuration;
+    }
+    public void setDataDir(String dataDir)
+    {
+        _dataDir = dataDir;
+    }
+    public String getDataDir()
+    {
+        return _dataDir;
     }
 }

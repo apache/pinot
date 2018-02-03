@@ -15,15 +15,19 @@
  */
 package com.linkedin.pinot.tools.pacelab.benchmark;
 
+import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.tools.pacelab.benchmark.QueryTask;
+import org.apache.commons.lang.math.LongRange;
 
+import java.util.List;
 import java.util.Properties;
 
 public class JobApplyQueryTask extends QueryTask {
 
-    public JobApplyQueryTask(Properties config, String[] queries) {
+    public JobApplyQueryTask(Properties config, String[] queries, String dataDir) {
         setConfig(config);
         setQueries(queries);
+        setDataDir(dataDir);
     }
 
     @Override
@@ -33,28 +37,41 @@ public class JobApplyQueryTask extends QueryTask {
 
 
     public void generateAndRunQuery(int queryId) throws Exception {
+        EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
         Properties config = getConfig();
         String[] queries = getQueries();
 
-        long maxApplyStartTime= Long.parseLong(config.getProperty("minApplyStartTime"));
-        long minApplyStartTime = Long.parseLong(config.getProperty("maxApplyStartTime"));
+        long maxApplyStartTime= Long.parseLong(config.getProperty("MinApplyStartTime"));
+        long minApplyStartTime = Long.parseLong(config.getProperty("MaxApplyStartTime"));
+
+        double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
+        LongRange timeRange = CommonTools.getZipfRandomTimeRange(minApplyStartTime,maxApplyStartTime,zipfS);
+
+        int selectLimit = CommonTools.getSelectLimt(config);
+        int groupByLimit = Integer.parseInt(config.getProperty("GroupByLimit"));
+
+        //List<GenericRow> profileTable = eventTableGenerator.readProfileTable();
+        //GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(profileTable);
+
+        List<GenericRow> jobTable = eventTableGenerator.readJobTable();
+        GenericRow randomJob = eventTableGenerator.getRandomGenericRow(jobTable);
 
         String query = "";
         switch (queryId) {
             case 0:
-                //query = String.format(queries[queryId], "");
+                query = String.format(queries[queryId], minApplyStartTime, maxApplyStartTime, selectLimit);
                 runQuery(query);
                 break;
             case 1:
-                //query = String.format(queries[queryId], );
+                query = String.format(queries[queryId], minApplyStartTime, maxApplyStartTime, randomJob.getValue("ID"));
                 runQuery(query);
                 break;
             case 2:
-                //query = String.format(queries[queryId], );
+                query = String.format(queries[queryId], minApplyStartTime, maxApplyStartTime, groupByLimit);
                 runQuery(query);
                 break;
             case 3:
-                //query = String.format(queries[queryId], );
+                query = String.format(queries[queryId], minApplyStartTime, maxApplyStartTime, groupByLimit);
                 runQuery(query);
                 break;
         }

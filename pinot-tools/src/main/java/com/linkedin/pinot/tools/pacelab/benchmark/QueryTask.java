@@ -16,15 +16,17 @@
 package com.linkedin.pinot.tools.pacelab.benchmark;
 
 import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
+import io.swagger.models.auth.In;
 
 import java.util.Properties;
 import java.util.Random;
 
 public class QueryTask implements Runnable{
-    private Properties config;
-    private String[] queries;
-    private Random rand = new Random();
-    private PostQueryCommand postQueryCommand;
+    protected Properties config;
+    protected String[] queries;
+    protected Random rand = new Random();
+    protected PostQueryCommand postQueryCommand;
+    protected String _dataDir;
 
     public enum Color {
         RESET("\u001B[0m"),
@@ -41,25 +43,41 @@ public class QueryTask implements Runnable{
 
     @Override
     public void run() {
-        while(!Thread.interrupted()){
-            try {
-                float[] likelihood = getLikelihoodArrayFromProps();
-                float randomLikelihood = rand.nextFloat();
-
-                for (int i = 0; i < likelihood.length; i++) {
-                    if (randomLikelihood <= likelihood[i]) {
-                        generateAndRunQuery(i);
-                        break;
+        float[] likelihood = getLikelihoodArrayFromProps();
+        int QPS = Integer.parseInt(config.getProperty("QPS"));
+        while(!Thread.interrupted()) {
+            long intervalStart = System.currentTimeMillis();
+            try
+            {
+                for (int q = 0; q < QPS; q++)
+                {
+                    float randomLikelihood = rand.nextFloat();
+                    for (int i = 0; i < likelihood.length; i++)
+                    {
+                        if (randomLikelihood <= likelihood[i])
+                        {
+                            generateAndRunQuery(i);
+                            break;
+                        }
                     }
                 }
-            } catch (Exception e) {
+                long intervalEnd = System.currentTimeMillis();
+                while (intervalEnd < intervalStart + 1000)
+                {
+                    Thread.sleep(1000);
+                    intervalEnd = System.currentTimeMillis();
+                }
+            }
+            catch (Exception e)
+            {
                 e.printStackTrace();
             }
+
         }
     }
 
     private float[] getLikelihoodArrayFromProps() {
-        String[] a = config.getProperty("likelihood").split(",");
+        String[] a = config.getProperty("LikelihoodVector").split(",");
         float[] likelihoodArray = new float[a.length];
         for(int i = 0;i < a.length;i++) {
             if (i == 0)
@@ -109,4 +127,13 @@ public class QueryTask implements Runnable{
         this.postQueryCommand = postQueryCommand;
     }
 
+    public void setDataDir(String dataDir)
+    {
+        _dataDir = dataDir;
+    }
+
+    public String getDataDir()
+    {
+        return _dataDir;
+    }
 }

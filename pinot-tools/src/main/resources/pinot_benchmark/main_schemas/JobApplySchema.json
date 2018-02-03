@@ -1,10 +1,6 @@
 {
   "metricFieldSpecs": [
     {
-      "dataType": "LONG",
-      "name" : "ApplyStartTime"
-    },
-    {
       "singleValueField" : true,
       "dataType": "INT",
       "name" : "TimeSpent"
@@ -57,5 +53,12 @@
       "name": "DidApplyIsFinalized"
     }
   ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "SECONDS",
+      "dataType": "LONG",
+      "name": "ApplyStartTime"
+    }
+  },
   "schemaName": "JobApplySchema"
 }

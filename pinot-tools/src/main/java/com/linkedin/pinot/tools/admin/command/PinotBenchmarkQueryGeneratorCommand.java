@@ -39,6 +39,9 @@ public class PinotBenchmarkQueryGeneratorCommand extends AbstractBaseAdminComman
     @Option(name = "-testDuration", required = false, metaVar = "<int>", usage = "Test duration.")
     private  int _testDuration = DEFAULT_TEST_DURATION;
 
+    @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Directory containing the data.")
+    private String _dataDir;
+
     public PinotBenchmarkQueryGeneratorCommand setBrokerHost (String brokerHost) {
         _brokerHost = brokerHost;
         return this;
@@ -63,6 +66,7 @@ public class PinotBenchmarkQueryGeneratorCommand extends AbstractBaseAdminComman
         List<QueryExecutor> executorList = QueryExecutor.getTableExecutors();
         for (QueryExecutor executor : executorList) {
             executor.setPostQueryCommand(postQueryCommand);
+            executor.setDataDir(_dataDir);
             executor.setTestDuration(_testDuration);
             executor.start();
         }

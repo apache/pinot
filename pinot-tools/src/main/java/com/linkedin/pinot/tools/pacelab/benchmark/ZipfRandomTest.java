@@ -13,9 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.linkedin.pinot.tools.pacelab.benchmark;
 
-public class GenerateBaseTable {
+import org.xerial.util.ZipfRandom;
 
+public class ZipfRandomTest {
+    public static void main(String[] args)
+    {
+        ZipfRandom zipfRandom = new ZipfRandom(0.5, 100);
+        int[] randomNumFreq = new int[101];
+        for(int i=0;i<1000;i++)
+        {
+            randomNumFreq[zipfRandom.nextInt()]++;
+        }
 
+        for(int i=1; i<101; i++)
+        {
+            System.out.println(randomNumFreq[i]);
+        }
+
+    }
 }
