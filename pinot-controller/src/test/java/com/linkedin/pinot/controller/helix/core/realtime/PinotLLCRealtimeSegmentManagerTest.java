@@ -221,30 +221,94 @@ public class PinotLLCRealtimeSegmentManagerTest {
   }
 
   /**
-   * Tests for generation of partition aware assignment
-   * Validates partition assignment and checks that servers got expected number of assignments
-   * @param partitionAwareTables
-   * @param nPartitions
-   * @param nReplicas
-   * @param instanceNames
+   * Tests for partitionAwarePartitionAssignment
+   * Validates partition assignment and checks that instances were assigned only the right amount of partitions
    */
-  @Test(dataProvider = "partitionAwareAssignmentDataProvider")
-  public void testGeneratePartitionAwareAssignment(List<String> partitionAwareTables, Map<String, Integer> nPartitions,
-      int nReplicas, List<String> instanceNames) {
+  @Test
+  public void testGeneratePartitionAwareAssignment() {
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(false, null);
 
-    Map<String, ZNRecord> partitionAwarePartitionAssignment =
-        segmentManager.partitionAwarePartitionAssignment(partitionAwareTables, nPartitions, nReplicas, instanceNames);
+    Map<String, TableConfig> allTableConfigsInSameTenant = new HashMap<>(1);
+    Map<String, Integer> nPartitionsExpected = new HashMap<>(1);
+    String table1 = "rtPartitionAwareTable1_REALTIME";
+    String table2 = "rtPartitionAwareTable2_REALTIME";
+    int nReplicasExpected = 2;
+    List<String> instanceNames = null;
+    Map<String, ZNRecord> currentAssignment = new HashMap<>(1);
 
-    // check that we got a new assignment for each table in our list
-    Assert.assertEquals(partitionAwarePartitionAssignment.size(), partitionAwareTables.size());
-    for (String tableName : partitionAwarePartitionAssignment.keySet()) {
-      Assert.assertTrue(partitionAwareTables.contains(tableName));
-    }
+    // single new table
+    TableConfig tableConfig1 = makeTableConfig(table1, nReplicasExpected, KAFKA_OFFSET, DUMMY_HOST, "topic1",
+        DEFAULT_SERVER_TENANT, RoutingTableBuilderName.PartitionAwareRealtime);
+    int nKafkaPartitions1 = 2;
+    allTableConfigsInSameTenant.put(table1, tableConfig1);
+    nPartitionsExpected.put(table1, nKafkaPartitions1);
+    instanceNames = getInstanceList(8);
+    currentAssignment =
+        partitionAwareAssignmentTest(segmentManager, tableConfig1, nKafkaPartitions1, instanceNames, currentAssignment,
+            allTableConfigsInSameTenant, 1, nPartitionsExpected, nReplicasExpected);
+
+    // no change
+    currentAssignment =
+        partitionAwareAssignmentTest(segmentManager, tableConfig1, nKafkaPartitions1, instanceNames, currentAssignment,
+            allTableConfigsInSameTenant, 1, nPartitionsExpected, nReplicasExpected);
+
+    // instances change
+    instanceNames = getInstanceList(10);
+    currentAssignment =
+        partitionAwareAssignmentTest(segmentManager, tableConfig1, nKafkaPartitions1, instanceNames, currentAssignment,
+            allTableConfigsInSameTenant, 1, nPartitionsExpected, nReplicasExpected);
+
+    // partitions change
+    nKafkaPartitions1 = 10;
+    nPartitionsExpected.put(table1, nKafkaPartitions1);
+    currentAssignment =
+        partitionAwareAssignmentTest(segmentManager, tableConfig1, nKafkaPartitions1, instanceNames, currentAssignment,
+            allTableConfigsInSameTenant, 1, nPartitionsExpected, nReplicasExpected);
+
+    // multiple tables
+    TableConfig tableConfig2 = makeTableConfig(table2, nReplicasExpected, KAFKA_OFFSET, DUMMY_HOST, "topic2",
+        DEFAULT_SERVER_TENANT, RoutingTableBuilderName.PartitionAwareRealtime);
+    int nKafkaPartitions2 = 8;
+    allTableConfigsInSameTenant.put(table2, tableConfig2);
+    nPartitionsExpected.put(table2, nKafkaPartitions2);
+    currentAssignment =
+        partitionAwareAssignmentTest(segmentManager, tableConfig2, nKafkaPartitions2, instanceNames, currentAssignment,
+            allTableConfigsInSameTenant, 2, nPartitionsExpected, nReplicasExpected);
+
+    // no change
+    currentAssignment =
+        partitionAwareAssignmentTest(segmentManager, tableConfig2, nKafkaPartitions2, instanceNames, currentAssignment,
+            allTableConfigsInSameTenant, 2, nPartitionsExpected, nReplicasExpected);
+
+    // change in 2 - partitions
+    nKafkaPartitions2 = 12;
+    nPartitionsExpected.put(table2, nKafkaPartitions2);
+    currentAssignment =
+        partitionAwareAssignmentTest(segmentManager, tableConfig2, nKafkaPartitions2, instanceNames, currentAssignment,
+            allTableConfigsInSameTenant, 2, nPartitionsExpected, nReplicasExpected);
+
+    // change in instances
+    instanceNames = getInstanceList(8);
+    currentAssignment =
+        partitionAwareAssignmentTest(segmentManager, tableConfig2, nKafkaPartitions2, instanceNames, currentAssignment,
+            allTableConfigsInSameTenant, 2, nPartitionsExpected, nReplicasExpected);
+
+  }
+
+  private Map<String, ZNRecord> partitionAwareAssignmentTest(FakePinotLLCRealtimeSegmentManager segmentManager, TableConfig tableConfig,
+      int nKafkaPartitions, List<String> instanceNames, Map<String, ZNRecord> currentPartitionAssignment, Map<String, TableConfig> allTableConfigsInTenant,
+      int numTablesExpected, Map<String, Integer> nPartitionsExpected, int nReplicasExpected) {
+
+    PartitionAwarePartitionAssignmentGenerator generator = new PartitionAwarePartitionAssignmentGenerator(tableConfig,
+        nKafkaPartitions, instanceNames, allTableConfigsInTenant, currentPartitionAssignment);
+
+    Map<String, ZNRecord> partitionAwarePartitionAssignment = generator.generatePartitionAssignment();
+
+    Assert.assertEquals(partitionAwarePartitionAssignment.size(), numTablesExpected);
 
     // validate assignment for number of partitions for each table, number replicas for each table, and correct instances used
     segmentManager._allPartitionAssignments = partitionAwarePartitionAssignment;
-    validatePartitionAssignment(segmentManager, nPartitions, nReplicas, instanceNames);
+    validatePartitionAssignment(segmentManager, nPartitionsExpected, nReplicasExpected, instanceNames);
 
     // partition aware assignment will simply spray partition replicas to list of servers uniformly.
     // check that servers got expected number of assignments
@@ -262,13 +326,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
         }
       }
       String tableName = entry.getKey();
-      int expectedPartitionCountMin = (nReplicas * nPartitions.get(tableName)) / instanceNames.size();
+      int expectedPartitionCountMin = (nReplicasExpected * nPartitionsExpected.get(tableName)) / instanceNames.size();
       int expectedPartitionCountMax = expectedPartitionCountMin + 1;
       for (Integer partitionCount : instanceToPartitionCount.values()) {
         Assert.assertTrue(partitionCount == expectedPartitionCountMin || partitionCount == expectedPartitionCountMax);
       }
     }
-
+    return partitionAwarePartitionAssignment;
   }
 
   /**
@@ -276,99 +340,100 @@ public class PinotLLCRealtimeSegmentManagerTest {
    * Validates partition assignment and checks that assignment was changed only when necessary
    */
   @Test
-  public void testGenerateAutoRebalanceAssignment() {
+  public void testGenerateAutoRebalanceAssignment()  {
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(false, null);
 
-    List<String> autoRebalanceTables = new ArrayList<>(1);
-    Map<String, Integer> nPartitions = new HashMap<>(1);
+    Map<String, TableConfig> allTableConfigsInSameTenant = new HashMap<>(1);
+    Map<String, Integer> nPartitionsExpected = new HashMap<>(1);
     String table1 = "rtTable1_REALTIME";
     String table2 = "rtTable2_REALTIME";
-    int nReplicas = 2;
+    int nReplicasExpected = 2;
     List<String> instanceNames = null;
     Map<String, ZNRecord> currentAssignment = new HashMap<>(1);
     Map<String, Boolean> assignmentChanged = new HashMap<>(1);
 
     // single new table
-    autoRebalanceTables.add(table1);
-    nPartitions.put(table1, 8);
+    TableConfig tableConfig1 = makeTableConfig(table1, nReplicasExpected, KAFKA_OFFSET, DUMMY_HOST, "topic1", DEFAULT_SERVER_TENANT, DEFAULT_ROUTING_TABLE_BUILDER);
+    int nKafkaPartitions1 = 8;
+    allTableConfigsInSameTenant.put(table1, tableConfig1);
+    nPartitionsExpected.put(table1, nKafkaPartitions1);
     instanceNames = getInstanceList(4);
     assignmentChanged.put(table1, true);
     currentAssignment =
-        autoRebalanceTest(segmentManager, autoRebalanceTables, nPartitions, nReplicas, instanceNames, currentAssignment,
-            assignmentChanged);
+        autoRebalanceTest(segmentManager, tableConfig1, nKafkaPartitions1, instanceNames, currentAssignment,
+            allTableConfigsInSameTenant, assignmentChanged, 1, nPartitionsExpected, nReplicasExpected);
 
     // no change
     assignmentChanged.put(table1, false);
     currentAssignment =
-        autoRebalanceTest(segmentManager, autoRebalanceTables, nPartitions, nReplicas, instanceNames, currentAssignment,
-            assignmentChanged);
+        currentAssignment =
+            autoRebalanceTest(segmentManager, tableConfig1, nKafkaPartitions1, instanceNames, currentAssignment,
+                allTableConfigsInSameTenant, assignmentChanged, 1, nPartitionsExpected, nReplicasExpected);
 
     // instances change
     instanceNames = getInstanceList(10);
     assignmentChanged.put(table1, true);
     currentAssignment =
-        autoRebalanceTest(segmentManager, autoRebalanceTables, nPartitions, nReplicas, instanceNames, currentAssignment,
-            assignmentChanged);
+        autoRebalanceTest(segmentManager, tableConfig1, nKafkaPartitions1, instanceNames, currentAssignment,
+            allTableConfigsInSameTenant, assignmentChanged, 1, nPartitionsExpected, nReplicasExpected);
 
     // partitions change
-    nPartitions.put(table1, 10);
+    nKafkaPartitions1 = 10;
+    nPartitionsExpected.put(table1, nKafkaPartitions1);
     currentAssignment =
-        autoRebalanceTest(segmentManager, autoRebalanceTables, nPartitions, nReplicas, instanceNames, currentAssignment,
-            assignmentChanged);
+        autoRebalanceTest(segmentManager, tableConfig1, nKafkaPartitions1, instanceNames, currentAssignment,
+            allTableConfigsInSameTenant, assignmentChanged, 1, nPartitionsExpected, nReplicasExpected);
 
     // multiple tables
+    TableConfig tableConfig2 = makeTableConfig(table2, nReplicasExpected, KAFKA_OFFSET, DUMMY_HOST, "topic2", DEFAULT_SERVER_TENANT, DEFAULT_ROUTING_TABLE_BUILDER);
+    int nKafkaPartitions2 = 8;
+    allTableConfigsInSameTenant.put(table2, tableConfig2);
     assignmentChanged.put(table1, false);
     assignmentChanged.put(table2, true);
-    autoRebalanceTables.add(table2);
-    nPartitions.put(table2, 8);
-     currentAssignment =
-        autoRebalanceTest(segmentManager, autoRebalanceTables, nPartitions, nReplicas, instanceNames, currentAssignment,
-            assignmentChanged);
+    nPartitionsExpected.put(table2, nKafkaPartitions2);
+    currentAssignment =
+        autoRebalanceTest(segmentManager, tableConfig2, nKafkaPartitions2, instanceNames, currentAssignment,
+            allTableConfigsInSameTenant, assignmentChanged, 2, nPartitionsExpected, nReplicasExpected);
 
     // no change
     assignmentChanged.put(table2, false);
     currentAssignment =
-        autoRebalanceTest(segmentManager, autoRebalanceTables, nPartitions, nReplicas, instanceNames, currentAssignment,
-            assignmentChanged);
+        autoRebalanceTest(segmentManager, tableConfig2, nKafkaPartitions2, instanceNames, currentAssignment,
+            allTableConfigsInSameTenant, assignmentChanged, 2, nPartitionsExpected, nReplicasExpected);
 
-    // change in 1 - partitions
-    nPartitions.put(table2, 12);
+    // change in 2 - partitions
+    nKafkaPartitions2 = 12;
+    nPartitionsExpected.put(table2, nKafkaPartitions2);
     assignmentChanged.put(table2, true);
     currentAssignment =
-        autoRebalanceTest(segmentManager, autoRebalanceTables, nPartitions, nReplicas, instanceNames, currentAssignment,
-            assignmentChanged);
+        autoRebalanceTest(segmentManager, tableConfig2, nKafkaPartitions2, instanceNames, currentAssignment,
+            allTableConfigsInSameTenant, assignmentChanged, 2, nPartitionsExpected, nReplicasExpected);
 
     // change in instances
     instanceNames = getInstanceList(8);
     assignmentChanged.put(table1, true);
     assignmentChanged.put(table2, true);
     currentAssignment =
-        autoRebalanceTest(segmentManager, autoRebalanceTables, nPartitions, nReplicas, instanceNames, currentAssignment,
-            assignmentChanged);
+        autoRebalanceTest(segmentManager, tableConfig2, nKafkaPartitions2, instanceNames, currentAssignment,
+            allTableConfigsInSameTenant, assignmentChanged, 2, nPartitionsExpected, nReplicasExpected);
 
-    // change in both, partitions
-    nPartitions.put(table1, 16);
-    nPartitions.put(table2, 14);
-    currentAssignment =
-        autoRebalanceTest(segmentManager, autoRebalanceTables, nPartitions, nReplicas, instanceNames, currentAssignment,
-            assignmentChanged);
   }
 
-  private Map<String, ZNRecord> autoRebalanceTest(FakePinotLLCRealtimeSegmentManager segmentManager, List<String> tablesForAutoRebalance, Map<String, Integer> nPartitions,
-      int nReplicas, List<String> instanceNames, Map<String, ZNRecord> currentPartitionAssignment, Map<String, Boolean> assignmentChanged) {
-    Map<String, ZNRecord> autoRebalancePartitionAssignment =
-        segmentManager.autoRebalancePartitionAssignment(tablesForAutoRebalance, nPartitions, nReplicas, instanceNames,
-            currentPartitionAssignment);
+  private Map<String, ZNRecord> autoRebalanceTest(FakePinotLLCRealtimeSegmentManager segmentManager, TableConfig tableConfig,
+      int nKafkaPartitions, List<String> instanceNames, Map<String, ZNRecord> currentPartitionAssignment, Map<String, TableConfig> allTableConfigsInTenant,
+      Map<String, Boolean> assignmentChanged, int numTablesExpected, Map<String, Integer> nPartitionsExpected, int nReplicasExpected) {
+
+    AutoRebalancePartitionAssignmentGenerator generator = new AutoRebalancePartitionAssignmentGenerator(tableConfig,
+        nKafkaPartitions, instanceNames, allTableConfigsInTenant, currentPartitionAssignment);
+
+    Map<String, ZNRecord> autoRebalancePartitionAssignment = generator.generatePartitionAssignment();
 
     // check that we got a new assignment for each table in our list
-    Assert.assertEquals(autoRebalancePartitionAssignment.size(), tablesForAutoRebalance.size());
-    for (String tableName : autoRebalancePartitionAssignment.keySet()) {
-      Assert.assertTrue(tablesForAutoRebalance.contains(tableName));
-    }
+    Assert.assertEquals(autoRebalancePartitionAssignment.size(), numTablesExpected);
 
     // validate assignment for number of partitions for each table, number replicas for each table, and correct instances used
     segmentManager._allPartitionAssignments = autoRebalancePartitionAssignment;
-    validatePartitionAssignment(segmentManager, nPartitions, nReplicas, instanceNames);
+    validatePartitionAssignment(segmentManager, nPartitionsExpected, nReplicasExpected, instanceNames);
 
     // validate if assignment changed when it should have
     for (Map.Entry<String, ZNRecord> entry : autoRebalancePartitionAssignment.entrySet()) {
@@ -399,10 +464,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<String> instances = getInstanceList(4);
     String table1 = "rtTable1_REALTIME";
     String table2 = "rtTable2_REALTIME";
-    String partitionAwareTable1 = "rtTable3_REALTIME";
+    String partitionAwareTable1 = "rtPartitionAwareTable1_REALTIME";
     String table4 = "rtTable4_REALTIME";
-    String partitionAwareTable2 = "rtTable5_REALTIME";
-    String partitionAwareTable3 = "rtTable6_REALTIME";
+    String partitionAwareTable2 = "rtPartitionAwareTable2_REALTIME";
+    String partitionAwareTable3 = "rtPartitionAwareTable3_REALTIME";
     String topic1 = "topic1";
     String topic2 = "topic2";
     String topic3 = "topic3";

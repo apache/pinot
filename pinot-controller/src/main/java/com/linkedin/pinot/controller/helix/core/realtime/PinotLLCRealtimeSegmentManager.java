@@ -1262,9 +1262,6 @@ public class PinotLLCRealtimeSegmentManager {
     // get table configs for all tables in same tenant
     Map<String, TableConfig> allTableConfigsInTenant = new HashMap<>(realtimeTablesWithSameTenant.size());
 
-    // get this from current kafka partitions from partition assignment for all tables
-    Map<String, Integer> targetNumPartitions = new HashMap<>(allTableConfigsInTenant.size());
-
     // get current partition assignments for all tables in same tenant
     Map<String, ZNRecord> currentPartitionAssignment = new HashMap<>(realtimeTablesWithSameTenant.size());
 
@@ -1273,17 +1270,21 @@ public class PinotLLCRealtimeSegmentManager {
       ZNRecord kafkaPartitionAssignment = getKafkaPartitionAssignment(tableName);
       if (kafkaPartitionAssignment != null) {
         currentPartitionAssignment.put(tableName, kafkaPartitionAssignment);
-        targetNumPartitions.put(tableName, kafkaPartitionAssignment.getListFields().size());
       }
     }
     allTableConfigsInTenant.put(tableConfig.getTableName(), tableConfig);
-    targetNumPartitions.put(tableConfig.getTableName(), nKafkaPartitions);
 
-    // get number of replicas
-    int nReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
-
-    return generatePartitionAssignment(tableConfig, instanceNames, allTableConfigsInTenant, currentPartitionAssignment,
-        nReplicas, targetNumPartitions);
+    PartitionAssignmentGenerator partitionAssignmentGenerator;
+    if (isPartitionAwareRealtimeRouting(tableConfig)) {
+      partitionAssignmentGenerator =
+          new PartitionAwarePartitionAssignmentGenerator(tableConfig, nKafkaPartitions, instanceNames,
+              allTableConfigsInTenant, currentPartitionAssignment);
+    } else {
+      partitionAssignmentGenerator =
+          new AutoRebalancePartitionAssignmentGenerator(tableConfig, nKafkaPartitions, instanceNames,
+              allTableConfigsInTenant, currentPartitionAssignment);
+    }
+    return partitionAssignmentGenerator.generatePartitionAssignment();
   }
 
   /**
@@ -1292,7 +1293,14 @@ public class PinotLLCRealtimeSegmentManager {
    * @return
    */
   protected List<String> getRealtimeTablesWithServerTenant(String serverTenantName) {
-    return _helixResourceManager.getAllRealtimeTablesWithServerTenant(serverTenantName);
+    List<String> realtimeTablesWithServerTenant = new ArrayList<>();
+    for (String tableName : _helixResourceManager.getAllRealtimeTables()) {
+      TableConfig realtimeTableConfig = getRealtimeTableConfig(tableName);
+      if (realtimeTableConfig.getTenantConfig().getServer().equals(serverTenantName)) {
+        realtimeTablesWithServerTenant.add(tableName);
+      }
+    }
+    return realtimeTablesWithServerTenant;
   }
 
   /**
@@ -1306,161 +1314,6 @@ public class PinotLLCRealtimeSegmentManager {
       return true;
     }
     return false;
-  }
-
-  /**
-   * Given all tables in the same tenant, generates the right partition assignment based on
-   * whether routing config is PartitionAware or not
-   * @param tableConfig
-   * @param instanceNames
-   * @param tablesInSameTenant
-   * @param currentPartitionAssignment
-   * @param nReplicas
-   * @param nKafkaPartitions
-   * @return
-   */
-  private Map<String, ZNRecord> generatePartitionAssignment(TableConfig tableConfig, List<String> instanceNames,
-      Map<String, TableConfig> tablesInSameTenant, Map<String, ZNRecord> currentPartitionAssignment, int nReplicas,
-      Map<String, Integer> nKafkaPartitions) {
-
-    Map<String, ZNRecord> tableNameToPartitionAssignment;
-
-    if (isPartitionAwareRealtimeRouting(tableConfig)) {
-
-      List<String> partitionAwareTables = new ArrayList<>();
-      for (TableConfig config : tablesInSameTenant.values()) {
-        if (isPartitionAwareRealtimeRouting(config)) {
-          partitionAwareTables.add(config.getTableName());
-        }
-      }
-
-      tableNameToPartitionAssignment =
-          partitionAwarePartitionAssignment(partitionAwareTables, nKafkaPartitions, nReplicas, instanceNames);
-    } else {
-
-      List<String> tablesForAutoRebalance = new ArrayList<>();
-      for (TableConfig config : tablesInSameTenant.values()) {
-        if (!isPartitionAwareRealtimeRouting(config)) {
-          tablesForAutoRebalance.add(config.getTableName());
-        }
-      }
-
-      tableNameToPartitionAssignment =
-          autoRebalancePartitionAssignment(tablesForAutoRebalance, nKafkaPartitions, nReplicas, instanceNames,
-              currentPartitionAssignment);
-    }
-
-    return tableNameToPartitionAssignment;
-  }
-
-  /**
-   * Generates partition assignment for all tables provided
-   * The partition assignment is done by uniformly spraying the partitions across available instances,
-   * such that the assignment can be used for a partition aware routing
-   *
-   * NOTE: We do not support/expect partition aware tables with multi tenant setup, hence this strategy should suffice
-   *
-   * @param partitionAwareTables
-   * @param nPartitions
-   * @param nReplicas
-   * @param instanceNames
-   * @return
-   */
-  protected Map<String, ZNRecord> partitionAwarePartitionAssignment(List<String> partitionAwareTables,
-      Map<String, Integer> nPartitions, int nReplicas, List<String> instanceNames) {
-
-    Map<String, ZNRecord> tableNameToPartitionAssignment = new HashMap<>(partitionAwareTables.size());
-
-    for (String realtimeTableName : partitionAwareTables) {
-      ZNRecord znRecord = new ZNRecord(realtimeTableName);
-      int serverId = 0;
-      for (int p = 0; p < nPartitions.get(realtimeTableName); p++) {
-        List<String> instances = new ArrayList<>(nReplicas);
-        for (int r = 0; r < nReplicas; r++) {
-          instances.add(instanceNames.get(serverId++));
-          if (serverId == instanceNames.size()) {
-            serverId = 0;
-          }
-        }
-        znRecord.setListField(Integer.toString(p), instances);
-      }
-      tableNameToPartitionAssignment.put(realtimeTableName, znRecord);
-    }
-    return tableNameToPartitionAssignment;
-  }
-
-  /**
-   * Generates partition assignment for all tables provided, using AutoRebalanceStrategy
-   * @param tablesForAutoRebalance all the tables that need rebalance
-   * @param nPartitions number of partitions for each table
-   * @param nReplicas number of replicas
-   * @param instanceNames instance names across which to rebalance
-   * @param currentPartitionAssignment current assignment of partitions
-   * @return
-   */
-  protected Map<String, ZNRecord> autoRebalancePartitionAssignment(List<String> tablesForAutoRebalance,
-      Map<String, Integer> nPartitions, int nReplicas, List<String> instanceNames,
-      Map<String, ZNRecord> currentPartitionAssignment) {
-
-    Map<String, ZNRecord> tableNameToPartitionAssignment = new HashMap<>(tablesForAutoRebalance.size());
-    final String partitionJoiner = "_";
-
-    Map<String, Map<String, String>> currentPartitions = new HashMap<>();
-    List<String> newPartitions = new ArrayList<>();
-    for (String realtimeTableName : tablesForAutoRebalance) {
-
-      // construct current partitions map
-      ZNRecord partitionAssignmentZNode = currentPartitionAssignment.get(realtimeTableName);
-      if (partitionAssignmentZNode != null) {
-
-        Map<String, List<String>> partitionToInstances = partitionAssignmentZNode.getListFields();
-        for (Map.Entry<String, List<String>> partitionEntry : partitionToInstances.entrySet()) {
-          String partitionNumber = partitionEntry.getKey();
-          List<String> partitionInstances = partitionEntry.getValue();
-          String key = realtimeTableName + partitionJoiner + partitionNumber;
-          Map<String, String> value = new HashMap<>();
-          for (String instance : partitionInstances) {
-            value.put(instance, "ONLINE");
-          }
-          currentPartitions.put(key, value);
-        }
-      }
-
-      // construct new partitions list
-      int p = nPartitions.get(realtimeTableName);
-      for (int i = 0; i < p; i++) {
-        newPartitions.add(realtimeTableName + partitionJoiner + Integer.toString(i));
-      }
-    }
-
-    // get states
-    LinkedHashMap<String, Integer> states = new LinkedHashMap<>(2);
-    states.put("OFFLINE", 0);
-    states.put("ONLINE", nReplicas);
-
-    // auto rebalance
-    AutoRebalanceStrategy autoRebalanceStrategy =
-        new AutoRebalanceStrategy(tablesForAutoRebalance.get(0), newPartitions, states);
-    ZNRecord partitionAssignmentAcrossAllTables =
-        autoRebalanceStrategy.computePartitionAssignment(instanceNames, instanceNames, currentPartitions, null);
-
-    // extract kafka partition assignment znodes from auto rebalance result
-    Map<String, List<String>> listFields = partitionAssignmentAcrossAllTables.getListFields();
-    for (Map.Entry<String, List<String>> entry : listFields.entrySet()) {
-      String partitionName = entry.getKey();
-      int lastIndex = partitionName.lastIndexOf(partitionJoiner);
-      String tableName = partitionName.substring(0, lastIndex);
-      String partitionNumber = partitionName.substring(lastIndex + 1);
-
-      ZNRecord znRecord = tableNameToPartitionAssignment.get(tableName);
-      if (znRecord == null) {
-        znRecord = new ZNRecord(tableName);
-        tableNameToPartitionAssignment.put(tableName, znRecord);
-      }
-      znRecord.setListField(partitionNumber, entry.getValue());
-    }
-
-    return tableNameToPartitionAssignment;
   }
 
   /**
