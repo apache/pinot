@@ -769,6 +769,11 @@ export default Controller.extend({
         Object.assign(newAlertObj, { exploreDimensions: selectedDimension });
       }
 
+      // Add speedup prop for minutely metrics
+      if (selectedGranularity.toLowerCase().includes('minute')) {
+        Object.assign(newAlertObj, { speedup: true });
+      }
+
       return {
         jobName,
         payload: JSON.stringify(newAlertObj)
@@ -877,7 +882,6 @@ export default Controller.extend({
       const filterNames = Object.keys(JSON.parse(selectedFilters));
       let isSelectedDimensionEqualToSelectedFilter = false;
 
-      this.set('graphConfig.filters', selectedFilters);
       // Remove selected filters from dimension options only if filter has single entity
       for (var key of filterNames) {
         if (selectedFilterObj[key].length === 1) {

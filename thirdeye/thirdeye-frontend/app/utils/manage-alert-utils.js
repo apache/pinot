@@ -81,13 +81,14 @@ export function enhanceAnomalies(rawAnomalies) {
     Object.assign(anomaly, {
       changeRate,
       shownChangeRate: changeRate,
+      isUserReported: anomaly.anomalyResultSource === 'USER_LABELED_ANOMALY',
       startDateStr: moment(anomaly.anomalyStart).format('MMM D, hh:mm A'),
       durationStr: noZeroDurationArr.join(', '),
       severityScore: (anomaly.current/anomaly.baseline - 1).toFixed(2),
       shownCurrent: anomaly.current,
       shownBaseline: anomaly.baseline,
       showResponseSaved: false,
-      shorResponseFailed: false
+      showResponseFailed: false
     });
 
     // Create a list of all available dimensions for toggling. Also massage dimension property.
@@ -261,6 +262,7 @@ export function buildAnomalyStats(alertEvalMetrics, mode, severity = '30', isPer
 
   if (mode === 'explore') {
     anomalyStats.splice(1, 0, responseRateObj);
+    anomalyStats.find(stat => stat.key === 'mttd').hideProjected = true;
   }
 
   anomalyStats.forEach((stat) => {
@@ -276,6 +278,8 @@ export function buildAnomalyStats(alertEvalMetrics, mode, severity = '30', isPer
     stat.showDirectionIcon = isFinite(origData) && isFinite(newData) && origData !== newData;
     stat.direction = stat.showDirectionIcon && origData > newData ? 'bottom' : 'top';
   });
+
+
 
   return anomalyStats;
 }

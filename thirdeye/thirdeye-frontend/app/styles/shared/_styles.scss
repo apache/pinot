@@ -472,6 +472,10 @@ body {
     overflow-y: scroll;
   }
 
+  &__text {
+    margin-right: 30px;
+  }
+
   &__head {
     line-height: 40px;
   }
