@@ -364,6 +364,7 @@ public class PinotHelixResourceManager {
     }
     return resourceNames;
   }
+
   /**
    * Get all Pinot raw table names.
    *
