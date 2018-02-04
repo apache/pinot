@@ -4,7 +4,7 @@
   "segmentsConfig": {
     "segmentPushType": "APPEND",
     "timeColumnName": "ReadStartTime",
-    "timeType": "MILLISECONDS",
+    "timeType": "SECONDS",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "schemaName": "ArticleReadSchema",
     "replication": "1"
