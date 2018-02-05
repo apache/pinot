@@ -6,6 +6,10 @@ import timeseriesCompare from 'thirdeye-frontend/mocks/timeseriesCompare';
 import { onboardJobStatus, onboardJobCreate } from 'thirdeye-frontend/mocks/detectionOnboard';
 import rootcause from 'thirdeye-frontend/mirage/endpoints/rootcause';
 
+/**
+ * TODO: Group endpoints together and put them in files under the endpoints folder to prevent overloading this file
+ */
+
 export default function() {
 
   this.timing = 1000;      // delay for each request, automatically set to 0 during testing

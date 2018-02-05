@@ -6,13 +6,13 @@ export default function(server) {
     return [ {
       "urn" : "thirdeye:metric:1",
       "score" : 1.0,
-      "label" : "thirdeyeKbmi::pageViews",
+      "label" : "thirdeye::pageViews",
       "type" : "metric",
       "link" : null,
       "relatedEntities" : [ ],
       "attributes" : {
         "inverse" : [ "false" ],
-        "dataset" : [ "thirdeyeKbmi" ],
+        "dataset" : [ "thirdeye" ],
         "derived" : [ "false" ],
         "additive" : [ "true" ]
       }
@@ -28,7 +28,7 @@ export default function(server) {
   server.get('/data/metric/1', () => {
     return {
       "id": 1,
-      "name": "pageViews"
+      "alias": "pageViews"
     };
   });
 

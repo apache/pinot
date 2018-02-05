@@ -4,6 +4,7 @@ import moduleForAcceptance from 'thirdeye-frontend/tests/helpers/module-for-acce
 const PLACEHOLDER = '.rootcause-placeholder';
 const TABS = '.rootcause-tabs';
 const LABEL = '.rootcause-legend__label';
+const SELECTED_METRIC = '.rootcause-select-metric-dimension';
 
 moduleForAcceptance('Acceptance | rootcause');
 
@@ -37,5 +38,11 @@ in the legend`, async assert => {
     find(LABEL).get(0).innerText,
     'pageViews',
     'metric label is correct'
+  );
+
+  assert.equal(
+    find(SELECTED_METRIC).get(0).innerText,
+    'pageViews',
+    'selected metric is correct'
   );
 });

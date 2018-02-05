@@ -5,6 +5,8 @@ import { task, timeout } from 'ember-concurrency';
 import _ from 'lodash';
 
 export default Ember.Component.extend({
+  classNames: ['rootcause-select-metric-dimension'],
+
   selectedUrn: null, // ""
 
   onSelection: null, // function (metricUrn)
@@ -43,7 +45,7 @@ export default Ember.Component.extend({
         fetch(url)
           .then(res => res.json())
           .then(res => this.set('selectedMetric', res));
-
+        console.log("selectedMetric: ", this.get('selectedMetric'));
       } else {
         this.set('selectedMetric', null);
       }
