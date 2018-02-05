@@ -7,13 +7,11 @@ import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatterContext;
 import com.linkedin.thirdeye.alert.content.OnboardingNotificationEmailContentFormatter;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardTask;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardExecutionContext;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
-import com.linkedin.thirdeye.dashboard.resources.EmailResource;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -33,7 +31,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Send out email notifications
  */
-public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
+public class NotificationOnboardingTask extends BaseDetectionOnboardTask {
   private static final Logger LOG = LoggerFactory.getLogger(NotificationOnboardingTask.class);
 
   public static final String TASK_NAME = "Notification";
@@ -119,6 +117,8 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask{
     EmailContentFormatter emailContentFormatter = new OnboardingNotificationEmailContentFormatter();
     // construct context
     EmailContentFormatterContext context = new EmailContentFormatterContext();
+    context.setAnomalyFunctionSpec(anomalyFunctionSpec);
+    context.setAlertConfig(alertConfig);
     context.setStart(start);
     context.setEnd(end);
 
