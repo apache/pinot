@@ -5,12 +5,10 @@ import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.lang.StringUtils;
-import org.joda.time.DateTime;
 import org.joda.time.Days;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +40,7 @@ public class OnboardingNotificationEmailContentFormatter extends BaseEmailConten
   @Override
   protected void updateTemplateDataByAnomalyResults(Map<String, Object> templateData,
       Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
-    AnomalyFunctionDTO anomalyFunctionSpec = null;
+    AnomalyFunctionDTO anomalyFunctionSpec = context.getAnomalyFunctionSpec();
     for (AnomalyResult anomalyResult : anomalies) {
       if (!(anomalyResult instanceof MergedAnomalyResultDTO)) {
         throw new IllegalArgumentException("Input anomalies should be instance of MergedAnomalyResultDTO");
@@ -71,12 +69,9 @@ public class OnboardingNotificationEmailContentFormatter extends BaseEmailConten
     if (alertFilter != null && alertFilter.containsKey(ALERT_FILTER_PATTERN_KEY)) {
       alertPattern = alertFilter.get(ALERT_FILTER_PATTERN_KEY);
     }
-    AlertConfigDTO alertConfig = null;
     templateData.put("alertPattern", alertPattern);
-    if (templateData.containsKey(ALERT_CONFIG_NAME)) {
-      String configName = (String) templateData.get(ALERT_CONFIG_NAME);
-      alertConfig = DAORegistry.getInstance().getAlertConfigDAO().findWhereNameEquals(configName);
-    }
+
+    AlertConfigDTO alertConfig = context.getAlertConfig();
     if (alertConfig == null) {
       alertConfig = new AlertConfigDTO();
     }
