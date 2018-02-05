@@ -8,6 +8,7 @@ import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
+import com.linkedin.thirdeye.anomaly.onboard.utils.FunctionCreationUtils;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
@@ -338,8 +339,11 @@ public class AnomalyResource {
     }
 
     TimeGranularity dataGranularity;
+    DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
+    if (datasetConfig == null) {
+      throw new IllegalArgumentException(String.format("No entry with dataset name %s exists", dataset));
+    }
     if (userInputDataGranularity == null) {
-      DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
       TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
       dataGranularity = timespec.getDataGranularity();
     } else {
@@ -397,7 +401,7 @@ public class AnomalyResource {
     anomalyFunctionSpec.setBucketUnit(dataGranularity.getUnit());
 
     if (StringUtils.isNotEmpty(exploreDimensions)) {
-      anomalyFunctionSpec.setExploreDimensions(getDimensions(dataset, exploreDimensions));
+      anomalyFunctionSpec.setExploreDimensions(FunctionCreationUtils.getDimensions(datasetConfig, exploreDimensions));
     }
     if (!StringUtils.isBlank(filters)) {
       filters = URLDecoder.decode(filters, UTF8);
@@ -537,7 +541,8 @@ public class AnomalyResource {
 
     if (StringUtils.isNotEmpty(exploreDimensions)) {
       // Ensure that the explore dimension names are ordered as schema dimension names
-      anomalyFunctionSpec.setExploreDimensions(getDimensions(dataset, exploreDimensions));
+      DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(anomalyFunctionSpec.getCollection());
+      anomalyFunctionSpec.setExploreDimensions(FunctionCreationUtils.getDimensions(datasetConfig, exploreDimensions));
     }
     if (StringUtils.isNotEmpty(cron)) {
       // validate cron
@@ -936,21 +941,6 @@ public class AnomalyResource {
       }
     }
     return false;
-  }
-
-  private String getDimensions(String dataset, String exploreDimensions) throws Exception {
-    // Ensure that the explore dimension names are ordered as schema dimension names
-    List<String> schemaDimensionNames = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(dataset).getDimensions();
-    Set<String> splitExploreDimensions = new HashSet<>(Arrays.asList(exploreDimensions.trim().split(",")));
-    StringBuilder reorderedExploreDimensions = new StringBuilder();
-    String separator = "";
-    for (String dimensionName : schemaDimensionNames) {
-      if (splitExploreDimensions.contains(dimensionName)) {
-        reorderedExploreDimensions.append(separator).append(dimensionName);
-        separator = ",";
-      }
-    }
-    return reorderedExploreDimensions.toString();
   }
 
   /**

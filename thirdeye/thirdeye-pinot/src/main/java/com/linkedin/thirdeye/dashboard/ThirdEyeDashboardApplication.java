@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.dashboard;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.cache.CacheBuilder;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
+import com.linkedin.thirdeye.anomaly.onboard.FunctionOnboardingResource;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.auth.AuthCookieSerializer;
 import com.linkedin.thirdeye.auth.Credentials;
@@ -153,6 +154,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new AutoOnboardResource(config));
     env.jersey().register(new ConfigResource(DAO_REGISTRY.getConfigDAO()));
     env.jersey().register(new RootCauseSessionResource(DAO_REGISTRY.getRootcauseSessionDAO(), new ObjectMapper()));
+    env.jersey().register(new FunctionOnboardingResource());
 
     if (config.getOnboardingHost() != null) {
       LOG.info("Setting up onboarding proxy for '{}'", config.getOnboardingHost());

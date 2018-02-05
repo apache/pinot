@@ -4,9 +4,11 @@ import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardTask;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardExecutionContext;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardTaskContext;
+import com.linkedin.thirdeye.anomaly.onboard.utils.FunctionCreationUtils;
 import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
@@ -21,8 +23,10 @@ import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Properties;
@@ -77,10 +81,11 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
   public static final String DEFAULT_ALERT_RECEIVER = DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER_ADDRESS;
 
   public static final Boolean DEFAULT_IS_ACTIVE = true;
-  public static final String DEFAULT_WINDOW_DELAY = "0";
+  public static final Integer DEFAULT_WINDOW_DELAY = 0;
   public static final String DEFAULT_ALERT_CRON = "0 0/5 * 1/1 * ? *"; // Every 5 min
   public static final String DEFAULT_ALERT_FILTER_PATTERN = AlertFilterAutoTuneOnboardingTask.DEFAULT_AUTOTUNE_PATTERN;
   public static final String DEFAULT_ALERT_FILTER_TYPE = "AUTOTUNE";
+  public static final String DEFAULT_URL_DECODER = "UTF-8";
 
   private AnomalyFunctionManager anoomalyFunctionDAO;
   private AlertConfigManager alertConfigDAO;
@@ -126,13 +131,15 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       Preconditions.checkNotNull(configuration.getString(ALERT_TO));
     }
 
-    // check if duplicate name exists
-    AnomalyFunctionDTO duplicateFunction = anoomalyFunctionDAO.findWhereNameEquals(configuration.getString(FUNCTION_NAME));
-    if (duplicateFunction != null) {
-      throw new IllegalArgumentException("Duplicate function name " + configuration.getString(FUNCTION_NAME)
-          + " is found");
+    // Get pre-created function name
+    // TODO Once pipeline refactor is done, this logic should be changed to be new function creation
+    AnomalyFunctionDTO anomalyFunction = anoomalyFunctionDAO.findWhereNameEquals(configuration.getString(FUNCTION_NAME));
+    if (anomalyFunction == null) {
+      throw new IllegalArgumentException(String.format("No function with name %s is found in the system",
+          configuration.getString(FUNCTION_NAME)));
     }
 
+    // check if duplicate name exists
     if (StringUtils.isNotBlank(configuration.getString(ALERT_NAME))) {
       AlertConfigDTO duplicateAlert = alertConfigDAO.findWhereNameEquals(configuration.getString(ALERT_NAME));
       if (duplicateAlert != null) {
@@ -165,8 +172,6 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     String defaultMetricFunction = metricConfig.getDefaultAggFunction().name();
 
     // create function
-    AnomalyResource anomalyResource = new AnomalyResource(anomalyFunctionFactory, alertFilterFactory);
-    AnomalyFunctionDTO anomalyFunction = null;
     try {
       AnomalyFunctionDTO defaultFunctionSpec = getDefaultFunctionSpecByTimeGranularity(dataGranularity);
 
@@ -179,25 +184,43 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
         defaultFunctionProperties.setProperty((String) propertyEntry.getKey(), (String) propertyEntry.getValue());
       }
 
-      Response response = anomalyResource.createAnomalyFunction(configuration.getString(COLLECTION_NAME),
-          configuration.getString(FUNCTION_NAME), configuration.getString(METRIC_NAME),
-          configuration.getString(METRIC_FUNCTION, defaultMetricFunction),
-          configuration.getString(FUNCTION_TYPE, defaultFunctionSpec.getType()),
-          configuration.getString(WINDOW_SIZE, Integer.toString(defaultFunctionSpec.getWindowSize())),
-          configuration.getString(WINDOW_UNIT, defaultFunctionSpec.getWindowUnit().name()),
-          configuration.getString(WINDOW_DELAY, DEFAULT_WINDOW_DELAY),
-          configuration.getString(CRON_EXPRESSION, defaultFunctionSpec.getCron()), configuration.getString(WINDOW_DELAY_UNIT),
-          configuration.getString(EXPLORE_DIMENSION), configuration.getString(FILTERS),
-          configuration.getString(DATA_GRANULARITY),
-          com.linkedin.thirdeye.datalayer.util.StringUtils.encodeCompactedProperties(defaultFunctionProperties),
-          configuration.getBoolean(IS_ACTIVE, DEFAULT_IS_ACTIVE));
-      if (Response.Status.OK.equals(response.getStatusInfo())) {
-        long functionId = Long.valueOf(response.getEntity().toString());
-        anomalyFunction = anoomalyFunctionDAO.findById(functionId);
-        executionContext.setExecutionResult(ANOMALY_FUNCTION_CONFIG, anomalyFunction);
-      } else {
-        throw new UnsupportedOperationException("Get Exception from Anomaly Function Creation End-Point");
+      anomalyFunction.setMetricId(metricConfig.getId());
+      anomalyFunction.setMetric(metricConfig.getName());
+      anomalyFunction.setTopicMetric(metricConfig.getName());
+      anomalyFunction.setMetrics(Arrays.asList(metricConfig.getName()));
+      anomalyFunction.setCollection(datasetConfig.getDataset());
+      anomalyFunction.setCron(configuration.getString(CRON_EXPRESSION, defaultFunctionSpec.getCron()));
+      anomalyFunction.setMetricFunction(MetricAggFunction.valueOf(
+          configuration.getString(METRIC_FUNCTION, defaultMetricFunction)));
+      String filters = configuration.getString(FILTERS);
+      if (!org.apache.commons.lang3.StringUtils.isBlank(filters)) {
+        filters = URLDecoder.decode(filters, DEFAULT_URL_DECODER);
+        String filterString = ThirdEyeUtils.getSortedFiltersFromJson(filters);
+        anomalyFunction.setFilters(filterString);
       }
+      if (org.apache.commons.lang3.StringUtils.isNotEmpty(configuration.getString(EXPLORE_DIMENSION))) {
+        anomalyFunction.setExploreDimensions(FunctionCreationUtils.getDimensions(datasetConfig, configuration.getString(EXPLORE_DIMENSION)));
+      }
+
+      anomalyFunction.setWindowSize(configuration.getInt(WINDOW_SIZE, defaultFunctionSpec.getWindowSize()));
+      anomalyFunction.setWindowUnit(TimeUnit.valueOf(configuration
+          .getString(WINDOW_UNIT, defaultFunctionSpec.getWindowUnit().name())));
+      anomalyFunction.setWindowDelay(configuration.getInt(WINDOW_DELAY, DEFAULT_WINDOW_DELAY));
+      anomalyFunction.setWindowDelayUnit(TimeUnit.valueOf(
+          configuration.getString(WINDOW_DELAY_UNIT, dataGranularity.getUnit().toString())));
+      anomalyFunction.setType(configuration.getString(FUNCTION_TYPE, defaultFunctionSpec.getType()));
+      anomalyFunction.setProperties(com.linkedin.thirdeye.datalayer.util.StringUtils.
+          encodeCompactedProperties(defaultFunctionProperties));
+      if (defaultFunctionSpec.getFrequency() != null) {
+        anomalyFunction.setFrequency(defaultFunctionSpec.getFrequency());
+      }
+      anomalyFunction.setBucketSize(dataGranularity.getSize());
+      anomalyFunction.setBucketUnit(dataGranularity.getUnit());
+      anomalyFunction.setIsActive(configuration.getBoolean(IS_ACTIVE, DEFAULT_IS_ACTIVE));
+
+      anoomalyFunctionDAO.update(anomalyFunction);
+
+      executionContext.setExecutionResult(ANOMALY_FUNCTION_CONFIG, anomalyFunction);
     } catch (Exception e) {
       throw new IllegalArgumentException(e);
     }
@@ -261,6 +284,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
         anomalyFunctionSpec.setCron("0 0 0 * * ?");
         anomalyFunctionSpec.setWindowSize(6);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
+        anomalyFunctionSpec.setFrequency(new TimeGranularity(15, TimeUnit.MINUTES));
         anomalyFunctionSpec.setProperties("");
         break;
       case HOURS:
