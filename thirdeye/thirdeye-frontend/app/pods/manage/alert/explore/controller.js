@@ -330,7 +330,7 @@ export default Controller.extend({
       checkReplayInterval
     } = this.getProperties('alertId', 'functionName', 'replayStartTime', 'requestCanContinue', 'checkReplayInterval');
     const br = `\r\n`;
-    const replayStatusList = ['completed', 'failed'];
+    const replayStatusList = ['completed', 'failed', 'timeout'];
     const subject = 'TE Self-Serve Create Alert Issue';
     const intro = `TE Team, please look into a replay error for...${br}${br}`;
     const mailtoString = `mailto:ask_thirdeye@linkedin.com?subject=${encodeURIComponent(subject)}&body=`;

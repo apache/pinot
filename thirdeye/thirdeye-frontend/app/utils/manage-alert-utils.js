@@ -108,7 +108,7 @@ export function enhanceAnomalies(rawAnomalies) {
     newAnomalies.push(anomaly);
   });
 
-  return newAnomalies;
+  return newAnomalies.sortBy('anomalyStart');
 }
 
 /**
