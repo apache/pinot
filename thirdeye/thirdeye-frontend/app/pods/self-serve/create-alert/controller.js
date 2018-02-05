@@ -39,6 +39,7 @@ export default Controller.extend({
   isProcessingForm: false,
   isEmailError: false,
   isDuplicateEmail: false,
+  isAlertNameUserModified: false,
   showGraphLegend: false,
   redirectToAlertPage: true,
   metricGranularityOptions: [],
@@ -622,6 +623,24 @@ export default Controller.extend({
   },
 
   /**
+   * Auto-generate the alert name until the user directly edits it
+   * @method modifyAlertFunctionName
+   * @return {undefined}
+   */
+  modifyAlertFunctionName() {
+    const {
+      functionNamePrimer,
+      isAlertNameUserModified,
+    } = this.getProperties('functionNamePrimer', 'isAlertNameUserModified');
+    // If user has not yet edited the alert name, continue to auto-generate it.
+    if (!isAlertNameUserModified) {
+      this.set('alertFunctionName', functionNamePrimer);
+    }
+    // Each time we modify the name, we validate it as well to ensure no duplicates exist.
+    this.send('validateAlertName', this.get('alertFunctionName'));
+  },
+
+  /**
    * Filter all existing alert groups down to only those that are active and belong to the
    * currently selected application team.
    * @method filteredConfigGroups
@@ -640,6 +659,39 @@ export default Controller.extend({
       } else {
         return activeGroups;
       }
+    }
+  ),
+
+  /**
+   * Generate alert name primer based on user selections
+   * @type {String}
+   */
+  functionNamePrimer: computed(
+    'selectedPattern',
+    'selectedDimension',
+    'selectedGranularity',
+    'selectedApplication',
+    'selectedMetricOption',
+    function() {
+      const {
+        selectedPattern,
+        selectedDimension,
+        selectedGranularity,
+        selectedApplication,
+        selectedMetricOption
+      } = this.getProperties(
+        'selectedPattern',
+        'selectedDimension',
+        'selectedGranularity',
+        'selectedApplication',
+        'selectedMetricOption'
+      );
+      const pattern = selectedPattern ? `${selectedPattern.camelize()}_` : '';
+      const dimension = selectedDimension ? `${selectedDimension.camelize()}_` : '';
+      const granularity = selectedGranularity ? selectedGranularity.toLowerCase().camelize() : '';
+      const app = selectedApplication ? `${selectedApplication.camelize()}_` : 'applicationName_';
+      const metric = selectedMetricOption ? `${selectedMetricOption.name.camelize()}_` : 'metricName_';
+      return `${app}${metric}${dimension}${pattern}${granularity}`;
     }
   ),
 
@@ -761,7 +813,7 @@ export default Controller.extend({
 
       // Add filters property if present
       if (selectedFilters.length > 2) {
-        Object.assign(newAlertObj, { filters: selectedFilters });
+        Object.assign(newAlertObj, { filters: encodeURIComponent(selectedFilters) });
       }
 
       // Add dimensions if present
@@ -857,7 +909,8 @@ export default Controller.extend({
           this.setProperties(hash);
           this.setProperties({
             metricGranularityOptions: hash.granularities,
-            originalDimensions: hash.dimensions
+            originalDimensions: hash.dimensions,
+            alertFunctionName: this.get('functionNamePrimer')
           });
           this.triggerGraphFromMetric(selectedObj);
         })
@@ -926,6 +979,7 @@ export default Controller.extend({
           isMetricDataLoading: true,
           isFetchingDimensions: true
         });
+        this.modifyAlertFunctionName();
         this.triggerGraphFromMetric(this.get('selectedMetricOption'));
       }
     },
@@ -941,7 +995,19 @@ export default Controller.extend({
         selectedGranularity: selectedObj,
         isMetricDataLoading: true
       });
+      this.modifyAlertFunctionName();
       this.triggerGraphFromMetric(this.get('selectedMetricOption'));
+    },
+
+    /**
+     * Set selected pattern and trigger auto-generation of Alert Name
+     * @method onSelectPattern
+     * @param {Object} selectedOption - The selected pattern option
+     * @return {undefined}
+     */
+    onSelectPattern(selectedOption) {
+      this.set('selectedPattern', selectedOption);
+      this.modifyAlertFunctionName();
     },
 
     /**
@@ -955,6 +1021,7 @@ export default Controller.extend({
         selectedAppName: selectedObj,
         selectedApplication: selectedObj.application
       });
+      this.modifyAlertFunctionName();
     },
 
     /**
@@ -981,9 +1048,11 @@ export default Controller.extend({
      * Make sure alert name does not already exist in the system
      * @method validateAlertName
      * @param {String} name - The new alert name
+     * @param {Boolean} userModified - Up to this moment, is the new name auto-generated, or user modified?
+     * If user-modified, we will stop modifying it dynamically (via 'isAlertNameUserModified')
      * @return {undefined}
      */
-    validateAlertName(name) {
+    validateAlertName(name, userModified = false) {
       let isDuplicateName = false;
       this.fetchAnomalyByName(name).then(anomaly => {
         for (var resultObj of anomaly) {
@@ -991,7 +1060,12 @@ export default Controller.extend({
             isDuplicateName = true;
           }
         }
-        this.set('isAlertNameDuplicate', isDuplicateName);
+      // If the user edits the alert name, we want to stop auto-generating it.
+      if (userModified) {
+        this.set('isAlertNameUserModified', true);
+      }
+      // Either add or clear the "is duplicate name" banner
+      this.set('isAlertNameDuplicate', isDuplicateName);
       });
     },
 

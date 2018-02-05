@@ -73,7 +73,7 @@ export default Route.extend({
       .then((jobStatus) => {
         const createStatusObj = _.has(jobStatus, 'taskStatuses') ? jobStatus.taskStatuses.find(status => status.taskName === 'FunctionAlertCreation') : null;
         const isCreateComplete = createStatusObj ? createStatusObj.taskStatus.toLowerCase() === 'completed' : false;
-        let continuePolling = Number(moment.duration(moment().diff(onboardStartTime)).asSeconds().toFixed(0)) > 10;
+        let continuePolling = Number(moment.duration(moment().diff(onboardStartTime)).asSeconds().toFixed(0)) > 20;
 
         if (isCreateComplete) {
           // alert function is created. Redirect to alert page.
