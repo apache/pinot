@@ -249,7 +249,7 @@ export default Route.extend({
       exploreDimensions
     };
 
-    // Load endpoints for projected metrics
+    // Load endpoints for projected metrics. TODO: consolidate into CP if duplicating this logic
     const qsParams = `start=${baseStart.utc().format(dateFormat)}&end=${baseEnd.utc().format(dateFormat)}&useNotified=true`;
     const dateParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
     const anomalyDataUrl = `/anomalies/search/anomalyIds/${startStamp}/${endStamp}/1?anomalyIds=`;

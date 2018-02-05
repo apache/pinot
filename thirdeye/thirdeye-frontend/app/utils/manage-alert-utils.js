@@ -261,8 +261,13 @@ export function buildAnomalyStats(alertEvalMetrics, mode, severity = '30', isPer
   ];
 
   if (mode === 'explore') {
+    // Hide MTTD projected metric
+    const mttdObj = anomalyStats.find(stat => stat.key === 'mttd');
+    if (mttdObj) {
+      mttdObj.hideProjected = true;
+    }
+    // Append response rate metric
     anomalyStats.splice(1, 0, responseRateObj);
-    anomalyStats.find(stat => stat.key === 'mttd').hideProjected = true;
   }
 
   anomalyStats.forEach((stat) => {

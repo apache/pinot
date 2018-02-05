@@ -893,6 +893,7 @@ export default Controller.extend({
 
     /**
      * When a metric is selected, fetch its props, and send them to the graph builder
+     * TODO: if 'hash.dimensions' is not needed, lets refactor the RSVP object instead of renaming
      * @method onSelectMetric
      * @param {Object} selectedObj - The selected metric
      * @return {undefined}
@@ -906,12 +907,12 @@ export default Controller.extend({
       });
       this.fetchMetricData(selectedObj.id)
         .then((hash) => {
-          this.setProperties(hash);
-          this.setProperties({
-            metricGranularityOptions: hash.granularities,
+          Object.assign(hash, {
             originalDimensions: hash.dimensions,
+            metricGranularityOptions: hash.granularities,
             alertFunctionName: this.get('functionNamePrimer')
           });
+          this.setProperties(hash);
           this.triggerGraphFromMetric(selectedObj);
         })
         .catch((err) => {
