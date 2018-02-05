@@ -39,9 +39,9 @@ export default Ember.Route.extend(ApplicationRouteMixin, {
    * @return {undefined}
    */
   afterModel() {
-    // if (config.environment === 'test') {
+    if (config.environment === 'test') {
       this.get('session.session').set('isAuthenticated', true);
-    // }
+    }
   },
 
   /**

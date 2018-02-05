@@ -1,6 +1,7 @@
 export default function(server) {
   /**
    * Get request for rootcause page
+   * @return {Array}
    */
   server.get(`/rootcause/raw`, () => {
     return [ {
@@ -19,12 +20,18 @@ export default function(server) {
     } ];
   });
 
+  /**
+   * Retrieves the options for autocomplete for 'filter' dropdown
+   */
   server.get('/data/autocomplete/filters/metric/1', () => {
     return {
       environment: ['prod']
     };
   });
 
+  /**
+   * Retrieves information about a metric
+   */
   server.get('/data/metric/1', () => {
     return {
       "id": 1,
@@ -32,7 +39,10 @@ export default function(server) {
     };
   });
 
+  /**
+   * Retrieves timestamp of last element in timeseries
+   */
   server.get('/data/maxDataTime/metricId/1', () => {
-    return 1;
+    return 1517846399998;
   });
 }
