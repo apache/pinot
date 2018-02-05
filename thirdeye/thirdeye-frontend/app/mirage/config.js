@@ -205,4 +205,43 @@ export default function() {
     const hardCodedId = 1234567;
     return hardCodedId;
   });
+
+  /**
+   * Get request for rootcause page
+   */
+  this.get(`/rootcause/raw`, () => {
+    return [ {
+      "urn" : "thirdeye:metric:1",
+      "score" : 1.0,
+      "label" : "thirdeyeKbmi::pageViews",
+      "type" : "metric",
+      "link" : null,
+      "relatedEntities" : [ ],
+      "attributes" : {
+        "inverse" : [ "false" ],
+        "dataset" : [ "thirdeyeKbmi" ],
+        "derived" : [ "false" ],
+        "additive" : [ "true" ]
+      }
+    } ];
+  });
+
+  this.get('/data/autocomplete/filters/metric/1', () => {
+    return {
+      environment: ['prod']
+    };
+  });
+
+  this.get('/data/metric/1', () => {
+    return {
+      "id": 1,
+      "name": "pageViews"
+    };
+  });
+
+  this.get('/data/maxDataTime/metricId/1', () => {
+    return 1;
+  });
+
+  this.passthrough();
 }

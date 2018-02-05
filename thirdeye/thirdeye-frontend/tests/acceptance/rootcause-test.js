@@ -3,6 +3,7 @@ import moduleForAcceptance from 'thirdeye-frontend/tests/helpers/module-for-acce
 
 const PLACEHOLDER = '.rootcause-placeholder';
 const TABS = '.rootcause-tabs';
+const LABEL = '.rootcause-legend__label';
 
 moduleForAcceptance('Acceptance | rootcause');
 
@@ -20,5 +21,21 @@ test('empty state of rootcause page should have a placeholder and no tabs', asyn
   assert.notOk(
     find(TABS).get(0),
     'tabs do not exist'
+  );
+});
+
+test(`visiting /rootcause with only a metric provided should have correct metric name selected by default and displayed
+in the legend`, async assert => {
+  await visit('/rootcause?metricId=1');
+
+  assert.equal(
+    currentURL(),
+    '/rootcause?metricId=1',
+    'link is correct');
+
+  assert.equal(
+    find(LABEL).get(0).innerText,
+    'pageViews',
+    'metric label is correct'
   );
 });
