@@ -472,6 +472,10 @@ body {
     overflow-y: scroll;
   }
 
+  &__text {
+    margin-right: 30px;
+  }
+
   &__head {
     line-height: 40px;
   }
@@ -511,6 +515,7 @@ body {
     list-style: none;
     margin-left: -39px;
     margin-bottom: 0;
+    max-width: 230px;
 
     &--lighter {
       font-size: 12px;
@@ -548,7 +553,7 @@ body {
     font-size: 15px;
   }
 
-  &__glyph {
+  &__icon {
     font-size: 14px;
     margin-left: 5px;
 

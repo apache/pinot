@@ -81,6 +81,7 @@ export default Controller.extend({
 
     // Start checking for replay to end if a jobId is present
     if (this.get('isReplayPending')) {
+      this.set('replayStartTime', moment());
       this.checkReplayStatus(this.get('jobId'));
     }
   },
@@ -234,8 +235,11 @@ export default Controller.extend({
     'alertEvalMetrics',
     'alertEvalMetrics.projected',
     function() {
-      const evalMetrics = this.get('alertEvalMetrics');
-      return buildAnomalyStats(evalMetrics, 'explore');
+      const {
+        alertEvalMetrics,
+        defaultSeverity
+      } = this.getProperties('alertEvalMetrics', 'defaultSeverity');
+      return buildAnomalyStats(alertEvalMetrics, 'explore', defaultSeverity);
     }
   ),
 
@@ -321,14 +325,16 @@ export default Controller.extend({
     const {
       alertId,
       functionName,
+      replayStartTime,
       requestCanContinue,
       checkReplayInterval
-    } = this.getProperties('alertId', 'functionName', 'requestCanContinue', 'checkReplayInterval');
+    } = this.getProperties('alertId', 'functionName', 'replayStartTime', 'requestCanContinue', 'checkReplayInterval');
     const br = `\r\n`;
-    const replayStatusArr = ['completed', 'timeout'];
+    const replayStatusList = ['completed', 'failed', 'timeout'];
     const subject = 'TE Self-Serve Create Alert Issue';
     const intro = `TE Team, please look into a replay error for...${br}${br}`;
     const mailtoString = `mailto:ask_thirdeye@linkedin.com?subject=${encodeURIComponent(subject)}&body=`;
+    let isReplayTimeUp = Number(moment.duration(moment().diff(replayStartTime)).asSeconds().toFixed(0)) > 60;
 
     // In replay status check, continue to display "pending" banner unless we have known success or failure.
     fetch(checkStatusUrl).then(checkStatus)
@@ -339,16 +345,12 @@ export default Controller.extend({
         const replayErr = replayStatusObj ? replayStatusObj.message : 'N/A';
         const replayStatus = replayStatusObj ? replayStatusObj.taskStatus.toLowerCase() : '';
         const bodyString = `${intro}jobId: ${jobId}${br}alertId: ${alertId}${br}functionName: ${functionName}${br}${br}error: ${replayErr}`;
+        const replayErrorMailtoStr = mailtoString + encodeURIComponent(bodyString);
 
-        if (replayStatusArr.includes(replayStatus)) {
+        if (replayStatusList.includes(replayStatus) || isReplayTimeUp) {
           this.set('isReplayPending', false);
           this.send('refreshModel');
           this.transitionToRoute('manage.alert', alertId, { queryParams: { jobId: null }});
-        } else if (replayStatus === 'failed') {
-          this.setProperties({
-            isReplayStatusError: true,
-            replayErrorMailtoStr: mailtoString + encodeURIComponent(bodyString)
-          });
         } else if (requestCanContinue) {
           later(() => {
             this.checkReplayStatus(jobId);

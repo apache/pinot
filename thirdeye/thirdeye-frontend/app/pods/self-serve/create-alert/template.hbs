@@ -139,7 +139,7 @@
         options=patternsOfInterest
         searchEnabled=false
         selected=selectedPattern
-        onchange=(action (mut selectedPattern))
+        onchange=(action "onSelectPattern")
         disabled=(not isMetricSelected)
         required=true
         as |name|
@@ -246,8 +246,7 @@
         class="form-control te-input"
         placeholder="Add a descriptive alert name"
         value=alertFunctionName
-        focus-out="validateAlertName"
-        key-up="validateAlertName"
+        key-up=(action "validateAlertName" alertFunctionName true)
         disabled=(not isMetricSelected)
       }}
     </div>

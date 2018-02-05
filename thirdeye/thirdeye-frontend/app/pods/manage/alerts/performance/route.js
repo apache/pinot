@@ -4,6 +4,7 @@
  * @exports alert create model
  */
 import Ember from 'ember';
+import fetch from 'fetch';
 import RSVP from 'rsvp';
 import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
 

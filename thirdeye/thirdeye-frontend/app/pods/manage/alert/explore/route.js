@@ -19,6 +19,7 @@ const dateFormat = 'YYYY-MM-DD';
 /**
  * Basic alert page defaults
  */
+const defaultSeverity = 30;
 const paginationDefault = 10;
 const durationDefault = '1m';
 const metricDataColor = 'blue';
@@ -41,10 +42,6 @@ const anomalyResponseObj = [
   { name: 'False alarm',
     value: 'NOT_ANOMALY',
     status: 'False Alarm'
-  },
-  { name: 'I don\'t know',
-    value: 'NO_FEEDBACK',
-    status: 'Not Resolved'
   },
   { name: 'Confirmed - New Trend',
     value: 'ANOMALY_NEW_TREND',
@@ -179,12 +176,10 @@ export default Route.extend({
     } = transition.queryParams;
 
     // Prepare endpoints for eval, mttd, projected metrics calls
-    const tuneParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
-    const tuneUrl = `/detection-job/autotune/filter/${id}?${tuneParams}`;
-    const evalUrl = `/detection-job/eval/filter/${id}?${tuneParams}`;
-    const mttdUrl = `/detection-job/eval/mttd/${id}`;
+    const dateParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
+    const evalUrl = `/detection-job/eval/filter/${id}?${dateParams}`;
+    const mttdUrl = `/detection-job/eval/mttd/${id}?severity=${defaultSeverity/100}`;
     const performancePromiseHash = {
-      autotuneId: fetch(tuneUrl, postProps('')).then(checkStatus),
       current: fetch(`${evalUrl}&isProjected=FALSE`).then(checkStatus),
       projected: fetch(`${evalUrl}&isProjected=TRUE`).then(checkStatus),
       mttd: fetch(mttdUrl).then(checkStatus)
@@ -201,7 +196,7 @@ export default Route.extend({
           duration,
           startDate,
           endDate,
-          tuneParams,
+          dateParams,
           alertEvalMetrics
         };
       })
@@ -254,16 +249,15 @@ export default Route.extend({
       exploreDimensions
     };
 
-    // Load endpoints for projected metrics
+    // Load endpoints for projected metrics. TODO: consolidate into CP if duplicating this logic
     const qsParams = `start=${baseStart.utc().format(dateFormat)}&end=${baseEnd.utc().format(dateFormat)}&useNotified=true`;
-    const tuneParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
+    const dateParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
     const anomalyDataUrl = `/anomalies/search/anomalyIds/${startStamp}/${endStamp}/1?anomalyIds=`;
-    const projectedMttdUrl = `/detection-job/eval/projected/mttd/${alertEvalMetrics.autotuneId}`;
     const metricsUrl = `/data/autocomplete/metric?name=${dataset}::${metricName}`;
     const anomaliesUrl = `/dashboard/anomaly-function/${alertId}/anomalies?${qsParams}`;
 
     const anomalyPromiseHash = {
-      projectedMttd: fetch(projectedMttdUrl).then(checkStatus),
+      projectedMttd: 0, // In overview mode, no projected MTTD value is needed
       metricsByName: fetch(metricsUrl).then(checkStatus),
       anomalyIds: fetch(anomaliesUrl).then(checkStatus)
     };
@@ -339,6 +333,7 @@ export default Route.extend({
       jobId,
       functionName,
       alertId: id,
+      defaultSeverity,
       isMetricDataInvalid: false,
       anomalyDataUrl,
       baselineOptions,
