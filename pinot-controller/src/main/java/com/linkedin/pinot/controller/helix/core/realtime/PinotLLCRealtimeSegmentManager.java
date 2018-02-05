@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.config.ColumnPartitionConfig;
 import com.linkedin.pinot.common.config.RoutingConfig;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableConfigWrapper;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.ColumnPartitionMetadata;
@@ -71,7 +72,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -89,7 +89,6 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.zookeeper.data.Stat;
@@ -214,9 +213,10 @@ public class PinotLLCRealtimeSegmentManager {
    * The topic name is being used as a dummy helix resource name. We do not read or write to zk in this
    * method.
    */
-  public void setupHelixEntries(TableConfig tableConfig, KafkaStreamMetadata kafkaStreamMetadata, int nPartitions, final List<String> instanceNames,
+  public void setupHelixEntries(TableConfigWrapper tableConfigWrapper, KafkaStreamMetadata kafkaStreamMetadata, int nPartitions, final List<String> instanceNames,
       IdealState idealState, boolean create) {
 
+    TableConfig tableConfig = tableConfigWrapper.getTableConfig();
     final int nReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
     final String topicName = kafkaStreamMetadata.getKafkaTopicName();
     final String realtimeTableName = tableConfig.getTableName();
@@ -227,7 +227,7 @@ public class PinotLLCRealtimeSegmentManager {
           instanceNames.size() + ") for table " + realtimeTableName + " topic " + topicName);
     }
 
-    Map<String, ZNRecord> newPartitionAssignment = generatePartitionAssignment(tableConfig, nPartitions, instanceNames);
+    Map<String, ZNRecord> newPartitionAssignment = generatePartitionAssignment(tableConfigWrapper, nPartitions, instanceNames);
 
     writeKafkaPartitionAssignment(newPartitionAssignment);
     setupInitialSegments(tableConfig, kafkaStreamMetadata, newPartitionAssignment.get(realtimeTableName), idealState,
@@ -1150,19 +1150,16 @@ public class PinotLLCRealtimeSegmentManager {
    * @param tableConfig tableConfig from propertystore
    */
   public void updateKafkaPartitionsIfNecessary(TableConfig tableConfig) {
+
+    TableConfigWrapper tableConfigWrapper = new TableConfigWrapper(tableConfig, _helixManager);
+
     final String realtimeTableName = tableConfig.getTableName();
     final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
     final Map<String, List<String>> partitionToServersMap = partitionAssignment.getListFields();
     final KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
 
-    /**
-     * TODO: Introduce config/class which given a tableConfig, will return the right instances
-     * This will be useful once we introduce consuming servers,
-     * as tables could either be using consuming instances or all server instances, depending on the tenant config
-     **/
-    final String realtimeServerTenantName =
-        ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tableConfig.getTenantConfig().getServer());
-    final List<String> currentInstances = getInstances(realtimeServerTenantName);
+    String consumingServersTag = tableConfigWrapper.getConsumingRealtimeServerTag();
+    final List<String> currentInstances = getInstances(consumingServersTag);
 
     // Previous partition count is what we find in the Kafka partition assignment znode.
     // Get the current partition count from Kafka.
@@ -1216,7 +1213,7 @@ public class PinotLLCRealtimeSegmentManager {
       _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.SHORT_OF_LIVE_INSTANCES, 0);
     }
 
-    Map<String, ZNRecord> newPartitionAssignment = generatePartitionAssignment(tableConfig, currentPartitionCount,
+    Map<String, ZNRecord> newPartitionAssignment = generatePartitionAssignment(tableConfigWrapper, currentPartitionCount,
         currentInstances);
     writeKafkaPartitionAssignment(newPartitionAssignment);
     LOGGER.info("Successfully updated Kafka partition assignment for table {}", realtimeTableName);
@@ -1252,12 +1249,14 @@ public class PinotLLCRealtimeSegmentManager {
    }
    *
    */
-  protected Map<String, ZNRecord> generatePartitionAssignment(TableConfig tableConfig, int nKafkaPartitions,
+  protected Map<String, ZNRecord> generatePartitionAssignment(TableConfigWrapper tableConfigWrapper, int nKafkaPartitions,
       List<String> instanceNames) {
+
+    TableConfig tableConfig = tableConfigWrapper.getTableConfig();
 
     // all realtime tables in same tenant
     List<String> realtimeTablesWithSameTenant =
-        getRealtimeTablesWithServerTenant(tableConfig.getTenantConfig().getServer());
+        getRealtimeTablesWithServerTenant(tableConfigWrapper.getServerTenantName());
 
     // get table configs for all tables in same tenant
     Map<String, TableConfig> allTableConfigsInTenant = new HashMap<>(realtimeTablesWithSameTenant.size());

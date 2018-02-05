@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.helix.core;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableConfigWrapper;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
@@ -34,6 +35,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
@@ -184,17 +186,8 @@ public class PinotTableIdealStateBuilder {
   }
 
   public static void buildLowLevelRealtimeIdealStateFor(String realtimeTableName, TableConfig realtimeTableConfig,
-      HelixAdmin helixAdmin, String helixClusterName, IdealState idealState) {
+      HelixAdmin helixAdmin, String helixClusterName, HelixManager helixManager, IdealState idealState) {
 
-    /**
-     * TODO: Introduce config/class which given a tableConfig, will return the right instances by reading the tenant config
-     * This will be useful once we introduce consuming servers,
-     * as tables could either be using consuming instances or all server instances, depending on the tenant config
-     **/
-    String realtimeServerTenant =
-        ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(realtimeTableConfig.getTenantConfig().getServer());
-    final List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName,
-        realtimeServerTenant);
     boolean create = false;
     // Validate replicasPerPartition here.
     final String replicasPerPartitionStr = realtimeTableConfig.getValidationConfig().getReplicasPerPartition();
@@ -217,7 +210,11 @@ public class PinotTableIdealStateBuilder {
     final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
     final int nPartitions = getPartitionCount(kafkaMetadata);
     LOGGER.info("Assigning {} partitions to instances for simple consumer for table {}", nPartitions, realtimeTableName);
-    segmentManager.setupHelixEntries(realtimeTableConfig, kafkaMetadata, nPartitions, realtimeInstances, idealState, create);
+
+    TableConfigWrapper tableConfigWrapper = new TableConfigWrapper(realtimeTableConfig, helixManager);
+    final List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName,
+        tableConfigWrapper.getConsumingRealtimeServerTag());
+    segmentManager.setupHelixEntries(tableConfigWrapper, kafkaMetadata, nPartitions, realtimeInstances, idealState, create);
   }
 
   public static int getPartitionCount(KafkaStreamMetadata kafkaMetadata) {
