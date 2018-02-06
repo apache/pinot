@@ -45,4 +45,28 @@ export default function(server) {
   server.get('/data/maxDataTime/metricId/1', () => {
     return 1517846399998;
   });
+
+  /**
+   * Retrieves information about a session
+   */
+  server.get('/session/1', () => {
+    return {
+      "id" : 1,
+      "version" : 1,
+      "createdBy" : "mickeymouse",
+      "updatedBy" : "mickeymouse",
+      "name" : "Mickey Mouse's Session",
+      "text" : "Let's find the rootcause Disney-style!",
+      "owner" : "mickeymouse",
+      "compareMode" : "WoW",
+      "granularity" : "1_HOURS",
+      "previousId" : null,
+      "anomalyRangeStart" : 1512400800000,
+      "anomalyRangeEnd" : 1512428100000,
+      "analysisRangeStart" : 1511856000000,
+      "analysisRangeEnd" : 1512460799999,
+      "created" : 1517363257776,
+      "updated" : 1517363257776
+    };
+  });
 }
