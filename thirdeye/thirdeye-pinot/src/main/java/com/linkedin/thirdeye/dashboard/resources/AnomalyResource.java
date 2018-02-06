@@ -16,6 +16,7 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
@@ -1011,7 +1012,8 @@ public class AnomalyResource {
 
       for (MergedAnomalyResultDTO mergedAnomaly : mergedResults) {
         // if use notified flag, only keep anomalies isNotified == true
-        if ( (useNotified && mergedAnomaly.isNotified()) || !useNotified) {
+        if ( (useNotified && mergedAnomaly.isNotified()) || !useNotified || mergedAnomaly.getAnomalyResultSource().equals(
+            AnomalyResultSource.USER_LABELED_ANOMALY)) {
           anomalyIdList.add(mergedAnomaly.getId());
         }
       }
