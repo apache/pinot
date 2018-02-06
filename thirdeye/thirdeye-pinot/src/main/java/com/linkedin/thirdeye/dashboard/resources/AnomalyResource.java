@@ -1012,8 +1012,8 @@ public class AnomalyResource {
 
       for (MergedAnomalyResultDTO mergedAnomaly : mergedResults) {
         // if use notified flag, only keep anomalies isNotified == true
-        if ( (useNotified && mergedAnomaly.isNotified()) || !useNotified || mergedAnomaly.getAnomalyResultSource().equals(
-            AnomalyResultSource.USER_LABELED_ANOMALY)) {
+        if ( (useNotified && mergedAnomaly.isNotified()) || !useNotified
+            || AnomalyResultSource.USER_LABELED_ANOMALY.equals(mergedAnomaly.getAnomalyResultSource())) {
           anomalyIdList.add(mergedAnomaly.getId());
         }
       }
