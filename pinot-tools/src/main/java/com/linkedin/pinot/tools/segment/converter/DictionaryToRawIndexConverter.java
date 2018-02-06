@@ -331,11 +331,11 @@ public class DictionaryToRawIndexConverter {
    * @param sorted True if column is sorted, False otherwise
    */
   private void deleteForwardIndex(File segmentDir, String column, boolean sorted) {
-    File dictionaryFile = new File(segmentDir, (column + V1Constants.Dict.FILE_EXTENTION));
+    File dictionaryFile = new File(segmentDir, (column + V1Constants.Dict.FILE_EXTENSION));
     FileUtils.deleteQuietly(dictionaryFile);
 
-    String fwdIndexFileExtension = (sorted) ? V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION
-        : V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION;
+    String fwdIndexFileExtension = (sorted) ? V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION
+        : V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
     File fwdIndexFile = new File(segmentDir, (column + fwdIndexFileExtension));
     FileUtils.deleteQuietly(fwdIndexFile);
   }

@@ -102,7 +102,7 @@ public class SegmentDictionaryCreator implements Closeable {
     this.sortedList = sortedList;
     this.spec = spec;
     this.paddingChar = paddingChar;
-    dictionaryFile = new File(indexDir, spec.getName() + ".dict");
+    dictionaryFile = new File(indexDir, spec.getName() + V1Constants.Dict.FILE_EXTENSION);
     FileUtils.touch(dictionaryFile);
   }
 

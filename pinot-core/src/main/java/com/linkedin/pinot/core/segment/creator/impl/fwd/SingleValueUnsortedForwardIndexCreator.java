@@ -33,7 +33,8 @@ public class SingleValueUnsortedForwardIndexCreator implements SingleValueForwar
 
   public SingleValueUnsortedForwardIndexCreator(FieldSpec spec, File baseIndexDir, int cardinality, int numDocs,
       int totalNumberOfValues, boolean hasNulls) throws Exception {
-    forwardIndexFile = new File(baseIndexDir, spec.getName() + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION);
+    forwardIndexFile =
+        new File(baseIndexDir, spec.getName() + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
     this.spec = spec;
     FileUtils.touch(forwardIndexFile);
     maxNumberOfBits = getNumOfBits(cardinality);

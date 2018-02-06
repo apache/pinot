@@ -237,9 +237,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    */
   protected void removeColumnV1Indices(String column) {
     // Delete existing dictionary and forward index for the column.
-    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Dict.FILE_EXTENTION));
-    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION));
-    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION));
+    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION));
+    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION));
+    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION));
 
     // Remove the column metadata information if exists.
     SegmentColumnarIndexCreator.removeColumnMetadataInfo(_segmentProperties, column);
