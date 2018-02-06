@@ -59,14 +59,14 @@ test('visiting rootcause page with a session should have correct session name, t
     'link is correct');
   assert.equal(
     find(HEADER).get(0).innerText,
-    'Mickey Mouse\'s Session',
+    'My Session',
     'session name is correct');
   assert.ok(
-    find(LAST_SAVED).get(0).innerText.includes('Last saved by mickeymouse'),
+    find(LAST_SAVED).get(0).innerText.includes('Last saved by rootcauseuser'),
     'last saved information is correct');
   assert.equal(
     find(COMMENT_TEXT).get(0).value,
-    'Let\'s find the rootcause Disney-style!',
+    'Cause of anomaly is unknown',
     'comments are correct');
   assert.equal(
     find(BASELINE).get(0).innerText,
