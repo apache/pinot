@@ -7,24 +7,25 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-
+/**
+ * Synthetic baseline from a single, given offset
+ */
 public class BaselineOffset implements Baseline {
-  final long offset;
+  private final long offset;
 
   private BaselineOffset(long offset) {
     this.offset = offset;
   }
 
   @Override
-  public List<MetricSlice> from(MetricSlice slice) {
+  public List<MetricSlice> scatter(MetricSlice slice) {
     return Collections.singletonList(slice
         .withStart(slice.getStart() + offset)
         .withEnd(slice.getEnd() + offset));
   }
 
-  @Override
-  public Map<MetricSlice, DataFrame> filter(MetricSlice slice, Map<MetricSlice, DataFrame> data) {
-    MetricSlice pattern = from(slice).get(0);
+  private Map<MetricSlice, DataFrame> filter(MetricSlice slice, Map<MetricSlice, DataFrame> data) {
+    MetricSlice pattern = scatter(slice).get(0);
     DataFrame value = data.get(pattern);
 
     if (!data.containsKey(pattern)) {
@@ -35,11 +36,13 @@ public class BaselineOffset implements Baseline {
   }
 
   @Override
-  public DataFrame compute(MetricSlice slice, Map<MetricSlice, DataFrame> data) {
-    Preconditions.checkArgument(data.size() == 1);
+  public DataFrame gather(MetricSlice slice, Map<MetricSlice, DataFrame> data) {
+    Map<MetricSlice, DataFrame> filtered = this.filter(slice, data);
 
-    MetricSlice dataSlice = data.entrySet().iterator().next().getKey();
-    DataFrame input = new DataFrame(data.entrySet().iterator().next().getValue());
+    Preconditions.checkArgument(filtered.size() == 1);
+
+    MetricSlice dataSlice = filtered.entrySet().iterator().next().getKey();
+    DataFrame input = new DataFrame(filtered.entrySet().iterator().next().getValue());
 
     long offset = dataSlice.getStart() - slice.getStart();
     if (offset != this.offset) {
@@ -52,6 +55,12 @@ public class BaselineOffset implements Baseline {
     return output;
   }
 
+  /**
+   * Returns an instance of BaselineOffset with the given offset.
+   *
+   * @param offset time offset
+   * @return BaselineOffset with given offset
+   */
   public static BaselineOffset fromOffset(long offset) {
     return new BaselineOffset(offset);
   }

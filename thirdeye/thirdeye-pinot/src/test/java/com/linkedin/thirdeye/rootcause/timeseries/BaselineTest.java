@@ -22,13 +22,13 @@ public class BaselineTest {
   private static final String COL_TIME = Baseline.COL_TIME;
   private static final String COL_VALUE = Baseline.COL_VALUE;
 
-  private static final MetricSlice baseSlice = MetricSlice.from(12345, 15000, 17000, ArrayListMultimap.<String, String>create(), new TimeGranularity(500, TimeUnit.MILLISECONDS));
+  private static final MetricSlice BASE_SLICE = MetricSlice.from(12345, 15000, 17000, ArrayListMultimap.<String, String>create(), new TimeGranularity(500, TimeUnit.MILLISECONDS));
 
   @Test
   public void testBaselineOffsetFrom() {
     BaselineOffset baseline = BaselineOffset.fromOffset(-1000);
 
-    List<MetricSlice> slices = baseline.from(baseSlice);
+    List<MetricSlice> slices = baseline.scatter(BASE_SLICE);
     Assert.assertEquals(slices.size(), 1);
     Assert.assertEquals(slices.get(0).getMetricId(), 12345);
     Assert.assertEquals(slices.get(0).getStart(), 14000);
@@ -39,13 +39,17 @@ public class BaselineTest {
   public void testBaselineOffsetCompute() {
     BaselineOffset baseline = BaselineOffset.fromOffset(-1000);
 
-    Map<MetricSlice, DataFrame> data = Collections.singletonMap(
-        MetricSlice.from(12345, 14000, 16000),
+    Map<MetricSlice, DataFrame> data = new HashMap<>();
+    data.put(BASE_SLICE.withStart(14000).withEnd(16000),
         new DataFrame(COL_TIME, LongSeries.buildFrom(14000L, 14500L, 15000L, 15500L))
             .addSeries(COL_VALUE, 400d, 500d, 600d, 700d)
     );
+    data.put(BASE_SLICE.withStart(14000).withEnd(99999),
+        new DataFrame(COL_TIME, LongSeries.buildFrom(99999L, 99999L, 99999L, 99999L))
+            .addSeries(COL_VALUE, 99999d, 99999d, 99999d, 99999d)
+    );
 
-    DataFrame result = baseline.compute(baseSlice, data);
+    DataFrame result = baseline.gather(BASE_SLICE, data);
 
     assertEquals(result.getLongs(COL_TIME), 15000L, 15500L, 16000L, 16500L);
     assertEquals(result.getDoubles(COL_VALUE), 400d, 500d, 600d, 700d);
@@ -56,7 +60,7 @@ public class BaselineTest {
     BaselineOffset baseline = BaselineOffset.fromOffset(-1000);
 
     Map<MetricSlice, DataFrame> data = Collections.singletonMap(
-        MetricSlice.from(12345, 14000, 16000),
+        BASE_SLICE.withStart(14000).withEnd(16000),
         new DataFrame()
             .addSeries(COL_TIME, LongSeries.buildFrom(14000L, 14500L, 15000L, 15500L))
             .addSeries("long", LongSeries.buildFrom(1, 2, 3, 4))
@@ -66,7 +70,7 @@ public class BaselineTest {
             .setIndex(COL_TIME, "long", "string", "double")
     );
 
-    DataFrame result = baseline.compute(baseSlice, data);
+    DataFrame result = baseline.gather(BASE_SLICE, data);
 
     assertEquals(result.getLongs(COL_TIME), 15000L, 15500L, 16000L, 16500L);
     assertEquals(result.getLongs("long"), 1, 2, 3, 4);
@@ -78,22 +82,22 @@ public class BaselineTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testBaselineOffsetComputeInvalidSlice() {
     BaselineOffset baseline = BaselineOffset.fromOffset(-1000);
-    baseline.compute(baseSlice, Collections.singletonMap(
-        baseSlice.withStart(13999), new DataFrame()
+    baseline.gather(BASE_SLICE, Collections.singletonMap(
+        BASE_SLICE.withStart(13999), new DataFrame()
     ));
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testBaselineOffsetComputeInvalidDataSize() {
     BaselineOffset baseline = BaselineOffset.fromOffset(-1000);
-    baseline.compute(baseSlice, Collections.<MetricSlice, DataFrame>emptyMap());
+    baseline.gather(BASE_SLICE, Collections.<MetricSlice, DataFrame>emptyMap());
   }
 
   @Test
   public void testBaselineAggregateFrom() {
-    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineType.MEDIAN, Arrays.asList(-1200L, -4500L));
+    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Arrays.asList(-1200L, -4500L));
 
-    List<MetricSlice> slices = baseline.from(baseSlice);
+    List<MetricSlice> slices = baseline.scatter(BASE_SLICE);
     Assert.assertEquals(slices.size(), 2);
     Assert.assertEquals(slices.get(0).getMetricId(), 12345);
     Assert.assertEquals(slices.get(0).getStart(), 13800);
@@ -105,19 +109,23 @@ public class BaselineTest {
 
   @Test
   public void testBaselineAggregateCompute() {
-    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineType.MEDIAN, Arrays.asList(-1200L, -4500L));
+    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Arrays.asList(-1200L, -4500L));
 
     Map<MetricSlice, DataFrame> data = new HashMap<>();
-    data.put(MetricSlice.from(12345, 13800, 15800),
+    data.put(BASE_SLICE.withStart(13800).withEnd(15800),
         new DataFrame(COL_TIME, LongSeries.buildFrom(13800L, 14300L, 14800L, 99999L))
             .addSeries(COL_VALUE, 400d, 500d, 600d, 700d)
     );
-    data.put(MetricSlice.from(12345, 10500, 12500),
+    data.put(BASE_SLICE.withStart(10500).withEnd(12500),
         new DataFrame(COL_TIME, LongSeries.buildFrom(10500L, 11000L, 11500L, 12000L))
             .addSeries(COL_VALUE, 500d, 600d, 700d, 800d)
     );
+    data.put(BASE_SLICE.withStart(13800).withEnd(99999),
+        new DataFrame(COL_TIME, LongSeries.buildFrom(99999L, 99999L, 99999L, 99999L))
+            .addSeries(COL_VALUE, 99999d, 99999d, 99999d, 99999d)
+    );
 
-    DataFrame result = baseline.compute(baseSlice, data);
+    DataFrame result = baseline.gather(BASE_SLICE, data);
 
     assertEquals(result.getLongs(COL_TIME), 15000L, 15500L, 16000L, 16500L);
     assertEquals(result.getDoubles(COL_VALUE), 450d, 550d, 650d, Double.NaN);
@@ -125,17 +133,17 @@ public class BaselineTest {
 
   @Test
   public void testBaselineAggregateComputeMultiIndex() {
-    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineType.MEDIAN, Arrays.asList(-1200L, -4500L));
+    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Arrays.asList(-1200L, -4500L));
 
     Map<MetricSlice, DataFrame> data = new HashMap<>();
-    data.put(MetricSlice.from(12345, 13800, 15800),
+    data.put(BASE_SLICE.withStart(13800).withEnd(15800),
         new DataFrame()
             .addSeries(COL_TIME, LongSeries.buildFrom(13800L, 13800L, 14300L, 14300L, 14800L, 14800L, 15300L, 15300L))
             .addSeries("string", StringSeries.buildFrom("A", "B", "A", "B", "A", "B", "A", "B"))
             .addSeries(COL_VALUE, 400d, 4000d, 500d, 5000d, 600d, 6000d, 700d, 7000d)
             .setIndex(COL_TIME, "string")
     );
-    data.put(MetricSlice.from(12345, 10500, 12500),
+    data.put(BASE_SLICE.withStart(10500).withEnd(12500),
         new DataFrame()
             .addSeries(COL_TIME, LongSeries.buildFrom(10500L, 11000L, 11500L, 12000L, 10500, 11000L, 11500L, 12000L))
             .addSeries("string", StringSeries.buildFrom("A", "A", "A", "A", "B", "B", "B", "B"))
@@ -143,7 +151,7 @@ public class BaselineTest {
             .setIndex(COL_TIME, "string")
     );
 
-    DataFrame result = baseline.compute(baseSlice, data).sortedBy("string", COL_TIME);
+    DataFrame result = baseline.gather(BASE_SLICE, data).sortedBy("string", COL_TIME);
 
     assertEquals(result.getLongs(COL_TIME), 15000L, 15500L, 16000L, 16500L, 15000L, 15500L, 16000L, 16500L);
     assertEquals(result.getStrings("string"), "A", "A", "A", "A", "B", "B", "B", "B");
@@ -152,9 +160,9 @@ public class BaselineTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testBaselineAggregateComputeInvalidSlice() {
-    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineType.MEDIAN, Arrays.asList(-1200L, -4500L));
-    baseline.compute(baseSlice, Collections.singletonMap(
-        baseSlice.withStart(13999), new DataFrame()
+    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Arrays.asList(-1200L, -4500L));
+    baseline.gather(BASE_SLICE, Collections.singletonMap(
+        BASE_SLICE.withStart(13999), new DataFrame()
     ));
   }
 

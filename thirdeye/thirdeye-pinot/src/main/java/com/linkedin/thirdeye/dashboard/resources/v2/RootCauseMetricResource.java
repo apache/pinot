@@ -14,7 +14,7 @@ import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineOffset;
-import com.linkedin.thirdeye.rootcause.timeseries.BaselineType;
+import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -118,12 +118,12 @@ public class RootCauseMetricResource {
     MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end));
     Baseline range = parseOffset(baseSlice, offset, timezone);
 
-    List<MetricSlice> slices = range.from(baseSlice);
+    List<MetricSlice> slices = range.scatter(baseSlice);
     logSlices(baseSlice, slices);
 
     Map<MetricSlice, DataFrame> data = fetchAggregates(slices);
 
-    DataFrame result = range.compute(baseSlice, data);
+    DataFrame result = range.gather(baseSlice, data);
 
     if (result.isEmpty()) {
       return Double.NaN;
@@ -173,12 +173,12 @@ public class RootCauseMetricResource {
     MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end));
     Baseline range = parseOffset(baseSlice, offset, timezone);
 
-    List<MetricSlice> slices = range.from(baseSlice);
+    List<MetricSlice> slices = range.scatter(baseSlice);
     logSlices(baseSlice, slices);
 
     Map<MetricSlice, DataFrame> data = fetchBreakdowns(slices);
 
-    DataFrame result = range.compute(baseSlice, data);
+    DataFrame result = range.gather(baseSlice, data);
 
     return makeBreakdownMap(result);
   }
@@ -225,12 +225,12 @@ public class RootCauseMetricResource {
     MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end, granularity));
     Baseline range = parseOffset(baseSlice, offset, timezone);
 
-    List<MetricSlice> slices = range.from(baseSlice);
+    List<MetricSlice> slices = range.scatter(baseSlice);
     logSlices(baseSlice, slices);
 
     Map<MetricSlice, DataFrame> data = fetchTimeSeries(slices);
 
-    DataFrame result = range.compute(baseSlice, data);
+    DataFrame result = range.gather(baseSlice, data);
 
     return makeTimeSeriesMap(result);
   }
@@ -396,27 +396,27 @@ public class RootCauseMetricResource {
 
     Matcher mWeekOverWeek = PATTERN_WEEK_OVER_WEEK.matcher(offset);
     if (mWeekOverWeek.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineType.MEAN, 1, Integer.valueOf(mWeekOverWeek.group(1)), timestamp, timezone);
+      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEAN, 1, Integer.valueOf(mWeekOverWeek.group(1)), timestamp, timezone);
     }
 
     Matcher mMean = PATTERN_MEAN.matcher(offset);
     if (mMean.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineType.MEAN, Integer.valueOf(mMean.group(1)), 1, timestamp, timezone);
+      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEAN, Integer.valueOf(mMean.group(1)), 1, timestamp, timezone);
     }
 
     Matcher mMedian = PATTERN_MEDIAN.matcher(offset);
     if (mMedian.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineType.MEDIAN, Integer.valueOf(mMedian.group(1)), 1, timestamp, timezone);
+      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, Integer.valueOf(mMedian.group(1)), 1, timestamp, timezone);
     }
 
     Matcher mMin = PATTERN_MIN.matcher(offset);
     if (mMin.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineType.MIN, Integer.valueOf(mMin.group(1)), 1, timestamp, timezone);
+      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MIN, Integer.valueOf(mMin.group(1)), 1, timestamp, timezone);
     }
 
     Matcher mMax = PATTERN_MAX.matcher(offset);
     if (mMax.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineType.MAX, Integer.valueOf(mMax.group(1)), 1, timestamp, timezone);
+      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MAX, Integer.valueOf(mMax.group(1)), 1, timestamp, timezone);
     }
 
     throw new IllegalArgumentException(String.format("Unknown offset '%s'", offset));

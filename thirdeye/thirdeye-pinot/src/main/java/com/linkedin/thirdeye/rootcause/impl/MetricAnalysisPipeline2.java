@@ -1,11 +1,8 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
-import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
@@ -23,8 +20,8 @@ import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
+import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineOffset;
-import com.linkedin.thirdeye.rootcause.timeseries.BaselineType;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -121,7 +118,7 @@ public class MetricAnalysisPipeline2 extends Pipeline {
     TimeRangeEntity baselineRange = TimeRangeEntity.getTimeRangeBaseline(context);
 
     Baseline rangeCurrent = BaselineOffset.fromOffset(0);
-    Baseline rangeBaseline = BaselineAggregate.fromWeekOverWeek(BaselineType.MEDIAN, 4);
+    Baseline rangeBaseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, 4, 0);
 
     Map<MetricEntity, MetricSlice> trainingSet = new HashMap<>();
     Map<MetricEntity, MetricSlice> testSet = new HashMap<>();
@@ -135,15 +132,15 @@ public class MetricAnalysisPipeline2 extends Pipeline {
 
       // TODO make training data cacheable (e.g. align to hours, days)
 
-      printSlices(rangeCurrent.from(sliceTest));
-      printSlices(rangeCurrent.from(sliceTrain));
-      printSlices(rangeBaseline.from(sliceTest));
-      printSlices(rangeBaseline.from(sliceTrain));
+      printSlices(rangeCurrent.scatter(sliceTest));
+      printSlices(rangeCurrent.scatter(sliceTrain));
+      printSlices(rangeBaseline.scatter(sliceTest));
+      printSlices(rangeBaseline.scatter(sliceTrain));
 
-      slicesRaw.addAll(rangeCurrent.from(sliceTest));
-      slicesRaw.addAll(rangeCurrent.from(sliceTrain));
-      slicesRaw.addAll(rangeBaseline.from(sliceTest));
-      slicesRaw.addAll(rangeBaseline.from(sliceTrain));
+      slicesRaw.addAll(rangeCurrent.scatter(sliceTest));
+      slicesRaw.addAll(rangeCurrent.scatter(sliceTrain));
+      slicesRaw.addAll(rangeBaseline.scatter(sliceTest));
+      slicesRaw.addAll(rangeBaseline.scatter(sliceTrain));
     }
 
     printSlices(slicesRaw);
@@ -235,20 +232,10 @@ public class MetricAnalysisPipeline2 extends Pipeline {
         MetricSlice sliceTest = testSet.get(me);
         MetricSlice sliceTrain = trainingSet.get(me);
 
-        Map<MetricSlice, DataFrame> dataTestCurrent = rangeCurrent.filter(sliceTest, data);
-        Map<MetricSlice, DataFrame> dataTestBaseline = rangeBaseline.filter(sliceTest, data);
-        Map<MetricSlice, DataFrame> dataTrainCurrent = rangeCurrent.filter(sliceTrain, data);
-        Map<MetricSlice, DataFrame> dataTrainBaseline = rangeBaseline.filter(sliceTrain, data);
-
-        LOG.info("dataTestCurrent:\n{}", dataTestCurrent);
-        LOG.info("dataTestBaseline:\n{}", dataTestBaseline);
-        LOG.info("dataTrainCurrent:\n{}", dataTrainCurrent);
-        LOG.info("dataTrainBaseline:\n{}", dataTrainBaseline);
-
-        DataFrame testCurrent = rangeCurrent.compute(sliceTest, dataTestCurrent);
-        DataFrame testBaseline = rangeBaseline.compute(sliceTest, dataTestBaseline);
-        DataFrame trainingCurrent = rangeCurrent.compute(sliceTrain, dataTrainCurrent);
-        DataFrame trainingBaseline = rangeBaseline.compute(sliceTrain, dataTrainBaseline);
+        DataFrame testCurrent = rangeCurrent.gather(sliceTest, data);
+        DataFrame testBaseline = rangeBaseline.gather(sliceTest, data);
+        DataFrame trainingCurrent = rangeCurrent.gather(sliceTrain, data);
+        DataFrame trainingBaseline = rangeBaseline.gather(sliceTrain, data);
 
 //        LOG.info("Preparing training and test data for metric '{}'", me.getUrn());
 //        DataFrame trainingBaseline = extractTimeRange(timeseries, trainingBaselineStart, trainingBaselineEnd);

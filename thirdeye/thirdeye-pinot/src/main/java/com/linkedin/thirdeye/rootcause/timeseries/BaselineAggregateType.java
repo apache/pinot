@@ -4,7 +4,12 @@ import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Series;
 
 
-public enum BaselineType {
+/**
+ * Aggregation types supported by BaselineAggregate.
+ *
+ * @see BaselineAggregate
+ */
+public enum BaselineAggregateType {
   SUM(DoubleSeries.SUM),
   PRODUCT(DoubleSeries.PRODUCT),
   MEAN(DoubleSeries.MEAN),
@@ -15,7 +20,7 @@ public enum BaselineType {
 
   final Series.DoubleFunction function;
 
-  BaselineType(Series.DoubleFunction function) {
+  BaselineAggregateType(Series.DoubleFunction function) {
     this.function = function;
   }
 
