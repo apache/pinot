@@ -46,8 +46,6 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
@@ -57,8 +55,6 @@ import static org.mockito.Mockito.*;
 
 
 public class SegmentAssignmentStrategyTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentAssignmentStrategyTest.class);
-
   private final static String ZK_SERVER = ZkStarter.DEFAULT_ZK_STR;
   private final static String HELIX_CLUSTER_NAME = "TestSegmentAssignmentStrategyHelix";
   private final static String TABLE_NAME_BALANCED = "testResourceBalanced";

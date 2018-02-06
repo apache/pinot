@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.broker.routing;
 
-import com.linkedin.pinot.broker.routing.HelixExternalViewBasedTimeBoundaryService;
 import com.linkedin.pinot.broker.routing.TimeBoundaryService.TimeBoundaryInfo;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
@@ -24,7 +23,6 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.ZkStarter;
-
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.StringUtils;
@@ -41,7 +39,6 @@ import org.testng.annotations.Test;
 
 
 public class TimeBoundaryServiceTest {
-
   private ZkClient _zkClient;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
@@ -50,16 +47,13 @@ public class TimeBoundaryServiceTest {
   public void beforeTest() {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
 
-    _zkClient =
-        new ZkClient(StringUtil.join("/", StringUtils.chomp(ZkStarter.DEFAULT_ZK_STR, "/")),
-            ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
+    _zkClient = new ZkClient(StringUtil.join("/", StringUtils.chomp(ZkStarter.DEFAULT_ZK_STR, "/")),
+        ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
     String helixClusterName = "TestTimeBoundaryService";
     _zkClient.deleteRecursive("/" + helixClusterName + "/PROPERTYSTORE");
     _zkClient.createPersistent("/" + helixClusterName + "/PROPERTYSTORE", true);
-    _propertyStore =
-        new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(_zkClient), "/" + helixClusterName
-            + "/PROPERTYSTORE", null);
-
+    _propertyStore = new ZkHelixPropertyStore<>(new ZkBaseDataAccessor<ZNRecord>(_zkClient),
+        "/" + helixClusterName + "/PROPERTYSTORE", null);
   }
 
   @AfterTest
@@ -73,7 +67,7 @@ public class TimeBoundaryServiceTest {
     addingTableToPropertyStore("testResource0");
     addingTableToPropertyStore("testResource1");
     HelixExternalViewBasedTimeBoundaryService tbs = new HelixExternalViewBasedTimeBoundaryService(_propertyStore);
-    addingSegmentsToPropertyStore(5, _propertyStore, "testResource0");
+    addingSegmentsToPropertyStore(5, "testResource0");
     ExternalView externalView = constructExternalView("testResource0");
 
     tbs.updateTimeBoundaryService(externalView);
@@ -81,14 +75,14 @@ public class TimeBoundaryServiceTest {
     Assert.assertEquals(tbi.getTimeColumn(), "timestamp");
     Assert.assertEquals(tbi.getTimeValue(), "4");
 
-    addingSegmentsToPropertyStore(50, _propertyStore, "testResource1");
+    addingSegmentsToPropertyStore(50, "testResource1");
     externalView = constructExternalView("testResource1");
     tbs.updateTimeBoundaryService(externalView);
     tbi = tbs.getTimeBoundaryInfoFor("testResource1");
     Assert.assertEquals(tbi.getTimeColumn(), "timestamp");
     Assert.assertEquals(tbi.getTimeValue(), "49");
 
-    addingSegmentsToPropertyStore(50, _propertyStore, "testResource0");
+    addingSegmentsToPropertyStore(50, "testResource0");
     externalView = constructExternalView("testResource0");
     tbs.updateTimeBoundaryService(externalView);
     tbi = tbs.getTimeBoundaryInfoFor("testResource0");
@@ -106,26 +100,24 @@ public class TimeBoundaryServiceTest {
     return externalView;
   }
 
-  private void addingSegmentsToPropertyStore(int numSegments, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String tableName) {
+  private void addingSegmentsToPropertyStore(int numSegments, String tableName) {
     for (int i = 0; i < numSegments; ++i) {
       OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
       offlineSegmentZKMetadata.setSegmentName(tableName + "_" + System.currentTimeMillis() + "_" + i);
-      offlineSegmentZKMetadata.setTimeUnit(TimeUnit.DAYS);
+      offlineSegmentZKMetadata.setTableName(tableName);
+      offlineSegmentZKMetadata.setStartTime(i - 1);
       offlineSegmentZKMetadata.setEndTime(i);
+      offlineSegmentZKMetadata.setTimeUnit(TimeUnit.DAYS);
       offlineSegmentZKMetadata.setCrc(-1);
       offlineSegmentZKMetadata.setCreationTime(-1);
-      offlineSegmentZKMetadata.setStartTime(i - 1);
       offlineSegmentZKMetadata.setIndexVersion("0");
       offlineSegmentZKMetadata.setPushTime(i + 5);
-      offlineSegmentZKMetadata.setTableName(tableName);
       offlineSegmentZKMetadata.setSegmentType(SegmentType.OFFLINE);
       ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
     }
   }
 
-  private void addingTableToPropertyStore(String tableName)
-      throws Exception {
+  private void addingTableToPropertyStore(String tableName) throws Exception {
     TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName)
         .setTimeColumnName("timestamp")
         .setTimeType("DAYS")

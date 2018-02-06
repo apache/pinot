@@ -224,7 +224,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         // We need to consume as much data as available, until we have either reached the max number of rows or
         // the max time we are allowed to consume.
         if (now >= _consumeEndTime) {
-          if (_realtimeSegment.getRawDocumentCount() == 0) {
+          if (_realtimeSegment.getNumDocsIndexed() == 0) {
             segmentLogger.info("No events came in, extending time by {} hours", TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
             _consumeEndTime += TimeUnit.HOURS.toMillis(TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
             return false;
@@ -1043,7 +1043,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   // This should be done during commit? We may not always commit when we build a segment....
   // TODO Call this method when we are loading the segment, which we do from table datamanager afaik
   private void updateCurrentDocumentCountMetrics() {
-    int currentRawDocs = _realtimeSegment.getRawDocumentCount();
+    int currentRawDocs = _realtimeSegment.getNumDocsIndexed();
     _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.DOCUMENT_COUNT, (currentRawDocs - _lastUpdatedRawDocuments
         .get()));
     _lastUpdatedRawDocuments.set(currentRawDocs);

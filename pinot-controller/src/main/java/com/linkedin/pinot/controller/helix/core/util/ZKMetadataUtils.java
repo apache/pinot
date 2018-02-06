@@ -25,29 +25,22 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import org.joda.time.Duration;
 
 
 public class ZKMetadataUtils {
   private ZKMetadataUtils() {
   }
 
-  public static OfflineSegmentZKMetadata updateSegmentMetadata(OfflineSegmentZKMetadata offlineSegmentZKMetadata, SegmentMetadata segmentMetadata) {
+  public static OfflineSegmentZKMetadata updateSegmentMetadata(OfflineSegmentZKMetadata offlineSegmentZKMetadata,
+      SegmentMetadata segmentMetadata) {
     offlineSegmentZKMetadata.setSegmentName(segmentMetadata.getName());
     offlineSegmentZKMetadata.setTableName(segmentMetadata.getTableName());
     offlineSegmentZKMetadata.setIndexVersion(segmentMetadata.getVersion());
     offlineSegmentZKMetadata.setSegmentType(SegmentType.OFFLINE);
-
-    offlineSegmentZKMetadata.setTimeUnit(extractTimeUnitFromDuration(segmentMetadata.getTimeGranularity()));
-    if (segmentMetadata.getTimeInterval() == null) {
-      offlineSegmentZKMetadata.setStartTime(-1);
-      offlineSegmentZKMetadata.setEndTime(-1);
-    } else {
-      offlineSegmentZKMetadata.setStartTime(
-          offlineSegmentZKMetadata.getTimeUnit().convert(segmentMetadata.getTimeInterval().getStartMillis(), TimeUnit.MILLISECONDS));
-      offlineSegmentZKMetadata.setEndTime(
-          offlineSegmentZKMetadata.getTimeUnit().convert(segmentMetadata.getTimeInterval().getEndMillis(), TimeUnit.MILLISECONDS));
+    if (segmentMetadata.getTimeInterval() != null) {
+      offlineSegmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
+      offlineSegmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
+      offlineSegmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
     }
     offlineSegmentZKMetadata.setTotalRawDocs(segmentMetadata.getTotalRawDocs());
     offlineSegmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
@@ -76,18 +69,5 @@ public class ZKMetadataUtils {
     }
 
     return offlineSegmentZKMetadata;
-  }
-
-  private static TimeUnit extractTimeUnitFromDuration(Duration timeGranularity) {
-    if (timeGranularity == null) {
-      return null;
-    }
-    long timeUnitInMills = timeGranularity.getMillis();
-    for (TimeUnit timeUnit : TimeUnit.values()) {
-      if (timeUnit.toMillis(1) == timeUnitInMills) {
-        return timeUnit;
-      }
-    }
-    return null;
   }
 }

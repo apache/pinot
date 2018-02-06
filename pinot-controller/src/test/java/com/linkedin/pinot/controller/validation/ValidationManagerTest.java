@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -178,15 +179,6 @@ public class ValidationManagerTest {
   }
 
   @Test
-  public void testTotalDocumentCountOffline() throws Exception {
-    List<SegmentMetadata> segmentMetadataList = new ArrayList<>();
-    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, 10));
-    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, 20));
-    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, 30));
-    Assert.assertEquals(ValidationManager.computeOfflineTotalDocumentInSegments(segmentMetadataList), 60);
-  }
-
-  @Test
   public void testTotalDocumentCountRealTime() throws Exception {
     // Create a bunch of dummy segments
     final String group1 = TEST_TABLE_NAME + "_REALTIME_1466446700000_34";
@@ -196,23 +188,28 @@ public class ValidationManagerTest {
     String segmentName3 = new HLCSegmentName(group1, "0", "3").getSegmentName();
     String segmentName4 = new HLCSegmentName(group2, "0", "3").getSegmentName();
 
-    List<SegmentMetadata> segmentMetadataList = new ArrayList<>();
-    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, segmentName1, 10));
-    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, segmentName2, 20));
-    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, segmentName3, 30));
+    List<RealtimeSegmentZKMetadata> segmentZKMetadataList = new ArrayList<>();
+    segmentZKMetadataList.add(
+        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName1, 10));
+    segmentZKMetadataList.add(
+        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName2, 20));
+    segmentZKMetadataList.add(
+        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName3, 30));
     // This should get ignored in the count as it belongs to a different group id
-    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, segmentName4, 20));
+    segmentZKMetadataList.add(
+        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName4, 20));
 
-    Assert.assertEquals(ValidationManager.computeRealtimeTotalDocumentInSegments(segmentMetadataList, true), 60);
+    Assert.assertEquals(ValidationManager.computeRealtimeTotalDocumentInSegments(segmentZKMetadataList, true), 60);
 
     // Now add some low level segment names
     String segmentName5 = new LLCSegmentName(TEST_TABLE_NAME, 1, 0, 1000).getSegmentName();
     String segmentName6 = new LLCSegmentName(TEST_TABLE_NAME, 2, 27, 10000).getSegmentName();
-    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, segmentName5, 10));
-    segmentMetadataList.add(SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, segmentName6, 5));
+    segmentZKMetadataList.add(
+        SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName5, 10));
+    segmentZKMetadataList.add(SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName6, 5));
 
     // Only the LLC segments should get counted.
-    Assert.assertEquals(ValidationManager.computeRealtimeTotalDocumentInSegments(segmentMetadataList, false), 15);
+    Assert.assertEquals(ValidationManager.computeRealtimeTotalDocumentInSegments(segmentZKMetadataList, false), 15);
   }
 
   @AfterClass

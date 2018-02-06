@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.utils;
 
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import org.mockito.Mockito;
 
@@ -31,6 +32,8 @@ public class SegmentMetadataMockUtils {
     Mockito.when(segmentMetadata.getTotalDocs()).thenReturn(numTotalDocs);
     Mockito.when(segmentMetadata.getTotalRawDocs()).thenReturn(numTotalDocs);
     Mockito.when(segmentMetadata.getCrc()).thenReturn(crc);
+    Mockito.when(segmentMetadata.getPushTime()).thenReturn(Long.MIN_VALUE);
+    Mockito.when(segmentMetadata.getRefreshTime()).thenReturn(Long.MIN_VALUE);
     return segmentMetadata;
   }
 
@@ -44,13 +47,12 @@ public class SegmentMetadataMockUtils {
     return mockSegmentMetadata(tableName, segmentName, 0, uniqueNumericString);
   }
 
-  public static SegmentMetadata mockSegmentMetadata(String tableName, int numTotalDocs) {
-    String uniqueNumericString = Long.toString(System.nanoTime());
-    return mockSegmentMetadata(tableName, tableName + uniqueNumericString, numTotalDocs, uniqueNumericString);
-  }
-
-  public static SegmentMetadata mockSegmentMetadata(String tableName, String segmentName, int numTotalDocs) {
-    String uniqueNumericString = Long.toString(System.nanoTime());
-    return mockSegmentMetadata(tableName, segmentName, numTotalDocs, uniqueNumericString);
+  public static RealtimeSegmentZKMetadata mockRealtimeSegmentZKMetadata(String tableName, String segmentName,
+      long numTotalDocs) {
+    RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = Mockito.mock(RealtimeSegmentZKMetadata.class);
+    Mockito.when(realtimeSegmentZKMetadata.getTableName()).thenReturn(tableName);
+    Mockito.when(realtimeSegmentZKMetadata.getSegmentName()).thenReturn(segmentName);
+    Mockito.when(realtimeSegmentZKMetadata.getTotalRawDocs()).thenReturn(numTotalDocs);
+    return realtimeSegmentZKMetadata;
   }
 }
