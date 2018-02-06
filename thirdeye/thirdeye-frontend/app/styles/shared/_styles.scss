@@ -247,6 +247,10 @@ body {
     border: 1px solid app-shade(black, 5);
     border-radius: 15px;
 
+    &:hover {
+      cursor: pointer;
+    }
+
     &--active {
       background-color: $te-alerts-background;
       border-color: $te-alerts-background;
@@ -261,6 +265,7 @@ body {
   &__range-picker {
     display: inline-block;
     color: app-shade(black, 7);
+    min-width: 237px;
     margin: 0;
 
     .daterangepicker-input {
@@ -269,6 +274,10 @@ body {
       box-shadow: none;
       padding: 3px 5px;
       height: auto;
+
+      &:hover {
+        cursor: pointer;
+      }
     }
   }
 
@@ -494,10 +503,15 @@ body {
     color: app-shade(black, 6);
     padding-left: 20px;
     line-height: 45px;
+
+    &--fixed {
+      width: 215px;
+    }
   }
 
   &__cell-link {
     color: app-shade(black, 6);
+    white-space: nowrap;
     font-weight: 700;
 
     &:hover {
@@ -543,6 +557,13 @@ body {
     display: inline-block;
     margin-right: 30px;
     width: 170px;
+  }
+
+  &__link-wrapper {
+    display: inline-block;
+    vertical-align: top;
+    margin-right: 20px;
+    padding-top: 7px;
   }
 
   &__link {

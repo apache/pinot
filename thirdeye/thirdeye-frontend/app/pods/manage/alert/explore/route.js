@@ -70,6 +70,26 @@ const fetchCombinedAnomalies = (anomalyIds) => {
 };
 
 /**
+ * Fetches severity scores for all anomalies
+ * TODO: Move this and other shared requests to a common service
+ * @param {Array} anomalyIds - list of all found anomaly ids
+ * @returns {RSVP promise}
+ */
+const fetchSeverityScores = (anomalyIds) => {
+  if (anomalyIds && anomalyIds.length) {
+    const anomalyPromiseHash = anomalyIds.map((id) => {
+      return RSVP.hash({
+        id,
+        score: fetch(`/dashboard/anomalies/score/${id}`).then(checkStatus)
+      });
+    });
+    return RSVP.allSettled(anomalyPromiseHash);
+  } else {
+    return RSVP.resolve([]);
+  }
+};
+
+/**
  * Derives start/end timestamps based on queryparams and user-selected time range with certain fall-backs/defaults
  * @param {String} bucketUnit - is requested range from an hourly or minutely metric?
  * @param {String} duration - the model's processed query parameter for duration ('1m', '2w', etc)
@@ -315,6 +335,7 @@ export default Route.extend({
     // Initial value setup for displayed option lists
     let subD = {};
     let anomalyData = [];
+    let rawAnomalies = [];
     const notCreateError = jobId !== -1;
     const resolutionOptions = ['All Resolutions'];
     const dimensionOptions = ['All Dimensions'];
@@ -356,7 +377,11 @@ export default Route.extend({
     if (notCreateError) {
       fetchCombinedAnomalies(anomalyIds)
         .then((rawAnomalyData) => {
-          anomalyData = enhanceAnomalies(rawAnomalyData);
+          rawAnomalies = rawAnomalyData;
+          return fetchSeverityScores(anomalyIds);
+        })
+        .then((severityScores) => {
+          anomalyData = enhanceAnomalies(rawAnomalies, severityScores);
           resolutionOptions.push(...new Set(anomalyData.map(record => record.anomalyFeedback)));
           dimensionOptions.push(...new Set(anomalyData.map(anomaly => anomaly.dimensionString)));
           controller.setProperties({

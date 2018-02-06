@@ -115,11 +115,15 @@ export default Route.extend({
     * @method triggerReplaySequence
     */
     triggerOnboardingJob(data) {
-      const onboardUrl = `/detection-onboard/create-job?jobName=${data.jobName}&payload=${encodeURIComponent(data.payload)}`;
       const newName = JSON.parse(data.payload).functionName;
+      const createAlertUrl = `/function-onboard/create-function?name=${newName}`;
+      const updateAlertUrl = `/detection-onboard/create-job?jobName=${data.jobName}&payload=${encodeURIComponent(data.payload)}`;
       let onboardStartTime = moment();
 
-      fetch(onboardUrl, postProps('')).then(checkStatus)
+      fetch(createAlertUrl, postProps('')).then(checkStatus)
+        .then((result) => {
+          return fetch(updateAlertUrl, postProps('')).then(checkStatus);
+        })
         .then((result) => {
           this.get('checkJobCreateStatus').perform(result.jobId, newName);
         })

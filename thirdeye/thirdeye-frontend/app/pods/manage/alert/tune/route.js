@@ -3,7 +3,7 @@
  * @module manage/alert/edit/explore
  * @exports manage/alert/edit/explore
  */
-import Ember from 'ember';
+import RSVP from "rsvp";
 import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
@@ -57,7 +57,7 @@ const anomalyTableStats = (anomalies) => {
  * Fetches all anomaly data for found anomalies - downloads all 'pages' of data from server
  * in order to handle sorting/filtering on the entire set locally. Start/end date are not used here.
  * @param {Array} anomalyIds - list of all found anomaly ids
- * @returns {Ember.RSVP promise}
+ * @returns {RSVP promise}
  */
 const fetchCombinedAnomalies = (anomalyIds) => {
   if (anomalyIds.length) {
@@ -65,11 +65,31 @@ const fetchCombinedAnomalies = (anomalyIds) => {
     const anomalyPromiseHash = idGroups.map((group, index) => {
       let idStringParams = `anomalyIds=${encodeURIComponent(idGroups[index].toString())}`;
       let getAnomalies = fetch(`/anomalies/search/anomalyIds/0/0/${index + 1}?${idStringParams}`).then(checkStatus);
-      return Ember.RSVP.resolve(getAnomalies);
+      return RSVP.resolve(getAnomalies);
     });
-    return Ember.RSVP.all(anomalyPromiseHash);
+    return RSVP.all(anomalyPromiseHash);
   } else {
-    return Ember.RSVP.resolve([]);
+    return RSVP.resolve([]);
+  }
+};
+
+/**
+ * Fetches severity scores for all anomalies
+ * TODO: Move this and other shared requests to a common service
+ * @param {Array} anomalyIds - list of all found anomaly ids
+ * @returns {RSVP promise}
+ */
+const fetchSeverityScores = (anomalyIds) => {
+  if (anomalyIds.length) {
+    const anomalyPromiseHash = anomalyIds.map((id) => {
+      return RSVP.hash({
+        id,
+        score: fetch(`/dashboard/anomalies/score/${id}`).then(checkStatus)
+      });
+    });
+    return RSVP.allSettled(anomalyPromiseHash);
+  } else {
+    return RSVP.resolve([]);
   }
 };
 
@@ -161,7 +181,7 @@ export default Route.extend({
       mttd: fetch(mttdUrl).then(checkStatus)
     };
 
-    return Ember.RSVP.hash(initialPromiseHash)
+    return RSVP.hash(initialPromiseHash)
       .then((alertEvalMetrics) => {
         Object.assign(alertEvalMetrics.current, { mttd: alertEvalMetrics.mttd});
         return {
@@ -176,7 +196,7 @@ export default Route.extend({
         };
       })
       .catch((error) => {
-        return Ember.RSVP.reject({ error, location: `${this.routeName}:model`, calls: initialPromiseHash });
+        return RSVP.reject({ error, location: `${this.routeName}:model`, calls: initialPromiseHash });
       });
   },
 
@@ -189,21 +209,27 @@ export default Route.extend({
       endDate,
       alertEvalMetrics
     } = model;
+    let idsRemoved = [];
 
-    return Ember.RSVP.hash(tuningPromiseHash(startDate, endDate, alertEvalMetrics.autotuneId, alertId))
+    return RSVP.hash(tuningPromiseHash(startDate, endDate, alertEvalMetrics.autotuneId, alertId))
       .then((data) => {
-        const idsRemoved = anomalyDiff(data.idListA, data.idListB).idsRemoved;
+        idsRemoved = anomalyDiff(data.idListA, data.idListB).idsRemoved;
         Object.assign(data.projectedEval, { mttd: data.projectedMttd });
         Object.assign(model.alertEvalMetrics, { projected: data.projectedEval });
+        Object.assign(model, { idsRemoved });
         return fetchCombinedAnomalies(idsRemoved);
       })
       // Fetch all anomaly data for returned Ids to paginate all from one array
       .then((rawAnomalyData) => {
         Object.assign(model, { rawAnomalyData });
+        return fetchSeverityScores(idsRemoved);
+      })
+      .then((scoreData) => {
+        Object.assign(model, { scoreData });
       })
       // Got errors?
       .catch((error) => {
-        return Ember.RSVP.reject({ error, location: `${this.routeName}:afterModel`, calls: tuningPromiseHash });
+        return RSVP.reject({ error, location: `${this.routeName}:afterModel`, calls: tuningPromiseHash });
       });
   },
 
@@ -212,29 +238,27 @@ export default Route.extend({
 
     const {
       id,
+      scoreData,
       alertData,
       duration,
       loadError,
+      idsRemoved,
       alertEvalMetrics,
       rawAnomalyData
     } = model;
 
-    const anomalyData = enhanceAnomalies(rawAnomalyData);
-    const tableStats = anomalyTableStats(anomalyData);
-    const timeRangeOptions = setUpTimeRangeOptions([durationDefault], duration);
+    const anomalyData = enhanceAnomalies(rawAnomalyData, scoreData);
 
-    // Prime the controller
     controller.setProperties({
       alertData,
       loadError,
-      tableStats,
       alertId: id,
-      timeRangeOptions,
       anomalyData,
       alertEvalMetrics,
-      originalProjectedMetrics: alertEvalMetrics.projected
+      tableStats: anomalyTableStats(anomalyData),
+      originalProjectedMetrics: alertEvalMetrics.projected,
+      timeRangeOptions: setUpTimeRangeOptions([durationDefault], duration)
     });
-
     controller.initialize();
   },
 
@@ -286,7 +310,7 @@ export default Route.extend({
 
       fetch(tuneIdUrl + configString, postProps('')).then(checkStatus)
         .then((autoTuneId) => {
-          return Ember.RSVP.hash(tuningPromiseHash(startDate, endDate, autoTuneId[0], alertId, severityVal));
+          return RSVP.hash(tuningPromiseHash(startDate, endDate, autoTuneId[0], alertId, severityVal));
         })
         .then((data) => {
           const idsRemoved = anomalyDiff(data.idListA, data.idListB).idsRemoved;

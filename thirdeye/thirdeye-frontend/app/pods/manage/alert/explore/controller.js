@@ -56,15 +56,11 @@ export default Controller.extend({
       selectedTimeRange: '',
       selectedFilters: JSON.stringify({}),
       openReportModal: false,
-      isReplayStarted: true,
       isAlertReady: false,
-      isReplayDone: false,
       isGraphReady: false,
       isReportSuccess: false,
       isReportFailure: false,
       isPageLoadFailure: false,
-      isReplayModeWrapper: true,
-      isReplayStatusError: false,
       isAnomalyArrayChanged: false,
       requestCanContinue: true,
       sortColumnStartUp: false,
@@ -607,11 +603,10 @@ export default Controller.extend({
             change = wowDetails.change.toFixed(2);
           }
 
-          this.setProperties(anomaly, {
-            shownCurrent: curr,
-            shownBaseline: base,
-            shownChangeRate: change
-          });
+          // Set displayed value properties. Note: ensure no CP watching these props
+          Ember.set(anomaly, 'shownCurrent', curr);
+          Ember.set(anomaly, 'shownBaseline', base);
+          Ember.set(anomaly, 'shownChangeRate', change);
         });
       }
     },

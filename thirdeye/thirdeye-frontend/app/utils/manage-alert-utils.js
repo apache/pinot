@@ -46,11 +46,15 @@ export function toIdGroups(anomalyIds, bucketSize = 10) {
  * @param {Array} anomalies - array of raw anomalies
  * @returns {Array}
  */
-export function enhanceAnomalies(rawAnomalies) {
+export function enhanceAnomalies(rawAnomalies, severityScores) {
   const newAnomalies = [];
   const anomaliesPresent = rawAnomalies && rawAnomalies.length;
   // De-dupe raw anomalies, extract only the good stuff (anomalyDetailsList)
   const anomalies = anomaliesPresent ? [].concat(...rawAnomalies.map(data => data.anomalyDetailsList)) : [];
+  // Extract all resolved scores from the RSVP promise response
+  const resolvedScores = severityScores ? severityScores.map((score) => {
+    return (score.state === 'fulfilled') ? score.value : '';
+  }) : [];
 
   // Loop over all anomalies to configure display settings
   anomalies.forEach((anomaly) => {
@@ -61,11 +65,14 @@ export function enhanceAnomalies(rawAnomalies) {
     const days = anomalyDuration.get("days");
     const hours = anomalyDuration.get("hours");
     const minutes = anomalyDuration.get("minutes");
+    const score = resolvedScores.length ? resolvedScores.find(score => score.id === anomaly.anomalyId).score : null;
     const durationArr = [pluralizeTime(days, 'day'), pluralizeTime(hours, 'hour'), pluralizeTime(minutes, 'minute')];
 
     // Placeholder: ChangeRate will not be calculated on front-end
     const changeRate = (anomaly.current && anomaly.baseline)
-      ? ((anomaly.current - anomaly.baseline) / anomaly.baseline * 100).toFixed(2) : 0;
+      ? (Math.abs(anomaly.current - anomaly.baseline) / anomaly.baseline * 100).toFixed(2) : 0;
+
+    const changeDirection = (anomaly.current > anomaly.baseline) ? '-' : '+';
 
     // We want to display only non-zero duration values in our table
     const noZeroDurationArr = _.remove(durationArr, function(item) {
@@ -80,11 +87,12 @@ export function enhanceAnomalies(rawAnomalies) {
     // Add missing properties
     Object.assign(anomaly, {
       changeRate,
+      changeDirection,
       shownChangeRate: changeRate,
       isUserReported: anomaly.anomalyResultSource === 'USER_LABELED_ANOMALY',
       startDateStr: moment(anomaly.anomalyStart).format('MMM D, hh:mm A'),
       durationStr: noZeroDurationArr.join(', '),
-      severityScore: (anomaly.current/anomaly.baseline - 1).toFixed(2),
+      severityScore: score ? score.toFixed(2) : 'N/A',
       shownCurrent: anomaly.current,
       shownBaseline: anomaly.baseline,
       showResponseSaved: false,
@@ -283,8 +291,6 @@ export function buildAnomalyStats(alertEvalMetrics, mode, severity = '30', isPer
     stat.showDirectionIcon = isFinite(origData) && isFinite(newData) && origData !== newData;
     stat.direction = stat.showDirectionIcon && origData > newData ? 'bottom' : 'top';
   });
-
-
 
   return anomalyStats;
 }

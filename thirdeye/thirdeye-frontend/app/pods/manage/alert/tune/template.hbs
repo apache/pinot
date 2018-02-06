@@ -232,7 +232,7 @@
                 <ul class="te-anomaly-table__list">
                  {{#each anomaly.dimensionList as |dimension|}}
                     <li class="te-anomaly-table__list--smaller">
-                      {{dimension.dimensionKey}}: {{dimension.dimensionVal}}
+                      {{dimension.dimensionKey}}: <span class="stronger">{{dimension.dimensionVal}}</span>
                     </li>
                  {{else}}
                     -
@@ -243,7 +243,7 @@
                <td class="te-anomaly-table__cell">
                 <ul class="te-anomaly-table__list">
                   <li>{{anomaly.shownCurrent}} / {{anomaly.shownBaseline}}</li>
-                  <li class="te-anomaly-table__list--warning">({{anomaly.shownChangeRate}}%)</li>
+                  <li class="te-anomaly-table__list--warning">({{anomaly.changeDirection}}{{anomaly.shownChangeRate}}%)</li>
                 </ul>
                </td>
                <td class="te-anomaly-table__cell">

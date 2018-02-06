@@ -23,15 +23,8 @@ export default Controller.extend({
   isFormDisabled: false,
   isDimensionError: false,
   isMetricDataInvalid: false,
-  isCreateAlertSuccess: false,
-  isCreateGroupSuccess: false,
-  isCreateAlertError: false,
   isSelectMetricError: false,
-  isReplayStatusError: false,
   isMetricDataLoading: false,
-  isReplayStatusPending: true,
-  isReplayStatusSuccess: false,
-  isReplayStarted: false,
   isGroupNameDuplicate: false,
   isAlertNameDuplicate: false,
   isFetchingDimensions: false,
@@ -47,7 +40,6 @@ export default Controller.extend({
   originalDimensions: [],
   bsAlertBannerType: 'success',
   graphEmailLinkProps: '',
-  replayStatusClass: 'te-form__banner--pending',
   legendText: {
     dotted: {
       text: 'WoW'
@@ -861,19 +853,13 @@ export default Controller.extend({
       newConfigGroupName: null,
       alertGroupNewRecipient: null,
       selectedGroupRecipients: null,
-      isCreateAlertSuccess: null,
-      isCreateAlertError: false,
       isProcessingForm: false,
       isCreateGroupSuccess: false,
-      isReplayStatusSuccess: false,
-      isReplayStarted: false,
-      isReplayStatusError: false,
       isGroupNameDuplicate: false,
       isAlertNameDuplicate: false,
       graphEmailLinkProps: '',
       bsAlertBannerType: 'success',
       selectedFilters: JSON.stringify({}),
-      replayStatusClass: 'te-form__banner--pending'
     });
     this.send('refreshModel');
   },

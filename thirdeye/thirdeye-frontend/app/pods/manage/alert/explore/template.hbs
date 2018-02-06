@@ -9,7 +9,7 @@
             {{range.name}}
             {{#if (eq range.name "Custom")}}
               : {{date-range-picker
-                  class="te-pill-selectors__range-picker"
+                  class="te-pill-selectors__range-picker te-pill-selectors__range-picker--explore"
                   timePicker=false
                   timePicker24Hour=true
                   timePickerIncrement=timePickerIncrement
@@ -167,7 +167,7 @@
                   <i class="te-anomaly-table__icon glyphicon {{if sortColumnStartUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
                 </a>
                </th>
-               <th class="te-anomaly-table__cell-head">Dimensions</th>
+               <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--fixed">Dimensions</th>
                <th class="te-anomaly-table__cell-head">
                 <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "score"}}>
                   Severity Score
@@ -206,7 +206,7 @@
                 <ul class="te-anomaly-table__list">
                  {{#each anomaly.dimensionList as |dimension|}}
                     <li class="te-anomaly-table__list--smaller">
-                      {{dimension.dimensionKey}}: {{dimension.dimensionVal}}
+                      {{dimension.dimensionKey}}: <span class="stronger">{{dimension.dimensionVal}}</span>
                     </li>
                  {{else}}
                     -
@@ -217,7 +217,7 @@
                <td class="te-anomaly-table__cell">
                 <ul class="te-anomaly-table__list">
                   <li>{{anomaly.shownCurrent}} / {{anomaly.shownBaseline}}</li>
-                  <li class="te-anomaly-table__list--warning">({{anomaly.shownChangeRate}}%)</li>
+                  <li class="te-anomaly-table__list--warning">({{anomaly.changeDirection}}{{anomaly.shownChangeRate}}%)</li>
                 </ul>
                </td>
                <td class="te-anomaly-table__cell">
@@ -245,7 +245,9 @@
                     {{/power-select}}
                   {{/if}}
 
-                  <a target="_blank" class="te-anomaly-table__link" href="/thirdeye#anomalies?anomaliesSearchMode=id&pageNumber=1&anomalyIds={{anomaly.anomalyId}}">investigate</a>
+                  <div class="te-anomaly-table__link-wrapper">
+                    <a target="_blank" class="te-anomaly-table__link" href="/thirdeye#anomalies?anomaliesSearchMode=id&pageNumber=1&anomalyIds={{anomaly.anomalyId}}">Investigate</a>
+                  </div>
                </td>
             </tr>
           {{/each}}
@@ -285,19 +287,13 @@
     </div>
 
   {{else}}
-
     <div class="te-alert-page-pending">
-      <img src="{{rootURL}}assets/images/te-alert-{{if isReplayStatusError "error" "pending"}}.png" class="te-alert-page-pending__image {{if isReplayStatusError "te-alert-page-pending__image--error"}}" alt="alertData.Setup is Processing">
-      <h2 class="te-alert-page-pending__title">{{if isReplayStatusError "Oops, something went wrong." "Setting up your alert"}}</h2>
-      {{#if (not isReplayStatusError)}}<div class="te-alert-page-pending__loader"></div>{{/if}}
+      <img src="{{rootURL}}assets/images/te-alert-pending.png" class="te-alert-page-pending__image" alt="alert setup processing">
+      <h2 class="te-alert-page-pending__title">Setting up your alert</h2>
+      <div class="te-alert-page-pending__loader"></div>
       <p class="te-alert-page-pending__text">
-        {{#if isReplayStatusError}}
-          Your alert <span class="stronger">{{functionName}}</span> was created, but data replay has failed.<br>Please contact <a class="thirdeye-link-secondary" target="_blank" href="{{replayErrorMailtoStr}}">ask_thirdeye@linkedin.com</a>
-        {{else}}
-          This may take a while (up to a few minutes) <br/>We will send you an email when it's done!
-        {{/if}}
+        This may take up to a minute<br/>We will send you an email when it's done!
       </p>
     </div>
-
   {{/if}}
 </div>
