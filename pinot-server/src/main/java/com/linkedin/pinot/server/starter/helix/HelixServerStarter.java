@@ -28,6 +28,7 @@ import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
+import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import com.linkedin.pinot.server.starter.ServerInstance;
 import java.util.HashMap;
 import java.util.List;
@@ -108,9 +109,12 @@ public class HelixServerStarter {
     addInstanceTagIfNeeded(helixClusterName, _instanceId);
     ZkHelixPropertyStore<ZNRecord> propertyStore = _helixManager.getHelixPropertyStore();
 
+
     LOGGER.info("Starting server instance");
     Utils.logVersions();
     ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_helixServerConfig);
+    // Need to do this before we start receiving state transitions.
+    setupSegmentCompletetionProtocolHandler(_helixServerConfig);
     _serverInstance = new ServerInstance();
     _serverInstance.init(serverInstanceConfig, propertyStore);
     _serverInstance.start();
@@ -190,6 +194,22 @@ public class HelixServerStarter {
         return (long) MmapUtils.getAllocationFailureCount();
       }
     });
+  }
+
+  private void setupSegmentCompletetionProtocolHandler(Configuration config) {
+    if (config.containsKey(CommonConstants.Server.CONFIG_OF_PREFERRED_CONTROLLER_PROTOCOL)) {
+      ServerSegmentCompletionProtocolHandler.setPreferredProtocol(
+          config.getString(CommonConstants.Server.CONFIG_OF_PREFERRED_CONTROLLER_PROTOCOL));
+    }
+    if (config.containsKey(CommonConstants.Server.CONFIG_OF_PREFERRED_CONTROLLER_PORT)) {
+      try {
+        int preferredPort = config.getInt(CommonConstants.Server.CONFIG_OF_PREFERRED_CONTROLLER_PORT);
+        ServerSegmentCompletionProtocolHandler.setPreferredPort(preferredPort);
+      } catch (Exception e) {
+        LOGGER.warn("Discarding controller preferred port configuration : {}",
+            config.getString(CommonConstants.Server.CONFIG_OF_PREFERRED_CONTROLLER_PORT));
+      }
+    }
   }
 
   private void updateInstanceConfigInHelix(int adminApiPort, boolean shuttingDown) {

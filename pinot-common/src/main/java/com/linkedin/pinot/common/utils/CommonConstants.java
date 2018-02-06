@@ -231,6 +231,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_ENABLE_SPLIT_COMMIT = "pinot.server.instance.enable.split.commit";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap.direct";
+    // Preferred port and protocol used by the controllers. Used in realtime segment completion protocol
+    public static final String CONFIG_OF_PREFERRED_CONTROLLER_PORT = "pinot.server.preferredControllerPort";
+    public static final String CONFIG_OF_PREFERRED_CONTROLLER_PROTOCOL = "pinot.server.preferredControllerProtocol";
 
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
     public static final String DEFAULT_READ_MODE = "heap";

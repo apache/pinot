@@ -14,16 +14,18 @@
  * limitations under the License.
  */
 
-
 package com.linkedin.pinot.server.realtime;
 
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
+import com.linkedin.pinot.core.query.utils.Pair;
 import java.io.File;
 import java.net.URI;
+import javax.annotation.Nonnull;
+import javax.net.ssl.SSLContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * A class that handles sending segment completion protocol requests to the controller and getting
@@ -33,13 +35,37 @@ public class ServerSegmentCompletionProtocolHandler {
   private static Logger LOGGER = LoggerFactory.getLogger(ServerSegmentCompletionProtocolHandler.class);
   private static final int SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 30_000;
   private static final int OTHER_REQUESTS_TIMEOUT = 5_000;
+  private static final String HTTPS_PROTOCOL = "https";
+
+  private static String _preferredProtocol = null;
+  private static Integer _preferredPort = null;
 
   private final String _instanceId;
   private final FileUploadDownloadClient _fileUploadDownloadClient;
+  private static SSLContext _sslContext;
+
+  public static void setPreferredProtocol(@Nonnull String _preferredProtocol) {
+    ServerSegmentCompletionProtocolHandler._preferredProtocol = _preferredProtocol.toLowerCase();
+    if (HTTPS_PROTOCOL.equals(_preferredProtocol)) {
+      try {
+        _sslContext = new ClientSSLContextGenerator.Builder().build().generate();
+      } catch (Exception e) {
+        throw new IllegalArgumentException("Cannot build SSL context", e);
+      }
+    }
+  }
+
+  public static void setPreferredPort(@Nonnull Integer _preferredPort) {
+    ServerSegmentCompletionProtocolHandler._preferredPort = _preferredPort;
+  }
 
   public ServerSegmentCompletionProtocolHandler(String instanceId) {
     _instanceId = instanceId;
-    _fileUploadDownloadClient = new FileUploadDownloadClient();
+    if (_sslContext != null) {
+      _fileUploadDownloadClient = new FileUploadDownloadClient(_sslContext);
+    } else {
+      _fileUploadDownloadClient = new FileUploadDownloadClient();
+    }
   }
 
   public SegmentCompletionProtocol.Response segmentCommitStart(long offset, final String segmentName) {
@@ -53,6 +79,7 @@ public class ServerSegmentCompletionProtocolHandler {
     return sendRequest(url);
   }
 
+  // TODO We need to make this work with trusted certificates if the VIP is using https.
   public SegmentCompletionProtocol.Response segmentCommitUpload(long offset, final String segmentName, final File segmentTarFile,
       final String controllerVipUrl) {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
@@ -128,13 +155,17 @@ public class ServerSegmentCompletionProtocolHandler {
 
   private String createSegmentCompletionUrl(SegmentCompletionProtocol.Request request) {
     ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
-    final String leaderHostPort = leaderLocator.getControllerLeader();
+    final Pair<String, Integer> leaderHostPort = leaderLocator.getControllerLeader();
     if (leaderHostPort == null) {
       LOGGER.warn("No leader found while trying to send {}", request.toString());
       return null;
     }
+    if (_preferredPort != null) {
+      leaderHostPort.setSecond(_preferredPort);
+    }
+    String protocol = (_preferredProtocol != null) ? _preferredProtocol : "http";
 
-    return request.getUrl(leaderHostPort, "http");
+    return request.getUrl(leaderHostPort.getFirst() + ":" + leaderHostPort.getSecond(), protocol);
   }
 
   private SegmentCompletionProtocol.Response sendRequest(String url) {
