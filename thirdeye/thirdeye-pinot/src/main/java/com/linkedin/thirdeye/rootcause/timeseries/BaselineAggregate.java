@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.rootcause.timeseries;
 
 import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import java.util.ArrayList;
@@ -51,6 +50,9 @@ public class BaselineAggregate implements Baseline {
   public DataFrame compute(MetricSlice slice, Map<MetricSlice, DataFrame> data) {
     DataFrame joined = new DataFrame(COL_TIME, BaselineUtil.makeTimestamps(slice));
 
+    final Set<Long> timestamps = new HashSet<>(joined.getLongs(COL_TIME).toList());
+    boolean isInitialized = false;
+
     List<String> colNames = new ArrayList<>();
     for (Map.Entry<MetricSlice, DataFrame> entry : data.entrySet()) {
       MetricSlice s = entry.getKey();
@@ -61,12 +63,30 @@ public class BaselineAggregate implements Baseline {
       }
 
       String colName = String.valueOf(s.getStart());
-
       DataFrame df = new DataFrame(entry.getValue());
+
       df.addSeries(COL_TIME, df.getLongs(COL_TIME).subtract(offset));
       df.renameSeries(COL_VALUE, colName);
+      df = df.filter(new Series.LongConditional() {
+        @Override
+        public boolean apply(long... values) {
+          return timestamps.contains(values[0]);
+        }
+      }, COL_TIME).dropNull();
 
-      joined.addSeries(df, colName);
+      if (!isInitialized) {
+        // handle multi-index via prototyping
+        DataFrame prototype = new DataFrame();
+        for (String name : df.getIndexNames()) {
+          prototype.addSeries(name, df.get(name));
+        }
+
+        joined = joined.joinOuter(prototype, COL_TIME);
+        joined.setIndex(df.getIndexNames());
+        isInitialized = true;
+      }
+
+      joined = joined.joinOuter(df);
       colNames.add(colName);
 
       // TODO fill null forward?
@@ -75,6 +95,7 @@ public class BaselineAggregate implements Baseline {
     String[] arrNames = colNames.toArray(new String[colNames.size()]);
 
     joined.addSeries(COL_VALUE, joined.map(this.type.function, arrNames));
+    joined.sortedBy(joined.getIndexNames());
 
     return joined;
   }

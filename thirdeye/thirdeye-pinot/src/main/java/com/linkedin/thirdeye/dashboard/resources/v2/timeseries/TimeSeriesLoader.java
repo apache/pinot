@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources.v2.timeseries;
 
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 
 
@@ -8,6 +9,9 @@ import com.linkedin.thirdeye.dataframe.util.MetricSlice;
  * Loader for metric series based on slice and an (optinal) granularity. Must be thread safe.
  */
 public interface TimeSeriesLoader {
+  String COL_TIME = DataFrameUtils.COL_TIME;
+  String COL_VALUE = DataFrameUtils.COL_VALUE;
+
   /**
    * Returns the metric time series for a given time range and filter set, with a specified
    * time granularity. If the underlying time series resolution does not correspond to the desired

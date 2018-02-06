@@ -46,10 +46,10 @@ public class BaselineOffset implements Baseline {
       throw new IllegalArgumentException(String.format("Found slice with invalid offset %d", offset));
     }
 
-    input.addSeries(COL_TIME, input.getLongs(COL_TIME).subtract(this.offset));
+    DataFrame output = new DataFrame(input);
+    output.addSeries(COL_TIME, output.getLongs(COL_TIME).subtract(this.offset));
 
-
-    return new DataFrame(COL_TIME, BaselineUtil.makeTimestamps(slice)).addSeries(input, COL_VALUE);
+    return output;
   }
 
   public static BaselineOffset fromOffset(long offset) {
