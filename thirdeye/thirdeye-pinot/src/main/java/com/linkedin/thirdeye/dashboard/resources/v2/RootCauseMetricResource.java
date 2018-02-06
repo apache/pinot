@@ -31,6 +31,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang.StringUtils;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,11 +62,11 @@ public class RootCauseMetricResource {
   private static final String GRANULARITY_DEFAULT = MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString();
 
   private static final Pattern PATTERN_CURRENT = Pattern.compile("current");
-  private static final Pattern PATTERN_WEEK_OVER_WEEK = Pattern.compile("wo([0-9]+)w");
-  private static final Pattern PATTERN_MEAN = Pattern.compile("mean([0-9]+)w");
-  private static final Pattern PATTERN_MEDIAN = Pattern.compile("median([0-9]+)w");
-  private static final Pattern PATTERN_MIN = Pattern.compile("min([0-9]+)w");
-  private static final Pattern PATTERN_MAX = Pattern.compile("max([0-9]+)w");
+  private static final Pattern PATTERN_WEEK_OVER_WEEK = Pattern.compile("wo([1-9][0-9]*)w");
+  private static final Pattern PATTERN_MEAN = Pattern.compile("mean([1-9][0-9]*)w");
+  private static final Pattern PATTERN_MEDIAN = Pattern.compile("median([1-9][0-9]*)w");
+  private static final Pattern PATTERN_MIN = Pattern.compile("min([1-9][0-9]*)w");
+  private static final Pattern PATTERN_MAX = Pattern.compile("max([1-9][0-9]*)w");
 
   private final ExecutorService executor;
   private final AggregationLoader aggregationLoader;
@@ -117,8 +119,9 @@ public class RootCauseMetricResource {
     Baseline range = parseOffset(baseSlice, offset, timezone);
 
     List<MetricSlice> slices = range.from(baseSlice);
+    logSlices(baseSlice, slices);
+
     Map<MetricSlice, DataFrame> data = fetchAggregates(slices);
-    LOG.info("aggregate data:\n{}", data);
 
     DataFrame result = range.compute(baseSlice, data);
 
@@ -171,8 +174,9 @@ public class RootCauseMetricResource {
     Baseline range = parseOffset(baseSlice, offset, timezone);
 
     List<MetricSlice> slices = range.from(baseSlice);
+    logSlices(baseSlice, slices);
+
     Map<MetricSlice, DataFrame> data = fetchBreakdowns(slices);
-    LOG.info("breakdown data:\n{}", data);
 
     DataFrame result = range.compute(baseSlice, data);
 
@@ -222,8 +226,9 @@ public class RootCauseMetricResource {
     Baseline range = parseOffset(baseSlice, offset, timezone);
 
     List<MetricSlice> slices = range.from(baseSlice);
+    logSlices(baseSlice, slices);
+
     Map<MetricSlice, DataFrame> data = fetchTimeSeries(slices);
-    LOG.info("timeseries data:\n{}", data);
 
     DataFrame result = range.compute(baseSlice, data);
 
@@ -391,7 +396,7 @@ public class RootCauseMetricResource {
 
     Matcher mWeekOverWeek = PATTERN_WEEK_OVER_WEEK.matcher(offset);
     if (mWeekOverWeek.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineType.MEAN, Integer.valueOf(mWeekOverWeek.group(1)), 1, timestamp, timezone);
+      return BaselineAggregate.fromWeekOverWeek(BaselineType.MEAN, 1, Integer.valueOf(mWeekOverWeek.group(1)), timestamp, timezone);
     }
 
     Matcher mMean = PATTERN_MEAN.matcher(offset);
@@ -455,5 +460,13 @@ public class RootCauseMetricResource {
   private MetricSlice makeSlice(String urn, long start, long end, TimeGranularity granularity) {
     MetricEntity metric = MetricEntity.fromURN(urn, 1.0);
     return MetricSlice.from(metric.getId(), start, end, metric.getFilters(), granularity);
+  }
+
+  private static void logSlices(MetricSlice baseSlice, List<MetricSlice> slices) {
+    final DateTimeFormatter formatter = DateTimeFormat.forStyle("LL");
+    LOG.info("{} - {}", formatter.print(baseSlice.getStart()), formatter.print(baseSlice.getEnd()));
+    for (MetricSlice slice : slices) {
+      LOG.info("{} - {}", formatter.print(slice.getStart()), formatter.print(slice.getEnd()));
+    }
   }
 }
