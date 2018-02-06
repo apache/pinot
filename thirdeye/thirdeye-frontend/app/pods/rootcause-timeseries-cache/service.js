@@ -1,8 +1,7 @@
 import Service from '@ember/service';
 import {
-  toAbsoluteRange,
-  toFilters,
-  toFilterMap
+  toMetricUrn,
+  toAbsoluteUrn
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
@@ -57,10 +56,7 @@ export default Service.extend({
 
     // metrics
     missing.forEach(urn => {
-      const range = toAbsoluteRange(urn, requestContext.analysisRange, requestContext.compareMode);
-      const offset = requestContext.analysisRange[0] - range[0];
-      const offsetFunc = (ts) => this._offsetTimeseries(ts, offset);
-      return this._fetchSlice(urn, range, requestContext, offsetFunc);
+      return this._fetchSlice(urn, requestContext);
     });
   },
 
@@ -81,39 +77,22 @@ export default Service.extend({
 
   _extractTimeseries(json, urn) {
     const timeseries = {};
-    Object.keys(json).forEach(range =>
-      Object.keys(json[range]).filter(sid => sid != 'timestamp').forEach(sid => {
-        const jrng = json[range];
-        timeseries[urn] = {
-          timestamps: jrng.timestamp,
-          values: jrng[sid]
-        };
-      })
-    );
+    timeseries[urn] = json;
     return timeseries;
   },
 
-  _offsetTimeseries(timeseries, offset) {
-    Object.keys(timeseries).forEach(urn => {
-      timeseries[urn].timestamps = timeseries[urn].timestamps.map(t => t + offset);
-    });
-    return timeseries;
-  },
+  _fetchSlice(urn, context) {
+    const metricUrn = toMetricUrn(urn);
+    const range = context.analysisRange;
+    const offset = toAbsoluteUrn(urn, context.compareMode).split(':')[2].toLowerCase();
+    const granularity = context.granularity;
 
-  _fetchSlice(urn, range, context, offsetFunc) {
-    const metricId = urn.split(':')[3];
-    const metricFilters = toFilters([urn]);
-    const filters = toFilterMap(metricFilters);
-
-    const filterString = encodeURIComponent(JSON.stringify(filters));
-
-    const url = `/timeseries/query?metricIds=${metricId}&ranges=${range[0]}:${range[1]}&filters=${filterString}&granularity=${context.granularity}`;
+    const url = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&granularity=${granularity}`;
     return fetch(url)
       .then(checkStatus)
       .then(res => this._extractTimeseries(res, urn))
-      .then(res => offsetFunc(res))
       .then(res => this._complete(context, res))
-      .catch(error => this._handleError(urn, error));
+      // .catch(error => this._handleError(urn, error));
   },
 
   _handleError(urn, error) {

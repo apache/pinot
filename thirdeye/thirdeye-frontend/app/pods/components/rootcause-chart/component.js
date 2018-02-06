@@ -401,8 +401,8 @@ export default Component.extend({
     if (hasPrefix(urn, 'frontend:metric:current:')) {
       const metricEntity = entities[toMetricUrn(urn)];
       const series = {
-        timestamps: timeseries[urn].timestamps,
-        values: timeseries[urn].values,
+        timestamps: timeseries[urn].timestamp,
+        values: timeseries[urn].value,
         color: metricEntity ? metricEntity.color : 'none',
         type: 'line',
         axis: 'y'
@@ -413,8 +413,8 @@ export default Component.extend({
     } else if (hasPrefix(urn, 'frontend:metric:baseline:')) {
       const metricEntity = entities[toMetricUrn(urn)];
       const series = {
-        timestamps: timeseries[urn].timestamps,
-        values: timeseries[urn].values,
+        timestamps: timeseries[urn].timestamp,
+        values: timeseries[urn].value,
         color: metricEntity ? 'light-' + metricEntity.color : 'none',
         type: 'line',
         axis: 'y'

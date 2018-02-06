@@ -1,8 +1,7 @@
 import Service from '@ember/service';
 import {
-  toAbsoluteRange,
-  toFilters,
-  toFilterMap
+  toMetricUrn,
+  toAbsoluteUrn
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
@@ -57,8 +56,7 @@ export default Service.extend({
 
     // metrics
     missing.forEach(urn => {
-      const range = toAbsoluteRange(urn, requestContext.anomalyRange, requestContext.compareMode);
-      return this._fetchSlice(urn, range, requestContext);
+      return this._fetchSlice(urn, requestContext);
     });
   },
 
@@ -78,26 +76,17 @@ export default Service.extend({
   },
 
   _extractBreakdowns(incoming, urn) {
-    // NOTE: only supports single time range
     const breakdowns = {};
-    breakdowns[urn] = {}; // default
-
-    Object.keys(incoming).forEach(range => {
-      Object.keys(incoming[range]).forEach(mid => {
-        breakdowns[urn] = incoming[range][mid];
-      });
-    });
+    breakdowns[urn] = incoming
     return breakdowns;
   },
 
-  _fetchSlice(urn, range, context) {
-    const metricId = urn.split(':')[3];
-    const metricFilters = toFilters([urn]);
-    const filters = toFilterMap(metricFilters);
+  _fetchSlice(urn, context) {
+    const metricUrn = toMetricUrn(urn);
+    const range = context.anomalyRange;
+    const offset = toAbsoluteUrn(urn, context.compareMode).split(':')[2].toLowerCase();
 
-    const filterString = encodeURIComponent(JSON.stringify(filters));
-
-    const url = `/aggregation/query?metricIds=${metricId}&ranges=${range[0]}:${range[1]}&filters=${filterString}&rollup=20`;
+    const url = `/rootcause/metric/breakdown?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}`;
     return fetch(url)
       .then(checkStatus)
       .then(res => this._extractBreakdowns(res, urn))

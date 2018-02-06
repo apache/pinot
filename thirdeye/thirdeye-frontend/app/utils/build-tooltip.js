@@ -45,7 +45,7 @@ const getTimeseriesLookup = (timeseries, hoverUrns) => {
   const lookup = {};
   frontendUrns.forEach(urn => {
     const ts = timeseries[urn];
-    lookup[urn] = ts.timestamps.map((t, i) => [parseInt(t, 10), ts.values[i]]);
+    lookup[urn] = ts.timestamp.map((t, i) => [parseInt(t, 10), ts.value[i]]);
   });
 
   return lookup;
