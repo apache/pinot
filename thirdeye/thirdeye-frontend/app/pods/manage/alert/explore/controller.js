@@ -603,7 +603,7 @@ export default Controller.extend({
             change = wowDetails.change.toFixed(2);
           }
 
-          // Set displayed value properties
+          // Set displayed value properties. Note: ensure no CP watching these props
           Ember.set(anomaly, 'shownCurrent', curr);
           Ember.set(anomaly, 'shownBaseline', base);
           Ember.set(anomaly, 'shownChangeRate', change);
