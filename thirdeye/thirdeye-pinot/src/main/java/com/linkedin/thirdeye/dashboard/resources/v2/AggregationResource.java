@@ -30,6 +30,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Used for RCA prototype. To be removed.
+ *
+ * @see RootCauseMetricResource
+ *
+ */
+@Deprecated
 @Path(value = "/aggregation")
 @Produces(MediaType.APPLICATION_JSON)
 public class AggregationResource {

@@ -60,6 +60,13 @@ import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
+/**
+ * Used by legacy RCA experience. To be removed.
+ *
+ * @see RootCauseMetricResource
+ */
+@Deprecated
 @Path(value = "/timeseries")
 @Produces(MediaType.APPLICATION_JSON)
 public class TimeSeriesResource {
