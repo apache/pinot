@@ -86,8 +86,9 @@ export default Service.extend({
     const range = context.analysisRange;
     const offset = toAbsoluteUrn(urn, context.compareMode).split(':')[2].toLowerCase();
     const granularity = context.granularity;
+    const timezone = moment.tz.guess();
 
-    const url = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&granularity=${granularity}`;
+    const url = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&granularity=${granularity}&timezone=${timezone}`;
     return fetch(url)
       .then(checkStatus)
       .then(res => this._extractTimeseries(res, urn))

@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
  * The endpoint parses metric urns and a unified set of "offsets", i.e. time-warped baseline of the
  * specified metric. It further aligns queried time stamps to sensibly match the raw dataset.</p>
  *
- * @see RootCauseMetricResource#parseOffset(String) supported offsets
+ * @see RootCauseMetricResource#parseOffset(MetricSlice, String, String) supported offsets
  */
 @Path(value = "/rootcause/metric")
 @Produces(MediaType.APPLICATION_JSON)
@@ -53,10 +53,10 @@ public class RootCauseMetricResource {
   private static final String COL_DIMENSION_NAME = AggregationLoader.COL_DIMENSION_NAME;
   private static final String COL_DIMENSION_VALUE = AggregationLoader.COL_DIMENSION_VALUE;
 
-  private static final long ONE_WEEK = TimeUnit.DAYS.toMillis(7);
   private static final long TIMEOUT = 60000;
 
   private static final String OFFSET_DEFAULT = "current";
+  private static final String TIMEZONE_DEFAULT = "UTC";
   private static final String GRANULARITY_DEFAULT = MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString();
 
   private static final Pattern PATTERN_CURRENT = Pattern.compile("current");
@@ -89,11 +89,12 @@ public class RootCauseMetricResource {
    * @param start start time (in millis)
    * @param end end time (in millis)
    * @param offset offset identifier (e.g. "current", "wo2w")
+   * @param timezone timezone identifier (e.g. "America/Los_Angeles")
    *
-   * @see RootCauseMetricResource#parseOffset(String) supported offsets
+   * @see RootCauseMetricResource#parseOffset(MetricSlice, String, String) supported offsets
    *
    * @return aggregate value, or NaN if data not available
-   * @throws Exception
+   * @throws Exception on catch-all execution failure
    */
   @GET
   @Path("/aggregate")
@@ -101,14 +102,19 @@ public class RootCauseMetricResource {
       @QueryParam("urn") @NotNull String urn,
       @QueryParam("start") @NotNull long start,
       @QueryParam("end") @NotNull long end,
-      @QueryParam("offset") String offset) throws Exception {
+      @QueryParam("offset") String offset,
+      @QueryParam("timezone") String timezone) throws Exception {
 
     if (StringUtils.isBlank(offset)) {
       offset = OFFSET_DEFAULT;
     }
 
+    if (StringUtils.isBlank(timezone)) {
+      timezone = TIMEZONE_DEFAULT;
+    }
+
     MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end));
-    Baseline range = parseOffset(offset);
+    Baseline range = parseOffset(baseSlice, offset, timezone);
 
     List<MetricSlice> slices = range.from(baseSlice);
     Map<MetricSlice, DataFrame> data = fetchAggregates(slices);
@@ -131,12 +137,13 @@ public class RootCauseMetricResource {
    * @param start start time (in millis)
    * @param end end time (in millis)
    * @param offset offset identifier (e.g. "current", "wo2w")
+   * @param timezone timezone identifier (e.g. "America/Los_Angeles")
    * @param rollup limit results to the top k elements, plus an 'OTHER' rollup element
    *
-   * @see RootCauseMetricResource#parseOffset(String) supported offsets
+   * @see RootCauseMetricResource#parseOffset(MetricSlice, String, String) supported offsets
    *
    * @return aggregate value, or NaN if data not available
-   * @throws Exception
+   * @throws Exception on catch-all execution failure
    */
   @GET
   @Path("/breakdown")
@@ -145,10 +152,15 @@ public class RootCauseMetricResource {
       @QueryParam("start") @NotNull long start,
       @QueryParam("end") @NotNull long end,
       @QueryParam("offset") String offset,
+      @QueryParam("timezone") String timezone,
       @QueryParam("rollup") Long rollup) throws Exception {
 
     if (StringUtils.isBlank(offset)) {
       offset = OFFSET_DEFAULT;
+    }
+
+    if (StringUtils.isBlank(timezone)) {
+      timezone = TIMEZONE_DEFAULT;
     }
 
     if (rollup != null) {
@@ -156,7 +168,7 @@ public class RootCauseMetricResource {
     }
 
     MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end));
-    Baseline range = parseOffset(offset);
+    Baseline range = parseOffset(baseSlice, offset, timezone);
 
     List<MetricSlice> slices = range.from(baseSlice);
     Map<MetricSlice, DataFrame> data = fetchBreakdowns(slices);
@@ -175,12 +187,13 @@ public class RootCauseMetricResource {
    * @param start start time (in millis)
    * @param end end time (in millis)
    * @param offset offset identifier (e.g. "current", "wo2w")
+   * @param timezone timezone identifier (e.g. "America/Los_Angeles")
    * @param granularityString time granularity (e.g. "5_MINUTES", "1_HOURS")
    *
-   * @see RootCauseMetricResource#parseOffset(String) supported offsets
+   * @see RootCauseMetricResource#parseOffset(MetricSlice, String, String) supported offsets
    *
    * @return aggregate value, or NaN if data not available
-   * @throws Exception
+   * @throws Exception on catch-all execution failure
    */
   @GET
   @Path("/timeseries")
@@ -189,10 +202,15 @@ public class RootCauseMetricResource {
       @QueryParam("start") @NotNull long start,
       @QueryParam("end") @NotNull long end,
       @QueryParam("offset") String offset,
+      @QueryParam("timezone") String timezone,
       @QueryParam("granularity") String granularityString) throws Exception {
 
     if (StringUtils.isBlank(offset)) {
       offset = OFFSET_DEFAULT;
+    }
+
+    if (StringUtils.isBlank(timezone)) {
+      timezone = TIMEZONE_DEFAULT;
     }
 
     if (StringUtils.isBlank(granularityString)) {
@@ -201,7 +219,7 @@ public class RootCauseMetricResource {
 
     TimeGranularity granularity = TimeGranularity.fromString(granularityString);
     MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end, granularity));
-    Baseline range = parseOffset(offset);
+    Baseline range = parseOffset(baseSlice, offset, timezone);
 
     List<MetricSlice> slices = range.from(baseSlice);
     Map<MetricSlice, DataFrame> data = fetchTimeSeries(slices);
@@ -255,7 +273,7 @@ public class RootCauseMetricResource {
    *
    * @param slices metric slices
    * @return map of dataframes (keyed by metric slice, columns: [COL_TIME(1), COL_VALUE])
-   * @throws Exception
+   * @throws Exception on catch-all execution failure
    */
   private Map<MetricSlice, DataFrame> fetchAggregates(List<MetricSlice> slices) throws Exception {
     Map<MetricSlice, Future<Double>> futures = new HashMap<>();
@@ -288,7 +306,7 @@ public class RootCauseMetricResource {
    * @param slices metric slices
    * @return map of dataframes (keyed by metric slice,
    *         columns: [COL_TIME(1), COL_DIMENSION_NAME, COL_DIMENSION_VALUE, COL_VALUE])
-   * @throws Exception
+   * @throws Exception on catch-all execution failure
    */
   private Map<MetricSlice, DataFrame> fetchBreakdowns(List<MetricSlice> slices) throws Exception {
     Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
@@ -321,7 +339,7 @@ public class RootCauseMetricResource {
    *
    * @param slices metric slices
    * @return map of dataframes (keyed by metric slice, columns: [COL_TIME(N), COL_VALUE])
-   * @throws Exception
+   * @throws Exception on catch-all execution failure
    */
   private Map<MetricSlice, DataFrame> fetchTimeSeries(List<MetricSlice> slices) throws Exception {
     Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
@@ -344,7 +362,8 @@ public class RootCauseMetricResource {
   }
 
   /**
-   * Returns a configured instance of Baseline for the given, named offset.
+   * Returns a configured instance of Baseline for the given, named offset. The method uses slice and
+   * timezone information to adjust for daylight savings time.
    *
    * <p>Supported offsets:</p>
    * <pre>
@@ -356,11 +375,15 @@ public class RootCauseMetricResource {
    *   maxXw     maximum of data points from the the past X weeks, with a lag of 1 week)
    * </pre>
    *
+   * @param baseSlice metric slice that acts as base
    * @param offset offset identifier
+   * @param timezone timezone identifier (location long format)
    * @return Baseline instance
    * @throws IllegalArgumentException if the offset cannot be parsed
    */
-  private static Baseline parseOffset(String offset) {
+  private static Baseline parseOffset(MetricSlice baseSlice, String offset, String timezone) {
+    long timestamp = baseSlice.getStart();
+
     Matcher mCurrent = PATTERN_CURRENT.matcher(offset);
     if (mCurrent.find()) {
       return BaselineOffset.fromOffset(0);
@@ -368,27 +391,27 @@ public class RootCauseMetricResource {
 
     Matcher mWeekOverWeek = PATTERN_WEEK_OVER_WEEK.matcher(offset);
     if (mWeekOverWeek.find()) {
-      return BaselineOffset.fromOffset(-1 * Integer.valueOf(mWeekOverWeek.group(1)) * ONE_WEEK);
+      return BaselineAggregate.fromWeekOverWeek(BaselineType.MEAN, Integer.valueOf(mWeekOverWeek.group(1)), 1, timestamp, timezone);
     }
 
     Matcher mMean = PATTERN_MEAN.matcher(offset);
     if (mMean.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineType.MEAN, Integer.valueOf(mMean.group(1)), 1);
+      return BaselineAggregate.fromWeekOverWeek(BaselineType.MEAN, Integer.valueOf(mMean.group(1)), 1, timestamp, timezone);
     }
 
     Matcher mMedian = PATTERN_MEDIAN.matcher(offset);
     if (mMedian.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineType.MEDIAN, Integer.valueOf(mMedian.group(1)), 1);
+      return BaselineAggregate.fromWeekOverWeek(BaselineType.MEDIAN, Integer.valueOf(mMedian.group(1)), 1, timestamp, timezone);
     }
 
     Matcher mMin = PATTERN_MIN.matcher(offset);
     if (mMin.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineType.MIN, Integer.valueOf(mMin.group(1)), 1);
+      return BaselineAggregate.fromWeekOverWeek(BaselineType.MIN, Integer.valueOf(mMin.group(1)), 1, timestamp, timezone);
     }
 
     Matcher mMax = PATTERN_MAX.matcher(offset);
     if (mMax.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineType.MAX, Integer.valueOf(mMax.group(1)), 1);
+      return BaselineAggregate.fromWeekOverWeek(BaselineType.MAX, Integer.valueOf(mMax.group(1)), 1, timestamp, timezone);
     }
 
     throw new IllegalArgumentException(String.format("Unknown offset '%s'", offset));

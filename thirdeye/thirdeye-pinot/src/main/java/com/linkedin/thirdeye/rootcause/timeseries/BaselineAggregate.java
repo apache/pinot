@@ -10,6 +10,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Duration;
 
 
 public class BaselineAggregate implements Baseline {
@@ -113,6 +116,19 @@ public class BaselineAggregate implements Baseline {
 
     for (int i = 0; i < numWeeks; i++) {
       long offset = -1 * (i + offsetWeeks) * TimeUnit.DAYS.toMillis(7);
+      offsets.add(offset);
+    }
+
+    return new BaselineAggregate(type, offsets);
+  }
+
+  public static BaselineAggregate fromWeekOverWeek(BaselineType type, int numWeeks, int offsetWeeks, long timestamp, String timezone) {
+    DateTime baseDate = new DateTime(timestamp, DateTimeZone.forID(timezone));
+
+    List<Long> offsets = new ArrayList<>();
+
+    for (int i = 0; i < numWeeks; i++) {
+      long offset = baseDate.minusWeeks(i + offsetWeeks).getMillis() - timestamp;
       offsets.add(offset);
     }
 
