@@ -9,6 +9,7 @@ const ROOTCAUSE_HEADER = 'rootcause-header';
 const HEADER = `.${ROOTCAUSE_HEADER}__major`;
 const LAST_SAVED = `.${ROOTCAUSE_HEADER}__last-updated-info`;
 const COMMENT_TEXT = `.${ROOTCAUSE_HEADER}--textarea`;
+const BASELINE = '#select-compare-mode';
 
 moduleForAcceptance('Acceptance | rootcause');
 
@@ -63,8 +64,12 @@ test('visiting rootcause page with a session should have correct session name, t
   assert.ok(
     find(LAST_SAVED).get(0).innerText.includes('Last saved by mickeymouse'),
     'last saved information is correct');
-  assert.ok(
+  assert.equal(
     find(COMMENT_TEXT).get(0).value,
     'Let\'s find the rootcause Disney-style!',
     'comments are correct');
+  assert.equal(
+    find(BASELINE).get(0).innerText,
+    'WoW',
+    'default baseline is correct');
 });
