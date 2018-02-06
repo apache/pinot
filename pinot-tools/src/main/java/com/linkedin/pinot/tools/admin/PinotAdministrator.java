@@ -52,6 +52,7 @@ import com.linkedin.pinot.tools.admin.command.StopProcessCommand;
 import com.linkedin.pinot.tools.admin.command.StreamAvroIntoKafkaCommand;
 import com.linkedin.pinot.tools.admin.command.UploadSegmentCommand;
 import com.linkedin.pinot.tools.admin.command.ValidateConfigCommand;
+import com.linkedin.pinot.tools.admin.command.VerifyClusterStateCommand;
 import com.linkedin.pinot.tools.admin.command.VerifySegmentState;
 import com.linkedin.pinot.tools.segment.converter.PinotSegmentConvertCommand;
 
@@ -90,7 +91,8 @@ public class PinotAdministrator {
       @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class),
       @SubCommand(name = "ConvertPinotSegment", impl = PinotSegmentConvertCommand.class),
       @SubCommand(name = "MoveReplicaGroup", impl = MoveReplicaGroup.class),
-      @SubCommand(name = "BackfillSegmentColumn", impl = BackfillDateTimeColumnCommand.class)
+      @SubCommand(name = "BackfillSegmentColumn", impl = BackfillDateTimeColumnCommand.class),
+      @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class)
   })
   Command _subCommand;
   // @formatter:on

@@ -34,7 +34,7 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
   @Option(name = "-tableName", required = false, metaVar = "<String>", usage = "Table name to rebalance (e.g. myTable_OFFLINE)", forbids ={"-tenantName"})
   private String _tableName;
 
-  @Option(name = "-tenantName", required = false, metaVar = "<string>", usage = "Name of the tenant. Note All offline tables belonging this tenant will be rebalanced", forbids ={"-tableName"})
+  @Option(name = "-tenantName", required = false, metaVar = "<String>", usage = "Name of the tenant. Note All offline tables belonging this tenant will be rebalanced", forbids ={"-tableName"})
   private String _tenantName;
 
   @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute command (Run the rebalancer)")
