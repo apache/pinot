@@ -209,10 +209,11 @@ export default Route.extend({
       endDate,
       alertEvalMetrics
     } = model;
+    let idsRemoved = [];
 
     return RSVP.hash(tuningPromiseHash(startDate, endDate, alertEvalMetrics.autotuneId, alertId))
       .then((data) => {
-        const idsRemoved = anomalyDiff(data.idListA, data.idListB).idsRemoved;
+        idsRemoved = anomalyDiff(data.idListA, data.idListB).idsRemoved;
         Object.assign(data.projectedEval, { mttd: data.projectedMttd });
         Object.assign(model.alertEvalMetrics, { projected: data.projectedEval });
         Object.assign(model, { idsRemoved });
@@ -221,6 +222,10 @@ export default Route.extend({
       // Fetch all anomaly data for returned Ids to paginate all from one array
       .then((rawAnomalyData) => {
         Object.assign(model, { rawAnomalyData });
+        return fetchSeverityScores(idsRemoved);
+      })
+      .then((scoreData) => {
+        Object.assign(model, { scoreData });
       })
       // Got errors?
       .catch((error) => {
@@ -233,6 +238,7 @@ export default Route.extend({
 
     const {
       id,
+      scoreData,
       alertData,
       duration,
       loadError,
@@ -241,29 +247,19 @@ export default Route.extend({
       rawAnomalyData
     } = model;
 
-    const anomalyData = enhanceAnomalies(rawAnomalyData);
-    const tableStats = anomalyTableStats(anomalyData);
-    const timeRangeOptions = setUpTimeRangeOptions([durationDefault], duration);
+    const anomalyData = enhanceAnomalies(rawAnomalyData, scoreData);
 
-    // Prime the controller
     controller.setProperties({
       alertData,
       loadError,
-      tableStats,
       alertId: id,
-      timeRangeOptions,
+      anomalyData,
       alertEvalMetrics,
-      originalProjectedMetrics: alertEvalMetrics.projected
+      tableStats: anomalyTableStats(anomalyData),
+      originalProjectedMetrics: alertEvalMetrics.projected,
+      timeRangeOptions: setUpTimeRangeOptions([durationDefault], duration)
     });
     controller.initialize();
-
-    // Fetch all severity score data for anomaly table
-    fetchSeverityScores(idsRemoved).then((scoreData) => {
-      controller.set('anomalyData', enhanceAnomalies(rawAnomalyData, scoreData));
-    })
-    .catch((error) => {
-      return RSVP.reject({ error, location: `${this.routeName}:setupController` });
-    })
   },
 
   resetController(controller, isExiting) {

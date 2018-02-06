@@ -603,11 +603,10 @@ export default Controller.extend({
             change = wowDetails.change.toFixed(2);
           }
 
-          this.setProperties(anomaly, {
-            shownCurrent: curr,
-            shownBaseline: base,
-            shownChangeRate: change
-          });
+          // Set displayed value properties
+          Ember.set(anomaly, 'shownCurrent', curr);
+          Ember.set(anomaly, 'shownBaseline', base);
+          Ember.set(anomaly, 'shownChangeRate', change);
         });
       }
     },

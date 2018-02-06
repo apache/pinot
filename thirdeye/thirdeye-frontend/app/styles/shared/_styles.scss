@@ -265,12 +265,8 @@ body {
   &__range-picker {
     display: inline-block;
     color: app-shade(black, 7);
-    min-width: 240px;
+    min-width: 237px;
     margin: 0;
-
-    &--explore {
-      min-width: 164px;
-    }
 
     .daterangepicker-input {
       background: none;
@@ -507,6 +503,10 @@ body {
     color: app-shade(black, 6);
     padding-left: 20px;
     line-height: 45px;
+
+    &--fixed {
+      width: 215px;
+    }
   }
 
   &__cell-link {

@@ -70,7 +70,7 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
 
     // Placeholder: ChangeRate will not be calculated on front-end
     const changeRate = (anomaly.current && anomaly.baseline)
-      ? ((anomaly.current - anomaly.baseline) / anomaly.baseline * 100).toFixed(2) : 0;
+      ? (Math.abs(anomaly.current - anomaly.baseline) / anomaly.baseline * 100).toFixed(2) : 0;
 
     const changeDirection = (anomaly.current > anomaly.baseline) ? '-' : '+';
 

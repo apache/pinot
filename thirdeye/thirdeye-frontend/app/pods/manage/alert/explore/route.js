@@ -76,7 +76,7 @@ const fetchCombinedAnomalies = (anomalyIds) => {
  * @returns {RSVP promise}
  */
 const fetchSeverityScores = (anomalyIds) => {
-  if (anomalyIds.length) {
+  if (anomalyIds && anomalyIds.length) {
     const anomalyPromiseHash = anomalyIds.map((id) => {
       return RSVP.hash({
         id,
