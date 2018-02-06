@@ -32,11 +32,14 @@ import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
  */
 public class AutoRebalancePartitionAssignmentGenerator extends PartitionAssignmentGenerator {
 
-  public AutoRebalancePartitionAssignmentGenerator(TableConfig tableConfig, int nKafkaPartitions,
+  private static  final String ONLINE_STATE = "ONLINE";
+  private static  final String OFFLINE_STATE = "OFFLINE";
+
+  public AutoRebalancePartitionAssignmentGenerator(TableConfig tableConfig, int numPartitions,
       List<String> instanceNames, Map<String, TableConfig> allTableConfigsInTenant,
       Map<String, ZNRecord> currentPartitionAssignment) {
 
-    super(tableConfig, nKafkaPartitions, instanceNames, currentPartitionAssignment);
+    super(tableConfig, numPartitions, instanceNames, currentPartitionAssignment);
 
     _tablesForPartitionAssignment = new ArrayList<>();
     for (TableConfig config : allTableConfigsInTenant.values()) {
@@ -68,14 +71,14 @@ public class AutoRebalancePartitionAssignmentGenerator extends PartitionAssignme
           String key = realtimeTableName + partitionJoiner + partitionNumber;
           Map<String, String> value = new HashMap<>();
           for (String instance : partitionInstances) {
-            value.put(instance, "ONLINE");
+            value.put(instance, ONLINE_STATE);
           }
           currentPartitions.put(key, value);
         }
       }
 
       // construct new partitions list
-      int p = _nPartitions.get(realtimeTableName);
+      int p = _tableToNumPartitions.get(realtimeTableName);
       for (int i = 0; i < p; i++) {
         newPartitions.add(realtimeTableName + partitionJoiner + Integer.toString(i));
       }
@@ -83,8 +86,8 @@ public class AutoRebalancePartitionAssignmentGenerator extends PartitionAssignme
 
     // get states
     LinkedHashMap<String, Integer> states = new LinkedHashMap<>(2);
-    states.put("OFFLINE", 0);
-    states.put("ONLINE", _nReplicas);
+    states.put(OFFLINE_STATE, 0);
+    states.put(ONLINE_STATE, _numReplicas);
 
     // auto rebalance
     AutoRebalanceStrategy autoRebalanceStrategy =

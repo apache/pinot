@@ -37,7 +37,6 @@ import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.RoutingTableBuilderName;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.StringUtil;
@@ -1276,7 +1275,7 @@ public class PinotLLCRealtimeSegmentManager {
     PartitionAssignmentGenerator partitionAssignmentGenerator;
     if (isPartitionAwareRealtimeRouting(tableConfig)) {
       partitionAssignmentGenerator =
-          new PartitionAwarePartitionAssignmentGenerator(tableConfig, nKafkaPartitions, instanceNames,
+          new PartitionAwareAssignmentGenerator(tableConfig, nKafkaPartitions, instanceNames,
               allTableConfigsInTenant, currentPartitionAssignment);
     } else {
       partitionAssignmentGenerator =

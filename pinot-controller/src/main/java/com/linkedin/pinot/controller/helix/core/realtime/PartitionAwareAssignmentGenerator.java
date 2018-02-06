@@ -31,13 +31,13 @@ import org.apache.helix.ZNRecord;
  *
  * NOTE: We do not support/expect partition aware tables with multi tenant setup, hence this strategy should suffice
  */
-public class PartitionAwarePartitionAssignmentGenerator extends PartitionAssignmentGenerator {
+public class PartitionAwareAssignmentGenerator extends PartitionAssignmentGenerator {
 
-  public PartitionAwarePartitionAssignmentGenerator(TableConfig tableConfig, int nKafkaPartitions,
+  public PartitionAwareAssignmentGenerator(TableConfig tableConfig, int numPartitions,
       List<String> instanceNames, Map<String, TableConfig> allTableConfigsInTenant,
       Map<String, ZNRecord> currentPartitionAssignment) {
 
-    super(tableConfig, nKafkaPartitions, instanceNames, currentPartitionAssignment);
+    super(tableConfig, numPartitions, instanceNames, currentPartitionAssignment);
 
     _tablesForPartitionAssignment = new ArrayList<>();
     for (TableConfig config : allTableConfigsInTenant.values()) {
@@ -56,9 +56,9 @@ public class PartitionAwarePartitionAssignmentGenerator extends PartitionAssignm
     for (String realtimeTableName : _tablesForPartitionAssignment) {
       ZNRecord znRecord = new ZNRecord(realtimeTableName);
       int serverId = 0;
-      for (int p = 0; p < _nPartitions.get(realtimeTableName); p++) {
-        List<String> instances = new ArrayList<>(_nReplicas);
-        for (int r = 0; r < _nReplicas; r++) {
+      for (int p = 0; p < _tableToNumPartitions.get(realtimeTableName); p++) {
+        List<String> instances = new ArrayList<>(_numReplicas);
+        for (int r = 0; r < _numReplicas; r++) {
           instances.add(_instanceNames.get(serverId++));
           if (serverId == _instanceNames.size()) {
             serverId = 0;

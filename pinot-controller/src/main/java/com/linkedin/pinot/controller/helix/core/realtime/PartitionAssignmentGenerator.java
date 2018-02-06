@@ -29,28 +29,28 @@ public abstract class PartitionAssignmentGenerator {
 
   List<String> _tablesForPartitionAssignment;
   List<String> _instanceNames;
-  int _nReplicas;
-  Map<String, Integer> _nPartitions;
+  int _numReplicas;
+  Map<String, Integer> _tableToNumPartitions;
   Map<String, ZNRecord> _currentPartitionAssignment;
 
   /**
    * Sets up the fields required for the partition assignment algorithm
    * @param tableConfig Table config requesting the partition assignment generation
-   * @param nKafkaPartitions number of kafka partitions found for the table
+   * @param numPartitions new number of partitions found for the table
    * @param instanceNames instance names over which to generate the partition assignment
    * @param currentPartitionAssignment current partition assignment for all tables
    */
-  PartitionAssignmentGenerator(TableConfig tableConfig, int nKafkaPartitions, List<String> instanceNames,
+  PartitionAssignmentGenerator(TableConfig tableConfig, int numPartitions, List<String> instanceNames,
       Map<String, ZNRecord> currentPartitionAssignment) {
 
     _currentPartitionAssignment = currentPartitionAssignment;
     _instanceNames = instanceNames;
-    _nReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
-    _nPartitions = new HashMap<>();
+    _numReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
+    _tableToNumPartitions = new HashMap<>();
     for (Map.Entry<String, ZNRecord> entry : currentPartitionAssignment.entrySet()) {
-      _nPartitions.put(entry.getKey(), entry.getValue().getListFields().size());
+      _tableToNumPartitions.put(entry.getKey(), entry.getValue().getListFields().size());
     }
-    _nPartitions.put(tableConfig.getTableName(), nKafkaPartitions);
+    _tableToNumPartitions.put(tableConfig.getTableName(), numPartitions);
   }
 
   public abstract Map<String, ZNRecord> generatePartitionAssignment();

@@ -30,7 +30,6 @@ import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.RoutingTableBuilderName;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -62,7 +61,6 @@ import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
@@ -241,7 +239,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       int nKafkaPartitions, List<String> instanceNames, Map<String, ZNRecord> currentPartitionAssignment, Map<String, TableConfig> allTableConfigsInTenant,
       int numTablesExpected, Map<String, Integer> nPartitionsExpected, int nReplicasExpected) {
 
-    PartitionAwarePartitionAssignmentGenerator generator = new PartitionAwarePartitionAssignmentGenerator(tableConfig,
+    PartitionAwareAssignmentGenerator generator = new PartitionAwareAssignmentGenerator(tableConfig,
         nKafkaPartitions, instanceNames, allTableConfigsInTenant, currentPartitionAssignment);
 
     Map<String, ZNRecord> partitionAwarePartitionAssignment = generator.generatePartitionAssignment();
