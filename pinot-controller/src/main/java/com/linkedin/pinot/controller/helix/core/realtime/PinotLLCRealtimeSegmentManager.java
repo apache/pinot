@@ -1215,6 +1215,10 @@ public class PinotLLCRealtimeSegmentManager {
     Map<String, ZNRecord> newPartitionAssignment = generatePartitionAssignment(tableConfigWrapper, currentPartitionCount,
         currentInstances);
     writeKafkaPartitionAssignment(newPartitionAssignment);
+    // FIXME: Some race conditions to consider
+    // 1) One kafka partition change is detected in the master controller and validation manager is updating a bunch of znodes.
+    // During this time if a table gets added in another controller, it will try to update the same set of znodes
+    // 2) A controller fails after updating some znodes and not others
     LOGGER.info("Successfully updated Kafka partition assignment for table {}", realtimeTableName);
   }
 

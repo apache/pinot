@@ -23,7 +23,7 @@ import org.apache.helix.ZNRecord;
 
 
 /**
- * Base class for partition assignment generation across tables of a tenant
+ * Base class for partition assignment generation across realtime tables of a tenant
  */
 public abstract class PartitionAssignmentGenerator {
 
