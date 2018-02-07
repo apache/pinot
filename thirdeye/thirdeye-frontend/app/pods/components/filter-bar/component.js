@@ -11,7 +11,7 @@
  * {{filter-bar
  *   config=filterBarConfig
  *   entities=entities
- *   onSelectFilter=(action "onFilterSelection")}}
+ *   onFilter=(action "onFilterSelection")}}
  *
  * @exports filter-bar
  */
