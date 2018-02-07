@@ -23,7 +23,7 @@ import org.apache.helix.HelixManager;
  * Wrapper class over TableConfig
  * This class will help answer questions about what are consuming/completed tags for a table
  */
-public class TableConfigWrapper {
+public class RealtimeTagConfig {
 
   private TableConfig _tableConfig;
 
@@ -33,7 +33,7 @@ public class TableConfigWrapper {
 
   private boolean _moveCompletedSegments = false;
 
-  public TableConfigWrapper(TableConfig realtimeTableConfig, HelixManager helixManager) {
+  public RealtimeTagConfig(TableConfig realtimeTableConfig, HelixManager helixManager) {
 
     _tableConfig = realtimeTableConfig;
 
