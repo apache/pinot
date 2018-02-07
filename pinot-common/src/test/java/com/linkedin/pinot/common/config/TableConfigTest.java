@@ -107,24 +107,31 @@ public class TableConfigTest {
       checkTableConfigWithAssignmentConfig(tableConfig, tableConfigToCompare);
     }
     {
-      // With StreamConsumptionConfig
-      ReplicaGroupStrategyConfig replicaGroupConfig = new ReplicaGroupStrategyConfig();
-      replicaGroupConfig.setNumInstancesPerPartition(5);
-      replicaGroupConfig.setMirrorAssignmentAcrossReplicaGroups(true);
-      replicaGroupConfig.setPartitionColumn("memberId");
+      // With default StreamConsumptionConfig
+      TableConfig tableConfig = tableConfigBuilder.build();
+      Assert.assertEquals(
+          tableConfig.getIndexingConfig().getStreamConsumptionConfig()
+              .getStreamPartitionAssignmentStrategy(), "UniformStreamPartitionAssignment");
 
-      TableConfig tableConfig =
-          tableConfigBuilder.setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy").build();
-      tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupConfig);
+      // with streamConsumptionConfig set
+      tableConfig =
+          tableConfigBuilder.setStreamPartitionAssignmentStrategy("BalancedStreamPartitionAssignment").build();
+      Assert.assertEquals(
+          tableConfig.getIndexingConfig().getStreamConsumptionConfig()
+              .getStreamPartitionAssignmentStrategy(), "BalancedStreamPartitionAssignment");
 
       // Serialize then de-serialize
       JSONObject jsonConfig = TableConfig.toJSONConfig(tableConfig);
       TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(jsonConfig);
-      checkTableConfigWithAssignmentConfig(tableConfig, tableConfigToCompare);
+      Assert.assertEquals(
+          tableConfigToCompare.getIndexingConfig().getStreamConsumptionConfig()
+              .getStreamPartitionAssignmentStrategy(), "BalancedStreamPartitionAssignment");
 
       ZNRecord znRecord = TableConfig.toZnRecord(tableConfig);
       tableConfigToCompare = TableConfig.fromZnRecord(znRecord);
-      checkTableConfigWithAssignmentConfig(tableConfig, tableConfigToCompare);
+      Assert.assertEquals(
+          tableConfigToCompare.getIndexingConfig().getStreamConsumptionConfig()
+              .getStreamPartitionAssignmentStrategy(), "BalancedStreamPartitionAssignment");
     }
     {
       // With star tree config
