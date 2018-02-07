@@ -195,7 +195,7 @@ export default Ember.Component.extend({
       const { entities, aggregates } = this.getProperties('entities', 'aggregates'); // poll observer
 
       const offsets = ['wo1w', 'wo2w', 'wo3w', 'wo4w', 'baseline'];
-      const dict = {}
+      const dict = {};
       offsets.forEach(offset => dict[offset] = this._computeChangesForOffset(offset));
 
       return dict;
@@ -299,9 +299,9 @@ export default Ember.Component.extend({
     const { entities, aggregates } = this.getProperties('entities', 'aggregates');
     return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
       .reduce((agg, urn) => {
-      agg[urn] = aggregates[toCurrentUrn(urn)] / aggregates[toOffsetUrn(urn, offset)] - 1;
-      return agg;
-    }, {});
+        agg[urn] = aggregates[toCurrentUrn(urn)] / aggregates[toOffsetUrn(urn, offset)] - 1;
+        return agg;
+      }, {});
   },
 
   /**
