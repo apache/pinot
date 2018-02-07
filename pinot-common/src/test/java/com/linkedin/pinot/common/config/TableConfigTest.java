@@ -107,6 +107,26 @@ public class TableConfigTest {
       checkTableConfigWithAssignmentConfig(tableConfig, tableConfigToCompare);
     }
     {
+      // With StreamConsumptionConfig
+      ReplicaGroupStrategyConfig replicaGroupConfig = new ReplicaGroupStrategyConfig();
+      replicaGroupConfig.setNumInstancesPerPartition(5);
+      replicaGroupConfig.setMirrorAssignmentAcrossReplicaGroups(true);
+      replicaGroupConfig.setPartitionColumn("memberId");
+
+      TableConfig tableConfig =
+          tableConfigBuilder.setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy").build();
+      tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupConfig);
+
+      // Serialize then de-serialize
+      JSONObject jsonConfig = TableConfig.toJSONConfig(tableConfig);
+      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(jsonConfig);
+      checkTableConfigWithAssignmentConfig(tableConfig, tableConfigToCompare);
+
+      ZNRecord znRecord = TableConfig.toZnRecord(tableConfig);
+      tableConfigToCompare = TableConfig.fromZnRecord(znRecord);
+      checkTableConfigWithAssignmentConfig(tableConfig, tableConfigToCompare);
+    }
+    {
       // With star tree config
       StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
       Set<String> dims = new HashSet<>();
