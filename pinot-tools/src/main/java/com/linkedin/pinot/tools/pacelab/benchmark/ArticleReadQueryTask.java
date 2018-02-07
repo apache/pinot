@@ -22,11 +22,22 @@ import java.util.List;
 import java.util.Properties;
 
 public class ArticleReadQueryTask extends QueryTask {
+    List<GenericRow> _articleTable;
 
     public ArticleReadQueryTask(Properties config, String[] queries, String dataDir) {
         setConfig(config);
         setQueries(queries);
         setDataDir(dataDir);
+        EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
+        try
+        {
+            _articleTable = eventTableGenerator.readArticleTable();
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+        }
+
     }
 
     @Override
@@ -52,25 +63,24 @@ public class ArticleReadQueryTask extends QueryTask {
         //List<GenericRow> profileTable = eventTableGenerator.readProfileTable();
         //GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(profileTable);
 
-        List<GenericRow> articleTable = eventTableGenerator.readArticleTable();
-        GenericRow randomArticle = eventTableGenerator.getRandomGenericRow(articleTable);
+        GenericRow randomArticle = eventTableGenerator.getRandomGenericRow(_articleTable);
 
         String query = "";
         switch (queryId) {
             case 0:
-                query = String.format(queries[queryId], minReadStartTime, maxReadStartTime, selectLimit);
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), selectLimit);
                 runQuery(query);
                 break;
             case 1:
-                query = String.format(queries[queryId], minReadStartTime, maxReadStartTime, randomArticle.getValue("ID"));
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomArticle.getValue("ID"));
                 runQuery(query);
                 break;
             case 2:
-                query = String.format(queries[queryId], minReadStartTime, maxReadStartTime, groupByLimit);
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), groupByLimit);
                 runQuery(query);
                 break;
             case 3:
-                query = String.format(queries[queryId], minReadStartTime, maxReadStartTime, groupByLimit);
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), groupByLimit);
                 runQuery(query);
                 break;
         }

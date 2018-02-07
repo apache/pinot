@@ -27,8 +27,8 @@ public class ArticleReadQueryExecutor extends QueryExecutor{
                 "SELECT * FROM ArticleRead" +
                     " WHERE  ReadStartTime > %d AND ReadStartTime < %d LIMIT %d",
                 "SELECT COUNT(*) FROM ArticleRead" +
-                    " WHERE ReadStartTime > %d AND ReadStartTime < %d AND ArticleID = %s",
-                "SELECT AVG(), MIN(), MAX(), AVG(), MIN(), MAX() FROM ArticleReadd" +
+                    " WHERE ReadStartTime > %d AND ReadStartTime < %d AND ArticleID = '%s'",
+                "SELECT AVG(TimeSpent), MIN(TimeSpent), MAX(TimeSpent), AVG(ReaderStrength), MIN(ReaderStrength), MAX(ReaderStrength) FROM ArticleReadd" +
                     " WHERE ReadStartTime > %d AND ReadStartTime < %d" +
                     " GROUP BY ArticleTopic LIMIT %d",
                 "SELECT COUNT(*) FROM ArticleRead" +

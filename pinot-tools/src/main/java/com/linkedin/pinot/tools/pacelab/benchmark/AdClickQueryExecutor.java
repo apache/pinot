@@ -27,7 +27,7 @@ public class AdClickQueryExecutor extends QueryExecutor{
                 "SELECT * FROM AdClick" +
                         " WHERE ClickTime > %d AND ClickTime < %d LIMIT %d",
                 "SELECT COUNT(*) FROM AdClick" +
-                        " WHERE ClickTime > %d AND ClickTime < %d AND AdID = %s" ,
+                        " WHERE ClickTime > %d AND ClickTime < %d AND AdID = '%s'" ,
                 "SELECT COUNT(*), AVG(ViewerStrength), MIN(ViewerStrength), MAX(ViewerStrength) FROM AdClick" +
                         " WHERE ClickTime > %d AND ClickTime < %d" +
                         " GROUP BY AdCampaign LIMIT %d",

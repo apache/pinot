@@ -23,11 +23,20 @@ import java.util.List;
 import java.util.Properties;
 
 public class JobApplyQueryTask extends QueryTask {
+    List<GenericRow> _jobTable;
 
     public JobApplyQueryTask(Properties config, String[] queries, String dataDir) {
         setConfig(config);
         setQueries(queries);
         setDataDir(dataDir);
+        EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
+        try
+        {
+            _jobTable = eventTableGenerator.readJobTable();
+        }catch (Exception e)
+        {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -41,8 +50,8 @@ public class JobApplyQueryTask extends QueryTask {
         Properties config = getConfig();
         String[] queries = getQueries();
 
-        long maxApplyStartTime= Long.parseLong(config.getProperty("MinApplyStartTime"));
-        long minApplyStartTime = Long.parseLong(config.getProperty("MaxApplyStartTime"));
+        long minApplyStartTime= Long.parseLong(config.getProperty("MinApplyStartTime"));
+        long maxApplyStartTime = Long.parseLong(config.getProperty("MaxApplyStartTime"));
 
         double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
         LongRange timeRange = CommonTools.getZipfRandomTimeRange(minApplyStartTime,maxApplyStartTime,zipfS);
@@ -53,25 +62,24 @@ public class JobApplyQueryTask extends QueryTask {
         //List<GenericRow> profileTable = eventTableGenerator.readProfileTable();
         //GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(profileTable);
 
-        List<GenericRow> jobTable = eventTableGenerator.readJobTable();
-        GenericRow randomJob = eventTableGenerator.getRandomGenericRow(jobTable);
+        GenericRow randomJob = eventTableGenerator.getRandomGenericRow(_jobTable);
 
         String query = "";
         switch (queryId) {
             case 0:
-                query = String.format(queries[queryId], minApplyStartTime, maxApplyStartTime, selectLimit);
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), selectLimit);
                 runQuery(query);
                 break;
             case 1:
-                query = String.format(queries[queryId], minApplyStartTime, maxApplyStartTime, randomJob.getValue("ID"));
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomJob.getValue("ID"));
                 runQuery(query);
                 break;
             case 2:
-                query = String.format(queries[queryId], minApplyStartTime, maxApplyStartTime, groupByLimit);
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), groupByLimit);
                 runQuery(query);
                 break;
             case 3:
-                query = String.format(queries[queryId], minApplyStartTime, maxApplyStartTime, groupByLimit);
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), groupByLimit);
                 runQuery(query);
                 break;
         }

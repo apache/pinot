@@ -70,7 +70,7 @@ public class PinotBenchmarkQueryGeneratorCommand extends AbstractBaseAdminComman
             executor.setTestDuration(_testDuration);
             executor.start();
         }
-        return false;
+        return true;
     }
 
     @Override

@@ -26,12 +26,20 @@ import java.util.Properties;
 import java.util.Random;
 
 public class ProfileViewQueryTask extends QueryTask {
-    final int DaySecond = 3600*24;
+    List<GenericRow> _profileTable;
 
     public ProfileViewQueryTask(Properties config, String[] queries, String dataDir) {
         setConfig(config);
         setQueries(queries);
         setDataDir(dataDir);
+        EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
+        try
+        {
+            _profileTable = eventTableGenerator.readProfileTable();
+        }catch (Exception e)
+        {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -53,8 +61,8 @@ public class ProfileViewQueryTask extends QueryTask {
         int selectLimit = CommonTools.getSelectLimt(config);
         int groupByLimit = Integer.parseInt(config.getProperty("GroupByLimit"));
 
-        List<GenericRow> profileTable = eventTableGenerator.readProfileTable();
-        GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(profileTable);
+
+        GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(_profileTable);
         String query = "";
         switch (queryId) {
             case 0:
