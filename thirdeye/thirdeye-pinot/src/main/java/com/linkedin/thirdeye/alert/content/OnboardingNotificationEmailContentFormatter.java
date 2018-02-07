@@ -59,7 +59,7 @@ public class OnboardingNotificationEmailContentFormatter extends BaseEmailConten
     }
 
     templateData.put("functionName", anomalyFunctionSpec.getFunctionName());
-    templateData.put("functionId", anomalyFunctionSpec.getId());
+    templateData.put("functionId", Long.toString(anomalyFunctionSpec.getId()));
     templateData.put("metrics", anomalyFunctionSpec.getMetric());
     templateData.put("filters", returnValueOrDefault(anomalyFunctionSpec.getFilters(), DEFAULT_NULL_STRING_VALUE));
     templateData.put("dimensionDrillDown", returnValueOrDefault(anomalyFunctionSpec.getExploreDimensions(), DEFAULT_NULL_STRING_VALUE));
