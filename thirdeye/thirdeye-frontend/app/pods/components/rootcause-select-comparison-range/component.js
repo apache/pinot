@@ -16,10 +16,10 @@ export default Ember.Component.extend({
   onChange: null, // func (start, end, compareMode)
 
   rangeOptions: {
-    'Last hour': [moment().subtract(1, 'hours').startOf('hour'), moment().startOf('hour')],
-    'Last 3 hours': [moment().subtract(3, 'hours').startOf('hour'), moment().startOf('hour')],
-    'Last 6 hours': [moment().subtract(6, 'hours').startOf('hour'), moment().startOf('hour')],
-    'Last 24 hours': [moment().subtract(24, 'hours').startOf('hour'), moment().startOf('hour')]
+    'Last hour': [moment().subtract(1, 'hours').startOf('hour'), moment().startOf('hour').add(1, 'hour')],
+    'Last 3 hours': [moment().subtract(3, 'hours').startOf('hour'), moment().startOf('hour').add(1, 'hour')],
+    'Last 6 hours': [moment().subtract(6, 'hours').startOf('hour'), moment().startOf('hour').add(1, 'hour')],
+    'Last 24 hours': [moment().subtract(24, 'hours').startOf('hour'), moment().startOf('hour').add(1, 'hour')]
   },
 
   compareModeOptions: [
@@ -31,7 +31,7 @@ export default Ember.Component.extend({
 
   maxDateFormatted: Ember.computed({
     get() {
-      return moment(moment().endOf('hour').valueOf() + 1).format(serverDateFormat);
+      return moment().startOf('hour').add(1, 'hour').format(serverDateFormat);
     }
   }),
 
