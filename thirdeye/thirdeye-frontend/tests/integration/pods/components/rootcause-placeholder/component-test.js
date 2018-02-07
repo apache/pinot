@@ -6,19 +6,18 @@ moduleForComponent('rootcause-placeholder', 'Integration | Component | rootcause
 });
 
 test('it renders', function(assert) {
-  // Set any properties with this.set('myProperty', 'value');
-  // Handle any actions with this.on('myAction', function(val) { ... });
+  const testMessage = 'Hey There!';
+  this.set('message', testMessage);
 
-  this.render(hbs`{{rootcause-placeholder}}`);
-
-  assert.equal(this.$().text().trim(), '');
-
-  // Template block usage:
   this.render(hbs`
-    {{#rootcause-placeholder}}
-      template block text
-    {{/rootcause-placeholder}}
+    {{rootcause-placeholder 
+      message=message}}
   `);
+  const message = this.$().find('p').text();
 
-  assert.equal(this.$().text().trim(), 'template block text');
+  assert.equal(
+    message,
+    testMessage,
+    'Message should be displayed correctly.'
+  );
 });
