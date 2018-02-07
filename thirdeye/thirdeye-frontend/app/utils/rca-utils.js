@@ -205,7 +205,7 @@ export function toAbsoluteUrn(urn, contextCompareMode) {
   if (offset === 'baseline') {
     offset = contextCompareMode.toLowerCase();
   }
-  
+
   if (offset === 'wow') {
     offset = 'wo1w';
   }
@@ -339,7 +339,11 @@ export function toBaselineRange(range, offset) {
     wo1w: 1,
     wo2w: 2,
     wo3w: 3,
-    wo4w: 4
+    wo4w: 4,
+    mean4w: 1, // default. not fully supported by backend yet
+    median4w: 1, // default. not fully supported by backend yet
+    min4w: 1, // default. not fully supported by backend yet
+    max4w: 1, // default. not fully supported by backend yet
   }[offset.toLowerCase()];
 
   if (offsetWeeks === 0) {
