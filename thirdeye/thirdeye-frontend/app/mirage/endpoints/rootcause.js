@@ -17,7 +17,34 @@ export default function(server) {
         derived : [ "false" ],
         additive : [ "true" ]
       }
-    } ];
+    }, {
+      urn : "thirdeye:timerange:anomaly:1512400800000:1512428100000",
+      score : 1.0,
+      label : "thirdeye:timerange:anomaly:1512400800000:1512428100000",
+      type : "other",
+      link : null,
+      relatedEntities : [ ],
+      attributes : { }
+    }, {
+      urn : "thirdeye:timerange:analysis:1511423999000:1512028799000",
+      score : 1.0,
+      label : "thirdeye:timerange:analysis:1511423999000:1512028799000",
+      type : "other",
+      link : null,
+      relatedEntities : [ ],
+      attributes : { }
+    }, {
+      urn : "thirdeye:event:anomaly:1",
+      score : 1.0,
+      label : "anomaly_label",
+      type : "event",
+      link : "#/rootcause?anomalyId=1",
+      relatedEntities : [ ],
+      attributes : {
+        function : [ "anomaly_label" ],
+        status : [ "NOT_ANOMALY" ]
+      }
+    }];
   });
 
   /**

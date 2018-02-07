@@ -10,6 +10,10 @@ const HEADER = `.${ROOTCAUSE_HEADER}__major`;
 const LAST_SAVED = `.${ROOTCAUSE_HEADER}__last-updated-info`;
 const COMMENT_TEXT = `.${ROOTCAUSE_HEADER}--textarea`;
 const BASELINE = '#select-compare-mode';
+const EXPAND_ANOMALY_BTN = '.rootcause-anomaly__icon a';
+const ANOMALY_TITLE = '.rootcause-anomaly__title';
+const ANOMALY_VALUE = '.rootcause-anomaly__props-value';
+const ANOMALY_STATUS = '.ember-radio-button.checked';
 
 moduleForAcceptance('Acceptance | rootcause');
 
@@ -72,4 +76,28 @@ test('visiting rootcause page with a session should have correct session name, t
     find(BASELINE).get(0).innerText,
     'WoW',
     'default baseline is correct');
+});
+
+test('visiting rootcause page with an anomaly should have correct anomaly information', async assert => {
+  await visit('/rootcause?anomalyId=1');
+  await click(EXPAND_ANOMALY_BTN);
+
+  assert.equal(
+    currentURL(),
+    '/rootcause?anomalyId=1',
+    'link is correct');
+  assert.equal(
+    find(ANOMALY_TITLE).get(0).innerText,
+    'Anomaly #1 anomaly_label',
+    'anomaly title is correct'
+  );
+  assert.equal(
+    find(ANOMALY_VALUE).get(0).innerText,
+    'pageViews',
+    'metric name in anomaly card is correct'
+  );
+  assert.equal(
+    find(ANOMALY_STATUS).get(0).innerText.trim(),
+    'No (False Alarm)',
+    'anomaly status is correct');
 });
