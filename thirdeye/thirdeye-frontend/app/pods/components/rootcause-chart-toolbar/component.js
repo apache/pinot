@@ -31,14 +31,14 @@ export default Component.extend({
   //
   // external (optional)
   //
-  analysisRangeMax: moment().endOf('day'),
+  analysisRangeMax: moment().endOf('day').valueOf() + 1,
 
   analysisRangePredefined: {
-    'Today': [moment(), moment().endOf('day')],
-    'Last 3 days': [moment().subtract(2, 'days').startOf('day'), moment().endOf('day')],
-    'Last 7 days': [moment().subtract(6, 'days').startOf('day'), moment().endOf('day')],
-    'Last 14 days': [moment().subtract(13, 'days').startOf('day'), moment().endOf('day')],
-    'Last 28 days': [moment().subtract(27, 'days').startOf('day'), moment().endOf('day')]
+    'Today': [moment(), moment().endOf('day').valueOf() + 1],
+    'Last 3 days': [moment().subtract(2, 'days').startOf('day'), moment().endOf('day').valueOf() + 1],
+    'Last 7 days': [moment().subtract(6, 'days').startOf('day'), moment().endOf('day').valueOf() + 1],
+    'Last 14 days': [moment().subtract(13, 'days').startOf('day'), moment().endOf('day').valueOf() + 1],
+    'Last 28 days': [moment().subtract(27, 'days').startOf('day'), moment().endOf('day').valueOf() + 1]
   },
 
   /**

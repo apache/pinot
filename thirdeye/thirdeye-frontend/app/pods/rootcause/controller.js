@@ -650,8 +650,18 @@ export default Ember.Controller.extend({
     onComparisonChange(start, end, compareMode) {
       const { context } = this.getProperties('context');
 
+      // adjust display window if necessary
+      let analysisRange = [...context.analysisRange];
+      if (analysisRange[0] >= start) {
+        analysisRange[0] = moment(start).startOf('day').valueOf();
+      }
+      if (analysisRange[1] <= end) {
+        analysisRange[1] = moment(end).endOf('day').valueOf() + 1;
+      }
+
       const newContext = Object.assign({}, context, {
         anomalyRange: [start, end],
+        analysisRange,
         compareMode
       });
 

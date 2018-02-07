@@ -31,7 +31,7 @@ export default Ember.Component.extend({
 
   maxDateFormatted: Ember.computed({
     get() {
-      return moment().endOf('day').format(serverDateFormat);
+      return moment(moment().endOf('hour').valueOf() + 1).format(serverDateFormat);
     }
   }),
 
