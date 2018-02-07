@@ -3,6 +3,7 @@ import { computed } from '@ember/object';
 import { makeSortable, toMetricLabel, toColorDirection, isInverse } from 'thirdeye-frontend/utils/rca-utils';
 
 export default Component.extend({
+  classNames: ['metrics-table'],
   /**
    * Columns for metrics table
    * @type Object[]

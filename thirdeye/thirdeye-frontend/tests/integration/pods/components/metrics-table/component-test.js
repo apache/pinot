@@ -6,19 +6,25 @@ moduleForComponent('metrics-table', 'Integration | Component | metrics table', {
 });
 
 test('it renders', function(assert) {
-  // Set any properties with this.set('myProperty', 'value');
-  // Handle any actions with this.on('myAction', function(val) { ... });
+  this.setProperties({
+    urns: [],
+    entities: {},
+    links: {},
+    selectedUrns: {},
+    toggleSelection: () => {}
+  });
 
-  this.render(hbs`{{metrics-table}}`);
-
-  assert.equal(this.$().text().trim(), '');
-
-  // Template block usage:
   this.render(hbs`
-    {{#metrics-table}}
-      template block text
-    {{/metrics-table}}
+    {{metrics-table
+      urns=urns
+      entities=entities
+      links=links
+      selectedUrns=selectedUrns
+      toggleSelection=(action toggleSelection)
+    }}
   `);
 
-  assert.equal(this.$().text().trim(), 'template block text');
+  const table = this.$('.metrics-table');
+  assert.ok(table.length, 'It should render properly');
+  assert.ok(table.find('.table-header').length, 'It should have headers');
 });
