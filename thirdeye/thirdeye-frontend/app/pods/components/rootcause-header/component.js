@@ -20,13 +20,13 @@ export default Component.extend({
 
   /**
    * Rootcause session comments
-   * @Type {string}
+   * @type {string}
    */
   sessionText: null,
 
   /**
    * Rootcause session owner
-   * @Type {string}
+   * @type {string}
    */
   sessionOwner: null,
 
