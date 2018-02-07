@@ -42,16 +42,16 @@ import javax.annotation.Nullable;
  * Reads table sizes from servers
  */
 public class TableSizeReader {
-  private static Logger LOGGER = LoggerFactory.getLogger(TableSizeReader.class);
-  private Executor executor;
-  private HttpConnectionManager connectionManager;
-  private PinotHelixResourceManager helixResourceManager;
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableSizeReader.class);
+  private Executor _executor;
+  private HttpConnectionManager _connectionManager;
+  private PinotHelixResourceManager _helixResourceManager;
 
   public TableSizeReader(Executor executor, HttpConnectionManager connectionManager,
       PinotHelixResourceManager helixResourceManager) {
-    this.executor = executor;
-    this.connectionManager = connectionManager;
-    this.helixResourceManager = helixResourceManager;
+    _executor = executor;
+    _connectionManager = connectionManager;
+    _helixResourceManager = helixResourceManager;
   }
 
   /**
@@ -60,8 +60,8 @@ public class TableSizeReader {
    * reported size indicates actual sizes collected from servers. For errors,
    * we use the size of largest segment as an estimate.
    * Returns null if the table is not found.
-   * @param tableName
-   * @param timeoutMsec
+   * @param tableName table name without type
+   * @param timeoutMsec timeout in milliseconds for reading table sizes from server
    * @return
    */
   public @Nullable TableSizeDetails getTableSizeDetails(@Nonnull String tableName,
@@ -77,8 +77,8 @@ public class TableSizeReader {
       hasRealtimeTable = tableType == CommonConstants.Helix.TableType.REALTIME;
       hasOfflineTable = tableType == CommonConstants.Helix.TableType.OFFLINE;
     } else {
-      hasRealtimeTable = helixResourceManager.hasRealtimeTable(tableName);
-      hasOfflineTable = helixResourceManager.hasOfflineTable(tableName);
+      hasRealtimeTable = _helixResourceManager.hasRealtimeTable(tableName);
+      hasOfflineTable = _helixResourceManager.hasOfflineTable(tableName);
     }
 
     if (!hasOfflineTable && !hasRealtimeTable) {
@@ -140,9 +140,9 @@ public class TableSizeReader {
 
     // get list of servers
     Map<String, List<String>> serverSegmentsMap =
-        helixResourceManager.getInstanceToSegmentsInATableMap(table);
-    ServerTableSizeReader serverTableSizeReader = new ServerTableSizeReader(executor, connectionManager);
-    BiMap<String, String> endpoints = helixResourceManager.getDataInstanceAdminEndpoints(serverSegmentsMap.keySet());
+        _helixResourceManager.getInstanceToSegmentsInATableMap(table);
+    ServerTableSizeReader serverTableSizeReader = new ServerTableSizeReader(_executor, _connectionManager);
+    BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(serverSegmentsMap.keySet());
     Map<String, List<SegmentSizeInfo>> serverSizeInfo =
         serverTableSizeReader.getSizeDetailsFromServers(endpoints, table, timeoutMsec);
 

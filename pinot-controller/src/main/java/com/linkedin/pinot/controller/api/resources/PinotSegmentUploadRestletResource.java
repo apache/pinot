@@ -591,12 +591,13 @@ public class PinotSegmentUploadRestletResource {
    * check if the segment represented by segmentFile is within the storage quota
    * @param segmentFile untarred segment. This should not be null.
    *                    segmentFile must exist on disk and must be a directory
-   * @param metadata segment metadata. This should not be null
+   * @param metadata segment metadata. This should not be null.
+   * @param offlineTableConfig offline table configuration. This should not be null.
    */
   private StorageQuotaChecker.QuotaCheckerResponse checkStorageQuota(@Nonnull File segmentFile,
       @Nonnull SegmentMetadata metadata, @Nonnull TableConfig offlineTableConfig) {
     TableSizeReader tableSizeReader = new TableSizeReader(_executor, _connectionManager, _pinotHelixResourceManager);
-    StorageQuotaChecker quotaChecker = new StorageQuotaChecker(offlineTableConfig, tableSizeReader);
+    StorageQuotaChecker quotaChecker = new StorageQuotaChecker(offlineTableConfig, tableSizeReader, _controllerMetrics);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(metadata.getTableName());
     return quotaChecker.isSegmentStorageWithinQuota(segmentFile, offlineTableName, metadata.getName(),
         _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
@@ -606,7 +607,7 @@ public class PinotSegmentUploadRestletResource {
    * Returns true if:
    * - Segment does not have a start/end time, OR
    * - The start/end time are in a valid range (Jan 01 1971 - Jan 01, 2071)
-   * @param metadata
+   * @param metadata Segment metadata
    * @return
    */
   private boolean isSegmentTimeValid(SegmentMetadata metadata) {
