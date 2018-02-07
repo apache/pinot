@@ -100,8 +100,7 @@ export default Component.extend({
     'anomalyUrn',
     function () {
       const { entities, anomalyUrn } = getProperties(this, 'entities', 'anomalyUrn');
-      console.log("anomalyUrn: ", anomalyUrn);
-      console.log('entities: ', entities);
+
       if (!anomalyUrn || !entities || !entities[anomalyUrn]) return ;
 
       return entities[anomalyUrn];
