@@ -13,6 +13,8 @@ const queryParamsConfig = {
 };
 
 export default Ember.Route.extend(AuthenticatedRouteMixin, {
+  authService: Ember.inject.service('session'),
+
   queryParams: {
     metricId: queryParamsConfig,
     sessionId: queryParamsConfig,
@@ -127,6 +129,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     let selectedUrns = new Set();
     let sessionName = 'New Investigation (' + moment().format(dateFormatFull) + ')';
     let sessionText = '';
+    let sessionOwner = this.get('authService.data.authenticated.name');
     let sessionUpdatedBy = '';
     let sessionUpdatedTime = '';
     let sessionModified = true;
@@ -184,7 +187,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     // session-initialized context
     if (sessionId) {
       if (!_.isEmpty(session)) {
-        const { name, text, updatedBy, updated } = model.session;
+        const { name, text, updatedBy, updated, owner } = model.session;
         context = {
           urns: new Set(session.contextUrns),
           anomalyRange: [session.anomalyRangeStart, session.anomalyRangeEnd],
@@ -197,6 +200,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
         sessionName = name;
         sessionText = text;
+        sessionOwner = owner
         sessionUpdatedBy = updatedBy;
         sessionUpdatedTime = updated;
         sessionModified = false;
@@ -211,6 +215,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       sessionId,
       sessionName,
       sessionText,
+      sessionOwner,
       sessionUpdatedBy,
       sessionUpdatedTime,
       sessionModified,

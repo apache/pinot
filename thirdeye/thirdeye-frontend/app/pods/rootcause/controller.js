@@ -50,6 +50,11 @@ export default Ember.Controller.extend({
   sessionService: Ember.inject.service('rootcause-session-datasource'),
 
   //
+  // user details
+  //
+  username: Ember.computed.reads('authService.data.authenticated.name'),
+
+  //
   // user selection
   //
 
@@ -108,18 +113,39 @@ export default Ember.Controller.extend({
 
   /**
    * rootcause session title (on top)
+   * @type {string}
    */
-  sessionName: null, // ""
+  sessionName: null,
 
   /**
    * rootcause session comments (on top)
+   * @type {string}
    */
-  sessionText: null, // ""
+  sessionText: null,
 
   /**
    * rootcause session modification indicator
+   * @type {boolean}
    */
-  sessionModified: null, // true
+  sessionModified: null,
+
+  /**
+   * rootcause session update timestamp
+   * @type {int}
+   */
+  sessionUpdated: null,
+
+  /**
+   * rootcause session last edit author
+   * @type {string}
+   */
+  sessionUpdatedBy: null,
+
+  /**
+   * rootcause session owner
+   * @type {string}
+   */
+  sessionOwner: null,
 
   //
   // static component config
@@ -353,6 +379,20 @@ export default Ember.Controller.extend({
     'hasErrorsBreakdowns'
   ),
 
+  //
+  // session handling
+  //
+  sessionCanSave: Ember.computed(
+    'sessionOwner',
+    'username',
+    function () {
+      const { sessionOwner, username } = this.getProperties('sessionOwner', 'username');
+      return _.isEmpty(sessionOwner) || (sessionOwner === username);
+    }
+  ),
+
+  sessionCanCopy: Ember.computed.bool('sessionId'),
+
   /**
    * Sets the transient rca session properties after saving
    *
@@ -360,11 +400,11 @@ export default Ember.Controller.extend({
    * @private
    */
   _updateSession(sessionId) {
-    const sessionUpdatedBy = this.get('authService.data.authenticated.name'); // fetch ldap of current user
+    const { username } = this.getProperties('username');
 
     this.setProperties({
       sessionId,
-      sessionUpdatedBy,
+      sessionUpdatedBy: username,
       sessionUpdatedTime: moment().valueOf(),
       sessionModified: false
     });
@@ -548,19 +588,20 @@ export default Ember.Controller.extend({
      * @returns {undefined}
      */
     onSessionSave() {
-      const { sessionService } = this.getProperties('sessionService');
+      const { sessionService, sessionCanSave } = this.getProperties('sessionService', 'sessionCanSave');
 
-      const session = this._makeSession();
-      const sessionUpdatedBy = this.get('authService.data.authenticated.name'); // fetch ldap of current user
+      if (sessionCanSave) {
+        const session = this._makeSession();
 
-      return sessionService
-        .saveAsync(session)
-        .then(sessionId => this._updateSession(sessionId))
-        .catch((error) => {
-          const { routeErrors } = this.getProperties('routeErrors');
-          routeErrors.add('Could not save investigation');
-          this.setProperties({ routeErrors: new Set(routeErrors) });
-        });
+        return sessionService
+          .saveAsync(session)
+          .then(sessionId => this._updateSession(sessionId))
+          .catch((error) => {
+            const { routeErrors } = this.getProperties('routeErrors');
+            routeErrors.add('Could not save investigation');
+            this.setProperties({ routeErrors: new Set(routeErrors) });
+          });
+      }
     },
 
     /**
@@ -569,24 +610,26 @@ export default Ember.Controller.extend({
      * @returns {undefined}
      */
     onSessionCopy() {
-      const { sessionId, sessionService } = this.getProperties('sessionId', 'sessionService');
+      const { sessionId, sessionName, sessionService, sessionCanCopy } = this.getProperties('sessionId', 'sessionName', 'sessionService', 'sessionCanCopy');
 
-      const session = this._makeSession();
+      if (sessionCanCopy) {
+        this.set('sessionName', `Copy of ${sessionName}`);
 
-      // copy, reference old session
-      delete session['id'];
-      session['previousId'] = sessionId;
+        const session = this._makeSession();
 
-      const sessionUpdatedBy = this.get('authService.data.authenticated.name'); // fetch ldap of current user
+        // copy, reference old session
+        delete session['id'];
+        session['previousId'] = sessionId;
 
-      return sessionService
-        .saveAsync(session)
-        .then(sessionId => this._updateSession(sessionId))
-        .catch((error) => {
-          const { routeErrors } = this.getProperties('routeErrors');
-          routeErrors.add('Could not copy investigation');
-          this.setProperties({ routeErrors: new Set(routeErrors) });
-        });
+        return sessionService
+          .saveAsync(session)
+          .then(sessionId => this._updateSession(sessionId))
+          .catch((error) => {
+            const { routeErrors } = this.getProperties('routeErrors');
+            routeErrors.add('Could not copy investigation');
+            this.setProperties({ routeErrors: new Set(routeErrors) });
+          });
+      }
     },
 
     /**

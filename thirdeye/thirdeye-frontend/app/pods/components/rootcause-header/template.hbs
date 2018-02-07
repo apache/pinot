@@ -26,9 +26,16 @@
           key-press="onChange"}}
       {{/unless}}
     </div>
-    <div class="rootcause-header__side">
-      <button {{action "onSave"}} class="te-button">Save</button>
-    </div>
+    {{#if canSave}}
+      <div class="rootcause-header__side">
+        <button {{action "onSave"}} class="te-button">Save</button>
+      </div>
+    {{/if}}
+    {{#if canCopy}}
+      <div class="rootcause-header__side">
+        <button {{action "onCopy"}} class="te-button">Copy</button>
+      </div>
+    {{/if}}
     <div class="col-xs-10">
       {{#if sessionId}}
         <p class="rootcause-header__last-updated-info">Last saved by {{sessionUpdatedBy}} on {{sessionUpdatedTimeFormatted}}</p>

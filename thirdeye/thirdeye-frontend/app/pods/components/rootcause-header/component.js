@@ -25,6 +25,12 @@ export default Component.extend({
   sessionText: null,
 
   /**
+   * Rootcause session owner
+   * @Type {string}
+   */
+  sessionOwner: null,
+
+  /**
    * Rootcause session dirty flag
    * @type {boolean}
    */
@@ -71,6 +77,18 @@ export default Component.extend({
    * @type {boolean}
    */
   isTitleEditMode: false,
+
+  /**
+   * whether to enable saving
+   * @type {boolean}
+   */
+  canSave: false,
+
+  /**
+   * whether to enable copying
+   * @type {boolean}
+   */
+  canCopy: false,
 
   /**
    * Formatted session last updated time
