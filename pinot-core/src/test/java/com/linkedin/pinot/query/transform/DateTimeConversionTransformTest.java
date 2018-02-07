@@ -362,7 +362,7 @@ public class DateTimeConversionTransformTest {
 
 
   // Test conversion of a dateTimeColumn value from a format to another
-  //@Test(dataProvider = "testEvaluateDataProvider")
+  @Test(dataProvider = "testEvaluateDataProvider")
   public void testDateTimeConversionEvaluation(String inputFormat, String outputFormat,
       String outputGranularity, Object inputValue, Object expectedValue) {
     DateTimeConvertor convertor = DateTimeConvertorFactory.getDateTimeConvertorFromFormats(inputFormat, outputFormat, outputGranularity);
