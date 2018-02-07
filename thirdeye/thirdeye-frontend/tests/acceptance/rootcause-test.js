@@ -13,6 +13,7 @@ const BASELINE = '#select-compare-mode';
 const EXPAND_ANOMALY_BTN = '.rootcause-anomaly__icon a';
 const ANOMALY_TITLE = '.rootcause-anomaly__title';
 const ANOMALY_VALUE = '.rootcause-anomaly__props-value';
+const ANOMALY_STATUS = '.ember-radio-button.checked';
 
 moduleForAcceptance('Acceptance | rootcause');
 
@@ -95,4 +96,8 @@ test('visiting rootcause page with an anomaly should have correct anomaly inform
     'pageViews',
     'metric name in anomaly card is correct'
   );
+  assert.equal(
+    find(ANOMALY_STATUS).get(0).innerText.trim(),
+    'No (False Alarm)',
+    'anomaly status is correct');
 });
