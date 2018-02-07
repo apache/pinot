@@ -3,13 +3,14 @@ package com.linkedin.thirdeye.dashboard.resources.v2;
 import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
 import com.linkedin.thirdeye.datalayer.bao.RootcauseSessionManager;
 import com.linkedin.thirdeye.datalayer.dto.RootcauseSessionDTO;
+import com.linkedin.thirdeye.datalayer.pojo.RootcauseSessionBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.rootcause.impl.AnomalyEventEntity;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -52,20 +53,28 @@ public class RootCauseSessionResource {
 
   @POST
   @Path("/")
-  public Long post(String jsonString) throws IOException {
+  public Long post(String jsonString) throws Exception {
     RootcauseSessionDTO session = this.mapper.readValue(jsonString, new TypeReference<RootcauseSessionDTO>() {});
 
-    session.setUpdated(DateTime.now().getMillis());
+    final long timestamp = DateTime.now().getMillis();
+    final String username = ThirdEyeAuthFilter.getCurrentPrincipal().getName();
+
+    session.setUpdated(timestamp);
 
     if (session.getId() == null) {
-      session.setCreated(DateTime.now().getMillis());
-      session.setOwner(ThirdEyeAuthFilter.getCurrentPrincipal().getName());
+      session.setCreated(timestamp);
+      session.setOwner(username);
       session.setAnomalyId(extractAnomalyId(session.getAnomalyUrns()));
 
     } else {
       RootcauseSessionDTO existing = this.sessionDAO.findById(session.getId());
       if (existing == null) {
         throw new IllegalArgumentException(String.format("Could not resolve session id %d", session.getId()));
+      }
+
+      if (Objects.equals(existing.getPermissions(), RootcauseSessionBean.PermissionType.READ.toString()) &&
+          !Objects.equals(existing.getOwner(),username)) {
+        throw new IllegalAccessException(String.format("No write permissions for '%s' on session id %d", username, existing.getId()));
       }
 
       session = merge(existing, session);
@@ -199,6 +208,9 @@ public class RootCauseSessionResource {
 
     if (other.getUpdated() != null)
       session.setUpdated(other.getUpdated());
+
+    if (other.getPermissions() != null)
+      session.setPermissions(other.getPermissions());
 
     return session;
   }

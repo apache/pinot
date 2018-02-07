@@ -20,9 +20,15 @@ export default Component.extend({
 
   /**
    * Rootcause session comments
-   * @Type {string}
+   * @type {string}
    */
   sessionText: null,
+
+  /**
+   * Rootcause session owner
+   * @type {string}
+   */
+  sessionOwner: null,
 
   /**
    * Rootcause session dirty flag
@@ -71,6 +77,18 @@ export default Component.extend({
    * @type {boolean}
    */
   isTitleEditMode: false,
+
+  /**
+   * whether to enable saving
+   * @type {boolean}
+   */
+  canSave: false,
+
+  /**
+   * whether to enable copying
+   * @type {boolean}
+   */
+  canCopy: false,
 
   /**
    * Formatted session last updated time
