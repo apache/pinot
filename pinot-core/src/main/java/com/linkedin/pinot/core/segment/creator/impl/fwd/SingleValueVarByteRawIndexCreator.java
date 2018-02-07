@@ -28,9 +28,8 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
   VarByteChunkSingleValueWriter _indexWriter;
 
   public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
-      String column, int totalDocs, int maxLength)
-      throws IOException {
-    File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FWD_IDX_FILE_EXTENTION);
+      String column, int totalDocs, int maxLength) throws IOException {
+    File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
 
     _indexWriter = new VarByteChunkSingleValueWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, maxLength);
   }

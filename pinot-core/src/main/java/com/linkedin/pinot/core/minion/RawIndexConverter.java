@@ -178,11 +178,11 @@ public class RawIndexConverter {
     LOGGER.info("Converting column: {}", columnName);
 
     // Delete dictionary and existing indexes
-    FileUtils.deleteQuietly(new File(_convertedIndexDir, columnName + V1Constants.Dict.FILE_EXTENTION));
+    FileUtils.deleteQuietly(new File(_convertedIndexDir, columnName + V1Constants.Dict.FILE_EXTENSION));
     FileUtils.deleteQuietly(
-        new File(_convertedIndexDir, columnName + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION));
+        new File(_convertedIndexDir, columnName + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION));
     FileUtils.deleteQuietly(
-        new File(_convertedIndexDir, columnName + V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION));
+        new File(_convertedIndexDir, columnName + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION));
     FileUtils.deleteQuietly(
         new File(_convertedIndexDir, columnName + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION));
 

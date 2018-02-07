@@ -507,21 +507,21 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     // }
     if (columnMetadata.isSingleValue()) {
       if (!columnMetadata.hasDictionary()) {
-        fileNameBuilder.append(V1Constants.Indexes.RAW_SV_FWD_IDX_FILE_EXTENTION);
+        fileNameBuilder.append(V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
       } else if (columnMetadata.isSorted()) {
-        fileNameBuilder.append(V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION);
+        fileNameBuilder.append(V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
       } else {
-        fileNameBuilder.append(V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION);
+        fileNameBuilder.append(V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
       }
     } else {
-      fileNameBuilder.append(V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION);
+      fileNameBuilder.append(V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
     }
     return fileNameBuilder.toString();
   }
 
   @Override
   public String getDictionaryFileName(String column) {
-    return column + V1Constants.Dict.FILE_EXTENTION;
+    return column + V1Constants.Dict.FILE_EXTENSION;
   }
 
   @Override

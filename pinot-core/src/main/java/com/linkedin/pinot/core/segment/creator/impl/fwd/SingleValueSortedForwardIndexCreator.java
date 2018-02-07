@@ -30,8 +30,8 @@ public class SingleValueSortedForwardIndexCreator implements SingleValueForwardI
   private int cardinality;
 
   public SingleValueSortedForwardIndexCreator(File indexDir, int cardinality, FieldSpec spec) throws Exception {
-    File indexFile = new File(indexDir, spec.getName() + V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION);
-    indexWriter = new FixedByteSingleValueMultiColWriter(indexFile, cardinality, 2, new int[] { 4, 4 });
+    File indexFile = new File(indexDir, spec.getName() + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+    indexWriter = new FixedByteSingleValueMultiColWriter(indexFile, cardinality, 2, new int[]{4, 4});
     mins = new int[cardinality];
     maxs = new int[cardinality];
 

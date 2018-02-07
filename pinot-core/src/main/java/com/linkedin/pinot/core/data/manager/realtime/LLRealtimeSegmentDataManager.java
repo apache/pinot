@@ -40,7 +40,9 @@ import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
+import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
@@ -113,17 +115,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     ERROR;
 
     public boolean shouldConsume() {
-      if (this.equals(INITIAL_CONSUMING) || this.equals(CATCHING_UP) || this.equals(CONSUMING_TO_ONLINE)) {
-        return true;
-      }
-      return false;
+      return this.equals(INITIAL_CONSUMING) || this.equals(CATCHING_UP) || this.equals(CONSUMING_TO_ONLINE);
     }
 
     public boolean isFinal() {
-      if (this.equals(ERROR) || this.equals(COMMITTED) || this.equals(RETAINED) || this.equals(DISCARDED)) {
-        return true;
-      }
-      return false;
+      return this.equals(ERROR) || this.equals(COMMITTED) || this.equals(RETAINED) || this.equals(DISCARDED);
     }
   }
 
@@ -152,7 +148,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private static final long TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS = 1;
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
   private static final int BUILD_TIME_LEASE_SECONDS = 30;
-  private final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
+  private static final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
 
   private final LLCRealtimeSegmentZKMetadata _segmentZKMetadata;
   private final TableConfig _tableConfig;
@@ -183,7 +179,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   // It takes 30s to locate controller leader, and more if there are multiple controller failures.
   // For now, we let 31s pass for this state transition.
-  private final int _maxTimeForConsumingToOnlineSec = 31;
+  private static final int MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS = 31;
 
   private Thread _consumerThread;
   private final String _kafkaTopic;
@@ -200,6 +196,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String _sortedColumn;
   private Logger segmentLogger = LOGGER;
   private final String _tableStreamName;
+  private final RealtimeIndexOffHeapMemoryManager _memoryManager;
   private AtomicLong _lastUpdatedRawDocuments = new AtomicLong(0);
   private final String _instanceId;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
@@ -785,7 +782,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         } else {
           segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
           boolean success = catchupToFinalOffset(endOffset,
-              TimeUnit.MILLISECONDS.convert(_maxTimeForConsumingToOnlineSec, TimeUnit.SECONDS));
+              TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
           if (success) {
             segmentLogger.info("Caught up to offset {}", _currentOffset);
             buildSegmentAndReplace();
@@ -879,7 +876,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       InstanceZKMetadata instanceZKMetadata, RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir,
       IndexLoadingConfig indexLoadingConfig, Schema schema, ServerMetrics serverMetrics)
       throws Exception {
-    initStatsHistory(realtimeTableDataManager);
     _segBuildSemaphore = realtimeTableDataManager.getSegmentBuildSemaphore();
     _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
     _tableConfig = tableConfig;
@@ -911,8 +907,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() +
         "_" + _segmentNameStr);
     _tableStreamName = _tableName + "_" + kafkaStreamProviderConfig.getStreamName();
-    initMemoryManager(realtimeTableDataManager, indexLoadingConfig.isRealtimeOffheapAllocation(), indexLoadingConfig.isDirectRealtimeOffheapAllocation(),
-        _segmentNameStr);
+    _memoryManager = getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentNameStr,
+        indexLoadingConfig.isRealtimeOffheapAllocation(), indexLoadingConfig.isDirectRealtimeOffheapAllocation(),
+        realtimeTableDataManager.getServerMetrics());
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     if (sortedColumns.isEmpty()) {
@@ -959,9 +956,18 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentMaxRowCount = segmentMaxRowCount;
 
     // Start new realtime segment
-    _realtimeSegment = new RealtimeSegmentImpl(_serverMetrics, this, indexLoadingConfig, _segmentMaxRowCount,
-        _kafkaTopic);
-    _realtimeSegment.setSegmentMetadata(segmentZKMetadata, schema);
+    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
+        new RealtimeSegmentConfig.Builder().setSegmentName(_segmentNameStr)
+            .setStreamName(_kafkaTopic)
+            .setSchema(schema)
+            .setCapacity(_segmentMaxRowCount)
+            .setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
+            .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
+            .setInvertedIndexColumns(invertedIndexColumns)
+            .setRealtimeSegmentZKMetadata(segmentZKMetadata)
+            .setOffHeap(indexLoadingConfig.isRealtimeOffheapAllocation())
+            .setMemoryManager(_memoryManager)
+            .setStatsHistory(realtimeTableDataManager.getStatsHistory());
 
     // Create message decoder
     _messageDecoder = _pinotKafkaConsumerFactory.getDecoder(kafkaStreamProviderConfig);
@@ -976,14 +982,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       try {
         int nPartitions = _consumerWrapper.getPartitionCount(_kafkaTopic, /*maxWaitTimeMs=*/5000L);
         segmentPartitionConfig.setNumPartitions(nPartitions);
-        _realtimeSegment.setSegmentPartitionConfig(segmentPartitionConfig);
+        realtimeSegmentConfigBuilder.setSegmentPartitionConfig(segmentPartitionConfig);
       } catch (Exception e) {
         segmentLogger.warn("Couldn't get number of partitions in 5s, not using partition config {}", e.getMessage());
-        _realtimeSegment.setSegmentPartitionConfig(null);
         makeConsumerWrapper("Timeout getting number of partitions");
       }
     }
 
+    _realtimeSegment = new RealtimeSegmentImpl(realtimeSegmentConfigBuilder.build());
     _startOffset = _segmentZKMetadata.getStartOffset();
     _currentOffset = _startOffset;
     _resourceTmpDir = new File(resourceDataDir, "_tmp");
@@ -1068,34 +1074,4 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   public String getSegmentName() {
     return _segmentNameStr;
   }
-
-  public int getMaxTimeForConsumingToOnlineSec() {
-    return _maxTimeForConsumingToOnlineSec;
-  }
-
-  @Override
-  public String getTableName() {
-    return _tableName;
-  }
-
-  @Override
-  public Schema getSchema() {
-    return _schema;
-  }
-
-  @Override
-  public List<String> getNoDictionaryColumns() {
-    return _noDictionaryColumns;
-  }
-
-  @Override
-  public List<String> getInvertedIndexColumns() {
-    return _invertedIndexColumns;
-  }
-
-  @Override
-  public File getTableDataDir() {
-    return new File(_resourceDataDir);
-  }
-
 }

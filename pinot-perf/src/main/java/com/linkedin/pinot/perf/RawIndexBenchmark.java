@@ -169,13 +169,14 @@ public class RawIndexBenchmark {
    */
   private void compareIndexSizes(IndexSegment segment, File segmentDir, String fwdIndexColumn, String rawIndexColumn) {
     String filePrefix = segmentDir.getAbsolutePath() + File.separator;
-    File rawIndexFile = new File(filePrefix + rawIndexColumn + V1Constants.Indexes.RAW_SV_FWD_IDX_FILE_EXTENTION);
+    File rawIndexFile = new File(filePrefix + rawIndexColumn + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
 
     String extension = (segment.getDataSource(_fwdIndexColumn).getDataSourceMetadata().isSorted())
-        ? V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION : V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION;
+        ? V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION
+        : V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
 
     File fwdIndexFile = new File(filePrefix + _fwdIndexColumn + extension);
-    File fwdIndexDictFile = new File(filePrefix + _fwdIndexColumn + V1Constants.Dict.FILE_EXTENTION);
+    File fwdIndexDictFile = new File(filePrefix + _fwdIndexColumn + V1Constants.Dict.FILE_EXTENSION);
 
     long rawIndexSize = rawIndexFile.length();
     long fwdIndexSize = fwdIndexFile.length() + fwdIndexDictFile.length();
