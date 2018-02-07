@@ -18,6 +18,9 @@ const ROOTCAUSE_SERVICE_BREAKDOWNS = 'breakdowns';
 
 const ROOTCAUSE_SESSION_TIMER_INTERVAL = 300000;
 
+const ROOTCAUSE_SESSION_PERMISSIONS_READ = 'READ';
+const ROOTCAUSE_SESSION_PERMISSIONS_READ_WRITE = 'READ_WRITE';
+
 // TODO: Update module import to comply by new Ember standards
 
 export default Ember.Controller.extend({
@@ -383,15 +386,40 @@ export default Ember.Controller.extend({
   // session handling
   //
   sessionCanSave: Ember.computed(
+    'sessionPermissions',
     'sessionOwner',
     'username',
     function () {
-      const { sessionOwner, username } = this.getProperties('sessionOwner', 'username');
-      return _.isEmpty(sessionOwner) || (sessionOwner === username);
+      const { sessionOwner, sessionPermissions, username } =
+        this.getProperties('sessionOwner', 'sessionPermissions', 'username');
+
+      if (sessionPermissions === ROOTCAUSE_SESSION_PERMISSIONS_READ_WRITE) {
+        return true;
+      }
+      return sessionOwner === username;
     }
   ),
 
-  sessionCanCopy: Ember.computed.bool('sessionId'),
+  sessionCanCopy: Ember.computed(
+    'sessionId',
+    'sessionPermissions',
+    'sessionOwner',
+    'username',
+    function () {
+      const { sessionId, sessionOwner, sessionPermissions, username } =
+        this.getProperties('sessionId', 'sessionOwner', 'sessionPermissions', 'username');
+
+      // NOTE: these conditions are temporary until full design for session copy is available
+
+      if (_.isEmpty(sessionId)) { return false; }
+
+      if (sessionOwner === username) { return false; } // temporary
+
+      if (sessionPermissions === ROOTCAUSE_SESSION_PERMISSIONS_READ) { return true; }
+
+      return false; // temporary
+    }
+  ), // Ember.computed.bool('sessionId') - when enabled
 
   /**
    * Sets the transient rca session properties after saving
@@ -418,13 +446,15 @@ export default Ember.Controller.extend({
    * @private
    */
   _makeSession() {
-    const { context, selectedUrns, sessionId, sessionName, sessionText } =
-      this.getProperties('context', 'selectedUrns', 'sessionId', 'sessionName', 'sessionText');
+    const { context, selectedUrns, sessionId, sessionName, sessionText, sessionOwner, sessionPermissions } =
+      this.getProperties('context', 'selectedUrns', 'sessionId', 'sessionName', 'sessionText', 'sessionOwner', 'sessionPermissions');
 
     return {
       id: sessionId,
       name: sessionName,
       text: sessionText,
+      owner: sessionOwner,
+      permissions: sessionPermissions,
       compareMode: context.compareMode,
       granularity: context.granularity,
       anomalyRangeStart: context.anomalyRange[0],

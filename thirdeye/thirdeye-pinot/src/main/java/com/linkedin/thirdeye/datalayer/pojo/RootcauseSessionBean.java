@@ -11,6 +11,11 @@ import java.util.Set;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class RootcauseSessionBean extends AbstractBean {
+  public enum PermissionType {
+    READ,
+    READ_WRITE
+  }
+
   private String name;
   private String text;
   private String owner;
@@ -27,6 +32,7 @@ public class RootcauseSessionBean extends AbstractBean {
   private Set<String> anomalyUrns;
   private Set<String> selectedUrns;
   private Long anomalyId;
+  private String permissions = PermissionType.READ_WRITE.toString();
 
   public String getName() {
     return name;
@@ -156,6 +162,14 @@ public class RootcauseSessionBean extends AbstractBean {
     this.anomalyId = anomalyId;
   }
 
+  public String getPermissions() {
+    return permissions;
+  }
+
+  public void setPermissions(String permissions) {
+    this.permissions = permissions;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -172,12 +186,13 @@ public class RootcauseSessionBean extends AbstractBean {
         that.analysisRangeStart) && Objects.equals(analysisRangeEnd, that.analysisRangeEnd) && Objects.equals(created,
         that.created) && Objects.equals(updated, that.updated) && Objects.equals(contextUrns, that.contextUrns)
         && Objects.equals(anomalyUrns, that.anomalyUrns) && Objects.equals(selectedUrns, that.selectedUrns)
-        && Objects.equals(anomalyId, that.anomalyId);
+        && Objects.equals(anomalyId, that.anomalyId) && Objects.equals(permissions, that.permissions);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(name, text, owner, compareMode, granularity, previousId, anomalyRangeStart, anomalyRangeEnd,
-        analysisRangeStart, analysisRangeEnd, created, updated, contextUrns, anomalyUrns, selectedUrns, anomalyId);
+        analysisRangeStart, analysisRangeEnd, created, updated, contextUrns, anomalyUrns, selectedUrns, anomalyId,
+        permissions);
   }
 }
