@@ -14,6 +14,9 @@ const EXPAND_ANOMALY_BTN = '.rootcause-anomaly__icon a';
 const ANOMALY_TITLE = '.rootcause-anomaly__title';
 const ANOMALY_VALUE = '.rootcause-anomaly__props-value';
 const ANOMALY_STATUS = '.ember-radio-button.checked';
+const EDIT_BTN = '.glyphicon-pencil';
+const NEW_COMMENT_BTN = '#target-for-tooltip-or-popover-1';
+const SAVE_BTN = '.te-button';
 
 moduleForAcceptance('Acceptance | rootcause');
 
@@ -35,7 +38,7 @@ test('empty state of rootcause page should have a placeholder and no tabs', asyn
 });
 
 test(`visiting /rootcause with only a metric provided should have correct metric name selected by default and displayed
-in the legend`, async assert => {
+      in the legend`, async assert => {
   await visit('/rootcause?metricId=1');
 
   assert.equal(
@@ -54,22 +57,31 @@ in the legend`, async assert => {
   );
 });
 
-test('visiting rootcause page with a session should have correct session name, text, and owner', async assert => {
-  await visit('/rootcause?sessionId=1');
+test('visiting rootcause page and making changes to the title and comment should create a session with saved changes',
+      async assert => {
+  const header = 'My Session';
+  const comment = 'Cause of anomaly is unknown';
+
+  await visit('/rootcause');
+  await click(EDIT_BTN);
+  await fillIn(HEADER, header);
+  await click(NEW_COMMENT_BTN);
+  await fillIn(COMMENT_TEXT, comment);
+  await click(SAVE_BTN);
 
   assert.equal(
     currentURL(),
     '/rootcause?sessionId=1',
     'link is correct');
   assert.equal(
-    find(HEADER).get(0).innerText,
+    find(HEADER).get(0).value,
     'My Session',
     'session name is correct');
   assert.ok(
     find(LAST_SAVED).get(0).innerText.includes('Last saved by rootcauseuser'),
     'last saved information is correct');
   assert.equal(
-    find(COMMENT_TEXT).get(0).value,
+    find(COMMENT_TEXT).get(1).value,
     'Cause of anomaly is unknown',
     'comments are correct');
   assert.equal(
