@@ -14,10 +14,6 @@ test('it renders well', function(assert) {
     onFilterSelection: () => {}
   });
 
-  // ('entities', {});
-  // this.set('config', config);
-  // this.set('onFilterSelection', () => {});
-
   this.render(hbs`
     {{filter-bar
       entities=entities
