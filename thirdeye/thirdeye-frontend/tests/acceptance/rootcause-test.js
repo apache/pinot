@@ -73,3 +73,12 @@ test('visiting rootcause page with a session should have correct session name, t
     'WoW',
     'default baseline is correct');
 });
+
+test('visiting rootcause page with an anomaly should have correct anomaly information', async assert => {
+  await visit('/rootcause?anomalyId=1');
+
+  assert.equal(
+    currentURL(),
+    '/rootcause?anomalyId=1',
+    'link is correct');
+});
