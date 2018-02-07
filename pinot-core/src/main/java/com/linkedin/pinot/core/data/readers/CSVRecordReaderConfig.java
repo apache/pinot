@@ -15,20 +15,19 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
-import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
-import org.codehaus.jackson.annotate.JsonIgnore;
 
 
 @SuppressWarnings("unused")
 public class CSVRecordReaderConfig implements RecordReaderConfig {
+  public static final char DEFAULT_DELIMITER = ',';
+  public static final char DEFAULT_MULTI_VALUE_DELIMITER = ';';
+
   private String _fileFormat;
   private String _header;
-  private char _delimiter = ',';
-  private char _multiValueDelimiter = ';';
-  private String _dateFormat;
-  private Set<String> _dateColumns;
+  private char _delimiter = DEFAULT_DELIMITER;
+  private char _multiValueDelimiter = DEFAULT_MULTI_VALUE_DELIMITER;
 
   public String getFileFormat() {
     return _fileFormat;
@@ -60,27 +59,6 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
 
   public void setMultiValueDelimiter(char multiValueDelimiter) {
     _multiValueDelimiter = multiValueDelimiter;
-  }
-
-  public String getDateFormat() {
-    return _dateFormat;
-  }
-
-  public void setDateFormat(String dateFormat) {
-    _dateFormat = dateFormat;
-  }
-
-  public Set<String> getDateColumns() {
-    return _dateColumns;
-  }
-
-  public void setDateColumns(Set<String> dateColumns) {
-    _dateColumns = dateColumns;
-  }
-
-  @JsonIgnore
-  public boolean isDataColumn(String columnName) {
-    return _dateColumns.contains(columnName);
   }
 
   @Override
