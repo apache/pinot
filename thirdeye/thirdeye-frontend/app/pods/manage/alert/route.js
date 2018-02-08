@@ -34,7 +34,7 @@ export default Route.extend({
         duration: durationDefault,
         startDate: startDateDefault,
         endDate: endDateDefault,
-        functionName,
+        functionName: null,
         jobId
       }});
     }
@@ -111,7 +111,6 @@ export default Route.extend({
       pathInfo,
       errorText,
       isLoadError,
-      functionName,
       isEditModeActive,
       alertData: newAlertData,
       isOverViewModeActive: !isEditModeActive,

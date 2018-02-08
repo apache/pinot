@@ -12,6 +12,7 @@ import { computed, set } from '@ember/object';
 import { task, timeout } from 'ember-concurrency';
 import { isPresent, isEmpty, isNone, isBlank } from "@ember/utils";
 import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
+import { buildMetricDataUrl, getTopDimensions } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Controller.extend({
 
@@ -40,6 +41,8 @@ export default Controller.extend({
   originalDimensions: [],
   bsAlertBannerType: 'success',
   graphEmailLinkProps: '',
+  dimensionCount: 7,
+  availableDimensions: 0,
   legendText: {
     dotted: {
       text: 'WoW'
@@ -270,172 +273,56 @@ export default Controller.extend({
   },
 
   /**
-   * Fetches the time series data required to display the anomaly detection graph for the current metric.
-   * @method fetchAnomalyGraphData
-   * @param {Object} config - key metric properties to graph
-   * @return {Promise} Returns time-series data for the metric
-   */
-  fetchAnomalyGraphData(config) {
-    const {
-      id,
-      dimension,
-      currentStart,
-      currentEnd,
-      baselineStart,
-      baselineEnd,
-      granularity,
-      filters
-    } = config;
-
-    const url = `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=${granularity}&filters=${encodeURIComponent(filters)}`;
-    return fetch(url).then(checkStatus);
-  },
-
-  /**
    * Loads time-series data into the anomaly-graph component.
    * Note: 'MINUTE' granularity loads 1 week of data. Otherwise, it loads 1 month.
    * @method triggerGraphFromMetric
    * @param {Number} metricId - Id of selected metric to graph
    * @return {undefined}
    */
-  triggerGraphFromMetric(metricId) {
-    const id = metricId.id;
-    const maxDimensionSize = 5;
-    const maxTime = this.get('maxTime');
-    const selectedDimension = this.get('selectedDimension');
-    const filters = this.get('selectedFilters') || '';
-    const dimension = selectedDimension || 'All';
-    const currentEnd = moment(maxTime).isValid()
-      ? moment(maxTime).valueOf()
-      : buildDateEod(1, 'day').valueOf();
-    const currentStart = moment(currentEnd).subtract(1, 'months').valueOf();
-    const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
-    const baselineEnd = moment(currentEnd).subtract(1, 'week');
-    const granularity = this.get('selectedGranularity') || this.get('granularities.firstObject') || '';
-    const isMinutely = granularity.toLowerCase().includes('minute');
-    const graphConfig = {
-      id,
-      dimension,
-      currentStart,
-      currentEnd,
-      baselineStart,
-      baselineEnd,
-      granularity,
-      filters
-    };
-
-    // Reduce data volume by narrowing graph window to 2 weeks for minute granularity
-    if (isMinutely) {
-      graphConfig.currentStart = moment(currentEnd).subtract(2, 'week').valueOf();
-    }
-
-    // Update graph, and related fields
-    this.setProperties({
-      isDimensionError: false,
-      graphConfig: graphConfig,
+  triggerGraphFromMetric() {
+    const {
+      maxTime,
+      selectedFilters: filters,
+      selectedDimension: dimension,
       selectedGranularity: granularity,
-      isFilterSelectDisabled: isEmpty(filters)
-    });
+      selectedMetricOption: metric
+    } = this.getProperties('maxTime', 'selectedFilters', 'selectedDimension', 'selectedGranularity', 'selectedMetricOption');
+
+    // Use key properties to derive the metric data url
+    const metricUrl = buildMetricDataUrl({ maxTime, filters, dimension, granularity, id: metric.id });
 
     // Fetch new graph metric data
-    this.fetchAnomalyGraphData(graphConfig).then(metricData => {
-      if (!this.isMetricGraphable(metricData)) {
-        // Metric has no data. not graphing
-        this.setProperties({
-          isMetricDataInvalid: true,
-          isMetricDataLoading: false
-        });
-      } else {
-        // Dimensions are selected. Compile, rank, and send them to the graph.
-        if(selectedDimension) {
-          this.getTopDimensions(metricData, graphConfig, maxDimensionSize, selectedDimension)
-            .then(orderedDimensions => {
-              this.setProperties({
-                isMetricSelected: true,
-                isFetchingDimensions: false,
-                isDimensionFetchDone: true,
-                isMetricDataLoading: false
-              });
-              // Update graph only if we have new dimension data
-              if (orderedDimensions.length) {
-                this.set('topDimensions', orderedDimensions);
-              }
-            });
-        } else {
-          this.set('isMetricDataLoading', false);
-        }
-        // Metric has data. now sending new data to graph.
+    fetch(metricUrl).then(checkStatus)
+      .then(metricData => {
         this.setProperties({
           isMetricSelected: true,
-          showGraphLegend: isPresent(selectedDimension),
-          selectedMetric: Object.assign(metricData, { color: 'blue' })
+          isMetricDataLoading: false,
+          showGraphLegend: true,
+          selectedMetric: Object.assign(metricData, { color: 'blue' }),
+          isMetricDataInvalid: !this.isMetricGraphable(metricData)
         });
-      }
-    }).catch((error) => {
-      // The request failed. No graph to render.
-      this.clearAll();
-      this.setProperties({
-        isMetricDataLoading: false,
-        selectMetricErrMsg: error
-      });
-    });
-  },
 
-  /**
-   * If a dimension has been selected, the metric data object will contain subdimensions.
-   * This method calls for dimension ranking by metric, filters for the selected dimension,
-   * and returns a sorted list of graph-ready dimension objects.
-   * @method getTopDimensions
-   * @param {Object} data - the graphable metric data returned from fetchAnomalyGraphData()
-   * @param {Object} config - the graph configuration object
-   * @param {Number} maxSize - number of sub-dimensions to display on graph
-   * @param {String} selectedDimension - the user-selected dimension to graph
-   * @return {undefined}
-   */
-  getTopDimensions(data, config, maxSize, selectedDimension) {
-    const url = `/rootcause/query?framework=relatedDimensions&anomalyStart=${config.currentStart}&anomalyEnd=${config.currentEnd}&baselineStart=${config.baselineStart}&baselineEnd=${config.baselineEnd}&analysisStart=${config.currentStart}&analysisEnd=${config.currentEnd}&urns=thirdeye:metric:${config.id}&filters=${encodeURIComponent(config.filters)}`;
-    const colors = ['orange', 'teal', 'purple', 'red', 'green', 'pink'];
-    const dimensionObj = data.subDimensionContributionMap || {};
-    let dimensionList = [];
-    let topDimensions = [];
-    let topDimensionLabels = [];
-    let filteredDimensions = [];
-    let colorIndex = 0;
-
-    return new RSVP.Promise((resolve) => {
-      fetch(url).then(checkStatus)
-        .then((scoredDimensions) => {
-          // Select scored dimensions belonging the selected one
-          filteredDimensions =  _.filter(scoredDimensions, function(dimension) {
-            return dimension.label.split('=')[0] === selectedDimension;
-          });
-          // Prep a sorted list of labels for our dimension's top contributing sub-dimensions
-          topDimensions = filteredDimensions.sortBy('score').reverse().slice(0, maxSize);
-          topDimensionLabels = [...new Set(topDimensions.map(key => key.label.split('=')[1]))];
-          // Build the array of subdimension objects for the selected dimension
-          for (let subDimension of topDimensionLabels) {
-            if (subDimension && dimensionObj[subDimension]) {
-              dimensionList.push({
-                name: subDimension,
-                color: colors[colorIndex],
-                baselineValues: dimensionObj[subDimension].baselineValues,
-                currentValues: dimensionObj[subDimension].currentValues,
-                isSelected: true
-              });
-              colorIndex++;
-            }
+        // Dimensions are selected. Compile, rank, and send them to the graph.
+        if(dimension) {
+          const orderedDimensions = getTopDimensions(metricData, this.get('dimensionCount'));
+          // Update graph only if we have new dimension data
+          if (orderedDimensions.length) {
+            this.setProperties({
+              isFetchingDimensions: false,
+              isDimensionFetchDone: true,
+              topDimensions: orderedDimensions,
+              availableDimensions: orderedDimensions.length
+            });
           }
-          // Return sorted list of dimension objects
-          resolve(dimensionList);
-        })
-        .catch(() => {
-          this.setProperties({
-            isDimensionError: true,
-            isMetricDataLoading: false
-          });
-          resolve([]);
+        }
+      }).catch((error) => {
+        // The request failed. No graph to render.
+        this.clearAll();
+        this.setProperties({
+          isMetricDataLoading: false,
+          selectMetricErrMsg: error
         });
-    });
+      });
   },
 
   /**
@@ -892,14 +779,19 @@ export default Controller.extend({
         selectedMetricOption: selectedObj
       });
       this.fetchMetricData(selectedObj.id)
-        .then((hash) => {
-          Object.assign(hash, {
-            originalDimensions: hash.dimensions,
-            metricGranularityOptions: hash.granularities,
+        .then((metricHash) => {
+          const { maxTime, filters, dimensions, granularities } = metricHash;
+          this.setProperties({
+            maxTime,
+            filters,
+            dimensions,
+            granularities,
+            originalDimensions: dimensions,
+            metricGranularityOptions: granularities,
+            selectedGranularity: granularities[0],
             alertFunctionName: this.get('functionNamePrimer')
           });
-          this.setProperties(hash);
-          this.triggerGraphFromMetric(selectedObj);
+          this.triggerGraphFromMetric();
         })
         .catch((err) => {
           this.setProperties({
@@ -941,7 +833,7 @@ export default Controller.extend({
         this.set('selectedDimension', 'All');
       }
       // Fetch new graph data with selected filters
-      this.triggerGraphFromMetric(this.get('selectedMetricOption'));
+      this.triggerGraphFromMetric();
     },
 
     /**
@@ -967,7 +859,7 @@ export default Controller.extend({
           isFetchingDimensions: true
         });
         this.modifyAlertFunctionName();
-        this.triggerGraphFromMetric(this.get('selectedMetricOption'));
+        this.triggerGraphFromMetric();
       }
     },
 
@@ -983,7 +875,7 @@ export default Controller.extend({
         isMetricDataLoading: true
       });
       this.modifyAlertFunctionName();
-      this.triggerGraphFromMetric(this.get('selectedMetricOption'));
+      this.triggerGraphFromMetric();
     },
 
     /**

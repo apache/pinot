@@ -86,7 +86,7 @@
           {{#if isDimensionError}}
             <div class="te-form__super-label">... error loading subDimensions for <strong>{{selectedDimension}}</strong></div>
           {{else}}
-            <div class="te-form__super-label">...{{if isDimensionFetchDone 'Displaying' 'Loading'}} top 5 contributing subDimensions for <strong>{{selectedDimension}}</strong></div>
+            <div class="te-form__super-label">...{{if isDimensionFetchDone 'Displaying' 'Loading'}} top {{availableDimensions}} contributing subDimensions for <strong>{{selectedDimension}}</strong></div>
           {{/if}}
         {{/if}}
         {{#if isMetricDataLoading}}
