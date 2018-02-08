@@ -196,20 +196,5 @@ export default function() {
     }
   });
 
-  /**
-   * Get request to retrieve an anomaly reports
-   */
-  this.get(`/session/:id`, () => {
-    return {};
-  });
-
-  /**
-   * Post request for saving anomaly reports
-   */
-  this.post(`/session`, () => {
-    const hardCodedId = 1234567;
-    return hardCodedId;
-  });
-
   rootcause(this);
 }

@@ -96,4 +96,12 @@ export default function(server) {
       updated : 1517363257776
     };
   });
+
+  /**
+   * Post request for saving anomaly reports
+   */
+  server.post(`/session`, () => {
+    const hardCodedId = 1;
+    return hardCodedId;
+  });
 }
