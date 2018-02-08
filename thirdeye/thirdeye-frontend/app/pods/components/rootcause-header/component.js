@@ -73,12 +73,6 @@ export default Component.extend({
   isCommentEditMode: computed.bool('sessionText'),
 
   /**
-   * Toggle for editing the session title
-   * @type {boolean}
-   */
-  isTitleEditMode: false,
-
-  /**
    * whether to enable saving
    * @type {boolean}
    */
