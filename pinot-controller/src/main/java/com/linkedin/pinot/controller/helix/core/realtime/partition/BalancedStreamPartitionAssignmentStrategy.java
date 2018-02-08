@@ -17,6 +17,7 @@ package com.linkedin.pinot.controller.helix.core.realtime.partition;
 
 import com.linkedin.pinot.common.config.StreamConsumptionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -32,8 +33,6 @@ import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
  */
 public class BalancedStreamPartitionAssignmentStrategy implements StreamPartitionAssignmentStrategy {
 
-  private static final String ONLINE_STATE = "ONLINE";
-  private static final String OFFLINE_STATE = "OFFLINE";
   private static final String PARTITION_JOINER = "_";
 
   private List<String> _tablesForPartitionAssignment;
@@ -88,7 +87,7 @@ public class BalancedStreamPartitionAssignmentStrategy implements StreamPartitio
           String key = realtimeTableName + PARTITION_JOINER + partition.getPartitionNum();
           Map<String, String> value = new HashMap<>();
           for (String instance : partition.getInstanceNames()) {
-            value.put(instance, ONLINE_STATE);
+            value.put(instance, RealtimeSegmentOnlineOfflineStateModel.ONLINE);
           }
           currentPartitions.put(key, value);
         }
@@ -102,8 +101,8 @@ public class BalancedStreamPartitionAssignmentStrategy implements StreamPartitio
 
     // get states
     LinkedHashMap<String, Integer> states = new LinkedHashMap<>(2);
-    states.put(OFFLINE_STATE, 0);
-    states.put(ONLINE_STATE, numReplicas);
+    states.put(RealtimeSegmentOnlineOfflineStateModel.OFFLINE, 0);
+    states.put(RealtimeSegmentOnlineOfflineStateModel.ONLINE, numReplicas);
 
     // auto rebalance
     AutoRebalanceStrategy autoRebalanceStrategy =
