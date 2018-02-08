@@ -28,7 +28,7 @@ public class ProfileViewQueryExecutor extends QueryExecutor{
                     " WHERE ViewStartTime > %d AND ViewStartTime < %d LIMIT %d",
                 "SELECT count(*) from ProfileView" +
                     " WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s'",
-                "SELECT COUNT(*), AVG(ReviewTime), MAX(ReviewTime), MIN(ReviewTime), AVG(ViewedProfileStrength), MAX(ViewedProfileStrength), MIN(ViewedProfileStrength) FROM ProfileView " +
+                "SELECT COUNT(*), AVG(ReviewTime), AVG(ViewedProfileStrength) FROM ProfileView " +
                     " WHERE ViewStartTime > %d AND ViewStartTime < %d " +
                     " GROUP BY ViewerPosition LIMIT %d",
                 "SELECT COUNT(*) FROM ProfileView" +
@@ -49,6 +49,6 @@ public class ProfileViewQueryExecutor extends QueryExecutor{
     }
 
     public ProfileViewQueryTask getTask(Properties config) {
-        return new ProfileViewQueryTask(config, QUERIES, _dataDir);
+        return new ProfileViewQueryTask(config, QUERIES, _dataDir, _testDuration);
     }
 }

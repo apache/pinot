@@ -28,7 +28,7 @@ public class ArticleReadQueryExecutor extends QueryExecutor{
                     " WHERE  ReadStartTime > %d AND ReadStartTime < %d LIMIT %d",
                 "SELECT COUNT(*) FROM ArticleRead" +
                     " WHERE ReadStartTime > %d AND ReadStartTime < %d AND ArticleID = '%s'",
-                "SELECT AVG(TimeSpent), MIN(TimeSpent), MAX(TimeSpent), AVG(ReaderStrength), MIN(ReaderStrength), MAX(ReaderStrength) FROM ArticleReadd" +
+                "SELECT COUNT(*), AVG(TimeSpent), AVG(ReaderStrength) FROM ArticleReadd" +
                     " WHERE ReadStartTime > %d AND ReadStartTime < %d" +
                     " GROUP BY ArticleTopic LIMIT %d",
                 "SELECT COUNT(*) FROM ArticleRead" +
@@ -49,6 +49,6 @@ public class ArticleReadQueryExecutor extends QueryExecutor{
     }
 
     public ArticleReadQueryTask getTask(Properties config) {
-        return new ArticleReadQueryTask(config, QUERIES, _dataDir);
+        return new ArticleReadQueryTask(config, QUERIES, _dataDir, _testDuration);
     }
 }

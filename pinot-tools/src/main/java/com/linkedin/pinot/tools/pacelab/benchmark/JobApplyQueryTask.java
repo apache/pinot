@@ -25,10 +25,11 @@ import java.util.Properties;
 public class JobApplyQueryTask extends QueryTask {
     List<GenericRow> _jobTable;
 
-    public JobApplyQueryTask(Properties config, String[] queries, String dataDir) {
+    public JobApplyQueryTask(Properties config, String[] queries, String dataDir, int testDuration) {
         setConfig(config);
         setQueries(queries);
         setDataDir(dataDir);
+        setTestDuration(testDuration);
         EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
         try
         {

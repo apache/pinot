@@ -15,12 +15,6 @@
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name" : "Title"
-    },
-    ,
-    {
-      "singleValueField" : true,
-      "dataType": "STRING",
       "name" : "Url"
     },
     {

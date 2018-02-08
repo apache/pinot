@@ -24,10 +24,11 @@ import java.util.Properties;
 public class ArticleReadQueryTask extends QueryTask {
     List<GenericRow> _articleTable;
 
-    public ArticleReadQueryTask(Properties config, String[] queries, String dataDir) {
+    public ArticleReadQueryTask(Properties config, String[] queries, String dataDir, int testDuration) {
         setConfig(config);
         setQueries(queries);
         setDataDir(dataDir);
+        setTestDuration(testDuration);
         EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
         try
         {

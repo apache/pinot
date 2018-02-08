@@ -10,22 +10,22 @@
   {
     "column" : "Salary",
     "range" : true,
-    "cardinality" : 1000,
-    "rangeStart" : 60000,
+    "cardinality" : 100,
+    "rangeStart" : 20000,
     "rangeEnd"   : 500000
   }
   ,
   {
     "column" : "Url",
     "range" : false,
-    "cardinality" : 10000,
+    "cardinality" : 100000,
     "minLength" : 32,
     "maxLength" : 256
   },
   {
     "column" : "Position",
     "range" : false,
-    "cardinality" : 50000,
+    "cardinality" : 10000,
     "minLength" : 64,
     "maxLength" : 256
   },
@@ -39,14 +39,14 @@
   {
     "column" : "Abstract",
     "range" : false,
-    "cardinality" : 50000,
+    "cardinality" : 100000,
     "minLength" : 256,
     "maxLength" : 512
   },
   {
     "column" : "Skills",
     "range" : false,
-    "cardinality" : 20000,
+    "cardinality" : 1000,
     "minLength" : 256,
     "maxLength" : 512
   },

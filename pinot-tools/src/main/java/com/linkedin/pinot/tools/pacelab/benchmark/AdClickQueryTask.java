@@ -26,10 +26,11 @@ public class AdClickQueryTask extends QueryTask {
     List<GenericRow> _adTable;
 
 
-    public AdClickQueryTask(Properties config, String[] queries, String dataDir) {
+    public AdClickQueryTask(Properties config, String[] queries, String dataDir, int testDuration) {
         setConfig(config);
         setQueries(queries);
         setDataDir(dataDir);
+        setTestDuration(testDuration);
         EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
         try
         {

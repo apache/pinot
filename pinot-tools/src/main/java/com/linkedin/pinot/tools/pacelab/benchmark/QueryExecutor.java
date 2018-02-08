@@ -30,8 +30,9 @@ import java.util.concurrent.TimeUnit;
 public abstract class QueryExecutor {
     protected Properties config;
     protected PostQueryCommand postQueryCommand;
-    protected int testDuration;
+    protected int _testDuration;
     protected String _dataDir;
+    ExecutorService _threadPool;
 
     public static QueryExecutor getInstance(){
         return null;
@@ -40,10 +41,10 @@ public abstract class QueryExecutor {
 
     public static List<QueryExecutor> getTableExecutors() {
         List<QueryExecutor> queryExecutors = new ArrayList<>();
-        //queryExecutors.add(ProfileViewQueryExecutor.getInstance());
+        queryExecutors.add(ProfileViewQueryExecutor.getInstance());
         //queryExecutors.add(JobApplyQueryExecutor.getInstance());
         //queryExecutors.add(AdClickQueryExecutor.getInstance());
-        queryExecutors.add(ArticleReadQueryExecutor.getInstance());
+        //queryExecutors.add(ArticleReadQueryExecutor.getInstance());
 
         return queryExecutors;
     }
@@ -51,12 +52,12 @@ public abstract class QueryExecutor {
     public void start() throws InterruptedException {
         loadConfig();
         int threadCnt = Integer.parseInt(config.getProperty("ThreadCount"));
-        ExecutorService threadPool = Executors.newFixedThreadPool(threadCnt);
+        _threadPool = Executors.newFixedThreadPool(threadCnt);
         QueryTask queryTask = getTask(config);
         queryTask.setPostQueryCommand(this.postQueryCommand);
-        threadPool.execute(queryTask);
-        threadPool.awaitTermination(this.testDuration, TimeUnit.SECONDS);
-        threadPool.shutdownNow();
+        _threadPool.execute(queryTask);
+        //threadPool.awaitTermination(_testDuration, TimeUnit.SECONDS);
+        //threadPool.shutdownNow();
     }
 
     public void loadConfig() {
@@ -83,7 +84,7 @@ public abstract class QueryExecutor {
     public abstract QueryTask getTask(Properties config);
 
     public void setTestDuration(int testDuration) {
-        this.testDuration = testDuration;
+        _testDuration = testDuration;
     }
     public void setDataDir(String dataDir)
     {
@@ -92,5 +93,9 @@ public abstract class QueryExecutor {
     public String getDataDir()
     {
         return _dataDir;
+    }
+    public void shutdownThreadPool()
+    {
+        _threadPool.shutdown();
     }
 }

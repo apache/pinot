@@ -40,7 +40,7 @@
     {
       "singleValueField" : true,
       "dataType": "STRING",
-      "name": "JobTitle"
+      "name": "JobPosition"
     },
     {
       "singleValueField" : true,

@@ -17,7 +17,7 @@
   {
     "column" : "Title",
     "range" : false,
-    "cardinality" : 100000,
+    "cardinality" : 50000,
     "minLength" : 64,
     "maxLength" : 256
   },

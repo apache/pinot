@@ -28,10 +28,11 @@ import java.util.Random;
 public class ProfileViewQueryTask extends QueryTask {
     List<GenericRow> _profileTable;
 
-    public ProfileViewQueryTask(Properties config, String[] queries, String dataDir) {
+    public ProfileViewQueryTask(Properties config, String[] queries, String dataDir, int testDuration) {
         setConfig(config);
         setQueries(queries);
         setDataDir(dataDir);
+        setTestDuration(testDuration);
         EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
         try
         {

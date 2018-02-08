@@ -28,7 +28,7 @@ public class JobApplyQueryExecutor extends QueryExecutor {
                         " WHERE ApplyStartTime > %d AND ApplyStartTime < %d LIMIT %d",
                 "SELECT count(*) FROM JobApply" +
                          " WHERE ApplyStartTime > %d AND ApplyStartTime < %d AND JobID = '%s'",
-                "SELECT AVG(TimeSpent), MIN(TimeSpent), MAX(TimeSpent), AVG(JobSalary), MIN(JobSalary), MAX(JobSalary) FROM JobApply" +
+                "SELECT COUNT(*), AVG(TimeSpent), AVG(JobSalary) FROM JobApply" +
                         " WHERE ApplyStartTime > %d AND ApplyStartTime < %d" +
                         " GROUP BY JobCompany LIMIT %d",
                 "SELECT count(*),AVG(JobSalary) FROM JobApply" +
@@ -49,6 +49,6 @@ public class JobApplyQueryExecutor extends QueryExecutor {
     }
 
     public JobApplyQueryTask getTask(Properties config) {
-        return new JobApplyQueryTask(config, QUERIES, _dataDir);
+        return new JobApplyQueryTask(config, QUERIES, _dataDir, _testDuration);
     }
 }

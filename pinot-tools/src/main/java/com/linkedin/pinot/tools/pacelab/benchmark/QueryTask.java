@@ -27,6 +27,8 @@ public class QueryTask implements Runnable{
     protected Random rand = new Random();
     protected PostQueryCommand postQueryCommand;
     protected String _dataDir;
+    protected int _testDuration;
+    //static int queryCount=0;
 
     public enum Color {
         RESET("\u001B[0m"),
@@ -43,9 +45,17 @@ public class QueryTask implements Runnable{
 
     @Override
     public void run() {
+        long runStartMillisTime = System.currentTimeMillis();
+        long currentTimeMillisTime = System.currentTimeMillis();
+
         float[] likelihood = getLikelihoodArrayFromProps();
         int QPS = Integer.parseInt(config.getProperty("QPS"));
-        while(!Thread.interrupted()) {
+
+        long secondsPassed = (currentTimeMillisTime-runStartMillisTime)/1000;
+        //while(!Thread.interrupted()) {
+        while(secondsPassed < _testDuration)
+        {
+
             long intervalStart = System.currentTimeMillis();
             try
             {
@@ -57,22 +67,26 @@ public class QueryTask implements Runnable{
                         if (randomLikelihood <= likelihood[i])
                         {
                             generateAndRunQuery(i);
+                            //queryCount++;
+                            //System.out.println(queryCount);
                             break;
                         }
                     }
                 }
                 long intervalEnd = System.currentTimeMillis();
-                while (intervalEnd < intervalStart + 1000)
+                long timeDistance = intervalEnd-intervalStart;
+                if (timeDistance<1000)
                 {
-                    Thread.sleep(1000);
-                    intervalEnd = System.currentTimeMillis();
+                    Thread.sleep(1000-timeDistance);
                 }
             }
             catch (Exception e)
             {
                 e.printStackTrace();
             }
-
+            currentTimeMillisTime = System.currentTimeMillis();
+            secondsPassed = (currentTimeMillisTime-runStartMillisTime)/1000;
+            //System.out.println(secondsPassed);
         }
     }
 
@@ -135,5 +149,9 @@ public class QueryTask implements Runnable{
     public String getDataDir()
     {
         return _dataDir;
+    }
+    public void setTestDuration(int testDuration)
+    {
+        _testDuration = testDuration;
     }
 }

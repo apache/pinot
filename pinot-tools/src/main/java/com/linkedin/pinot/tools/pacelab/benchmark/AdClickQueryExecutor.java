@@ -49,6 +49,6 @@ public class AdClickQueryExecutor extends QueryExecutor{
     }
 
     public AdClickQueryTask getTask(Properties config) {
-        return new AdClickQueryTask(config, QUERIES, _dataDir);
+        return new AdClickQueryTask(config, QUERIES, _dataDir, _testDuration);
     }
 }

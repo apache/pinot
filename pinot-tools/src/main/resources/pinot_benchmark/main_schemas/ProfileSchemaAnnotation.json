@@ -37,7 +37,7 @@
   {
     "column" : "Skills",
     "range" : false,
-    "cardinality" : 20000,
+    "cardinality" : 1000,
     "minLength" : 256,
     "maxLength" : 512
   }
