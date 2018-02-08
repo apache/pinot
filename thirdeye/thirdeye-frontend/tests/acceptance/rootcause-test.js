@@ -15,7 +15,6 @@ const ANOMALY_TITLE = '.rootcause-anomaly__title';
 const ANOMALY_VALUE = '.rootcause-anomaly__props-value';
 const ANOMALY_STATUS = '.ember-radio-button.checked';
 const EDIT_BTN = '.glyphicon-pencil';
-const NEW_COMMENT_BTN = '#target-for-tooltip-or-popover-1';
 const SAVE_BTN = '.te-button';
 const DISPLAY_VIEW = '.rootcause-metric__display-view';
 const METRICS_TABLE = '.metrics-table';
@@ -69,7 +68,6 @@ test('visiting rootcause page and making changes to the title and comment should
   await visit('/rootcause');
   await click(EDIT_BTN);
   await fillIn(HEADER, header);
-  await click(NEW_COMMENT_BTN);
   await fillIn(COMMENT_TEXT, comment);
   await click(SAVE_BTN);
 
@@ -118,7 +116,7 @@ test('visiting rootcause page with an anomaly should have correct anomaly inform
     'anomaly status is correct');
 });
 
-test('Metrics tab should have 2 views: table and card', async assert => {
+test('Metrics, Dimensions, and Events tabs exist and should have correct information', async assert => {
   await visit('/rootcause?metricId=1');
 
   assert.equal(
@@ -137,4 +135,6 @@ test('Metrics tab should have 2 views: table and card', async assert => {
   assert.ok(
     find(METRIC_CARD).get(0),
     'metric card is present when card view is selected');
+
+  await click(find(`${TABS} a`).get(1));
 });
