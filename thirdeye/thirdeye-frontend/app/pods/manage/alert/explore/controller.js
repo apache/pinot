@@ -6,10 +6,9 @@
 import _ from 'lodash';
 import fetch from 'fetch';
 import moment from 'moment';
-import { set } from "@ember/object";
 import { later } from "@ember/runloop";
 import Controller from '@ember/controller';
-import { computed } from '@ember/object';
+import { computed, set } from '@ember/object';
 import { isPresent } from "@ember/utils";
 import { task, timeout } from 'ember-concurrency';
 import { checkStatus, postProps, buildDateEod } from 'thirdeye-frontend/utils/utils';
@@ -593,9 +592,9 @@ export default Controller.extend({
           }
 
           // Set displayed value properties. Note: ensure no CP watching these props
-          Ember.set(anomaly, 'shownCurrent', curr);
-          Ember.set(anomaly, 'shownBaseline', base);
-          Ember.set(anomaly, 'shownChangeRate', change);
+          set(anomaly, 'shownCurrent', curr);
+          set(anomaly, 'shownBaseline', base);
+          set(anomaly, 'shownChangeRate', change);
         });
       }
     },
