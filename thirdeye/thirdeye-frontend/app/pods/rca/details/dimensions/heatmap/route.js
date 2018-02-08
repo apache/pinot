@@ -9,7 +9,7 @@ export default Ember.Route.extend({
     const {
       analysisStart: initStart,
       analysisEnd: initEnd
-     } = this.modelFor('rca.details');
+    } = this.modelFor('rca.details');
     const {
       analysisStart,
       analysisEnd

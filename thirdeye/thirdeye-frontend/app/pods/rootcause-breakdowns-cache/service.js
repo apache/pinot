@@ -54,7 +54,7 @@ export default Ember.Service.extend({
     // metrics
     missing.forEach(urn => {
       const range = toAbsoluteRange(urn, requestContext.anomalyRange, requestContext.compareMode);
-      return this._fetchSlice(urn, range, requestContext)
+      return this._fetchSlice(urn, range, requestContext);
     });
   },
 

@@ -126,7 +126,7 @@ function actions(dispatch) {
     onMetricSelection(metric) {
       dispatch(Actions.selectMetric(metric));
     },
-    
+
 
     /**
      * Handles deselection of an entity

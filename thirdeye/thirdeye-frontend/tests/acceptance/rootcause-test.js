@@ -46,55 +46,55 @@ test('empty state of rootcause page should have a placeholder and no tabs', asyn
 
 test(`visiting /rootcause with only a metric provided should have correct metric name selected by default and displayed
       in the legend`, async assert => {
-  await visit('/rootcause?metricId=1');
+    await visit('/rootcause?metricId=1');
 
-  assert.equal(
-    currentURL(),
-    '/rootcause?metricId=1',
-    'link is correct');
-  assert.equal(
-    find(LABEL).get(0).innerText,
-    'pageViews',
-    'metric label is correct'
-  );
-  assert.equal(
-    find(SELECTED_METRIC).get(0).innerText,
-    'pageViews',
-    'selected metric is correct'
-  );
-});
+    assert.equal(
+      currentURL(),
+      '/rootcause?metricId=1',
+      'link is correct');
+    assert.equal(
+      find(LABEL).get(0).innerText,
+      'pageViews',
+      'metric label is correct'
+    );
+    assert.equal(
+      find(SELECTED_METRIC).get(0).innerText,
+      'pageViews',
+      'selected metric is correct'
+    );
+  });
 
 test('visiting rootcause page and making changes to the title and comment should create a session with saved changes',
-      async assert => {
-  const header = 'My Session';
-  const comment = 'Cause of anomaly is unknown';
+  async assert => {
+    const header = 'My Session';
+    const comment = 'Cause of anomaly is unknown';
 
-  await visit('/rootcause');
-  await click(EDIT_BTN);
-  await fillIn(HEADER, header);
-  await fillIn(COMMENT_TEXT, comment);
-  await click(SAVE_BTN);
+    await visit('/rootcause');
+    await click(EDIT_BTN);
+    await fillIn(HEADER, header);
+    await fillIn(COMMENT_TEXT, comment);
+    await click(SAVE_BTN);
 
-  assert.equal(
-    currentURL(),
-    '/rootcause?sessionId=1',
-    'link is correct');
-  assert.equal(
-    find(HEADER).get(0).value,
-    'My Session',
-    'session name is correct');
-  assert.ok(
-    find(LAST_SAVED).get(0).innerText.includes('Last saved by rootcauseuser'),
-    'last saved information is correct');
-  assert.equal(
-    find(COMMENT_TEXT).get(1).value,
-    'Cause of anomaly is unknown',
-    'comments are correct');
-  assert.equal(
-    find(BASELINE).get(0).innerText,
-    'WoW',
-    'default baseline is correct');
-});
+    assert.equal(
+      currentURL(),
+      '/rootcause?sessionId=1',
+      'link is correct');
+    assert.equal(
+      find(HEADER).get(0).value,
+      'My Session',
+      'session name is correct');
+    assert.ok(
+      find(LAST_SAVED).get(0).innerText.includes('Last saved by rootcauseuser'),
+      'last saved information is correct');
+    assert.equal(
+      find(COMMENT_TEXT).get(1).value,
+      'Cause of anomaly is unknown',
+      'comments are correct');
+    assert.equal(
+      find(BASELINE).get(0).innerText,
+      'WoW',
+      'default baseline is correct');
+  });
 
 test('visiting rootcause page with an anomaly should have correct anomaly information', async assert => {
   await visit('/rootcause?anomalyId=1');
@@ -128,7 +128,7 @@ test('Metrics, Dimensions, and Events tabs exist and should have correct informa
     'Metrics',
     'default tab is correct');
   assert.equal(
-    find(DISPLAY_VIEW).get(0).innerText.replace(/ /g,''), // remove white space in text
+    find(DISPLAY_VIEW).get(0).innerText.replace(/ /g, ''), // remove white space in text
     'Table|Card',
     'metrics viewing options are correct');
   assert.ok(

@@ -178,7 +178,7 @@ const adjustAnomalyLink = (event) => {
     return Object.assign(event, { link });
   }
   return event;
-}
+};
 
 /**
  * Helper function to humanize a start offset
@@ -290,7 +290,7 @@ function fetchEvents(start, end, mode) {
           .sort((a, b) => (b.score - a.score));
       })
       .then(res => dispatch(loadEvents(res)
-    ));
+      ));
   };
 }
 

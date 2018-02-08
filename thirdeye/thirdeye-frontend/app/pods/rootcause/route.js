@@ -38,12 +38,12 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     }
 
     if (sessionId) {
-      session = fetch(`/session/${sessionId}`).then(checkStatus).catch(res => undefined);
+      session = fetch(`/session/${sessionId}`).then(checkStatus).catch(() => undefined);
     }
 
     if (anomalyUrn) {
-      anomalyContext = fetch(`/rootcause/raw?framework=anomalyContext&urns=${anomalyUrn}`).then(checkStatus).catch(res => undefined);
-      anomalySessions = fetch(`/session/query?anomalyId=${anomalyId}`).then(checkStatus).catch(res => undefined);
+      anomalyContext = fetch(`/rootcause/raw?framework=anomalyContext&urns=${anomalyUrn}`).then(checkStatus).catch(() => undefined);
+      anomalySessions = fetch(`/session/query?anomalyId=${anomalyId}`).then(checkStatus).catch(() => undefined);
     }
 
     return RSVP.hash({
@@ -201,7 +201,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
         sessionName = name;
         sessionText = text;
-        sessionOwner = owner
+        sessionOwner = owner;
         sessionPermissions = permissions;
         sessionUpdatedBy = updatedBy;
         sessionUpdatedTime = updated;

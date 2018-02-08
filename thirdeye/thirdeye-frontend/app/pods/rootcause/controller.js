@@ -5,10 +5,10 @@ import filterBarConfig from 'thirdeye-frontend/mocks/filterBarConfig';
 import fetch from 'fetch';
 import moment from 'moment';
 import config from 'thirdeye-frontend/config/environment';
+import _ from 'lodash';
 
 const ROOTCAUSE_TAB_DIMENSIONS = 'dimensions';
 const ROOTCAUSE_TAB_METRICS = 'metrics';
-const ROOTCAUSE_TAB_EVENTS = 'events';
 
 const ROOTCAUSE_SERVICE_ROUTE = 'route';
 const ROOTCAUSE_SERVICE_ENTITIES = 'entities';
@@ -487,7 +487,7 @@ export default Ember.Controller.extend({
           });
         }
       })
-      .catch(error => undefined);
+      .catch(() => undefined);
   },
 
   /**
@@ -626,7 +626,7 @@ export default Ember.Controller.extend({
         return sessionService
           .saveAsync(session)
           .then(sessionId => this._updateSession(sessionId))
-          .catch((error) => {
+          .catch(() => {
             const { routeErrors } = this.getProperties('routeErrors');
             routeErrors.add('Could not save investigation');
             this.setProperties({ routeErrors: new Set(routeErrors) });
@@ -654,7 +654,7 @@ export default Ember.Controller.extend({
         return sessionService
           .saveAsync(session)
           .then(sessionId => this._updateSession(sessionId))
-          .catch((error) => {
+          .catch(() => {
             const { routeErrors } = this.getProperties('routeErrors');
             routeErrors.add('Could not copy investigation');
             this.setProperties({ routeErrors: new Set(routeErrors) });
