@@ -80,7 +80,7 @@ export default Ember.Component.extend({
     return fetch(`/data/autocomplete/filters/metric/${id}`)
       .then(checkStatus)
       .then(res => this.setProperties({ filterOptions: res, filterMap: this._pruneFilters(res, filterMap) }))
-      .then(res => this.send('onSelect'));
+      .then(() => this.send('onSelect'));
   },
 
   actions: {

@@ -247,7 +247,7 @@ export default Ember.Component.extend({
     if (primaryMetric.isSelected === undefined) {
       Ember.set(primaryMetric, 'isSelected', true);
     }
-    
+
     const data = [
       primaryMetric,
       ...relatedMetric,
@@ -510,7 +510,7 @@ export default Ember.Component.extend({
   onbrush: function(dates) {
     const [ start, end ] = dates;
     const onSubchartBrush = this.get('onSubchartChange');
-    const [ _, ...graphDates ] = this.get('chartDates');
+    const [ , ...graphDates ] = this.get('chartDates');
     const min = graphDates.get('firstObject');
     const max = graphDates.get('lastObject');
 
@@ -560,8 +560,8 @@ export default Ember.Component.extend({
       if (primaryMetric.isSelected) {
         const { baselineValues, currentValues } = primaryMetric.subDimensionContributionMap['All'];
         return [
-            [`${primaryMetric.metricName}-current`, ...currentValues],
-            [`${primaryMetric.metricName}-expected`, ...baselineValues]
+          [`${primaryMetric.metricName}-current`, ...currentValues],
+          [`${primaryMetric.metricName}-expected`, ...baselineValues]
         ];
       }
       return [

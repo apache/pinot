@@ -30,7 +30,7 @@ export default Ember.Component.extend({
     }
   ),
 
-    /**
+  /**
    * anomaly events
    */
   anomaly: Ember.computed(

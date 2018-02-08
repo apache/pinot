@@ -1,5 +1,4 @@
 import Ember from 'ember';
-import _ from 'lodash';
 import d3 from 'd3';
 
 const { get } = Ember;
@@ -171,7 +170,7 @@ export default Ember.Component.extend({
         if (d.role !== 'value') {
           return 'rgba(0,0,0,0.45)';
         }
-        return getTextColor(d.actualValue, d.inverse)
+        return getTextColor(d.actualValue, d.inverse);
       });
 
     cell.on('click', get(this, 'heatmapClickHandler').bind(this));

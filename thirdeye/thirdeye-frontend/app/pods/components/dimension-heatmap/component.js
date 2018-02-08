@@ -123,7 +123,7 @@ export default Ember.Component.extend({
       });
 
       var div = d3.select(dimensionPlaceHolderId).attr("class", "heatmap")
-          .append("svg:svg").attr("width", width).attr("height", height).append("svg:g").attr("transform", "translate(.5,.5)");
+        .append("svg:svg").attr("width", width).attr("height", height).append("svg:g").attr("transform", "translate(.5,.5)");
 
       var nodes = treeMap.nodes(data).filter(function(d) {
         return !d.children;

@@ -135,7 +135,7 @@ function fetchRelatedMetricIds() {
 
     const {
       compareMode,
-      filters: filterJson,
+      filters: filterJson
     } = primaryMetric;
 
     const analysisDurationSafe = Math.min(analysisEndRaw - analysisStartRaw, ROOTCAUSE_ANALYSIS_DURATION_MAX);
@@ -284,9 +284,7 @@ function updateMetricDate(startDate, endDate) {
  * @param {Number} end The end time in unix ms
  */
 function updateDates(start, end) {
-  return (dispatch, getState) => {
-    // const { primaryMetric } = getState();
-    //check if dates are stame
+  return (dispatch) => {
 
     return dispatch(setDate([start, end]));
   };

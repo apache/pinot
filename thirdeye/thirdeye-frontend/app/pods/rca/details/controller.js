@@ -285,9 +285,9 @@ export default Ember.Controller.extend({
       });
 
       const {
-          startDate: currentStart,
-          endDate: currentEnd
-        } = this.getProperties('startDate', 'endDate');
+        startDate: currentStart,
+        endDate: currentEnd
+      } = this.getProperties('startDate', 'endDate');
       if (rangeStart <= currentStart) {
         const newStartDate = +currentStart - (currentEnd - currentStart);
 

@@ -101,7 +101,7 @@ function resetSelectedData() {
 function selectPrimary() {
   return {
     type: ActionTypes.SELECT_PRIMARY
-  }
+  };
 }
 
 
@@ -131,7 +131,7 @@ function fetchRegions() {
     } = store.primaryMetric;
 
     const metricIds = [primaryMetricId, ...relatedMetricIds].join(',');
-     // todo: identify better way for query params
+    // todo: identify better way for query params
     return fetch(`/data/anomalies/ranges?metricIds=${metricIds}&start=${currentStart}&end=${currentEnd}&filters=${encodeURIComponent(filters)}`)
       .then(res => res.json())
       .then(res => dispatch(loadRegions(res)))

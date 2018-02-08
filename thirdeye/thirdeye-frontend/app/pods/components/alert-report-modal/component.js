@@ -81,7 +81,7 @@ export default Component.extend({
      * @param {Object} selectedObj - the user-selected dimension to filter by
      */
     onSelectDimension(selectedObj) {
-      this.set('selectedDimension' , selectedObj);
+      this.set('selectedDimension', selectedObj);
       this.bubbleModalInput();
     },
 
@@ -91,7 +91,7 @@ export default Component.extend({
      * @param {Object} selectedObj - the user-selected dimension to filter by
      */
     onFeedbackTypeSelection(trendSelection) {
-      this.set('isNewTrend' , trendSelection);
+      this.set('isNewTrend', trendSelection);
       this.bubbleModalInput();
     },
 

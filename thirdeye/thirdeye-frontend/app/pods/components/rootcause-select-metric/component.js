@@ -29,7 +29,7 @@ export default Ember.Component.extend({
     yield timeout(1000);
     const url = `/data/autocomplete/metric?name=${metric}`;
     return fetch(url)
-        .then(res => res.json());
+      .then(res => res.json());
   }),
 
   didReceiveAttrs() {

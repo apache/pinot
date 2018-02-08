@@ -163,46 +163,46 @@ export default Ember.Component.extend({
     'startIndex',
     'endIndex',
     'relatedMetricRows',
-     function() {
-       const startIndex = this.get('startIndex') || 0;
-       const endIndex = this.get('endIndex') || 0;
-       const rows = this.get('relatedMetricRows');
+    function() {
+      const startIndex = this.get('startIndex') || 0;
+      const endIndex = this.get('endIndex') || 0;
+      const rows = this.get('relatedMetricRows');
 
 
-       return filterRow(rows, startIndex, endIndex) || [];
-     }
+      return filterRow(rows, startIndex, endIndex) || [];
+    }
   ),
 
   filteredDimensionRows: Ember.computed(
     'startIndex',
     'endIndex',
     'dimensionRows',
-     function() {
-       const startIndex = this.get('startIndex') || 0;
-       const endIndex = this.get('endIndex') || 0;
-       const dimensions = this.get('dimensionRows');
-       const valueKeys = [
-         'baselineValues',
-         'cumulativeBaselineValues',
-         'cumulativeCurrentValues',
-         'cumulativePercentageChange',
-         'currentValues',
-         'percentageChange'
-       ];
+    function() {
+      const startIndex = this.get('startIndex') || 0;
+      const endIndex = this.get('endIndex') || 0;
+      const dimensions = this.get('dimensionRows');
+      const valueKeys = [
+        'baselineValues',
+        'cumulativeBaselineValues',
+        'cumulativeCurrentValues',
+        'cumulativePercentageChange',
+        'currentValues',
+        'percentageChange'
+      ];
 
-       if (!startIndex && !endIndex) {
-         return dimensions;
-       }
+      if (!startIndex && !endIndex) {
+        return dimensions;
+      }
 
-       return dimensions.map((dimension) => {
-         const hash = {
-           name: dimension.name
-         };
-         valueKeys.forEach((key) => {
-           hash[key] = _.slice(dimension[key], startIndex, endIndex);
-         });
-         return hash;
-       }) || [];
-     }
+      return dimensions.map((dimension) => {
+        const hash = {
+          name: dimension.name
+        };
+        valueKeys.forEach((key) => {
+          hash[key] = _.slice(dimension[key], startIndex, endIndex);
+        });
+        return hash;
+      }) || [];
+    }
   )
 });
