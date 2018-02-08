@@ -113,3 +113,15 @@ test('visiting rootcause page with an anomaly should have correct anomaly inform
     'No (False Alarm)',
     'anomaly status is correct');
 });
+
+test('Metrics tab should have 2 views: table and card', async assert => {
+  await visit('/rootcause?metricId=1');
+
+  assert.equal(
+    find(`${TABS} a`).get(0).innerText,
+    'Metrics',
+    'default tab is correct');
+  // assert.equal(
+
+  // )
+});

@@ -5,10 +5,10 @@
     float: right;
     font-size: 16px;
     cursor: pointer;
+  }
 
-    li {
-      display: inline-block;
-    }
+  &__display-option {
+    display: inline-block;
 
     &--active {
       color: $te-link-blue;
