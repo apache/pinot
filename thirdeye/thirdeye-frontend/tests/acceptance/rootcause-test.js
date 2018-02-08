@@ -17,6 +17,10 @@ const ANOMALY_STATUS = '.ember-radio-button.checked';
 const EDIT_BTN = '.glyphicon-pencil';
 const NEW_COMMENT_BTN = '#target-for-tooltip-or-popover-1';
 const SAVE_BTN = '.te-button';
+const DISPLAY_VIEW = '.rootcause-metric__display-view';
+const METRICS_TABLE = '.metrics-table';
+const DISPLAY_OPTION = '.rootcause-metric__display-option';
+const METRIC_CARD = '.rootcause-metric__card';
 
 moduleForAcceptance('Acceptance | rootcause');
 
@@ -121,7 +125,16 @@ test('Metrics tab should have 2 views: table and card', async assert => {
     find(`${TABS} a`).get(0).innerText,
     'Metrics',
     'default tab is correct');
-  // assert.equal(
+  assert.equal(
+    find(DISPLAY_VIEW).get(0).innerText.replace(/ /g,''), // remove white space in text
+    'Table|Card',
+    'metrics viewing options are correct');
+  assert.ok(
+    find(METRICS_TABLE).get(0),
+    'metrics table exist when table view is selected');
 
-  // )
+  await click(find(DISPLAY_OPTION).get(2));
+  assert.ok(
+    find(METRIC_CARD).get(0),
+    'metric card is present when card view is selected');
 });
