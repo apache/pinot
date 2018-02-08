@@ -178,13 +178,14 @@ export function evalObj() {
 
 /**
  * Builds the request parameters for the metric data API call.
+ * TODO: Document this inline for clarity.
  * @method buildMetricDataUrl
  * @param {Object} graphConfig - the metric settings
  * @returns {String} metric data call params/url
  */
 export function buildMetricDataUrl(graphConfig) {
   const { id, maxTime, filters, dimension, granularity } = graphConfig;
-  const selectedDimension = dimension ? dimension : 'All';
+  const selectedDimension = dimension || 'All';
   const startTimeBucket = granularity && granularity.toLowerCase().includes('minute') ? 'week' : 'months';
   const currentEnd = moment(maxTime).isValid() ? moment(maxTime).valueOf() : buildDateEod(1, 'day').valueOf();
   const currentStart = moment(currentEnd).subtract(1, startTimeBucket).valueOf();
@@ -213,27 +214,25 @@ export function getTopDimensions(metricData, dimCount) {
   let colorIndex = 0;
 
   // Build the array of subdimension objects for the selected dimension
-  if (dimensionKeys && dimensionKeys.length) {
-    dimensionKeys.forEach((subDimension) => {
-      let subdObj = dimensionObj[subDimension];
-      let changeArr = subdObj.cumulativePercentageChange.map(item => Math.abs(item));
-      let average = changeArr.reduce((previous, current) => current += previous) / changeArr.length;
-      if (subDimension.toLowerCase() !== 'all') {
-        dimensionList.push({
-          average,
-          name: subDimension,
-          baselineValues: subdObj.baselineValues,
-          currentValues: subdObj.currentValues,
-          isSelected: true
-        });
-      }
-    });
-    processedDimensions = dimensionList.sortBy('average').reverse().slice(0, dimCount);
-    processedDimensions.forEach((dimension) => {
-      dimension.color = colors[colorIndex];
-      colorIndex = colorIndex > 5 ? 0 : colorIndex + 1;
-    });
-  }
+  dimensionKeys.forEach((subDimension) => {
+    let subdObj = dimensionObj[subDimension];
+    let changeArr = subdObj.cumulativePercentageChange.map(item => Math.abs(item));
+    let average = changeArr.reduce((previous, current) => current += previous) / changeArr.length;
+    if (subDimension.toLowerCase() !== 'all') {
+      dimensionList.push({
+        average,
+        name: subDimension,
+        baselineValues: subdObj.baselineValues,
+        currentValues: subdObj.currentValues,
+        isSelected: true
+      });
+    }
+  });
+  processedDimensions = dimensionList.sortBy('average').reverse().slice(0, dimCount);
+  processedDimensions.forEach((dimension) => {
+    dimension.color = colors[colorIndex];
+    colorIndex = colorIndex > 5 ? 0 : colorIndex + 1;
+  });
 
   // Return the top X sorted by level of change contribution
   return processedDimensions;

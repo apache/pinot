@@ -129,7 +129,6 @@ const processRangeParams = (bucketUnit, duration, start, end) => {
  * Setup for query param behavior
  */
 const queryParamsConfig = {
-  //refreshModel: true,
   replace: true
 };
 
@@ -347,6 +346,7 @@ export default Route.extend({
     controller.initialize();
 
     // Fetch all anomalies we have Ids for. Enhance the data and populate power-select filter options.
+    // TODO: look into possibility of bundling calls or using async/await: https://github.com/linkedin/pinot/pull/2468
     if (notCreateError) {
       fetchCombinedAnomalies(anomalyIds)
         .then((rawAnomalyData) => {
