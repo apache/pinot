@@ -30,6 +30,33 @@ import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 /**
  * Generates partition assignment for all tables with
  * streamPartitionAssignmentStrategy as BalancedStreamPartitionAssignment, using AutoRebalanceStrategy
+ *
+ * The partitions are evenly distributed across available instances.
+ * Any other tables in the same tenant which also have BalancedStreamPartitionAssignmentStrategy will also be repartitioned
+ * AutoRebalance Strategy tries to not move partitions unnecessarily
+ *
+ * An example znode for 8 kafka partitions and and 6 realtime servers (Server_s1 to Server_s6)
+ * for a tableConfig with BalancedStreamPartitionAssignmentStrategy in zookeeper.
+ *
+ *
+ * {
+   "id":"KafkaTopicName"
+      ,"simpleFields":{
+   }
+   ,"listFields":{
+      "0":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
+      ,"1":["Server_s2.company.com_8001","Server_s3.company.com_8001","Server_s4.company.com_8001"]
+      ,"2":["Server_s3.company.com_8001","Server_s4.company.com_8001","Server_s5.company.com_8001"]
+      ,"3":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
+      ,"4":["Server_s5.company.com_8001","Server_s6.company.com_8001","Server_s1.company.com_8001"]
+      ,"5":["Server_s6.company.com_8001","Server_s1.company.com_8001","Server_s2.company.com_8001"]
+      ,"6":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
+      ,"7":["Server_s2.company.com_8001","Server_s3.company.com_8001","Server_s4.company.com_8001"]
+   }
+   ,"mapFields":{
+   }
+ }
+ *
  */
 public class BalancedStreamPartitionAssignmentStrategy implements StreamPartitionAssignmentStrategy {
 
@@ -42,6 +69,12 @@ public class BalancedStreamPartitionAssignmentStrategy implements StreamPartitio
   @Override
   public void init(List<TableConfig> allTablesInTenant, List<String> instanceNames,
       Map<String, List<RealtimePartition>> tableNameToPartitionsList) {
+
+    // NOTE: we only consider those tables which have explicitly stated that their streamPartitionAssignmentStrategy
+    // is Balanced. We treat Uniform strategy as our default, which writes only a single table,
+    // until we resolve race conditions in the znodes read/update code.
+    // Therefore, unless explicitly asked for, Balanced strategy will not be applied to the tables
+
     _tablesForPartitionAssignment = new ArrayList<>();
     for (TableConfig tableConfig : allTablesInTenant) {
       StreamConsumptionConfig streamConsumptionConfig = tableConfig.getIndexingConfig().getStreamConsumptionConfig();

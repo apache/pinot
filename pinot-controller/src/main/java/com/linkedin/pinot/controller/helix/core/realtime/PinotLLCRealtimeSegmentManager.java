@@ -21,10 +21,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.MinMaxPriorityQueue;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.ColumnPartitionConfig;
-import com.linkedin.pinot.common.config.RoutingConfig;
+import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.ColumnPartitionMetadata;
@@ -36,7 +35,6 @@ import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.RoutingTableBuilderName;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.StringUtil;
@@ -1240,35 +1238,8 @@ public class PinotLLCRealtimeSegmentManager {
     LOGGER.info("Successfully updated Kafka partition assignment for table {}", realtimeTableName);
   }
 
-  /*
-   * Generates partition assignment.
-   *
-   * In multi tenant cases, this method will fetch all tables located in the same tenant
-   * as the one requesting the partition assignment, and do a partition assignment across all those tables.
-   * For multi tenant cases, AutoRebalanceStrategy is used to do a rebalance across all the partitions.
-   *
-   * If the table has partition aware routing, we do not use AutoRebalanceStrategy.
-   * Instead, a uniform spray is done across all the available instances.
-   * An example znode for 8 kafka partitions and and 6 realtime servers for partition aware table looks as below
-   * in zookeeper.
-   * {
-     "id":"KafkaTopicName"
-     ,"simpleFields":{
-     }
-     ,"listFields":{
-       "0":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
-       ,"1":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
-       ,"2":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
-       ,"3":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
-       ,"4":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
-       ,"5":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
-       ,"6":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
-       ,"7":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
-     }
-     ,"mapFields":{
-     }
-   }
-   *
+  /**
+   * Generates partition assignment for given table, given num partitions over given instances
    */
   protected Map<String, ZNRecord> generatePartitionAssignment(TableConfig tableConfig, int numPartitions,
       List<String> instanceNames) {

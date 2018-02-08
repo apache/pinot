@@ -16,7 +16,6 @@
 package com.linkedin.pinot.controller.helix.core.realtime.partition;
 
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.controller.helix.core.realtime.partition.RealtimePartition;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -33,6 +32,29 @@ import java.util.Random;
  * and only assigns partitions for the one table that is being added/updated
  *
  * NOTE: We do not support/expect partition aware tables with multi tenant setup, hence this strategy should suffice
+ *
+ * An example znode for 8 kafka partitions and and 6 realtime servers (Server_s1 to Server_s6)
+ * for a table config with UniformStreamPartitionAssignmentStrategy looks as below in zookeeper.
+ * This example assumes that the random point picked was at the first server i.e. Server_s1.company.com
+ *
+ {
+   "id":"KafkaTopicName"
+   ,"simpleFields":{
+   }
+   ,"listFields":{
+     "0":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
+     ,"1":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
+     ,"2":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
+     ,"3":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
+     ,"4":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
+     ,"5":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
+     ,"6":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
+     ,"7":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
+   }
+   ,"mapFields":{
+   }
+ }
+ *
  */
 public class UniformStreamPartitionAssignmentStrategy implements StreamPartitionAssignmentStrategy {
 
