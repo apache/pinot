@@ -131,6 +131,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       segmentPruneTimer.stopAndRecord();
 
       int numSegmentsMatched = queryableSegmentDataManagerList.size();
+      List<String> selectedSegments = new ArrayList<>();
+      for(int i=0;i<numSegmentsMatched;i++)
+      {
+        selectedSegments.add(queryableSegmentDataManagerList.get(i).getSegmentName());
+      }
+      queryRequest.setSegmentsAfterPruning(selectedSegments);
+
+
       queryRequest.setSegmentCountAfterPruning(numSegmentsMatched);
       LOGGER.debug("Matched {} segments", numSegmentsMatched);
       if (numSegmentsMatched == 0) {

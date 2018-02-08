@@ -28,6 +28,8 @@ import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+
 /**
  * Class to encapsulate the query request and query processing
  * context within the server. Goal is to make most of the information
@@ -47,6 +49,7 @@ public class ServerQueryRequest {
 
   private final ServerMetrics serverMetrics;
   private int segmentCountAfterPruning = -1;
+  private List<String> segmentsAfterPruning;
 
   public ServerQueryRequest(InstanceRequest request, ServerMetrics serverMetrics) {
     this.instanceRequest = request;
@@ -117,11 +120,20 @@ public class ServerQueryRequest {
     return timerContext;
   }
 
+  public void setSegmentsAfterPruning(List<String> segmentsAfterPruning)
+  {
+    this.segmentsAfterPruning = segmentsAfterPruning;
+  }
   public void setSegmentCountAfterPruning(int segmentCountAfterPruning) {
     this.segmentCountAfterPruning = segmentCountAfterPruning;
   }
 
   public int getSegmentCountAfterPruning() {
     return segmentCountAfterPruning;
+  }
+
+  public List<String> getSegmntsAfterPruning()
+  {
+    return segmentsAfterPruning;
   }
 }
