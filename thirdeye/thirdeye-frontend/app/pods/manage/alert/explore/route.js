@@ -7,9 +7,9 @@ import RSVP from "rsvp";
 import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
-import { checkStatus, postProps, parseProps, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
 import { isPresent, isEmpty, isNone, isBlank } from "@ember/utils";
-import { enhanceAnomalies, toIdGroups, setUpTimeRangeOptions, getTopDimensions } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { checkStatus, postProps, parseProps, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
+import { enhanceAnomalies, toIdGroups, setUpTimeRangeOptions, getTopDimensions, buildMetricDataUrl } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 /**
  * Shorthand for setting date defaults
@@ -21,6 +21,7 @@ const dateFormat = 'YYYY-MM-DD';
  */
 const defaultSeverity = 30;
 const paginationDefault = 10;
+const dimensionCount = 7;
 const durationDefault = '1m';
 const metricDataColor = 'blue';
 const durationMap = { m:'month', d:'day', w:'week' };
@@ -125,42 +126,9 @@ const processRangeParams = (bucketUnit, duration, start, end) => {
 };
 
 /**
- * Builds the graph metric URL from config settings
- * TODO: Pull this into utils if used by create-alert
- * @param {Object} cfg - settings for current metric graph
- * @param {String} maxTime - an 'bookend' for this metric's graphable data
- * @return {String} URL for graph metric API
- */
-const buildGraphConfig = (config, maxTime) => {
-  const dimension = config.exploreDimensions ? config.exploreDimensions.split(',')[0] : 'All';
-  const currentEnd = moment(maxTime).isValid()
-    ? moment(maxTime).valueOf()
-    : buildDateEod(1, 'day').valueOf();
-  const formattedFilters = JSON.stringify(parseProps(config.filters));
-  // Load less data if granularity is 'minutes'
-  const isMinutely = config.bucketUnit.toLowerCase().includes('minute');
-  const duration = isMinutely ? { unit: 2, size: 'week' } : { unit: 1, size: 'month' };
-  const currentStart = moment(currentEnd).subtract(duration.unit, duration.size).valueOf();
-  const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
-  const baselineEnd = moment(currentEnd).subtract(1, 'week');
-  // Prepare call for metric graph data
-  const metricDataUrl =  `/timeseries/compare/${config.id}/${currentStart}/${currentEnd}/` +
-    `${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=` +
-    `${config.bucketSize + '_' + config.bucketUnit}&filters=${encodeURIComponent(formattedFilters)}`;
-  // Prepare call for dimension graph data
-  const topDimensionsUrl = `/rootcause/query?framework=relatedDimensions&anomalyStart=${currentStart}` +
-    `&anomalyEnd=${currentEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}` +
-    `&analysisStart=${currentStart}&analysisEnd=${currentEnd}&urns=thirdeye:metric:${config.id}` +
-    `&filters=${encodeURIComponent(formattedFilters)}`;
-
-  return { metricDataUrl, topDimensionsUrl };
-};
-
-/**
  * Setup for query param behavior
  */
 const queryParamsConfig = {
-  refreshModel: true,
   replace: true
 };
 
@@ -172,21 +140,20 @@ export default Route.extend({
   },
 
   beforeModel(transition) {
-    const { duration, startDate, jobId } = transition.queryParams;
+    const { duration, startDate } = transition.queryParams;
 
     // Default to 1 month of anomalies to show if no dates present in query params
     if (!duration || !startDate) {
       this.transitionTo({ queryParams: {
         duration: durationDefault,
         startDate: startDateDefault,
-        endDate: endDateDefault,
-        jobId
+        endDate: endDateDefault
       }});
     }
   },
 
   model(params, transition) {
-    const { id, alertData, jobId, functionName } = this.modelFor('manage.alert');
+    const { id, alertData, jobId } = this.modelFor('manage.alert');
     if (!id) { return; }
 
     const {
@@ -211,7 +178,6 @@ export default Route.extend({
         return {
           id,
           jobId,
-          functionName,
           alertData,
           duration,
           startDate,
@@ -298,8 +264,14 @@ export default Route.extend({
       })
       // Note: In the event of custom date selection, the end date might be less than maxTime
       .then((maxTime) => {
-        const { metricDataUrl, topDimensionsUrl } = buildGraphConfig(config, maxTime);
-        Object.assign(model, { metricDataUrl, topDimensionsUrl });
+        Object.assign(model, { metricDataUrl: buildMetricDataUrl({
+            maxTime,
+            id: config.id,
+            filters: config.filters,
+            granularity: config.bucketUnit,
+            dimension: config.exploreDimensions ? config.exploreDimensions.split(',')[0] : 'All'
+          })
+        });
       })
       // Catch is not mandatory here due to our error action, but left it to add more context
       .catch((err) => {
@@ -313,7 +285,6 @@ export default Route.extend({
     const {
       id,
       jobId,
-      functionName,
       alertData,
       anomalyIds,
       email,
@@ -344,6 +315,7 @@ export default Route.extend({
     const responseOptions = anomalyResponseObj.map(response => response.name);
     const timeRangeOptions = setUpTimeRangeOptions(['1m', '2w', '1w'], duration);
     const alertDimension = exploreDimensions ? exploreDimensions.split(',')[0] : '';
+    const isReplayPending = isPresent(jobId) && jobId !== -1;
     const newWowList = wowOptions.map((item) => {
       return { name: item, isActive: false };
     });
@@ -352,28 +324,29 @@ export default Route.extend({
     controller.setProperties({
       loadError,
       jobId,
-      functionName,
+      alertData,
       alertId: id,
       defaultSeverity,
-      isMetricDataInvalid: false,
+      isReplayPending,
       anomalyDataUrl,
       baselineOptions,
       responseOptions,
       timeRangeOptions,
-      alertData,
       anomalyResponseObj,
-      anomaliesLoaded: false,
       alertEvalMetrics,
+      anomaliesLoaded: false,
+      isMetricDataInvalid: false,
       activeRangeStart: config.startStamp,
       activeRangeEnd: config.endStamp,
       isMetricDataLoading: true,
-      isReplayPending: isPresent(model.jobId) && model.jobId !== -1
+      alertHasDimensions: isPresent(exploreDimensions)
     });
 
     // Kick off controller defaults and replay status check
     controller.initialize();
 
     // Fetch all anomalies we have Ids for. Enhance the data and populate power-select filter options.
+    // TODO: look into possibility of bundling calls or using async/await: https://github.com/linkedin/pinot/pull/2468
     if (notCreateError) {
       fetchCombinedAnomalies(anomalyIds)
         .then((rawAnomalyData) => {
@@ -390,18 +363,6 @@ export default Route.extend({
             resolutionOptions,
             dimensionOptions
           });
-          return fetch(metricDataUrl).then(checkStatus);
-        })
-        // Fetch and load graph metric data
-        .then((metricData) => {
-          subD = metricData.subDimensionContributionMap;
-          Object.assign(metricData, { color: metricDataColor });
-          controller.setProperties({
-            alertDimension,
-            topDimensions: [],
-            metricData,
-            isMetricDataLoading: exploreDimensions ? true : false
-          });
           return this.fetchCombinedAnomalyChangeData(anomalyData);
         })
         // Load and display rest of options once data is loaded ('2week', 'Last Week')
@@ -413,15 +374,20 @@ export default Route.extend({
             anomalyData,
             baselineOptions: [baselineOptions[0], ...newWowList]
           });
-          // If alert has dimensions set, load them into graph
-          if (exploreDimensions) {
-            return fetch(topDimensionsUrl).then(checkStatus).then((allDimensions) => {
-              const newtopDimensions = getTopDimensions(subD, allDimensions, alertDimension);
-              controller.setProperties({
-                topDimensions: newtopDimensions,
-                isMetricDataLoading: false
-              });
-            });
+          return fetch(metricDataUrl).then(checkStatus);
+        })
+        // Fetch and load graph metric data. Stop spinner/loader
+        .then((metricData) => {
+          Object.assign(metricData, { color: metricDataColor });
+          controller.setProperties({
+            metricData,
+            alertDimension,
+            topDimensions: [],
+            isMetricDataLoading: false
+          });
+          // If alert has dimensions set, load them into graph once replay is done.
+          if (exploreDimensions && !isReplayPending) {
+            controller.set('topDimensions', getTopDimensions(metricData, dimensionCount));
           }
         })
         .catch((errors) => {

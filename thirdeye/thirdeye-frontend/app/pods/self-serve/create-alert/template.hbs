@@ -84,9 +84,9 @@
       <div class="te-graph-alert {{if (not isMetricSelected) 'te-graph-alert--pending'}}">
         {{#if (or isFetchingDimensions isDimensionFetchDone)}}
           {{#if isDimensionError}}
-            <div class="te-form__super-label">... error loading subDimensions for <strong>{{selectedDimension}}</strong></div>
+            <div class="te-form__super-label">... error loading subDimensions for <span class="stronger">{{selectedDimension}}</span></div>
           {{else}}
-            <div class="te-form__super-label">...{{if isDimensionFetchDone 'Displaying' 'Loading'}} top 5 contributing subDimensions for <strong>{{selectedDimension}}</strong></div>
+            <div class="te-form__super-label">...{{if isDimensionFetchDone 'Displaying' 'Loading'}} top {{availableDimensions}} contributing subDimensions for <span class="stronger">{{selectedDimension}}</span></div>
           {{/if}}
         {{/if}}
         {{#if isMetricDataLoading}}

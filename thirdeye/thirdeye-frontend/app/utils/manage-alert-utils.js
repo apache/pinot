@@ -1,6 +1,7 @@
 import Ember from 'ember';
 import _ from 'lodash';
 import moment from 'moment';
+import { buildDateEod } from 'thirdeye-frontend/utils/utils';
 
 /**
  * Handles types and defaults returned from eval/projected endpoints
@@ -176,45 +177,65 @@ export function evalObj() {
 }
 
 /**
- * If a dimension has been selected, the metric data object will contain subdimensions.
- * This method calls for dimension ranking by metric, filters for the selected dimension,
- * and returns a sorted list of graph-ready dimension objects.
- * @method getTopDimensions
- * @param {Object} dimensionObj - the object containing available subdimension for current metric
- * @param {Array} scoredDimensions - array of dimensions scored by relevance
- * @param {String} selectedDimension - the user-selected dimension to graph
- * @return {RSVP Promise}
+ * Builds the request parameters for the metric data API call.
+ * TODO: Document this inline for clarity.
+ * @method buildMetricDataUrl
+ * @param {Object} graphConfig - the metric settings
+ * @returns {String} metric data call params/url
  */
-export function getTopDimensions(dimensionObj = {}, scoredDimensions, selectedDimension) {
-  const maxSize = 5;
+export function buildMetricDataUrl(graphConfig) {
+  const { id, maxTime, filters, dimension, granularity } = graphConfig;
+  const selectedDimension = dimension || 'All';
+  const startTimeBucket = granularity && granularity.toLowerCase().includes('minute') ? 'week' : 'months';
+  const currentEnd = moment(maxTime).isValid() ? moment(maxTime).valueOf() : buildDateEod(1, 'day').valueOf();
+  const currentStart = moment(currentEnd).subtract(1, startTimeBucket).valueOf();
+  const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
+  const baselineEnd = moment(currentEnd).subtract(1, 'week');
+
+  return `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=` +
+         `${selectedDimension}&granularity=${granularity}&filters=${encodeURIComponent(filters)}`;
+}
+
+/**
+ * If a dimension has been selected, the metric data object will contain subdimensions.
+ * This method averages each subdimension's total change rate and returns a sorted list
+ * of the top X graph-ready dimension objects
+ * @method getTopDimensions
+ * @param {Object} metricData - the graphable metric data returned from fetchAnomalyGraphData()
+ * @param {Number} dimCount - number of dimensions to allow in response
+ * @return {undefined}
+ */
+export function getTopDimensions(metricData, dimCount) {
   const colors = ['orange', 'teal', 'purple', 'red', 'green', 'pink'];
+  const dimensionObj = metricData.subDimensionContributionMap || {};
+  const dimensionKeys = Object.keys(dimensionObj);
+  let processedDimensions = [];
   let dimensionList = [];
   let colorIndex = 0;
 
-  if (selectedDimension) {
-    const filteredDimensions =  _.filter(scoredDimensions, (dimension) => {
-      return dimension.label.split('=')[0] === selectedDimension;
-    });
-    const topDimensions = filteredDimensions.sortBy('score').reverse().slice(0, maxSize);
-    const topDimensionLabels = [...new Set(topDimensions.map(key => key.label.split('=')[1]))];
+  // Build the array of subdimension objects for the selected dimension
+  dimensionKeys.forEach((subDimension) => {
+    let subdObj = dimensionObj[subDimension];
+    let changeArr = subdObj.cumulativePercentageChange.map(item => Math.abs(item));
+    let average = changeArr.reduce((previous, current) => current += previous) / changeArr.length;
+    if (subDimension.toLowerCase() !== 'all') {
+      dimensionList.push({
+        average,
+        name: subDimension,
+        baselineValues: subdObj.baselineValues,
+        currentValues: subdObj.currentValues,
+        isSelected: true
+      });
+    }
+  });
+  processedDimensions = dimensionList.sortBy('average').reverse().slice(0, dimCount);
+  processedDimensions.forEach((dimension) => {
+    dimension.color = colors[colorIndex];
+    colorIndex = colorIndex > 5 ? 0 : colorIndex + 1;
+  });
 
-    // Build the array of subdimension objects for the selected dimension
-    topDimensionLabels.forEach((subDimension) => {
-      if (dimensionObj[subDimension] && subDimension !== '') {
-        dimensionList.push({
-          name: subDimension,
-          metricName: subDimension,
-          color: colors[colorIndex],
-          baselineValues: dimensionObj[subDimension].baselineValues,
-          currentValues: dimensionObj[subDimension].currentValues
-        });
-        colorIndex++;
-      }
-    });
-  }
-
-  // Return sorted list of dimension objects
-  return dimensionList;
+  // Return the top X sorted by level of change contribution
+  return processedDimensions;
 }
 
 /**
@@ -303,5 +324,6 @@ export default {
   getTopDimensions,
   setUpTimeRangeOptions,
   buildAnomalyStats,
+  buildMetricDataUrl,
   evalObj
 };

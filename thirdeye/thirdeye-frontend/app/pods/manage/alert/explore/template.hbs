@@ -66,21 +66,23 @@
       {{#if filteredAnomalies}}
         <div class="te-pill-selectors">
           {{!-- Dimension selector --}}
-          <div class="te-form__select te-form__select--wider col-md-3">
-            {{#power-select
-              triggerId="select-dimension"
-              triggerClass="te-form__select"
-              options=dimensionOptions
-              searchEnabled=false
-              matchTriggerWidth=true
-              matchContentWidth=true
-              selected=selectedDimension
-              onchange=(action "onSelectDimension")
-              as |dimension|
-            }}
-              {{dimension}}
-            {{/power-select}}
-          </div>
+          {{#if alertHasDimensions}}
+            <div class="te-form__select te-form__select--wider col-md-3">
+              {{#power-select
+                triggerId="select-dimension"
+                triggerClass="te-form__select"
+                options=dimensionOptions
+                searchEnabled=false
+                matchTriggerWidth=true
+                matchContentWidth=true
+                selected=selectedDimension
+                onchange=(action "onSelectDimension")
+                as |dimension|
+              }}
+                {{dimension}}
+              {{/power-select}}
+            </div>
+          {{/if}}
           {{!-- Resolution selector --}}
           <div class="te-pill-selectors__range-picker col-md-3">
             {{#power-select
@@ -167,7 +169,9 @@
                   <i class="te-anomaly-table__icon glyphicon {{if sortColumnStartUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
                 </a>
                </th>
-               <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--fixed">Dimensions</th>
+               {{#if alertHasDimensions}}
+                  <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--fixed">Dimensions</th>
+               {{/if}}
                <th class="te-anomaly-table__cell-head">
                 <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "score"}}>
                   Severity Score
@@ -202,17 +206,19 @@
                   <li class="te-anomaly-table__list--lighter">{{anomaly.durationStr}}</li>
                 </ul>
                </td>
-               <td class="te-anomaly-table__cell">
-                <ul class="te-anomaly-table__list">
-                 {{#each anomaly.dimensionList as |dimension|}}
-                    <li class="te-anomaly-table__list--smaller">
-                      {{dimension.dimensionKey}}: <span class="stronger">{{dimension.dimensionVal}}</span>
-                    </li>
-                 {{else}}
-                    -
-                 {{/each}}
-                </ul>
-               </td>
+               {{#if alertHasDimensions}}
+                 <td class="te-anomaly-table__cell">
+                  <ul class="te-anomaly-table__list">
+                   {{#each anomaly.dimensionList as |dimension|}}
+                      <li class="te-anomaly-table__list--smaller">
+                        {{dimension.dimensionKey}}: <span class="stronger">{{dimension.dimensionVal}}</span>
+                      </li>
+                   {{else}}
+                      -
+                   {{/each}}
+                  </ul>
+                 </td>
+               {{/if}}
                <td class="te-anomaly-table__cell">{{anomaly.severityScore}}</td>
                <td class="te-anomaly-table__cell">
                 <ul class="te-anomaly-table__list">

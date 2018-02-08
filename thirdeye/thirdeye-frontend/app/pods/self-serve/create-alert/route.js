@@ -63,30 +63,23 @@ export default Route.extend({
    * @param {String} functionName - user-provided new function name (used to validate creation)
    * @return {undefined}
    */
-  checkJobCreateStatus: task(function * (jobId, functionName) {
+  checkJobCreateStatus: task(function * (jobId, functionName, functionId) {
     yield timeout(2000);
     const checkStatusUrl = `/detection-onboard/get-status?jobId=${jobId}`;
-    const alertByNameUrl = `/data/autocomplete/functionByName?name=${functionName}`;
 
     // In replay status check, continue to display "pending" banner unless we have success or create job takes more than 10 seconds.
     return fetch(checkStatusUrl).then(checkStatus)
       .then((jobStatus) => {
         const createStatusObj = _.has(jobStatus, 'taskStatuses') ? jobStatus.taskStatuses.find(status => status.taskName === 'FunctionAlertCreation') : null;
         const isCreateComplete = createStatusObj ? createStatusObj.taskStatus.toLowerCase() === 'completed' : false;
-        let continuePolling = Number(moment.duration(moment().diff(onboardStartTime)).asSeconds().toFixed(0)) > 20;
-
+        const secondsSinceOnboardStart = Number(moment.duration(moment().diff(onboardStartTime)).asSeconds().toFixed(0));
         if (isCreateComplete) {
           // alert function is created. Redirect to alert page.
-          fetch(alertByNameUrl).then(checkStatus)
-            .then((newAlert) => {
-              const isPresent = isArray(newAlert) && newAlert.length === 1;
-              const alertId = isPresent ? newAlert[0].id : -1;
-              this.controller.set('isProcessingForm', false);
-              this.jumpToAlertPage(alertId, jobId, functionName);
-            });
-        } else if (continuePolling) {
+          this.controller.set('isProcessingForm', false);
+          this.jumpToAlertPage(functionId, jobId, null);
+        } else if (secondsSinceOnboardStart < 20) {
           // alert creation is still pending. check again.
-          this.get('checkJobCreateStatus').perform(jobId, functionName);
+          this.get('checkJobCreateStatus').perform(jobId, functionName, functionId);
         } else {
           // too much time has passed. Show create failure.
           this.controller.set('isProcessingForm', false);
@@ -119,13 +112,15 @@ export default Route.extend({
       const createAlertUrl = `/function-onboard/create-function?name=${newName}`;
       const updateAlertUrl = `/detection-onboard/create-job?jobName=${data.jobName}&payload=${encodeURIComponent(data.payload)}`;
       let onboardStartTime = moment();
+      let newFunctionId = '';
 
       fetch(createAlertUrl, postProps('')).then(checkStatus)
         .then((result) => {
+          newFunctionId = result.id;
           return fetch(updateAlertUrl, postProps('')).then(checkStatus);
         })
         .then((result) => {
-          this.get('checkJobCreateStatus').perform(result.jobId, newName);
+          this.get('checkJobCreateStatus').perform(result.jobId, newName, newFunctionId);
         })
         .catch((err) => {
           // Error state will be handled on alert page

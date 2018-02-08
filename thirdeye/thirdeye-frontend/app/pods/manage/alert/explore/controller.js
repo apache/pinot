@@ -6,11 +6,11 @@
 import _ from 'lodash';
 import fetch from 'fetch';
 import moment from 'moment';
-import { set } from "@ember/object";
 import { later } from "@ember/runloop";
 import Controller from '@ember/controller';
-import { computed } from '@ember/object';
+import { computed, set } from '@ember/object';
 import { isPresent } from "@ember/utils";
+import { task, timeout } from 'ember-concurrency';
 import { checkStatus, postProps, buildDateEod } from 'thirdeye-frontend/utils/utils';
 import { buildAnomalyStats } from 'thirdeye-frontend/utils/manage-alert-utils';
 
@@ -62,7 +62,6 @@ export default Controller.extend({
       isReportFailure: false,
       isPageLoadFailure: false,
       isAnomalyArrayChanged: false,
-      requestCanContinue: true,
       sortColumnStartUp: false,
       sortColumnScoreUp: false,
       sortColumnChangeUp: false,
@@ -78,7 +77,7 @@ export default Controller.extend({
     // Start checking for replay to end if a jobId is present
     if (this.get('isReplayPending')) {
       this.set('replayStartTime', moment());
-      this.checkReplayStatus(this.get('jobId'));
+      this.get('checkReplayStatus').perform(this.get('jobId'));
     }
   },
 
@@ -309,27 +308,21 @@ export default Controller.extend({
   },
 
   /**
-   * Pings the job-info endpoint to check status of an ongoing replay job.
+   * Concurrenty task to ping the job-info endpoint to check status of an ongoing replay job.
    * If there is no progress after a set time, we display an error message.
-   * TODO: Refactor method to use concurrency task instead of run.later
-   * @method checkReplayStatus
    * @param {Number} jobId - the id for the newly triggered replay job
-   * @return {fetch promise}
+   * @return {undefined}
    */
-  checkReplayStatus(jobId) {
-    const checkStatusUrl = `/detection-onboard/get-status?jobId=${jobId}`;
+  checkReplayStatus: task(function * (jobId) {
+    yield timeout(2000);
+
     const {
       alertId,
-      functionName,
       replayStartTime,
-      requestCanContinue,
       checkReplayInterval
-    } = this.getProperties('alertId', 'functionName', 'replayStartTime', 'requestCanContinue', 'checkReplayInterval');
-    const br = `\r\n`;
+    } = this.getProperties('alertId', 'replayStartTime', 'checkReplayInterval');
     const replayStatusList = ['completed', 'failed', 'timeout'];
-    const subject = 'TE Self-Serve Create Alert Issue';
-    const intro = `TE Team, please look into a replay error for...${br}${br}`;
-    const mailtoString = `mailto:ask_thirdeye@linkedin.com?subject=${encodeURIComponent(subject)}&body=`;
+    const checkStatusUrl = `/detection-onboard/get-status?jobId=${jobId}`;
     let isReplayTimeUp = Number(moment.duration(moment().diff(replayStartTime)).asSeconds().toFixed(0)) > 60;
 
     // In replay status check, continue to display "pending" banner unless we have known success or failure.
@@ -338,22 +331,19 @@ export default Controller.extend({
         const replayStatusObj = _.has(jobStatus, 'taskStatuses')
           ? jobStatus.taskStatuses.find(status => status.taskName === 'FunctionReplay')
           : null;
-        const replayErr = replayStatusObj ? replayStatusObj.message : 'N/A';
         const replayStatus = replayStatusObj ? replayStatusObj.taskStatus.toLowerCase() : '';
-        const bodyString = `${intro}jobId: ${jobId}${br}alertId: ${alertId}${br}functionName: ${functionName}${br}${br}error: ${replayErr}`;
-        const replayErrorMailtoStr = mailtoString + encodeURIComponent(bodyString);
-
+        // When either replay is no longer pending or 60 seconds have passed, transition to full alert page.
         if (replayStatusList.includes(replayStatus) || isReplayTimeUp) {
-          this.set('isReplayPending', false);
-          this.send('refreshModel');
           this.transitionToRoute('manage.alert', alertId, { queryParams: { jobId: null }});
-        } else if (requestCanContinue) {
-          later(() => {
-            this.checkReplayStatus(jobId);
-          }, checkReplayInterval);
+        } else {
+          this.get('checkReplayStatus').perform(jobId);
         }
+      })
+      .catch(() => {
+        // If we have job status failure, go ahead and transition to full alert page.
+        this.transitionToRoute('manage.alert', alertId, { queryParams: { jobId: null }});
       });
-  },
+  }),
 
   /**
    * Update feedback status on any anomaly
@@ -439,10 +429,8 @@ export default Controller.extend({
    * @return {undefined}
    */
   clearAll() {
-    this.setProperties({
-      requestCanContinue: false,
-      alertEvalMetrics: {}
-    });
+    this.set('alertEvalMetrics', {});
+    this.get('checkReplayStatus').cancelAll();
   },
 
   /**
@@ -604,9 +592,9 @@ export default Controller.extend({
           }
 
           // Set displayed value properties. Note: ensure no CP watching these props
-          Ember.set(anomaly, 'shownCurrent', curr);
-          Ember.set(anomaly, 'shownBaseline', base);
-          Ember.set(anomaly, 'shownChangeRate', change);
+          set(anomaly, 'shownCurrent', curr);
+          set(anomaly, 'shownBaseline', base);
+          set(anomaly, 'shownChangeRate', change);
         });
       }
     },
