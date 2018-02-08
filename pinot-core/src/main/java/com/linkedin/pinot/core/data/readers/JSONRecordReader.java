@@ -34,14 +34,22 @@ import org.codehaus.jackson.map.ObjectMapper;
 public class JSONRecordReader implements RecordReader {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+  private final JsonFactory _factory = new JsonFactory();
+  private final File _dataFile;
   private final Schema _schema;
-  private final JsonParser _parser;
 
+  private JsonParser _parser;
   private Iterator<Map> _iterator;
 
   public JSONRecordReader(File dataFile, Schema schema) throws IOException {
+    _dataFile = dataFile;
     _schema = schema;
-    _parser = new JsonFactory().createJsonParser(RecordReaderUtils.getFileReader(dataFile));
+
+    init();
+  }
+
+  private void init() throws IOException {
+    _parser = _factory.createJsonParser(RecordReaderUtils.getFileReader(_dataFile));
     try {
       _iterator = OBJECT_MAPPER.readValues(_parser, Map.class);
     } catch (Exception e) {
@@ -84,7 +92,8 @@ public class JSONRecordReader implements RecordReader {
 
   @Override
   public void rewind() throws IOException {
-    _iterator = OBJECT_MAPPER.readValues(_parser, Map.class);
+    _parser.close();
+    init();
   }
 
   @Override

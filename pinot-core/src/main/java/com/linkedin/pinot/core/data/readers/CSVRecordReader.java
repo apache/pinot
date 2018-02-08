@@ -20,10 +20,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import java.io.File;
 import java.io.IOException;
-import java.io.Reader;
-import java.text.SimpleDateFormat;
 import java.util.Iterator;
-import java.util.Set;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -34,47 +31,28 @@ import org.apache.commons.lang.StringUtils;
  * Record reader for CSV file.
  */
 public class CSVRecordReader implements RecordReader {
+  private final File _dataFile;
   private final Schema _schema;
+  private final CSVFormat _format;
   private final char _multiValueDelimiter;
-  private final SimpleDateFormat _simpleDateFormat;
-  private final Set<String> _dateColumns;
-  private final CSVParser _parser;
 
+  private CSVParser _parser;
   private Iterator<CSVRecord> _iterator;
 
-  public CSVRecordReader(File dataFile, Schema schema, CSVRecordReaderConfig recordReaderConfig) throws IOException {
+  public CSVRecordReader(File dataFile, Schema schema, CSVRecordReaderConfig config) throws IOException {
+    _dataFile = dataFile;
     _schema = schema;
-    if (recordReaderConfig == null) {
-      _multiValueDelimiter = ';';
-      _simpleDateFormat = null;
-      _dateColumns = null;
-    } else {
-      _multiValueDelimiter = recordReaderConfig.getMultiValueDelimiter();
-      if (recordReaderConfig.getDateFormat() == null) {
-        _simpleDateFormat = null;
-        _dateColumns = null;
-      } else {
-        _simpleDateFormat = new SimpleDateFormat(recordReaderConfig.getDateFormat());
-        _dateColumns = recordReaderConfig.getDateColumns();
-      }
-    }
-    _parser = getCSVParser(dataFile, recordReaderConfig);
-    _iterator = _parser.iterator();
-  }
 
-  public static CSVParser getCSVParser(File dataFile, CSVRecordReaderConfig recordReaderConfig) throws IOException {
-    Reader fileReader = RecordReaderUtils.getFileReader(dataFile);
-
-    if (recordReaderConfig == null) {
-      return CSVFormat.DEFAULT.withDelimiter(',').withHeader().parse(fileReader);
+    if (config == null) {
+      _format = CSVFormat.DEFAULT.withDelimiter(CSVRecordReaderConfig.DEFAULT_DELIMITER).withHeader();
+      _multiValueDelimiter = CSVRecordReaderConfig.DEFAULT_MULTI_VALUE_DELIMITER;
     } else {
       CSVFormat format;
-
-      String csvFileFormat = recordReaderConfig.getFileFormat();
-      if (csvFileFormat == null) {
+      String formatString = config.getFileFormat();
+      if (formatString == null) {
         format = CSVFormat.DEFAULT;
       } else {
-        switch (csvFileFormat.toUpperCase()) {
+        switch (formatString.toUpperCase()) {
           case "EXCEL":
             format = CSVFormat.EXCEL;
             break;
@@ -92,17 +70,24 @@ public class CSVRecordReader implements RecordReader {
             break;
         }
       }
-      char delimiter = recordReaderConfig.getDelimiter();
+      char delimiter = config.getDelimiter();
       format = format.withDelimiter(delimiter);
-      String csvHeader = recordReaderConfig.getHeader();
+      String csvHeader = config.getHeader();
       if (csvHeader == null) {
         format = format.withHeader();
       } else {
         format = format.withHeader(StringUtils.split(csvHeader, delimiter));
       }
-
-      return format.parse(fileReader);
+      _format = format;
+      _multiValueDelimiter = config.getMultiValueDelimiter();
     }
+
+    init();
+  }
+
+  private void init() throws IOException {
+    _parser = _format.parse(RecordReaderUtils.getFileReader(_dataFile));
+    _iterator = _parser.iterator();
   }
 
   @Override
@@ -120,45 +105,27 @@ public class CSVRecordReader implements RecordReader {
     CSVRecord record = _iterator.next();
 
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
-      String fieldName = fieldSpec.getName();
-
-      String token;
-      if (!record.isSet(fieldName)) {
-        token = null;
-      } else {
-        token = record.get(fieldName);
-        if (_simpleDateFormat != null && _dateColumns.contains(token)) {
-          try {
-            token = Long.toString(_simpleDateFormat.parse(token).getTime());
-          } catch (Exception e) {
-            throw new RuntimeException(
-                "Caught exception while parsing token: " + token + " from date column: " + fieldName, e);
-          }
-        }
-      }
+      String column = fieldSpec.getName();
+      String token = record.isSet(column) ? record.get(column) : null;
 
       Object value;
       if (fieldSpec.isSingleValueField()) {
         value = RecordReaderUtils.convertToDataType(token, fieldSpec);
       } else {
-        String[] tokens;
-        if (token != null) {
-          tokens = StringUtils.split(token, _multiValueDelimiter);
-        } else {
-          tokens = null;
-        }
+        String[] tokens = token != null ? StringUtils.split(token, _multiValueDelimiter) : null;
         value = RecordReaderUtils.convertToDataTypeArray(tokens, fieldSpec);
       }
 
-      reuse.putField(fieldName, value);
+      reuse.putField(column, value);
     }
 
     return reuse;
   }
 
   @Override
-  public void rewind() {
-    _iterator = _parser.iterator();
+  public void rewind() throws IOException {
+    _parser.close();
+    init();
   }
 
   @Override
