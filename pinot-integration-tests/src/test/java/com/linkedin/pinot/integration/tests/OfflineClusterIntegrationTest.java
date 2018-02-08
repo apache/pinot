@@ -15,6 +15,12 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.google.common.base.Function;
+import com.google.common.collect.ImmutableList;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.ServiceStatus;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -25,6 +31,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -32,13 +39,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.google.common.base.Function;
-import com.google.common.collect.ImmutableList;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ServiceStatus;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.util.TestUtils;
-import javax.annotation.Nullable;
 
 
 /**
@@ -148,7 +148,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Update table config and trigger reload
     updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1,
         UPDATED_INVERTED_INDEX_COLUMNS, getTaskConfig());
-    sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline");
+    sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
 
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
       @Override
@@ -207,7 +207,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
 
     // Trigger reload
-    sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline");
+    sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
 
     String errorMessage;
     if (withExtraColumns) {
