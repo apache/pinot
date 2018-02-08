@@ -5,7 +5,7 @@ import fetch from 'fetch';
 import _ from 'lodash';
 
 const ROOTCAUSE_ANALYSIS_DURATION_MAX = 1209600000; // 14 days (in millis)
-const ROOTCAUSE_ANOMALY_DURATION_MAX = 86400000; // 1 day (in millis)
+const ROOTCAUSE_ANOMALY_DURATION_MAX = 172800000; // 2 days (in millis)
 
 export default Ember.Service.extend({
   entities: null, // {}
