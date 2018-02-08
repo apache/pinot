@@ -15,8 +15,15 @@ const ANOMALY_TITLE = '.rootcause-anomaly__title';
 const ANOMALY_VALUE = '.rootcause-anomaly__props-value';
 const ANOMALY_STATUS = '.ember-radio-button.checked';
 const EDIT_BTN = '.glyphicon-pencil';
-const NEW_COMMENT_BTN = '#target-for-tooltip-or-popover-1';
 const SAVE_BTN = '.te-button';
+const DISPLAY_VIEW = '.rootcause-metric__display-view';
+const METRICS_TABLE = '.metrics-table';
+const DISPLAY_OPTION = '.rootcause-metric__display-option';
+const METRIC_CARD = '.rootcause-metric__card';
+const HEATMAP_DROPDOWN = '#select-heatmap-mode';
+const SELECTED_HEATMAP_MODE = '.ember-power-select-selected-item';
+const EVENTS_FILTER_BAR = '.filter-bar';
+const EVENTS_TABLE = '.events-table';
 
 moduleForAcceptance('Acceptance | rootcause');
 
@@ -65,7 +72,6 @@ test('visiting rootcause page and making changes to the title and comment should
   await visit('/rootcause');
   await click(EDIT_BTN);
   await fillIn(HEADER, header);
-  await click(NEW_COMMENT_BTN);
   await fillIn(COMMENT_TEXT, comment);
   await click(SAVE_BTN);
 
@@ -112,4 +118,47 @@ test('visiting rootcause page with an anomaly should have correct anomaly inform
     find(ANOMALY_STATUS).get(0).innerText.trim(),
     'No (False Alarm)',
     'anomaly status is correct');
+});
+
+test('Metrics, Dimensions, and Events tabs exist and should have correct information', async assert => {
+  await visit('/rootcause?metricId=1');
+
+  assert.equal(
+    find(`${TABS} a`).get(0).innerText,
+    'Metrics',
+    'default tab is correct');
+  assert.equal(
+    find(DISPLAY_VIEW).get(0).innerText.replace(/ /g,''), // remove white space in text
+    'Table|Card',
+    'metrics viewing options are correct');
+  assert.ok(
+    find(METRICS_TABLE).get(0),
+    'metrics table exist when table view is selected');
+
+  // Click on card view
+  await click(find(DISPLAY_OPTION).get(2));
+
+  assert.ok(
+    find(METRIC_CARD).get(0),
+    'metric card is present when card view is selected');
+
+  // Click on Dimensions tab
+  await click(find(`${TABS} a`).get(1));
+
+  assert.ok(
+    find(HEATMAP_DROPDOWN).get(0),
+    'heatmap dropdown exists');
+  assert.equal(
+    find(SELECTED_HEATMAP_MODE).get(4).innerText,
+    'Change in Contribution',
+    'default heatmap mode is correct');
+
+  // Click on Events tab
+  await click(find(`${TABS} a`).get(2));
+  assert.ok(
+    find(EVENTS_FILTER_BAR).get(0),
+    'filter bar exists in events tab');
+  assert.ok(
+    find(EVENTS_TABLE).get(0),
+    'events table exists in events tab');
 });

@@ -104,4 +104,32 @@ export default function(server) {
     const hardCodedId = 1;
     return hardCodedId;
   });
+
+  /**
+   * TODO: Once API is finalized, have this call return something meaningful
+   */
+  server.get('/timeseries/query', () => {
+    return {};
+  });
+
+  /**
+   * TODO: Once API is finalized, have this call return something meaningful
+   */
+  server.get('/rootcause/query', () => {
+    return {};
+  });
+
+  /**
+   * TODO: Once API is finalized, have this call return something meaningful
+   */
+  server.get('/aggregation/aggregate', () => {
+    return {};
+  });
+
+  /**
+   * TODO: Once API is finalized, have this call return something meaningful
+   */
+  server.get('/session/query', () => {
+    return {};
+  });
 }
