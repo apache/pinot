@@ -1,13 +1,20 @@
 package com.linkedin.thirdeye.datasource.csv;
 
+import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 
 public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
+  Map<String, DataFrame> dataSources;
+
+  public CSVThirdEyeDataSource(Map<String, DataFrame> dataSources) {
+    this.dataSources = dataSources;
+  }
 
   @Override
   public String getName() {
@@ -21,7 +28,7 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
 
   @Override
   public List<String> getDatasets() throws Exception {
-    return null;
+    return new ArrayList<>(dataSources.keySet());
   }
 
   @Override
