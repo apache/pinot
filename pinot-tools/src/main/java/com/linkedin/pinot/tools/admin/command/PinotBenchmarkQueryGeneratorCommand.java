@@ -70,7 +70,6 @@ public class PinotBenchmarkQueryGeneratorCommand extends AbstractBaseAdminComman
             executor.setTestDuration(_testDuration);
             executor.start();
         }
-
         Thread.sleep(_testDuration*1000);
 
         for (QueryExecutor executor : executorList) {
