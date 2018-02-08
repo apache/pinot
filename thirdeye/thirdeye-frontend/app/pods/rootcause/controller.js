@@ -656,7 +656,7 @@ export default Ember.Controller.extend({
         analysisRange[0] = moment(start).startOf('day').valueOf();
       }
       if (analysisRange[1] <= end) {
-        analysisRange[1] = moment(end).startOf('day').add(1, 'day').valueOf();
+        analysisRange[1] = moment(end).startOf('day').add(1, 'days').valueOf();
       }
 
       const newContext = Object.assign({}, context, {
