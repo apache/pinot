@@ -3,8 +3,13 @@ import fetch from 'fetch';
 import Ember from 'ember';
 import moment from 'moment';
 import _ from 'lodash';
+import {
+  COMPARE_MODE_MAPPING,
+  colors,
+  ROOTCAUSE_ANALYSIS_DURATION_MAX,
+  ROOTCAUSE_ANOMALY_DURATION_MAX
+} from './constants';
 
-import { COMPARE_MODE_MAPPING, colors } from './constants';
 /**
  * Define the metric action types
  */
@@ -122,16 +127,24 @@ function fetchRelatedMetricIds() {
 
     let {
       primaryMetricId: metricId,
-      currentStart: analysisStart,
-      currentEnd: analysisEnd,
-      regionStart: anomalyStart,
-      regionEnd: anomalyEnd
+      currentStart: analysisStartRaw,
+      currentEnd: analysisEndRaw,
+      regionStart: anomalyStartRaw,
+      regionEnd: anomalyEndRaw
     } = metrics;
 
     const {
       compareMode,
       filters: filterJson,
     } = primaryMetric;
+
+    const analysisDurationSafe = Math.min(analysisEndRaw - analysisStartRaw, ROOTCAUSE_ANALYSIS_DURATION_MAX);
+    const analysisStart = Math.max(analysisStartRaw, analysisEndRaw - analysisDurationSafe);
+    const analysisEnd = analysisEndRaw;
+
+    const anomalyDurationSafe = Math.min(anomalyEndRaw - anomalyStartRaw, ROOTCAUSE_ANOMALY_DURATION_MAX);
+    const anomalyStart = anomalyStartRaw;
+    const anomalyEnd = anomalyStartRaw + anomalyDurationSafe;
 
     const offset = COMPARE_MODE_MAPPING[compareMode] || 1;
     const baselineStart = moment(anomalyStart).subtract(offset, 'week').valueOf();

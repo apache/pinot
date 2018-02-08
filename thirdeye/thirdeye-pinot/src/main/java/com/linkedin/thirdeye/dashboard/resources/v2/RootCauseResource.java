@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -28,6 +29,10 @@ public class RootCauseResource {
   private static final Logger LOG = LoggerFactory.getLogger(RootCauseResource.class);
 
   private static final int DEFAULT_FORMATTER_DEPTH = 1;
+
+  private static final long ANALYSIS_RANGE_MAX = TimeUnit.DAYS.toMillis(14);
+  private static final long ANOMALY_RANGE_MAX = TimeUnit.DAYS.toMillis(7);
+  private static final long BASELINE_RANGE_MAX = ANOMALY_RANGE_MAX;
 
   private final List<RootCauseEntityFormatter> formatters;
   private final Map<String, RCAFramework> frameworks;
@@ -75,6 +80,15 @@ public class RootCauseResource {
 
     if(formatterDepth == null)
       formatterDepth = DEFAULT_FORMATTER_DEPTH;
+
+    if(anomalyEnd - anomalyStart > ANOMALY_RANGE_MAX)
+      throw new IllegalArgumentException(String.format("Anomaly range cannot be longer than %d", ANOMALY_RANGE_MAX));
+
+    if(baselineEnd - baselineStart > BASELINE_RANGE_MAX)
+      throw new IllegalArgumentException(String.format("Baseline range cannot be longer than %d", BASELINE_RANGE_MAX));
+
+    if(analysisEnd - analysisStart > ANALYSIS_RANGE_MAX)
+      throw new IllegalArgumentException(String.format("Analysis range cannot be longer than %d", ANALYSIS_RANGE_MAX));
 
     urns = parseUrnsParam(urns);
     if(urns.isEmpty())

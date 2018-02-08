@@ -4,6 +4,9 @@ import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
+const ROOTCAUSE_ANALYSIS_DURATION_MAX = 1209600000; // 14 days (in millis)
+const ROOTCAUSE_ANOMALY_DURATION_MAX = 604800000; // 7 days (in millis)
+
 export default Ember.Service.extend({
   entities: null, // {}
 
@@ -104,6 +107,22 @@ export default Ember.Service.extend({
     this.setProperties({ entities: newEntities, pending: newPending });
   },
 
+  _trimRanges(anomalyRange, analysisRange) {
+    // trim anomaly range from start of anomaly range forward
+    const newAnomalyDuration = Math.min(anomalyRange[1] - anomalyRange[0], ROOTCAUSE_ANOMALY_DURATION_MAX);
+    const newAnomalyRange = [anomalyRange[0], anomalyRange[0] + newAnomalyDuration];
+
+    // trim analysis range from end of anomaly range backward
+    const newAnalysisDuration = Math.min(analysisRange[1] - analysisRange[0], ROOTCAUSE_ANALYSIS_DURATION_MAX);
+    const newAnalysisRangeStart = Math.max(analysisRange[0], anomalyRange[1] - newAnalysisDuration);
+    const newAnalysisRange = [newAnalysisRangeStart, anomalyRange[1]];
+
+    return Object.assign({}, {
+      anomalyRange: newAnomalyRange,
+      analysisRange: newAnalysisRange
+    });
+  },
+
   _evictionCandidates(entities, framework) {
     switch (framework) {
       case 'events':
@@ -119,11 +138,13 @@ export default Ember.Service.extend({
 
   _makeUrl(framework, context) {
     const urnString = filterPrefix(context.urns, 'thirdeye:metric:').map(encodeURIComponent).join(',');
-    const baselineRange = toBaselineRange(context.anomalyRange, context.compareMode);
+    const ranges = this._trimRanges(context.anomalyRange, context.analysisRange);
+
+    const baselineRange = toBaselineRange(ranges.anomalyRange, context.compareMode);
     return `/rootcause/query?framework=${framework}` +
-      `&anomalyStart=${context.anomalyRange[0]}&anomalyEnd=${context.anomalyRange[1]}` +
+      `&anomalyStart=${ranges.anomalyRange[0]}&anomalyEnd=${ranges.anomalyRange[1]}` +
       `&baselineStart=${baselineRange[0]}&baselineEnd=${baselineRange[1]}` +
-      `&analysisStart=${context.analysisRange[0]}&analysisEnd=${context.analysisRange[1]}` +
+      `&analysisStart=${ranges.analysisRange[0]}&analysisEnd=${ranges.analysisRange[1]}` +
       `&urns=${urnString}`;
   },
 

@@ -6,7 +6,9 @@ import {
   COMPARE_MODE_MAPPING,
   eventColorMapping,
   baselineEventColorMapping,
-  eventWeightMapping
+  eventWeightMapping,
+  ROOTCAUSE_ANALYSIS_DURATION_MAX,
+  ROOTCAUSE_ANOMALY_DURATION_MAX
 } from './constants';
 
 /**
@@ -248,13 +250,21 @@ function fetchEvents(start, end, mode) {
 
     if (!metricId || events.length) { return; }
 
-    const analysisStart = currentStart;
-    const analysisEnd = currentEnd;
+    const analysisStartRaw = currentStart;
+    const analysisEndRaw = currentEnd;
+
+    const analysisDurationSafe = Math.min(analysisEndRaw - analysisStartRaw, ROOTCAUSE_ANALYSIS_DURATION_MAX);
+    const analysisStart = Math.max(analysisStartRaw, analysisEndRaw - analysisDurationSafe);
+    const analysisEnd = analysisEndRaw;
 
     const diff = Math.floor((currentEnd - currentStart) / 4);
-    const anomalyEnd = end || (+currentEnd - diff);
-    const anomalyStart = start || (+currentStart + diff);
+    const anomalyEndRaw = end || (+currentEnd - diff);
+    const anomalyStartRaw = start || (+currentStart + diff);
     mode = mode || compareMode;
+
+    const anomalyDurationSafe = Math.min(anomalyEndRaw - anomalyStartRaw, ROOTCAUSE_ANOMALY_DURATION_MAX);
+    const anomalyStart = anomalyStartRaw;
+    const anomalyEnd = anomalyStartRaw + anomalyDurationSafe;
 
     const offset = COMPARE_MODE_MAPPING[compareMode] || 1;
     const baselineStart = moment(anomalyStart).clone().subtract(offset, 'week').valueOf();
