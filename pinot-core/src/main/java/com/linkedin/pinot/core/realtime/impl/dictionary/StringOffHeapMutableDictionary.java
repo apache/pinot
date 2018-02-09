@@ -16,7 +16,7 @@
 
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -32,9 +32,9 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   private String _max = null;
 
   public StringOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize,
-      RealtimeIndexOffHeapMemoryManager memoryManager, String columnName, int avgStringLen) {
-    super(estimatedCardinality, maxOverflowHashSize, memoryManager, columnName);
-    _byteStore = new MutableOffHeapByteArrayStore(memoryManager, columnName, estimatedCardinality, avgStringLen);
+      PinotDataBufferMemoryManager memoryManager, String allocationContext, int avgStringLen) {
+    super(estimatedCardinality, maxOverflowHashSize, memoryManager, allocationContext);
+    _byteStore = new MutableOffHeapByteArrayStore(memoryManager, allocationContext, estimatedCardinality, avgStringLen);
   }
 
   @Override
@@ -56,14 +56,14 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   public void index(@Nonnull Object rawValue) {
     if (rawValue instanceof String) {
       // Single value
-      byte[] serializedValue =  ((String)rawValue).getBytes(UTF_8);
+      byte[] serializedValue =  ((String) rawValue).getBytes(UTF_8);
       indexValue(rawValue, serializedValue);
       updateMinMax((String) rawValue);
     } else {
       // Multi value
       Object[] values = (Object[]) rawValue;
       for (Object value : values) {
-        byte[] serializedValue =  ((String)value).getBytes(UTF_8);
+        byte[] serializedValue =  ((String) value).getBytes(UTF_8);
         indexValue(value, serializedValue);
         updateMinMax((String) value);
       }
@@ -159,6 +159,6 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Override
   public int getAvgValueSize() {
-    return (int)_byteStore.getAvgValueSize();
+    return (int) _byteStore.getAvgValueSize();
   }
 }

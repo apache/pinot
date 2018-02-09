@@ -22,7 +22,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.realtime.RealtimeSegment;
@@ -56,7 +56,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private final int _capacity;
   private final SegmentMetadata _segmentMetadata;
   private final boolean _offHeap;
-  private final RealtimeIndexOffHeapMemoryManager _memoryManager;
+  private final PinotDataBufferMemoryManager _memoryManager;
   private final RealtimeSegmentStatsHistory _statsHistory;
   private final SegmentPartitionConfig _segmentPartitionConfig;
 
@@ -121,21 +121,27 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         } else {
           dictionaryColumnSize = dataType.size();
         }
+        String allocationContext = buildAllocationContext(_segmentName, column, V1Constants.Dict.FILE_EXTENSION);
         MutableDictionary dictionary =
             MutableDictionaryFactory.getMutableDictionary(dataType, _offHeap, _memoryManager, dictionaryColumnSize,
-                _statsHistory.getEstimatedCardinality(column), column + V1Constants.Dict.FILE_EXTENSION);
+                _statsHistory.getEstimatedCardinality(column), allocationContext);
         _dictionaryMap.put(column, dictionary);
       }
 
+
       DataFileReader indexReaderWriter;
       if (fieldSpec.isSingleValueField()) {
+        String allocationContext =
+            buildAllocationContext(_segmentName, column, V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
         indexReaderWriter = new FixedByteSingleColumnSingleValueReaderWriter(_capacity, indexColumnSize, _memoryManager,
-            column + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+            allocationContext);
       } else {
         // TODO: Start with a smaller capacity on FixedByteSingleColumnMultiValueReaderWriter and let it expand
+        String allocationContext =
+            buildAllocationContext(_segmentName, column, V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
         indexReaderWriter =
             new FixedByteSingleColumnMultiValueReaderWriter(MAX_MULTI_VALUES_PER_ROW, avgNumMultiValues, _capacity,
-                indexColumnSize, _memoryManager, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
+                indexColumnSize, _memoryManager, allocationContext);
       }
       _indexReaderWriterMap.put(column, indexReaderWriter);
 
@@ -350,7 +356,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     if (_offHeap) {
       if (_numDocsIndexed > 0) {
         int numSeconds = (int) ((System.currentTimeMillis() - _startTimeMillis) / 1000);
-        long totalMemBytes = _memoryManager.getTotalMemBytes();
+        long totalMemBytes = _memoryManager.getTotalAllocatedBytes();
         _logger.info("Segment used {} bytes of memory for {} rows consumed in {} seconds", totalMemBytes,
             _numDocsIndexed, numSeconds);
 
@@ -556,5 +562,17 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         "The number of docs indexed: %s is not equal to the number of sorted documents: %s", _numDocsIndexed, i);
 
     return docIds;
+  }
+
+  /**
+   * Helper method that builds allocation context that includes segment name, column name, and index type.
+   *
+   * @param segmentName Name of segment.
+   * @param columnName Name of column.
+   * @param indexType Index type.
+   * @return Allocation context built from segment name, column name and index type.
+   */
+  private String buildAllocationContext(String segmentName, String columnName, String indexType) {
+    return segmentName + ":" + columnName + indexType;
   }
 }

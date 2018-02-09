@@ -16,7 +16,7 @@
 
 package com.linkedin.pinot.core.operator.docvaliterators;
 
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -40,7 +40,7 @@ public class RealtimeSingleValueIteratorTest {
   FixedByteSingleColumnSingleValueReaderWriter _longReader;
   FixedByteSingleColumnSingleValueReaderWriter _floatReader;
   FixedByteSingleColumnSingleValueReaderWriter _doubleReader;
-  private RealtimeIndexOffHeapMemoryManager _memoryManager;
+  private PinotDataBufferMemoryManager _memoryManager;
 
   @BeforeClass
   public void setUp() {

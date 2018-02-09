@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.realtime.impl;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import java.util.Set;
 
 
@@ -32,14 +32,14 @@ public class RealtimeSegmentConfig {
   private final Set<String> _invertedIndexColumns;
   private final RealtimeSegmentZKMetadata _realtimeSegmentZKMetadata;
   private final boolean _offHeap;
-  private final RealtimeIndexOffHeapMemoryManager _memoryManager;
+  private final PinotDataBufferMemoryManager _memoryManager;
   private final RealtimeSegmentStatsHistory _statsHistory;
   private final SegmentPartitionConfig _segmentPartitionConfig;
 
   private RealtimeSegmentConfig(String segmentName, String streamName, Schema schema, int capacity,
       int avgNumMultiValues, Set<String> noDictionaryColumns, Set<String> invertedIndexColumns,
       RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap,
-      RealtimeIndexOffHeapMemoryManager memoryManager, RealtimeSegmentStatsHistory statsHistory,
+      PinotDataBufferMemoryManager memoryManager, RealtimeSegmentStatsHistory statsHistory,
       SegmentPartitionConfig segmentPartitionConfig) {
     _segmentName = segmentName;
     _streamName = streamName;
@@ -91,7 +91,7 @@ public class RealtimeSegmentConfig {
     return _offHeap;
   }
 
-  public RealtimeIndexOffHeapMemoryManager getMemoryManager() {
+  public PinotDataBufferMemoryManager getMemoryManager() {
     return _memoryManager;
   }
 
@@ -113,7 +113,7 @@ public class RealtimeSegmentConfig {
     private Set<String> _invertedIndexColumns;
     private RealtimeSegmentZKMetadata _realtimeSegmentZKMetadata;
     private boolean _offHeap;
-    private RealtimeIndexOffHeapMemoryManager _memoryManager;
+    private PinotDataBufferMemoryManager _memoryManager;
     private RealtimeSegmentStatsHistory _statsHistory;
     private SegmentPartitionConfig _segmentPartitionConfig;
 
@@ -165,7 +165,7 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    public Builder setMemoryManager(RealtimeIndexOffHeapMemoryManager memoryManager) {
+    public Builder setMemoryManager(PinotDataBufferMemoryManager memoryManager) {
       _memoryManager = memoryManager;
       return this;
     }

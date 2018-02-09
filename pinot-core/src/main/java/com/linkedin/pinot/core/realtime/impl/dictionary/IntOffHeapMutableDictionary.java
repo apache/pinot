@@ -16,7 +16,7 @@
 
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.IOException;
@@ -30,12 +30,12 @@ public class IntOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
 
   private final FixedByteSingleColumnSingleValueReaderWriter _dictIdToValue;
 
-  public IntOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowSize, RealtimeIndexOffHeapMemoryManager memoryManager,
-      String columnName) {
-    super(estimatedCardinality, maxOverflowSize, memoryManager, columnName);
+  public IntOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowSize, PinotDataBufferMemoryManager memoryManager,
+      String allocationContext) {
+    super(estimatedCardinality, maxOverflowSize, memoryManager, allocationContext);
     final int initialEntryCount = nearestPowerOf2(estimatedCardinality);
     _dictIdToValue = new FixedByteSingleColumnSingleValueReaderWriter(initialEntryCount, V1Constants.Numbers.INTEGER_SIZE,
-        memoryManager, columnName);
+        memoryManager, allocationContext);
   }
 
   public Object get(int dictionaryId) {
@@ -112,6 +112,7 @@ public class IntOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
 
   @Nonnull
   @Override
+  @SuppressWarnings("Duplicates")
   public int[] getSortedValues() {
     int numValues = length();
     int[] sortedValues = new int[numValues];

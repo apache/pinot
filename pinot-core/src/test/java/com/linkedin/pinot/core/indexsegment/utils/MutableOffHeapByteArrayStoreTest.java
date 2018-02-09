@@ -16,11 +16,11 @@
 
 package com.linkedin.pinot.core.indexsegment.utils;
 
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import java.util.Arrays;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
 import junit.framework.Assert;
@@ -28,7 +28,7 @@ import junit.framework.Assert;
 
 public class MutableOffHeapByteArrayStoreTest {
 
-  private RealtimeIndexOffHeapMemoryManager _memoryManager;
+  private PinotDataBufferMemoryManager _memoryManager;
 
   @BeforeClass
   public void setUp() {

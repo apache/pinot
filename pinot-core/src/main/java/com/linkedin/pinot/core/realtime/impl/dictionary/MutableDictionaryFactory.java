@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 
 
 public class MutableDictionaryFactory {
@@ -24,21 +24,21 @@ public class MutableDictionaryFactory {
   }
 
   public static MutableDictionary getMutableDictionary(FieldSpec.DataType dataType, boolean isOffHeapAllocation,
-      RealtimeIndexOffHeapMemoryManager memoryManager, int avgStringLen, int cardinality, String columnName) {
+      PinotDataBufferMemoryManager memoryManager, int avgStringLen, int cardinality, String allocationContext) {
     if (isOffHeapAllocation) {
       // OnHeap allocation
-      int maxOverflowSize = cardinality/10;
+      int maxOverflowSize = cardinality / 10;
       switch (dataType) {
         case INT:
-          return new IntOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, columnName);
+          return new IntOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext);
         case LONG:
-          return new LongOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, columnName);
+          return new LongOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext);
         case FLOAT:
-          return new FloatOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, columnName);
+          return new FloatOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext);
         case DOUBLE:
-          return new DoubleOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, columnName);
+          return new DoubleOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext);
         case STRING:
-          return new StringOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, columnName,
+          return new StringOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext,
               avgStringLen);
         default:
           throw new UnsupportedOperationException();

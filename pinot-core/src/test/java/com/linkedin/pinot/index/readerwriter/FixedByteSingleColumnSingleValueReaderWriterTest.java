@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.index.readerwriter;
 
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import java.io.IOException;
@@ -28,7 +28,7 @@ import org.testng.annotations.Test;
 
 
 public class FixedByteSingleColumnSingleValueReaderWriterTest {
-  private RealtimeIndexOffHeapMemoryManager _memoryManager;
+  private PinotDataBufferMemoryManager _memoryManager;
 
   @BeforeClass
   public void setUp() {

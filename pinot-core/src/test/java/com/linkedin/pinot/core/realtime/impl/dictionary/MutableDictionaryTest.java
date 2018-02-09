@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import java.util.HashMap;
 import java.util.Map;
@@ -45,7 +45,7 @@ public class MutableDictionaryTest {
   private static final Random RANDOM = new Random(RANDOM_SEED);
 
   private final ExecutorService _executorService = Executors.newFixedThreadPool(NUM_READERS + 1);
-  private final RealtimeIndexOffHeapMemoryManager _memoryManager =
+  private final PinotDataBufferMemoryManager _memoryManager =
       new DirectMemoryManager(MutableDictionaryTest.class.getName());
 
   @Test

@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.io.readerwriter.impl;
 
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnSingleValueReaderWriter;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
@@ -49,23 +49,23 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   private final int _numRowsPerChunk;
   private final int _columnSizesInBytes;
 
-  private final RealtimeIndexOffHeapMemoryManager _memoryManager;
-  private final String _columnName;
+  private final PinotDataBufferMemoryManager _memoryManager;
+  private final String _allocationContext;
   private int _capacityInRows = 0;
 
   /**
    * @param numRowsPerChunk Number of rows to pack in one chunk before a new chunk is created.
    * @param columnSizesInBytes Size of column value in bytes.
    * @param memoryManager Memory manager to be used for allocating memory.
-   * @param columnName Name of the column.
+   * @param allocationContext Allocation allocationContext.
    */
   public FixedByteSingleColumnSingleValueReaderWriter(int numRowsPerChunk, int columnSizesInBytes,
-      RealtimeIndexOffHeapMemoryManager memoryManager, String columnName) {
+      PinotDataBufferMemoryManager memoryManager, String allocationContext) {
     _chunkSizeInBytes = numRowsPerChunk * columnSizesInBytes;
     _numRowsPerChunk = numRowsPerChunk;
     _columnSizesInBytes = columnSizesInBytes;
     _memoryManager = memoryManager;
-    _columnName = columnName;
+    _allocationContext = allocationContext;
     addBuffer();
   }
 
@@ -163,9 +163,8 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   }
 
   private void addBuffer() {
-    LOGGER.info("Allocating {} bytes for column {} for segment {}", _chunkSizeInBytes, _columnName,
-        _memoryManager.getSegmentName());
-    PinotDataBuffer buffer = _memoryManager.allocate(_chunkSizeInBytes, _columnName);
+    LOGGER.info("Allocating {} bytes for: {}", _chunkSizeInBytes, _allocationContext);
+    PinotDataBuffer buffer = _memoryManager.allocate(_chunkSizeInBytes, _allocationContext);
     _capacityInRows += _numRowsPerChunk;
 
     buffer.order(ByteOrder.nativeOrder());

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.index.readerwriter;
 
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
@@ -23,13 +24,12 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 
 
 public class FixedByteSingleColumnMultiValueReaderWriterTest {
-  private RealtimeIndexOffHeapMemoryManager _memoryManager;
+  private PinotDataBufferMemoryManager _memoryManager;
 
   @BeforeClass
   public void setUp() {
@@ -156,11 +156,8 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     final int avgMultiValueCount = r.nextInt(maxNumberOfMultiValuesPerRow) + 1;
     final int rowCountPerChunk = r.nextInt(rows) + 1;
 
-    FixedByteSingleColumnMultiValueReaderWriter readerWriter =
-        new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, avgMultiValueCount,
-            rowCountPerChunk, columnSize, _memoryManager, "ReaderWriter");
-
-    return readerWriter;
+    return new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, avgMultiValueCount,
+        rowCountPerChunk, columnSize, _memoryManager, "ReaderWriter");
   }
 
   private int sizeForType(FieldSpec.DataType type) {
