@@ -132,6 +132,10 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask {
       throw new IllegalStateException("Unable to send out email to recipients");
     }
 
+    // Set the alert to be active after everything is successful
+    alertConfig.setActive(true);
+    DAORegistry.getInstance().getAlertConfigDAO().update(alertConfig);
+
     // Update Notified flag
     for (MergedAnomalyResultDTO notifiedAnomaly : anomalyCandidates) {
       notifiedAnomaly.setNotified(true);
