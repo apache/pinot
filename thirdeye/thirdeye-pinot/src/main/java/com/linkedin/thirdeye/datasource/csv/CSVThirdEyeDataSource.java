@@ -1,15 +1,20 @@
 package com.linkedin.thirdeye.datasource.csv;
 
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.linkedin.thirdeye.dataframe.Series.SeriesType.*;
+
 
 public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
+  public static final String COL_TIMESTAMP = "timestamp";
   Map<String, DataFrame> dataSources;
 
   public CSVThirdEyeDataSource(Map<String, DataFrame> dataSources) {
@@ -43,11 +48,24 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
 
   @Override
   public long getMaxDataTime(String dataset) throws Exception {
-    return 0;
+    if (!dataSources.containsKey(dataset)) {
+      throw new IllegalArgumentException();
+    }
+    return dataSources.get(dataset).getLongs(COL_TIMESTAMP).max().longValue();
   }
 
   @Override
   public Map<String, List<String>> getDimensionFilters(String dataset) throws Exception {
-    return null;
+    if (!dataSources.containsKey(dataset)) {
+      throw new IllegalArgumentException();
+    }
+    Map<String, Series> data = dataSources.get(dataset).getSeries();
+    Map<String, List<String>> output = new HashMap<>();
+    for (Map.Entry<String, Series> entry : data.entrySet()){
+      if(entry.getValue().type() == STRING){
+        output.put(entry.getKey(), entry.getValue().unique().getStrings().toList());
+      }
+    }
+    return output;
   }
 }
