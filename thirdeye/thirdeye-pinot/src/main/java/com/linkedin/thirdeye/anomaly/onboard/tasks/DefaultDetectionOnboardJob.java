@@ -81,7 +81,7 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   protected AlertFilterFactory alertFilterFactory;
 
   public static final String MISSING_PARAMETER_ERROR_MESSAGE_TEMPLATE = "Require parameter field: %s";
-  public static final Boolean DEFAULT_NOTIFY_IF_FAILS = Boolean.FALSE;
+  public static final Boolean DEFAULT_NOTIFY_IF_FAILS = Boolean.TRUE;
 
   public DefaultDetectionOnboardJob(String jobName, Map<String, String> properties) {
     super(jobName, properties);
