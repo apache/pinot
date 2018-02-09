@@ -271,6 +271,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       alertConfig.setApplication(configuration.getString(ALERT_APPLICATION));
       alertConfig.setRecipients(alertRecipients);
       alertConfig.setCronExpression(configuration.getString(ALERT_CRON, DEFAULT_ALERT_CRON));
+      alertConfig.setActive(DEFAULT_IS_ACTIVE);
       alertConfigDAO.save(alertConfig);
     }
     executionContext.setExecutionResult(ALERT_CONFIG, alertConfig);
