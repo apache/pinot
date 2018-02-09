@@ -94,7 +94,7 @@
   <inceptionYear>2014-2016</inceptionYear>
   <properties>
     <build.profile.id>dev</build.profile.id>
-    <jdk.version>1.7</jdk.version>
+    <jdk.version>1.8</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <!-- Only unit tests are run by default. -->
     <skip.integration.tests>true</skip.integration.tests>
@@ -724,8 +724,8 @@
           <artifactId>maven-compiler-plugin</artifactId>
           <version>2.5.1</version>
           <configuration>
-            <source>1.7</source>
-            <target>1.7</target>
+            <source>${jdk.version}</source>
+            <target>${jdk.version}</target>
           </configuration>
         </plugin>
         <plugin>
