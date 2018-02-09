@@ -16,6 +16,10 @@
 
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
@@ -23,10 +27,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -133,27 +133,28 @@ import org.slf4j.LoggerFactory;
  *   threshold. In this case, we could close the realtime segment, and start a new one with bigger buffers.
  */
 public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseOffHeapMutableDictionary.class);
+
   // List of primes from http://compoasso.free.fr/primelistweb/page/prime/liste_online_en.php
-  private static int[] PRIME_NUMBERS = new int[] {
-      13, 127, 547, 1009, 2003, 3001, 4003, 5003, 7001, 9001, 10007, 12007, 14009, 16001, 18013,
-      20011, 40009, 60013, 80021, 100003, 125113, 150011, 175003, 200003,
-      225023, 250007, 275003, 300007,350003, 400009, 450001, 500009, 600011,700001, 800011, 900001, 1000003};
+  private static final int[] PRIME_NUMBERS =
+      new int[]{13, 127, 547, 1009, 2003, 3001, 4003, 5003, 7001, 9001, 10007, 12007, 14009, 16001, 18013, 20011,
+          40009, 60013, 80021, 100003, 125113, 150011, 175003, 200003, 225023, 250007, 275003, 300007, 350003, 400009,
+          450001, 500009, 600011, 700001, 800011, 900001, 1000003};
 
   // expansionMultiple setting as we add new buffers. A setting of 1 sets the new buffer to be
   // the same size as the last one added. Setting of 2 allocates a buffer twice as big as the
   // previous one. It is assumed that these values are powers of 2. It is a good idea to restrict
   // these to 1 or 2, but not higher values. This array can be arbitrarily long. If the number of
   // buffers exceeds the number of elements in the array, we use the last value.
-  private static final int[] EXPANSION_MULTIPLES = new int[] {1, 1, 2, 2, 2};
+  private static final int[] EXPANSION_MULTIPLES = new int[]{1, 1, 2, 2, 2};
 
   // Number of columns in each row of an IntBuffer.
   private static final int NUM_COLUMNS = 3;
 
   // Whether to start with 0 off-heap storage. Items are added to the overflow map first, until it reaches
   // a threshold, and then the off-heap structures are allocated.
-  private static final boolean HEAP_FIRST = true;
-
-  public static Logger LOGGER = LoggerFactory.getLogger(BaseOffHeapMutableDictionary.class);
+  @SuppressWarnings("FieldCanBeLocal")
+  private static boolean _heapFirst = true;
 
   private final int _maxItemsInOverflowHash;
 
@@ -164,8 +165,8 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   // that we can call close() on these.
   private List<PinotDataBuffer> _pinotDataBuffers = new ArrayList<>();
   private final int _initialRowCount;
-  protected final RealtimeIndexOffHeapMemoryManager _memoryManager;
-  protected final String _columnName;
+  protected final PinotDataBufferMemoryManager _memoryManager;
+  protected final String _allocationContext;
 
   /**
    * A class to hold all the objects needed for the reverse mapping.
@@ -184,6 +185,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     private List<IntBuffer> getIBufList() {
       return _iBufList;
     }
+
     private Map<Object, Integer> getOverflowMap() {
       return _overflowMap;
     }
@@ -191,17 +193,16 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
 
   private volatile ValueToDictId _valueToDict;
 
-  protected BaseOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize, RealtimeIndexOffHeapMemoryManager memoryManager,
-      String columnName) {
+  protected BaseOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize,
+      PinotDataBufferMemoryManager memoryManager, String allocationContext) {
     _memoryManager = memoryManager;
-    _columnName = columnName;
+    _allocationContext = allocationContext;
     int initialRowCount = nearestPrime(estimatedCardinality);
     _numEntries = 0;
     _maxItemsInOverflowHash = maxOverflowHashSize;
-    ValueToDictId valueToDictId = new ValueToDictId(new ArrayList<IntBuffer>(0), new ConcurrentHashMap<Object, Integer>(0));
-    _valueToDict = valueToDictId;
+    _valueToDict = new ValueToDictId(new ArrayList<IntBuffer>(0), new ConcurrentHashMap<Object, Integer>(0));
     _initialRowCount = initialRowCount;
-    if (!HEAP_FIRST || (maxOverflowHashSize == 0)) {
+    if (!_heapFirst || (maxOverflowHashSize == 0)) {
       expand(_initialRowCount, 1);
     }
   }
@@ -247,7 +248,8 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     doClose();
 
     ValueToDictId valueToDictId = _valueToDict;
@@ -264,12 +266,12 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   }
 
   private int nearestPrime(int size) {
-    for (int i = 0; i < PRIME_NUMBERS.length; i++) {
-      if (PRIME_NUMBERS[i] >= size) {
-        return PRIME_NUMBERS[i];
+    for (int primeNumber : PRIME_NUMBERS) {
+      if (primeNumber >= size) {
+        return primeNumber;
       }
     }
-    return PRIME_NUMBERS[PRIME_NUMBERS.length-1];
+    return PRIME_NUMBERS[PRIME_NUMBERS.length - 1];
   }
 
   private long computeBBsize(long numRows) {
@@ -278,7 +280,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
 
   // Assume prevNumRows is a valid value, and return it if the new one overflows.
   private int validatedNumRows(int prevNumRows, int multiple) {
-    long newNumRows = (long)prevNumRows * multiple;
+    long newNumRows = (long) prevNumRows * multiple;
 
     if (newNumRows > Integer.MAX_VALUE) {
       return prevNumRows;
@@ -287,12 +289,12 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     if (computeBBsize(newNumRows) > Integer.MAX_VALUE) {
       return prevNumRows;
     }
-    return (int)newNumRows;
+    return (int) newNumRows;
   }
 
   private IntBuffer expand(int prevNumRows, int multiple) {
     final int newNumRows = validatedNumRows(prevNumRows, multiple);
-    final int bbSize = (int)computeBBsize(newNumRows);
+    final int bbSize = (int) computeBBsize(newNumRows);
 
     final ValueToDictId valueToDictId = _valueToDict;
     List<IntBuffer> oldList = valueToDictId.getIBufList();
@@ -300,8 +302,8 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     for (IntBuffer iBuf : oldList) {
       newList.add(iBuf);
     }
-    LOGGER.info("Allocating {} bytes for column {} segment {}", bbSize, _columnName, _memoryManager.getSegmentName());
-    PinotDataBuffer buffer = _memoryManager.allocate(bbSize, _columnName);
+    LOGGER.info("Allocating {} bytes for: {}", bbSize, _allocationContext);
+    PinotDataBuffer buffer = _memoryManager.allocate(bbSize, _allocationContext);
     _pinotDataBuffers.add(buffer);
     buffer.order(ByteOrder.nativeOrder());
     IntBuffer iBuf = buffer.toDirectByteBuffer(0L, bbSize).asIntBuffer();
@@ -328,7 +330,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
         }
       }
     }
-    _valueToDict  = new ValueToDictId(newList, newOverflowMap);
+    _valueToDict = new ValueToDictId(newList, newOverflowMap);
     // We should not clear oldOverflowMap or oldList here, as readers may still be accessing those.
     // We let GC take care of those elements.
     return iBuf;
@@ -341,21 +343,21 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     if (numBuffers == 0) {
       return expand(_initialRowCount, 1);
     }
-    final int lastCapacity = iBufList.get(numBuffers-1).capacity();
-    int expansionMultiple = EXPANSION_MULTIPLES[EXPANSION_MULTIPLES.length-1];
+    final int lastCapacity = iBufList.get(numBuffers - 1).capacity();
+    int expansionMultiple = EXPANSION_MULTIPLES[EXPANSION_MULTIPLES.length - 1];
     if (numBuffers < EXPANSION_MULTIPLES.length) {
       expansionMultiple = EXPANSION_MULTIPLES[numBuffers];
     }
-    int prevNumRows = lastCapacity/NUM_COLUMNS;
+    int prevNumRows = lastCapacity / NUM_COLUMNS;
     return expand(prevNumRows, expansionMultiple);
   }
 
   protected int nearestPowerOf2(int num) {
-    if ((num & (num -1)) == 0) {
+    if ((num & (num - 1)) == 0) {
       return num;
     }
     int power = Integer.SIZE - Integer.numberOfLeadingZeros(num);
-    Preconditions.checkState(power < Integer.SIZE-1);
+    Preconditions.checkState(power < Integer.SIZE - 1);
     return 1 << power;
   }
 
@@ -375,8 +377,8 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     final ValueToDictId valueToDictId = _valueToDict;
     final List<IntBuffer> iBufList = valueToDictId.getIBufList();
     for (IntBuffer iBuf : iBufList) {
-      final int modulo = iBuf.capacity()/NUM_COLUMNS;
-      final int offsetInBuf = (hashVal % modulo)  * NUM_COLUMNS;
+      final int modulo = iBuf.capacity() / NUM_COLUMNS;
+      final int offsetInBuf = (hashVal % modulo) * NUM_COLUMNS;
       for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
         int dictId = iBuf.get(i);
         if (dictId != NULL_VALUE_INDEX) {
@@ -411,7 +413,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     final List<IntBuffer> iBufList = valueToDictId.getIBufList();
 
     for (IntBuffer iBuf : iBufList) {
-      final int modulo = iBuf.capacity()/NUM_COLUMNS;
+      final int modulo = iBuf.capacity() / NUM_COLUMNS;
       final int offsetInBuf = (hashVal % modulo) * NUM_COLUMNS;
       for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
         final int dictId = iBuf.get(i);
@@ -444,7 +446,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     }
     // Need a new buffer
     IntBuffer buf = expand();
-    final int modulo = buf.capacity()/NUM_COLUMNS;
+    final int modulo = buf.capacity() / NUM_COLUMNS;
     final int offsetInBuf = (hashVal % modulo) * NUM_COLUMNS;
     boolean done = false;
     for (int i = offsetInBuf; i < offsetInBuf + NUM_COLUMNS; i++) {
@@ -485,34 +487,12 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     return valueToDictId._overflowMap.size();
   }
 
-  public int[] getRowFillCount() {
-    ValueToDictId valueToDictId = _valueToDict;
-    int rowsWith1Col[] = new int[NUM_COLUMNS];
-
-    for (int i = 0; i < rowsWith1Col.length; i++) {
-      rowsWith1Col[i] = 0;
-    }
-
-    for (IntBuffer iBuf : valueToDictId._iBufList) {
-      final int nRows = iBuf.capacity()/NUM_COLUMNS;
-      for (int row = 0; row < nRows; row++) {
-        for (int col = 0; col < NUM_COLUMNS; col++) {
-          if (iBuf.get(row * NUM_COLUMNS + col) == NULL_VALUE_INDEX) {
-            rowsWith1Col[col]++;
-            break;
-          }
-        }
-      }
-    }
-    return rowsWith1Col;
-  }
-
   protected boolean equalsValueAt(int dictId, Object value, byte[] serializedValue) {
     return value.equals(get(dictId));
   }
 
-  public abstract void doClose() throws IOException;
+  public abstract void doClose()
+      throws IOException;
 
   protected abstract void setRawValueAt(int dictId, Object rawValue, byte[] serializedValue);
-
 }

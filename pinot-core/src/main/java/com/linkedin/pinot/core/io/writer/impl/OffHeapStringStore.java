@@ -16,15 +16,15 @@
 
 package com.linkedin.pinot.core.io.writer.impl;
 
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.LinkedList;
 import java.util.List;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,9 +84,10 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class OffHeapStringStore implements Closeable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OffHeapStringStore.class);
+
   private static final int START_SIZE = 32 * 1024;
   private static final int INT_SIZE = V1Constants.Numbers.INTEGER_SIZE;
-  public static Logger LOGGER = LoggerFactory.getLogger(OffHeapStringStore.class);
 
   public static int getStartSize() {
     return START_SIZE;
@@ -103,7 +104,7 @@ public class OffHeapStringStore implements Closeable {
     private int _numStrings = 0;
     private int _availEndOffset;  // Exclusive
 
-    private Buffer(long size, int startIndex, RealtimeIndexOffHeapMemoryManager memoryManager, String columnName) {
+    private Buffer(long size, int startIndex, PinotDataBufferMemoryManager memoryManager, String columnName) {
       if (size >= Integer.MAX_VALUE) {
         size = Integer.MAX_VALUE - 1;
       }
@@ -130,30 +131,13 @@ public class OffHeapStringStore implements Closeable {
       return _numStrings++;
     }
 
-    private boolean equalsStringAt(String string, int index) {
-      int startOffset = _byteBuffer.getInt(index * INT_SIZE);
-      int endOffset = _byteBuffer.capacity();
-      if (index > 0) {
-        endOffset = _byteBuffer.getInt((index - 1) * INT_SIZE);
-      }
-      if ((endOffset - startOffset)/CHAR_SIZE != string.length()) {
-        return false;
-      }
-      for (int i = 0, j = startOffset; i < string.length(); i++, j = j + CHAR_SIZE) {
-        if (string.charAt(i) != _byteBuffer.getChar(j)) {
-          return false;
-        }
-      }
-      return true;
-    }
-
     private String get(final int index) {
       int startOffset = _byteBuffer.getInt(index * INT_SIZE);
       int endOffset = _byteBuffer.capacity();
       if (index > 0) {
         endOffset = _byteBuffer.getInt((index - 1) * INT_SIZE);
       }
-      char[] chars = new char[(endOffset - startOffset)/CHAR_SIZE];
+      char[] chars = new char[(endOffset - startOffset) / CHAR_SIZE];
       for (int i = 0, j = startOffset; i < chars.length; i++, j = j + CHAR_SIZE) {
         chars[i] = _byteBuffer.getChar(j);
       }
@@ -178,18 +162,19 @@ public class OffHeapStringStore implements Closeable {
   private volatile List<Buffer> _buffers = new LinkedList<>();
   private int _numElements = 0;
   private volatile Buffer _currentBuffer;
-  private final RealtimeIndexOffHeapMemoryManager _memoryManager;
-  private final String _columnName;
+  private final PinotDataBufferMemoryManager _memoryManager;
+  private final String _allocationContext;
 
-  public OffHeapStringStore(RealtimeIndexOffHeapMemoryManager memoryManager, String columnName) {
+  public OffHeapStringStore(PinotDataBufferMemoryManager memoryManager, String allocationContext) {
     _memoryManager = memoryManager;
-    _columnName = columnName;
+    this._allocationContext = allocationContext;
     expand(START_SIZE, 0L);
   }
 
   // Expand the buffer size, allocating a min of 32k for strings.
+  @SuppressWarnings("Duplicates")
   private Buffer expand(long suggestedSize, long minSize) {
-    Buffer buffer = new Buffer(Math.max(suggestedSize, minSize), _numElements, _memoryManager, _columnName);
+    Buffer buffer = new Buffer(Math.max(suggestedSize, minSize), _numElements, _memoryManager, _allocationContext);
     List<Buffer> newList = new LinkedList<>();
     for (Buffer b : _buffers) {
       newList.add(b);
@@ -201,14 +186,13 @@ public class OffHeapStringStore implements Closeable {
   }
 
   private Buffer expand(long sizeOfNewValue) {
-    Buffer newBuffer = expand(_currentBuffer.getSize() * 2, sizeOfNewValue + INT_SIZE);
-    return newBuffer;
+    return expand(_currentBuffer.getSize() * 2, sizeOfNewValue + INT_SIZE);
   }
 
   // Returns a string, given an index
   public String get(int index) {
     List<Buffer> bufList = _buffers;
-    for (int x = bufList.size()-1; x >= 0; x--) {
+    for (int x = bufList.size() - 1; x >= 0; x--) {
       Buffer buffer = bufList.get(x);
       if (index >= buffer.getStartIndex()) {
         return buffer.get(index - buffer.getStartIndex());
@@ -228,17 +212,6 @@ public class OffHeapStringStore implements Closeable {
     }
     _numElements++;
     return index + buffer.getStartIndex();
-  }
-
-  public boolean equalsStringAt(String string, int index) {
-    List<Buffer> bufList = _buffers;
-    for (int x = bufList.size()-1; x >= 0; x--) {
-      Buffer buffer = bufList.get(x);
-      if (index >= buffer.getStartIndex()) {
-        return buffer.equalsStringAt(string, index- buffer.getStartIndex());
-      }
-    }
-    throw new RuntimeException("dictionary ID '" + index + "' too low");
   }
 
   @Override

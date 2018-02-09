@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.perf;
 
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -29,7 +30,6 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.TimeValue;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.realtime.impl.dictionary.LongOffHeapMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.LongOnHeapMutableDictionary;
@@ -37,23 +37,23 @@ import com.linkedin.pinot.core.realtime.impl.dictionary.LongOnHeapMutableDiction
 
 @State(Scope.Benchmark)
 public class BenchmarkDictionary {
-  private Long[] colValues;
-  private final int ROW_COUNT = 2_500_000;
-  private long[] uniqueColValues;
-  private final int CARDINALITY = 1_000_000;
-  private RealtimeIndexOffHeapMemoryManager _memoryManager;
+  private static final int ROW_COUNT = 2_500_000;
+  private static final int CARDINALITY = 1_000_000;
+
+  private Long[] _colValues;
+  private PinotDataBufferMemoryManager _memoryManager;
 
   @Setup
   public void setUp() {
     _memoryManager = new DirectMemoryManager(BenchmarkDictionary.class.getName());
     // Create a list of values to insert into the hash map
-    uniqueColValues = new long[CARDINALITY];
+    long[] uniqueColValues = new long[CARDINALITY];
     for (int i = 0; i < uniqueColValues.length; i++) {
-      uniqueColValues[i] = (long)(Math.random() * Long.MAX_VALUE);
+      uniqueColValues[i] = (long) (Math.random() * Long.MAX_VALUE);
     }
-    colValues = new Long[ROW_COUNT];
-    for (int i = 0; i < colValues.length; i++) {
-      colValues[i] = uniqueColValues[(int)(Math.random() * CARDINALITY)];
+    _colValues = new Long[ROW_COUNT];
+    for (int i = 0; i < _colValues.length; i++) {
+      _colValues[i] = uniqueColValues[(int) (Math.random() * CARDINALITY)];
     }
   }
 
@@ -68,8 +68,8 @@ public class BenchmarkDictionary {
   public LongOnHeapMutableDictionary benchmarkOnHeap0ToN() {
     LongOnHeapMutableDictionary dictionary = new LongOnHeapMutableDictionary();
 
-    for (int i = 0; i < colValues.length; i++) {
-      dictionary.index(colValues[i]);
+    for (Long colValue : _colValues) {
+      dictionary.index(colValue);
     }
 
     return dictionary;
@@ -80,11 +80,11 @@ public class BenchmarkDictionary {
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public LongOffHeapMutableDictionary benchmarkOffHeapMidSizeWithOverflow() {
-    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY/3, 1000,
+    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY / 3, 1000,
         _memoryManager, "longColumn");
 
-    for (int i = 0; i < colValues.length; i++) {
-      dictionary.index(colValues[i]);
+    for (Long colValue : _colValues) {
+      dictionary.index(colValue);
     }
 
     return dictionary;
@@ -95,11 +95,11 @@ public class BenchmarkDictionary {
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public LongOffHeapMutableDictionary benchmarkOffHeapMidSizeWithoutOverflow() {
-    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY/3, 0,
+    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY / 3, 0,
         _memoryManager, "longColumn");
 
-    for (int i = 0; i < colValues.length; i++) {
-      dictionary.index(colValues[i]);
+    for (Long colValue : _colValues) {
+      dictionary.index(colValue);
     }
 
     return dictionary;
@@ -114,8 +114,8 @@ public class BenchmarkDictionary {
     LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY, 1000,
         _memoryManager, "longColumn");
 
-    for (int i = 0; i < colValues.length; i++) {
-      dictionary.index(colValues[i]);
+    for (Long colValue : _colValues) {
+      dictionary.index(colValue);
     }
 
     return dictionary;
@@ -129,8 +129,8 @@ public class BenchmarkDictionary {
     LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY, 0,
         _memoryManager, "longColumn");
 
-    for (int i = 0; i < colValues.length; i++) {
-      dictionary.index(colValues[i]);
+    for (Long colValue : _colValues) {
+      dictionary.index(colValue);
     }
 
     return dictionary;
@@ -143,8 +143,8 @@ public class BenchmarkDictionary {
   public LongOffHeapMutableDictionary benchmarkOffHeapMinSizeWithoutOverflow() {
     LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(10000, 0, _memoryManager, "longColumn");
 
-    for (int i = 0; i < colValues.length; i++) {
-      dictionary.index(colValues[i]);
+    for (Long colValue : _colValues) {
+      dictionary.index(colValue);
     }
 
     return dictionary;
@@ -157,8 +157,8 @@ public class BenchmarkDictionary {
   public LongOffHeapMutableDictionary benchmarkOffHeapMinSizeWithOverflow() {
     LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(10000, 1000, _memoryManager, "longColumn");
 
-    for (int i = 0; i < colValues.length; i++) {
-      dictionary.index(colValues[i]);
+    for (Long colValue : _colValues) {
+      dictionary.index(colValue);
     }
 
     return dictionary;
@@ -172,8 +172,7 @@ public class BenchmarkDictionary {
         .warmupIterations(8)
         .measurementTime(TimeValue.seconds(60))
         .measurementIterations(8)
-        .forks(5)
-        ;
+        .forks(5);
 
     new Runner(opt.build()).run();
   }

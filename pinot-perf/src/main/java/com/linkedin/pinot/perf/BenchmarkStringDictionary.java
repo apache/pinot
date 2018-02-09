@@ -16,6 +16,10 @@
 
 package com.linkedin.pinot.perf;
 
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
+import com.linkedin.pinot.core.realtime.impl.dictionary.StringOffHeapMutableDictionary;
+import com.linkedin.pinot.core.realtime.impl.dictionary.StringOnHeapMutableDictionary;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -32,39 +36,36 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.TimeValue;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
-import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
-import com.linkedin.pinot.core.realtime.impl.dictionary.StringOffHeapMutableDictionary;
-import com.linkedin.pinot.core.realtime.impl.dictionary.StringOnHeapMutableDictionary;
 
 
 @State(Scope.Benchmark)
 public class BenchmarkStringDictionary {
-  private final int ROW_COUNT = 2_500_000;
-  private String[] stringValues;
-  private String[] uniqueStrings;
-  private final int CARDINALITY = 1_000_000;
-  private final int MAX_STRING_LEN = 32;
-  private RealtimeIndexOffHeapMemoryManager _memoryManager;
+  private static final int ROW_COUNT = 2_500_000;
+  private static final int CARDINALITY = 1_000_000;
+  private static final int MAX_STRING_LEN = 32;
+
+  private String[] _stringValues;
+  private PinotDataBufferMemoryManager _memoryManager;
 
   @Setup
   public void setUp() {
     _memoryManager = new DirectMemoryManager(BenchmarkStringDictionary.class.getName());
     // Create a list of values to insert into the hash map
-    uniqueStrings = new String[CARDINALITY];
+    String[] uniqueStrings = new String[CARDINALITY];
     Random r = new Random();
     for (int i = 0; i < uniqueStrings.length; i++) {
-      uniqueStrings[i] = generateRandomString(r, r.nextInt(MAX_STRING_LEN+1));
+      uniqueStrings[i] = generateRandomString(r, r.nextInt(MAX_STRING_LEN + 1));
     }
-    stringValues = new String[ROW_COUNT];
-    for (int i = 0; i < stringValues.length; i++) {
+    _stringValues = new String[ROW_COUNT];
+    for (int i = 0; i < _stringValues.length; i++) {
       int u = r.nextInt(CARDINALITY);
-      stringValues[i] = uniqueStrings[u];
+      _stringValues[i] = uniqueStrings[u];
     }
   }
 
   @TearDown
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     _memoryManager.close();
   }
 
@@ -72,21 +73,20 @@ public class BenchmarkStringDictionary {
   private String generateRandomString(Random r, final int len) {
     byte[] bytes = new byte[len];
     for (int i = 0; i < len; i++) {
-      bytes[i] = (byte)(r.nextInt(92) + 32);
+      bytes[i] = (byte) (r.nextInt(92) + 32);
     }
     return new String(bytes);
   }
-
 
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public StringOffHeapMutableDictionary benchmarkOffHeapStringDictionary() {
-    StringOffHeapMutableDictionary dictionary = new StringOffHeapMutableDictionary(5000, 10, _memoryManager, "stringColumn",
-        32);
+    StringOffHeapMutableDictionary dictionary =
+        new StringOffHeapMutableDictionary(5000, 10, _memoryManager, "stringColumn", 32);
 
-    for (int i = 0; i < stringValues.length; i++) {
-      dictionary.index(stringValues[i]);
+    for (String stringValue : _stringValues) {
+      dictionary.index(stringValue);
     }
 
     return dictionary;
@@ -98,24 +98,23 @@ public class BenchmarkStringDictionary {
   public StringOnHeapMutableDictionary benchmarkOnHeapStringDictionary() {
     StringOnHeapMutableDictionary dictionary = new StringOnHeapMutableDictionary();
 
-    for (int i = 0; i < stringValues.length; i++) {
-      dictionary.index(stringValues[i]);
+    for (String stringValue : _stringValues) {
+      dictionary.index(stringValue);
     }
 
     return dictionary;
   }
 
-  public static void main(String[] args) throws Exception {
-    ChainedOptionsBuilder opt = new OptionsBuilder()
-        .include(BenchmarkStringDictionary.class.getSimpleName())
+  public static void main(String[] args)
+      throws Exception {
+    ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkStringDictionary.class.getSimpleName())
         .addProfiler(GCProfiler.class)
         .addProfiler(HotspotMemoryProfiler.class)
         .warmupTime(TimeValue.seconds(60))
         .warmupIterations(8)
         .measurementTime(TimeValue.seconds(60))
         .measurementIterations(8)
-        .forks(5)
-        ;
+        .forks(5);
 
     new Runner(opt.build()).run();
   }

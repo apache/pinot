@@ -15,14 +15,14 @@
  */
 package com.linkedin.pinot.core.io.readerwriter.impl;
 
+import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
+import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnMultiValueReaderWriter;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
-import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnMultiValueReaderWriter;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
-import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,158 +86,159 @@ import org.slf4j.LoggerFactory;
 
 public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColumnMultiValueReaderWriter {
 
-  public static Logger LOGGER = LoggerFactory.getLogger(FixedByteSingleColumnMultiValueReaderWriter.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteSingleColumnMultiValueReaderWriter.class);
   /**
-   * number of columns is 1, column size is variable but less than maxNumberOfMultiValuesPerRow
-   * @param rows
+   * number of columns is 1, column size is variable but less than _maxNumberOfMultiValuesPerRow
    */
 
   private static final int SIZE_OF_INT = 4;
   private static final int NUM_COLS_IN_HEADER = 3;
 
-  private static final int INCREMENT_PERCENTAGE = 100;//Increments the Initial size by 100% of initial capacity every time we runs out of capacity
+  private static final int INCREMENT_PERCENTAGE = 100;
+      //Increments the Initial size by 100% of initial capacity every time we runs out of capacity
 
-  private PinotDataBuffer headerBuffer;
-  private List<PinotDataBuffer> dataBuffers = new ArrayList<>();
-  private List<PinotDataBuffer> headerBuffers = new ArrayList<>();
-  private List<FixedByteSingleValueMultiColReader> headerReaders = new ArrayList<>();
-  private List<FixedByteSingleValueMultiColWriter> headerWriters = new ArrayList<>();
-  private FixedByteSingleValueMultiColWriter curHeaderWriter;
-  private List<FixedByteSingleValueMultiColWriter> dataWriters = new ArrayList<FixedByteSingleValueMultiColWriter>();
-  private List<FixedByteSingleValueMultiColReader> dataReaders = new ArrayList<FixedByteSingleValueMultiColReader>();
-  private FixedByteSingleValueMultiColWriter currentDataWriter;
-  private int currentDataWriterIndex = -1;
-  private int currentCapacity = 0;
-  private int headerSize;
-  private int incrementalCapacity;
-  private int columnSizeInBytes;
-  private int maxNumberOfMultiValuesPerRow;
-  private final int rowCountPerChunk;
-  private final RealtimeIndexOffHeapMemoryManager memoryManager;
-  private final String columnName;
-  private int prevRowStartIndex = 0;  // Offset in the databuffer for the last row added.
-  private int prevRowLength = 0;  // Number of values in the column for the last row added.
+  private PinotDataBuffer _headerBuffer;
+  private List<PinotDataBuffer> _dataBuffers = new ArrayList<>();
+  private List<PinotDataBuffer> _headerBuffers = new ArrayList<>();
+  private List<FixedByteSingleValueMultiColReader> _headerReaders = new ArrayList<>();
+  private List<FixedByteSingleValueMultiColWriter> _headerWriters = new ArrayList<>();
+  private FixedByteSingleValueMultiColWriter _curHeaderWriter;
+  private List<FixedByteSingleValueMultiColWriter> _dataWriters = new ArrayList<>();
+  private List<FixedByteSingleValueMultiColReader> _dataReaders = new ArrayList<>();
+  private FixedByteSingleValueMultiColWriter _currentDataWriter;
+  private int _currentDataWriterIndex = -1;
+  private int _currentCapacity = 0;
+  private int _headerSize;
+  private int _incrementalCapacity;
+  private int _columnSizeInBytes;
+  private int _maxNumberOfMultiValuesPerRow;
+  private final int _rowCountPerChunk;
+  private final PinotDataBufferMemoryManager _memoryManager;
+  private final String _context;
+  private int _prevRowStartIndex = 0;  // Offset in the data-buffer for the last row added.
+  private int _prevRowLength = 0;  // Number of values in the column for the last row added.
 
-  public FixedByteSingleColumnMultiValueReaderWriter(int maxNumberOfMultiValuesPerRow, int avgMultiValueCount, int rowCountPerChunk,
-      int columnSizeInBytes, RealtimeIndexOffHeapMemoryManager memoryManager, String columnName) {
-    this.memoryManager = memoryManager;
-    this.columnName = columnName;
+  public FixedByteSingleColumnMultiValueReaderWriter(int maxNumberOfMultiValuesPerRow, int avgMultiValueCount,
+      int rowCountPerChunk, int columnSizeInBytes, PinotDataBufferMemoryManager memoryManager, String context) {
+    _memoryManager = memoryManager;
+    _context = context;
     int initialCapacity = Math.max(maxNumberOfMultiValuesPerRow, rowCountPerChunk * avgMultiValueCount);
     int incrementalCapacity =
         Math.max(maxNumberOfMultiValuesPerRow, (int) (initialCapacity * 1.0f * INCREMENT_PERCENTAGE / 100));
-    this.columnSizeInBytes = columnSizeInBytes;
-    this.maxNumberOfMultiValuesPerRow = maxNumberOfMultiValuesPerRow;
-    headerSize = rowCountPerChunk * SIZE_OF_INT * NUM_COLS_IN_HEADER;
-    this.rowCountPerChunk = rowCountPerChunk;
+    _columnSizeInBytes = columnSizeInBytes;
+    _maxNumberOfMultiValuesPerRow = maxNumberOfMultiValuesPerRow;
+    _headerSize = rowCountPerChunk * SIZE_OF_INT * NUM_COLS_IN_HEADER;
+    _rowCountPerChunk = rowCountPerChunk;
     addHeaderBuffers();
     //at least create space for million entries, which for INT translates into 4mb buffer
-    this.incrementalCapacity = incrementalCapacity;
+    _incrementalCapacity = incrementalCapacity;
     addDataBuffers(initialCapacity);
-    //init(rowCountPerChunk, columnSizeInBytes, maxNumberOfMultiValuesPerRow, initialCapacity, incrementalCapacity);
+    //init(_rowCountPerChunk, _columnSizeInBytes, _maxNumberOfMultiValuesPerRow, initialCapacity, _incrementalCapacity);
   }
 
   private void addHeaderBuffers() {
-    LOGGER.info("Allocating header buffer of size {} for column {} segment {}", headerSize, columnName, memoryManager.getSegmentName());
-    headerBuffer = memoryManager.allocate(headerSize, columnName);
+    LOGGER.info("Allocating header buffer of size {} for: {}", _headerSize, _context);
+    _headerBuffer = _memoryManager.allocate(_headerSize, _context);
     // We know that these buffers will not be copied directly into a file (or mapped from a file).
     // So, we can use native byte order here.
-    headerBuffer.order(ByteOrder.nativeOrder());
+    _headerBuffer.order(ByteOrder.nativeOrder());
     // dataBufferId, startIndex, length
-    curHeaderWriter =
-        new FixedByteSingleValueMultiColWriter(headerBuffer, rowCountPerChunk, 3,
-            new int[] { SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT });
+    _curHeaderWriter = new FixedByteSingleValueMultiColWriter(_headerBuffer, _rowCountPerChunk, 3,
+        new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT});
     FixedByteSingleValueMultiColReader curHeaderReader =
-        new FixedByteSingleValueMultiColReader(headerBuffer, rowCountPerChunk, new int[] { SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT });
-    headerBuffers.add(headerBuffer);
-    headerWriters.add(curHeaderWriter);
-    headerReaders.add(curHeaderReader);
+        new FixedByteSingleValueMultiColReader(_headerBuffer, _rowCountPerChunk,
+            new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT});
+    _headerBuffers.add(_headerBuffer);
+    _headerWriters.add(_curHeaderWriter);
+    _headerReaders.add(curHeaderReader);
   }
 
   /**
-   * This method automatically computes the space needed based on the columnSizeInBytes
+   * This method automatically computes the space needed based on the _columnSizeInBytes
    * @param rowCapacity Additional capacity to be added in terms of number of rows
    * @throws RuntimeException
    */
-  private void addDataBuffers(int rowCapacity) throws RuntimeException {
+  private void addDataBuffers(int rowCapacity)
+      throws RuntimeException {
     PinotDataBuffer dataBuffer;
     try {
-      final long size = rowCapacity * columnSizeInBytes;
-      LOGGER.info("Allocating data buffer of size {} for column {}", size, columnName);
-      dataBuffer = memoryManager.allocate(size, columnName);
+      final long size = rowCapacity * _columnSizeInBytes;
+      LOGGER.info("Allocating data buffer of size {} for column {}", size, _context);
+      dataBuffer = _memoryManager.allocate(size, _context);
       dataBuffer.order(ByteOrder.nativeOrder());
-      dataBuffers.add(dataBuffer);
-      currentDataWriter =
-          new FixedByteSingleValueMultiColWriter(dataBuffer, rowCapacity, 1, new int[] { columnSizeInBytes });
-      dataWriters.add(currentDataWriter);
+      _dataBuffers.add(dataBuffer);
+      _currentDataWriter =
+          new FixedByteSingleValueMultiColWriter(dataBuffer, rowCapacity, 1, new int[]{_columnSizeInBytes});
+      _dataWriters.add(_currentDataWriter);
 
       FixedByteSingleValueMultiColReader dataFileReader =
-          new FixedByteSingleValueMultiColReader(dataBuffer, rowCapacity, new int[] { columnSizeInBytes });
-      dataReaders.add(dataFileReader);
+          new FixedByteSingleValueMultiColReader(dataBuffer, rowCapacity, new int[]{_columnSizeInBytes});
+      _dataReaders.add(dataFileReader);
       //update the capacity
-      currentCapacity = rowCapacity;
-      currentDataWriterIndex = currentDataWriterIndex + 1;
+      _currentCapacity = rowCapacity;
+      _currentDataWriterIndex = _currentDataWriterIndex + 1;
     } catch (Exception e) {
-      throw new RuntimeException("Error while expanding the capacity by allocating additional buffer with capacity:"
-          + rowCapacity, e);
+      throw new RuntimeException(
+          "Error while expanding the capacity by allocating additional buffer with capacity:" + rowCapacity, e);
     }
   }
 
   @Override
   public void close() {
-    for (PinotDataBuffer dataBuffer : dataBuffers) {
+    for (PinotDataBuffer dataBuffer : _dataBuffers) {
       dataBuffer.close();
     }
-    dataBuffers.clear();
-    for (PinotDataBuffer headerBuffer : headerBuffers) {
+    _dataBuffers.clear();
+    for (PinotDataBuffer headerBuffer : _headerBuffers) {
       headerBuffer.close();
     }
-    headerBuffers.clear();
-    headerBuffer = null;
-    for (FixedByteSingleValueMultiColReader reader : headerReaders) {
+    _headerBuffers.clear();
+    _headerBuffer = null;
+    for (FixedByteSingleValueMultiColReader reader : _headerReaders) {
       reader.close();
     }
-    for (FixedByteSingleValueMultiColReader reader : dataReaders) {
+    for (FixedByteSingleValueMultiColReader reader : _dataReaders) {
       reader.close();
     }
-    for (FixedByteSingleValueMultiColWriter writer : headerWriters) {
+    for (FixedByteSingleValueMultiColWriter writer : _headerWriters) {
       writer.close();
     }
-    for (FixedByteSingleValueMultiColWriter writer : dataWriters) {
+    for (FixedByteSingleValueMultiColWriter writer : _dataWriters) {
       writer.close();
     }
   }
 
   private void writeIntoHeader(int row, int dataWriterIndex, int startIndex, int length) {
-    if (row >= headerBuffers.size() * rowCountPerChunk) {
+    if (row >= _headerBuffers.size() * _rowCountPerChunk) {
       addHeaderBuffers();
     }
-    curHeaderWriter.setInt(getRowInCurrentHeader(row), 0, dataWriterIndex);
-    curHeaderWriter.setInt(getRowInCurrentHeader(row), 1, startIndex);
-    curHeaderWriter.setInt(getRowInCurrentHeader(row), 2, length);
+    _curHeaderWriter.setInt(getRowInCurrentHeader(row), 0, dataWriterIndex);
+    _curHeaderWriter.setInt(getRowInCurrentHeader(row), 1, startIndex);
+    _curHeaderWriter.setInt(getRowInCurrentHeader(row), 2, length);
   }
 
-  // TODO Use powers of two for rowCountPerChunk to optimize computation for the
+  // TODO Use powers of two for _rowCountPerChunk to optimize computation for the
   // methods below. Or, assert that the input values to the class are powers of two. TBD.
-  private final FixedByteSingleValueMultiColReader getCurrentReader(int row) {
-    return headerReaders.get(row / rowCountPerChunk);
+  private FixedByteSingleValueMultiColReader getCurrentReader(int row) {
+    return _headerReaders.get(row / _rowCountPerChunk);
   }
 
-  private final int getRowInCurrentHeader(int row) {
-    return row % rowCountPerChunk;
+  private int getRowInCurrentHeader(int row) {
+    return row % _rowCountPerChunk;
   }
 
   private int updateHeader(int row, int numValues) {
-    assert (numValues <= maxNumberOfMultiValuesPerRow);
-    int newStartIndex = prevRowStartIndex + prevRowLength;
-    if (newStartIndex + numValues > currentCapacity) {
-      addDataBuffers(incrementalCapacity);
-      prevRowStartIndex = 0;
-      prevRowLength = 0;
+    assert (numValues <= _maxNumberOfMultiValuesPerRow);
+    int newStartIndex = _prevRowStartIndex + _prevRowLength;
+    if (newStartIndex + numValues > _currentCapacity) {
+      addDataBuffers(_incrementalCapacity);
+      _prevRowStartIndex = 0;
+      _prevRowLength = 0;
       newStartIndex = 0;
     }
-    writeIntoHeader(row, currentDataWriterIndex, newStartIndex, numValues);
-    prevRowStartIndex = newStartIndex;
-    prevRowLength = numValues;
+    writeIntoHeader(row, _currentDataWriterIndex, newStartIndex, numValues);
+    _prevRowStartIndex = newStartIndex;
+    _prevRowLength = numValues;
     return newStartIndex;
   }
 
@@ -245,7 +246,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   public void setCharArray(int row, char[] charArray) {
     int newStartIndex = updateHeader(row, charArray.length);
     for (int i = 0; i < charArray.length; i++) {
-      currentDataWriter.setChar(newStartIndex + i, 0, charArray[i]);
+      _currentDataWriter.setChar(newStartIndex + i, 0, charArray[i]);
     }
   }
 
@@ -254,7 +255,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
 
     int newStartIndex = updateHeader(row, shortsArray.length);
     for (int i = 0; i < shortsArray.length; i++) {
-      currentDataWriter.setShort(newStartIndex + i, 0, shortsArray[i]);
+      _currentDataWriter.setShort(newStartIndex + i, 0, shortsArray[i]);
     }
   }
 
@@ -262,7 +263,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   public void setIntArray(int row, int[] intArray) {
     int newStartIndex = updateHeader(row, intArray.length);
     for (int i = 0; i < intArray.length; i++) {
-      currentDataWriter.setInt(newStartIndex + i, 0, intArray[i]);
+      _currentDataWriter.setInt(newStartIndex + i, 0, intArray[i]);
     }
   }
 
@@ -270,7 +271,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   public void setLongArray(int row, long[] longArray) {
     int newStartIndex = updateHeader(row, longArray.length);
     for (int i = 0; i < longArray.length; i++) {
-      currentDataWriter.setLong(newStartIndex + i, 0, longArray[i]);
+      _currentDataWriter.setLong(newStartIndex + i, 0, longArray[i]);
     }
   }
 
@@ -278,7 +279,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   public void setFloatArray(int row, float[] floatArray) {
     int newStartIndex = updateHeader(row, floatArray.length);
     for (int i = 0; i < floatArray.length; i++) {
-      currentDataWriter.setFloat(newStartIndex + i, 0, floatArray[i]);
+      _currentDataWriter.setFloat(newStartIndex + i, 0, floatArray[i]);
     }
   }
 
@@ -286,7 +287,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   public void setDoubleArray(int row, double[] doubleArray) {
     int newStartIndex = updateHeader(row, doubleArray.length);
     for (int i = 0; i < doubleArray.length; i++) {
-      currentDataWriter.setDouble(newStartIndex + i, 0, doubleArray[i]);
+      _currentDataWriter.setDouble(newStartIndex + i, 0, doubleArray[i]);
     }
   }
 
@@ -294,7 +295,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   public void setStringArray(int row, String[] stringArray) {
     int newStartIndex = updateHeader(row, stringArray.length);
     for (int i = 0; i < stringArray.length; i++) {
-      currentDataWriter.setString(newStartIndex + i, 0, stringArray[i]);
+      _currentDataWriter.setString(newStartIndex + i, 0, stringArray[i]);
     }
   }
 
@@ -302,18 +303,18 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   public void setBytesArray(int row, byte[][] bytesArray) {
     int newStartIndex = updateHeader(row, bytesArray.length);
     for (int i = 0; i < bytesArray.length; i++) {
-      currentDataWriter.setBytes(newStartIndex + i, 0, bytesArray[i]);
+      _currentDataWriter.setBytes(newStartIndex + i, 0, bytesArray[i]);
     }
   }
 
   @Override
   public int getCharArray(int row, char[] charArray) {
     FixedByteSingleValueMultiColReader headerReader = getCurrentReader(row);
-    int rowInCurrentHeader  = getRowInCurrentHeader(row);
+    int rowInCurrentHeader = getRowInCurrentHeader(row);
     int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
     int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
     int length = headerReader.getInt(rowInCurrentHeader, 2);
-    FixedByteSingleValueMultiColReader dataReader = dataReaders.get(bufferIndex);
+    FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
       charArray[i] = dataReader.getChar(startIndex + i, 0);
     }
@@ -323,11 +324,11 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   @Override
   public int getShortArray(int row, short[] shortsArray) {
     FixedByteSingleValueMultiColReader headerReader = getCurrentReader(row);
-    int rowInCurrentHeader  = getRowInCurrentHeader(row);
+    int rowInCurrentHeader = getRowInCurrentHeader(row);
     int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
     int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
     int length = headerReader.getInt(rowInCurrentHeader, 2);
-    FixedByteSingleValueMultiColReader dataReader = dataReaders.get(bufferIndex);
+    FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
       shortsArray[i] = dataReader.getShort(startIndex + i, 0);
     }
@@ -337,11 +338,11 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   @Override
   public int getIntArray(int row, int[] intArray) {
     FixedByteSingleValueMultiColReader headerReader = getCurrentReader(row);
-    int rowInCurrentHeader  = getRowInCurrentHeader(row);
+    int rowInCurrentHeader = getRowInCurrentHeader(row);
     int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
     int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
     int length = headerReader.getInt(rowInCurrentHeader, 2);
-    FixedByteSingleValueMultiColReader dataReader = dataReaders.get(bufferIndex);
+    FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
       intArray[i] = dataReader.getInt(startIndex + i, 0);
     }
@@ -351,11 +352,11 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   @Override
   public int getLongArray(int row, long[] longArray) {
     FixedByteSingleValueMultiColReader headerReader = getCurrentReader(row);
-    int rowInCurrentHeader  = getRowInCurrentHeader(row);
+    int rowInCurrentHeader = getRowInCurrentHeader(row);
     int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
     int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
     int length = headerReader.getInt(rowInCurrentHeader, 2);
-    FixedByteSingleValueMultiColReader dataReader = dataReaders.get(bufferIndex);
+    FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
       longArray[i] = dataReader.getLong(startIndex + i, 0);
     }
@@ -365,11 +366,11 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   @Override
   public int getFloatArray(int row, float[] floatArray) {
     FixedByteSingleValueMultiColReader headerReader = getCurrentReader(row);
-    int rowInCurrentHeader  = getRowInCurrentHeader(row);
+    int rowInCurrentHeader = getRowInCurrentHeader(row);
     int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
     int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
     int length = headerReader.getInt(rowInCurrentHeader, 2);
-    FixedByteSingleValueMultiColReader dataReader = dataReaders.get(bufferIndex);
+    FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
       floatArray[i] = dataReader.getFloat(startIndex + i, 0);
     }
@@ -379,11 +380,11 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   @Override
   public int getDoubleArray(int row, double[] doubleArray) {
     FixedByteSingleValueMultiColReader headerReader = getCurrentReader(row);
-    int rowInCurrentHeader  = getRowInCurrentHeader(row);
+    int rowInCurrentHeader = getRowInCurrentHeader(row);
     int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
     int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
     int length = headerReader.getInt(rowInCurrentHeader, 2);
-    FixedByteSingleValueMultiColReader dataReader = dataReaders.get(bufferIndex);
+    FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
       doubleArray[i] = dataReader.getDouble(startIndex + i, 0);
     }
@@ -393,11 +394,11 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   @Override
   public int getStringArray(int row, String[] stringArray) {
     FixedByteSingleValueMultiColReader headerReader = getCurrentReader(row);
-    int rowInCurrentHeader  = getRowInCurrentHeader(row);
+    int rowInCurrentHeader = getRowInCurrentHeader(row);
     int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
     int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
     int length = headerReader.getInt(rowInCurrentHeader, 2);
-    FixedByteSingleValueMultiColReader dataReader = dataReaders.get(bufferIndex);
+    FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
       stringArray[i] = dataReader.getString(startIndex + i, 0);
     }
@@ -407,11 +408,11 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   @Override
   public int getBytesArray(int row, byte[][] bytesArray) {
     FixedByteSingleValueMultiColReader headerReader = getCurrentReader(row);
-    int rowInCurrentHeader  = getRowInCurrentHeader(row);
+    int rowInCurrentHeader = getRowInCurrentHeader(row);
     int bufferIndex = headerReader.getInt(rowInCurrentHeader, 0);
     int startIndex = headerReader.getInt(rowInCurrentHeader, 1);
     int length = headerReader.getInt(rowInCurrentHeader, 2);
-    FixedByteSingleValueMultiColReader dataReader = dataReaders.get(bufferIndex);
+    FixedByteSingleValueMultiColReader dataReader = _dataReaders.get(bufferIndex);
     for (int i = 0; i < length; i++) {
       bytesArray[i] = dataReader.getBytes(startIndex + i, 0);
     }

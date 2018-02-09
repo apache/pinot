@@ -17,7 +17,7 @@
 package com.linkedin.pinot.core.io.writer.impl;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
@@ -84,7 +84,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MutableOffHeapByteArrayStore implements Closeable {
   private static final int INT_SIZE = V1Constants.Numbers.INTEGER_SIZE;
-  public static Logger LOGGER = LoggerFactory.getLogger(MutableOffHeapByteArrayStore.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(MutableOffHeapByteArrayStore.class);
 
   private static class Buffer implements Closeable {
 
@@ -96,12 +96,12 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     private int _numValues = 0;
     private int _availEndOffset;  // Exclusive
 
-    private Buffer(long size, int startIndex, RealtimeIndexOffHeapMemoryManager memoryManager, String columnName) {
+    private Buffer(long size, int startIndex, PinotDataBufferMemoryManager memoryManager, String allocationContext) {
       if (size >= Integer.MAX_VALUE) {
         size = Integer.MAX_VALUE - 1;
       }
-      LOGGER.info("Allocating byte array store buffer of size {} for column {} segment {}", size, columnName, memoryManager.getSegmentName());
-      _pinotDataBuffer = memoryManager.allocate(size, columnName);
+      LOGGER.info("Allocating byte array store buffer of size {} for: {}", size, allocationContext);
+      _pinotDataBuffer = memoryManager.allocate(size, allocationContext);
       _pinotDataBuffer.order(ByteOrder.nativeOrder());
       _byteBuffer = _pinotDataBuffer.toDirectByteBuffer(0, (int) size);
       _startIndex = startIndex;
@@ -171,8 +171,8 @@ public class MutableOffHeapByteArrayStore implements Closeable {
   private volatile List<Buffer> _buffers = new LinkedList<>();
   private int _numElements = 0;
   private volatile Buffer _currentBuffer;
-  private final RealtimeIndexOffHeapMemoryManager _memoryManager;
-  private final String _columnName;
+  private final PinotDataBufferMemoryManager _memoryManager;
+  private final String _allocationContext;
   private long _totalStringSize = 0;
   private final int _startSize;
 
@@ -181,10 +181,10 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     return _startSize;
   }
 
-  public MutableOffHeapByteArrayStore(RealtimeIndexOffHeapMemoryManager memoryManager, String columnName, int numArrays,
+  public MutableOffHeapByteArrayStore(PinotDataBufferMemoryManager memoryManager, String allocationContext, int numArrays,
       int avgArrayLen) {
     _memoryManager = memoryManager;
-    _columnName = columnName;
+    _allocationContext = allocationContext;
     _startSize = numArrays * (avgArrayLen + 4); // For each array, we store the array and its startoffset (4 bytes)
     expand(_startSize, 0L);
   }
@@ -195,10 +195,11 @@ public class MutableOffHeapByteArrayStore implements Closeable {
    *
    * @param suggestedSize is the size of the new buffer to be allocated
    * @param minSize is the new value that must fit into the new buffer.
-   * @return
+   * @return Expanded buffer
    */
+  @SuppressWarnings("Duplicates")
   private Buffer expand(long suggestedSize, long minSize) {
-    Buffer buffer = new Buffer(Math.max(suggestedSize, minSize), _numElements, _memoryManager, _columnName);
+    Buffer buffer = new Buffer(Math.max(suggestedSize, minSize), _numElements, _memoryManager, _allocationContext);
     List<Buffer> newList = new LinkedList<>();
     for (Buffer b : _buffers) {
       newList.add(b);
@@ -210,14 +211,13 @@ public class MutableOffHeapByteArrayStore implements Closeable {
   }
 
   private Buffer expand(long sizeOfNewValue) {
-    Buffer newBuffer = expand(_currentBuffer.getSize() * 2, sizeOfNewValue + INT_SIZE);
-    return newBuffer;
+    return expand(_currentBuffer.getSize() * 2, sizeOfNewValue + INT_SIZE);
   }
 
   // Returns a byte array, given an index
   public byte[] get(int index) {
     List<Buffer> bufList = _buffers;
-    for (int x = bufList.size()-1; x >= 0; x--) {
+    for (int x = bufList.size() - 1; x >= 0; x--) {
       Buffer buffer = bufList.get(x);
       if (index >= buffer.getStartIndex()) {
         return buffer.get(index - buffer.getStartIndex());
@@ -242,7 +242,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
 
   public boolean equalsValueAt(byte[] value, int index) {
     List<Buffer> bufList = _buffers;
-    for (int x = bufList.size()-1; x >= 0; x--) {
+    for (int x = bufList.size() - 1; x >= 0; x--) {
       Buffer buffer = bufList.get(x);
       if (index >= buffer.getStartIndex()) {
         return buffer.equalsValueAt(value, index - buffer.getStartIndex());

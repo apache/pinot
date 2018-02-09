@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.common;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.operator.BaseOperator;
@@ -44,7 +44,7 @@ public class RealtimeNoDictionaryTest {
   private double[] _doubleVals = new double[NUM_ROWS];
   private Random _random;
 
-  private RealtimeIndexOffHeapMemoryManager _memoryManager;
+  private PinotDataBufferMemoryManager _memoryManager;
 
   @BeforeClass
   public void setUp() {
@@ -56,6 +56,7 @@ public class RealtimeNoDictionaryTest {
     _memoryManager.close();
   }
 
+  @SuppressWarnings("Duplicates")
   private DataFetcher makeDataFetcher(long seed) {
     FieldSpec intSpec = new MetricFieldSpec(INT_COL_NAME, FieldSpec.DataType.INT);
     FieldSpec longSpec = new MetricFieldSpec(LONG_COL_NAME, FieldSpec.DataType.LONG);
@@ -265,7 +266,7 @@ public class RealtimeNoDictionaryTest {
       double[] doubleValues = new double[NUM_ROWS];
       dataFetcher.fetchDoubleValues(DOUBLE_COL_NAME, docIds, startIndex, numDocIds, doubleValues, valStart);
       for (int i = 0; i < numDocIds; i++) {
-        Assert.assertEquals(doubleValues[valStart + i], (double)_doubleVals[docIds[startIndex + i]], " for row " + docIds[startIndex+i]);
+        Assert.assertEquals(doubleValues[valStart + i], _doubleVals[docIds[startIndex + i]], " for row " + docIds[startIndex+i]);
       }
 
     } catch (Throwable t) {

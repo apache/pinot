@@ -16,7 +16,7 @@
 
 package com.linkedin.pinot.core.indexsegment.utils;
 
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.MmapMemoryManager;
 import java.io.File;
 import org.apache.commons.io.FileUtils;
@@ -50,14 +50,14 @@ public class MmapMemoryManagerFileCleanupTest {
     final String someColumn = "column";
     final long firstAlloc = 20;
     final long allocAfterRestart = 200;
-    RealtimeIndexOffHeapMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
+    PinotDataBufferMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
     memoryManager.allocate(firstAlloc, someColumn);
     // Now, if the host restarts, we will have a file left behind for the same consuming segment.
     // and we should not see any exception.
     memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
     memoryManager.allocate(allocAfterRestart, someColumn);
     // We should not see the first allocation in the total.
-    Assert.assertEquals(memoryManager.getTotalMemBytes(), allocAfterRestart);
+    Assert.assertEquals(memoryManager.getTotalAllocatedBytes(), allocAfterRestart);
     memoryManager.close();
   }
 }
