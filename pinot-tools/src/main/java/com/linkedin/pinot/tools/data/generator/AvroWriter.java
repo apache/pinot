@@ -15,69 +15,56 @@
  */
 package com.linkedin.pinot.tools.data.generator;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
-
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
 
 
-/**
- * Sep 14, 2014
- */
+public class AvroWriter implements Closeable {
+  private final Map<String, Generator> _generatorMap;
+  private final org.apache.avro.Schema _avroSchema;
+  private final DataFileWriter<GenericData.Record> _recordWriter;
 
-public class AvroWriter implements FileWriter {
-  private final File avroFile;
-  private final Schema schema;
-  private final Map<String, Generator> generatorMap;
-  private final DataFileWriter<GenericData.Record> recordWriter;
-  private final org.apache.avro.Schema schemaJSON;
-
-  @SuppressWarnings("deprecation")
-  public AvroWriter(File baseDir, int index, Map<String, Generator> generatorMap, Schema schema) throws IOException, JSONException {
-    avroFile = new File(baseDir, "part-" + index + ".avro");
-    this.generatorMap = generatorMap;
-    this.schema = schema;
-
-    schemaJSON = org.apache.avro.Schema.parse(getJSONSchema().toString());
-    final GenericDatumWriter<GenericData.Record> datum = new GenericDatumWriter<GenericData.Record>(schemaJSON);
-    recordWriter = new DataFileWriter<GenericData.Record>(datum);
-    recordWriter.create(schemaJSON, avroFile);
+  public AvroWriter(File baseDir, int index, Map<String, Generator> generatorMap, Schema schema) throws IOException {
+    _generatorMap = generatorMap;
+    _avroSchema = getAvroSchema(schema);
+    _recordWriter = new DataFileWriter<>(new GenericDatumWriter<GenericData.Record>(_avroSchema));
+    _recordWriter.create(_avroSchema, new File(baseDir, "part-" + index + ".avro"));
   }
 
-  public JSONObject getJSONSchema() throws JSONException {
-    final JSONObject ret = new JSONObject();
-    ret.put("name", "data_gen_record");
-    ret.put("type", "record");
+  public static org.apache.avro.Schema getAvroSchema(Schema schema) {
+    JsonObject avroSchema = new JsonObject();
+    avroSchema.addProperty("name", "data_gen_record");
+    avroSchema.addProperty("type", "record");
 
-    final JSONArray fields = new JSONArray();
-
-    for (final FieldSpec spec : schema.getAllFieldSpecs()) {
-      fields.put(spec.getDataType().toJSONSchemaFor(spec.getName()));
+    JsonArray fields = new JsonArray();
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      JsonObject jsonObject = fieldSpec.toAvroSchemaJsonObject();
+      fields.add(jsonObject);
     }
+    avroSchema.add("fields", fields);
 
-    ret.put("fields", fields);
-
-    return ret;
+    return new org.apache.avro.Schema.Parser().parse(avroSchema.toString());
   }
 
   public void writeNext() throws IOException {
-    final GenericData.Record outRecord = new GenericData.Record(schemaJSON);
-    for (final String column : generatorMap.keySet()) {
-      outRecord.put(column, generatorMap.get(column).next());
+    GenericData.Record nextRecord = new GenericData.Record(_avroSchema);
+    for (String column : _generatorMap.keySet()) {
+      nextRecord.put(column, _generatorMap.get(column).next());
     }
-    recordWriter.append(outRecord);
+    _recordWriter.append(nextRecord);
   }
 
-  public void seal() throws IOException {
-    recordWriter.close();
+  @Override
+  public void close() throws IOException {
+    _recordWriter.close();
   }
 }

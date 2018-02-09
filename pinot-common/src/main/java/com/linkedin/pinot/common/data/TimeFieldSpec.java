@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
+import com.google.gson.JsonObject;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
@@ -23,6 +24,7 @@ import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 
+@SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class TimeFieldSpec extends FieldSpec {
   private TimeGranularitySpec _incomingGranularitySpec;
@@ -126,16 +128,19 @@ public final class TimeFieldSpec extends FieldSpec {
     return FieldType.TIME;
   }
 
+  // Required by JSON de-serializer. DO NOT REMOVE.
   @Override
   public void setName(@Nonnull String name) {
     // Ignore setName for TimeFieldSpec because we pick the name from TimeGranularitySpec.
   }
 
+  // Required by JSON de-serializer. DO NOT REMOVE.
   @Override
   public void setDataType(@Nonnull DataType dataType) {
     // Ignore setDataType for TimeFieldSpec because we pick the data type from TimeGranularitySpec.
   }
 
+  // Required by JSON de-serializer. DO NOT REMOVE.
   @Override
   public void setSingleValueField(boolean isSingleValueField) {
     Preconditions.checkArgument(isSingleValueField, "Unsupported multi-value for time field.");
@@ -166,6 +171,7 @@ public final class TimeFieldSpec extends FieldSpec {
     return _incomingGranularitySpec;
   }
 
+  // Required by JSON de-serializer. DO NOT REMOVE.
   public void setIncomingGranularitySpec(@Nonnull TimeGranularitySpec incomingGranularitySpec) {
     _incomingGranularitySpec = incomingGranularitySpec;
     if (_outgoingGranularitySpec == null) {
@@ -183,41 +189,47 @@ public final class TimeFieldSpec extends FieldSpec {
     }
   }
 
+  // Required by JSON de-serializer. DO NOT REMOVE.
   public void setOutgoingGranularitySpec(@Nonnull TimeGranularitySpec outgoingGranularitySpec) {
     _outgoingGranularitySpec = outgoingGranularitySpec;
     super.setName(outgoingGranularitySpec.getName());
     super.setDataType(outgoingGranularitySpec.getDataType());
   }
 
+  @Nonnull
+  @Override
+  public JsonObject toJsonObject() {
+    JsonObject jsonObject = new JsonObject();
+    jsonObject.add("incomingGranularitySpec", _incomingGranularitySpec.toJsonObject());
+    if (!getOutgoingGranularitySpec().equals(_incomingGranularitySpec)) {
+      jsonObject.add("outgoingGranularitySpec", _outgoingGranularitySpec.toJsonObject());
+    }
+    appendDefaultNullValue(jsonObject);
+    return jsonObject;
+  }
+
   @Override
   public String toString() {
     return "< field type: TIME, incoming granularity spec: " + _incomingGranularitySpec
-        + ", outgoing granularity spec: " + getOutgoingGranularitySpec() + ", default null value: "
-        + getDefaultNullValue() + " >";
+        + ", outgoing granularity spec: " + getOutgoingGranularitySpec() + ", default null value: " + _defaultNullValue
+        + " >";
   }
 
   @Override
   public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
-      return true;
-    }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+    if (!super.equals(o)) {
       return false;
     }
 
     TimeFieldSpec that = (TimeFieldSpec) o;
-
-    return super.equals(that) &&
-        EqualityUtils.isEqual(_incomingGranularitySpec, that._incomingGranularitySpec) &&
-        EqualityUtils.isEqual(_outgoingGranularitySpec, that._outgoingGranularitySpec);
+    return EqualityUtils.isEqual(_incomingGranularitySpec, that._incomingGranularitySpec) && EqualityUtils.isEqual(
+        getOutgoingGranularitySpec(), that.getOutgoingGranularitySpec());
   }
 
   @Override
   public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(super.hashCode());
-    result = EqualityUtils.hashCodeOf(result, _incomingGranularitySpec);
-    result = EqualityUtils.hashCodeOf(result, _outgoingGranularitySpec);
+    int result = EqualityUtils.hashCodeOf(super.hashCode(), _incomingGranularitySpec);
+    result = EqualityUtils.hashCodeOf(result, getOutgoingGranularitySpec());
     return result;
   }
 }

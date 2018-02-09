@@ -46,7 +46,7 @@ public final class DimensionFieldSpec extends FieldSpec {
 
   @Override
   public String toString() {
-    return "< field type: DIMENSION, field name: " + getName() + ", data type: " + getDataType()
-        + ", is single-value field: " + isSingleValueField() + ", default null value: " + getDefaultNullValue() + " >";
+    return "< field type: DIMENSION, field name: " + _name + ", data type: " + _dataType + ", is single-value field: "
+        + _isSingleValueField + ", default null value: " + _defaultNullValue + " >";
   }
 }
