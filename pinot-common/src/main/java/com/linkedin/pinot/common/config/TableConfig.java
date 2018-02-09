@@ -330,6 +330,7 @@ public class TableConfig {
     private static final String DEFAULT_SEGMENT_PUSH_TYPE = "APPEND";
     private static final String REFRESH_SEGMENT_PUSH_TYPE = "REFRESH";
     private static final String DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceNumSegmentAssignmentStrategy";
+    private static final String DEFAULT_STREAM_PARTITION_ASSIGNMENT_STRATEGY = "UniformStreamPartitionAssignment";
     private static final String DEFAULT_NUM_REPLICAS = "1";
     private static final String DEFAULT_LOAD_MODE = "HEAP";
     private static final String MMAP_LOAD_MODE = "MMAP";
@@ -361,6 +362,7 @@ public class TableConfig {
     private List<String> _noDictionaryColumns;
     private List<String> _onHeapDictionaryColumns;
     private Map<String, String> _streamConfigs;
+    private String _streamPartitionAssignmentStrategy = DEFAULT_STREAM_PARTITION_ASSIGNMENT_STRATEGY;
 
     private TableCustomConfig _customConfig;
     private QuotaConfig _quotaConfig;
@@ -478,6 +480,11 @@ public class TableConfig {
       return this;
     }
 
+    public Builder setStreamPartitionAssignmentStrategy(String streamPartitionAssignmentStrategy) {
+      _streamPartitionAssignmentStrategy = streamPartitionAssignmentStrategy;
+      return this;
+    }
+
     public Builder setStreamConfigs(Map<String, String> streamConfigs) {
       Preconditions.checkState(_tableType == TableType.REALTIME);
       _streamConfigs = streamConfigs;
@@ -537,6 +544,9 @@ public class TableConfig {
       indexingConfig.setNoDictionaryColumns(_noDictionaryColumns);
       indexingConfig.setOnHeapDictionaryColumns(_onHeapDictionaryColumns);
       indexingConfig.setStreamConfigs(_streamConfigs);
+      StreamConsumptionConfig streamConsumptionConfig = new StreamConsumptionConfig();
+      streamConsumptionConfig.setStreamPartitionAssignmentStrategy(_streamPartitionAssignmentStrategy);
+      indexingConfig.setStreamConsumptionConfig(streamConsumptionConfig);
       // TODO: set SegmentPartitionConfig here
 
       if (_customConfig == null) {

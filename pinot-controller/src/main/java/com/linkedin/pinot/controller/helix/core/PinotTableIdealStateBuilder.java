@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.helix.core;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
@@ -34,6 +35,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
@@ -184,11 +186,8 @@ public class PinotTableIdealStateBuilder {
   }
 
   public static void buildLowLevelRealtimeIdealStateFor(String realtimeTableName, TableConfig realtimeTableConfig,
-      HelixAdmin helixAdmin, String helixClusterName, IdealState idealState) {
-    String realtimeServerTenant =
-        ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(realtimeTableConfig.getTenantConfig().getServer());
-    final List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName,
-        realtimeServerTenant);
+      HelixAdmin helixAdmin, String helixClusterName, HelixManager helixManager, IdealState idealState) {
+
     boolean create = false;
     // Validate replicasPerPartition here.
     final String replicasPerPartitionStr = realtimeTableConfig.getValidationConfig().getReplicasPerPartition();
@@ -211,7 +210,11 @@ public class PinotTableIdealStateBuilder {
     final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
     final int nPartitions = getPartitionCount(kafkaMetadata);
     LOGGER.info("Assigning {} partitions to instances for simple consumer for table {}", nPartitions, realtimeTableName);
-    segmentManager.setupHelixEntries(realtimeTableConfig, kafkaMetadata, nPartitions, realtimeInstances, idealState, create);
+
+    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(realtimeTableConfig, helixManager);
+    final List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName,
+        realtimeTagConfig.getConsumingRealtimeServerTag());
+    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaMetadata, nPartitions, realtimeInstances, idealState, create);
   }
 
   public static int getPartitionCount(KafkaStreamMetadata kafkaMetadata) {

@@ -36,6 +36,7 @@ public class IndexingConfig {
   private List<String> _sortedColumn = new ArrayList<>();
   private String _loadMode;
   private Map<String, String> _streamConfigs = new HashMap<>();
+  private StreamConsumptionConfig _streamConsumptionConfig;
   private String _segmentFormatVersion;
   private String _columnMinMaxValueGeneratorMode;
   private List<String> _noDictionaryColumns;
@@ -81,6 +82,14 @@ public class IndexingConfig {
 
   public void setStreamConfigs(Map<String, String> streamConfigs) {
     _streamConfigs = streamConfigs;
+  }
+
+  public StreamConsumptionConfig getStreamConsumptionConfig() {
+    return _streamConsumptionConfig;
+  }
+
+  public void setStreamConsumptionConfig(StreamConsumptionConfig streamConsumptionConfig) {
+    _streamConsumptionConfig = streamConsumptionConfig;
   }
 
   public String getSegmentFormatVersion() {

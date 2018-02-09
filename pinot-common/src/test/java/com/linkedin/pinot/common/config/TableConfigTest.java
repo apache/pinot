@@ -107,6 +107,33 @@ public class TableConfigTest {
       checkTableConfigWithAssignmentConfig(tableConfig, tableConfigToCompare);
     }
     {
+      // With default StreamConsumptionConfig
+      TableConfig tableConfig = tableConfigBuilder.build();
+      Assert.assertEquals(
+          tableConfig.getIndexingConfig().getStreamConsumptionConfig()
+              .getStreamPartitionAssignmentStrategy(), "UniformStreamPartitionAssignment");
+
+      // with streamConsumptionConfig set
+      tableConfig =
+          tableConfigBuilder.setStreamPartitionAssignmentStrategy("BalancedStreamPartitionAssignment").build();
+      Assert.assertEquals(
+          tableConfig.getIndexingConfig().getStreamConsumptionConfig()
+              .getStreamPartitionAssignmentStrategy(), "BalancedStreamPartitionAssignment");
+
+      // Serialize then de-serialize
+      JSONObject jsonConfig = TableConfig.toJSONConfig(tableConfig);
+      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(jsonConfig);
+      Assert.assertEquals(
+          tableConfigToCompare.getIndexingConfig().getStreamConsumptionConfig()
+              .getStreamPartitionAssignmentStrategy(), "BalancedStreamPartitionAssignment");
+
+      ZNRecord znRecord = TableConfig.toZnRecord(tableConfig);
+      tableConfigToCompare = TableConfig.fromZnRecord(znRecord);
+      Assert.assertEquals(
+          tableConfigToCompare.getIndexingConfig().getStreamConsumptionConfig()
+              .getStreamPartitionAssignmentStrategy(), "BalancedStreamPartitionAssignment");
+    }
+    {
       // With star tree config
       StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
       Set<String> dims = new HashSet<>();
