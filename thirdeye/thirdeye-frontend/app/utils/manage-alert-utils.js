@@ -186,15 +186,23 @@ export function evalObj() {
  */
 export function buildMetricDataUrl(graphConfig) {
   const { id, maxTime, filters, dimension, granularity } = graphConfig;
+  // Chosen dimension
   const selectedDimension = dimension || 'All';
+  // Do not send a filters param if value not present
+  const filterQs = filters ? `&filters=${encodeURIComponent(filters)}` : '';
+  // Load only a week of data if granularity is high
   const startTimeBucket = granularity && granularity.toLowerCase().includes('minute') ? 'week' : 'months';
+  // For end date, choose either maxTime or end of yesterday
   const currentEnd = moment(maxTime).isValid() ? moment(maxTime).valueOf() : buildDateEod(1, 'day').valueOf();
+  // For graph start date, take either 1 week or 1 month, depending on granularity
   const currentStart = moment(currentEnd).subtract(1, startTimeBucket).valueOf();
+  // Baseline starts 1 week before our start date
   const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
+  // Baseline ends 1 week before our end date
   const baselineEnd = moment(currentEnd).subtract(1, 'week');
-
+  // Now build the metric data url
   return `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=` +
-         `${selectedDimension}&granularity=${granularity}&filters=${encodeURIComponent(filters)}`;
+         `${selectedDimension}&granularity=${granularity}${filterQs}`;
 }
 
 /**
@@ -290,13 +298,8 @@ export function buildAnomalyStats(alertEvalMetrics, mode, severity = '30', isPer
     }
   ];
 
+  // Append response rate metric in explore mode
   if (mode === 'explore') {
-    // Hide MTTD projected metric
-    const mttdObj = anomalyStats.find(stat => stat.key === 'mttd');
-    if (mttdObj) {
-      mttdObj.hideProjected = true;
-    }
-    // Append response rate metric
     anomalyStats.splice(1, 0, responseRateObj);
   }
 
@@ -305,7 +308,7 @@ export function buildAnomalyStats(alertEvalMetrics, mode, severity = '30', isPer
     let newData = alertEvalMetrics.projected[stat.key];
     let isPercentageMetric = stat.units === '%';
     let isTotal = stat.key === 'totalAlerts';
-    stat.showProjected = mode === 'explore';
+    stat.showProjected = false;
     stat.value = isTotal ? origData : formatEvalMetric(origData, isPercentageMetric);
     stat.projected = isTotal ? newData : formatEvalMetric(newData, isPercentageMetric);
     stat.valueUnits = isFinite(origData) ? stat.units : null;

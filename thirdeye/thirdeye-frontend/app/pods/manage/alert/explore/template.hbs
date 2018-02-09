@@ -210,7 +210,7 @@
                  <td class="te-anomaly-table__cell">
                   <ul class="te-anomaly-table__list">
                    {{#each anomaly.dimensionList as |dimension|}}
-                      <li class="te-anomaly-table__list-item">
+                      <li class="te-anomaly-table__list-item" title="{{dimension.dimensionVal}}">
                         {{dimension.dimensionKey}}: <span class="stronger">{{dimension.dimensionVal}}</span>
                       </li>
                    {{else}}
