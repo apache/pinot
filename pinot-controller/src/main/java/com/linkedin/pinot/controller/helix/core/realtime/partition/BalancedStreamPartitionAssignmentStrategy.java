@@ -127,8 +127,11 @@ public class BalancedStreamPartitionAssignmentStrategy implements StreamPartitio
       }
 
       // construct new partitions list
-      for (int i = 0; i < tableToNumPartitions.get(realtimeTableName); i++) {
-        newPartitions.add(realtimeTableName + PARTITION_JOINER + Integer.toString(i));
+      if (tableToNumPartitions.get(realtimeTableName) != null) { // if new table was added by another controller to the same tenant,
+        // we will find it in this list, but not have the current partition assignment for it
+        for (int i = 0; i < tableToNumPartitions.get(realtimeTableName); i++) {
+          newPartitions.add(realtimeTableName + PARTITION_JOINER + Integer.toString(i));
+        }
       }
     }
 
