@@ -14,7 +14,6 @@ const EXPAND_ANOMALY_BTN = '.rootcause-anomaly__icon a';
 const ANOMALY_TITLE = '.rootcause-anomaly__title';
 const ANOMALY_VALUE = '.rootcause-anomaly__props-value';
 const ANOMALY_STATUS = '.ember-radio-button.checked';
-const EDIT_BTN = '.glyphicon-pencil';
 const SAVE_BTN = '.te-button';
 const DISPLAY_VIEW = '.rootcause-metric__display-view';
 const METRICS_TABLE = '.metrics-table';
@@ -70,7 +69,6 @@ test('visiting rootcause page and making changes to the title and comment should
     const comment = 'Cause of anomaly is unknown';
 
     await visit('/rootcause');
-    await click(EDIT_BTN);
     await fillIn(HEADER, header);
     await fillIn(COMMENT_TEXT, comment);
     await click(SAVE_BTN);
