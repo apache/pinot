@@ -1,7 +1,11 @@
 package com.linkedin.thirdeye.datasource.csv;
 
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
+import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
+import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -59,5 +63,12 @@ public class CSVThirdEyeDataSourceTest {
     dataSource.getDimensionFilters("invalid");
   }
 
-
+  @Test
+  public void testExecuteSingleRequest() throws Exception {
+//    ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
+//        .addMetricFunction(new MetricFunction(MetricAggFunction.AVG, "views", 0L, "source", null, null))
+//        .build("ref");
+////    ThirdEyeResponse response = ThirdEyeResponse;
+//    Assert.assertEquals(dataSource.execute(request), reponse);
+  }
 }
