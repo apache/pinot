@@ -16,8 +16,8 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime.partition;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.List;
-import java.util.Objects;
 
 
 /**
@@ -43,18 +43,24 @@ public class RealtimePartition {
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) {
+    if (EqualityUtils.isSameReference(this, o)) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
       return false;
     }
+
     RealtimePartition that = (RealtimePartition) o;
-    return Objects.equals(_partitionNum, that._partitionNum) && Objects.equals(_instanceNames, that._instanceNames);
+
+    return EqualityUtils.isEqual(_partitionNum, that._partitionNum) && EqualityUtils.isEqual(_instanceNames,
+        that._instanceNames);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_partitionNum, _instanceNames);
+    int result = EqualityUtils.hashCodeOf(_partitionNum);
+    result = EqualityUtils.hashCodeOf(result, _instanceNames);
+    return result;
   }
 }
