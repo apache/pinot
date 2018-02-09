@@ -197,24 +197,27 @@ public final class TimeFieldSpec extends FieldSpec {
   }
 
   @Override
-  public boolean equals(Object object) {
-    if (this == object) {
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
       return true;
     }
-    if (object instanceof TimeFieldSpec) {
-      TimeFieldSpec that = (TimeFieldSpec) object;
-      return _incomingGranularitySpec.equals(that._incomingGranularitySpec)
-          && getOutgoingGranularitySpec().equals(that.getOutgoingGranularitySpec())
-          && getDefaultNullValue().equals(that.getDefaultNullValue());
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
     }
-    return false;
+
+    TimeFieldSpec that = (TimeFieldSpec) o;
+
+    return super.equals(that) &&
+        EqualityUtils.isEqual(_incomingGranularitySpec, that._incomingGranularitySpec) &&
+        EqualityUtils.isEqual(_outgoingGranularitySpec, that._outgoingGranularitySpec);
   }
 
   @Override
   public int hashCode() {
-    int result = _incomingGranularitySpec.hashCode();
-    result = EqualityUtils.hashCodeOf(result, getOutgoingGranularitySpec());
-    result = EqualityUtils.hashCodeOf(result, getDefaultNullValue());
+    int result = EqualityUtils.hashCodeOf(super.hashCode());
+    result = EqualityUtils.hashCodeOf(result, _incomingGranularitySpec);
+    result = EqualityUtils.hashCodeOf(result, _outgoingGranularitySpec);
     return result;
   }
 }

@@ -123,28 +123,27 @@ public final class DateTimeFieldSpec extends FieldSpec {
   }
 
   @Override
-  public boolean equals(Object object) {
-    if (this == object) {
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
       return true;
     }
-    if (object instanceof DateTimeFieldSpec) {
-      DateTimeFieldSpec that = (DateTimeFieldSpec) object;
-      return getName().equals(that.getName())
-          && getDataType().equals(that.getDataType())
-          && getFormat().equals(that.getFormat())
-          && getGranularity().equals(that.getGranularity())
-          && getDefaultNullValue().equals(that.getDefaultNullValue());
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
     }
-    return false;
+
+    DateTimeFieldSpec that = (DateTimeFieldSpec) o;
+
+    return super.equals(that) &&
+        EqualityUtils.isEqual(_format, that._format) &&
+        EqualityUtils.isEqual(_granularity, that._granularity);
   }
 
   @Override
   public int hashCode() {
-    int result = getName().hashCode();
-    result = EqualityUtils.hashCodeOf(result, getDataType());
-    result = EqualityUtils.hashCodeOf(result, getFormat());
-    result = EqualityUtils.hashCodeOf(result, getGranularity());
+    int result = EqualityUtils.hashCodeOf(super.hashCode());
+    result = EqualityUtils.hashCodeOf(result, _format);
+    result = EqualityUtils.hashCodeOf(result, _granularity);
     return result;
   }
-
 }

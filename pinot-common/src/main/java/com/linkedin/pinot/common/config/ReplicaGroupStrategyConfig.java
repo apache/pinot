@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nullable;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
@@ -73,29 +74,26 @@ public class ReplicaGroupStrategyConfig {
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) {
+    if (EqualityUtils.isSameReference(this, o)) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
       return false;
     }
 
     ReplicaGroupStrategyConfig that = (ReplicaGroupStrategyConfig) o;
 
-    if (_numInstancesPerPartition != that._numInstancesPerPartition) {
-      return false;
-    }
-    if (_mirrorAssignmentAcrossReplicaGroups != that._mirrorAssignmentAcrossReplicaGroups) {
-      return false;
-    }
-    return _partitionColumn != null ? _partitionColumn.equals(that._partitionColumn) : that._partitionColumn == null;
+    return EqualityUtils.isEqual(_numInstancesPerPartition, that._numInstancesPerPartition) &&
+        EqualityUtils.isEqual(_mirrorAssignmentAcrossReplicaGroups, that._mirrorAssignmentAcrossReplicaGroups) &&
+        EqualityUtils.isEqual(_partitionColumn, that._partitionColumn);
   }
 
   @Override
   public int hashCode() {
-    int result = _partitionColumn != null ? _partitionColumn.hashCode() : 0;
-    result = 31 * result + _numInstancesPerPartition;
-    result = 31 * result + (_mirrorAssignmentAcrossReplicaGroups ? 1 : 0);
+    int result = EqualityUtils.hashCodeOf(_partitionColumn);
+    result = EqualityUtils.hashCodeOf(result, _numInstancesPerPartition);
+    result = EqualityUtils.hashCodeOf(result, _mirrorAssignmentAcrossReplicaGroups);
     return result;
   }
 }

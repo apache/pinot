@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -109,19 +110,24 @@ public class DateTimeGranularitySpec {
     return true;
   }
 
-
+  @Override
   public boolean equals(Object o) {
-    if (!(o instanceof DateTimeGranularitySpec)) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
       return false;
     }
-    DateTimeGranularitySpec dg = (DateTimeGranularitySpec) o;
-    return Objects.equals(getGranularity(), dg.getGranularity());
+
+    DateTimeGranularitySpec that = (DateTimeGranularitySpec) o;
+
+    return EqualityUtils.isEqual(_granularity, that._granularity);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getGranularity());
+    int result = EqualityUtils.hashCodeOf(_granularity);
+    return result;
   }
-
-
 }

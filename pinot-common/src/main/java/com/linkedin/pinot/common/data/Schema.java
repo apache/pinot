@@ -566,19 +566,39 @@ public final class Schema {
   }
 
   @Override
-  public boolean equals(Object object) {
-    if (this == object) {
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
       return true;
     }
-    if (object instanceof Schema) {
-      Schema that = (Schema) object;
-      return _schemaName.equals(that._schemaName) && _fieldSpecMap.equals(that._fieldSpecMap);
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
     }
-    return false;
+
+    Schema schema = (Schema) o;
+
+    return EqualityUtils.isEqual(_schemaName, schema._schemaName) &&
+        EqualityUtils.isEqual(_dimensionFieldSpecs, schema._dimensionFieldSpecs) &&
+        EqualityUtils.isEqual(_metricFieldSpecs, schema._metricFieldSpecs) &&
+        EqualityUtils.isEqual(_timeFieldSpec, schema._timeFieldSpec) &&
+        EqualityUtils.isEqual(_dateTimeFieldSpecs, schema._dateTimeFieldSpecs) &&
+        EqualityUtils.isEqual(_fieldSpecMap, schema._fieldSpecMap) &&
+        EqualityUtils.isEqual(_dimensionNames, schema._dimensionNames) &&
+        EqualityUtils.isEqual(_metricNames, schema._metricNames) &&
+        EqualityUtils.isEqual(_dateTimeNames, schema._dateTimeNames);
   }
 
   @Override
   public int hashCode() {
-    return EqualityUtils.hashCodeOf(_schemaName.hashCode(), _fieldSpecMap);
+    int result = EqualityUtils.hashCodeOf(_schemaName);
+    result = EqualityUtils.hashCodeOf(result, _dimensionFieldSpecs);
+    result = EqualityUtils.hashCodeOf(result, _metricFieldSpecs);
+    result = EqualityUtils.hashCodeOf(result, _timeFieldSpec);
+    result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
+    result = EqualityUtils.hashCodeOf(result, _fieldSpecMap);
+    result = EqualityUtils.hashCodeOf(result, _dimensionNames);
+    result = EqualityUtils.hashCodeOf(result, _metricNames);
+    result = EqualityUtils.hashCodeOf(result, _dateTimeNames);
+    return result;
   }
 }

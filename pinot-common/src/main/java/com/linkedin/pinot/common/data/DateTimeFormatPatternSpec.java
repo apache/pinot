@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -36,7 +37,7 @@ public class DateTimeFormatPatternSpec {
   private TimeFormat _timeFormat;
   private String _sdfPattern = null;
   private DateTimeZone _dateTimeZone = DEFAULT_DATETIMEZONE;
-  private DateTimeFormatter _dateTimeFormatter ;
+  private transient DateTimeFormatter _dateTimeFormatter;
 
   public DateTimeFormatPatternSpec(String timeFormat, String sdfPatternWithTz) {
     _timeFormat = TimeFormat.valueOf(timeFormat);
@@ -66,5 +67,36 @@ public class DateTimeFormatPatternSpec {
 
   public DateTimeFormatter getDateTimeFormatter() {
     return _dateTimeFormatter;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    DateTimeFormatPatternSpec that = (DateTimeFormatPatternSpec) o;
+
+    return EqualityUtils.isEqual(_timeFormat, that._timeFormat) &&
+        EqualityUtils.isEqual(_sdfPattern, that._sdfPattern) &&
+        EqualityUtils.isEqual(_dateTimeZone, that._dateTimeZone);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_timeFormat);
+    result = EqualityUtils.hashCodeOf(result, _sdfPattern);
+    result = EqualityUtils.hashCodeOf(result, _dateTimeZone);
+    return result;
+  }
+
+  @Override
+  public String toString() {
+    return "DateTimeFormatPatternSpec{" + "_timeFormat=" + _timeFormat + ", _sdfPattern='" + _sdfPattern + '\''
+        + ", _dateTimeZone=" + _dateTimeZone + ", _dateTimeFormatter=" + _dateTimeFormatter + '}';
   }
 }

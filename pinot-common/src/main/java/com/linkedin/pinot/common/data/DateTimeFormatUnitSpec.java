@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.EnumUtils;
 
@@ -63,5 +64,28 @@ public class DateTimeFormatUnitSpec {
       return true;
     }
     return false;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    DateTimeFormatUnitSpec that = (DateTimeFormatUnitSpec) o;
+
+    return EqualityUtils.isEqual(_timeUnit, that._timeUnit) &&
+        EqualityUtils.isEqual(_dateTimeTransformUnit, that._dateTimeTransformUnit);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_timeUnit);
+    result = EqualityUtils.hashCodeOf(result, _dateTimeTransformUnit);
+    return result;
   }
 }

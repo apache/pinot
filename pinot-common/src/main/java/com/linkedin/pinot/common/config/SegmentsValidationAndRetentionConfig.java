@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.config;
 
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.startree.hll.HllConfig;
 import java.lang.reflect.Field;
 import org.codehaus.jackson.annotate.JsonIgnore;
@@ -189,5 +190,50 @@ public class SegmentsValidationAndRetentionConfig {
     result.append("}");
 
     return result.toString();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    SegmentsValidationAndRetentionConfig that = (SegmentsValidationAndRetentionConfig) o;
+
+    return EqualityUtils.isEqual(retentionTimeUnit, that.retentionTimeUnit) &&
+        EqualityUtils.isEqual(retentionTimeValue, that.retentionTimeValue) &&
+        EqualityUtils.isEqual(segmentPushFrequency, that.segmentPushFrequency) &&
+        EqualityUtils.isEqual(segmentPushType, that.segmentPushType) &&
+        EqualityUtils.isEqual(replication, that.replication) &&
+        EqualityUtils.isEqual(schemaName, that.schemaName) &&
+        EqualityUtils.isEqual(timeColumnName, that.timeColumnName) &&
+        EqualityUtils.isEqual(timeType, that.timeType) &&
+        EqualityUtils.isEqual( segmentAssignmentStrategy, that.segmentAssignmentStrategy) &&
+        EqualityUtils.isEqual(replicaGroupStrategyConfig, that.replicaGroupStrategyConfig) &&
+        EqualityUtils.isEqual(starTreeConfig, that.starTreeConfig) &&
+        EqualityUtils.isEqual(hllConfig, that.hllConfig) &&
+        EqualityUtils.isEqual(replicasPerPartition, that.replicasPerPartition);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(retentionTimeUnit);
+    result = EqualityUtils.hashCodeOf(result, retentionTimeValue);
+    result = EqualityUtils.hashCodeOf(result, segmentPushFrequency);
+    result = EqualityUtils.hashCodeOf(result, segmentPushType);
+    result = EqualityUtils.hashCodeOf(result, replication);
+    result = EqualityUtils.hashCodeOf(result, schemaName);
+    result = EqualityUtils.hashCodeOf(result, timeColumnName);
+    result = EqualityUtils.hashCodeOf(result, timeType);
+    result = EqualityUtils.hashCodeOf(result, segmentAssignmentStrategy);
+    result = EqualityUtils.hashCodeOf(result, replicaGroupStrategyConfig);
+    result = EqualityUtils.hashCodeOf(result, starTreeConfig);
+    result = EqualityUtils.hashCodeOf(result, hllConfig);
+    result = EqualityUtils.hashCodeOf(result, replicasPerPartition);
+    return result;
   }
 }

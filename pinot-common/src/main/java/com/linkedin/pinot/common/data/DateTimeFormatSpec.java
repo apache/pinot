@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -220,17 +221,36 @@ public class DateTimeFormatSpec {
     return true;
   }
 
-
+  @Override
   public boolean equals(Object o) {
-    if (!(o instanceof DateTimeFormatSpec)) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
       return false;
     }
-    DateTimeFormatSpec df = (DateTimeFormatSpec) o;
-    return Objects.equals(getFormat(), df.getFormat());
+
+    DateTimeFormatSpec that = (DateTimeFormatSpec) o;
+
+    return EqualityUtils.isEqual(_size, that._size) &&
+        EqualityUtils.isEqual(_format, that._format) &&
+        EqualityUtils.isEqual(_unitSpec, that._unitSpec) &&
+        EqualityUtils.isEqual(_patternSpec, that._patternSpec);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getFormat());
+    int result = EqualityUtils.hashCodeOf(_format);
+    result = EqualityUtils.hashCodeOf(result, _size);
+    result = EqualityUtils.hashCodeOf(result, _unitSpec);
+    result = EqualityUtils.hashCodeOf(result, _patternSpec);
+    return result;
+  }
+
+  @Override
+  public String toString() {
+    return "DateTimeFormatSpec{" + "_format='" + _format + '\'' + ", _size=" + _size + ", _unitSpec=" + _unitSpec
+        + ", _patternSpec=" + _patternSpec + '}';
   }
 }

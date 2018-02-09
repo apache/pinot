@@ -18,6 +18,7 @@ package com.linkedin.pinot.common.config;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.startree.hll.HllConfig;
 import java.io.IOException;
 import java.util.Collections;
@@ -286,6 +287,43 @@ public class TableConfig {
     } catch (Exception e) {
       return e.toString();
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    TableConfig that = (TableConfig) o;
+
+    return EqualityUtils.isEqual(_tableName, that._tableName) &&
+        EqualityUtils.isEqual(_tableType, that._tableType) &&
+        EqualityUtils.isEqual(_validationConfig, that._validationConfig) &&
+        EqualityUtils.isEqual(_tenantConfig, that._tenantConfig) &&
+        EqualityUtils.isEqual(_indexingConfig, that._indexingConfig) &&
+        EqualityUtils.isEqual( _customConfig, that._customConfig) &&
+        EqualityUtils.isEqual(_quotaConfig, that._quotaConfig) &&
+        EqualityUtils.isEqual(_taskConfig, that._taskConfig) &&
+        EqualityUtils.isEqual(_routingConfig, that._routingConfig);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_tableName);
+    result = EqualityUtils.hashCodeOf(result, _tableType);
+    result = EqualityUtils.hashCodeOf(result, _validationConfig);
+    result = EqualityUtils.hashCodeOf(result, _tenantConfig);
+    result = EqualityUtils.hashCodeOf(result, _indexingConfig);
+    result = EqualityUtils.hashCodeOf(result, _customConfig);
+    result = EqualityUtils.hashCodeOf(result, _quotaConfig);
+    result = EqualityUtils.hashCodeOf(result, _taskConfig);
+    result = EqualityUtils.hashCodeOf(result, _routingConfig);
+    return result;
   }
 
   public static class Builder {

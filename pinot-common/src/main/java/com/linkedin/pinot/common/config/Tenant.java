@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -84,41 +85,33 @@ public class Tenant {
     return (realtimeInstances + offlineInstances > numberOfInstances);
   }
 
-  /**
-   *  returns true if all properties are the same
-   */
   @Override
-  public boolean equals(Object object) {
-    if (!(object instanceof Tenant)) {
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
       return false;
     }
 
-    final Tenant toCompare = (Tenant) object;
+    Tenant tenant = (Tenant) o;
 
-    if ((toCompare.getTenantRole().equals(getTenantName())) && (toCompare.getTenantName().equals(getTenantName()))
-        && (toCompare.getNumberOfInstances() == getNumberOfInstances())) {
-      if (getTenantRole() == TenantRole.SERVER) {
-        if (toCompare.getOfflineInstances() == getOfflineInstances()
-            && toCompare.getRealtimeInstances() == getRealtimeInstances()) {
-          return true;
-        } else {
-          return false;
-        }
-      } else {
-        return true;
-      }
-    }
-    return false;
+    return EqualityUtils.isEqual(numberOfInstances, tenant.numberOfInstances) &&
+        EqualityUtils.isEqual(offlineInstances, tenant.offlineInstances) &&
+        EqualityUtils.isEqual(realtimeInstances, tenant.realtimeInstances) &&
+        EqualityUtils.isEqual(tenantRole, tenant.tenantRole) &&
+        EqualityUtils.isEqual(tenantName, tenant.tenantName);
   }
 
   @Override
   public int hashCode() {
-    if (getTenantRole() == TenantRole.SERVER) {
-      return Objects.hashCode(getTenantRole(), getTenantName(), getNumberOfInstances(), getOfflineInstances(),
-          getRealtimeInstances());
-    } else {
-      return Objects.hashCode(getTenantRole(), getTenantName(), getNumberOfInstances());
-    }
+    int result = EqualityUtils.hashCodeOf(tenantRole);
+    result = EqualityUtils.hashCodeOf(result, tenantName);
+    result = EqualityUtils.hashCodeOf(result, numberOfInstances);
+    result = EqualityUtils.hashCodeOf(result, offlineInstances);
+    result = EqualityUtils.hashCodeOf(result, realtimeInstances);
+    return result;
   }
 
   @Override

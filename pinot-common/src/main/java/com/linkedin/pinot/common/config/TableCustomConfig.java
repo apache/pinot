@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.lang.reflect.Field;
 import java.util.Map;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
@@ -68,5 +69,26 @@ public class TableCustomConfig {
     result.append("}");
 
     return result.toString();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    TableCustomConfig that = (TableCustomConfig) o;
+
+    return EqualityUtils.isEqual(_customConfigs, that._customConfigs);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_customConfigs);
+    return result;
   }
 }

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.data;
 
 import com.linkedin.pinot.common.utils.DataSchema;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Type;
 import org.json.JSONArray;
@@ -49,8 +50,8 @@ public abstract class FieldSpec {
   private String _name;
   private DataType _dataType;
   private boolean _isSingleValueField = true;
-  private String _stringDefaultNullValue;
-  private Object _cachedDefaultNullValue;
+  private transient String _stringDefaultNullValue;
+  private transient Object _cachedDefaultNullValue;
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public FieldSpec() {
@@ -71,7 +72,9 @@ public abstract class FieldSpec {
   }
 
   @Nonnull
-  public abstract FieldType getFieldType();
+  public FieldType getFieldType() {
+    return FieldType.INVALID;
+  }
 
   @Nonnull
   public String getName() {
@@ -98,6 +101,33 @@ public abstract class FieldSpec {
 
   public void setSingleValueField(boolean isSingleValueField) {
     _isSingleValueField = isSingleValueField;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    FieldSpec fieldSpec = (FieldSpec) o;
+
+    return EqualityUtils.isEqual(_isSingleValueField, fieldSpec._isSingleValueField) &&
+        EqualityUtils.isEqual(_name, fieldSpec._name) &&
+        EqualityUtils.isEqual(_dataType, fieldSpec._dataType) &&
+        EqualityUtils.isEqual(getDefaultNullValue(), fieldSpec.getDefaultNullValue());
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_name);
+    result = EqualityUtils.hashCodeOf(result, _dataType);
+    result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
+    result = EqualityUtils.hashCodeOf(result, getDefaultNullValue());
+    return result;
   }
 
   @Nonnull
@@ -194,6 +224,7 @@ public abstract class FieldSpec {
    * segments, otherwise treated the same as <code>DIMENSION</code> field.
    */
   public enum FieldType {
+    INVALID,
     DIMENSION,
     METRIC,
     TIME,

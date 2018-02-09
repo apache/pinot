@@ -260,28 +260,31 @@ public class TimeGranularitySpec {
   }
 
   @Override
-  public boolean equals(Object anObject) {
-    if (this == anObject) {
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
       return true;
     }
-    if (anObject instanceof TimeGranularitySpec) {
-      TimeGranularitySpec anotherTimeGranularitySpec = (TimeGranularitySpec) anObject;
-      return _dataType.equals(anotherTimeGranularitySpec._dataType)
-          && _timeType.equals(anotherTimeGranularitySpec._timeType)
-          && _timeUnitSize == anotherTimeGranularitySpec._timeUnitSize
-          && _name.equals(anotherTimeGranularitySpec._name)
-          && _timeFormat.equals(anotherTimeGranularitySpec._timeFormat);
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
     }
-    return false;
+
+    TimeGranularitySpec that = (TimeGranularitySpec) o;
+
+    return EqualityUtils.isEqual(_timeUnitSize, that._timeUnitSize) &&
+        EqualityUtils.isEqual(_dataType, that._dataType) &&
+        EqualityUtils.isEqual(_timeType, that._timeType) &&
+        EqualityUtils.isEqual(_timeFormat, that._timeFormat) &&
+        EqualityUtils.isEqual(_name, that._name);
   }
 
   @Override
   public int hashCode() {
-    int result = _dataType.hashCode();
+    int result = EqualityUtils.hashCodeOf(_dataType);
     result = EqualityUtils.hashCodeOf(result, _timeType);
     result = EqualityUtils.hashCodeOf(result, _timeUnitSize);
-    result = EqualityUtils.hashCodeOf(result, _name);
     result = EqualityUtils.hashCodeOf(result, _timeFormat);
+    result = EqualityUtils.hashCodeOf(result, _name);
     return result;
   }
 }

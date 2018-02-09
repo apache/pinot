@@ -17,6 +17,7 @@ package com.linkedin.pinot.common.data;
 
 import com.google.common.collect.Sets;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -131,5 +132,36 @@ public class StarTreeIndexSpec {
         Sets.newHashSet(starTreeMetadata.getSkipMaterializationForDimensions()));
     starTreeIndexSpec.setSkipMaterializationCardinalityThreshold(starTreeMetadata.getSkipMaterializationCardinality());
     return starTreeIndexSpec;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    StarTreeIndexSpec that = (StarTreeIndexSpec) o;
+
+    return EqualityUtils.isEqual(_maxLeafRecords, that._maxLeafRecords) &&
+        EqualityUtils.isEqual( _skipMaterializationCardinalityThreshold, that._skipMaterializationCardinalityThreshold) &&
+        EqualityUtils.isEqual(_excludeSkipMaterializationDimensionsForStarTreeIndex, that._excludeSkipMaterializationDimensionsForStarTreeIndex) &&
+        EqualityUtils.isEqual(_dimensionsSplitOrder, that._dimensionsSplitOrder) &&
+        EqualityUtils.isEqual(_skipStarNodeCreationForDimensions, that._skipStarNodeCreationForDimensions) &&
+        EqualityUtils.isEqual(_skipMaterializationForDimensions, that._skipMaterializationForDimensions);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_maxLeafRecords);
+    result = EqualityUtils.hashCodeOf(result, _dimensionsSplitOrder);
+    result = EqualityUtils.hashCodeOf(result, _skipStarNodeCreationForDimensions);
+    result = EqualityUtils.hashCodeOf(result, _skipMaterializationForDimensions);
+    result = EqualityUtils.hashCodeOf(result, _skipMaterializationCardinalityThreshold);
+    result = EqualityUtils.hashCodeOf(result, _excludeSkipMaterializationDimensionsForStarTreeIndex);
+    return result;
   }
 }

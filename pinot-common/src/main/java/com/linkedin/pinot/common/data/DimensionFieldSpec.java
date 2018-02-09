@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nonnull;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
@@ -49,30 +48,5 @@ public final class DimensionFieldSpec extends FieldSpec {
   public String toString() {
     return "< field type: DIMENSION, field name: " + getName() + ", data type: " + getDataType()
         + ", is single-value field: " + isSingleValueField() + ", default null value: " + getDefaultNullValue() + " >";
-  }
-
-  @Override
-  public boolean equals(Object object) {
-    if (this == object) {
-      return true;
-    }
-    if (object instanceof DimensionFieldSpec) {
-      DimensionFieldSpec that = (DimensionFieldSpec) object;
-
-      return getName().equals(that.getName())
-          && getDataType() == that.getDataType()
-          && isSingleValueField() == that.isSingleValueField()
-          && getDefaultNullValue().equals(that.getDefaultNullValue());
-    }
-    return false;
-  }
-
-  @Override
-  public int hashCode() {
-    int result = getName().hashCode();
-    result = EqualityUtils.hashCodeOf(result, getDataType());
-    result = EqualityUtils.hashCodeOf(result, isSingleValueField());
-    result = EqualityUtils.hashCodeOf(result, getDefaultNullValue());
-    return result;
   }
 }

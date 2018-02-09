@@ -130,27 +130,25 @@ public final class MetricFieldSpec extends FieldSpec {
   }
 
   @Override
-  public boolean equals(Object object) {
-    if (this == object) {
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
       return true;
     }
-    if (object instanceof MetricFieldSpec) {
-      MetricFieldSpec that = (MetricFieldSpec) object;
 
-      return getName().equals(that.getName())
-          && getDataType() == that.getDataType()
-          && getDefaultNullValue().equals(that.getDefaultNullValue())
-          && getFieldSize() == that.getFieldSize()
-          && _derivedMetricType == that._derivedMetricType;
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
     }
-    return false;
+
+    MetricFieldSpec that = (MetricFieldSpec) o;
+
+    return super.equals(that) &&
+        EqualityUtils.isEqual(getFieldSize(), that.getFieldSize()) &&
+        EqualityUtils.isEqual(_derivedMetricType, that._derivedMetricType);
   }
 
   @Override
   public int hashCode() {
-    int result = getName().hashCode();
-    result = EqualityUtils.hashCodeOf(result, getDataType());
-    result = EqualityUtils.hashCodeOf(result, getDefaultNullValue());
+    int result = EqualityUtils.hashCodeOf(super.hashCode());
     result = EqualityUtils.hashCodeOf(result, getFieldSize());
     result = EqualityUtils.hashCodeOf(result, _derivedMetricType);
     return result;
