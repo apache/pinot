@@ -541,15 +541,27 @@ body {
       font-size: 13px;
     }
 
-    &--smaller {
-      font-size: 12px;
-      margin-left: -2px;
-    }
-
     &--shadow {
       position: absolute;
       color: app-shade(black, 2);
       margin-left: -18px;
+    }
+  }
+
+  &__list-item {
+    font-size: 12px;
+    margin-left: -2px;
+  }
+
+  &__value-label {
+    font-size: 13px;
+
+    &--up {
+      color: green;
+    }
+
+    &--down {
+      color: red;
     }
   }
 

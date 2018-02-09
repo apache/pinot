@@ -69,11 +69,11 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
     const score = resolvedScores.length ? resolvedScores.find(score => score.id === anomaly.anomalyId).score : null;
     const durationArr = [pluralizeTime(days, 'day'), pluralizeTime(hours, 'hour'), pluralizeTime(minutes, 'minute')];
 
-    // Placeholder: ChangeRate will not be calculated on front-end
+    // Set up anomaly change rate display
     const changeRate = (anomaly.current && anomaly.baseline)
-      ? (Math.abs(anomaly.current - anomaly.baseline) / anomaly.baseline * 100).toFixed(2) : 0;
-
+      ? ((anomaly.current / anomaly.baseline - 1.0) * 100).toFixed(2) : 0;
     const changeDirection = (anomaly.current > anomaly.baseline) ? '-' : '+';
+    const changeDirectionLabel = changeDirection === '-' ? 'down' : 'up';
 
     // We want to display only non-zero duration values in our table
     const noZeroDurationArr = _.remove(durationArr, function(item) {
@@ -89,6 +89,7 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
     Object.assign(anomaly, {
       changeRate,
       changeDirection,
+      changeDirectionLabel,
       shownChangeRate: changeRate,
       isUserReported: anomaly.anomalyResultSource === 'USER_LABELED_ANOMALY',
       startDateStr: moment(anomaly.anomalyStart).format('MMM D, hh:mm A'),
