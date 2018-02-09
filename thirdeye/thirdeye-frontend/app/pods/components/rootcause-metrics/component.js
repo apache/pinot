@@ -18,7 +18,7 @@ const ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC = 'metric';
 const ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET = 'dataset';
 const ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE = 'change';
 const ROOTCAUSE_METRICS_SORT_PROPERTY_SCORE = 'score';
-
+const OFFSETS = ['wo1w', 'wo2w', 'wo3w', 'wo4w', 'baseline'];
 const ROOTCAUSE_METRICS_OUTPUT_MODE_ASC = 'asc';
 const ROOTCAUSE_METRICS_OUTPUT_MODE_DESC = 'desc';
 
@@ -227,14 +227,34 @@ export default Component.extend({
     'aggregates',
     function () {
       const { entities, aggregates } = this.getProperties('entities', 'aggregates'); // poll observer
+      let dict = {};
 
-      const offsets = ['wo1w', 'wo2w', 'wo3w', 'wo4w', 'baseline'];
-      const dict = {};
-      offsets.forEach(offset => dict[offset] = this._computeChangesForOffset(offset));
+      OFFSETS.forEach(offset => dict[offset] = this._computeChangesForOffset(offset));
 
       return dict;
     }
   ),
+
+  baselineScores: Ember.computed(
+    'entities',
+    'aggregates',
+    function () {
+      let dict = {};
+
+      OFFSETS.forEach(offset => dict[offset] = this._computeBaselineScore(offset));
+      return dict;
+    }
+  ),
+
+  _computeBaselineScore(offset) {
+    const { entities, aggregates } = this.getProperties('entities', 'aggregates');
+    const score = filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
+      .reduce((agg, urn) => {
+        agg[urn] = aggregates[toOffsetUrn(urn, offset)];
+        return agg;
+      }, {});
+    return score;
+  },
 
   /**
    * Formatted change strings for 'changesOffset'

@@ -145,11 +145,13 @@ export default Component.extend({
   ),
 
   _makeRecord(offset, urn) {
-    const { entities, changesOffset, changesOffsetFormatted } =
-      this.getProperties('entities', 'changesOffset', 'changesOffsetFormatted');
+    const { entities, changesOffset, changesOffsetFormatted, baselineScores } =
+      this.getProperties('entities', 'changesOffset', 'changesOffsetFormatted', 'baselineScores');
+
     return {
       value: changesOffsetFormatted[offset][urn],
-      direction: toColorDirection(changesOffset[offset][urn], isInverse(urn, entities))
+      direction: toColorDirection(changesOffset[offset][urn], isInverse(urn, entities)),
+      score: humanizeScore(baselineScores[offset][urn])
     };
   },
 
