@@ -16,6 +16,9 @@
 package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
@@ -60,10 +63,10 @@ public final class Schema {
   private final List<DateTimeFieldSpec> _dateTimeFieldSpecs = new ArrayList<>();
 
   // Json ignored fields
-  private final Map<String, FieldSpec> _fieldSpecMap = new HashMap<>();
-  private final List<String> _dimensionNames = new ArrayList<>();
-  private final List<String> _metricNames = new ArrayList<>();
-  private final List<String> _dateTimeNames = new ArrayList<>();
+  private transient final Map<String, FieldSpec> _fieldSpecMap = new HashMap<>();
+  private transient final List<String> _dimensionNames = new ArrayList<>();
+  private transient final List<String> _metricNames = new ArrayList<>();
+  private transient final List<String> _dateTimeNames = new ArrayList<>();
 
   @Nonnull
   public static Schema fromFile(@Nonnull File schemaFile) throws IOException {
@@ -327,81 +330,98 @@ public final class Schema {
   @JsonIgnore
   @Nonnull
   public String getJSONSchema() {
-    try {
-      return MAPPER.writeValueAsString(this);
-    } catch (IOException e) {
-      throw new RuntimeException("Caught exception while writing Schema as JSON format string.", e);
+    JsonObject jsonSchema = new JsonObject();
+    jsonSchema.addProperty("schemaName", _schemaName);
+    if (!_dimensionFieldSpecs.isEmpty()) {
+      JsonArray jsonArray = new JsonArray();
+      for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {
+        jsonArray.add(dimensionFieldSpec.toJsonObject());
+      }
+      jsonSchema.add("dimensionFieldSpecs", jsonArray);
     }
+    if (!_metricFieldSpecs.isEmpty()) {
+      JsonArray jsonArray = new JsonArray();
+      for (MetricFieldSpec metricFieldSpec : _metricFieldSpecs) {
+        jsonArray.add(metricFieldSpec.toJsonObject());
+      }
+      jsonSchema.add("metricFieldSpecs", jsonArray);
+    }
+    if (_timeFieldSpec != null) {
+      jsonSchema.add("timeFieldSpec", _timeFieldSpec.toJsonObject());
+    }
+    if (!_dateTimeFieldSpecs.isEmpty()) {
+      JsonArray jsonArray = new JsonArray();
+      for (DateTimeFieldSpec dateTimeFieldSpec : _dateTimeFieldSpecs) {
+        jsonArray.add(dateTimeFieldSpec.toJsonObject());
+      }
+      jsonSchema.add("dateTimeFieldSpecs", jsonArray);
+    }
+    return new GsonBuilder().setPrettyPrinting().create().toJson(jsonSchema);
   }
 
   /**
-   * Validates a pinot schema. The following validations are performed:
-   * <p>- For dimension and time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, STRING.
-   * <p>- For metric fields (non-derived), support {@link DataType}: INT, LONG, FLOAT, DOUBLE.
-   * <p>- All fields must have a default null value.
+   * Validates a pinot schema.
+   * <p>The following validations are performed:
+   * <ul>
+   *   <li>For dimension, time, date time fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE, STRING</li>
+   *   <li>For non-derived metric fields, support {@link DataType}: INT, LONG, FLOAT, DOUBLE</li>
+   * </ul>
    *
-   * @param ctxLogger logger used to log the message (if null, the current class logger is used).
-   * @return whether schema is valid.
+   * @param ctxLogger Logger used to log the message (if null, the current class logger is used)
+   * @return Whether schema is valid
    */
   public boolean validate(Logger ctxLogger) {
     if (ctxLogger == null) {
       ctxLogger = LOGGER;
     }
-    boolean isValid = true;
 
     // Log ALL the schema errors that may be present.
     for (FieldSpec fieldSpec : _fieldSpecMap.values()) {
       FieldType fieldType = fieldSpec.getFieldType();
       DataType dataType = fieldSpec.getDataType();
       String fieldName = fieldSpec.getName();
-      try {
-        switch (fieldType) {
-          case DIMENSION:
-          case TIME:
-          case DATE_TIME:
-            switch (dataType) {
-              case INT:
-              case LONG:
-              case FLOAT:
-              case DOUBLE:
-              case STRING:
-                // Check getDefaultNullValue() does not throw exception.
-                fieldSpec.getDefaultNullValue();
-                break;
-              default:
-                ctxLogger.info("Unsupported data type: {} in DIMENSION/TIME field: {}", dataType, fieldName);
-                isValid = false;
-                break;
-            }
-            break;
-          case METRIC:
-            switch (dataType) {
-              case INT:
-              case LONG:
-              case FLOAT:
-              case DOUBLE:
-                // Check getDefaultNullValue() does not throw exception.
-                fieldSpec.getDefaultNullValue();
-                break;
-              default:
-                ctxLogger.info("Unsupported data type: {} in METRIC field: {}", dataType, fieldName);
-                isValid = false;
-                break;
-            }
-            break;
-          default:
-            ctxLogger.info("Unsupported field type: {} for field: {}", dataType, fieldName);
-            isValid = false;
-            break;
-        }
-      } catch (Exception e) {
-        ctxLogger.info("Caught exception while validating field: {} with field type: {}, data type: {}, {}", fieldName,
-            fieldType, dataType, e.getMessage());
-        isValid = false;
+      switch (fieldType) {
+        case DIMENSION:
+        case TIME:
+        case DATE_TIME:
+          switch (dataType) {
+            case INT:
+            case LONG:
+            case FLOAT:
+            case DOUBLE:
+            case STRING:
+              break;
+            default:
+              ctxLogger.info("Unsupported data type: {} in DIMENSION/TIME field: {}", dataType, fieldName);
+              return false;
+          }
+          break;
+        case METRIC:
+          switch (dataType) {
+            case INT:
+            case LONG:
+            case FLOAT:
+            case DOUBLE:
+              break;
+            case STRING:
+              MetricFieldSpec metricFieldSpec = (MetricFieldSpec) fieldSpec;
+              if (!metricFieldSpec.isDerivedMetric()) {
+                ctxLogger.info("Unsupported data type: STRING in non-derived METRIC field: {}", fieldName);
+                return false;
+              }
+              break;
+            default:
+              ctxLogger.info("Unsupported data type: {} in METRIC field: {}", dataType, fieldName);
+              return false;
+          }
+          break;
+        default:
+          ctxLogger.info("Unsupported field type: {} for field: {}", dataType, fieldName);
+          return false;
       }
     }
 
-    return isValid;
+    return true;
   }
 
   public static class SchemaBuilder {
@@ -565,6 +585,7 @@ public final class Schema {
     return getJSONSchema();
   }
 
+  @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
   @Override
   public boolean equals(Object o) {
     if (EqualityUtils.isSameReference(this, o)) {
@@ -575,17 +596,11 @@ public final class Schema {
       return false;
     }
 
-    Schema schema = (Schema) o;
-
-    return EqualityUtils.isEqual(_schemaName, schema._schemaName) &&
-        EqualityUtils.isEqual(_dimensionFieldSpecs, schema._dimensionFieldSpecs) &&
-        EqualityUtils.isEqual(_metricFieldSpecs, schema._metricFieldSpecs) &&
-        EqualityUtils.isEqual(_timeFieldSpec, schema._timeFieldSpec) &&
-        EqualityUtils.isEqual(_dateTimeFieldSpecs, schema._dateTimeFieldSpecs) &&
-        EqualityUtils.isEqual(_fieldSpecMap, schema._fieldSpecMap) &&
-        EqualityUtils.isEqual(_dimensionNames, schema._dimensionNames) &&
-        EqualityUtils.isEqual(_metricNames, schema._metricNames) &&
-        EqualityUtils.isEqual(_dateTimeNames, schema._dateTimeNames);
+    Schema that = (Schema) o;
+    return EqualityUtils.isEqual(_schemaName, that._schemaName) && EqualityUtils.isEqual(_dimensionFieldSpecs,
+        that._dimensionFieldSpecs) && EqualityUtils.isEqual(_metricFieldSpecs, that._metricFieldSpecs)
+        && EqualityUtils.isEqual(_timeFieldSpec, that._timeFieldSpec) && EqualityUtils.isEqual(_dateTimeFieldSpecs,
+        that._dateTimeFieldSpecs);
   }
 
   @Override
@@ -595,10 +610,6 @@ public final class Schema {
     result = EqualityUtils.hashCodeOf(result, _metricFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _timeFieldSpec);
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
-    result = EqualityUtils.hashCodeOf(result, _fieldSpecMap);
-    result = EqualityUtils.hashCodeOf(result, _dimensionNames);
-    result = EqualityUtils.hashCodeOf(result, _metricNames);
-    result = EqualityUtils.hashCodeOf(result, _dateTimeNames);
     return result;
   }
 }

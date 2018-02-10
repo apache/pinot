@@ -16,14 +16,11 @@
 package com.linkedin.pinot.common.data;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-
 import org.codehaus.jackson.map.ObjectMapper;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -104,8 +101,7 @@ public class FieldSpecTest {
    * Test derived {@link MetricFieldSpec}.
    */
   @Test
-  public void testDerivedMetricFieldSpec()
-      throws IOException {
+  public void testDerivedMetricFieldSpec() throws Exception {
     MetricFieldSpec derivedMetricField =
         new MetricFieldSpec("derivedMetric", DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL);
     Assert.assertEquals(derivedMetricField.getFieldSize(), 10);
@@ -115,7 +111,7 @@ public class FieldSpecTest {
 
     // Test serialize deserialize.
     MetricFieldSpec derivedMetricField2 =
-        MAPPER.readValue(MAPPER.writeValueAsString(derivedMetricField), MetricFieldSpec.class);
+        MAPPER.readValue(derivedMetricField.toJsonObject().toString(), MetricFieldSpec.class);
     Assert.assertEquals(derivedMetricField2, derivedMetricField);
   }
 
@@ -210,9 +206,7 @@ public class FieldSpecTest {
 
     DateTimeFieldSpec dateTimeFieldSpec3 = new DateTimeFieldSpec(name, DataType.LONG, format, granularity);
     Assert.assertEquals(dateTimeFieldSpec1, dateTimeFieldSpec3);
-
   }
-
 
   @Test(dataProvider = "testFormatDataProvider")
   public void testDateTimeFormat(String name, DataType dataType, String format, String granularity,
@@ -237,40 +231,22 @@ public class FieldSpecTest {
     String granularity = "1:HOURS";
 
     List<Object[]> entries = new ArrayList<>();
-    entries.add(new Object[] {
-        name, dataType, "1:hours", granularity, true, null
-    });
-    entries.add(new Object[] {
-        name, dataType, "one_hours", granularity, true, null
-    });
-    entries.add(new Object[] {
-        name, dataType, "1:HOURS:SIMPLE_DATE_FORMAT", granularity, true, null
-    });
-    entries.add(new Object[] {
-        name, dataType, "1:hour:EPOCH", granularity, true, null
-    });
-    entries.add(new Object[] {
-        name, dataType, "1:HOUR:EPOCH:yyyyMMdd", granularity, true, null
-    });
-    entries.add(new Object[] {
-        name, dataType, "0:HOURS:EPOCH", granularity, true, null
-    });
-    entries.add(new Object[] {
-        name, dataType, "-1:HOURS:EPOCH", granularity, true, null
-    });
-    entries.add(new Object[] {
-        name, dataType, "0.1:HOURS:EPOCH", granularity, true, null
-    });
-    entries.add(new Object[] {
-        name, dataType, "1:HOURS:EPOCH", granularity, false, new DateTimeFieldSpec(name, dataType, "1:HOURS:EPOCH", granularity)
-    });
-    entries.add(new Object[] {
-        name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity, false, new DateTimeFieldSpec(name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity)
-    });
+    entries.add(new Object[]{name, dataType, "1:hours", granularity, true, null});
+    entries.add(new Object[]{name, dataType, "one_hours", granularity, true, null});
+    entries.add(new Object[]{name, dataType, "1:HOURS:SIMPLE_DATE_FORMAT", granularity, true, null});
+    entries.add(new Object[]{name, dataType, "1:hour:EPOCH", granularity, true, null});
+    entries.add(new Object[]{name, dataType, "1:HOUR:EPOCH:yyyyMMdd", granularity, true, null});
+    entries.add(new Object[]{name, dataType, "0:HOURS:EPOCH", granularity, true, null});
+    entries.add(new Object[]{name, dataType, "-1:HOURS:EPOCH", granularity, true, null});
+    entries.add(new Object[]{name, dataType, "0.1:HOURS:EPOCH", granularity, true, null});
+    entries.add(new Object[]{name, dataType, "1:HOURS:EPOCH", granularity, false, new DateTimeFieldSpec(name, dataType,
+        "1:HOURS:EPOCH", granularity)});
+    entries.add(
+        new Object[]{name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity, false, new DateTimeFieldSpec(
+            name, dataType, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", granularity)});
 
     return entries.toArray(new Object[entries.size()][]);
   }
-
 
   /**
    * Test different order of fields in serialized JSON string to deserialize {@link FieldSpec}.
@@ -293,19 +269,16 @@ public class FieldSpecTest {
     Assert.assertEquals(dimensionFieldSpec1.getDefaultNullValue(), "false", ERROR_MESSAGE);
 
     // Multi-value dimension field with default null value.
-    dimensionFields = new String[]{
-        "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false",
-        "\"defaultNullValue\":\"default\""};
+    dimensionFields =
+        new String[]{"\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false", "\"defaultNullValue\":\"default\""};
     dimensionFieldSpec1 = MAPPER.readValue(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
     dimensionFieldSpec2 = new DimensionFieldSpec("dimension", DataType.STRING, false, "default");
     Assert.assertEquals(dimensionFieldSpec1, dimensionFieldSpec2, ERROR_MESSAGE);
     Assert.assertEquals(dimensionFieldSpec1.getDefaultNullValue(), "default", ERROR_MESSAGE);
 
     // Time field with default null value.
-    String[] timeFields = {
-        "\"incomingGranularitySpec\":{\"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\",\"name\":\"incomingTime\"}",
-        "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\",\"name\":\"outgoingTime\"}",
-        "\"defaultNullValue\":-1"};
+    String[] timeFields =
+        {"\"incomingGranularitySpec\":{\"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\",\"name\":\"incomingTime\"}", "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\",\"name\":\"outgoingTime\"}", "\"defaultNullValue\":-1"};
     TimeFieldSpec timeFieldSpec1 = MAPPER.readValue(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
     TimeFieldSpec timeFieldSpec2 =
         new TimeFieldSpec("incomingTime", DataType.LONG, TimeUnit.MILLISECONDS, "outgoingTime", DataType.INT,
@@ -314,9 +287,12 @@ public class FieldSpecTest {
     Assert.assertEquals(timeFieldSpec1.getDefaultNullValue(), -1, ERROR_MESSAGE);
 
     // Date time field with default null value.
-    String[] dateTimeFields = {"\"name\":\"Date\"", "\"dataType\":\"LONG\"", "\"format\":\"1:MILLISECONDS:EPOCH\"", "\"granularity\":\"5:MINUTES\"", "\"dateTimeType\":\"PRIMARY\""};
-    DateTimeFieldSpec dateTimeFieldSpec1 = MAPPER.readValue(getRandomOrderJsonString(dateTimeFields), DateTimeFieldSpec.class);
-    DateTimeFieldSpec dateTimeFieldSpec2 = new DateTimeFieldSpec("Date", DataType.LONG, "1:MILLISECONDS:EPOCH", "5:MINUTES");
+    String[] dateTimeFields =
+        {"\"name\":\"Date\"", "\"dataType\":\"LONG\"", "\"format\":\"1:MILLISECONDS:EPOCH\"", "\"granularity\":\"5:MINUTES\"", "\"dateTimeType\":\"PRIMARY\""};
+    DateTimeFieldSpec dateTimeFieldSpec1 =
+        MAPPER.readValue(getRandomOrderJsonString(dateTimeFields), DateTimeFieldSpec.class);
+    DateTimeFieldSpec dateTimeFieldSpec2 =
+        new DateTimeFieldSpec("Date", DataType.LONG, "1:MILLISECONDS:EPOCH", "5:MINUTES");
     Assert.assertEquals(dateTimeFieldSpec1, dateTimeFieldSpec2, ERROR_MESSAGE);
   }
 
@@ -331,36 +307,34 @@ public class FieldSpecTest {
     // Short type Metric field.
     String[] metricFields = {"\"name\":\"metric\"", "\"dataType\":\"SHORT\""};
     first = MAPPER.readValue(getRandomOrderJsonString(metricFields), MetricFieldSpec.class);
-    second = MAPPER.readValue(MAPPER.writeValueAsString(first), MetricFieldSpec.class);
+    second = MAPPER.readValue(first.toJsonObject().toString(), MetricFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);
 
     // Single-value boolean type dimension field with default null value.
     String[] dimensionFields = {"\"name\":\"dimension\"", "\"dataType\":\"BOOLEAN\"", "\"defaultNullValue\":false"};
     first = MAPPER.readValue(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
-    second = MAPPER.readValue(MAPPER.writeValueAsString(first), DimensionFieldSpec.class);
+    second = MAPPER.readValue(first.toJsonObject().toString(), DimensionFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);
 
     // Multi-value dimension field with default null value.
-    dimensionFields = new String[]{
-        "\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false",
-        "\"defaultNullValue\":\"default\""};
+    dimensionFields =
+        new String[]{"\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false", "\"defaultNullValue\":\"default\""};
     first = MAPPER.readValue(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
-    second = MAPPER.readValue(MAPPER.writeValueAsString(first), DimensionFieldSpec.class);
+    second = MAPPER.readValue(first.toJsonObject().toString(), DimensionFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);
 
     // Time field with default value.
-    String[] timeFields = {
-        "\"incomingGranularitySpec\":{\"timeUnitSize\":1, \"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\",\"name\":\"incomingTime\"}",
-        "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\",\"name\":\"outgoingTime\"}",
-        "\"defaultNullValue\":-1"};
+    String[] timeFields =
+        {"\"incomingGranularitySpec\":{\"timeUnitSize\":1, \"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\",\"name\":\"incomingTime\"}", "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\",\"name\":\"outgoingTime\"}", "\"defaultNullValue\":-1"};
     first = MAPPER.readValue(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
-    second = MAPPER.readValue(MAPPER.writeValueAsString(first), TimeFieldSpec.class);
+    second = MAPPER.readValue(first.toJsonObject().toString(), TimeFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);
 
     // DateTime field
-    String[] dateTimeFields = {"\"name\":\"Date\"", "\"dataType\":\"LONG\"", "\"format\":\"1:MILLISECONDS:EPOCH\"", "\"granularity\":\"5:MINUTES\"", "\"dateTimeType\":\"PRIMARY\""};
+    String[] dateTimeFields =
+        {"\"name\":\"Date\"", "\"dataType\":\"LONG\"", "\"format\":\"1:MILLISECONDS:EPOCH\"", "\"granularity\":\"5:MINUTES\"", "\"dateTimeType\":\"PRIMARY\""};
     first = MAPPER.readValue(getRandomOrderJsonString(dateTimeFields), DateTimeFieldSpec.class);
-    second = MAPPER.readValue(MAPPER.writeValueAsString(first), DateTimeFieldSpec.class);
+    second = MAPPER.readValue(first.toJsonObject().toString(), DateTimeFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);
   }
 

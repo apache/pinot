@@ -15,22 +15,19 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.google.common.base.Preconditions;
+import com.google.gson.JsonObject;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.utils.EqualityUtils;
 
-
+@SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class DateTimeFieldSpec extends FieldSpec {
-
   private String _format;
   private String _granularity;
-
 
   public enum TimeFormat {
     EPOCH,
@@ -82,7 +79,6 @@ public final class DateTimeFieldSpec extends FieldSpec {
     _granularity = granularity;
   }
 
-
   @JsonIgnore
   @Nonnull
   @Override
@@ -90,16 +86,19 @@ public final class DateTimeFieldSpec extends FieldSpec {
     return FieldType.DATE_TIME;
   }
 
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  @Override
+  public void setSingleValueField(boolean isSingleValueField) {
+    Preconditions.checkArgument(isSingleValueField, "Unsupported multi-value for date time field.");
+  }
+
   @Nonnull
   public String getFormat() {
     return _format;
   }
 
-  /**
-   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
-   * @param format
-   */
-  public void setFormat(String format) {
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  public void setFormat(@Nonnull String format) {
     _format = format;
   }
 
@@ -108,41 +107,39 @@ public final class DateTimeFieldSpec extends FieldSpec {
     return _granularity;
   }
 
-  /**
-   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
-   * @param granularity
-   */
-  public void setGranularity(String granularity) {
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  public void setGranularity(@Nonnull String granularity) {
     _granularity = granularity;
+  }
+
+  @Nonnull
+  @Override
+  public JsonObject toJsonObject() {
+    JsonObject jsonObject = super.toJsonObject();
+    jsonObject.addProperty("format", _format);
+    jsonObject.addProperty("granularity", _granularity);
+    return jsonObject;
   }
 
   @Override
   public String toString() {
-    return "< field type: DATE_TIME, field name: " + getName() + ", datatype: " + getDataType()
-        + ", time column format: " + getFormat() + ", time field granularity: " + getGranularity() + " >";
+    return "< field type: DATE_TIME, field name: " + _name + ", datatype: " + _dataType + ", time column format: "
+        + _format + ", time field granularity: " + _granularity + " >";
   }
 
   @Override
   public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
-      return true;
-    }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+    if (!super.equals(o)) {
       return false;
     }
 
     DateTimeFieldSpec that = (DateTimeFieldSpec) o;
-
-    return super.equals(that) &&
-        EqualityUtils.isEqual(_format, that._format) &&
-        EqualityUtils.isEqual(_granularity, that._granularity);
+    return EqualityUtils.isEqual(_format, that._format) && EqualityUtils.isEqual(_granularity, that._granularity);
   }
 
   @Override
   public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(super.hashCode());
-    result = EqualityUtils.hashCodeOf(result, _format);
+    int result = EqualityUtils.hashCodeOf(super.hashCode(), _format);
     result = EqualityUtils.hashCodeOf(result, _granularity);
     return result;
   }
