@@ -1,3 +1,4 @@
+
 /**
  * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
@@ -41,35 +42,18 @@ public class ClientSSLContextGenerator {
   private static final String CERTIFICATE_TYPE = "X509";
   private static final String KEYSTORE_TYPE = "PKCS12";
   private static final String KEYMANAGER_FACTORY_ALGORITHM = "SunX509";
-  private static final Logger _logger = LoggerFactory.getLogger(ClientSSLContextGenerator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ClientSSLContextGenerator.class);
 
-  private String _serverCACertFile;
-  private boolean _enableServerVerification;
-  private String _keyStoreFile;
-  private String _keyStorePassword;
-  private boolean _presentClientCerts;
+  private final String _serverCACertFile;
+  private final String _keyStoreFile;
+  private final String _keyStorePassword;
+  private final boolean _presentClientCerts;
 
-  private ClientSSLContextGenerator() {
-  }
-
-  private void setKeyStoreFile(String keyStoreFile) {
-    _keyStoreFile = keyStoreFile;
-  }
-
-  private void setKeyStorePassword(String keyStorePassword) {
-    _keyStorePassword = keyStorePassword;
-  }
-
-  private void setEnableServerVerification(boolean enableServerVerification) {
-    _enableServerVerification = enableServerVerification;
-  }
-
-  private void setServerCACertFile(String serverCACertFile) {
+  private ClientSSLContextGenerator(String keyStoreFile, String keyStorePassword, String serverCACertFile) {
     _serverCACertFile = serverCACertFile;
-  }
-
-  private void setPresentClientCerts(boolean presentClientCerts) {
-    _presentClientCerts = presentClientCerts;
+    _keyStoreFile = keyStoreFile;
+    _keyStorePassword = keyStorePassword;
+    _presentClientCerts = (_keyStoreFile != null);
   }
 
   public SSLContext generate() {
@@ -90,9 +74,8 @@ public class ClientSSLContextGenerator {
       throws CertificateException, KeyStoreException, IOException, NoSuchAlgorithmException {
     // This is the cert authority that validates server's cert, so we need to put it in our
     // trustStore.
-    final String fileNotConfigured = "Https server CA Certificate file not confugured ";
-    if (_enableServerVerification) {
-      _logger.info("Initializing trust store from {}", _serverCACertFile);
+    if (_serverCACertFile != null) {
+      LOGGER.info("Initializing trust store from {}", _serverCACertFile);
       FileInputStream is = new FileInputStream(new File(_serverCACertFile));
       KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
       trustStore.load(null);
@@ -100,7 +83,7 @@ public class ClientSSLContextGenerator {
       int i = 0;
       while (is.available() > 0) {
         X509Certificate cert = (X509Certificate) certificateFactory.generateCertificate(is);
-        _logger.info("Read certificate serial number {} by issuer {} ", cert.getSerialNumber().toString(16), cert.getIssuerDN().toString());
+        LOGGER.info("Read certificate serial number {} by issuer {} ", cert.getSerialNumber().toString(16), cert.getIssuerDN().toString());
 
         String serverKey = "https-server-" + i;
         trustStore.setCertificateEntry(serverKey, cert);
@@ -109,11 +92,11 @@ public class ClientSSLContextGenerator {
 
       TrustManagerFactory tmf = TrustManagerFactory.getInstance(CERTIFICATE_TYPE);
       tmf.init(trustStore);
-      _logger.info("Successfully initialized trust store");
+      LOGGER.info("Successfully initialized trust store");
       return tmf.getTrustManagers();
     }
     // Server verification disabled. Trust all servers
-    _logger.warn("{}. All servers will be trusted!", fileNotConfigured);
+    LOGGER.warn("Https Server CA file not configured.. All servers will be trusted!");
     TrustManager[] trustAllCerts = new TrustManager[]{new X509TrustManager() {
       @Override
       public void checkClientTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
@@ -137,11 +120,11 @@ public class ClientSSLContextGenerator {
     }
     try {
       KeyStore keyStore = KeyStore.getInstance(KEYSTORE_TYPE);
-      _logger.info("Setting up keystore with file {}", _keyStoreFile);
+      LOGGER.info("Setting up keystore with file {}", _keyStoreFile);
       keyStore.load(new FileInputStream(new File(_keyStoreFile)), _keyStorePassword.toCharArray());
       KeyManagerFactory kmf = KeyManagerFactory.getInstance(KEYMANAGER_FACTORY_ALGORITHM);
       kmf.init(keyStore, _keyStorePassword.toCharArray());
-      _logger.info("Successfully initialized keystore");
+      LOGGER.info("Successfully initialized keystore");
       return kmf.getKeyManagers();
     } catch (Exception e) {
       Utils.rethrowException(e);
@@ -153,8 +136,6 @@ public class ClientSSLContextGenerator {
     String _serverCACertFile;
     String _keyStoreFile;
     String _keyStorePassword;
-    boolean _enableServerVerification = false;
-    boolean _presentClientCerts = false;
 
     public Builder() {
     }
@@ -170,7 +151,6 @@ public class ClientSSLContextGenerator {
     public Builder withServerCACertFile(String serverCACertFile) {
       if (serverCACertFile != null) {
         _serverCACertFile = serverCACertFile;
-        _enableServerVerification = true;
       }
       return this;
     }
@@ -184,7 +164,6 @@ public class ClientSSLContextGenerator {
     public Builder withKeystoreFile(String keyStoreFile) {
       if (keyStoreFile != null) {
         _keyStoreFile = keyStoreFile;
-        _presentClientCerts = true;
       }
       return this;
     }
@@ -197,7 +176,6 @@ public class ClientSSLContextGenerator {
     public Builder withKeyStorePassword(String keyStorePassword) {
       if (keyStorePassword != null) {
         _keyStorePassword = keyStorePassword;
-        _presentClientCerts = true;
       }
       return this;
     }
@@ -205,15 +183,9 @@ public class ClientSSLContextGenerator {
     public ClientSSLContextGenerator build() {
       if ((_keyStoreFile == null && _keyStorePassword != null) ||
           (_keyStoreFile != null && _keyStorePassword == null)) {
-        throw new IllegalArgumentException("One of Keystore file or password must be specified");
+        throw new IllegalArgumentException("Inconsistent keystore file name and keystore password specification");
       }
-      ClientSSLContextGenerator sslContextGenerator = new ClientSSLContextGenerator();
-      sslContextGenerator.setEnableServerVerification(_enableServerVerification);
-      sslContextGenerator.setKeyStoreFile(_keyStoreFile);
-      sslContextGenerator.setKeyStorePassword(_keyStorePassword);
-      sslContextGenerator.setPresentClientCerts(_presentClientCerts);
-      sslContextGenerator.setServerCACertFile(_serverCACertFile);
-      return sslContextGenerator;
+      return new ClientSSLContextGenerator(_keyStoreFile, _keyStorePassword, _serverCACertFile);
     }
   }
 }

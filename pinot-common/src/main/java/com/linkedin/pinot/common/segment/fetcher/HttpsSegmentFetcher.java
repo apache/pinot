@@ -16,16 +16,12 @@
 
 package com.linkedin.pinot.common.segment.fetcher;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import java.util.Collections;
 import java.util.Set;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.Configuration;
-
-
-
 
 /*
  * The following links are useful to understand some of the SSL terminology (key store, trust store, algorithms,
@@ -86,12 +82,8 @@ public class HttpsSegmentFetcher extends HttpSegmentFetcher {
       builder.withKeystoreFile(keyStoreFile).withKeyStorePassword(keyStorePassword);
     }
 
-    try {
-      SSLContext sslContext = builder.build().generate();
-      _httpClient = new FileUploadDownloadClient(sslContext);
-    } catch (Exception e) {
-      Utils.rethrowException(e);
-    }
+    SSLContext sslContext = builder.build().generate();
+    _httpClient = new FileUploadDownloadClient(sslContext);
   }
 
   @Override

@@ -22,8 +22,8 @@ import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.core.query.utils.Pair;
 import java.io.File;
 import java.net.URI;
-import javax.annotation.Nonnull;
 import javax.net.ssl.SSLContext;
+import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,27 +36,30 @@ public class ServerSegmentCompletionProtocolHandler {
   private static final int SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 30_000;
   private static final int OTHER_REQUESTS_TIMEOUT = 5_000;
   private static final String HTTPS_PROTOCOL = "https";
+  private static final String HTTP_PROTOCOL = "http";
 
-  private static String _preferredProtocol = null;
-  private static Integer _preferredPort = null;
+  private static final String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "https.enabled";
+  private static final String CONFIG_OF_CONTROLLER_HTTPS_PORT = "https.controller.port";
+  private static final String CONFIG_OF_HTTPS_CONTROLLER_CACERT = "https.ca-cert";
+  private static final String CONFIG_OF_HTTPS_KEYSTORE_FILE = "https.pkcs12.file";
+  private static final String CONFIG_OF_HTTPS_KEYSTORE_PASSWORD = "https.pkcs12.password";
+
+  private static Integer _controllerHttpsPort = null;
 
   private final String _instanceId;
   private final FileUploadDownloadClient _fileUploadDownloadClient;
   private static SSLContext _sslContext;
 
-  public static void setPreferredProtocol(@Nonnull String _preferredProtocol) {
-    ServerSegmentCompletionProtocolHandler._preferredProtocol = _preferredProtocol.toLowerCase();
-    if (HTTPS_PROTOCOL.equals(_preferredProtocol)) {
-      try {
-        _sslContext = new ClientSSLContextGenerator.Builder().build().generate();
-      } catch (Exception e) {
-        throw new IllegalArgumentException("Cannot build SSL context", e);
-      }
-    }
-  }
+  public static void init(Configuration config) {
+    if (config.getBoolean(CONFIG_OF_CONTROLLER_HTTPS_ENABLED, false)) {
+      ClientSSLContextGenerator.Builder builder = new ClientSSLContextGenerator.Builder();
+      builder.withServerCACertFile(config.getString(CONFIG_OF_HTTPS_CONTROLLER_CACERT));
+      builder.withKeystoreFile(config.getString(CONFIG_OF_HTTPS_KEYSTORE_FILE));
+      builder.withKeyStorePassword(config.getString(CONFIG_OF_HTTPS_KEYSTORE_PASSWORD));
 
-  public static void setPreferredPort(@Nonnull Integer _preferredPort) {
-    ServerSegmentCompletionProtocolHandler._preferredPort = _preferredPort;
+      _controllerHttpsPort = config.getInt(CONFIG_OF_CONTROLLER_HTTPS_PORT);
+      _sslContext = builder.build().generate();
+    }
   }
 
   public ServerSegmentCompletionProtocolHandler(String instanceId) {
@@ -160,10 +163,11 @@ public class ServerSegmentCompletionProtocolHandler {
       LOGGER.warn("No leader found while trying to send {}", request.toString());
       return null;
     }
-    if (_preferredPort != null) {
-      leaderHostPort.setSecond(_preferredPort);
+    String protocol = HTTP_PROTOCOL;
+    if (_controllerHttpsPort != null) {
+      leaderHostPort.setSecond(_controllerHttpsPort);
+      protocol = HTTPS_PROTOCOL;
     }
-    String protocol = (_preferredProtocol != null) ? _preferredProtocol : "http";
 
     return request.getUrl(leaderHostPort.getFirst() + ":" + leaderHostPort.getSecond(), protocol);
   }

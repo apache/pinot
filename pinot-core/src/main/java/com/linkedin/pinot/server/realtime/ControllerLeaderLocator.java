@@ -38,8 +38,7 @@ public class ControllerLeaderLocator {
   private final String _clusterName;
 
   // Co-ordinates of the last known controller leader.
-  private volatile String _controllerLeaderHostPortNotUsed = null;
-  private volatile Pair<String, Integer> _controllerLeaderHostPort = null;
+  private Pair<String, Integer> _controllerLeaderHostPort = null;
 
   // Should we refresh the controller leader co-ordinates?
   private volatile boolean _refresh = true;
@@ -93,7 +92,6 @@ public class ControllerLeaderLocator {
       return _controllerLeaderHostPort;
     } catch (Exception e) {
       LOGGER.warn("Could not locate controller leader, exception", e);
-      _controllerLeaderHostPortNotUsed = null;
       _refresh = true;
       return null;
     }

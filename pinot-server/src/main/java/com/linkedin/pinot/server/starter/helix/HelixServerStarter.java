@@ -114,7 +114,7 @@ public class HelixServerStarter {
     Utils.logVersions();
     ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_helixServerConfig);
     // Need to do this before we start receiving state transitions.
-    setupSegmentCompletetionProtocolHandler(_helixServerConfig);
+    ServerSegmentCompletionProtocolHandler.init(_helixServerConfig.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     _serverInstance = new ServerInstance();
     _serverInstance.init(serverInstanceConfig, propertyStore);
     _serverInstance.start();
@@ -194,22 +194,6 @@ public class HelixServerStarter {
         return (long) MmapUtils.getAllocationFailureCount();
       }
     });
-  }
-
-  private void setupSegmentCompletetionProtocolHandler(Configuration config) {
-    if (config.containsKey(CommonConstants.Server.CONFIG_OF_PREFERRED_CONTROLLER_PROTOCOL)) {
-      ServerSegmentCompletionProtocolHandler.setPreferredProtocol(
-          config.getString(CommonConstants.Server.CONFIG_OF_PREFERRED_CONTROLLER_PROTOCOL));
-    }
-    if (config.containsKey(CommonConstants.Server.CONFIG_OF_PREFERRED_CONTROLLER_PORT)) {
-      try {
-        int preferredPort = config.getInt(CommonConstants.Server.CONFIG_OF_PREFERRED_CONTROLLER_PORT);
-        ServerSegmentCompletionProtocolHandler.setPreferredPort(preferredPort);
-      } catch (Exception e) {
-        LOGGER.warn("Discarding controller preferred port configuration : {}",
-            config.getString(CommonConstants.Server.CONFIG_OF_PREFERRED_CONTROLLER_PORT));
-      }
-    }
   }
 
   private void updateInstanceConfigInHelix(int adminApiPort, boolean shuttingDown) {
