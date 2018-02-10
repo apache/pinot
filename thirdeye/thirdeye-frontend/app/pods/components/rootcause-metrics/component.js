@@ -221,6 +221,20 @@ export default Component.extend({
   /**
    * Change values from multiple offsets to current time range, keyed by offset, then by metric urn
    * @type {Object}
+   * @example
+   * {
+   *  baseline: {
+   *    thirdeye:metric:1: 0.2222222,
+   *    thirdeye:metric:2: 0
+   *  },
+   *  wo1w: {
+   *    thirdeye:metric:1: NaN,
+   *    thirdeye:metric:2: 0
+   *  },
+   *  wo2w: {...},
+   *  wo3w: {...},
+   *  wo4w: {...}
+   * }
    */
   changesOffset: computed(
     'entities',
@@ -235,6 +249,24 @@ export default Component.extend({
     }
   ),
 
+  /**
+   * Baseline values from multiple offsets to current time range, keyed by offset, then by metric urn
+   * @type {Object}
+   * @example
+   * {
+   *  baseline: {
+   *    thirdeye:metric:1: 123,
+   *    thirdeye:metric:2: 0
+   *  },
+   *  wo1w: {
+   *    thirdeye:metric:1: 123,
+   *    thirdeye:metric:2: 0
+   *  },
+   *  wo2w: {...},
+   *  wo3w: {...},
+   *  wo4w: {...}
+   * }
+   */
   baselineScores: Ember.computed(
     'entities',
     'aggregates',
@@ -246,6 +278,12 @@ export default Component.extend({
     }
   ),
 
+  /**
+   * Compute scores from a given offset to the current time range
+   *
+   * @param {String} offset time range offset, e.g. 'baseline', 'wow', 'wo2w', ...
+   * @returns {Object} scores, keyed by metric urn
+   */
   _computeBaselineScore(offset) {
     const { entities, aggregates } = this.getProperties('entities', 'aggregates');
     const score = filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
