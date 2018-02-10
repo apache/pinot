@@ -16,27 +16,6 @@
     }
   }
 
-  &__table {
-    &__column {
-      vertical-align: middle !important;
-      &--small {
-        width: 100px;
-      }
-
-      &--large {
-        width: 400px;
-      }
-    }
-
-    &--positive {
-      color: $te-green;
-    }
-
-    &--negative {
-      color: $te-red;
-    }
-  }
-
   &__card {
     height: 160px;
     border-radius: 2px;
