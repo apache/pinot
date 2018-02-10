@@ -51,17 +51,6 @@
     </div>
 
     <div class="col-xs-6">
-      <label for="select-filters" class="control-label te-label te-label--taller required">Filters (optional)</label>
-      {{filter-select
-        options=filters
-        selected=selectedFilters
-        triggerId="select-filters"
-        onChange=(action "onSelectFilter")
-        disabled=isFilterSelectDisabled
-      }}
-    </div>
-
-    <div class="col-xs-6">
       <label for="select-dimension" class="control-label te-label te-label--taller">Dimension (optional)</label>
       {{#power-select
         classNames="te-input"
@@ -78,6 +67,17 @@
       }}
         {{dimension}}
       {{/power-select}}
+    </div>
+
+    <div class="col-xs-6">
+      <label for="select-filters" class="control-label te-label te-label--taller required">Filters (optional)</label>
+      {{filter-select
+        options=filters
+        selected=selectedFilters
+        triggerId="select-filters"
+        onChange=(action "onSelectFilter")
+        disabled=isFilterSelectDisabled
+      }}
     </div>
 
     <div class="col-xs-12">

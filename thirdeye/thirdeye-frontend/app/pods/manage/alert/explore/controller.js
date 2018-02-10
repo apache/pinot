@@ -308,7 +308,7 @@ export default Controller.extend({
   },
 
   /**
-   * Concurrenty task to ping the job-info endpoint to check status of an ongoing replay job.
+   * Concurrency task to ping the job-info endpoint to check status of an ongoing replay job.
    * If there is no progress after a set time, we display an error message.
    * @param {Number} jobId - the id for the newly triggered replay job
    * @return {undefined}
@@ -445,6 +445,12 @@ export default Controller.extend({
      */
     onSelectDimension(selectedObj) {
       this.set('selectedDimension', selectedObj);
+      // Select graph dimensions based on filter
+      this.get('topDimensions').forEach((dimension) => {
+        const isAllSelected = selectedObj === 'All Dimensions';
+        const isActive = selectedObj.includes(dimension.name) || isAllSelected;
+        set(dimension, 'isSelected', isActive);
+      });
     },
 
     /**
