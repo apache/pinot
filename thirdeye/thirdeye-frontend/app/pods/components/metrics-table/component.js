@@ -17,52 +17,51 @@ export default Component.extend({
    */
   metricsTableColumns: [
     {
-      template: 'custom/table-checkbox'
+      template: 'custom/table-checkbox',
+      className: 'metrics-table__column'
     }, {
       propertyName: 'label',
       title: 'Metric',
-      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--large'
+      className: 'metrics-table__column metrics-table__column--large'
     }, {
       template: 'custom/rca-metric-links',
       propertyName: 'links',
       title: 'Links',
       disableFiltering: true,
-      className: 'rootcause-metric__table__links-column rootcause-metric__table__links-column--small'
+      className: 'metrics-table__column metrics-table__column--small'
     }, {
       propertyName: 'score',
       title: 'Anomalous',
       disableFiltering: true,
-      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--small',
-      sortPrecedence: 0,
-      sortDirection: 'desc'
+      className: 'metrics-table__column metrics-table__column--small'
     }, {
       propertyName: 'wo1w',
       template: 'custom/metrics-table-changes/wo1w',
       sortedBy: 'sortable_wo1w',
       title: 'WoW',
       disableFiltering: true,
-      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--small'
+      className: 'metrics-table__column metrics-table__column--small'
     }, {
       propertyName: 'wo2w',
       template: 'custom/metrics-table-changes/wo2w',
       sortedBy: 'sortable_wo2w',
       title: 'Wo2W',
       disableFiltering: true,
-      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--small'
+      className: 'metrics-table__column metrics-table__column--small'
     }, {
       propertyName: 'wo3w',
       template: 'custom/metrics-table-changes/wo3w',
       sortedBy: 'sortable_wo3w',
       title: 'Wo3W',
       disableFiltering: true,
-      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--small'
+      className: 'metrics-table__column metrics-table__column--small'
     }, {
       propertyName: 'wo4w',
       template: 'custom/metrics-table-changes/wo4w',
       sortedBy: 'sortable_wo4w',
       title: 'Wo4W',
       disableFiltering: true,
-      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--small'
+      className: 'metrics-table__column metrics-table__column--small'
     }
   ],
 

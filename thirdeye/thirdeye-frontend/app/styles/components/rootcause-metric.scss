@@ -18,8 +18,9 @@
 
   &__table {
     &__column {
+      vertical-align: middle !important;
       &--small {
-        width: 200px;
+        width: 100px;
       }
 
       &--large {
