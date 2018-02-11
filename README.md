@@ -68,7 +68,7 @@ cd pinot-distribution/target/pinot-0.016-pkg
 chmod +x bin/*.sh
 ```
 
-### Run
+### 2: Run
 
 We will load BaseBall stats from 1878 to 2013 into Pinot and run queries against it. There are 100000 records and 15 columns ([schema](https://github.com/linkedin/pinot/blob/master/pinot-tools/src/main/resources/sample_data/baseballStats_schema.json)) in this dataset.
 
@@ -111,7 +111,7 @@ select playerName, runs, homeRuns from baseballStats order by yearID limit 10
 
 ```
 
-### Step 3: Pinot Data Explorer
+### 3: Pinot Data Explorer
 
 There are 3 ways to [interact](https://github.com/linkedin/pinot/wiki/Pinot-Client-API) with Pinot - simple web interface, REST api and java client. Open your browser and go to http://localhost:9000/query/ and run any of the queries provided above. See [Pinot Query Syntax](https://github.com/linkedin/pinot/wiki/Pinot-Query-Language-Examples) for more info.
 
