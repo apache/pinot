@@ -113,12 +113,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
         LOG.error("Encountered unknown error while running job {}.", jobContext.getJobName(), e);
       }
 
-      if (abortOnFailure && !TaskConstants.TaskStatus.COMPLETED.equals(taskStatus.getTaskStatus())) {
-        jobStatus.setJobStatus(JobConstants.JobStatus.FAILED);
-        LOG.error("Failed to execute job {}.", jobContext.getJobName());
-        return;
-      }
-
+      // Notify upon exception
       if (notifyIfFails && !TaskConstants.TaskStatus.COMPLETED.equals(taskStatus.getTaskStatus())) {
         if (smtpConfiguration == null || StringUtils.isBlank(failureNotificationSender)
             || StringUtils.isBlank(failureNotificationReceiver)) {
@@ -130,6 +125,12 @@ public class DetectionOnBoardJobRunner implements Runnable {
             LOG.warn("Unable to send failure emails");
           }
         }
+      }
+
+      if (abortOnFailure && !TaskConstants.TaskStatus.COMPLETED.equals(taskStatus.getTaskStatus())) {
+        jobStatus.setJobStatus(JobConstants.JobStatus.FAILED);
+        LOG.error("Failed to execute job {}.", jobContext.getJobName());
+        return;
       }
     }
     jobStatus.setJobStatus(JobConstants.JobStatus.COMPLETED);
