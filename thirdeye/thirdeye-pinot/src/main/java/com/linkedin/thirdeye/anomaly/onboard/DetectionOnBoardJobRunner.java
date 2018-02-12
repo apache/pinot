@@ -113,21 +113,23 @@ public class DetectionOnBoardJobRunner implements Runnable {
         LOG.error("Encountered unknown error while running job {}.", jobContext.getJobName(), e);
       }
 
+      // Notify upon exception
+      if (notifyIfFails && !TaskConstants.TaskStatus.COMPLETED.equals(taskStatus.getTaskStatus())) {
+        if (smtpConfiguration == null || StringUtils.isBlank(failureNotificationSender)
+            || StringUtils.isBlank(failureNotificationReceiver)) {
+          LOG.warn("SmtpConfiguration, and email sender/recipients cannot be null or empty");
+        } else {
+          try {
+            sendFailureEmail();
+          } catch (JobExecutionException e) {
+            LOG.warn("Unable to send failure emails");
+          }
+        }
+      }
+
       if (abortOnFailure && !TaskConstants.TaskStatus.COMPLETED.equals(taskStatus.getTaskStatus())) {
         jobStatus.setJobStatus(JobConstants.JobStatus.FAILED);
         LOG.error("Failed to execute job {}.", jobContext.getJobName());
-        if (notifyIfFails) {
-          if (smtpConfiguration == null || StringUtils.isBlank(failureNotificationSender)
-              || StringUtils.isBlank(failureNotificationReceiver)) {
-            LOG.warn("SmtpConfiguration, and email sender/recipients cannot be null or empty");
-          } else {
-            try {
-              sendFailureEmail();
-            } catch (JobExecutionException e) {
-              LOG.warn("Unable to send failure emails");
-            }
-          }
-        }
         return;
       }
     }
@@ -146,11 +148,11 @@ public class DetectionOnBoardJobRunner implements Runnable {
       LOG.warn("Unable to parse job context {}", jobContext);
       jobStatusString = jobStatus.toString();
     }
-    String textBody = String
+    String htmlBody = String
         .format("<h1>Job Status</h1><p>%s</p>", jobStatusString);
     try {
       EmailHelper
-          .sendEmailWithTextBody(email, smtpConfiguration, subject, textBody,
+          .sendEmailWithHtml(email, smtpConfiguration, subject, htmlBody,
               failureNotificationSender, failureNotificationReceiver);
     } catch (EmailException e) {
       throw new JobExecutionException(e);
