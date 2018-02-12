@@ -148,11 +148,11 @@ public class DetectionOnBoardJobRunner implements Runnable {
       LOG.warn("Unable to parse job context {}", jobContext);
       jobStatusString = jobStatus.toString();
     }
-    String textBody = String
+    String htmlBody = String
         .format("<h1>Job Status</h1><p>%s</p>", jobStatusString);
     try {
       EmailHelper
-          .sendEmailWithTextBody(email, smtpConfiguration, subject, textBody,
+          .sendEmailWithHtml(email, smtpConfiguration, subject, htmlBody,
               failureNotificationSender, failureNotificationReceiver);
     } catch (EmailException e) {
       throw new JobExecutionException(e);
