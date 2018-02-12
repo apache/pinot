@@ -17,8 +17,8 @@
 package com.linkedin.pinot.common.segment.fetcher;
 
 import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
-import java.util.Collections;
 import java.util.Set;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.Configuration;
@@ -50,45 +50,15 @@ import org.apache.commons.configuration.Configuration;
  * server is presenting an X509 certificate.
  */
 public class HttpsSegmentFetcher extends HttpSegmentFetcher {
-  private static final String SECURITY_ALGORITHM = "TLS";
-  private static final String CERTIFICATE_TYPE = "X509";
-  private static final String KEYSTORE_TYPE = "PKCS12";
-  private static final String KEYMANAGER_FACTORY_ALGORITHM = "SunX509";
-
-  private static final String CONFIG_OF_SERVER_CA_CERT = "ssl.server.ca-cert";
-  private static final String CONFIG_OF_CLIENT_PKCS12_FILE = "ssl.client.pkcs12.file";
-  private static final String CONFIG_OF_CLIENT_PKCS12_PASSWORD = "ssl.client.pkcs12.password";
-  private static final String CONFIG_OF_ENABLE_SERVER_VERIFICATION = "ssl.server.enable-verification";
-
   @Override
   protected void initHttpClient(Configuration configs) {
-    final String serverCACertFile = configs.getString(CONFIG_OF_SERVER_CA_CERT);
-    final boolean enableServerVerifiction = configs.getBoolean(CONFIG_OF_ENABLE_SERVER_VERIFICATION, true);
-    final String keyStoreFile = configs.getString(CONFIG_OF_CLIENT_PKCS12_FILE);
-    final String keyStorePassword = configs.getString(CONFIG_OF_CLIENT_PKCS12_PASSWORD);
-
-    ClientSSLContextGenerator.Builder builder = new ClientSSLContextGenerator.Builder();
-
-    if (enableServerVerifiction) {
-      if (serverCACertFile == null) {
-        throw new RuntimeException("Https server CA Certificate file not configured (" + CONFIG_OF_SERVER_CA_CERT + ")");
-      }
-      builder.withServerCACertFile(serverCACertFile);
-    }
-    if (keyStoreFile == null || keyStorePassword == null) {
-      _logger.info("Either keystore file name ({}) or keystore password ({}) is not configured. Client will not present certificates to server.",
-          CONFIG_OF_CLIENT_PKCS12_FILE, CONFIG_OF_CLIENT_PKCS12_PASSWORD);
-    } else {
-      builder.withKeystoreFile(keyStoreFile).withKeyStorePassword(keyStorePassword);
-    }
-
-    SSLContext sslContext = builder.build().generate();
+    SSLContext sslContext = new ClientSSLContextGenerator(configs.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
     _httpClient = new FileUploadDownloadClient(sslContext);
   }
 
   @Override
   public Set<String> getProtectedConfigKeys() {
-    return Collections.singleton(CONFIG_OF_CLIENT_PKCS12_PASSWORD);
+    return ClientSSLContextGenerator.getProtectedConfigKeys();
   }
 
 }

@@ -27,17 +27,24 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.Collections;
+import java.util.Set;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
+import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class ClientSSLContextGenerator {
+  private static final String CONFIG_OF_SERVER_CA_CERT = "server.ca-cert";
+  private static final String CONFIG_OF_CLIENT_PKCS12_FILE = "client.pkcs12.file";
+  private static final String CONFIG_OF_CLIENT_PKCS12_PASSWORD = "client.pkcs12.password";
+  private static final String CONFIG_OF_ENABLE_SERVER_VERIFICATION = "server.enable-verification";
   private static final String SECURITY_ALGORITHM = "TLS";
   private static final String CERTIFICATE_TYPE = "X509";
   private static final String KEYSTORE_TYPE = "PKCS12";
@@ -47,13 +54,24 @@ public class ClientSSLContextGenerator {
   private final String _serverCACertFile;
   private final String _keyStoreFile;
   private final String _keyStorePassword;
-  private final boolean _presentClientCerts;
 
-  private ClientSSLContextGenerator(String keyStoreFile, String keyStorePassword, String serverCACertFile) {
-    _serverCACertFile = serverCACertFile;
-    _keyStoreFile = keyStoreFile;
-    _keyStorePassword = keyStorePassword;
-    _presentClientCerts = (_keyStoreFile != null);
+  public static Set<String> getProtectedConfigKeys() {
+    return Collections.singleton(CONFIG_OF_CLIENT_PKCS12_PASSWORD);
+  }
+
+  public ClientSSLContextGenerator(Configuration sslConfig) {
+    if (sslConfig.getBoolean(CONFIG_OF_ENABLE_SERVER_VERIFICATION)) {
+      _serverCACertFile = sslConfig.getString(CONFIG_OF_SERVER_CA_CERT);
+    } else {
+      _serverCACertFile = null;
+      LOGGER.warn("Https Server CA file not configured.. All servers will be trusted!");
+    }
+    _keyStoreFile = sslConfig.getString(CONFIG_OF_CLIENT_PKCS12_FILE);
+    _keyStorePassword = sslConfig.getString(CONFIG_OF_CLIENT_PKCS12_PASSWORD);
+    if ((_keyStorePassword == null && _keyStoreFile != null) ||
+        (_keyStorePassword != null && _keyStoreFile == null)) {
+      throw new IllegalArgumentException("Invalid configuration of keystore file and passowrd");
+    }
   }
 
   public SSLContext generate() {
@@ -96,7 +114,6 @@ public class ClientSSLContextGenerator {
       return tmf.getTrustManagers();
     }
     // Server verification disabled. Trust all servers
-    LOGGER.warn("Https Server CA file not configured.. All servers will be trusted!");
     TrustManager[] trustAllCerts = new TrustManager[]{new X509TrustManager() {
       @Override
       public void checkClientTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
@@ -115,7 +132,7 @@ public class ClientSSLContextGenerator {
   }
 
   private KeyManager[] setupKeyManagers() {
-    if (!_presentClientCerts) {
+    if (_keyStoreFile == null) {
       return null;
     }
     try {
@@ -130,62 +147,5 @@ public class ClientSSLContextGenerator {
       Utils.rethrowException(e);
     }
     return null;
-  }
-
-  public static class Builder {
-    String _serverCACertFile;
-    String _keyStoreFile;
-    String _keyStorePassword;
-
-    public Builder() {
-    }
-
-    /**
-     *
-     * @param serverCACertFile is path name of a file containing all the certificates from trusted
-     *                         Certifying Authorities. The client will verify the server's certificate
-     *                         against the CA bundle specified. If this method is not called, or is called
-     *                         with a null argument, then server's certificates will not be verified.
-     * @return
-     */
-    public Builder withServerCACertFile(String serverCACertFile) {
-      if (serverCACertFile != null) {
-        _serverCACertFile = serverCACertFile;
-      }
-      return this;
-    }
-
-    /**
-     *
-     * @param keyStoreFile is the path name of a PCKS12 file containing the client certificates to be presented to the
-     *                     server during SSL handshake. If this method is called, then
-     * @return
-     */
-    public Builder withKeystoreFile(String keyStoreFile) {
-      if (keyStoreFile != null) {
-        _keyStoreFile = keyStoreFile;
-      }
-      return this;
-    }
-
-    /**
-     *
-     * @param keyStorePassword is the password to open the keyStoreFile.
-     * @return
-     */
-    public Builder withKeyStorePassword(String keyStorePassword) {
-      if (keyStorePassword != null) {
-        _keyStorePassword = keyStorePassword;
-      }
-      return this;
-    }
-
-    public ClientSSLContextGenerator build() {
-      if ((_keyStoreFile == null && _keyStorePassword != null) ||
-          (_keyStoreFile != null && _keyStorePassword == null)) {
-        throw new IllegalArgumentException("Inconsistent keystore file name and keystore password specification");
-      }
-      return new ClientSSLContextGenerator(_keyStoreFile, _keyStorePassword, _serverCACertFile);
-    }
   }
 }

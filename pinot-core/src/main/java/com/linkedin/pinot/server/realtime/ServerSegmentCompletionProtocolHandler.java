@@ -18,6 +18,7 @@ package com.linkedin.pinot.server.realtime;
 
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.core.query.utils.Pair;
 import java.io.File;
@@ -38,11 +39,8 @@ public class ServerSegmentCompletionProtocolHandler {
   private static final String HTTPS_PROTOCOL = "https";
   private static final String HTTP_PROTOCOL = "http";
 
-  private static final String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "https.enabled";
-  private static final String CONFIG_OF_CONTROLLER_HTTPS_PORT = "https.controller.port";
-  private static final String CONFIG_OF_HTTPS_CONTROLLER_CACERT = "https.ca-cert";
-  private static final String CONFIG_OF_HTTPS_KEYSTORE_FILE = "https.pkcs12.file";
-  private static final String CONFIG_OF_HTTPS_KEYSTORE_PASSWORD = "https.pkcs12.password";
+  private static final String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "enabled";
+  private static final String CONFIG_OF_CONTROLLER_HTTPS_PORT = "controller.port";
 
   private static Integer _controllerHttpsPort = null;
 
@@ -50,15 +48,11 @@ public class ServerSegmentCompletionProtocolHandler {
   private final FileUploadDownloadClient _fileUploadDownloadClient;
   private static SSLContext _sslContext;
 
-  public static void init(Configuration config) {
-    if (config.getBoolean(CONFIG_OF_CONTROLLER_HTTPS_ENABLED, false)) {
-      ClientSSLContextGenerator.Builder builder = new ClientSSLContextGenerator.Builder();
-      builder.withServerCACertFile(config.getString(CONFIG_OF_HTTPS_CONTROLLER_CACERT));
-      builder.withKeystoreFile(config.getString(CONFIG_OF_HTTPS_KEYSTORE_FILE));
-      builder.withKeyStorePassword(config.getString(CONFIG_OF_HTTPS_KEYSTORE_PASSWORD));
-
-      _controllerHttpsPort = config.getInt(CONFIG_OF_CONTROLLER_HTTPS_PORT);
-      _sslContext = builder.build().generate();
+  public static void init(Configuration uploaderConfig) {
+    Configuration httpsConfig = uploaderConfig.subset(HTTPS_PROTOCOL);
+    if (httpsConfig.getBoolean(CONFIG_OF_CONTROLLER_HTTPS_ENABLED, false)) {
+      _sslContext = new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
+      _controllerHttpsPort = httpsConfig.getInt(CONFIG_OF_CONTROLLER_HTTPS_PORT);
     }
   }
 

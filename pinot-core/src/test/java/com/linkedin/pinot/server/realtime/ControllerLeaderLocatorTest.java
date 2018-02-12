@@ -69,7 +69,9 @@ public class ControllerLeaderLocatorTest {
     FakeControllerLeaderLocator.create(helixManager);
     ControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
 
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(), new Pair<String, Integer>(leaderHost, leaderPort));
+    Pair<String, Integer> expectedLeaderLocation = new Pair<>(leaderHost, leaderPort);
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader().getFirst(), expectedLeaderLocation.getFirst());
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader().getSecond(), expectedLeaderLocation.getSecond());
   }
 
   static class FakeControllerLeaderLocator extends ControllerLeaderLocator {
