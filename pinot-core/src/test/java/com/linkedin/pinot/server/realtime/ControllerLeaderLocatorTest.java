@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.server.realtime;
 
+import com.linkedin.pinot.core.query.utils.Pair;
 import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -55,10 +56,12 @@ public class ControllerLeaderLocatorTest {
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
     BaseDataAccessor<ZNRecord> baseDataAccessor = mock(BaseDataAccessor.class);
     ZNRecord znRecord = mock(ZNRecord.class);
+    final String leaderHost = "host";
+    final int leaderPort = 12345;
 
     when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
     when(helixDataAccessor.getBaseDataAccessor()).thenReturn(baseDataAccessor);
-    when(znRecord.getId()).thenReturn("host_port");
+    when(znRecord.getId()).thenReturn(leaderHost + "_" + leaderPort);
     when(baseDataAccessor.get(anyString(), (Stat) any(), anyInt())).thenReturn(znRecord);
     when(helixManager.getClusterName()).thenReturn("myCluster");
 
@@ -66,7 +69,9 @@ public class ControllerLeaderLocatorTest {
     FakeControllerLeaderLocator.create(helixManager);
     ControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
 
-    Assert.assertEquals(controllerLeaderLocator.getControllerLeader(), "host:port");
+    Pair<String, Integer> expectedLeaderLocation = new Pair<>(leaderHost, leaderPort);
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader().getFirst(), expectedLeaderLocation.getFirst());
+    Assert.assertEquals(controllerLeaderLocator.getControllerLeader().getSecond(), expectedLeaderLocation.getSecond());
   }
 
   static class FakeControllerLeaderLocator extends ControllerLeaderLocator {
