@@ -38,7 +38,7 @@ export default Ember.Service.extend({
           .then(checkStatus)
           .then(this._jsonToEntities)
           .then(incoming => this._complete(requestContext, urns, incoming, 'identity'));
-          // .catch(error => this._handleError('identity', error));
+          .catch(error => this._handleError('identity', error));
       }
     }
 
@@ -60,7 +60,7 @@ export default Ember.Service.extend({
           .then(checkStatus)
           .then(this._jsonToEntities)
           .then(incoming => this._complete(requestContext, urns, incoming, framework));
-          // .catch(error => this._handleError(framework, error));
+          .catch(error => this._handleError(framework, error));
       });
     }
   },
