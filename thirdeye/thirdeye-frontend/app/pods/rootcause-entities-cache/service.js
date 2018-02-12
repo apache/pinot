@@ -1,11 +1,8 @@
 import Ember from 'ember';
-import { filterObject, filterPrefix, toBaselineRange, toColor } from 'thirdeye-frontend/utils/rca-utils';
+import { filterObject, filterPrefix, toBaselineRange, toColor, trimTimeRanges } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
-
-const ROOTCAUSE_ANALYSIS_DURATION_MAX = 1209600000; // 14 days (in millis)
-const ROOTCAUSE_ANOMALY_DURATION_MAX = 604800000; // 7 days (in millis)
 
 export default Ember.Service.extend({
   entities: null, // {}
@@ -40,8 +37,8 @@ export default Ember.Service.extend({
         fetch(this._makeIdentityUrl(requestNativeUrns))
           .then(checkStatus)
           .then(this._jsonToEntities)
-          .then(incoming => this._complete(requestContext, urns, incoming, 'identity'))
-          .catch(error => this._handleError('identity', error));
+          .then(incoming => this._complete(requestContext, urns, incoming, 'identity'));
+          // .catch(error => this._handleError('identity', error));
       }
     }
 
@@ -54,7 +51,7 @@ export default Ember.Service.extend({
         return;
       }
 
-      const frameworks = new Set(['events', 'metricAnalysis']);
+      const frameworks = new Set(['eventAnomaly', 'eventHoliday', 'eventIssue', 'eventExperiment', 'eventDeployment', 'metricRelated']);
 
       this.setProperties({ context: _.cloneDeep(requestContext), entities: newEntities, pending: frameworks });
 
@@ -62,8 +59,8 @@ export default Ember.Service.extend({
         fetch(this._makeUrl(framework, requestContext))
           .then(checkStatus)
           .then(this._jsonToEntities)
-          .then(incoming => this._complete(requestContext, urns, incoming, framework))
-          .catch(error => this._handleError(framework, error));
+          .then(incoming => this._complete(requestContext, urns, incoming, framework));
+          // .catch(error => this._handleError(framework, error));
       });
     }
   },
@@ -138,7 +135,7 @@ export default Ember.Service.extend({
 
   _makeUrl(framework, context) {
     const urnString = filterPrefix(context.urns, 'thirdeye:metric:').map(encodeURIComponent).join(',');
-    const ranges = this._trimRanges(context.anomalyRange, context.analysisRange);
+    const ranges = trimTimeRanges(context.anomalyRange, context.analysisRange);
 
     const baselineRange = toBaselineRange(ranges.anomalyRange, context.compareMode);
     return `/rootcause/query?framework=${framework}` +

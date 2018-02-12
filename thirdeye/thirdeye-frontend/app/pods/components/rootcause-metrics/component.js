@@ -15,12 +15,35 @@ export default Ember.Component.extend({
   //
   // external properties
   //
-  entities: null, // {}
 
-  aggregates: null, // {}
+  /**
+   * Entities cache
+   * @type {object}
+   */
+  entities: null,
 
-  selectedUrns: null, // Set
+  /**
+   * Metric aggregates
+   * @type {object}
+   */
+  aggregates: null,
 
+  /**
+   * (Metric) entity scores
+   * @type {object}
+   */
+  scores: null,
+
+  /**
+   * User-selected urns
+   * @type {Set}
+   */
+  selectedUrns: null,
+
+  /**
+   * Callback on metric selection
+   * @type {function}
+   */
   onSelection: null, // function (Set, state)
 
   //

@@ -45,6 +45,14 @@ export function humanizeChange(f) {
 }
 
 /**
+ * Formatter for human-readable entity scores with 2 decimals
+ */
+export function humanizeScore(f) {
+  if (f === null || f === undefined ||Number.isNaN(f)) { return '-'; }
+  return f.toFixed(2);
+}
+
+/**
  * Helps with shorthand for repetitive date generation
  */
 export function buildDateEod(unit, type) {
@@ -94,6 +102,7 @@ export default {
   checkStatus,
   humanizeFloat,
   humanizeChange,
+  humanizeScore,
   parseProps,
   postProps,
   toIso

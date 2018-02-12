@@ -1,6 +1,9 @@
 import moment from 'moment';
 import _ from 'lodash';
 
+const ROOTCAUSE_ANALYSIS_DURATION_MAX = 1209600000; // 14 days (in millis)
+const ROOTCAUSE_ANOMALY_DURATION_MAX = 604800000; // 7 days (in millis)
+
 // TODO load from config
 // colors mapping for charts
 export const colorMapping = {
@@ -199,9 +202,12 @@ export function toMetricUrn(urn) {
  * @returns {string} human-readable metric label
  */
 export function toMetricLabel(urn, entities) {
-  let metricName = urn;
-  if (urn && entities && entities[urn]) {
+  let metricName;
+  try {
     metricName = entities[urn].label.split("::")[1].split("_").join(' ');
+  }
+  catch (err) {
+    metricName = urn;
   }
 
   const filters = toFilters(urn).map(t => t[1]);
@@ -218,11 +224,13 @@ export function toMetricLabel(urn, entities) {
  * @returns {string} human-readable event label
  */
 export function toEventLabel(urn, entities) {
-  if (!urn || !entities || !entities[urn]) {
-    return urn;
+  let label;
+  try {
+    label = entities[urn].label;
   }
-
-  let label = entities[urn].label;
+  catch (err) {
+    label = urn;
+  }
 
   if (urn.includes('anomaly')) {
     const [, id] = urn.split(':anomaly:');
@@ -494,6 +502,29 @@ export function findLabelMapping(label, config) {
   return labelMapping;
 }
 
+/**
+ * Returns time ranges for rootcause queries trimmed (intelligently) to the endpoint's maximum bounds.
+ *
+ * @param {Array} anomalyRange anomaly time range
+ * @param {Array} analysisRange display time range
+ * @return {Object} trimmed { anomalyRange, analysisRange }
+ */
+export function trimTimeRanges(anomalyRange, analysisRange) {
+  // trim anomaly range from start of anomaly range forward
+  const newAnomalyDuration = Math.min(anomalyRange[1] - anomalyRange[0], ROOTCAUSE_ANOMALY_DURATION_MAX);
+  const newAnomalyRange = [anomalyRange[0], anomalyRange[0] + newAnomalyDuration];
+
+  // trim analysis range from end of anomaly range backward
+  const newAnalysisDuration = Math.min(analysisRange[1] - analysisRange[0], ROOTCAUSE_ANALYSIS_DURATION_MAX);
+  const newAnalysisRangeStart = Math.max(analysisRange[0], anomalyRange[1] - newAnalysisDuration);
+  const newAnalysisRange = [newAnalysisRangeStart, anomalyRange[1]];
+
+  return Object.assign({}, {
+    anomalyRange: newAnomalyRange,
+    analysisRange: newAnalysisRange
+  });
+}
+
 export default {
   isIterable,
   makeIterable,
@@ -521,5 +552,6 @@ export default {
   appendFilters,
   colorMapping,
   eventColorMapping,
-  dateFormatFull
+  dateFormatFull,
+  trimTimeRanges
 };
