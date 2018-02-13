@@ -36,19 +36,22 @@ import java.util.Map;
 public class JSONRecordReader implements RecordReader {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+  private final JsonFactory _factory = new JsonFactory();
+  private final File _dataFile;
   private final Schema _schema;
+
   private JsonParser _parser;
-  private File _dataFile;
   private Iterator<Map> _iterator;
 
   public JSONRecordReader(File dataFile, Schema schema) throws IOException {
-    _schema = schema;
     _dataFile = dataFile;
-    init(_dataFile);
+    _schema = schema;
+
+    init();
   }
 
-  private void init(File dataFile) throws IOException {
-    _parser = new JsonFactory().createJsonParser(RecordReaderUtils.getFileReader(dataFile));
+  private void init() throws IOException {
+    _parser = _factory.createJsonParser(RecordReaderUtils.getFileReader(_dataFile));
     try {
       _iterator = OBJECT_MAPPER.readValues(_parser, Map.class);
     } catch (Exception e) {
@@ -91,7 +94,8 @@ public class JSONRecordReader implements RecordReader {
 
   @Override
   public void rewind() throws IOException {
-    init(_dataFile);
+    _parser.close();
+    init();
   }
 
   @Override
