@@ -8,12 +8,12 @@ import Ember from 'ember';
 import fetch from 'fetch';
 import moment from 'moment';
 import { later } from "@ember/runloop";
-import Controller from '@ember/controller';
-import { computed, set, get } from '@ember/object';
 import { isPresent } from "@ember/utils";
+import Controller from '@ember/controller';
 import { task, timeout } from 'ember-concurrency';
+import { computed, set, get, setProperties } from '@ember/object';
 import { checkStatus, postProps, buildDateEod } from 'thirdeye-frontend/utils/utils';
-import { buildAnomalyStats } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { buildAnomalyStats, extractSeverity } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Controller.extend({
   /**
@@ -50,7 +50,7 @@ export default Controller.extend({
     const repRunStatus = this.get('repRunStatus');
     this.setProperties({
       filters: {},
-      metricData: {},
+      //metricData: {},
       loadedWowData: [],
       predefinedRanges: {},
       missingAnomalyProps: {},
@@ -244,12 +244,8 @@ export default Controller.extend({
         defaultSeverity
       } = this.getProperties('alertData', 'alertEvalMetrics', 'defaultSeverity');
       const features = Ember.getWithDefault(alertData, 'alertFilter.features', null);
-      const severity = Ember.getWithDefault(alertData, 'alertFilter.mttd', null);
-      const parsedSeverity = severity ? severity.split(';')[1].split('=') : null;
-      const isSeverityNumeric = parsedSeverity && !isNaN(parsedSeverity[1]);
       const severityUnit = features && features.split(',')[1] !== 'deviation' ? '%' : '';
-      const mttdWeight = isSeverityNumeric ? parsedSeverity[1] * 100 : defaultSeverity * 100;
-
+      const mttdWeight = Number(extractSeverity(alertData, defaultSeverity)) * 100;
       const statsCards = [
           {
             title: 'Number of anomalies',
@@ -687,10 +683,12 @@ export default Controller.extend({
           }
 
           // Set displayed value properties. Note: ensure no CP watching these props
-          set(anomaly, 'shownCurrent', curr);
-          set(anomaly, 'shownBaseline', base);
-          set(anomaly, 'shownChangeRate', change);
-          set(anomaly, 'changeDirectionLabel', change < 0 ? 'down' : 'up');
+          setProperties(anomaly, {
+            shownCurrent: curr,
+            shownBaseline: base,
+            shownChangeRate: change,
+            changeDirectionLabel: change < 0 ? 'down' : 'up'
+          });
         });
       }
     },

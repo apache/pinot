@@ -31,17 +31,19 @@
   <div class="te-content-block">
     <fieldset class="te-form__section te-form__section--first te-form__section--slim row">
       <div class="col-xs-12">
-        <legend class="te-form__section-title">Tune alert sensitivity</legend>
+        {{!-- <legend class="te-form__section-title">Tune alert notifications</legend> --}}
+        <h4 class="te-self-serve__block-title">Tune alert notifications</h4>
+        <p class="te-self-serve__block-subtext">All configurations and outputs will be based on reviewed anomalies.</p>
       </div>
       <ul class="te-form__list col-xs-12 col-sm-8">
         <li class="te-form__list-item">
           {{#radio-button value="current" groupValue=selectedTuneType}}
-            <div class="te-form__list-label">Tune based on reviewed anomalies</div>
+            <div class="te-form__list-label">Automatically tune alert settings</div>
           {{/radio-button}}
         </li>
         <li class="te-form__list-item">
           {{#radio-button value="custom" groupValue=selectedTuneType}}
-            <div class="te-form__list-label">Tune based on reviewed anomalies with customization</div>
+            <div class="te-form__list-label">Customize alert settings</div>
           {{/radio-button}}
          </li>
       </ul>
@@ -85,7 +87,7 @@
             {{severity}}
           {{/power-select}}
         </div>
-{{!--         <span class="te-form__list-label">is >=</span> --}}
+
         <label for="custom-tune-percent" class="te-form__list-label">is >=</label>
         <div class="te-form__tune-field te-form__tune-field--amount">
           {{input
@@ -99,7 +101,7 @@
         {{#if isTuneAmountPercent}}
           <span class="te-form__list-label--suffix">%, </span>
         {{/if}}
-        {{!-- <span class="te-form__list-label">MTTD should be no more than</span> --}}
+
         <label for="custom-tune-mttd" class="te-form__list-label">MTTD should be no more than</label>
         <div class="te-form__tune-field te-form__tune-field--amount">
           {{input
@@ -107,6 +109,7 @@
             id="custom-tune-mttd"
             class="form-control te-input"
             value=customMttdChange
+            onchange=(action "onChangeMttdValue")
             disabled=isCustomFieldsDisabled
           }}
         </div>
@@ -126,7 +129,7 @@
   </div>
 
   <div class="te-horizontal-cards te-content-block">
-    <h4 class="te-alert-page__subtitle">{{if isTunePreviewActive "Compare" "Last Saved Tuning's"}} Alert Performance</h4>
+    <h4 class="te-self-serve__block-title">{{if isTunePreviewActive "Compare" "Tuned"}} Alert Performance</h4>
     <div class="te-horizontal-cards__container">
       {{#if isPerformanceDataLoading}}
         <div class="spinner-wrapper-self-serve spinner-wrapper-self-serve__content-block">{{ember-spinner}}</div>
@@ -166,11 +169,11 @@
 
   {{#if isTunePreviewActive}}
     <div class="te-horizontal-cards te-content-block">
-      <h4 class="te-alert-page__subtitle">{{anomalyData.length}} Anomalies removed with these settings</h4>
+      <h4 class="te-self-serve__block-title">{{anomalyData.length}} Anomalies removed with these settings</h4>
       {{#if diffedAnomalies}}
-        <p>The following previously sent anomalies <span class="stronger">would not have sent</span> under the new settings.</p>
+        <p class="te-self-serve__block-subtext">The following previously sent anomalies <span class="stronger">would not have been sent</span> under the new settings.</p>
       {{else}}
-        <p>These settings would result in <span class="stronger">NO reduction</span> of sent anomalies</p>
+        <p class="te-self-serve__block-subtext">These settings would result in <span class="stronger">NO reduction</span> of sent anomalies</p>
       {{/if}}
 
       {{!-- Alert anomaly table --}}
@@ -229,16 +232,16 @@
               <tr class="te-anomaly-table__row">
                  <td class="te-anomaly-table__cell">
                   <ul class="te-anomaly-table__list">
-                    <li class="te-anomaly-table__list--shadow">{{anomaly.index}}</li>
-                    <li class="te-anomaly-table__list--stronger">{{anomaly.startDateStr}}</li>
-                    <li class="te-anomaly-table__list--lighter">{{anomaly.durationStr}}</li>
+                    <li class="te-anomaly-table__list-item te-anomaly-table__list-item--shadow">{{anomaly.index}}</li>
+                    <li class="te-anomaly-table__list-item te-anomaly-table__list-item--stronger">{{anomaly.startDateStr}}</li>
+                    <li class="te-anomaly-table__list-item te-anomaly-table__list-item--lighter">{{anomaly.durationStr}}</li>
                   </ul>
                  </td>
                  {{#if alertHasDimensions}}
                    <td class="te-anomaly-table__cell">
                     <ul class="te-anomaly-table__list">
                      {{#each anomaly.dimensionList as |dimension|}}
-                        <li class="te-anomaly-table__list-item">
+                        <li class="te-anomaly-table__list-item te-anomaly-table__list-item--smaller">
                           {{dimension.dimensionKey}}: <span class="stronger">{{dimension.dimensionVal}}</span>
                         </li>
                      {{else}}

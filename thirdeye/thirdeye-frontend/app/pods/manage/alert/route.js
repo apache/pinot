@@ -126,6 +126,11 @@ export default Route.extend({
       }
     },
 
+    navigateToAlertPage() {
+      const { id, duration, startDate, endDate } = this.modelFor('manage.alert.tune');
+      this.transitionTo('manage.alert', id, { queryParams: { duration, startDate, endDate }});
+    },
+
     // Sub-route errors will bubble up to this
     error(error, transition) {
       this.controller.set('isLoadError', true);

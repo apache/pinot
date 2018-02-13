@@ -202,21 +202,21 @@ export default Controller.extend({
             title: 'Estimated number of anomalies',
             key: 'totalAlerts',
             tooltip: false,
-            text: 'Actual number of alerts received'
+            text: 'Estimated number of anomalies  based on alert settings'
           },
           {
             title: 'Estimated precision',
             key: 'precision',
             units: '%',
             tooltip: false,
-            text: 'Among all anomalies reviewed, the % of them that are true.'
+            text: 'Among all anomalies sent by the alert, the % of them that are true.'
           },
           {
             title: 'Estimated recall',
             key: 'recall',
             units: '%',
             tooltip: false,
-            text: 'Among all anomalies that happened, the % of them detected by the system.'
+            text: 'Among all anomalies that happened, the % of them sent by the alert.'
           },
           {
             title: `MTTD for > ${severity}${severityUnit} change`,
@@ -246,7 +246,7 @@ export default Controller.extend({
         selectedSortMode
       } = this.getProperties('anomalyData', 'filterBy', 'selectedSortMode');
       let filterKey = '';
-      let filteredAnomalies = anomalies;
+      let filteredAnomalies = anomalies || [];
       let num = 1;
 
       switch (activeFilter) {
@@ -256,7 +256,7 @@ export default Controller.extend({
         case 'False Alarms':
           filterKey = 'False Alarm';
           break;
-        case 'User Created':
+        case 'User Reported':
           filterKey = 'New Trend';
           break;
         default:
@@ -277,12 +277,10 @@ export default Controller.extend({
       }
 
       // Number the list
-      if (filteredAnomalies) {
-        filteredAnomalies.forEach((anomaly) => {
-          set(anomaly, 'index', num);
-          num++;
-        });
-      }
+      filteredAnomalies.forEach((anomaly) => {
+        set(anomaly, 'index', num);
+        num++;
+      });
 
       return filteredAnomalies;
     }
@@ -328,6 +326,14 @@ export default Controller.extend({
       }
     },
 
+    onChangeSeverityValue(severity) {
+      debugger;
+    },
+
+    onChangeMttdValue(mttd) {
+      debugger;
+    },
+
     /**
      * Sets the new custom date range for anomaly coverage
      * @method onRangeSelection
@@ -362,6 +368,7 @@ export default Controller.extend({
     onResetPage() {
       this.initialize();
       this.set('alertEvalMetrics.projected', this.get('originalProjectedMetrics'));
+      this.send('resetTuningParams', this.get('alertData'));
     },
 
     /**

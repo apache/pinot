@@ -5,7 +5,6 @@
  */
 import RSVP from "rsvp";
 import _ from 'lodash';
-import Ember from 'ember';
 import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
@@ -262,7 +261,6 @@ export default Route.extend({
     return RSVP.hash(initialPromiseHash)
       .then((alertEvalMetrics) => {
         Object.assign(alertEvalMetrics.current, { mttd: alertEvalMetrics.mttd});
-        //Object.assign(alertEvalMetrics, { projected: alertEvalMetrics.current});
         return {
           id,
           alertData,
@@ -342,6 +340,22 @@ export default Route.extend({
         startDate: startDateDefault,
         endDate: endDateDefault
       }});
+    },
+
+    // User resets settings
+    resetTuningParams(alertData) {
+      const {
+        selectedSeverityOption,
+        selectedTunePattern,
+        customPercentChange,
+        customMttdChange
+      } = processDefaultTuningParams(alertData);
+      this.controller.setProperties({
+        selectedSeverityOption,
+        selectedTunePattern,
+        customPercentChange,
+        customMttdChange
+      });
     },
 
     // User clicks "save" on previewed tune settings
