@@ -25,6 +25,8 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.time.TimeConverter;
 import com.linkedin.pinot.common.utils.time.TimeConverterProvider;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.function.FunctionExpressionEvaluator;
+
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -74,12 +76,14 @@ public class PlainFieldExtractor implements FieldExtractor {
   private String _incomingTimeColumnName;
   private String _outgoingTimeColumnName;
   private TimeConverter _timeConverter;
-
+  private Map<String, FunctionExpressionEvaluator> _functionEvaluatorMap;
+  
   public PlainFieldExtractor(Schema schema) {
     _schema = schema;
     initErrorCount();
     initColumnTypes();
     initTimeConverters();
+    initFunctionEvaluators();
   }
 
   public void resetCounters() {
@@ -117,6 +121,23 @@ public class PlainFieldExtractor implements FieldExtractor {
     }
   }
 
+  private void initFunctionEvaluators(){
+    _functionEvaluatorMap = new HashMap<>();
+    for (String column : _schema.getColumnNames()) {
+      FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+      if (fieldSpec.getTransformFunction() != null) {
+        String expression = fieldSpec.getTransformFunction();
+        FunctionExpressionEvaluator functionEvaluator;
+        try {
+          functionEvaluator = new FunctionExpressionEvaluator(column, expression);
+          _functionEvaluatorMap.put(column, functionEvaluator);
+        } catch (Exception e) {
+          LOGGER.error("Unable to instantiate function evaluator for {}", expression, e);
+        }
+      }
+    }
+  }
+  
   @Override
   public Schema getSchema() {
     return _schema;
@@ -146,10 +167,7 @@ public class PlainFieldExtractor implements FieldExtractor {
       if (column.equals(_outgoingTimeColumnName) && _timeConverter != null) {
         // Convert incoming time to outgoing time.
         value = row.getValue(_incomingTimeColumnName);
-        if (value == null) {
-          hasNull = true;
-          _totalNullCols++;
-        } else {
+        if (value != null) {
           try {
             value = _timeConverter.convert(value);
           } catch (Exception e) {
@@ -159,12 +177,16 @@ public class PlainFieldExtractor implements FieldExtractor {
             _errorCount.put(column, _errorCount.get(column) + 1);
           }
         }
+      } else if (fieldSpec.getTransformFunction() != null) {
+         FunctionExpressionEvaluator functionEvaluator = _functionEvaluatorMap.get(column);
+         value = functionEvaluator.evaluate(row);
       } else {
         value = row.getValue(column);
-        if (value == null) {
-          hasNull = true;
-          _totalNullCols++;
-        }
+      }
+      
+      if (value == null) {
+        hasNull = true;
+        _totalNullCols++;
       }
 
       // Convert value if necessary.
