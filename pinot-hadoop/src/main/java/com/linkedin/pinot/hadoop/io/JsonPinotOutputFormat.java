@@ -1,47 +1,37 @@
 /**
  * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
  *
- *         http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software distributed under the License
+ * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ * or implied. See the License for the specific language governing permissions and limitations under
+ * the License.
  */
 package com.linkedin.pinot.hadoop.io;
 
-import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.io.DatumWriter;
-import org.apache.avro.io.Decoder;
-import org.apache.avro.io.DecoderFactory;
-import org.apache.avro.io.EncoderFactory;
-import org.apache.avro.io.JsonEncoder;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
 
 /**
  * OutputFormat implementation for Json source
- * @param <K>
- * @param <V>
  */
 public class JsonPinotOutputFormat<K, V extends Serializable> extends PinotOutputFormat<K, V> {
 
-    public static final String JSON_READER_CLASS = "json.reader.class";
+    private static final String JSON_READER_CLASS = "json.reader.class";
 
     @Override
     public void configure(Configuration conf) {
@@ -61,36 +51,53 @@ public class JsonPinotOutputFormat<K, V extends Serializable> extends PinotOutpu
 
     public static class JsonPinotRecordSerialization<T> implements PinotRecordSerialization<T> {
 
-        private ObjectMapper _mapper;
+        private PinotRecord _record;
         private Schema _schema;
-        private DatumReader<GenericData.Record> _reader;
-        private DatumWriter<GenericRecord> _writer;
+        private ObjectMapper _mapper;
         private Configuration _conf;
-        private ByteArrayOutputStream _outputStream;
 
         @Override
         public void init(Configuration conf, Schema schema) {
             _schema = schema;
-            _conf = conf;
-            _reader = new GenericDatumReader(_schema);
-            _writer = new GenericDatumWriter(_schema);
             _mapper = new ObjectMapper();
-            _outputStream = new ByteArrayOutputStream();
+            _conf = conf;
         }
 
         @Override
         public PinotRecord serialize(T t) throws IOException {
-            Decoder decoder = DecoderFactory.get().jsonDecoder(_schema, _mapper.writeValueAsString(t));
-            return new PinotRecord(_reader.read(null, decoder));
+            _record = PinotRecord.createOrReuseRecord(_record, _schema);
+            try {
+                JSONObject obj = new JSONObject(_mapper.writeValueAsString(t));
+                for (FieldSpec fieldSpec : _record.getSchema().getAllFieldSpecs()) {
+                    Object fieldValue = getFieldValue(obj, fieldSpec);
+                    _record.putField(fieldSpec.getName(), fieldValue);
+                }
+            } catch (JSONException e) {
+                throw new RuntimeException("Serialization exception", e);
+            }
+            return _record;
         }
 
         @Override
         public T deserialize(PinotRecord record) throws IOException {
-            _outputStream.reset();
-            JsonEncoder encoder = EncoderFactory.get().jsonEncoder(_schema, _outputStream);
-            _writer.write(record.get(), encoder);
-            encoder.flush();
-            return _mapper.readValue(_outputStream.toByteArray(), initReader(_conf));
+            JSONObject obj = new JSONObject();
+            for (FieldSpec fieldSpec : _record.getSchema().getAllFieldSpecs()) {
+                Object value = record.getValue(fieldSpec.getName());
+                addJsonField(obj, fieldSpec, value);
+            }
+            return _mapper.readValue(obj.toString().getBytes("UTF-8"), getJsonReaderClass(_conf));
+        }
+
+        private void addJsonField(JSONObject obj, FieldSpec fieldSpec, Object value) {
+            try {
+                if (value instanceof Object[]) {
+                    obj.put(fieldSpec.getName(), new JSONArray(value));
+                } else {
+                    obj.put(fieldSpec.getName(), value);
+                }
+            } catch (JSONException e) {
+                throw new RuntimeException("Error initialize json reader class", e);
+            }
         }
 
         @Override
@@ -98,15 +105,21 @@ public class JsonPinotOutputFormat<K, V extends Serializable> extends PinotOutpu
 
         }
 
-        private Class<T> initReader(Configuration conf) {
+        private Class<T> getJsonReaderClass(Configuration conf) {
             try {
-                return (Class<T>) Class.forName(getJsonReaderClass(conf));
-            } catch (Exception e) {
-                throw new RuntimeException("Error initializing json reader class", e);
+                return (Class<T>) Class.forName(JsonPinotOutputFormat.getJsonReaderClass(conf));
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException("Error initialize json reader class", e);
             }
         }
 
-
+        private Object getFieldValue(JSONObject obj, FieldSpec fieldSpec) {
+            Object fieldValue = obj.opt(fieldSpec.getName());
+            if (fieldValue != null) {
+                return fieldValue;
+            }
+            return fieldSpec.getDefaultNullValue();
+        }
     }
 
 }

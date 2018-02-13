@@ -218,7 +218,7 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
     }
 
     private void initSegmentConfig(JobContext context) throws IOException {
-        _segmentConfig.setFormat(FileFormat.AVRO);
+        _segmentConfig.setFormat(FileFormat.JSON);
         _segmentConfig.setOutDir(PinotOutputFormat.getTempSegmentDir(context) + "/segmentDir");
         _segmentConfig.setOverwrite(true);
         _segmentConfig.setTableName(PinotOutputFormat.getTableName(context));

@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.hadoop.io;
 
+import com.linkedin.pinot.common.data.Schema;
+
 import org.apache.hadoop.conf.Configuration;
 
 import java.io.IOException;
@@ -24,7 +26,7 @@ public interface PinotRecordSerialization<T> {
     /**
      * init method, called during the {@link PinotRecordWriter()} object creation
      */
-    void init(Configuration conf, org.apache.avro.Schema schema);
+    void init(Configuration conf, Schema schema);
 
     /**
      * Serialize object to {@link PinotRecord}, called during the {@link

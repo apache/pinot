@@ -1,17 +1,15 @@
 /**
  * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
  *
- *         http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software distributed under the License
+ * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ * or implied. See the License for the specific language governing permissions and limitations under
+ * the License.
  */
 package com.linkedin.pinot.hadoop.io;
 
@@ -19,15 +17,8 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.util.AvroUtils;
 import com.linkedin.pinot.hadoop.job.JobConfigConstants;
 
-import org.apache.avro.Schema;
-import org.apache.avro.file.DataFileConstants;
-import org.apache.avro.file.DataFileWriter;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.avro.io.DatumWriter;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -50,30 +41,19 @@ public class PinotRecordWriter<K, V> extends RecordWriter<K, V> {
     private final Path _workDir;
     private final String _baseDataDir;
     private PinotRecordSerialization _pinotRecordSerialization;
-    /**
-     * A writer for the Avro container file.
-     */
-    private final DataFileWriter<GenericData.Record> _mAvroFileWriter;
-
+    private final FileHandler _handler;
+    private long MAX_FILE_SIZE = 64 * 1000000L;
 
     public PinotRecordWriter(SegmentGeneratorConfig segmentConfig, TaskAttemptContext context, Path workDir, PinotRecordSerialization pinotRecordSerialization) {
         _segmentConfig = segmentConfig;
         _workDir = workDir;
         _baseDataDir = PinotOutputFormat.getTempSegmentDir(context) + "/data";
         String filename = PinotOutputFormat.getTableName(context);
-        Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(segmentConfig.getSchema());
-        File f = new File(_baseDataDir, filename + ".avro");
-        DatumWriter<GenericData.Record> datumWriter = new GenericDatumWriter(avroSchema);
-        _mAvroFileWriter = new DataFileWriter(datumWriter);
         try {
-            _mAvroFileWriter.setSyncInterval(DataFileConstants.DEFAULT_SYNC_INTERVAL);
-            if (!f.exists()) {
-                f.getParentFile().mkdirs();
-                f.createNewFile();
-            }
-            _mAvroFileWriter.create(avroSchema, f);
+            _handler = new FileHandler(_baseDataDir, filename, ".json", MAX_FILE_SIZE);
+            _handler.open(true);
             _pinotRecordSerialization = pinotRecordSerialization;
-            _pinotRecordSerialization.init(context.getConfiguration(), avroSchema);
+            _pinotRecordSerialization.init(context.getConfiguration(), segmentConfig.getSchema());
         } catch (Exception e) {
             throw new RuntimeException("Error initialize PinotRecordReader", e);
         }
@@ -82,13 +62,13 @@ public class PinotRecordWriter<K, V> extends RecordWriter<K, V> {
     @Override
     public void write(K key, V value) throws IOException, InterruptedException {
         PinotRecord record = _pinotRecordSerialization.serialize(value);
-        _mAvroFileWriter.append(record.get());
+        _handler.write(record.toBytes());
     }
 
     @Override
     public void close(TaskAttemptContext context) throws IOException, InterruptedException {
         _pinotRecordSerialization.close();
-        _mAvroFileWriter.close();
+        _handler.close();
         File dir = new File(_baseDataDir);
         _segmentConfig.setSegmentName(PinotOutputFormat.getSegmentName(context));
         SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
@@ -132,7 +112,6 @@ public class PinotRecordWriter<K, V> extends RecordWriter<K, V> {
 
     /**
      * delete the temp files
-     * @param baseDir
      */
     private void clean(String baseDir) {
         File f = new File(baseDir);
