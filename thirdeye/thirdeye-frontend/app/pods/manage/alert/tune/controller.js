@@ -326,14 +326,6 @@ export default Controller.extend({
       }
     },
 
-    onChangeSeverityValue(severity) {
-      debugger;
-    },
-
-    onChangeMttdValue(mttd) {
-      debugger;
-    },
-
     /**
      * Sets the new custom date range for anomaly coverage
      * @method onRangeSelection
