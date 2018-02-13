@@ -27,10 +27,11 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
   model(params) {
     const { metricId, anomalyId, sessionId } = params;
 
-    let metricUrn, anomalyUrn, session, anomalyContext, anomalySessions;
+    let metricUrn, metricMaxTime, anomalyUrn, session, anomalyContext, anomalySessions;
 
     if (metricId) {
       metricUrn = `thirdeye:metric:${metricId}`;
+      metricMaxTime = fetch(`/data/maxDataTime/metricId/${metricId}`).then(checkStatus).catch(() => undefined);
     }
 
     if (anomalyId) {
@@ -48,6 +49,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
     return RSVP.hash({
       metricId,
+      metricMaxTime,
       anomalyId,
       sessionId,
       metricUrn,
@@ -59,7 +61,14 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
   },
 
   afterModel(model, transition) {
-    const maxTime = moment().startOf('hour').valueOf();
+    const { metricMaxTime } = model;
+
+    let time = moment().valueOf();
+    if (metricMaxTime) {
+      time = metricMaxTime;
+    }
+
+    const maxTime = moment(time).startOf('hour').valueOf();
 
     const defaultParams = {
       anomalyRangeStart:  moment(maxTime).subtract(3, 'hours').valueOf(),
