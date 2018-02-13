@@ -69,7 +69,7 @@
         <tbody>
           {{#each applications as |app|}}
             <tr class="te-anomaly-table__row">
-              <td class="te-anomaly-table__cell te-anomaly-table__list--stronger">{{app.name}}</td>
+              <td class="te-anomaly-table__cell te-anomaly-table__list-item te-anomaly-table__list-item--stronger">{{app.name}}</td>
               <td class="te-anomaly-table__cell">{{app.alerts}}</td>
               <td class="te-anomaly-table__cell">
                 {{performance-tooltip
@@ -113,11 +113,11 @@
               </td>
               <td class="te-anomaly-table__cell">
                 {{app.data.responseRate}}
-                <span class="te-anomaly-table__list-item">%</span>
+                <span class="te-anomaly-table__list-item te-anomaly-table__list-item--smaller">%</span>
               </td>
               <td class="te-anomaly-table__cell">
                 {{app.data.precision}}
-                <span class="te-anomaly-table__list-item">%</span>
+                <span class="te-anomaly-table__list-item te-anomaly-table__list-item--smaller">%</span>
               </td>
             </tr>
           {{/each}}

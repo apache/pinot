@@ -31,17 +31,19 @@
   <div class="te-content-block">
     <fieldset class="te-form__section te-form__section--first te-form__section--slim row">
       <div class="col-xs-12">
-        <legend class="te-form__section-title">Tune alert sensitivity</legend>
+        {{!-- <legend class="te-form__section-title">Tune alert notifications</legend> --}}
+        <h4 class="te-self-serve__block-title">Tune alert notifications</h4>
+        <p class="te-self-serve__block-subtext">All configurations and outputs will be based on reviewed anomalies.</p>
       </div>
       <ul class="te-form__list col-xs-12 col-sm-8">
         <li class="te-form__list-item">
           {{#radio-button value="current" groupValue=selectedTuneType}}
-            <div class="te-form__list-label">Tune automatically with default settings</div>
+            <div class="te-form__list-label">Automatically tune alert settings</div>
           {{/radio-button}}
         </li>
         <li class="te-form__list-item">
           {{#radio-button value="custom" groupValue=selectedTuneType}}
-            <div class="te-form__list-label">Tune with customized settings</div>
+            <div class="te-form__list-label">Customize alert settings</div>
           {{/radio-button}}
          </li>
       </ul>
@@ -85,7 +87,7 @@
             {{severity}}
           {{/power-select}}
         </div>
-{{!--         <span class="te-form__list-label">is >=</span> --}}
+
         <label for="custom-tune-percent" class="te-form__list-label">is >=</label>
         <div class="te-form__tune-field te-form__tune-field--amount">
           {{input
@@ -99,7 +101,7 @@
         {{#if isTuneAmountPercent}}
           <span class="te-form__list-label--suffix">%, </span>
         {{/if}}
-        {{!-- <span class="te-form__list-label">MTTD should be no more than</span> --}}
+
         <label for="custom-tune-mttd" class="te-form__list-label">MTTD should be no more than</label>
         <div class="te-form__tune-field te-form__tune-field--amount">
           {{input
@@ -107,6 +109,7 @@
             id="custom-tune-mttd"
             class="form-control te-input"
             value=customMttdChange
+            onchange=(action "onChangeMttdValue")
             disabled=isCustomFieldsDisabled
           }}
         </div>
@@ -126,8 +129,11 @@
   </div>
 
   <div class="te-horizontal-cards te-content-block">
-    <h4 class="te-alert-page__subtitle">{{if isTunePreviewActive "Compare" "Current"}} Alert Performance</h4>
+    <h4 class="te-self-serve__block-title">{{if isTunePreviewActive "Compare" "Tuned"}} Alert Performance</h4>
     <div class="te-horizontal-cards__container">
+      {{#if isPerformanceDataLoading}}
+        <div class="spinner-wrapper-self-serve spinner-wrapper-self-serve__content-block">{{ember-spinner}}</div>
+      {{/if}}
       {{!-- Alert anomaly stats cards --}}
       {{anomaly-stats-block
         isTunePreviewActive=isTunePreviewActive
@@ -163,102 +169,104 @@
 
   {{#if isTunePreviewActive}}
     <div class="te-horizontal-cards te-content-block">
-      <h4 class="te-alert-page__subtitle">Anomalies removed with settings</h4>
+      <h4 class="te-self-serve__block-title">{{anomalyData.length}} Anomalies removed with these settings</h4>
       {{#if diffedAnomalies}}
-        <p>The following previously sent anomalies <span class="stronger">would not have sent</span> under the new settings.</p>
+        <p class="te-self-serve__block-subtext">The following previously sent anomalies <span class="stronger">would not have been sent</span> under the new settings.</p>
       {{else}}
-        <p>These settings would result in <span class="stronger">NO reduction</span> of sent anomalies</p>
+        <p class="te-self-serve__block-subtext">These settings would result in <span class="stronger">NO reduction</span> of sent anomalies</p>
       {{/if}}
 
       {{!-- Alert anomaly table --}}
-      <table class="te-anomaly-table te-anomaly-table-tuning">
-        <thead>
-          <tr class="te-anomaly-table__row te-anomaly-table__row--metrics">
-            <td colspan="5" class="x">
-              <ul class="te-anomaly-table-stats">
-                {{#each tableStats as |metric|}}
-                  <li class="te-anomaly-table-stats__category {{if metric.isActive "te-anomaly-table-stats__category--active"}}" {{action "toggleCategory" metric.label}}>
-                    <div class="te-anomaly-table-stats__content te-anomaly-table-stats__content--number">
-                      {{metric.count}}
-                    </div>
-                    <div class="te-anomaly-table-stats__content te-anomaly-table-stats__content--text">
-                      {{metric.label}}
-                    </div>
-                  </li>
-                {{/each}}
-              </ul>
-            </td>
-          </tr>
-          <tr class="te-anomaly-table__row te-anomaly-table__head">
-             <th class="te-anomaly-table__cell-head">
-              <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "start"}}>
-                Start/Duration (PDT)
-                <i class="te-anomaly-table__icon glyphicon {{if sortColumnStartUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
-              </a>
-             </th>
-             {{#if alertHasDimensions}}
-                <th class="te-anomaly-table__cell-head">Dimensions</th>
-             {{/if}}
-             <th class="te-anomaly-table__cell-head">
-              <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "score"}}>
-                Severity Score
-                <i class="te-anomaly-table__icon glyphicon {{if sortColumnScoreUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
-              </a>
-             </th>
-             <th class="te-anomaly-table__cell-head">
-              <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "change"}}>
-                Current/WoW
-                <i class="te-anomaly-table__icon glyphicon {{if sortColumnChangeUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
-              </a>
-             </th>
-             <th class="te-anomaly-table__cell-head">
-              <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "resolution"}}>
-                Resolution
-                <i class="te-anomaly-table__icon glyphicon {{if sortColumnResolutionUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
-              </a>
-           </th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {{#each diffedAnomalies as |anomaly|}}
-            <tr class="te-anomaly-table__row">
-               <td class="te-anomaly-table__cell">
-                <ul class="te-anomaly-table__list">
-                  <li class="te-anomaly-table__list--shadow">{{anomaly.index}}</li>
-                  <li class="te-anomaly-table__list--stronger">{{anomaly.startDateStr}}</li>
-                  <li class="te-anomaly-table__list--lighter">{{anomaly.durationStr}}</li>
+      {{#if diffedAnomalies}}
+        <table class="te-anomaly-table te-anomaly-table-tuning">
+          <thead>
+            <tr class="te-anomaly-table__row te-anomaly-table__row--metrics">
+              <td colspan="5">
+                <ul class="te-anomaly-table-stats">
+                  {{#each tableStats as |metric|}}
+                    <li class="te-anomaly-table-stats__category {{if metric.isActive "te-anomaly-table-stats__category--active"}}" {{action "toggleCategory" metric.label}}>
+                      <div class="te-anomaly-table-stats__content te-anomaly-table-stats__content--number">
+                        {{metric.count}}
+                      </div>
+                      <div class="te-anomaly-table-stats__content te-anomaly-table-stats__content--text">
+                        {{metric.label}}
+                      </div>
+                    </li>
+                  {{/each}}
                 </ul>
-               </td>
+              </td>
+            </tr>
+            <tr class="te-anomaly-table__row te-anomaly-table__head">
+               <th class="te-anomaly-table__cell-head">
+                <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "start"}}>
+                  Start/Duration (PDT)
+                  <i class="te-anomaly-table__icon glyphicon {{if sortColumnStartUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+                </a>
+               </th>
                {{#if alertHasDimensions}}
+                  <th class="te-anomaly-table__cell-head">Dimensions</th>
+               {{/if}}
+               <th class="te-anomaly-table__cell-head">
+                <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "score"}}>
+                  Severity Score
+                  <i class="te-anomaly-table__icon glyphicon {{if sortColumnScoreUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+                </a>
+               </th>
+               <th class="te-anomaly-table__cell-head">
+                <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "change"}}>
+                  Current/WoW
+                  <i class="te-anomaly-table__icon glyphicon {{if sortColumnChangeUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+                </a>
+               </th>
+               <th class="te-anomaly-table__cell-head">
+                <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "resolution"}}>
+                  Resolution
+                  <i class="te-anomaly-table__icon glyphicon {{if sortColumnResolutionUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+                </a>
+             </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {{#each diffedAnomalies as |anomaly|}}
+              <tr class="te-anomaly-table__row">
                  <td class="te-anomaly-table__cell">
                   <ul class="te-anomaly-table__list">
-                   {{#each anomaly.dimensionList as |dimension|}}
-                      <li class="te-anomaly-table__list-item">
-                        {{dimension.dimensionKey}}: <span class="stronger">{{dimension.dimensionVal}}</span>
-                      </li>
-                   {{else}}
-                      -
-                   {{/each}}
+                    <li class="te-anomaly-table__list-item te-anomaly-table__list-item--shadow">{{anomaly.index}}</li>
+                    <li class="te-anomaly-table__list-item te-anomaly-table__list-item--stronger">{{anomaly.startDateStr}}</li>
+                    <li class="te-anomaly-table__list-item te-anomaly-table__list-item--lighter">{{anomaly.durationStr}}</li>
                   </ul>
                  </td>
-               {{/if}}
-               <td class="te-anomaly-table__cell">{{anomaly.severityScore}}</td>
-               <td class="te-anomaly-table__cell">
-                <ul class="te-anomaly-table__list">
-                  <li>{{anomaly.shownCurrent}} / {{anomaly.shownBaseline}}</li>
-                  <li class="te-anomaly-table__value-label te-anomaly-table__value-label--{{anomaly.changeDirectionLabel}}">
-                    ({{anomaly.changeDirection}}{{anomaly.shownChangeRate}}%)
-                  </li>
-                </ul>
-               </td>
-               <td class="te-anomaly-table__cell">
-                  {{anomaly.anomalyFeedback}}
-               </td>
-            </tr>
-          {{/each}}
-        </tbody>
-      </table>
+                 {{#if alertHasDimensions}}
+                   <td class="te-anomaly-table__cell">
+                    <ul class="te-anomaly-table__list">
+                     {{#each anomaly.dimensionList as |dimension|}}
+                        <li class="te-anomaly-table__list-item te-anomaly-table__list-item--smaller">
+                          {{dimension.dimensionKey}}: <span class="stronger">{{dimension.dimensionVal}}</span>
+                        </li>
+                     {{else}}
+                        -
+                     {{/each}}
+                    </ul>
+                   </td>
+                 {{/if}}
+                 <td class="te-anomaly-table__cell">{{anomaly.severityScore}}</td>
+                 <td class="te-anomaly-table__cell">
+                   <ul class="te-anomaly-table__list">
+                      <li>{{anomaly.shownCurrent}} / {{anomaly.shownBaseline}}</li>
+                      <li class="te-anomaly-table__value-label te-anomaly-table__value-label--{{anomaly.changeDirectionLabel}}">
+                        ({{anomaly.shownChangeRate}}%)
+                      </li>
+                   </ul>
+                 </td>
+                 <td class="te-anomaly-table__cell">
+                    {{anomaly.anomalyFeedback}}
+                 </td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      {{/if}}
     </div>
   {{/if}}
 

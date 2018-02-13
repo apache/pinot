@@ -3,6 +3,7 @@
  * @module manage/alert/tune
  * @exports manage/alert/tune
  */
+import _ from 'lodash';
 import Controller from '@ember/controller';
 import moment from 'moment';
 import { computed, set } from '@ember/object';
@@ -30,36 +31,17 @@ export default Controller.extend({
       isTunePreviewActive: false,
       isTuneSaveSuccess: false,
       isTuneSaveFailure: false,
-      selectedSeverityOption: 'Percentage of Change',
-      selectedTunePattern: 'None',
-      customPercentChange: '30',
       selectedTuneType: 'current',
-      customMttdChange: '5',
       predefinedRanges: {},
       today: moment(),
       selectedSortMode: '',
       sortColumnStartUp: false,
       sortColumnScoreUp: false,
       sortColumnChangeUp: false,
-      sortColumnResolutionUp: false
+      sortColumnResolutionUp: false,
+      isPerformanceDataLoading: false
     });
   },
-
-  /**
-   * Severity display options (power-select) and values
-   * @type {Object}
-   */
-  severityMap: computed('alertData', function() {
-    const severityObj = {
-      'Percentage of Change': 'weight',
-      'Absolute Value of Change': 'deviation'
-    };
-    // make site wide impact available only for alerts with the following condition
-    if (this.get('alertData.toCalculateGlobalMetric') !== false) {
-      severityObj['Site Wide Impact'] = 'site_wide_impact';
-    }
-    return severityObj;
-  }),
 
   /**
    * Severity power-select options
@@ -68,16 +50,6 @@ export default Controller.extend({
   tuneSeverityOptions: computed('severityMap', function() {
     return Object.keys(this.get('severityMap'));
   }),
-
-  /**
-   * Pattern display options (power-select) and values
-   */
-  patternMap: {
-    'None': '',
-    'Up and Down': 'UP,DOWN',
-    'Up Only': 'UP',
-    'Down Only': 'DOWN'
-  },
 
   /**
    * Returns selectable pattern options for power-select
@@ -199,20 +171,63 @@ export default Controller.extend({
 
   /**
    * Data needed to render the stats 'cards' above the anomaly graph for this alert
+   * NOTE: buildAnomalyStats util currently requires both 'current' and 'projected' props to be present.
    * @type {Object}
    */
   anomalyStats: computed(
+    'alertEvalMetrics',
+    'isTuneAmountPercent',
+    'isTunePreviewActive',
     'customPercentChange',
     'selectedSeverityOption',
-    'alertEvalMetrics',
     'alertEvalMetrics.projected',
     function() {
       const {
-        alertEvalMetrics: evalMetrics,
-        customPercentChange: severity
-      } = this.getProperties('alertEvalMetrics', 'customPercentChange');
-      const isPercent = !this.get('selectedSeverityOption').includes('Absolute');
-      return buildAnomalyStats(evalMetrics, 'tune', severity, isPercent);
+        isTuneAmountPercent,
+        isTunePreviewActive,
+        alertEvalMetrics: metrics,
+        customPercentChange: severity,
+        selectedSeverityOption
+      } = this.getProperties(
+        'isTuneAmountPercent',
+        'isTunePreviewActive',
+        'alertEvalMetrics',
+        'customPercentChange',
+        'selectedSeverityOption'
+      );
+      const severityUnit = isTuneAmountPercent ? '%' : '';
+      const isPerfDataReady = _.has(metrics, 'current');
+      const statsCards = [
+          {
+            title: 'Estimated number of anomalies',
+            key: 'totalAlerts',
+            tooltip: false,
+            text: 'Estimated number of anomalies  based on alert settings'
+          },
+          {
+            title: 'Estimated precision',
+            key: 'precision',
+            units: '%',
+            tooltip: false,
+            text: 'Among all anomalies sent by the alert, the % of them that are true.'
+          },
+          {
+            title: 'Estimated recall',
+            key: 'recall',
+            units: '%',
+            tooltip: false,
+            text: 'Among all anomalies that happened, the % of them sent by the alert.'
+          },
+          {
+            title: `MTTD for > ${severity}${severityUnit} change`,
+            key: 'mttd',
+            units: 'hrs',
+            tooltip: false,
+            text: `Minimum time to detect for anomalies with > ${severity}${severityUnit} change`
+          }
+        ];
+
+      return isPerfDataReady ? buildAnomalyStats(metrics, statsCards, false) : [];
     }
   ),
 
@@ -231,7 +246,7 @@ export default Controller.extend({
         selectedSortMode
       } = this.getProperties('anomalyData', 'filterBy', 'selectedSortMode');
       let filterKey = '';
-      let filteredAnomalies = anomalies;
+      let filteredAnomalies = anomalies || [];
       let num = 1;
 
       switch (activeFilter) {
@@ -241,7 +256,7 @@ export default Controller.extend({
         case 'False Alarms':
           filterKey = 'False Alarm';
           break;
-        case 'User Created':
+        case 'User Reported':
           filterKey = 'New Trend';
           break;
         default:
@@ -262,12 +277,10 @@ export default Controller.extend({
       }
 
       // Number the list
-      if (this.get('isTunePreviewActive')) {
-        filteredAnomalies.forEach((anomaly) => {
-          set(anomaly, 'index', num);
-          num++;
-        });
-      }
+      filteredAnomalies.forEach((anomaly) => {
+        set(anomaly, 'index', num);
+        num++;
+      });
 
       return filteredAnomalies;
     }
@@ -338,8 +351,7 @@ export default Controller.extend({
      * Save the currently loaded tuning options
      */
     onSubmitTuning() {
-      const tuneId = this.get('alertEvalMetrics.autotuneId');
-      this.send('submitTuningRequest', tuneId);
+      this.send('submitTuningRequest', this.get('autoTuneId'));
     },
 
     /**
@@ -348,6 +360,7 @@ export default Controller.extend({
     onResetPage() {
       this.initialize();
       this.set('alertEvalMetrics.projected', this.get('originalProjectedMetrics'));
+      this.send('resetTuningParams', this.get('alertData'));
     },
 
     /**
@@ -395,12 +408,14 @@ export default Controller.extend({
      * tuning if we have custom settings (tuning data for default option is already loaded)
      */
     onClickPreviewPerformance() {
-      const isTuneTypeCustom = this.get('selectedTuneType') === 'custom';
-      this.set('isTunePreviewActive', true);
-      if (isTuneTypeCustom) {
+      const defaultConfig = { configString: '' };
+      this.set('isPerformanceDataLoading', true);
+      if (this.get('selectedTuneType') === 'custom') {
+        // Trigger preview with custom params
         this.send('triggerTuningSequence', this.get('customTuneQueryString'));
       } else {
-        this.set('alertEvalMetrics.projected', this.get('originalProjectedMetrics'));
+        // When user wants to preview using "current" settings, our request does not contain custom params.
+        this.send('triggerTuningSequence', defaultConfig);
       }
     }
   }

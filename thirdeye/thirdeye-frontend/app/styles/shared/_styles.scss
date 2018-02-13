@@ -231,6 +231,17 @@ body {
   }
 }
 
+.te-self-serve {
+  &__block-title {
+    margin-top: 0;
+    color: app-shade(black, 8);
+  }
+
+  &__block-subtext {
+    margin: -5px 0 25px 0;
+  }
+}
+
 .te-alert-page-hzlist {
     display: inline-block;
     margin-left: 10px;
@@ -328,7 +339,8 @@ body {
   &__container {
     display: flex;
     justify-content: flex-end;
-    margin-top: 20px;
+    margin-top: 15px;
+    clear: both;
   }
 
   &__card {
@@ -337,7 +349,7 @@ body {
     margin-right: 12px;
     border-radius: 5px;
     border: 2px solid app-shade(black, 1);
-    padding: 13px 18px 6px 18px;
+    padding: 13px 15px 6px 17px;
     flex-basis: 25%;
     display: flex;
     align-items: stretch;
@@ -530,7 +542,16 @@ body {
     margin-left: -39px;
     margin-bottom: 0;
     max-width: 250px;
+  }
 
+  &__list-item {
+    &--smaller {
+      font-size: 12px;
+      margin-left: -2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     &--lighter {
       font-size: 12px;
       color: app-shade(black, 6);
@@ -546,14 +567,6 @@ body {
       color: app-shade(black, 2);
       margin-left: -18px;
     }
-  }
-
-  &__list-item {
-    font-size: 12px;
-    margin-left: -2px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   &__value-label {

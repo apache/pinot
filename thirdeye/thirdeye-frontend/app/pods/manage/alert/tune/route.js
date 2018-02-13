@@ -4,11 +4,13 @@
  * @exports manage/alert/edit/explore
  */
 import RSVP from "rsvp";
+import _ from 'lodash';
 import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
+import { isPresent } from "@ember/utils";
 import { checkStatus, postProps, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
-import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups, extractSeverity } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 /**
  * Basic alert page defaults
@@ -16,8 +18,35 @@ import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups } from 'thirdeye-fr
 const durationDefault = '3m';
 const defaultSeverity = '0.3';
 const dateFormat = 'YYYY-MM-DD';
-const startDateDefault = buildDateEod(3, 'month');
-const endDateDefault = buildDateEod(1, 'day');
+const startDateDefault = buildDateEod(3, 'month').valueOf();
+const endDateDefault = moment().valueOf();
+
+/**
+ * Pattern display options (power-select) and values
+ */
+const patternMap = {
+  'Up and Down': 'UP,DOWN',
+  'Up Only': 'UP',
+  'Down Only': 'DOWN'
+};
+
+/**
+ * Severity display options (power-select) and values
+ */
+const severityMap = {
+  'Percentage of Change': 'weight',
+  'Absolute Value of Change': 'deviation'
+};
+
+/**
+ * If no filter data is set for sensitivity, use this
+ */
+const sensitivityDefaults = {
+  selectedSeverityOption: 'Percentage of Change',
+  selectedTunePattern: 'Up and Down',
+  defaultPercentChange: '30',
+  defaultMttdChange: '5'
+};
 
 /**
  * Build the object to populate anomaly table feedback categories
@@ -51,6 +80,55 @@ const anomalyTableStats = (anomalies) => {
       isActive: false
     }
   ];
+};
+
+/**
+ * Set up select & input field defaults for sensitivity settings
+ * @param {Array} alertData - properties for the currently loaded alert
+ * @returns {Object}
+ */
+const processDefaultTuningParams = (alertData) => {
+  let {
+    selectedSeverityOption,
+    selectedTunePattern,
+    defaultPercentChange,
+    defaultMttdChange
+  } = sensitivityDefaults;
+
+  // Cautiously derive tuning data from alert filter properties
+  const featureString = 'window_size_in_hour';
+  const alertFilterObj = alertData.alertFilter || null;
+  const alertPattern = alertFilterObj ? alertFilterObj.pattern : null;
+  const isFeaturesPropFormatted = _.has(alertFilterObj, 'features') && alertFilterObj.features.includes(featureString);
+  const isMttdPropFormatted =  _.has(alertFilterObj, 'mttd') && alertFilterObj.mttd.includes(`${featureString}=`);
+  const alertFeatures = isFeaturesPropFormatted ? alertFilterObj.features.split(',')[1] : null;
+  const alertMttd = isMttdPropFormatted ? alertFilterObj.mttd.split(';') : null;
+
+  // Load saved pattern into pattern options
+  const savedTunePattern = alertPattern ? alertPattern : 'UP,DOWN';
+  for (var patternKey in patternMap) {
+    if (savedTunePattern === patternMap[patternKey]) {
+      selectedTunePattern = patternKey;
+    }
+  }
+
+  // Load saved severity type
+  const savedSeverityPattern = alertFeatures ? alertFeatures : 'weight';
+  for (var severityKey in severityMap) {
+    if (savedSeverityPattern === severityMap[severityKey]) {
+      selectedSeverityOption = severityKey;
+    }
+  }
+
+  // Load saved mttd
+  const mttdValue = alertMttd ? alertMttd[0].split('=')[1] : 'N/A';
+  const customMttdChange = !isNaN(mttdValue) ? Number(mttdValue).toFixed(2) : defaultMttdChange;
+
+  // Load saved severity value
+  const severityValue = alertMttd ? alertMttd[1].split('=')[1] : 'N/A';
+  const customPercentChange = !isNaN(severityValue) ? Number(severityValue) * 100 : defaultPercentChange;
+
+  return { selectedSeverityOption, selectedTunePattern, customPercentChange, customMttdChange };
 };
 
 /**
@@ -154,8 +232,8 @@ export default Route.extend({
     if (!duration || (duration !== 'custom' && duration !== '3m') || !startDate) {
       this.transitionTo({ queryParams: {
         duration: durationDefault,
-        startDate: startDateDefault.valueOf(),
-        endDate: endDateDefault.valueOf()
+        startDate: startDateDefault,
+        endDate: endDateDefault
       }});
     }
   },
@@ -174,10 +252,9 @@ export default Route.extend({
     const tuneParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
     const tuneIdUrl = `/detection-job/autotune/filter/${id}?${tuneParams}`;
     const evalUrl = `/detection-job/eval/filter/${id}?${tuneParams}&isProjected=TRUE`;
-    const mttdUrl = `/detection-job/eval/mttd/${id}?severity=${defaultSeverity}`;
+    const mttdUrl = `/detection-job/eval/mttd/${id}?severity=${extractSeverity(alertData, defaultSeverity)}`;
     const initialPromiseHash = {
       current: fetch(evalUrl).then(checkStatus),
-      autotuneId: fetch(tuneIdUrl, postProps('')).then(checkStatus),
       mttd: fetch(mttdUrl).then(checkStatus)
     };
 
@@ -200,63 +277,43 @@ export default Route.extend({
       });
   },
 
-  afterModel(model) {
-    this._super(model);
-
-    const {
-      id: alertId,
-      startDate,
-      endDate,
-      alertEvalMetrics
-    } = model;
-    let idsRemoved = [];
-
-    return RSVP.hash(tuningPromiseHash(startDate, endDate, alertEvalMetrics.autotuneId, alertId))
-      .then((data) => {
-        idsRemoved = anomalyDiff(data.idListA, data.idListB).idsRemoved;
-        Object.assign(data.projectedEval, { mttd: data.projectedMttd });
-        Object.assign(model.alertEvalMetrics, { projected: data.projectedEval });
-        Object.assign(model, { idsRemoved });
-        return fetchCombinedAnomalies(idsRemoved);
-      })
-      // Fetch all anomaly data for returned Ids to paginate all from one array
-      .then((rawAnomalyData) => {
-        Object.assign(model, { rawAnomalyData });
-        return fetchSeverityScores(idsRemoved);
-      })
-      .then((scoreData) => {
-        Object.assign(model, { scoreData });
-      })
-      // Got errors?
-      .catch((error) => {
-        return RSVP.reject({ error, location: `${this.routeName}:afterModel`, calls: tuningPromiseHash });
-      });
-  },
-
   setupController(controller, model) {
     this._super(controller, model);
 
     const {
       id,
-      scoreData,
       alertData,
       duration,
       loadError,
-      idsRemoved,
       alertEvalMetrics,
-      rawAnomalyData
     } = model;
 
-    const anomalyData = enhanceAnomalies(rawAnomalyData, scoreData);
+    // Conditionally add select option for severity
+    if (alertData.toCalculateGlobalMetric) {
+      severityMap['Site Wide Impact'] = 'site_wide_impact';
+    }
+
+    // Prepare sensitivity default values to populate tuning options from alert data
+    const {
+      selectedSeverityOption,
+      selectedTunePattern,
+      customPercentChange,
+      customMttdChange
+    } = processDefaultTuningParams(alertData);
 
     controller.setProperties({
       alertData,
       loadError,
+      patternMap,
+      severityMap,
       alertId: id,
-      anomalyData,
+      autoTuneId: '',
+      customMttdChange,
+      customPercentChange,
       alertEvalMetrics,
-      tableStats: anomalyTableStats(anomalyData),
-      originalProjectedMetrics: alertEvalMetrics.projected,
+      selectedTunePattern,
+      selectedSeverityOption,
+      alertHasDimensions: isPresent(alertData.exploreDimensions),
       timeRangeOptions: setUpTimeRangeOptions([durationDefault], duration)
     });
     controller.initialize();
@@ -280,9 +337,25 @@ export default Route.extend({
     resetPage() {
       this.transitionTo({ queryParams: {
         duration: durationDefault,
-        startDate: startDateDefault.valueOf(),
-        endDate: endDateDefault.valueOf()
+        startDate: startDateDefault,
+        endDate: endDateDefault
       }});
+    },
+
+    // User resets settings
+    resetTuningParams(alertData) {
+      const {
+        selectedSeverityOption,
+        selectedTunePattern,
+        customPercentChange,
+        customMttdChange
+      } = processDefaultTuningParams(alertData);
+      this.controller.setProperties({
+        selectedSeverityOption,
+        selectedTunePattern,
+        customPercentChange,
+        customMttdChange
+      });
     },
 
     // User clicks "save" on previewed tune settings
@@ -299,7 +372,7 @@ export default Route.extend({
 
     // User clicks "preview", having configured performance settings
     triggerTuningSequence(configObj) {
-      const { configString, severityVal } = configObj;
+      const { configString, severityVal} = configObj;
       const {
         id: alertId,
         startDate,
@@ -307,20 +380,32 @@ export default Route.extend({
         tuneIdUrl
       } = this.currentModel;
       let projectedStats = {};
+      let rawAnomalies = [];
+      let idsRemoved = [];
 
       fetch(tuneIdUrl + configString, postProps('')).then(checkStatus)
-        .then((autoTuneId) => {
-          return RSVP.hash(tuningPromiseHash(startDate, endDate, autoTuneId[0], alertId, severityVal));
+        .then((tuneId) => {
+          const autoTuneId = tuneId[0];
+          this.controller.set('autoTuneId', autoTuneId);
+          return RSVP.hash(tuningPromiseHash(startDate, endDate, autoTuneId, alertId, severityVal));
         })
         .then((data) => {
-          const idsRemoved = anomalyDiff(data.idListA, data.idListB).idsRemoved;
+          idsRemoved = anomalyDiff(data.idListA, data.idListB).idsRemoved;
           projectedStats = data.projectedEval;
           projectedStats.mttd = data.projectedMttd;
+          this.controller.set('alertEvalMetrics.projected', projectedStats);
+          this.controller.setProperties({
+            isTunePreviewActive: true,
+            isPerformanceDataLoading: false
+          });
           return fetchCombinedAnomalies(idsRemoved);
         })
         .then((rawAnomalyData) => {
-          const anomalyData = enhanceAnomalies(rawAnomalyData);
-          this.controller.set('alertEvalMetrics.projected', projectedStats);
+          rawAnomalies = rawAnomalyData;
+          return fetchSeverityScores(idsRemoved);
+        })
+        .then((severityScores) => {
+          const anomalyData = enhanceAnomalies(rawAnomalies, severityScores);
           this.controller.setProperties({
             anomalyData,
             tableStats: anomalyTableStats(anomalyData)

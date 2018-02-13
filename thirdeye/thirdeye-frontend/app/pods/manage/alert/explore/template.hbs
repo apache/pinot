@@ -35,7 +35,7 @@
     {{/if}}
 
     <div class="te-horizontal-cards te-content-block">
-      <h4 class="te-alert-page__subtitle">Alert Performance</h4>
+      <h4 class="te-self-serve__block-title">Alert Performance</h4>
       <a class="te-pill-selectors__side-link" {{action "onClickTuneSensitivity" this}}>Customize sensitivity</a>
       <div class="te-horizontal-cards__container">
         {{!-- Alert anomaly stats cards --}}
@@ -60,7 +60,7 @@
     {{/if}}
 
     <div class="te-content-block">
-      <h4>Anomalies over time ({{filteredAnomalies.length}})</h4>
+      <h4 class="te-self-serve__block-title">Anomalies over time ({{filteredAnomalies.length}})</h4>
       <a class="te-pill-selectors__side-link te-pill-selectors__side-link--high" {{action "onClickReportAnomaly" this}}>Report missing anomaly</a>
 
       {{#if filteredAnomalies}}
@@ -198,19 +198,20 @@
             <tr class="te-anomaly-table__row">
                <td class="te-anomaly-table__cell">
                 <ul class="te-anomaly-table__list">
-                  <li class="te-anomaly-table__list--stronger">
+                  <li class="te-anomaly-table__list-item te-anomaly-table__list-item--shadow">{{anomaly.index}}</li>
+                  <li class="te-anomaly-table__list-item te-anomaly-table__list-item--stronger">
                     <a target="_blank" class="te-anomaly-table__link" href="/thirdeye#anomalies?anomaliesSearchMode=id&pageNumber=1&anomalyIds={{anomaly.anomalyId}}">
                       {{anomaly.startDateStr}}
                     </a>
                   </li>
-                  <li class="te-anomaly-table__list--lighter">{{anomaly.durationStr}}</li>
+                  <li class="te-anomaly-table__list-item te-anomaly-table__list-item--lighter">{{anomaly.durationStr}}</li>
                 </ul>
                </td>
                {{#if alertHasDimensions}}
                  <td class="te-anomaly-table__cell">
                   <ul class="te-anomaly-table__list">
                    {{#each anomaly.dimensionList as |dimension|}}
-                      <li class="te-anomaly-table__list-item" title="{{dimension.dimensionVal}}">
+                      <li class="te-anomaly-table__list-item te-anomaly-table__list-item--smaller" title="{{dimension.dimensionVal}}">
                         {{dimension.dimensionKey}}: <span class="stronger">{{dimension.dimensionVal}}</span>
                       </li>
                    {{else}}
@@ -224,7 +225,7 @@
                 <ul class="te-anomaly-table__list">
                   <li>{{anomaly.shownCurrent}} / {{anomaly.shownBaseline}}</li>
                   <li class="te-anomaly-table__value-label te-anomaly-table__value-label--{{anomaly.changeDirectionLabel}}">
-                    ({{anomaly.changeDirection}}{{anomaly.shownChangeRate}}%)
+                    ({{anomaly.shownChangeRate}}%)
                   </li>
                 </ul>
                </td>

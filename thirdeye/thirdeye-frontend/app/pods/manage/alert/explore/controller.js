@@ -4,24 +4,26 @@
  * @exports manage/alert/explore
  */
 import _ from 'lodash';
+import Ember from 'ember';
 import fetch from 'fetch';
 import moment from 'moment';
 import { later } from "@ember/runloop";
-import Controller from '@ember/controller';
-import { computed, set } from '@ember/object';
 import { isPresent } from "@ember/utils";
+import Controller from '@ember/controller';
 import { task, timeout } from 'ember-concurrency';
+import { computed, set, get, setProperties } from '@ember/object';
 import { checkStatus, postProps, buildDateEod } from 'thirdeye-frontend/utils/utils';
-import { buildAnomalyStats } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { buildAnomalyStats, extractSeverity } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Controller.extend({
   /**
    * Be ready to receive time span for anomalies via query params
    */
-  queryParams: ['duration', 'startDate', 'endDate'],
+  queryParams: ['duration', 'startDate', 'endDate', 'repRunStatus'],
   duration: null,
   startDate: null,
   endDate: null,
+  repRunStatus: null,
 
   /**
    * Mapping anomaly table column names to corresponding prop keys
@@ -45,9 +47,10 @@ export default Controller.extend({
    * @return {undefined}
    */
   initialize() {
+    const repRunStatus = this.get('repRunStatus');
     this.setProperties({
       filters: {},
-      metricData: {},
+      //metricData: {},
       loadedWowData: [],
       predefinedRanges: {},
       missingAnomalyProps: {},
@@ -78,6 +81,11 @@ export default Controller.extend({
     if (this.get('isReplayPending')) {
       this.set('replayStartTime', moment());
       this.get('checkReplayStatus').perform(this.get('jobId'));
+    }
+
+    // If a replay is still running, reload when done
+    if (repRunStatus) {
+      this.get('checkForNewAnomalies').perform(repRunStatus);
     }
   },
 
@@ -223,18 +231,62 @@ export default Controller.extend({
 
   /**
    * Data needed to render the stats 'cards' above the anomaly graph for this alert
-   * TODO: pull this into its own component, as we're re-using it in manage/alert/tune
    * @type {Object}
    */
   anomalyStats: computed(
+    'alertData',
     'alertEvalMetrics',
     'alertEvalMetrics.projected',
     function() {
       const {
+        alertData,
         alertEvalMetrics,
         defaultSeverity
-      } = this.getProperties('alertEvalMetrics', 'defaultSeverity');
-      return buildAnomalyStats(alertEvalMetrics, 'explore', defaultSeverity);
+      } = this.getProperties('alertData', 'alertEvalMetrics', 'defaultSeverity');
+      const features = Ember.getWithDefault(alertData, 'alertFilter.features', null);
+      const severityUnit = features && features.split(',')[1] !== 'deviation' ? '%' : '';
+      const mttdWeight = Number(extractSeverity(alertData, defaultSeverity)) * 100;
+      const statsCards = [
+          {
+            title: 'Number of anomalies',
+            key: 'totalAlerts',
+            tooltip: false,
+            hideProjected: false,
+            text: 'Actual number of alerts received'
+          },
+          {
+            title: 'Response Rate',
+            key: 'responseRate',
+            units: '%',
+            tooltip: false,
+            hideProjected: true,
+            text: '% of anomalies that are reviewed.'
+          },
+          {
+            title: 'Precision',
+            key: 'precision',
+            units: '%',
+            tooltip: false,
+            text: 'Among all anomalies reviewed, the % of them that are true.'
+          },
+          {
+            title: 'Recall',
+            key: 'recall',
+            units: '%',
+            tooltip: false,
+            text: 'Among all anomalies that happened, the % of them detected by the system.'
+          },
+          {
+            title: `MTTD for > ${mttdWeight}${severityUnit} change`,
+            key: 'mttd',
+            units: 'hrs',
+            tooltip: false,
+            hideProjected: true,
+            text: `Minimum time to detect for anomalies with > ${mttdWeight}${severityUnit} change`
+          }
+        ];
+
+      return buildAnomalyStats(alertEvalMetrics, statsCards, true);
     }
   ),
 
@@ -266,6 +318,10 @@ export default Controller.extend({
           // Filter for selected resolution
           anomalies = anomalies.filter(data => targetResolution === data.anomalyFeedback);
         }
+        // Add an index number to each row
+        anomalies.forEach((anomaly, index) => {
+          anomaly.index = index + 1;
+        });
       }
       return anomalies;
     }
@@ -334,7 +390,8 @@ export default Controller.extend({
         const replayStatus = replayStatusObj ? replayStatusObj.taskStatus.toLowerCase() : '';
         // When either replay is no longer pending or 60 seconds have passed, transition to full alert page.
         if (replayStatusList.includes(replayStatus) || isReplayTimeUp) {
-          this.transitionToRoute('manage.alert', alertId, { queryParams: { jobId: null }});
+          const repRunStatus = replayStatus === 'running' ? jobId : null;
+          this.transitionToRoute('manage.alert', alertId, { queryParams: { jobId: null, repRunStatus }});
         } else {
           this.get('checkReplayStatus').perform(jobId);
         }
@@ -342,6 +399,34 @@ export default Controller.extend({
       .catch(() => {
         // If we have job status failure, go ahead and transition to full alert page.
         this.transitionToRoute('manage.alert', alertId, { queryParams: { jobId: null }});
+      });
+  }),
+
+  /**
+   * Concurrency task to reload page once a running replay is complete
+   * @param {Number} jobId - the id for the newly triggered replay job
+   * @return {undefined}
+   */
+  checkForNewAnomalies: task(function * (jobId) {
+    yield timeout(5000);
+
+    // In replay status check, continue to display "pending" banner unless we have known success or failure.
+    fetch(`/detection-onboard/get-status?jobId=${jobId}`).then(checkStatus)
+      .then((jobStatus) => {
+        const replayStatusObj = _.has(jobStatus, 'taskStatuses')
+          ? jobStatus.taskStatuses.find(status => status.taskName === 'FunctionReplay')
+          : null;
+        if (replayStatusObj) {
+          if (replayStatusObj.taskStatus.toLowerCase() === 'completed') {
+            this.transitionToRoute({ queryParams: { repRunStatus: null }});
+          } else {
+            this.get('checkForNewAnomalies').perform(jobId);
+          }
+        }
+      })
+      .catch(() => {
+        // If we have job status failure, go ahead and transition to full alert page.
+        this.transitionToRoute('manage.alert', this.get('alertId'), { queryParams: { repRunStatus: null }});
       });
   }),
 
@@ -594,13 +679,16 @@ export default Controller.extend({
           if (wowDetails) {
             curr = wow.currentVal.toFixed(2);
             base = wowDetails.baselineValue.toFixed(2);
-            change = wowDetails.change.toFixed(2);
+            change = (wowDetails.change * 100).toFixed(2);
           }
 
           // Set displayed value properties. Note: ensure no CP watching these props
-          set(anomaly, 'shownCurrent', curr);
-          set(anomaly, 'shownBaseline', base);
-          set(anomaly, 'shownChangeRate', change);
+          setProperties(anomaly, {
+            shownCurrent: curr,
+            shownBaseline: base,
+            shownChangeRate: change,
+            changeDirectionLabel: change < 0 ? 'down' : 'up'
+          });
         });
       }
     },

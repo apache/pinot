@@ -5,6 +5,7 @@
  */
 import RSVP from 'rsvp';
 import fetch from 'fetch';
+import moment from 'moment';
 import { isPresent } from "@ember/utils";
 import Route from '@ember/routing/route';
 import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
@@ -25,7 +26,7 @@ export default Route.extend({
     const { jobId, functionName } = transition.queryParams;
     const durationDefault = '3m';
     const startDateDefault = buildDateEod(3, 'month').valueOf();
-    const endDateDefault = buildDateEod(1, 'day');
+    const endDateDefault = moment().utc().valueOf();
 
     // Enter default 'explore' route with defaults loaded in URI
     // An alert Id of 0 means there is an alert creation error to display
@@ -123,6 +124,11 @@ export default Route.extend({
       if (transition.targetName === 'manage.alert.index') {
         this.refresh();
       }
+    },
+
+    navigateToAlertPage() {
+      const { id, duration, startDate, endDate } = this.modelFor('manage.alert.tune');
+      this.transitionTo('manage.alert', id, { queryParams: { duration, startDate, endDate }});
     },
 
     // Sub-route errors will bubble up to this
