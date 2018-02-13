@@ -134,6 +134,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     let sessionUpdatedBy = '';
     let sessionUpdatedTime = '';
     let sessionModified = true;
+    let setupMode = true;
     let routeErrors = new Set();
 
     // metric-initialized context
@@ -206,6 +207,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
         sessionUpdatedBy = updatedBy;
         sessionUpdatedTime = updated;
         sessionModified = false;
+        setupMode = false;
 
       } else {
         routeErrors.add(`Could not find sessionId ${sessionId}`);
@@ -223,6 +225,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       sessionUpdatedTime,
       sessionModified,
       selectedUrns,
+      setupMode,
       context
     });
   }

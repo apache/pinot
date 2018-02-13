@@ -10,6 +10,9 @@ import _ from 'lodash';
 const ROOTCAUSE_TAB_DIMENSIONS = 'dimensions';
 const ROOTCAUSE_TAB_METRICS = 'metrics';
 
+const ROOTCAUSE_SETUP_EVENTS_SCORE_THRESHOLD = 1.0;
+const ROOTCAUSE_SETUP_METRICS_SCORE_THRESHOLD = 0.5;
+
 const ROOTCAUSE_SERVICE_ROUTE = 'route';
 const ROOTCAUSE_SERVICE_ENTITIES = 'entities';
 const ROOTCAUSE_SERVICE_TIMESERIES = 'timeseries';
@@ -33,9 +36,18 @@ export default Ember.Controller.extend({
   //
   // notifications
   //
+
+  /**
+   * Errors from routing
+   * @type {Set}
+   */
   routeErrors: null, // Set
 
-  sessionUpdateWarning: null, // string
+  /**
+   * Warning for concurrent session modification
+   * @type {string}
+   */
+  sessionUpdateWarning: null,
 
   //
   // services
@@ -57,6 +69,11 @@ export default Ember.Controller.extend({
   //
   // user details
   //
+
+  /**
+   * Active user name
+   * @type {string}
+   */
   username: Ember.computed.reads('authService.data.authenticated.name'),
 
   //
@@ -65,6 +82,7 @@ export default Ember.Controller.extend({
 
   /**
    * rootcause search context
+   * @type {object}
    *
    * {
    *   urns: Set,
@@ -75,42 +93,55 @@ export default Ember.Controller.extend({
    *   granularity: string
    * }
    */
-  context: null, //
+  context: null,
 
   /**
    * entity urns selected for display
+   * @type {Set}
    */
-  selectedUrns: null, // Set
+  selectedUrns: null,
 
   /**
    * entity urns marked as invisible
+   * @type {Set}
    */
-  invisibleUrns: null, // Set
+  invisibleUrns: null,
 
   /**
    * entity urns currently being hovered over
+   * @type {Set}
    */
-  hoverUrns: null, // Set
+  hoverUrns: null,
 
   /**
    * (event) entity urns passing the filter side-bar
+   * @type {Set}
    */
   filteredUrns: null,
 
   /**
    * displayed investigation tab ('metrics', 'dimensions', ...)
+   * @type {string}
    */
-  activeTab: null, // ""
+  activeTab: null,
 
   /**
    * display mode for timeseries chart
+   * @type {string}
    */
-  timeseriesMode: null, // ""
+  timeseriesMode: null,
 
   /**
    * urn of the currently focused entity in the legend component
+   * @type {string}
    */
   focusedUrn: null,
+
+  /**
+   * toggle for running _setupForMetric() on selection of the first metric
+   * @type {boolean}
+   */
+  setupMode: false,
 
   //
   // session data
@@ -158,8 +189,9 @@ export default Ember.Controller.extend({
 
   /**
    * side-bar filter config
+   * @type {object}
    */
-  filterConfig: filterBarConfig, // {}
+  filterConfig: filterBarConfig,
 
   /**
    * Default settings
@@ -198,7 +230,7 @@ export default Ember.Controller.extend({
    *
    * breakdowns:   de-aggregated metric values over multiple time windows (anomaly, baseline, ...)
    *               (typically displayed in dimension heatmap)
-   * 
+   *
    * scores:       entity scores as computed by backend pipelines (e.g. metric anomality score)
    *               (typically displayed in metrics table)
    */
@@ -254,11 +286,43 @@ export default Ember.Controller.extend({
         .reduce((agg, l) => agg.concat(l), []);
 
       aggregatesService.request(context, new Set(offsetUrns));
-      
+
       // scores
       const scoresUrns = aggregatesUrns;
-      
+
       scoresService.request(context, new Set(scoresUrns));
+    }
+  ),
+
+  /**
+   * Setup observer for selecting default entities on metric selection
+   * Runs multiple times until all entities loaded.
+   */
+  _setupObserver: Ember.observer(
+    'setupMode',
+    'loadingFrameworks',
+    'isLoadingScores',
+    'context',
+    'entities',
+    'scores',
+    'selectedUrns',
+    function () {
+      const { setupMode, context, loadingFrameworks, isLoadingScores, selectedUrns } =
+        this.getProperties('setupMode', 'context', 'loadingFrameworks', 'isLoadingScores', 'selectedUrns');
+
+      if (!setupMode) { return; }
+      if (context.urns.size <= 0) { return; }
+
+      const setupUrns = this._setupForMetric();
+      const newSelectedUrns = new Set(selectedUrns);
+      setupUrns.forEach(urn => newSelectedUrns.add(urn));
+
+      if (_.isEqual(newSelectedUrns, selectedUrns)) { return; }
+
+      this.setProperties({
+        setupMode: loadingFrameworks.size > 0 || isLoadingScores,
+        selectedUrns: newSelectedUrns
+      });
     }
   ),
 
@@ -376,11 +440,11 @@ export default Ember.Controller.extend({
   isLoadingAggregates: Ember.computed.gt('aggregatesService.pending.size', 0),
 
   isLoadingBreakdowns: Ember.computed.gt('breakdownsService.pending.size', 0),
-  
+
   isLoadingScores: Ember.computed.gt('scoresService.pending.size', 0),
-  
+
   loadingFrameworks: Ember.computed.reads('entitiesService.pending'),
-  
+
   //
   // error indicators
   //
@@ -528,6 +592,55 @@ export default Ember.Controller.extend({
     if (!sessionId) { return; }
 
     this._checkSession();
+  },
+
+  //
+  // default selection
+  //
+
+  /**
+   * Select top-scoring entities by default if metric selected for the first time.
+   *
+   * @return {Set} top-scoring entities
+   * @private
+   */
+  _setupForMetric() {
+    const { context, loadingFrameworks, entities, scores } =
+      this.getProperties('context', 'loadingFrameworks', 'entities', 'scores');
+
+    const urns = new Set();
+
+    const contextMetricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
+    contextMetricUrns.forEach(urn => urns.add(urn));
+    contextMetricUrns.map(toCurrentUrn).forEach(urn => urns.add(urn));
+    contextMetricUrns.map(toBaselineUrn).forEach(urn => urns.add(urn));
+
+    // events
+    const groupedEvents = Object.values(entities)
+      .filter(e => e.type === 'event')
+      .reduce((agg, e) => {
+        const type = e.eventType;
+        agg[type] = agg[type] || [];
+        agg[type].push(e);
+        return agg;
+      }, {});
+
+    Object.values(groupedEvents)
+      .forEach(arr => {
+        const topk = arr.filter(e => e.score >= ROOTCAUSE_SETUP_EVENTS_SCORE_THRESHOLD);
+        topk.forEach(e => urns.add(e.urn));
+      });
+
+    // metrics
+    const metricUrns = filterPrefix(Object.keys(entities), 'thirdeye:metric:')
+      .filter(urn => urn in scores)
+      .filter(urn => scores[urn] >= ROOTCAUSE_SETUP_METRICS_SCORE_THRESHOLD);
+
+    metricUrns.forEach(urn => urns.add(urn));
+    metricUrns.map(toCurrentUrn).forEach(urn => urns.add(urn));
+    metricUrns.map(toBaselineUrn).forEach(urn => urns.add(urn));
+
+    return urns;
   },
 
   //
