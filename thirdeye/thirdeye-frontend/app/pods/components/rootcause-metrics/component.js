@@ -242,21 +242,6 @@ export default Ember.Component.extend({
   ),
 
   /**
-   * Anomalyity scores, keyed by metric urn
-   */
-  scores: Ember.computed(
-    'entities',
-    function () {
-      const { entities } = this.getProperties('entities');
-      return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
-        .reduce((agg, urn) => {
-          agg[urn] = entities[urn].score.toFixed(2);
-          return agg;
-        }, {});
-    }
-  ),
-
-  /**
    * Trend direction label (positive, neutral, negative) for change values
    * @type {Object}
    */
