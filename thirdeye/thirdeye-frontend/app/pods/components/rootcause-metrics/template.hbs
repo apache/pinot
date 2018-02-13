@@ -1,14 +1,19 @@
 <div class="row">
-  {{#if (eq selectedView "card")}}
-    <div class="col-xs-8">
+  <div class="col-xs-4">
+    {{#if (eq selectedView "card")}}
       sort
       | <a {{action "toggleSort" "metric"}}>metric</a>
       | <a {{action "toggleSort" "dataset"}}>dataset</a>
       | <a {{action "toggleSort" "change"}}>change</a>
       | <a {{action "toggleSort" "score"}}>score</a>
-    </div>
-  {{/if}}
-  <div class="col-xs-4 pull-right">
+    {{/if}}
+  </div>
+  <div class="col-xs-4">
+    {{#if isLoading}}
+      <span class="rootcause-metric-spinner">{{ember-spinner scale=0.5}}</span>
+    {{/if}}
+  </div>
+  <div class="col-xs-4">
     <ul class="rootcause-metric__display-view">
       <li class="rootcause-metric__display-option rootcause-metric__display-option--{{if (eq selectedView "table") "active"}}" {{action "selectView" 'table'}}>
         Table
@@ -45,6 +50,7 @@
   {{metrics-table
     urns=urns
     links=links
+    scores=scores
     selectedUrns=selectedUrns
     entities=entities
     changesOffset=changesOffset

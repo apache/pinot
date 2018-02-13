@@ -15,12 +15,35 @@ export default Ember.Component.extend({
   //
   // external properties
   //
-  entities: null, // {}
 
-  aggregates: null, // {}
+  /**
+   * Entities cache
+   * @type {object}
+   */
+  entities: null,
 
-  selectedUrns: null, // Set
+  /**
+   * Metric aggregates
+   * @type {object}
+   */
+  aggregates: null,
 
+  /**
+   * (Metric) entity scores
+   * @type {object}
+   */
+  scores: null,
+
+  /**
+   * User-selected urns
+   * @type {Set}
+   */
+  selectedUrns: null,
+
+  /**
+   * Callback on metric selection
+   * @type {function}
+   */
   onSelection: null, // function (Set, state)
 
   //
@@ -215,21 +238,6 @@ export default Ember.Component.extend({
       Object.keys(changesOffset).forEach(offset => dict[offset] = this._formatChanges(changesOffset[offset]));
 
       return dict;
-    }
-  ),
-
-  /**
-   * Anomalyity scores, keyed by metric urn
-   */
-  scores: Ember.computed(
-    'entities',
-    function () {
-      const { entities } = this.getProperties('entities');
-      return filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
-        .reduce((agg, urn) => {
-          agg[urn] = entities[urn].score.toFixed(2);
-          return agg;
-        }, {});
     }
   ),
 

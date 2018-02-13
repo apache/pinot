@@ -50,6 +50,8 @@ export default Ember.Controller.extend({
 
   breakdownsService: Ember.inject.service('rootcause-breakdowns-cache'),
 
+  scoresService: Ember.inject.service('rootcause-scores-cache'),
+
   sessionService: Ember.inject.service('rootcause-session-datasource'),
 
   //
@@ -196,6 +198,9 @@ export default Ember.Controller.extend({
    *
    * breakdowns:   de-aggregated metric values over multiple time windows (anomaly, baseline, ...)
    *               (typically displayed in dimension heatmap)
+   * 
+   * scores:       entity scores as computed by backend pipelines (e.g. metric anomality score)
+   *               (typically displayed in metrics table)
    */
   _contextObserver: Ember.observer(
     'context',
@@ -207,8 +212,8 @@ export default Ember.Controller.extend({
     'breakdownsService',
     'activeTab',
     function () {
-      const { context, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, activeTab } =
-        this.getProperties('context', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'activeTab');
+      const { context, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, activeTab } =
+        this.getProperties('context', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'activeTab');
 
       if (!context || !selectedUrns) {
         return;
@@ -249,6 +254,11 @@ export default Ember.Controller.extend({
         .reduce((agg, l) => agg.concat(l), []);
 
       aggregatesService.request(context, new Set(offsetUrns));
+      
+      // scores
+      const scoresUrns = aggregatesUrns;
+      
+      scoresService.request(context, new Set(scoresUrns));
     }
   ),
 
@@ -275,6 +285,11 @@ export default Ember.Controller.extend({
    * Subscribed breakdowns cache
    */
   breakdowns: Ember.computed.reads('breakdownsService.breakdowns'),
+
+  /**
+   * Subscribed scores cache
+   */
+  scores: Ember.computed.reads('scoresService.scores'),
 
   /**
    * Primary metric urn for rootcause search
@@ -358,10 +373,14 @@ export default Ember.Controller.extend({
 
   isLoadingTimeseries: Ember.computed.gt('timeseriesService.pending.size', 0),
 
-  isLoadingAggregates: Ember.computed.or('aggregatesService.pending.size', 'entitiesService.pending.size'),
+  isLoadingAggregates: Ember.computed.gt('aggregatesService.pending.size', 0),
 
   isLoadingBreakdowns: Ember.computed.gt('breakdownsService.pending.size', 0),
-
+  
+  isLoadingScores: Ember.computed.gt('scoresService.pending.size', 0),
+  
+  loadingFrameworks: Ember.computed.reads('entitiesService.pending'),
+  
   //
   // error indicators
   //
@@ -375,11 +394,14 @@ export default Ember.Controller.extend({
 
   hasErrorsBreakdowns: Ember.computed.gt('breakdownsService.errors.size', 0),
 
+  hasErrorsScores: Ember.computed.gt('scoresService.errors.size', 0),
+
   hasServiceErrors: Ember.computed.or(
     'hasErrorsEntities',
     'hasErrorsTimeseries',
     'hasErrorsAggregates',
-    'hasErrorsBreakdowns'
+    'hasErrorsBreakdowns',
+    'hasErrorsScores'
   ),
 
   //

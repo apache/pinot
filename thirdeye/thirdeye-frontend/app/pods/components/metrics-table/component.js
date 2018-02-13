@@ -1,9 +1,11 @@
 import Component from '@ember/component';
 import { computed } from '@ember/object';
 import { makeSortable, toMetricLabel, toColorDirection, isInverse } from 'thirdeye-frontend/utils/rca-utils';
+import { humanizeScore } from 'thirdeye-frontend/utils/utils';
 
 export default Component.extend({
   classNames: ['metrics-table'],
+
   /**
    * Columns for metrics table
    * @type Object[]
@@ -25,7 +27,9 @@ export default Component.extend({
       propertyName: 'score',
       title: 'Anomalous',
       disableFiltering: true,
-      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--small'
+      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--small',
+      sortPrecedence: 0,
+      sortDirection: 'desc'
     }, {
       propertyName: 'wo1w',
       template: 'custom/metrics-table-changes/wo1w',
@@ -58,6 +62,48 @@ export default Component.extend({
   ],
 
   /**
+   * Metric urns in sorted order
+   * @type {string}
+   */
+  urns: null,
+
+  /**
+   * Entities cache
+   * @type {object}
+   */
+  entities: null,
+
+  /**
+   * Relative changes from offset to current
+   * @type {object}
+   */
+  changesOffset: null,
+
+  /**
+   * Formatted strings for changesOffset
+   * @type {object}
+   */
+  changesOffsetFormatted: null,
+
+  /**
+   * User-selected urns
+   * @type {Set}
+   */
+  selectedUrns: null,
+
+  /**
+   * (External) links for metric labels
+   * @type {object}
+   */
+  links: null,
+
+  /**
+   * Scores for metric entities
+   * @type {object}
+   */
+  scores: null,
+
+  /**
    * Data for metrics table
    * @type Object[] - array of objects, each corresponding to a row in the table
    */
@@ -66,10 +112,12 @@ export default Component.extend({
     'selectedUrns',
     'entities',
     'changesOffset',
+    'changesOffsetFormatted',
     'links',
+    'scores',
     function() {
-      const { urns, entities, changesOffset, selectedUrns, links } =
-        this.getProperties('urns', 'entities', 'changesOffset', 'selectedUrns', 'links');
+      const { urns, entities, changesOffset, selectedUrns, links, scores } =
+        this.getProperties('urns', 'entities', 'changesOffset', 'selectedUrns', 'links', 'scores');
 
       return urns.map(urn => {
         return {
@@ -77,7 +125,7 @@ export default Component.extend({
           links: links[urn],
           isSelected: selectedUrns.has(urn),
           label: toMetricLabel(urn, entities),
-          score: entities[urn].score.toFixed(2),
+          score: humanizeScore(scores[urn]),
           wo1w: this._makeRecord('wo1w', urn),
           wo2w: this._makeRecord('wo2w', urn),
           wo3w: this._makeRecord('wo3w', urn),

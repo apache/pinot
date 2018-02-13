@@ -183,7 +183,7 @@
               {{/if}}
 
               {{#if (eq activeTab "metrics")}}
-                {{#if isLoadingAggregates}}
+                {{#if (set-has loadingFrameworks "metricRelated")}}
                   <div class="spinner-wrapper spinner-wrapper--card">
                     {{ember-spinner}}
                   </div>
@@ -192,7 +192,9 @@
                 {{rootcause-metrics
                   entities=entities
                   aggregates=aggregates
+                  scores=scores
                   selectedUrns=selectedUrns
+                  isLoading=(or isLoadingAggregates isLoadingScores)
                   onSelection=(action "onSelection")
                 }}
               {{/if}}
@@ -203,16 +205,11 @@
                     {{filter-bar
                       config=filterConfig
                       entities=eventFilterEntities
+                      loadingFrameworks=loadingFrameworks
                       onFilter=(action "onFilter")}}
                   </div>
 
                   <div class="col-xs-9">
-                    {{#if isLoadingEntities}}
-                      <div class="spinner-wrapper spinner-wrapper--card">
-                        {{ember-spinner}}
-                      </div>
-                    {{/if}}
-
                     {{rootcause-table
                       entities=eventTableEntities
                       columns=eventTableColumns

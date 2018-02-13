@@ -1,11 +1,8 @@
 import Ember from 'ember';
-import { filterObject, filterPrefix, toBaselineRange, toColor } from 'thirdeye-frontend/utils/rca-utils';
+import { filterObject, filterPrefix, toBaselineRange, toColor, trimTimeRanges } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
-
-const ROOTCAUSE_ANALYSIS_DURATION_MAX = 1209600000; // 14 days (in millis)
-const ROOTCAUSE_ANOMALY_DURATION_MAX = 604800000; // 7 days (in millis)
 
 export default Ember.Service.extend({
   entities: null, // {}
@@ -54,7 +51,7 @@ export default Ember.Service.extend({
         return;
       }
 
-      const frameworks = new Set(['events', 'metricAnalysis']);
+      const frameworks = new Set(['eventAnomaly', 'eventHoliday', 'eventIssue', 'eventExperiment', 'eventDeployment', 'metricRelated']);
 
       this.setProperties({ context: _.cloneDeep(requestContext), entities: newEntities, pending: frameworks });
 
@@ -107,22 +104,6 @@ export default Ember.Service.extend({
     this.setProperties({ entities: newEntities, pending: newPending });
   },
 
-  _trimRanges(anomalyRange, analysisRange) {
-    // trim anomaly range from start of anomaly range forward
-    const newAnomalyDuration = Math.min(anomalyRange[1] - anomalyRange[0], ROOTCAUSE_ANOMALY_DURATION_MAX);
-    const newAnomalyRange = [anomalyRange[0], anomalyRange[0] + newAnomalyDuration];
-
-    // trim analysis range from end of anomaly range backward
-    const newAnalysisDuration = Math.min(analysisRange[1] - analysisRange[0], ROOTCAUSE_ANALYSIS_DURATION_MAX);
-    const newAnalysisRangeStart = Math.max(analysisRange[0], anomalyRange[1] - newAnalysisDuration);
-    const newAnalysisRange = [newAnalysisRangeStart, anomalyRange[1]];
-
-    return Object.assign({}, {
-      anomalyRange: newAnomalyRange,
-      analysisRange: newAnalysisRange
-    });
-  },
-
   _evictionCandidates(entities, framework) {
     switch (framework) {
       case 'events':
@@ -138,7 +119,7 @@ export default Ember.Service.extend({
 
   _makeUrl(framework, context) {
     const urnString = filterPrefix(context.urns, 'thirdeye:metric:').map(encodeURIComponent).join(',');
-    const ranges = this._trimRanges(context.anomalyRange, context.analysisRange);
+    const ranges = trimTimeRanges(context.anomalyRange, context.analysisRange);
 
     const baselineRange = toBaselineRange(ranges.anomalyRange, context.compareMode);
     return `/rootcause/query?framework=${framework}` +

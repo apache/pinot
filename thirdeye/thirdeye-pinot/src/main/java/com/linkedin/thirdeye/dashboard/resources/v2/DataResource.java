@@ -179,6 +179,12 @@ public class DataResource {
       Set<String> aliasParts = new HashSet<>(Arrays.asList(name.split("\\s+")));
       metricConfigs = metricConfigDAO.findWhereAliasLikeAndActive(aliasParts);
     }
+    Collections.sort(metricConfigs, new Comparator<MetricConfigDTO>() {
+      @Override
+      public int compare(MetricConfigDTO o1, MetricConfigDTO o2) {
+        return o1.getAlias().compareTo(o2.getAlias());
+      }
+    });
     return metricConfigs;
   }
 

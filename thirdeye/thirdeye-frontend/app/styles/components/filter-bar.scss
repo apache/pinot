@@ -8,7 +8,7 @@
       border-top: 1px solid $te-grey--border;
     }
   }
-  
+
   &__group-title {
     padding: 15px $te-default-element-spacing;
     margin-top: 0px;
@@ -54,6 +54,12 @@
     &--hidden {
       display: none;
     }
+  }
+
+  &--spinner {
+    position: relative;
+    width: 10px;
+    margin-right: 10px;
   }
 }
 

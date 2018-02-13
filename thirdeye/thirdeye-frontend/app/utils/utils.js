@@ -1,4 +1,5 @@
 import moment from 'moment';
+import Ember from 'ember';
 
 /**
  * The Promise returned from fetch() won't reject on HTTP error status even if the response is an HTTP 404 or 500.
@@ -31,7 +32,7 @@ export function checkStatus(response, mode = 'get', recoverBlank = false) {
  * Formatter for the human-readable floating point numbers numbers
  */
 export function humanizeFloat(f) {
-  if (Number.isNaN(f)) { return '-'; }
+  if (Ember.isNone(f) || Number.isNaN(f)) { return '-'; }
   const fixed = Math.max(3 - Math.max(Math.floor(Math.log10(f)) + 1, 0), 0);
   return f.toFixed(fixed);
 }
@@ -40,8 +41,16 @@ export function humanizeFloat(f) {
  * Formatter for the human-readable change values in percent with 1 decimal
  */
 export function humanizeChange(f) {
-  if (Number.isNaN(f)) { return '-'; }
+  if (Ember.isNone(f) || Number.isNaN(f)) { return '-'; }
   return `${f > 0 ? '+' : ''}${(Math.round(f * 1000) / 10.0).toFixed(1)}%`;
+}
+
+/**
+ * Formatter for human-readable entity scores with 2 decimals
+ */
+export function humanizeScore(f) {
+  if (Ember.isNone(f) || Number.isNaN(f)) { return '-'; }
+  return f.toFixed(2);
 }
 
 /**
@@ -94,6 +103,7 @@ export default {
   checkStatus,
   humanizeFloat,
   humanizeChange,
+  humanizeScore,
   parseProps,
   postProps,
   toIso

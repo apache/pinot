@@ -8,11 +8,13 @@
  *    a. label {string} - displayed name for the input
  *    b. labelMapping {string} - key value of label in the payload's attribute object that maps to the label
  *    c. type {string} - input type (i.e. dropdown, checkbox, drag)
+ *  5. framework {string} rca framework name for loading indicator
  */
 export default [
   {
     header: "Holidays",
     eventType: "holiday",
+    framework: "eventHoliday",
     color: "green",
     inputs: [
       {
@@ -25,6 +27,7 @@ export default [
   {
     header: "GCN",
     eventType: "gcn",
+    framework: "eventIssue",
     color: "orange",
     inputs: [
       {
@@ -47,6 +50,7 @@ export default [
   {
     header: "LiX",
     eventType: "lix",
+    framework: "eventExperiment",
     color: "purple",
     inputs: [
       {
@@ -69,6 +73,7 @@ export default [
   {
     header: "Deployments",
     eventType: "informed",
+    framework: "eventDeployment",
     color: "red",
     inputs: [
       {
@@ -91,6 +96,7 @@ export default [
   {
     header: "Anomalies",
     eventType: "anomaly",
+    framework: "eventAnomaly",
     color: "teal",
     inputs: [
       {

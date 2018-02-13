@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.dashboard.resources.v2.rootcause;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.dashboard.resources.v2.ResourceUtils;
 import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEntityFormatter;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
@@ -18,12 +17,14 @@ import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import scala.Int;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class MetricEntityFormatter extends RootCauseEntityFormatter {
+  private static final Logger LOG = LoggerFactory.getLogger(MetricEntityFormatter.class);
+
   private static final long SLICE_START_OFFSET = TimeUnit.DAYS.toMillis(7);
 
   private static final Map<String, Integer> TIME_RANGE_PRIORITY = new HashMap<>();
@@ -64,7 +65,14 @@ public class MetricEntityFormatter extends RootCauseEntityFormatter {
     MetricEntity e = (MetricEntity) entity;
 
     MetricConfigDTO metric = this.metricDAO.findById(e.getId());
+    if (metric == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve metric id %d", e.getId()));
+    }
+
     DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
+    if (dataset == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for metric id %d", metric.getDataset(), metric.getId()));
+    }
 
     Multimap<String, String> attributes = ArrayListMultimap.create();
     attributes.put(ATTR_DATASET, metric.getDataset());
