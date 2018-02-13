@@ -207,10 +207,12 @@ public class PlainFieldExtractor implements FieldExtractor {
           }
         }
 
-        // Null character is the default padding character, we do not allow trailing null chars in strings.
-        // Allowing this can cause multiple values to map to the same padded value, breaking segment generation.
-        if (dest == PinotDataType.STRING) {
-          value = StringUtil.trimTrailingNulls((String) value);
+        // Null character is used as the padding character, so we do not allow null characters in strings.
+        if (dest == PinotDataType.STRING && value != null) {
+          if (StringUtil.containsNullCharacter(value.toString())) {
+            LOGGER.error("Input value: {} for column: {} contains null character", value, column);
+            value = StringUtil.removeNullCharacters(value.toString());
+          }
         }
       }
 

@@ -49,10 +49,8 @@ import org.testng.annotations.Test;
  * Class for testing Raw index creators.
  */
 public class RawIndexCreatorTest {
-
   private static final int NUM_ROWS = 10009;
   private static final int MAX_STRING_LENGTH = 101;
-  private static final int MAX_STRING_LENGTH_IN_BYTES = MAX_STRING_LENGTH / 4; // margin for UTF-8 chars.
 
   private static final String SEGMENT_DIR_NAME = System.getProperty("java.io.tmpdir") + File.separator + "fwdIndexTest";
   private static final String SEGMENT_NAME = "testSegment";
@@ -237,38 +235,26 @@ public class RawIndexCreatorTest {
   }
 
   /**
-   * Helper method that generates a random value for a given data type
+   * Helper method that generates a random value for a given data type.
    *
    * @param dataType Data type for which to generate the random value
-   * @return Random value for the data type.
+   * @return Random value for the data type
    */
   public static Object getRandomValue(Random random, FieldSpec.DataType dataType) {
-    Object value;
     switch (dataType) {
       case INT:
-        value = random.nextInt();
-        break;
-
+        return random.nextInt();
       case LONG:
-        value = random.nextLong();
-        break;
-
+        return random.nextLong();
       case FLOAT:
-        value = random.nextFloat();
-        break;
-
+        return random.nextFloat();
       case DOUBLE:
-        value = random.nextDouble();
-        break;
-
+        return random.nextDouble();
       case STRING:
-        value = StringUtil.trimTrailingNulls(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH_IN_BYTES)));
-        break;
-
+        return StringUtil.removeNullCharacters(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)));
       default:
-        throw new IllegalArgumentException("Illegal data type for random value generator: " + dataType);
+        throw new UnsupportedOperationException("Unsupported data type for random value generator: " + dataType);
     }
-    return value;
   }
 
   /**

@@ -15,42 +15,43 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import javax.annotation.Nonnull;
 import org.apache.commons.lang.StringUtils;
 
-/**
- * Sep 30, 2014
- */
 
 public class StringUtil {
+  private static final char NULL_CHARACTER = '\0';
 
-  private static final String EMPTY_STRING = "";
-
-  public static String join(String seperator, String...keys) {
-    return StringUtils.join(keys, seperator);
+  /**
+   * Joins the given keys with the separator.
+   */
+  public static String join(String separator, String... keys) {
+    return StringUtils.join(keys, separator);
   }
 
   /**
-   * Trim trailing null characters from a string.
-   * @param input Input to trim
-   * @return Trimmed input
+   * Returns whether the string contains null character.
    */
-  public static String trimTrailingNulls(String input) {
-    if (input == null) {
+  public static boolean containsNullCharacter(@Nonnull String input) {
+    return input.indexOf(NULL_CHARACTER) >= 0;
+  }
+
+  /**
+   * Removes the null characters from a string.
+   */
+  public static String removeNullCharacters(@Nonnull String input) {
+    if (!containsNullCharacter(input)) {
       return input;
     }
 
-    int origEnd = input.length() - 1;
-    int end = origEnd;
-    while (end >= 0 && input.charAt(end) == '\0') {
-      end--;
+    char[] chars = input.toCharArray();
+    int length = chars.length;
+    int index = 0;
+    for (int i = 0; i < length; i++) {
+      if (chars[i] != NULL_CHARACTER) {
+        chars[index++] = chars[i];
+      }
     }
-
-    if (end == origEnd) {
-      return input;
-    } else if (end < 0) {
-      return EMPTY_STRING;
-    } else {
-      return input.substring(0, end+1);
-    }
+    return new String(chars, 0, index);
   }
 }
