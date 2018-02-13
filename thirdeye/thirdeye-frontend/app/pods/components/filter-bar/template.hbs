@@ -3,7 +3,13 @@
     <section class="filter-bar__group">
       <h5 class="filter-bar__group-title {{if block.isHidden "" "filter-bar__group-title--active "}}" {{action 'selectEventType' block.eventType}}>
         <div class="filter-bar__indicator">
-          <span class="entity-indicator entity-indicator--{{block.color}}"></span>
+          {{#if (set-has loadingFrameworks block.framework)}}
+            <span class="filter-bar--spinner">
+              {{ember-spinner scale=0.5}}
+            </span>
+          {{else}}
+            <span class="entity-indicator entity-indicator--{{block.color}}"></span>
+          {{/if}}
         </div>
         <div class="filter-bar__header">
           <span>{{block.header}} ({{get eventTypeMap block.eventType}})</span>

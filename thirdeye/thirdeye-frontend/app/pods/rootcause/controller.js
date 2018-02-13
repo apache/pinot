@@ -373,10 +373,14 @@ export default Ember.Controller.extend({
 
   isLoadingTimeseries: Ember.computed.gt('timeseriesService.pending.size', 0),
 
-  isLoadingAggregates: Ember.computed.or('aggregatesService.pending.size', 'entitiesService.pending.size'),
+  isLoadingAggregates: Ember.computed.gt('aggregatesService.pending.size', 0),
 
   isLoadingBreakdowns: Ember.computed.gt('breakdownsService.pending.size', 0),
-
+  
+  isLoadingScores: Ember.computed.gt('scoresService.pending.size', 0),
+  
+  loadingFrameworks: Ember.computed.reads('entitiesService.pending'),
+  
   //
   // error indicators
   //
@@ -390,11 +394,14 @@ export default Ember.Controller.extend({
 
   hasErrorsBreakdowns: Ember.computed.gt('breakdownsService.errors.size', 0),
 
+  hasErrorsScores: Ember.computed.gt('scoresService.errors.size', 0),
+
   hasServiceErrors: Ember.computed.or(
     'hasErrorsEntities',
     'hasErrorsTimeseries',
     'hasErrorsAggregates',
-    'hasErrorsBreakdowns'
+    'hasErrorsBreakdowns',
+    'hasErrorsScores'
   ),
 
   //

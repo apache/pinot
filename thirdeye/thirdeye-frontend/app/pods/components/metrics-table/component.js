@@ -27,7 +27,9 @@ export default Component.extend({
       propertyName: 'score',
       title: 'Anomalous',
       disableFiltering: true,
-      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--small'
+      className: 'rootcause-metric__table__column rootcause-metric__table__links-column--small',
+      sortPrecedence: 0,
+      sortDirection: 'desc'
     }, {
       propertyName: 'wo1w',
       template: 'custom/metrics-table-changes/wo1w',

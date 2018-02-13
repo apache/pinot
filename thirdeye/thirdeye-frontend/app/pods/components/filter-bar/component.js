@@ -49,6 +49,12 @@ export default Component.extend({
   urnsCache: {},
 
   /**
+   * Set of frameworks currently loading
+   * @type {Set}
+   */
+  loadingFrameworks: {},
+
+  /**
    * Overwrite the init function
    * Initializes values of the filter blocks
    * Example of a filter block:

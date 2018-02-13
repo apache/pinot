@@ -37,7 +37,7 @@ export default Ember.Service.extend({
         fetch(this._makeIdentityUrl(requestNativeUrns))
           .then(checkStatus)
           .then(this._jsonToEntities)
-          .then(incoming => this._complete(requestContext, urns, incoming, 'identity'));
+          .then(incoming => this._complete(requestContext, urns, incoming, 'identity'))
           .catch(error => this._handleError('identity', error));
       }
     }
@@ -59,7 +59,7 @@ export default Ember.Service.extend({
         fetch(this._makeUrl(framework, requestContext))
           .then(checkStatus)
           .then(this._jsonToEntities)
-          .then(incoming => this._complete(requestContext, urns, incoming, framework));
+          .then(incoming => this._complete(requestContext, urns, incoming, framework))
           .catch(error => this._handleError(framework, error));
       });
     }
@@ -102,22 +102,6 @@ export default Ember.Service.extend({
     newPending.delete(framework);
 
     this.setProperties({ entities: newEntities, pending: newPending });
-  },
-
-  _trimRanges(anomalyRange, analysisRange) {
-    // trim anomaly range from start of anomaly range forward
-    const newAnomalyDuration = Math.min(anomalyRange[1] - anomalyRange[0], ROOTCAUSE_ANOMALY_DURATION_MAX);
-    const newAnomalyRange = [anomalyRange[0], anomalyRange[0] + newAnomalyDuration];
-
-    // trim analysis range from end of anomaly range backward
-    const newAnalysisDuration = Math.min(analysisRange[1] - analysisRange[0], ROOTCAUSE_ANALYSIS_DURATION_MAX);
-    const newAnalysisRangeStart = Math.max(analysisRange[0], anomalyRange[1] - newAnalysisDuration);
-    const newAnalysisRange = [newAnalysisRangeStart, anomalyRange[1]];
-
-    return Object.assign({}, {
-      anomalyRange: newAnomalyRange,
-      analysisRange: newAnalysisRange
-    });
   },
 
   _evictionCandidates(entities, framework) {
