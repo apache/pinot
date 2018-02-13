@@ -32,7 +32,7 @@ public abstract class QueryExecutor {
     protected PostQueryCommand postQueryCommand;
     protected int _testDuration;
     protected String _dataDir;
-    ExecutorService _threadPool;
+    List<ExecutorService> _threadPool;
 
     public static QueryExecutor getInstance(){
         return null;
@@ -52,10 +52,19 @@ public abstract class QueryExecutor {
     public void start() throws InterruptedException {
         loadConfig();
         int threadCnt = Integer.parseInt(config.getProperty("ThreadCount"));
-        _threadPool = Executors.newFixedThreadPool(threadCnt);
+        _threadPool = new ArrayList<>();
+
         QueryTask queryTask = getTask(config);
         queryTask.setPostQueryCommand(this.postQueryCommand);
-        _threadPool.execute(queryTask);
+
+        for(int i=0; i < threadCnt; i++)
+        {
+            _threadPool.add(Executors.newFixedThreadPool(1));
+        }
+        for(int i=0; i < threadCnt; i++)
+        {
+            _threadPool.get(i).execute(queryTask);
+        }
         //threadPool.awaitTermination(_testDuration, TimeUnit.SECONDS);
         //threadPool.shutdownNow();
     }
@@ -96,6 +105,10 @@ public abstract class QueryExecutor {
     }
     public void shutdownThreadPool()
     {
-        _threadPool.shutdown();
+        int threadCnt = Integer.parseInt(config.getProperty("ThreadCount"));
+        for(int i=0; i<threadCnt;i++)
+        {
+            _threadPool.get(i).shutdown();
+        }
     }
 }

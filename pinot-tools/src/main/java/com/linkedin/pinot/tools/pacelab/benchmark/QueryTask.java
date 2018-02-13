@@ -53,7 +53,7 @@ public class QueryTask implements Runnable{
 
         long secondsPassed = (currentTimeMillisTime-runStartMillisTime)/1000;
         //while(!Thread.interrupted()) {
-        while(secondsPassed < _testDuration)
+        while(secondsPassed < _testDuration && !Thread.interrupted())
         {
 
             long intervalStart = System.currentTimeMillis();
