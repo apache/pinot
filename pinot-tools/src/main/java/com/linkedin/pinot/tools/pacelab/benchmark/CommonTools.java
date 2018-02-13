@@ -40,13 +40,14 @@ public class CommonTools {
 
         if(firstDay<secondDay)
         {
-            queriedStartTime = minProfileViewStartTime + firstDay*DaySecond;
-            queriedEndTime = minProfileViewStartTime + secondDay*DaySecond;
+
+            queriedStartTime = maxProfileViewStartTime - secondDay*DaySecond;
+            queriedEndTime = maxProfileViewStartTime - firstDay*DaySecond;
         }
         else
         {
-            queriedStartTime = minProfileViewStartTime + secondDay*DaySecond;
-            queriedEndTime = minProfileViewStartTime + firstDay*DaySecond;
+            queriedStartTime = maxProfileViewStartTime - firstDay*DaySecond;
+            queriedEndTime = maxProfileViewStartTime - secondDay*DaySecond;
         }
         return new LongRange(queriedStartTime,queriedEndTime);
     }
