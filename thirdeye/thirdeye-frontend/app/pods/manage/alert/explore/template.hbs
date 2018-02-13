@@ -198,6 +198,7 @@
             <tr class="te-anomaly-table__row">
                <td class="te-anomaly-table__cell">
                 <ul class="te-anomaly-table__list">
+                  <li class="te-anomaly-table__list--shadow">{{anomaly.index}}</li>
                   <li class="te-anomaly-table__list--stronger">
                     <a target="_blank" class="te-anomaly-table__link" href="/thirdeye#anomalies?anomaliesSearchMode=id&pageNumber=1&anomalyIds={{anomaly.anomalyId}}">
                       {{anomaly.startDateStr}}
@@ -224,7 +225,7 @@
                 <ul class="te-anomaly-table__list">
                   <li>{{anomaly.shownCurrent}} / {{anomaly.shownBaseline}}</li>
                   <li class="te-anomaly-table__value-label te-anomaly-table__value-label--{{anomaly.changeDirectionLabel}}">
-                    ({{anomaly.changeDirection}}{{anomaly.shownChangeRate}}%)
+                    ({{anomaly.shownChangeRate}}%)
                   </li>
                 </ul>
                </td>

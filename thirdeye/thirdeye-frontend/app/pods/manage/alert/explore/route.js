@@ -9,7 +9,7 @@ import moment from 'moment';
 import Route from '@ember/routing/route';
 import { isPresent, isEmpty, isNone, isBlank } from "@ember/utils";
 import { checkStatus, postProps, parseProps, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
-import { enhanceAnomalies, toIdGroups, setUpTimeRangeOptions, getTopDimensions, buildMetricDataUrl } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { enhanceAnomalies, toIdGroups, setUpTimeRangeOptions, getTopDimensions, buildMetricDataUrl, extractSeverity } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 /**
  * Shorthand for setting date defaults
@@ -19,14 +19,14 @@ const dateFormat = 'YYYY-MM-DD';
 /**
  * Basic alert page defaults
  */
-const defaultSeverity = 30;
+const defaultSeverity = 0.3;
 const paginationDefault = 10;
 const dimensionCount = 7;
-const durationDefault = '1m';
+const durationDefault = '3m';
 const metricDataColor = 'blue';
 const durationMap = { m:'month', d:'day', w:'week' };
-const startDateDefault = buildDateEod(1, 'month');
-const endDateDefault = buildDateEod(1, 'day');
+const startDateDefault = buildDateEod(3, 'month').valueOf();
+const endDateDefault = moment();
 
 /**
  * Response type options for anomalies
@@ -129,6 +129,7 @@ const processRangeParams = (bucketUnit, duration, start, end) => {
  * Setup for query param behavior
  */
 const queryParamsConfig = {
+  refreshModel: true,
   replace: true
 };
 
@@ -136,7 +137,8 @@ export default Route.extend({
   queryParams: {
     duration: queryParamsConfig,
     startDate: queryParamsConfig,
-    endDate: queryParamsConfig
+    endDate: queryParamsConfig,
+    repRunStatus: queryParamsConfig
   },
 
   beforeModel(transition) {
@@ -159,13 +161,14 @@ export default Route.extend({
     const {
       duration = durationDefault,
       startDate = startDateDefault,
-      endDate = endDateDefault
+      endDate = endDateDefault,
+      repStatus
     } = transition.queryParams;
 
     // Prepare endpoints for eval, mttd, projected metrics calls
     const dateParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
     const evalUrl = `/detection-job/eval/filter/${id}?${dateParams}`;
-    const mttdUrl = `/detection-job/eval/mttd/${id}?severity=${defaultSeverity/100}`;
+    const mttdUrl = `/detection-job/eval/mttd/${id}?severity=${extractSeverity(alertData, defaultSeverity)}`;
     const performancePromiseHash = {
       current: fetch(`${evalUrl}&isProjected=FALSE`).then(checkStatus),
       projected: fetch(`${evalUrl}&isProjected=TRUE`).then(checkStatus),
@@ -181,8 +184,8 @@ export default Route.extend({
           alertData,
           duration,
           startDate,
+          evalUrl,
           endDate,
-          dateParams,
           alertEvalMetrics
         };
       })
@@ -237,7 +240,6 @@ export default Route.extend({
 
     // Load endpoints for projected metrics. TODO: consolidate into CP if duplicating this logic
     const qsParams = `start=${baseStart.utc().format(dateFormat)}&end=${baseEnd.utc().format(dateFormat)}&useNotified=true`;
-    const dateParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
     const anomalyDataUrl = `/anomalies/search/anomalyIds/${startStamp}/${endStamp}/1?anomalyIds=`;
     const metricsUrl = `/data/autocomplete/metric?name=${dataset}::${metricName}`;
     const anomaliesUrl = `/dashboard/anomaly-function/${alertId}/anomalies?${qsParams}`;
@@ -258,6 +260,7 @@ export default Route.extend({
           exploreDimensions,
           totalAnomalies,
           anomalyDataUrl,
+          anomaliesUrl,
           config
         });
         fetch(`/data/maxDataTime/metricId/${config.id}`).then(checkStatus);
@@ -265,13 +268,12 @@ export default Route.extend({
       // Note: In the event of custom date selection, the end date might be less than maxTime
       .then((maxTime) => {
         Object.assign(model, { metricDataUrl: buildMetricDataUrl({
-            maxTime,
-            id: config.id,
-            filters: config.filters,
-            granularity: config.bucketUnit,
-            dimension: config.exploreDimensions ? config.exploreDimensions.split(',')[0] : 'All'
-          })
-        });
+          maxTime,
+          id: config.id,
+          filters: config.filters,
+          granularity: config.bucketUnit,
+          dimension: config.exploreDimensions ? config.exploreDimensions.split(',')[0] : 'All'
+        })});
       })
       // Catch is not mandatory here due to our error action, but left it to add more context
       .catch((err) => {
@@ -313,7 +315,7 @@ export default Route.extend({
     const wowOptions = ['Wow', 'Wo2W', 'Wo3W', 'Wo4W'];
     const baselineOptions = [{ name: 'Predicted', isActive: true }];
     const responseOptions = anomalyResponseObj.map(response => response.name);
-    const timeRangeOptions = setUpTimeRangeOptions(['1m', '2w', '1w'], duration);
+    const timeRangeOptions = setUpTimeRangeOptions(['3m'], duration);
     const alertDimension = exploreDimensions ? exploreDimensions.split(',')[0] : '';
     const isReplayPending = isPresent(jobId) && jobId !== -1;
     const newWowList = wowOptions.map((item) => {

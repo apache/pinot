@@ -3,13 +3,12 @@
  * @module manage/alert/edit/edit
  * @exports manage/alert/edit/edit
  */
-import fetch from 'fetch';
 import _ from 'lodash';
 import Route from '@ember/routing/route';
 
 export default Route.extend({
   model(params) {
-   const { id, alertData, email, allConfigGroups, allAppNames } = this.modelFor('manage.alert');
+    const { id, alertData, email, allConfigGroups, allAppNames } = this.modelFor('manage.alert');
     if (!id) { return; }
 
     return {

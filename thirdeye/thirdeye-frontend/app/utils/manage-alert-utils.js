@@ -70,10 +70,9 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
     const durationArr = [pluralizeTime(days, 'day'), pluralizeTime(hours, 'hour'), pluralizeTime(minutes, 'minute')];
 
     // Set up anomaly change rate display
-    const changeRate = (anomaly.current && anomaly.baseline)
-      ? ((anomaly.current / anomaly.baseline - 1.0) * 100).toFixed(2) : 0;
+    const changeRate = (anomaly.current && anomaly.baseline) ? ((anomaly.current - anomaly.baseline) / anomaly.baseline * 100).toFixed(2) : 0;
     const changeDirection = (anomaly.current > anomaly.baseline) ? '-' : '+';
-    const changeDirectionLabel = changeDirection === '-' ? 'down' : 'up';
+    const changeDirectionLabel = changeRate < 0 ? 'down' : 'up';
 
     // We want to display only non-zero duration values in our table
     const noZeroDurationArr = _.remove(durationArr, function(item) {
@@ -118,7 +117,8 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
     newAnomalies.push(anomaly);
   });
 
-  return newAnomalies.sortBy('anomalyStart');
+  // List most recent anomalies first
+  return newAnomalies.sortBy('anomalyStart').reverse();
 }
 
 /**
@@ -250,74 +250,51 @@ export function getTopDimensions(metricData, dimCount) {
 /**
  * Data needed to render the stats 'cards' above the anomaly graph for a given alert
  * @param {Object} alertEvalMetrics - contains the alert's performance data
- * @param {String} mode - the originating route
+ * @param {Object} anomalyStats - collection of metric block definitions
+ * example: {
+ *    title: 'Recall',
+      key: 'recall',
+      units: '%',
+      tooltip,
+      text: 'Number of anomalies detected by the system.'
+    }
  * @param {String} severity - the severity threshold entered
  * @param {Boolean} isPercent - suffix associated with the selected severity mode
  * @returns {Array}
  */
-export function buildAnomalyStats(alertEvalMetrics, mode, severity = '30', isPercent = true) {
-  const tooltip = false;
-  const severityUnit = isPercent ? '%' : '';
-
-  const responseRateObj = {
-    title: 'Response Rate',
-    key: 'responseRate',
-    units: '%',
-    tooltip,
-    hideProjected: true,
-    text: '% of anomalies that are reviewed.'
-  };
-
-  const anomalyStats = [
-    {
-      title: 'Number of anomalies',
-      key: 'totalAlerts',
-      text: 'Estimated average number of anomalies',
-      tooltip
-    },
-    {
-      title: 'Precision',
-      key: 'precision',
-      units: '%',
-      tooltip,
-      text: 'Among all anomalies detected, the % of them that are true.'
-    },
-    {
-      title: 'Recall',
-      key: 'recall',
-      units: '%',
-      tooltip,
-      text: 'Among all anomalies that happened, the % of them detected by the system.'
-    },
-    {
-      title: `MTTD for > ${severity}${severityUnit} change`,
-      key: 'mttd',
-      units: 'hrs',
-      tooltip,
-      text: `Minimum time to detect for anomalies with > ${severity}${severityUnit} change`
-    }
-  ];
-
-  // Append response rate metric in explore mode
-  if (mode === 'explore') {
-    anomalyStats.splice(1, 0, responseRateObj);
-  }
-
+export function buildAnomalyStats(alertEvalMetrics, anomalyStats, showProjected = true) {
   anomalyStats.forEach((stat) => {
     let origData = alertEvalMetrics.current[stat.key];
-    let newData = alertEvalMetrics.projected[stat.key];
+    let newData = alertEvalMetrics.projected ? alertEvalMetrics.projected[stat.key] : null;
     let isPercentageMetric = stat.units === '%';
     let isTotal = stat.key === 'totalAlerts';
-    stat.showProjected = false;
+    stat.showProjected = showProjected;
     stat.value = isTotal ? origData : formatEvalMetric(origData, isPercentageMetric);
-    stat.projected = isTotal ? newData : formatEvalMetric(newData, isPercentageMetric);
     stat.valueUnits = isFinite(origData) ? stat.units : null;
-    stat.projectedUnits = isFinite(newData) ? stat.units : null;
-    stat.showDirectionIcon = isFinite(origData) && isFinite(newData) && origData !== newData;
-    stat.direction = stat.showDirectionIcon && origData > newData ? 'bottom' : 'top';
+    if (newData) {
+      stat.projected = isTotal ? newData : formatEvalMetric(newData, isPercentageMetric);
+      stat.projectedUnits = isFinite(newData) ? stat.units : null;
+      stat.showDirectionIcon = isFinite(origData) && isFinite(newData) && origData !== newData;
+      stat.direction = stat.showDirectionIcon && origData > newData ? 'bottom' : 'top';
+    }
   });
 
   return anomalyStats;
+}
+
+/**
+ * When fetching current and projected MTTD (minimum time to detect) data, we need to supply the
+ * endpoint with a severity threshold. This decides whether to use the default or not.
+ * @method extractSeverity
+ * @param {Number} defaultSeverity - number to fall back on if we have none defined in alert filter
+ * @return {undefined}
+ */
+export function extractSeverity(alertData, defaultSeverity) {
+  const alertFilterSeverity = Ember.getWithDefault(alertData, 'alertFilter.mttd', null);
+  const parsedSeverity = alertFilterSeverity ? alertFilterSeverity.split(';')[1].split('=') : null;
+  const isSeverityNumeric = parsedSeverity && !isNaN(parsedSeverity[1]);
+  const finalSeverity = isSeverityNumeric ? parsedSeverity[1] : defaultSeverity;
+  return finalSeverity;
 }
 
 export default {
@@ -329,5 +306,6 @@ export default {
   setUpTimeRangeOptions,
   buildAnomalyStats,
   buildMetricDataUrl,
+  extractSeverity,
   evalObj
 };
