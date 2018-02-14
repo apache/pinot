@@ -21,7 +21,6 @@ import com.google.gson.JsonPrimitive;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.avro.Schema.Type;
 
 
@@ -123,7 +122,7 @@ public abstract class FieldSpec {
   }
 
   private static Object getDefaultNullValue(@Nonnull FieldType fieldType, @Nonnull DataType dataType,
-      @Nullable String stringDefaultNullValue) {
+      String stringDefaultNullValue) {
     if (stringDefaultNullValue != null) {
       switch (dataType) {
         case INT:
