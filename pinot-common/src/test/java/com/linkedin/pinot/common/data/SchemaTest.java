@@ -15,14 +15,11 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.pinot.common.utils.SchemaUtils;
-
 import java.io.File;
 import java.net.URL;
 import java.util.concurrent.TimeUnit;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -33,8 +30,7 @@ public class SchemaTest {
   public static final Logger LOGGER = LoggerFactory.getLogger(SchemaTest.class);
 
   @Test
-  public void testValidation()
-      throws Exception {
+  public void testValidation() throws Exception {
     Schema schemaToValidate;
 
     schemaToValidate = Schema.fromString(makeSchema(FieldSpec.DataType.LONG, FieldSpec.DataType.STRING, true));
@@ -71,80 +67,109 @@ public class SchemaTest {
 
   @Test
   public void testSchemaBuilder() {
-    final Float defaultFloat = 0.5f;
-    Schema schema = new Schema.SchemaBuilder()
-        .addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
+    String defaultString = "default";
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
         .addMultiValueDimension("mvDimension", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, "default")
+        .addMultiValueDimension("mvDimensionWithDefault", FieldSpec.DataType.STRING, defaultString)
         .addMetric("metric", FieldSpec.DataType.INT)
         .addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
-        .addMetric("derivedMetric", FieldSpec.DataType.LONG, 10, MetricFieldSpec.DerivedMetricType.HLL)
-        .addMetric("derivedMetricWithDefault", DataType.FLOAT, 10, MetricFieldSpec.DerivedMetricType.HLL,
-            defaultFloat.toString())
+        .addMetric("derivedMetric", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL)
+        .addMetric("derivedMetricWithDefault", FieldSpec.DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL,
+            defaultString)
         .addTime("time", TimeUnit.DAYS, FieldSpec.DataType.LONG)
-        .addDateTime("dateTime", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .build();
 
-    FieldSpec fieldSpec;
-    fieldSpec = schema.getDimensionSpec("svDimension");
-    Assert.assertNotNull(fieldSpec);
-    Assert.assertEquals(fieldSpec.isSingleValueField(), true);
-    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.INT);
-    Assert.assertEquals(fieldSpec.getDefaultNullValue(), Integer.MIN_VALUE);
+    DimensionFieldSpec dimensionFieldSpec = schema.getDimensionSpec("svDimension");
+    Assert.assertNotNull(dimensionFieldSpec);
+    Assert.assertEquals(dimensionFieldSpec.getFieldType(), FieldSpec.FieldType.DIMENSION);
+    Assert.assertEquals(dimensionFieldSpec.getName(), "svDimension");
+    Assert.assertEquals(dimensionFieldSpec.getDataType(), FieldSpec.DataType.INT);
+    Assert.assertEquals(dimensionFieldSpec.isSingleValueField(), true);
+    Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), Integer.MIN_VALUE);
 
-    fieldSpec = schema.getDimensionSpec("svDimensionWithDefault");
-    Assert.assertNotNull(fieldSpec);
-    Assert.assertEquals(fieldSpec.isSingleValueField(), true);
-    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.INT);
-    Assert.assertEquals(fieldSpec.getDefaultNullValue(), 10);
+    dimensionFieldSpec = schema.getDimensionSpec("svDimensionWithDefault");
+    Assert.assertNotNull(dimensionFieldSpec);
+    Assert.assertEquals(dimensionFieldSpec.getFieldType(), FieldSpec.FieldType.DIMENSION);
+    Assert.assertEquals(dimensionFieldSpec.getName(), "svDimensionWithDefault");
+    Assert.assertEquals(dimensionFieldSpec.getDataType(), FieldSpec.DataType.INT);
+    Assert.assertEquals(dimensionFieldSpec.isSingleValueField(), true);
+    Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), 10);
 
-    fieldSpec = schema.getDimensionSpec("mvDimension");
-    Assert.assertNotNull(fieldSpec);
-    Assert.assertEquals(fieldSpec.isSingleValueField(), false);
-    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.STRING);
-    Assert.assertEquals(fieldSpec.getDefaultNullValue(), "null");
+    dimensionFieldSpec = schema.getDimensionSpec("mvDimension");
+    Assert.assertNotNull(dimensionFieldSpec);
+    Assert.assertEquals(dimensionFieldSpec.getFieldType(), FieldSpec.FieldType.DIMENSION);
+    Assert.assertEquals(dimensionFieldSpec.getName(), "mvDimension");
+    Assert.assertEquals(dimensionFieldSpec.getDataType(), FieldSpec.DataType.STRING);
+    Assert.assertEquals(dimensionFieldSpec.isSingleValueField(), false);
+    Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), "null");
 
-    fieldSpec = schema.getDimensionSpec("mvDimensionWithDefault");
-    Assert.assertNotNull(fieldSpec);
-    Assert.assertEquals(fieldSpec.isSingleValueField(), false);
-    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.STRING);
-    Assert.assertEquals(fieldSpec.getDefaultNullValue(), "default");
+    dimensionFieldSpec = schema.getDimensionSpec("mvDimensionWithDefault");
+    Assert.assertNotNull(dimensionFieldSpec);
+    Assert.assertEquals(dimensionFieldSpec.getFieldType(), FieldSpec.FieldType.DIMENSION);
+    Assert.assertEquals(dimensionFieldSpec.getName(), "mvDimensionWithDefault");
+    Assert.assertEquals(dimensionFieldSpec.getDataType(), FieldSpec.DataType.STRING);
+    Assert.assertEquals(dimensionFieldSpec.isSingleValueField(), false);
+    Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), defaultString);
 
-    fieldSpec = schema.getMetricSpec("metric");
-    Assert.assertNotNull(fieldSpec);
-    Assert.assertEquals(fieldSpec.isSingleValueField(), true);
-    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.INT);
-    Assert.assertEquals(fieldSpec.getDefaultNullValue(), 0);
+    MetricFieldSpec metricFieldSpec = schema.getMetricSpec("metric");
+    Assert.assertNotNull(metricFieldSpec);
+    Assert.assertEquals(metricFieldSpec.getFieldType(), FieldSpec.FieldType.METRIC);
+    Assert.assertEquals(metricFieldSpec.getName(), "metric");
+    Assert.assertEquals(metricFieldSpec.getDataType(), FieldSpec.DataType.INT);
+    Assert.assertEquals(metricFieldSpec.isSingleValueField(), true);
+    Assert.assertEquals(metricFieldSpec.getDefaultNullValue(), 0);
+    Assert.assertEquals(metricFieldSpec.getFieldSize(), 4);
+    Assert.assertNull(metricFieldSpec.getDerivedMetricType());
 
-    fieldSpec = schema.getMetricSpec("metricWithDefault");
-    Assert.assertNotNull(fieldSpec);
-    Assert.assertEquals(fieldSpec.isSingleValueField(), true);
-    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.INT);
-    Assert.assertEquals(fieldSpec.getDefaultNullValue(), 5);
+    metricFieldSpec = schema.getMetricSpec("metricWithDefault");
+    Assert.assertNotNull(metricFieldSpec);
+    Assert.assertEquals(metricFieldSpec.getFieldType(), FieldSpec.FieldType.METRIC);
+    Assert.assertEquals(metricFieldSpec.getName(), "metricWithDefault");
+    Assert.assertEquals(metricFieldSpec.getDataType(), FieldSpec.DataType.INT);
+    Assert.assertEquals(metricFieldSpec.isSingleValueField(), true);
+    Assert.assertEquals(metricFieldSpec.getDefaultNullValue(), 5);
+    Assert.assertEquals(metricFieldSpec.getFieldSize(), 4);
+    Assert.assertNull(metricFieldSpec.getDerivedMetricType());
 
-    fieldSpec = schema.getMetricSpec("derivedMetric");
-    Assert.assertNotNull(fieldSpec);
-    Assert.assertEquals(fieldSpec.isSingleValueField(), true);
-    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.LONG);
-    Assert.assertEquals(fieldSpec.getDefaultNullValue(), 0L);
+    metricFieldSpec = schema.getMetricSpec("derivedMetric");
+    Assert.assertNotNull(metricFieldSpec);
+    Assert.assertEquals(metricFieldSpec.getFieldType(), FieldSpec.FieldType.METRIC);
+    Assert.assertEquals(metricFieldSpec.getName(), "derivedMetric");
+    Assert.assertEquals(metricFieldSpec.getDataType(), FieldSpec.DataType.STRING);
+    Assert.assertEquals(metricFieldSpec.isSingleValueField(), true);
+    Assert.assertEquals(metricFieldSpec.getDefaultNullValue(), "null");
+    Assert.assertEquals(metricFieldSpec.getFieldSize(), 10);
+    Assert.assertNotNull(metricFieldSpec.getDerivedMetricType());
 
-    fieldSpec = schema.getMetricSpec("derivedMetricWithDefault");
-    Assert.assertNotNull(fieldSpec);
-    Assert.assertEquals(fieldSpec.isSingleValueField(), true);
-    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.FLOAT);
-    Assert.assertEquals(fieldSpec.getDefaultNullValue(), defaultFloat);
+    metricFieldSpec = schema.getMetricSpec("derivedMetricWithDefault");
+    Assert.assertNotNull(metricFieldSpec);
+    Assert.assertEquals(metricFieldSpec.getFieldType(), FieldSpec.FieldType.METRIC);
+    Assert.assertEquals(metricFieldSpec.getName(), "derivedMetricWithDefault");
+    Assert.assertEquals(metricFieldSpec.getDataType(), FieldSpec.DataType.STRING);
+    Assert.assertEquals(metricFieldSpec.isSingleValueField(), true);
+    Assert.assertEquals(metricFieldSpec.getDefaultNullValue(), defaultString);
+    Assert.assertEquals(metricFieldSpec.getFieldSize(), 10);
+    Assert.assertNotNull(metricFieldSpec.getDerivedMetricType());
 
-    fieldSpec = schema.getTimeFieldSpec();
-    Assert.assertNotNull(fieldSpec);
-    Assert.assertEquals(fieldSpec.isSingleValueField(), true);
-    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.LONG);
-    Assert.assertEquals(fieldSpec.getDefaultNullValue(), Long.MIN_VALUE);
+    TimeFieldSpec timeFieldSpec = schema.getTimeFieldSpec();
+    Assert.assertNotNull(timeFieldSpec);
+    Assert.assertEquals(timeFieldSpec.getFieldType(), FieldSpec.FieldType.TIME);
+    Assert.assertEquals(timeFieldSpec.getName(), "time");
+    Assert.assertEquals(timeFieldSpec.getDataType(), FieldSpec.DataType.LONG);
+    Assert.assertEquals(timeFieldSpec.isSingleValueField(), true);
+    Assert.assertEquals(timeFieldSpec.getDefaultNullValue(), Long.MIN_VALUE);
 
-    fieldSpec = schema.getDateTimeSpec("dateTime");
-    Assert.assertNotNull(fieldSpec);
-    Assert.assertEquals(fieldSpec.isSingleValueField(), true);
-    Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.LONG);
+    DateTimeFieldSpec dateTimeFieldSpec = schema.getDateTimeSpec("dateTime");
+    Assert.assertNotNull(dateTimeFieldSpec);
+    Assert.assertEquals(dateTimeFieldSpec.getFieldType(), FieldSpec.FieldType.DATE_TIME);
+    Assert.assertEquals(dateTimeFieldSpec.getName(), "dateTime");
+    Assert.assertEquals(dateTimeFieldSpec.getDataType(), FieldSpec.DataType.LONG);
+    Assert.assertEquals(dateTimeFieldSpec.isSingleValueField(), true);
+    Assert.assertEquals(dateTimeFieldSpec.getDefaultNullValue(), Long.MIN_VALUE);
+    Assert.assertEquals(dateTimeFieldSpec.getFormat(), "1:HOURS:EPOCH");
+    Assert.assertEquals(dateTimeFieldSpec.getGranularity(), "1:HOURS");
   }
 
   @Test
@@ -248,8 +273,7 @@ public class SchemaTest {
   }
 
   @Test
-  public void testSerializeDeserialize()
-      throws Exception {
+  public void testSerializeDeserialize() throws Exception {
     URL resourceUrl = getClass().getClassLoader().getResource("schemaTest.schema");
     Assert.assertNotNull(resourceUrl);
     Schema schema = Schema.fromFile(new File(resourceUrl.getFile()));
@@ -270,12 +294,13 @@ public class SchemaTest {
   }
 
   @Test
-  public void testSimpleDateFormat()
-      throws Exception {
+  public void testSimpleDateFormat() throws Exception {
     TimeGranularitySpec incomingTimeGranularitySpec =
-        new TimeGranularitySpec(DataType.STRING, 1, TimeUnit.DAYS, TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
+        new TimeGranularitySpec(FieldSpec.DataType.STRING, 1, TimeUnit.DAYS,
+            TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
     TimeGranularitySpec outgoingTimeGranularitySpec =
-        new TimeGranularitySpec(DataType.STRING, 1, TimeUnit.DAYS, TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
+        new TimeGranularitySpec(FieldSpec.DataType.STRING, 1, TimeUnit.DAYS,
+            TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec)
         .build();
