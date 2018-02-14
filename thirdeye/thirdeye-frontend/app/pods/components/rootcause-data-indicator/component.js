@@ -27,9 +27,10 @@ export default Component.extend({
   didReceiveAttrs() {
     const { selectedUrn, anomalyRange } = getProperties(this, 'selectedUrn', 'anomalyRange');
 
-    if (!selectedUrn || !anomalyRange) { return; }
-
-    if (!selectedUrn.startsWith('thirdeye:metric:')) { return; }
+    if (!selectedUrn || !anomalyRange || !selectedUrn.startsWith('thirdeye:metric:')) {
+      this.setProperties({ maxTime: null });
+      return;
+    }
 
     const id = selectedUrn.split(':')[2];
 
@@ -56,6 +57,9 @@ export default Component.extend({
    */
   maxTimeFormatted: computed('maxTime', function () {
     const { maxTime } = getProperties(this, 'maxTime');
+
+    if (!maxTime) { return; }
+
     return moment(maxTime).format('MMM D, hh:mm a');
   })
 
