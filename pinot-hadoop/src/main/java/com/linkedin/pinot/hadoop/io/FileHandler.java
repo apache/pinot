@@ -24,18 +24,12 @@ import java.io.OutputStream;
 public class FileHandler {
 
     private MeteredStream _meter;
-
-    private File _logFile;
-
+    private final File _logFile;
     private String _baseDir;
-
-    private String _fileName;
-
+    private final String _fileName;
     private int _fileCount = 0;
-
-    private String _extension;
-
-    private Long _maxSize;
+    private final String _extension;
+    private final Long _maxSize;
 
     public FileHandler(String baseDir, String fileName, String extension, long maxSize) {
         _baseDir = baseDir;
@@ -47,49 +41,49 @@ public class FileHandler {
     }
 
     /**
-     * A metered stream is a subclass of OutputStream that (a) forwards all its output to a target
-     * stream (b) keeps track of how many bytes have been written copied from {@link
-     * java.util.logging.FileHandler}
+     * A metered stream is a subclass of OutputStream that <ul> <li>forwards all its output to a
+     * target stream</li> <li>keeps track of how many bytes have been written copied from {@link
+     * java.util.logging.FileHandler}</li> </ul>
      */
     private static class MeteredStream extends OutputStream {
-        final OutputStream out;
-        long written;
+        final OutputStream _out;
+        long _written;
 
         MeteredStream(OutputStream out, long written) {
-            this.out = out;
-            this.written = written;
+            _out = out;
+            _written = written;
         }
 
         @Override
         public void write(int b) throws IOException {
-            out.write(b);
-            written++;
+            _out.write(b);
+            _written++;
         }
 
         @Override
         public void write(byte buff[]) throws IOException {
-            out.write(buff);
-            written += buff.length;
+            _out.write(buff);
+            _written += buff.length;
         }
 
         @Override
         public void write(byte buff[], int off, int len) throws IOException {
-            out.write(buff, off, len);
-            written += len;
+            _out.write(buff, off, len);
+            _written += len;
         }
 
         @Override
         public void flush() throws IOException {
-            out.flush();
+            _out.flush();
         }
 
         @Override
         public void close() throws IOException {
-            out.close();
+            _out.close();
         }
 
         public long getSize() {
-            return written;
+            return _written;
         }
     }
 
