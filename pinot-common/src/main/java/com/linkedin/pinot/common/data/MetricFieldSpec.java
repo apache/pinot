@@ -47,18 +47,19 @@ public final class MetricFieldSpec extends FieldSpec {
 
   public MetricFieldSpec(@Nonnull String name, @Nonnull DataType dataType) {
     super(name, dataType, true);
+    _fieldSize = _dataType.size();
   }
 
   public MetricFieldSpec(@Nonnull String name, @Nonnull DataType dataType, @Nonnull Object defaultNullValue) {
     super(name, dataType, true, defaultNullValue);
+    _fieldSize = _dataType.size();
   }
 
   // For derived metric fields.
   public MetricFieldSpec(@Nonnull String name, @Nonnull DataType dataType, int fieldSize,
       @Nonnull DerivedMetricType derivedMetricType) {
     super(name, dataType, true);
-    Preconditions.checkArgument(fieldSize > 0, "Field size must be a positive number.");
-    _fieldSize = fieldSize;
+    setFieldSize(fieldSize);
     _derivedMetricType = derivedMetricType;
   }
 
@@ -66,21 +67,21 @@ public final class MetricFieldSpec extends FieldSpec {
   public MetricFieldSpec(@Nonnull String name, @Nonnull DataType dataType, int fieldSize,
       @Nonnull DerivedMetricType derivedMetricType, @Nonnull Object defaultNullValue) {
     super(name, dataType, true, defaultNullValue);
-    Preconditions.checkArgument(fieldSize > 0, "Field size must be a positive number.");
-    _fieldSize = fieldSize;
+    setFieldSize(fieldSize);
     _derivedMetricType = derivedMetricType;
   }
 
   public int getFieldSize() {
-    if (_fieldSize == UNDEFINED_FIELD_SIZE) {
-      return getDataType().size();
-    } else {
-      return _fieldSize;
-    }
+    return _fieldSize;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setFieldSize(int fieldSize) {
+    Preconditions.checkArgument(fieldSize > 0, "Field size: " + fieldSize + " is not a positive number.");
+    if (_dataType != DataType.STRING) {
+      Preconditions.checkArgument(fieldSize == _dataType.size(),
+          "Field size: " + fieldSize + " does not match data type: " + _dataType);
+    }
     _fieldSize = fieldSize;
   }
 
@@ -101,6 +102,16 @@ public final class MetricFieldSpec extends FieldSpec {
     return FieldType.METRIC;
   }
 
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  @Override
+  public void setDataType(@Nonnull DataType dataType) {
+    super.setDataType(dataType);
+    if (_dataType != DataType.STRING) {
+      _fieldSize = _dataType.size();
+    }
+  }
+
+  // Required by JSON de-serializer. DO NOT REMOVE.
   @Override
   public void setSingleValueField(boolean isSingleValueField) {
     Preconditions.checkArgument(isSingleValueField, "Unsupported multi-value for metric field.");
@@ -128,7 +139,7 @@ public final class MetricFieldSpec extends FieldSpec {
   @Override
   public JsonObject toJsonObject() {
     JsonObject jsonObject = super.toJsonObject();
-    if (_fieldSize != UNDEFINED_FIELD_SIZE) {
+    if (_dataType == DataType.STRING && _fieldSize != UNDEFINED_FIELD_SIZE) {
       jsonObject.addProperty("fieldSize", _fieldSize);
     }
     if (_derivedMetricType != null) {

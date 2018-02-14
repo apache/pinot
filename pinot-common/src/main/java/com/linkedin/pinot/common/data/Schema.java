@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -611,5 +612,15 @@ public final class Schema {
     result = EqualityUtils.hashCodeOf(result, _timeFieldSpec);
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
     return result;
+  }
+
+  public static void main(String[] args) throws IOException {
+    File schemaDir = new File("/home/xajiang/Projects/pinot2config/schemas");
+    for (File schemaFile : schemaDir.listFiles()) {
+      Schema schema = Schema.fromFile(schemaFile);
+      try (FileWriter writer = new FileWriter(schemaFile)) {
+        writer.write(schema.getJSONSchema());
+      }
+    }
   }
 }
