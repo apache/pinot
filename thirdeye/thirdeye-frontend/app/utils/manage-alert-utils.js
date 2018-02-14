@@ -283,6 +283,29 @@ export function buildAnomalyStats(alertEvalMetrics, anomalyStats, showProjected 
 }
 
 /**
+ * Caches duration data to local storage in order to persist it across pages
+ * TODO: Move this to self-serve services
+ * @method setDuration
+ * @param {String} duration - qualifies duration set as 'custom' or a range key like '3m'
+ * @param {Number} startDate - start date for alert page (and list of anomalies)
+ * @param {Number} endDate - end date for alert page (and list of anomalies)
+ * @return {undefined}
+ */
+export function setDuration(duration, startDate, endDate) {
+  localStorage.setItem('duration', JSON.stringify({ duration, startDate, endDate }));
+}
+
+/**
+ * Retrieves duration data from local storage in order to persist it across pages
+ * TODO: Move this to self-serve services
+ * @method getDuration
+ * @return {Object}
+ */
+export function getDuration() {
+  return JSON.parse(localStorage.getItem('duration'));
+}
+
+/**
  * When fetching current and projected MTTD (minimum time to detect) data, we need to supply the
  * endpoint with a severity threshold. This decides whether to use the default or not.
  * @method extractSeverity
@@ -307,5 +330,7 @@ export default {
   buildAnomalyStats,
   buildMetricDataUrl,
   extractSeverity,
+  setDuration,
+  getDuration,
   evalObj
 };

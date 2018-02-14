@@ -102,14 +102,18 @@
     {{#if isEditModeActive}}
       <div class="te-topcard-subnav">
         <div class="te-topcard-subnav__item">
-          {{#link-to "manage.alert.edit" alertData.id class="thirdeye-link thirdeye-link--smaller thirdeye-link--nav" activeClass="thirdeye-link--active"}}
-            Edit alert settings
-          {{/link-to}}
+          <span {{action "setEditModeActive"}}>
+            {{#link-to "manage.alert.edit" alertData.id class="thirdeye-link thirdeye-link--smaller thirdeye-link--nav" activeClass="thirdeye-link--active"}}
+              Edit alert settings
+            {{/link-to}}
+          </span>
         </div>
         <div class="te-topcard-subnav__item">
-          {{#link-to "manage.alert.tune" alertData.id class="thirdeye-link thirdeye-link--smaller thirdeye-link--nav" activeClass="thirdeye-link--active"}}
-            Tune alert sensitivity
-          {{/link-to}}
+          <span {{action "setEditModeActive"}}>
+            {{#link-to "manage.alert.tune" alertData.id class="thirdeye-link thirdeye-link--smaller thirdeye-link--nav" activeClass="thirdeye-link--active"}}
+              Tune alert sensitivity
+            {{/link-to}}
+          </span>
         </div>
       </div>
     {{/if}}

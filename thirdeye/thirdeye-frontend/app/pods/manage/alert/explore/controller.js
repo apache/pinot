@@ -13,7 +13,7 @@ import Controller from '@ember/controller';
 import { task, timeout } from 'ember-concurrency';
 import { computed, set, get, setProperties } from '@ember/object';
 import { checkStatus, postProps, buildDateEod } from 'thirdeye-frontend/utils/utils';
-import { buildAnomalyStats, extractSeverity } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { buildAnomalyStats, extractSeverity, setDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Controller.extend({
   /**
@@ -187,30 +187,6 @@ export default Controller.extend({
         return 5;
     }
   }),
-
-  /**
-   * date-time-picker: returns a time object from selected range end date
-   * @type {Object}
-   */
-  viewRegionEnd: computed(
-    'activeRangeEnd',
-    function() {
-      const end = this.get('activeRangeEnd');
-      return moment(end).format(this.get('serverDateFormat'));
-    }
-  ),
-
-  /**
-   * date-time-picker: returns a time object from selected range start date
-   * @type {Object}
-   */
-  viewRegionStart: computed(
-    'activeRangeStart',
-    function() {
-      const start = this.get('activeRangeStart');
-      return moment(start).format(this.get('serverDateFormat'));
-    }
-  ),
 
   /**
    * date-time-picker: indicates the date format to be used based on granularity
@@ -514,7 +490,11 @@ export default Controller.extend({
    * @return {undefined}
    */
   clearAll() {
-    this.set('alertEvalMetrics', {});
+    this.setProperties({
+      activeRangeStart: '',
+      activeRangeEnd: '',
+      alertEvalMetrics: {}
+    });
     this.get('checkReplayStatus').cancelAll();
   },
 
@@ -701,39 +681,39 @@ export default Controller.extend({
     onRangeOptionClick(rangeOption) {
       const rangeFormat = 'YYYY-MM-DD';
       const defaultEndDate = buildDateEod(1, 'day').valueOf();
-
+      const duration = rangeOption.value;
+      const startDate = moment(rangeOption.start).valueOf;
+      const endDate = moment(defaultEndDate).valueOf();
       // Trigger reload in model with new time range. Transition for 'custom' dates is handled by 'onRangeSelection'
       if (rangeOption.value !== 'custom') {
-        this.transitionToRoute({ queryParams: {
-          mode: 'explore',
-          duration: rangeOption.value,
-          startDate: rangeOption.start,
-          endDate: defaultEndDate
-        }});
+        // Cache chosen time range
+        setDuration(duration, startDate, endDate);
+        this.transitionToRoute({ queryParams: { mode: 'explore', duration, startDate, endDate }});
       }
     },
 
     /**
-     * Sets the new custom date range for anomaly coverage
+     * Sets the new custom date range for anomaly coverage. Also caches it.
      * @method onRangeSelection
      * @param {String} start  - stringified start date
      * @param {String} end    - stringified end date
      */
     onRangeSelection(start, end) {
-      this.set('timeRangeOptions', this.newTimeRangeOptions('custom'));
-      this.transitionToRoute({ queryParams: {
-        mode: 'explore',
-        duration: 'custom',
-        startDate: moment(start).valueOf(),
-        endDate: moment(end).valueOf()
-      }});
+      const duration = 'custom';
+      const startDate = moment(start).valueOf();
+      const endDate = moment(end).valueOf();
+      this.set('timeRangeOptions', this.newTimeRangeOptions(duration));
+      setDuration(duration, startDate, endDate);
+      this.transitionToRoute({ queryParams: { mode: 'explore', duration, startDate, endDate }});
     },
 
     /**
-     * Load tuning sub-route
+     * Load tuning sub-route and properly toggle alert nav button
      */
     onClickTuneSensitivity() {
-      this.transitionToRoute('manage.alert.tune', this.get('alertId'));
+      this.send('updateParentLink');
+      const { duration, startDate, endDate } = this.model;
+      this.transitionToRoute('manage.alert.tune', this.get('alertId'), { queryParams: { duration, startDate, endDate }});
     },
 
     /**
