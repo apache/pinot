@@ -45,6 +45,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileStream;
@@ -56,6 +60,7 @@ import org.apache.avro.io.DecoderFactory;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.http.HttpStatus;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -217,11 +222,25 @@ public abstract class ClusterTest extends ControllerTest {
     String[] segmentNames = segmentDir.list();
     Assert.assertNotNull(segmentNames);
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort);
-      for (String segmentName : segmentNames) {
-        File segmentFile = new File(segmentDir, segmentName);
-        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentName, segmentFile);
+      final URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort);
+
+      // Upload all segments in parallel
+      int numSegments = segmentNames.length;
+      ExecutorService executor = Executors.newFixedThreadPool(numSegments);
+      List<Future<Integer>> tasks = new ArrayList<>(numSegments);
+      for (final String segmentName : segmentNames) {
+        final File segmentFile = new File(segmentDir, segmentName);
+        tasks.add(executor.submit(new Callable<Integer>() {
+          @Override
+          public Integer call() throws Exception {
+            return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentName, segmentFile);
+          }
+        }));
       }
+      for (Future<Integer> task : tasks) {
+        Assert.assertEquals((int) task.get(), HttpStatus.SC_OK);
+      }
+      executor.shutdown();
     }
   }
 
