@@ -1,10 +1,20 @@
-import Ember from 'ember';
+import { computed } from '@ember/object';
+import Component from '@ember/component';
 import fetch from 'fetch';
-import { filterPrefix, toFilters, stripTail, toFilterMap, appendFilters, fromFilterMap, toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/utils/rca-utils';
+import {
+  filterPrefix,
+  toFilters,
+  stripTail,
+  toFilterMap,
+  appendFilters,
+  fromFilterMap,
+  toBaselineUrn,
+  toCurrentUrn
+} from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
 
-export default Ember.Component.extend({
+export default Component.extend({
   selectedUrn: null,
 
   onSelection: null,
@@ -45,7 +55,7 @@ export default Ember.Component.extend({
     this.setProperties({ baseUrn, filterMap });
   },
 
-  filters: Ember.computed('filterMap', {
+  filters: computed('filterMap', {
     get() {
       const { filterMap } = this.getProperties('filterMap');
       return JSON.stringify(filterMap);

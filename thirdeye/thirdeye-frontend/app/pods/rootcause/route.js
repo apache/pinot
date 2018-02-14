@@ -1,9 +1,15 @@
-import Ember from 'ember';
+import { inject as service } from '@ember/service';
+import Route from '@ember/routing/route';
 import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
-import { toCurrentUrn, toBaselineUrn, filterPrefix, dateFormatFull } from 'thirdeye-frontend/utils/rca-utils';
+import {
+  toCurrentUrn,
+  toBaselineUrn,
+  filterPrefix,
+  dateFormatFull
+} from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
 
@@ -49,8 +55,8 @@ const toAnalysisOffset = (granularity) => {
   return UNIT_MAPPING[granularity[1]] || -1;
 };
 
-export default Ember.Route.extend(AuthenticatedRouteMixin, {
-  authService: Ember.inject.service('session'),
+export default Route.extend(AuthenticatedRouteMixin, {
+  authService: service('session'),
 
   queryParams: {
     metricId: {

@@ -21,9 +21,11 @@
  *
  * @exports filter-bar
  */
-import Ember from 'ember';
+import { computed } from '@ember/object';
 
-export default Ember.Component.extend({
+import Component from '@ember/component';
+
+export default Component.extend({
 
   /**
    * @type Array
@@ -35,7 +37,7 @@ export default Ember.Component.extend({
    * options to populate dropdown (required by power-select addon)
    * @type {Array}
    */
-  options: Ember.computed(
+  options: computed(
     'labelMapping',
     'attributesMap',
     'eventType',

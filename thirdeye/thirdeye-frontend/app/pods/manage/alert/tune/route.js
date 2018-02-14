@@ -10,8 +10,19 @@ import moment from 'moment';
 import Route from '@ember/routing/route';
 import { isPresent } from "@ember/utils";
 import { later } from "@ember/runloop";
-import { checkStatus, postProps, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
-import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups, extractSeverity, getDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
+import {
+  checkStatus,
+  postProps,
+  buildDateEod,
+  toIso
+} from 'thirdeye-frontend/utils/utils';
+import {
+  enhanceAnomalies,
+  setUpTimeRangeOptions,
+  toIdGroups,
+  extractSeverity,
+  getDuration
+} from 'thirdeye-frontend/utils/manage-alert-utils';
 
 /**
  * Basic alert page defaults

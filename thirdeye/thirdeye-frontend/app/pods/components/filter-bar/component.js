@@ -16,7 +16,14 @@
  * @exports filter-bar
  */
 import Component from "@ember/component";
-import { get, set, setProperties, computed, getProperties, observer } from "@ember/object";
+import {
+  get,
+  set,
+  setProperties,
+  computed,
+  getProperties,
+  observer
+} from "@ember/object";
 import _ from 'lodash';
 
 export default Component.extend({

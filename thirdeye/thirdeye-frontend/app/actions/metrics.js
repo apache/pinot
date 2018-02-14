@@ -1,6 +1,6 @@
+import { hash } from 'rsvp';
 import { type } from './utils';
 import fetch from 'fetch';
-import Ember from 'ember';
 import moment from 'moment';
 import _ from 'lodash';
 import {
@@ -229,7 +229,7 @@ function fetchRelatedMetricData() {
       return hash;
     }, {});
 
-    return Ember.RSVP.hash(promiseHash)
+    return hash(promiseHash)
       .then((metrics) => {
         const filteredMetrics = _.pickBy(metrics, filterMetric);
 

@@ -1,6 +1,11 @@
 import Component from '@ember/component';
 import { computed } from '@ember/object';
-import { makeSortable, toMetricLabel, toColorDirection, isInverse } from 'thirdeye-frontend/utils/rca-utils';
+import {
+  makeSortable,
+  toMetricLabel,
+  toColorDirection,
+  isInverse
+} from 'thirdeye-frontend/utils/rca-utils';
 import { humanizeScore } from 'thirdeye-frontend/utils/utils';
 
 export default Component.extend({

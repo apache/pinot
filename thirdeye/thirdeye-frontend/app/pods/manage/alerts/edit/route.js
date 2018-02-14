@@ -1,11 +1,15 @@
-import Ember from 'ember';
+import Route from '@ember/routing/route';
 import moment from 'moment';
 import fetch from 'fetch';
 import RSVP from 'rsvp';
 import _ from 'lodash';
-import { checkStatus, buildDateEod, parseProps } from 'thirdeye-frontend/utils/utils';
+import {
+  checkStatus,
+  buildDateEod,
+  parseProps
+} from 'thirdeye-frontend/utils/utils';
 
-export default Ember.Route.extend({
+export default Route.extend({
   model(params) {
     const { alertId: id } = params;
     if (!id) { return; }

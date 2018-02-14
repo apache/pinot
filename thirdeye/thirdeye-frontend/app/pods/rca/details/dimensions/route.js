@@ -1,9 +1,10 @@
-import Ember from 'ember';
+import { later } from '@ember/runloop';
+import Route from '@ember/routing/route';
 
 import { Actions } from 'thirdeye-frontend/actions/dimensions';
 import { inject as service } from '@ember/service';
 
-export default Ember.Route.extend({
+export default Route.extend({
   redux: service(),
 
   // queryParam unique to the dimension route
@@ -41,7 +42,7 @@ export default Ember.Route.extend({
       Number(end)
     ));
 
-    Ember.run.later(() => {
+    later(() => {
       redux.dispatch(Actions.updateDimension(dimension)).then(() => {
         redux.dispatch(Actions.fetchDimensions(metricId));
       });
@@ -89,7 +90,7 @@ export default Ember.Route.extend({
           start = start || oldParams.analysisStart;
           end = end || oldParams.analysisEnd;
 
-          Ember.run.later(() => {
+          later(() => {
             redux.dispatch(Actions.updateDates(
               Number(start),
               Number(end)
@@ -115,7 +116,7 @@ export default Ember.Route.extend({
           shouldReload = true;
         }
         if (shouldReload) {
-          Ember.run.later(() => {
+          later(() => {
             redux.dispatch(Actions.loaded());
           });
           shouldReload = false;

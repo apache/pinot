@@ -3,6 +3,8 @@
  * @module manage/alert/edit
  * @exports manage/alert/edit
  */
+import { reads, or } from '@ember/object/computed';
+
 import _ from 'lodash';
 import RSVP from 'rsvp';
 import fetch from 'fetch';
@@ -59,7 +61,7 @@ export default Controller.extend({
    * The config group that the current alert belongs to
    * @type {Object}
    */
-  originalConfigGroup: computed.reads('model.originalConfigGroup'),
+  originalConfigGroup: reads('model.originalConfigGroup'),
 
   /**
    * Returns the list of existing config groups and updates it if a new one is added.
@@ -200,7 +202,7 @@ export default Controller.extend({
    * @method isSubmitDisabled
    * @return {Boolean} show/hide submit
    */
-  isSubmitDisabled: computed.or('{isEmptyEmail,isEmailError,isDuplicateEmail,isProcessingForm}'),
+  isSubmitDisabled: or('{isEmptyEmail,isEmailError,isDuplicateEmail,isProcessingForm}'),
 
   /**
    * Fetches an alert function record by name.

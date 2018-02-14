@@ -1,4 +1,5 @@
-import Ember from 'ember';
+import { computed } from '@ember/object';
+import Component from '@ember/component';
 import moment from 'moment';
 
 /**
@@ -8,7 +9,7 @@ import moment from 'moment';
  */
 const serverDateFormat = 'YYYY-MM-DD HH:mm';
 
-export default Ember.Component.extend({
+export default Component.extend({
   range: null, // [0, 0]
 
   compareMode: null, // ""
@@ -29,25 +30,25 @@ export default Ember.Component.extend({
     'Wo4W'
   ],
 
-  maxDateFormatted: Ember.computed({
+  maxDateFormatted: computed({
     get() {
       return moment().startOf('hour').add(1, 'hours').format(serverDateFormat);
     }
   }),
 
-  startFormatted: Ember.computed('range', {
+  startFormatted: computed('range', {
     get() {
       return moment(this.get('range')[0]).format(serverDateFormat);
     }
   }),
 
-  endFormatted: Ember.computed('range', {
+  endFormatted: computed('range', {
     get() {
       return moment(this.get('range')[1]).format(serverDateFormat);
     }
   }),
 
-  compareModeFormatted: Ember.computed('compareMode', {
+  compareModeFormatted: computed('compareMode', {
     get() {
       return this.get('compareMode');
     }

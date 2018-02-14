@@ -1,8 +1,10 @@
-import Ember from 'ember';
+import { computed } from '@ember/object';
+import { oneWay } from '@ember/object/computed';
+import Controller from '@ember/controller';
 import { task, timeout } from 'ember-concurrency';
 
-export default Ember.Controller.extend({
-  primaryMetric: Ember.computed.oneWay('model'),
+export default Controller.extend({
+  primaryMetric: oneWay('model'),
   mostRecentSearch: null,
 
   /**
@@ -29,7 +31,7 @@ export default Ember.Controller.extend({
       .then(res => res.json());
   }),
 
-  placeholder: Ember.computed(function() {
+  placeholder: computed(function() {
     'Search for a Metric';
   }),
 

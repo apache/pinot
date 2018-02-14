@@ -1,4 +1,4 @@
-import Ember from 'ember';
+import { getWithDefault } from '@ember/object';
 import _ from 'lodash';
 import moment from 'moment';
 import { isPresent } from "@ember/utils";
@@ -77,7 +77,7 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
 
     // We want to display only non-zero duration values in our table
     const noZeroDurationArr = _.remove(durationArr, function(item) {
-      return Ember.isPresent(item);
+      return isPresent(item);
     });
 
     // Set 'not reviewed' label
@@ -314,7 +314,7 @@ export function getDuration() {
  * @return {undefined}
  */
 export function extractSeverity(alertData, defaultSeverity) {
-  const alertFilterSeverity = Ember.getWithDefault(alertData, 'alertFilter.mttd', null);
+  const alertFilterSeverity = getWithDefault(alertData, 'alertFilter.mttd', null);
   const parsedSeverity = alertFilterSeverity ? alertFilterSeverity.split(';')[1].split('=') : null;
   const isSeverityNumeric = parsedSeverity && !isNaN(parsedSeverity[1]);
   const finalSeverity = isSeverityNumeric ? parsedSeverity[1] : defaultSeverity;

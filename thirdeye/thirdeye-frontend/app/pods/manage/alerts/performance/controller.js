@@ -1,11 +1,5 @@
-/**
- * Controller for Alert Details Page: Tune Sensitivity Tab
- * @module manage/alert/tune
- * @exports manage/alert/tune
- */
-import Ember from 'ember';
 import _ from 'lodash';
-import { computed } from '@ember/object';
+import { computed, set } from '@ember/object';
 import Controller from '@ember/controller';
 
 export default Controller.extend({
@@ -71,7 +65,7 @@ export default Controller.extend({
       let direction = '';
       this.toggleProperty(propName);
       direction  = this.get(propName) ? 'up' : 'down';
-      Ember.set(sortMenu, sortKey, direction);
+      set(sortMenu, sortKey, direction);
       this.set('selectedSortMode', `${sortKey}:${direction}`);
     }
   }

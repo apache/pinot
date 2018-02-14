@@ -1,12 +1,13 @@
-import Ember from 'ember';
+import { inject as service } from '@ember/service';
+import Route from '@ember/routing/route';
 import ApplicationRouteMixin from 'ember-simple-auth/mixins/application-route-mixin';
 import fetch from 'fetch';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import config from 'thirdeye-frontend/config/environment';
 
-export default Ember.Route.extend(ApplicationRouteMixin, {
-  moment: Ember.inject.service(),
-  session: Ember.inject.service(),
+export default Route.extend(ApplicationRouteMixin, {
+  moment: service(),
+  session: service(),
 
   beforeModel() {
     // calling this._super to trigger ember-simple-auth's hook

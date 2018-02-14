@@ -1,9 +1,10 @@
-import Ember from 'ember';
+import { hash } from 'rsvp';
+import Route from '@ember/routing/route';
 import fetch from 'fetch';
 
-export default Ember.Route.extend({
+export default Route.extend({
   model() {
-    return Ember.RSVP.hash({
+    return hash({
       alerts: fetch('/thirdeye/entity/ANOMALY_FUNCTION').then(res => res.json()),
       subscriberGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(res => res.json()),
       applications: fetch('/thirdeye/entity/APPLICATION').then(res => res.json())

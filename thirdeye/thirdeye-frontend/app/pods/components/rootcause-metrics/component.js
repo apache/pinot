@@ -1,6 +1,17 @@
-import Ember from 'ember';
+import { computed } from '@ember/object';
+import Component from '@ember/component';
 import _ from 'lodash';
-import { toCurrentUrn, toBaselineUrn, toOffsetUrn, hasPrefix, filterPrefix, toMetricLabel, makeSortable, isInverse, toColorDirection } from 'thirdeye-frontend/utils/rca-utils';
+import {
+  toCurrentUrn,
+  toBaselineUrn,
+  toOffsetUrn,
+  hasPrefix,
+  filterPrefix,
+  toMetricLabel,
+  makeSortable,
+  isInverse,
+  toColorDirection
+} from 'thirdeye-frontend/utils/rca-utils';
 import { humanizeChange } from 'thirdeye-frontend/utils/utils';
 
 const ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC = 'metric';
@@ -11,7 +22,7 @@ const ROOTCAUSE_METRICS_SORT_PROPERTY_SCORE = 'score';
 const ROOTCAUSE_METRICS_OUTPUT_MODE_ASC = 'asc';
 const ROOTCAUSE_METRICS_OUTPUT_MODE_DESC = 'desc';
 
-export default Ember.Component.extend({
+export default Component.extend({
   //
   // external properties
   //
@@ -78,7 +89,7 @@ export default Ember.Component.extend({
    * List of metric urns, sorted by sortProperty and ordered by outputMode.
    * @type {Array}
    */
-  urns: Ember.computed(
+  urns: computed(
     'entities',
     'metrics',
     'datasets',
@@ -154,7 +165,7 @@ export default Ember.Component.extend({
    * Metric labels, keyed by urn
    * @type {Object}
    */
-  metrics: Ember.computed(
+  metrics: computed(
     'entities',
     function () {
       const { entities } = this.getProperties('entities');
@@ -170,7 +181,7 @@ export default Ember.Component.extend({
    * Dataset labels, keyed by metric urn
    * @type {Object}
    */
-  datasets: Ember.computed(
+  datasets: computed(
     'entities',
     function () {
       const { entities } = this.getProperties('entities');
@@ -186,7 +197,7 @@ export default Ember.Component.extend({
    * Change values from baseline to current time range, keyed by metric urn
    * @type {Object}
    */
-  changes: Ember.computed(
+  changes: computed(
     'entities',
     'aggregates',
     function () {
@@ -199,7 +210,7 @@ export default Ember.Component.extend({
    * Formatted change strings for 'changes'
    * @type {Object}
    */
-  changesFormatted: Ember.computed(
+  changesFormatted: computed(
     'changes',
     function () {
       const { changes } = this.getProperties('changes');
@@ -211,7 +222,7 @@ export default Ember.Component.extend({
    * Change values from multiple offsets to current time range, keyed by offset, then by metric urn
    * @type {Object}
    */
-  changesOffset: Ember.computed(
+  changesOffset: computed(
     'entities',
     'aggregates',
     function () {
@@ -229,7 +240,7 @@ export default Ember.Component.extend({
    * Formatted change strings for 'changesOffset'
    * @type {Object}
    */
-  changesOffsetFormatted: Ember.computed(
+  changesOffsetFormatted: computed(
     'changesOffset',
     function () {
       const { changesOffset } = this.getProperties('changesOffset');
@@ -245,7 +256,7 @@ export default Ember.Component.extend({
    * Trend direction label (positive, neutral, negative) for change values
    * @type {Object}
    */
-  directions: Ember.computed(
+  directions: computed(
     'entities',
     'changes',
     function () {
@@ -271,7 +282,7 @@ export default Ember.Component.extend({
    *  ]
    * }
    */
-  links: Ember.computed(
+  links: computed(
     'urns',
     function() {
       const { urns, entities } = this.getProperties('urns', 'entities');

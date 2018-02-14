@@ -1,10 +1,11 @@
-import Ember from 'ember';
+import { debounce } from '@ember/runloop';
+import Component from '@ember/component';
 import c3 from 'c3';
 import d3 from 'd3';
 import _ from 'lodash';
 import moment from 'moment';
 
-export default Ember.Component.extend({
+export default Component.extend({
   tagName: 'div',
   classNames: ['timeseries-chart'],
 
@@ -203,7 +204,7 @@ export default Ember.Component.extend({
     this._updateFocusedEntity();
 
     if (!_.isEqual(series, cache)) {
-      Ember.run.debounce(this, this._updateChart, 300);
+      debounce(this, this._updateChart, 300);
     }
   },
 

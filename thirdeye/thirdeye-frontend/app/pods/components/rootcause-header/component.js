@@ -1,3 +1,4 @@
+import { bool } from '@ember/object/computed';
 import Component from '@ember/component';
 import { get, getProperties, computed } from '@ember/object';
 import { dateFormatFull } from 'thirdeye-frontend/utils/rca-utils';
@@ -70,7 +71,7 @@ export default Component.extend({
    * Toggle for the comment textarea
    * @type {boolean}
    */
-  isCommentEditMode: computed.bool('sessionText'),
+  isCommentEditMode: bool('sessionText'),
 
   /**
    * whether to enable saving

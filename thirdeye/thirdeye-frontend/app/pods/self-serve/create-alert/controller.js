@@ -3,15 +3,25 @@
  * @module self-serve/create/controller
  * @exports create
  */
+import { reads } from '@ember/object/computed';
+
 import RSVP from "rsvp";
 import _ from 'lodash';
 import fetch from 'fetch';
 import Controller from '@ember/controller';
 import { computed, set } from '@ember/object';
 import { task, timeout } from 'ember-concurrency';
-import { isPresent, isEmpty, isNone, isBlank } from "@ember/utils";
+import {
+  isPresent,
+  isEmpty,
+  isNone,
+  isBlank
+} from "@ember/utils";
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
-import { buildMetricDataUrl, getTopDimensions } from 'thirdeye-frontend/utils/manage-alert-utils';
+import {
+  buildMetricDataUrl,
+  getTopDimensions
+} from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Controller.extend({
 
@@ -196,12 +206,12 @@ export default Controller.extend({
   /**
    * Application name field options loaded from our model.
    */
-  allApplicationNames: computed.reads('model.allAppNames'),
+  allApplicationNames: reads('model.allAppNames'),
 
   /**
    * The list of all existing alert configuration groups.
    */
-  allAlertsConfigGroups: computed.reads('model.allConfigGroups'),
+  allAlertsConfigGroups: reads('model.allConfigGroups'),
 
   /**
    * Handler for search by function name - using ember concurrency (task)

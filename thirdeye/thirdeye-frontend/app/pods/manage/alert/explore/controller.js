@@ -4,16 +4,29 @@
  * @exports manage/alert/explore
  */
 import _ from 'lodash';
-import Ember from 'ember';
 import fetch from 'fetch';
 import moment from 'moment';
 import { later } from "@ember/runloop";
 import { isPresent } from "@ember/utils";
 import Controller from '@ember/controller';
 import { task, timeout } from 'ember-concurrency';
-import { computed, set, get, setProperties } from '@ember/object';
-import { checkStatus, postProps, buildDateEod } from 'thirdeye-frontend/utils/utils';
-import { buildAnomalyStats, extractSeverity, setDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
+import {
+  computed,
+  set,
+  get,
+  setProperties,
+  getWithDefault
+} from '@ember/object';
+import {
+  checkStatus,
+  postProps,
+  buildDateEod
+} from 'thirdeye-frontend/utils/utils';
+import {
+  buildAnomalyStats,
+  extractSeverity,
+  setDuration
+} from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Controller.extend({
   /**
@@ -219,7 +232,7 @@ export default Controller.extend({
         alertEvalMetrics,
         defaultSeverity
       } = this.getProperties('alertData', 'alertEvalMetrics', 'defaultSeverity');
-      const features = Ember.getWithDefault(alertData, 'alertFilter.features', null);
+      const features = getWithDefault(alertData, 'alertFilter.features', null);
       const severityUnit = features && features.split(',')[1] !== 'deviation' ? '%' : '';
       const mttdWeight = Number(extractSeverity(alertData, defaultSeverity)) * 100;
       const statsCards = [

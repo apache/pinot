@@ -3,9 +3,12 @@
  * @module self-serve/create/route
  * @exports alert create model
  */
-import Ember from 'ember';
+import { getWithDefault } from '@ember/object';
+
+import { isPresent } from '@ember/utils';
+import Route from '@ember/routing/route';
 import fetch from 'fetch';
-import RSVP from 'rsvp';
+import RSVP, { hash, allSettled } from 'rsvp';
 import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
 
 /**
@@ -45,10 +48,10 @@ const fetchAppAnomalies = (alertList) => {
       name,
       data: fetch(`/detection-job/eval/filter/${alert.id}?${tuneParams}`).then(checkStatus)
     };
-    alertPromises.push(Ember.RSVP.hash(getAlertPerfHash));
+    alertPromises.push(hash(getAlertPerfHash));
   });
 
-  return Ember.RSVP.allSettled(alertPromises);
+  return allSettled(alertPromises);
 };
 
 /**
@@ -131,7 +134,7 @@ const calculateRate = (anomalies, subset) => {
   return Number(percentage.toFixed());
 };
 
-export default Ember.Route.extend({
+export default Route.extend({
 
   actions: {
     /**
@@ -161,7 +164,7 @@ export default Ember.Route.extend({
     this._super(model);
 
     const activeGroups = model.configGroups.filterBy('active');
-    const groupsWithAppName = activeGroups.filter(group => Ember.isPresent(group.application));
+    const groupsWithAppName = activeGroups.filter(group => isPresent(group.application));
     const groupsWithAlertId = groupsWithAppName.filter(group => group.emailConfig.functionIds.length > 0);
     const idsByApplication = fillAppBuckets(model.applications, groupsWithAlertId);
     Object.assign(model, { idsByApplication });
@@ -198,7 +201,7 @@ export default Ember.Route.extend({
 
           // Get array of keys from first record
           let metricKeys = Object.keys(groupData[0].data);
-          let getTotalValue = (key) => Ember.getWithDefault(avgData, key, 0);
+          let getTotalValue = (key) => getWithDefault(avgData, key, 0);
           count++;
 
           // Look at each anomaly's perf object keys. For our "roundable" fields, get derived data

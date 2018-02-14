@@ -1,6 +1,12 @@
-import Ember from 'ember';
+import Component from '@ember/component';
 import { getProperties, computed } from '@ember/object';
-import { toCurrentUrn, toBaselineUrn, appendFilters, isInverse, isAdditive } from 'thirdeye-frontend/utils/rca-utils';
+import {
+  toCurrentUrn,
+  toBaselineUrn,
+  appendFilters,
+  isInverse,
+  isAdditive
+} from 'thirdeye-frontend/utils/rca-utils';
 import { humanizeChange } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
 
@@ -23,7 +29,7 @@ const ROOTCAUSE_MODE_MAPPING = {
   'Contribution to Overall Change': ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_TO_DIFF
 };
 
-export default Ember.Component.extend({
+export default Component.extend({
   //
   // external
   //
@@ -70,7 +76,7 @@ export default Ember.Component.extend({
     return modeMapping[selectedMode];
   }),
 
-  current: Ember.computed(
+  current: computed(
     'breakdowns',
     'selectedUrn',
     function () {
@@ -89,7 +95,7 @@ export default Ember.Component.extend({
     }
   ),
 
-  baseline: Ember.computed(
+  baseline: computed(
     'breakdowns',
     'selectedUrn',
     function () {
@@ -108,7 +114,7 @@ export default Ember.Component.extend({
     }
   ),
 
-  hasCurrent: Ember.computed(
+  hasCurrent: computed(
     'current',
     'isLoadingBreakdowns',
     function () {
@@ -117,7 +123,7 @@ export default Ember.Component.extend({
     }
   ),
 
-  hasBaseline: Ember.computed(
+  hasBaseline: computed(
     'baseline',
     'isLoadingBreakdowns',
     function () {
@@ -126,7 +132,7 @@ export default Ember.Component.extend({
     }
   ),
 
-  isInverse: Ember.computed(
+  isInverse: computed(
     'selectedUrn',
     'entities',
     function () {
@@ -135,7 +141,7 @@ export default Ember.Component.extend({
     }
   ),
 
-  isAdditive: Ember.computed(
+  isAdditive: computed(
     'selectedUrn',
     'entities',
     function () {
@@ -149,7 +155,7 @@ export default Ember.Component.extend({
     }
   ),
 
-  _dataRollup: Ember.computed(
+  _dataRollup: computed(
     'current',
     'baseline',
     'rollupRange',
@@ -195,7 +201,7 @@ export default Ember.Component.extend({
     }
   ),
 
-  cells: Ember.computed(
+  cells: computed(
     '_dataRollup',
     'mode',
     'isInverse',

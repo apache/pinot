@@ -1,8 +1,16 @@
-import Ember from 'ember';
+import { computed } from '@ember/object';
+import Component from '@ember/component';
 import moment from 'moment';
 import d3 from 'd3';
 import buildTooltip from 'thirdeye-frontend/utils/build-tooltip';
-import { toBaselineUrn, toMetricUrn, filterPrefix, hasPrefix, toMetricLabel, colorMapping } from 'thirdeye-frontend/utils/rca-utils';
+import {
+  toBaselineUrn,
+  toMetricUrn,
+  filterPrefix,
+  hasPrefix,
+  toMetricLabel,
+  colorMapping
+} from 'thirdeye-frontend/utils/rca-utils';
 
 const TIMESERIES_MODE_ABSOLUTE = 'absolute';
 const TIMESERIES_MODE_RELATIVE = 'relative';
@@ -11,7 +19,7 @@ const TIMESERIES_MODE_SPLIT = 'split';
 
 const EVENT_MIN_GAP = 60000;
 
-export default Ember.Component.extend({
+export default Component.extend({
   entities: null, // {}
 
   selectedUrns: null, // Set
@@ -36,7 +44,7 @@ export default Ember.Component.extend({
    * Translate an urn into a chart id
    * @returns {String|null}
    */
-  focusedId: Ember.computed('focusedUrn', function() {
+  focusedId: computed('focusedUrn', function() {
     const urn = this.get('focusedUrn');
 
     return this._urnToChartId(urn);
@@ -69,7 +77,7 @@ export default Ember.Component.extend({
     height: 200
   },
 
-  tooltip: Ember.computed(
+  tooltip: computed(
     'onHover',
     function () {
       return {
@@ -96,7 +104,7 @@ export default Ember.Component.extend({
     }
   ),
 
-  axis: Ember.computed(
+  axis: computed(
     'context',
     function () {
       const { context } = this.getProperties('context');
@@ -131,7 +139,7 @@ export default Ember.Component.extend({
   /**
    * Array of displayable urns in timeseries chart (events, metrics, metric refs)
    */
-  displayableUrns: Ember.computed(
+  displayableUrns: computed(
     'entities',
     'timeseries',
     'selectedUrns',
@@ -148,7 +156,7 @@ export default Ember.Component.extend({
   /**
    * Transformed data series as ingested by timeseries-chart
    */
-  series: Ember.computed(
+  series: computed(
     'entities',
     'timeseries',
     'context',
@@ -177,7 +185,7 @@ export default Ember.Component.extend({
   /**
    * Dictionary of transformed data series for split view, keyed by metric ref urn.
    */
-  splitSeries: Ember.computed(
+  splitSeries: computed(
     'entities',
     'timeseries',
     'context',
@@ -214,7 +222,7 @@ export default Ember.Component.extend({
   /**
    * Array of urns for split view. One per metric ref urn.
    */
-  splitUrns: Ember.computed(
+  splitUrns: computed(
     'entities',
     'displayableUrns',
     'timeseriesMode',
@@ -236,7 +244,7 @@ export default Ember.Component.extend({
   /**
    * Dictionary of chart labels for split view, keyed by metric ref urn.
    */
-  splitLabels: Ember.computed(
+  splitLabels: computed(
     'entities',
     'displayableUrns',
     'timeseriesMode',
@@ -259,7 +267,7 @@ export default Ember.Component.extend({
   /**
    * Split view indicator
    */
-  isSplit: Ember.computed(
+  isSplit: computed(
     'timeseriesMode',
     function () {
       return this.get('timeseriesMode') == TIMESERIES_MODE_SPLIT;
@@ -298,7 +306,7 @@ export default Ember.Component.extend({
   /**
    * Dictionary for the min and mix timestamps of events and timeseries for hover bounds checking
    */
-  _hoverBounds: Ember.computed(
+  _hoverBounds: computed(
     'entities',
     'timeseries',
     'displayableUrns',
@@ -318,7 +326,7 @@ export default Ember.Component.extend({
   /**
    * Dictionary of y-values for event entities. Laid out by a swimlane algorithm purely for display purposes
    */
-  _eventValues: Ember.computed(
+  _eventValues: computed(
     'entities',
     'displayableUrns',
     function () {

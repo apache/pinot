@@ -1,4 +1,5 @@
-import Ember from 'ember';
+import { inject as service } from '@ember/service';
+import Route from '@ember/routing/route';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
 /**
@@ -6,8 +7,8 @@ import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-rout
  * This is necessary because we need to have access to this from
  * the old (non-Ember) UI
  */
-export default Ember.Route.extend(AuthenticatedRouteMixin, {
-  session: Ember.inject.service(),
+export default Route.extend(AuthenticatedRouteMixin, {
+  session: service(),
 
   routeIfAlreadyAuthenticated: 'rca',
 

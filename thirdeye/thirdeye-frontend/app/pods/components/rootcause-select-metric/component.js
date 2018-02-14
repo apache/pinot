@@ -1,10 +1,10 @@
-import Ember from 'ember';
+import Component from '@ember/component';
 import fetch from 'fetch';
 import { toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/utils/rca-utils';
 import { task, timeout } from 'ember-concurrency';
 import _ from 'lodash';
 
-export default Ember.Component.extend({
+export default Component.extend({
   classNames: ['rootcause-select-metric-dimension'],
 
   selectedUrn: null, // ""

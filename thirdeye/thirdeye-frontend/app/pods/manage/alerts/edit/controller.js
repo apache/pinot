@@ -3,12 +3,18 @@
  * @module self-serve/create/controller
  * @exports create
  */
+import { later } from '@ember/runloop';
+
+import { Promise as EmberPromise } from 'rsvp';
+import { isPresent, isEmpty } from '@ember/utils';
+import { notEmpty, or } from '@ember/object/computed';
+import { computed, getWithDefault, set } from '@ember/object';
+import Controller from '@ember/controller';
 import fetch from 'fetch';
-import Ember from 'ember';
 import _ from 'lodash';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
-export default Ember.Controller.extend({
+export default Controller.extend({
 
   /**
    * Default text value for the anomaly graph legend
@@ -68,7 +74,7 @@ export default Ember.Controller.extend({
    * @method allAlertsConfigGroups
    * @return {Array} list of existing config groups
    */
-  allAlertsConfigGroups: Ember.computed(
+  allAlertsConfigGroups: computed(
     'isNewConfigGroupSaved',
     'alertConfigGroups',
     'newConfigGroupObj',
@@ -89,7 +95,7 @@ export default Ember.Controller.extend({
    * @method topDimensions
    * @return {Array} dimensionList: array of graphable dimensions
    */
-  topDimensions: Ember.computed(
+  topDimensions: computed(
     'metricDimensions',
     'alertDimension',
     'metricData',
@@ -131,14 +137,14 @@ export default Ember.Controller.extend({
    * @method showGraphLegend
    * @return {Boolean}
    */
-  showGraphLegend: Ember.computed.notEmpty('alertDimension'),
+  showGraphLegend: notEmpty('alertDimension'),
 
   /**
    * Returns the appropriate subtitle for selected config group monitored alerts
    * @method selectedConfigGroupSubtitle
    * @return {String} title of expandable section for selected config group
    */
-  selectedConfigGroupSubtitle: Ember.computed(
+  selectedConfigGroupSubtitle: computed(
     'selectedConfigGroup',
     function () {
       return `Alerts Monitored by: ${this.get('selectedConfigGroup.name')}`;
@@ -149,7 +155,7 @@ export default Ember.Controller.extend({
    * Mapping alertFilter's pattern to human readable strings
    * @returns {String}
    */
-  pattern: Ember.computed('alertProps', function() {
+  pattern: computed('alertProps', function() {
     const props = this.get('alertProps');
     const patternObj = props.find(prop => prop.name === 'pattern');
     const pattern = patternObj ? decodeURIComponent(patternObj.value) : 'Up and Down';
@@ -161,7 +167,7 @@ export default Ember.Controller.extend({
    * Extracting Weekly Effect from alert Filter
    * @returns {String}
    */
-  weeklyEffect: Ember.computed('alertFilters.weeklyEffectModeled', function() {
+  weeklyEffect: computed('alertFilters.weeklyEffectModeled', function() {
     const weeklyEffect = this.getWithDefault('alertFilters.weeklyEffectModeled', true);
 
     return weeklyEffect;
@@ -171,7 +177,7 @@ export default Ember.Controller.extend({
    * Extracting sensitivity from alert Filter and maps it to human readable values
    * @returns {String}
    */
-  sensitivity: Ember.computed('alertProps', function() {
+  sensitivity: computed('alertProps', function() {
     const props = this.get('alertProps');
     const sensitivityObj = props.find(prop => prop.name === 'sensitivity');
     const sensitivity = sensitivityObj ? decodeURIComponent(sensitivityObj.value) : 'MEDIUM';
@@ -191,13 +197,13 @@ export default Ember.Controller.extend({
    * @method selectedConfigGroupRecipients
    * @return {String} comma-separated email addresses
    */
-  selectedConfigGroupRecipients: Ember.computed(
+  selectedConfigGroupRecipients: computed(
     'selectedConfigGroup',
     'updatedRecipients',
     function() {
       const newRecipients = this.get('updatedRecipients');
-      const originalRecipients = Ember.getWithDefault(this, 'selectedConfigGroup.recipients', []);
-      const finalRecipients = Ember.isPresent(newRecipients) ? newRecipients : originalRecipients;
+      const originalRecipients = getWithDefault(this, 'selectedConfigGroup.recipients', []);
+      const finalRecipients = isPresent(newRecipients) ? newRecipients : originalRecipients;
       return finalRecipients.replace(/,+$/g, '').replace(/,/g, ', ');
     }
   ),
@@ -209,7 +215,7 @@ export default Ember.Controller.extend({
    * @method newConfigGroupObj
    * @return {Object} primer props for a new alert config group
    */
-  newConfigGroupObj: Ember.computed(
+  newConfigGroupObj: computed(
     'newConfigGroupName',
     function() {
       return {
@@ -229,7 +235,7 @@ export default Ember.Controller.extend({
    * @method isEmptyEmail
    * @return {Boolean} are both values empty
    */
-  isEmptyEmail: Ember.computed(
+  isEmptyEmail: computed(
     'selectedConfigGroupRecipients',
     'alertGroupNewRecipient',
     'isExiting',
@@ -237,7 +243,7 @@ export default Ember.Controller.extend({
       if (this.get('isExiting')) {
         return false;
       } else {
-        return Ember.isEmpty(this.get('selectedConfigGroupRecipients')) && Ember.isEmpty(this.get('alertGroupNewRecipient'));
+        return isEmpty(this.get('selectedConfigGroupRecipients')) && isEmpty(this.get('alertGroupNewRecipient'));
       }
     }
   ),
@@ -247,7 +253,7 @@ export default Ember.Controller.extend({
    * @method isSubmitDisabled
    * @return {Boolean} show/hide submit
    */
-  isSubmitDisabled: Ember.computed.or('{isEmptyEmail,isEmailError,isDuplicateEmail,isProcessingForm}'),
+  isSubmitDisabled: or('{isEmptyEmail,isEmailError,isDuplicateEmail,isProcessingForm}'),
 
   /**
    * Fetches an alert function record by name.
@@ -287,7 +293,7 @@ export default Ember.Controller.extend({
     let cnt = 0;
 
     // Build object for each function(alert) to display in results table
-    return new Ember.RSVP.Promise((resolve) => {
+    return new EmberPromise((resolve) => {
       for (var functionId of existingFunctionList) {
         this.fetchFunctionById(functionId).then(functionData => {
           newFunctionList.push({
@@ -329,7 +335,7 @@ export default Ember.Controller.extend({
    */
   confirmEditSuccess() {
     this.set('isEditAlertSuccess', true);
-    Ember.run.later(this, function() {
+    later(this, function() {
       this.clearAll();
       this.transitionToRoute('manage.alerts');
     }, 2000);
@@ -544,8 +550,8 @@ export default Ember.Controller.extend({
       if (emailError || this.get('isDuplicateEmail')) { return; }
 
       // Assign these fresh editable values to the Alert object currently being edited
-      Ember.set(postFunctionBody, 'functionName', this.get('alertFunctionName'));
-      Ember.set(postFunctionBody, 'isActive', this.get('isActive'));
+      set(postFunctionBody, 'functionName', this.get('alertFunctionName'));
+      set(postFunctionBody, 'isActive', this.get('isActive'));
 
       // Prepare the POST payload to save an edited Alert object
       postProps = {
@@ -562,8 +568,8 @@ export default Ember.Controller.extend({
           if (this.get('isEditedConfigGroup')) {
 
             // Whether its a new Config object or existing, assign new user-supplied values to these props:
-            Ember.set(postConfigBody, 'application', newApplication);
-            Ember.set(postConfigBody, 'recipients', cleanRecipientsArr);
+            set(postConfigBody, 'application', newApplication);
+            set(postConfigBody, 'recipients', cleanRecipientsArr);
 
             // Make sure current Id is part of new config array
             if (postConfigBody.emailConfig) {
@@ -595,7 +601,7 @@ export default Ember.Controller.extend({
 
                       // If save successful, update new config group name before model refresh (avoid big data delay)
                       this.set('updatedRecipients', cleanRecipientsArr);
-                      if (Ember.isPresent(newGroupName)) {
+                      if (isPresent(newGroupName)) {
                         this.setProperties({
                           isNewConfigGroupSaved: true,
                           selectedConfigGroup: this.get('newConfigGroupObj')
