@@ -19,7 +19,6 @@ import com.google.common.base.Preconditions;
 import com.google.gson.JsonObject;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
@@ -78,20 +77,19 @@ public final class MetricFieldSpec extends FieldSpec {
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setFieldSize(int fieldSize) {
     Preconditions.checkArgument(fieldSize > 0, "Field size: " + fieldSize + " is not a positive number.");
-    if (_dataType != DataType.STRING) {
+    if (_dataType != null && _dataType != DataType.STRING) {
       Preconditions.checkArgument(fieldSize == _dataType.size(),
           "Field size: " + fieldSize + " does not match data type: " + _dataType);
     }
     _fieldSize = fieldSize;
   }
 
-  @Nullable
   public DerivedMetricType getDerivedMetricType() {
     return _derivedMetricType;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setDerivedMetricType(@Nullable DerivedMetricType derivedMetricType) {
+  public void setDerivedMetricType(DerivedMetricType derivedMetricType) {
     _derivedMetricType = derivedMetricType;
   }
 
