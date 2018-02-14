@@ -236,11 +236,11 @@ public class FileUploadDownloadClient implements Closeable {
       controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
     }
     StatusLine statusLine = response.getStatusLine();
-    String message = null;
+    String message;
     try {
       message = EntityUtils.toString(response.getEntity());
     } catch (Exception e) {
-      // ignore
+      message = "No message";
     }
     String errorMessage =
         String.format("Got error status code: %d with reason: %s while sending request: %s\nMessage: %s", statusLine.getStatusCode(),
