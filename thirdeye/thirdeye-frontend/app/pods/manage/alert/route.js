@@ -132,12 +132,12 @@ export default Route.extend({
     /**
      * Toggle button modes and handle transition for edit
      */
-    transitionToEditPage() {
+    transitionToEditPage(alertId) {
       this.controller.setProperties({
         isOverViewModeActive: false,
         isEditModeActive: true
       });
-      this.transitionTo('manage.alert.edit', id);
+      this.transitionTo('manage.alert.edit', alertId);
     },
 
     /**

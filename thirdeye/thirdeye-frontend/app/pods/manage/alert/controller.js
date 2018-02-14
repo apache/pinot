@@ -38,7 +38,7 @@ export default Controller.extend({
      * Handle navigation to edit route
      */
     onClickEdit() {
-      this.send('transitionToEditPage');
+      this.send('transitionToEditPage', this.get('id'));
     },
 
     /**

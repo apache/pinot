@@ -285,7 +285,7 @@ export default Controller.extend({
      * @param {Object} rangeOption - the selected range object
      */
     onRangeOptionClick(rangeOption) {
-      const rangeFormat = 'YYYY-MM-DD';
+      const rangeFormat = 'YYYY-MM-DD HH:mm';
       const defaultEndDate = buildDateEod(1, 'day').valueOf();
       const timeRangeOptions = this.get('timeRangeOptions');
       const duration = rangeOption.value;
