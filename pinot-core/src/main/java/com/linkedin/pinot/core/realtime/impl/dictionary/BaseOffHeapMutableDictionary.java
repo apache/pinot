@@ -197,12 +197,15 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
       PinotDataBufferMemoryManager memoryManager, String allocationContext) {
     _memoryManager = memoryManager;
     _allocationContext = allocationContext;
-    int initialRowCount = nearestPrime(estimatedCardinality);
-    _numEntries = 0;
+    _initialRowCount = nearestPrime(estimatedCardinality);
     _maxItemsInOverflowHash = maxOverflowHashSize;
+    init();
+  }
+
+  protected void init() {
+    _numEntries = 0;
     _valueToDict = new ValueToDictId(new ArrayList<IntBuffer>(0), new ConcurrentHashMap<Object, Integer>(0));
-    _initialRowCount = initialRowCount;
-    if (!_heapFirst || (maxOverflowHashSize == 0)) {
+    if (!_heapFirst || (_maxItemsInOverflowHash == 0)) {
       expand(_initialRowCount, 1);
     }
   }
@@ -252,6 +255,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
       throws IOException {
     doClose();
 
+    _numEntries = 0;
     ValueToDictId valueToDictId = _valueToDict;
     _valueToDict = null;
     Map<Object, Integer> overflowMap = valueToDictId.getOverflowMap();
