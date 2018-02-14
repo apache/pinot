@@ -10,6 +10,10 @@ import _ from 'lodash';
 const ROOTCAUSE_TAB_DIMENSIONS = 'dimensions';
 const ROOTCAUSE_TAB_METRICS = 'metrics';
 
+const ROOTCAUSE_SETUP_MODE_CONTEXT = "context";
+const ROOTCAUSE_SETUP_MODE_SELECTED = "selected";
+const ROOTCAUSE_SETUP_MODE_NONE = "none";
+
 const ROOTCAUSE_SETUP_EVENTS_SCORE_THRESHOLD = 1.0;
 const ROOTCAUSE_SETUP_METRICS_SCORE_THRESHOLD = 0.5;
 
@@ -141,7 +145,7 @@ export default Ember.Controller.extend({
    * toggle for running _setupForMetric() on selection of the first metric
    * @type {boolean}
    */
-  setupMode: false,
+  setupMode: ROOTCAUSE_SETUP_MODE_NONE,
 
   //
   // session data
@@ -238,16 +242,16 @@ export default Ember.Controller.extend({
     'context',
     'entities',
     'selectedUrns',
-    'entitiesService',
-    'timeseriesService',
-    'aggregatesService',
-    'breakdownsService',
     'activeTab',
     function () {
-      const { context, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, activeTab } =
-        this.getProperties('context', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'activeTab');
+      const { context, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, activeTab, setupMode } =
+        this.getProperties('context', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'activeTab', 'setupMode');
 
       if (!context || !selectedUrns) {
+        return;
+      }
+
+      if (setupMode === ROOTCAUSE_SETUP_MODE_CONTEXT) {
         return;
       }
 
@@ -295,34 +299,34 @@ export default Ember.Controller.extend({
   ),
 
   /**
-   * Setup observer for selecting default entities on metric selection
-   * Runs multiple times until all entities loaded.
+   * Setup observer for context and default selection
+   * May run multiple times while entities are loading.
    */
   _setupObserver: Ember.observer(
-    'setupMode',
-    'loadingFrameworks',
-    'isLoadingScores',
     'context',
     'entities',
     'scores',
-    'selectedUrns',
+    'setupMode',
     function () {
-      const { setupMode, context, loadingFrameworks, isLoadingScores, selectedUrns } =
-        this.getProperties('setupMode', 'context', 'loadingFrameworks', 'isLoadingScores', 'selectedUrns');
+      const { setupMode } =
+        this.getProperties('setupMode');
 
-      if (!setupMode) { return; }
-      if (context.urns.size <= 0) { return; }
+      switch (setupMode) {
+        case ROOTCAUSE_SETUP_MODE_NONE:
+          // left blank
+          break;
 
-      const setupUrns = this._setupForMetric();
-      const newSelectedUrns = new Set(selectedUrns);
-      setupUrns.forEach(urn => newSelectedUrns.add(urn));
+        case ROOTCAUSE_SETUP_MODE_CONTEXT:
+          this._setupContext();
+          break;
 
-      if (_.isEqual(newSelectedUrns, selectedUrns)) { return; }
+        case ROOTCAUSE_SETUP_MODE_SELECTED:
+          this._setupSelected();
+          break;
 
-      this.setProperties({
-        setupMode: loadingFrameworks.size > 0 || isLoadingScores,
-        selectedUrns: newSelectedUrns
-      });
+        default:
+          throw new Error(`Unknown setup mode '${setupMode}'`);
+      }
     }
   ),
 
@@ -599,21 +603,39 @@ export default Ember.Controller.extend({
   //
 
   /**
-   * Select top-scoring entities by default if metric selected for the first time.
+   * Transition to route for metric id
    *
-   * @return {Set} top-scoring entities
    * @private
    */
-  _setupForMetric() {
+  _setupContext() {
     const { context, loadingFrameworks, entities, scores } =
       this.getProperties('context', 'loadingFrameworks', 'entities', 'scores');
 
-    const urns = new Set();
+    const contextMetricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
+
+    if (_.isEmpty(contextMetricUrns)) { return; }
+
+    const metricUrn = contextMetricUrns[0];
+    const metricId = metricUrn.split(':')[2];
+
+    this.transitionToRoute({ queryParams: { metricId } });
+  },
+
+  /**
+   * Select top-scoring entities by default if metric selected for the first time.
+   *
+   * @private
+   */
+  _setupSelected() {
+    const { context, entities, scores, selectedUrns, loadingFrameworks, isLoadingScores } =
+      this.getProperties('context', 'entities', 'scores', 'selectedUrns', 'loadingFrameworks', 'isLoadingScores');
+
+    const newSelectedUrns = new Set(selectedUrns);
 
     const contextMetricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
-    contextMetricUrns.forEach(urn => urns.add(urn));
-    contextMetricUrns.map(toCurrentUrn).forEach(urn => urns.add(urn));
-    contextMetricUrns.map(toBaselineUrn).forEach(urn => urns.add(urn));
+    contextMetricUrns.forEach(urn => newSelectedUrns.add(urn));
+    contextMetricUrns.map(toCurrentUrn).forEach(urn => newSelectedUrns.add(urn));
+    contextMetricUrns.map(toBaselineUrn).forEach(urn => newSelectedUrns.add(urn));
 
     // events
     const groupedEvents = Object.values(entities)
@@ -628,7 +650,7 @@ export default Ember.Controller.extend({
     Object.values(groupedEvents)
       .forEach(arr => {
         const topk = arr.filter(e => e.score >= ROOTCAUSE_SETUP_EVENTS_SCORE_THRESHOLD);
-        topk.forEach(e => urns.add(e.urn));
+        topk.forEach(e => newSelectedUrns.add(e.urn));
       });
 
     // metrics
@@ -636,11 +658,16 @@ export default Ember.Controller.extend({
       .filter(urn => urn in scores)
       .filter(urn => scores[urn] >= ROOTCAUSE_SETUP_METRICS_SCORE_THRESHOLD);
 
-    metricUrns.forEach(urn => urns.add(urn));
-    metricUrns.map(toCurrentUrn).forEach(urn => urns.add(urn));
-    metricUrns.map(toBaselineUrn).forEach(urn => urns.add(urn));
+    metricUrns.forEach(urn => newSelectedUrns.add(urn));
+    metricUrns.map(toCurrentUrn).forEach(urn => newSelectedUrns.add(urn));
+    metricUrns.map(toBaselineUrn).forEach(urn => newSelectedUrns.add(urn));
 
-    return urns;
+    if (_.isEqual(selectedUrns, newSelectedUrns)) { return; }
+
+    this.setProperties({
+      selectedUrns: newSelectedUrns,
+      setupMode: (loadingFrameworks.size > 0 || isLoadingScores) ? ROOTCAUSE_SETUP_MODE_SELECTED : ROOTCAUSE_SETUP_MODE_NONE
+    });
   },
 
   //

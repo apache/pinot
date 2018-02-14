@@ -7,17 +7,22 @@ import { toCurrentUrn, toBaselineUrn, filterPrefix, dateFormatFull } from 'third
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
 
-const queryParamsConfig = {
-  refreshModel: false,
-  replace: false
-};
+const ROOTCAUSE_SETUP_MODE_CONTEXT = "context";
+const ROOTCAUSE_SETUP_MODE_SELECTED = "selected";
+const ROOTCAUSE_SETUP_MODE_NONE = "none";
 
 export default Ember.Route.extend(AuthenticatedRouteMixin, {
   authService: Ember.inject.service('session'),
 
   queryParams: {
-    metricId: queryParamsConfig,
-    sessionId: queryParamsConfig,
+    metricId: {
+      refreshModel: true,
+      replace: true
+    },
+    sessionId: {
+      refreshModel: false,
+      replace: false
+    },
     anomalyId: {
       refreshModel: true,
       replace: false
@@ -143,7 +148,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     let sessionUpdatedBy = '';
     let sessionUpdatedTime = '';
     let sessionModified = true;
-    let setupMode = true;
+    let setupMode = ROOTCAUSE_SETUP_MODE_CONTEXT;
     let routeErrors = new Set();
 
     // metric-initialized context
@@ -158,6 +163,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       };
 
       selectedUrns = new Set([metricUrn, toCurrentUrn(metricUrn), toBaselineUrn(metricUrn)]);
+      setupMode = ROOTCAUSE_SETUP_MODE_SELECTED;
     }
 
     // anomaly-initialized context
@@ -189,6 +195,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
         selectedUrns = new Set([...metricUrns, ...metricUrns.map(toCurrentUrn), ...metricUrns.map(toBaselineUrn), anomalyUrn]);
         sessionName = 'New Investigation of #' + anomalyId + ' (' + moment().format(dateFormatFull) + ')';
+        setupMode = ROOTCAUSE_SETUP_MODE_SELECTED;
 
       } else {
         routeErrors.add(`Could not find anomalyId ${anomalyId}`);
@@ -216,7 +223,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
         sessionUpdatedBy = updatedBy;
         sessionUpdatedTime = updated;
         sessionModified = false;
-        setupMode = false;
+        setupMode = ROOTCAUSE_SETUP_MODE_NONE;
 
       } else {
         routeErrors.add(`Could not find sessionId ${sessionId}`);
