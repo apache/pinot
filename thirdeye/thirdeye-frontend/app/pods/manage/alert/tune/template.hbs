@@ -14,8 +14,8 @@
               timePicker24Hour=true
               timePickerIncrement=timePickerIncrement
               maxDate=today
-              start=viewRegionStart
-              end=viewRegionEnd
+              start=activeRangeStart
+              end=activeRangeEnd
               ranges=predefinedRanges
               showCustomRangeLabel=false
               format=uiDateFormat
@@ -94,6 +94,7 @@
             type="text"
             id="custom-tune-percent"
             class="form-control te-input te-input"
+            focus-out="onChangeSeverityValue"
             value=customPercentChange
             disabled=isCustomFieldsDisabled
           }}
@@ -109,7 +110,7 @@
             id="custom-tune-mttd"
             class="form-control te-input"
             value=customMttdChange
-            onchange=(action "onChangeMttdValue")
+            focus-out="onChangeMttdValue"
             disabled=isCustomFieldsDisabled
           }}
         </div>

@@ -25,21 +25,34 @@ export default Controller.extend({
     },
 
     /**
-     * Handle navigation to edit route
+     * Handle conditions for display of appropriate alert nav link (overview or edit)
      */
-    onClickEdit() {
+    setEditModeActive() {
       this.setProperties({
         isOverViewModeActive: false,
         isEditModeActive: true
       });
-      this.transitionToRoute('manage.alert.edit', this.get('id'));
     },
 
     /**
-     * Navigate back to manage base route
+     * Handle navigation to edit route
+     */
+    onClickEdit() {
+      this.send('transitionToEditPage', this.get('id'));
+    },
+
+    /**
+     * Navigate to Tune Page
+     */
+    onClickNavToTune() {
+      this.send('transitionToTunePage', this.get('id'));
+    },
+
+    /**
+     * Navigate to Alert Page
      */
     onClickNavToOverview() {
-      this.transitionToRoute('manage.alert', this.get('id'));
+      this.send('transitionToAlertPage', this.get('id'));
     }
   }
 });

@@ -9,6 +9,7 @@ import moment from 'moment';
 import { isPresent } from "@ember/utils";
 import Route from '@ember/routing/route';
 import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
+import { setDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 // Setup for query param behavior
 const queryParamsConfig = {
@@ -38,6 +39,8 @@ export default Route.extend({
         functionName: null,
         jobId
       }});
+      // Save duration to localstorage for guaranteed availability
+      setDuration(durationDefault, startDateDefault, endDateDefault);
     }
   },
 
@@ -126,9 +129,51 @@ export default Route.extend({
       }
     },
 
-    navigateToAlertPage() {
-      const { id, duration, startDate, endDate } = this.modelFor('manage.alert.tune');
-      this.transitionTo('manage.alert', id, { queryParams: { duration, startDate, endDate }});
+    /**
+     * Toggle button modes and handle transition for edit
+     */
+    transitionToEditPage(alertId) {
+      this.controller.setProperties({
+        isOverViewModeActive: false,
+        isEditModeActive: true
+      });
+      this.transitionTo('manage.alert.edit', alertId);
+    },
+
+    /**
+     * Toggle button modes and handle transition for Alert Page (overview)
+     * Persist query params as much as possible
+     */
+    transitionToAlertPage(alertId) {
+      const tuneModel = this.modelFor('manage.alert.tune');
+      this.controller.setProperties({
+        isOverViewModeActive: true,
+        isEditModeActive: false
+      });
+      if (tuneModel && tuneModel.duration === 'custom') {
+        const { id, duration, startDate, endDate } = tuneModel;
+        this.transitionTo('manage.alert.explore', id, { queryParams: { duration, startDate, endDate }});
+      } else {
+        this.transitionTo('manage.alert', alertId);
+      }
+    },
+
+    /**
+     * Toggle button modes and handle transition for tuning page
+     * Persist query params as much as possible
+     */
+    transitionToTunePage(alertId) {
+      const exploreModel = this.modelFor('manage.alert.explore');
+      this.controller.setProperties({
+        isOverViewModeActive: false,
+        isEditModeActive: true
+      });
+      if (exploreModel && exploreModel.duration === 'custom') {
+        const { id, duration, startDate, endDate } = exploreModel;
+        this.transitionTo('manage.alert.tune', id, { queryParams: { duration, startDate, endDate }});
+      } else {
+        this.transitionTo('manage.alert.tune', alertId);
+      }
     },
 
     // Sub-route errors will bubble up to this

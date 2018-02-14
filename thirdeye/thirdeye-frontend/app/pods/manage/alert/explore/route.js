@@ -7,14 +7,17 @@ import RSVP from "rsvp";
 import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
-import { isPresent, isEmpty, isNone, isBlank } from "@ember/utils";
-import { checkStatus, postProps, parseProps, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
-import { enhanceAnomalies, toIdGroups, setUpTimeRangeOptions, getTopDimensions, buildMetricDataUrl, extractSeverity } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { later } from "@ember/runloop";
+import { set, get, setProperties } from '@ember/object';
+import { isPresent } from "@ember/utils";
+import { checkStatus, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
+import { enhanceAnomalies, toIdGroups, setUpTimeRangeOptions, getTopDimensions, buildMetricDataUrl, extractSeverity, getDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 /**
  * Shorthand for setting date defaults
  */
 const dateFormat = 'YYYY-MM-DD';
+const displayDateFormat = 'YYYY-MM-DD HH:mm';
 
 /**
  * Basic alert page defaults
@@ -158,12 +161,12 @@ export default Route.extend({
     const { id, alertData, jobId } = this.modelFor('manage.alert');
     if (!id) { return; }
 
+    // Fetch saved time range
     const {
       duration = durationDefault,
       startDate = startDateDefault,
-      endDate = endDateDefault,
-      repStatus
-    } = transition.queryParams;
+      endDate = endDateDefault
+    } = getDuration();
 
     // Prepare endpoints for eval, mttd, projected metrics calls
     const dateParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
@@ -338,14 +341,20 @@ export default Route.extend({
       alertEvalMetrics,
       anomaliesLoaded: false,
       isMetricDataInvalid: false,
-      activeRangeStart: config.startStamp,
-      activeRangeEnd: config.endStamp,
       isMetricDataLoading: true,
       alertHasDimensions: isPresent(exploreDimensions)
     });
 
     // Kick off controller defaults and replay status check
     controller.initialize();
+
+    // Ensure date range picker gets populated correctly
+    later(this, () => {
+      controller.setProperties({
+        activeRangeStart: moment(config.startStamp).format(displayDateFormat),
+        activeRangeEnd: moment(config.endStamp).format(displayDateFormat)
+      });
+    });
 
     // Fetch all anomalies we have Ids for. Enhance the data and populate power-select filter options.
     // TODO: look into possibility of bundling calls or using async/await: https://github.com/linkedin/pinot/pull/2468
@@ -432,6 +441,16 @@ export default Route.extend({
     */
     refreshModel() {
       this.refresh();
+    },
+
+    /**
+    * Change link state in parent controller to reflect transition to tuning route
+    */
+    updateParentLink() {
+      setProperties(this.controllerFor('manage.alert'), {
+        isOverViewModeActive: false,
+        isEditModeActive: true
+      });
     },
 
     /**

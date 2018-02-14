@@ -6,9 +6,10 @@
 import _ from 'lodash';
 import Controller from '@ember/controller';
 import moment from 'moment';
+import { isPresent } from "@ember/utils";
 import { computed, set } from '@ember/object';
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
-import { buildAnomalyStats } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { buildAnomalyStats, setDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Controller.extend({
   /**
@@ -35,6 +36,8 @@ export default Controller.extend({
       predefinedRanges: {},
       today: moment(),
       selectedSortMode: '',
+      activeRangeStart: '',
+      activeRangeEnd: '',
       sortColumnStartUp: false,
       sortColumnScoreUp: false,
       sortColumnChangeUp: false,
@@ -148,28 +151,6 @@ export default Controller.extend({
   }),
 
   /**
-   * date-time-picker: returns a time object from selected range end date
-   * @type {Object}
-   */
-  viewRegionEnd: computed(
-    'activeRangeEnd',
-    function() {
-      return moment(this.get('activeRangeEnd')).format(this.get('serverDateFormat'));
-    }
-  ),
-
-  /**
-   * date-time-picker: returns a time object from selected range start date
-   * @type {Object}
-   */
-  viewRegionStart: computed(
-    'activeRangeStart',
-    function() {
-      return moment(this.get('activeRangeStart')).format(this.get('serverDateFormat'));
-    }
-  ),
-
-  /**
    * Data needed to render the stats 'cards' above the anomaly graph for this alert
    * NOTE: buildAnomalyStats util currently requires both 'current' and 'projected' props to be present.
    * @type {Object}
@@ -177,23 +158,17 @@ export default Controller.extend({
   anomalyStats: computed(
     'alertEvalMetrics',
     'isTuneAmountPercent',
-    'isTunePreviewActive',
     'customPercentChange',
-    'selectedSeverityOption',
     'alertEvalMetrics.projected',
     function() {
       const {
         isTuneAmountPercent,
-        isTunePreviewActive,
         alertEvalMetrics: metrics,
-        customPercentChange: severity,
-        selectedSeverityOption
+        customPercentChange: severity
       } = this.getProperties(
         'isTuneAmountPercent',
-        'isTunePreviewActive',
         'alertEvalMetrics',
-        'customPercentChange',
-        'selectedSeverityOption'
+        'customPercentChange'
       );
       const severityUnit = isTuneAmountPercent ? '%' : '';
       const isPerfDataReady = _.has(metrics, 'current');
@@ -304,9 +279,12 @@ export default Controller.extend({
      * @param {Object} rangeOption - the selected range object
      */
     onRangeOptionClick(rangeOption) {
-      const rangeFormat = 'YYYY-MM-DD';
+      const rangeFormat = 'YYYY-MM-DD HH:mm';
       const defaultEndDate = buildDateEod(1, 'day').valueOf();
       const timeRangeOptions = this.get('timeRangeOptions');
+      const duration = rangeOption.value;
+      const startDate = moment(rangeOption.start).valueOf();
+      const endDate = moment(defaultEndDate).valueOf();
 
       if (rangeOption.value !== 'custom') {
         // Set date picker defaults to new start/end dates
@@ -317,12 +295,31 @@ export default Controller.extend({
         // Reset options and highlight selected one
         timeRangeOptions.forEach(op => set(op, 'isActive', false));
         set(rangeOption, 'isActive', true);
+        setDuration(duration, startDate, endDate);
         // Reload model according to new timerange
-        this.transitionToRoute({ queryParams: {
-          duration: rangeOption.value,
-          startDate: rangeOption.start,
-          endDate: buildDateEod(1, 'day').valueOf()
-        }});
+        this.transitionToRoute({ queryParams: { mode: 'explore', duration, startDate, endDate }});
+      }
+    },
+
+    /**
+     * This field will not accept empty input - default back to the original value
+     * @method onChangeSeverityValue
+     * @param {String} severity - the custom tuning severity input
+     */
+    onChangeSeverityValue(severity) {
+      if (!isPresent(severity)) {
+        this.set('customPercentChange', this.model.customPercentChange);
+      }
+    },
+
+    /**
+     * This field will not accept empty input - default back to the original value
+     * @method onChangeMttdValue
+     * @param {String} mttd - the custom tuning mttd input
+     */
+    onChangeMttdValue(mttd) {
+      if (!isPresent(mttd)) {
+        this.set('customMttdChange', this.model.customMttdChange);
       }
     },
 
@@ -333,18 +330,16 @@ export default Controller.extend({
      * @param {String} end    - stringified end date
      */
     onRangeSelection(start, end) {
+      const duration = 'custom';
+      const startDate = moment(start).valueOf();
+      const endDate = moment(end).valueOf();
       const timeRangeOptions = this.get('timeRangeOptions');
       const currOption = timeRangeOptions.find(option => option.value === 'custom');
       // Toggle time reange button states to highlight the current one
       timeRangeOptions.forEach(op => set(op, 'isActive', false));
       set(currOption, 'isActive', true);
-      // Reload model according to new timerange
-      this.transitionToRoute({ queryParams: {
-        mode: 'explore',
-        duration: 'custom',
-        startDate: moment(start).valueOf(),
-        endDate: moment(end).valueOf()
-      }});
+      setDuration(duration, startDate, endDate);
+      this.transitionToRoute({ queryParams: { mode: 'explore', duration, startDate, endDate }});
     },
 
     /**

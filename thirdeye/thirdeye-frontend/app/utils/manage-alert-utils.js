@@ -1,6 +1,7 @@
 import Ember from 'ember';
 import _ from 'lodash';
 import moment from 'moment';
+import { isPresent } from "@ember/utils";
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
 
 /**
@@ -271,7 +272,7 @@ export function buildAnomalyStats(alertEvalMetrics, anomalyStats, showProjected 
     stat.showProjected = showProjected;
     stat.value = isTotal ? origData : formatEvalMetric(origData, isPercentageMetric);
     stat.valueUnits = isFinite(origData) ? stat.units : null;
-    if (newData) {
+    if (isPresent(newData)) {
       stat.projected = isTotal ? newData : formatEvalMetric(newData, isPercentageMetric);
       stat.projectedUnits = isFinite(newData) ? stat.units : null;
       stat.showDirectionIcon = isFinite(origData) && isFinite(newData) && origData !== newData;
@@ -280,6 +281,29 @@ export function buildAnomalyStats(alertEvalMetrics, anomalyStats, showProjected 
   });
 
   return anomalyStats;
+}
+
+/**
+ * Caches duration data to local storage in order to persist it across pages
+ * TODO: Move this to self-serve services
+ * @method setDuration
+ * @param {String} duration - qualifies duration set as 'custom' or a range key like '3m'
+ * @param {Number} startDate - start date for alert page (and list of anomalies)
+ * @param {Number} endDate - end date for alert page (and list of anomalies)
+ * @return {undefined}
+ */
+export function setDuration(duration, startDate, endDate) {
+  localStorage.setItem('duration', JSON.stringify({ duration, startDate, endDate }));
+}
+
+/**
+ * Retrieves duration data from local storage in order to persist it across pages
+ * TODO: Move this to self-serve services
+ * @method getDuration
+ * @return {Object}
+ */
+export function getDuration() {
+  return JSON.parse(localStorage.getItem('duration'));
 }
 
 /**
@@ -307,5 +331,7 @@ export default {
   buildAnomalyStats,
   buildMetricDataUrl,
   extractSeverity,
+  setDuration,
+  getDuration,
   evalObj
 };

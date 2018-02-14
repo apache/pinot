@@ -6,12 +6,11 @@
 import RSVP from "rsvp";
 import _ from 'lodash';
 import fetch from 'fetch';
-import moment from 'moment';
 import Controller from '@ember/controller';
 import { computed, set } from '@ember/object';
 import { task, timeout } from 'ember-concurrency';
 import { isPresent, isEmpty, isNone, isBlank } from "@ember/utils";
-import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import { buildMetricDataUrl, getTopDimensions } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Controller.extend({
@@ -411,7 +410,6 @@ export default Controller.extend({
   isSubmitDisabled: computed(
     'selectedMetricOption',
     'selectedPattern',
-    'selectedWeeklyEffect',
     'alertFunctionName',
     'selectedAppName',
     'selectedConfigGroup',
@@ -509,7 +507,7 @@ export default Controller.extend({
   modifyAlertFunctionName() {
     const {
       functionNamePrimer,
-      isAlertNameUserModified,
+      isAlertNameUserModified
     } = this.getProperties('functionNamePrimer', 'isAlertNameUserModified');
     // If user has not yet edited the alert name, continue to auto-generate it.
     if (!isAlertNameUserModified) {
@@ -627,9 +625,7 @@ export default Controller.extend({
     'selectedMetricOption',
     'selectedDimension',
     'selectedFilters',
-    'selectedPattern',
     'selectedGranularity',
-    'selectedWeeklyEffect',
     'selectedConfigGroup',
     'newConfigGroupName',
     'alertGroupNewRecipient',
@@ -641,9 +637,7 @@ export default Controller.extend({
         selectedMetricOption,
         selectedDimension,
         selectedFilters,
-        selectedPattern,
         selectedGranularity,
-        selectedWeeklyEffect,
         selectedConfigGroup,
         newConfigGroupName,
         alertGroupNewRecipient,
@@ -654,9 +648,7 @@ export default Controller.extend({
         'selectedMetricOption',
         'selectedDimension',
         'selectedFilters',
-        'selectedPattern',
         'selectedGranularity',
-        'selectedWeeklyEffect',
         'selectedConfigGroup',
         'newConfigGroupName',
         'alertGroupNewRecipient',
@@ -746,7 +738,7 @@ export default Controller.extend({
       isAlertNameDuplicate: false,
       graphEmailLinkProps: '',
       bsAlertBannerType: 'success',
-      selectedFilters: JSON.stringify({}),
+      selectedFilters: JSON.stringify({})
     });
     this.send('refreshModel');
   },
@@ -755,7 +747,6 @@ export default Controller.extend({
    * Actions for create alert form view
    */
   actions: {
-
 
     /**
      * Handles the primary metric selection in the alert creation
@@ -939,12 +930,12 @@ export default Controller.extend({
             isDuplicateName = true;
           }
         }
-      // If the user edits the alert name, we want to stop auto-generating it.
-      if (userModified) {
-        this.set('isAlertNameUserModified', true);
-      }
-      // Either add or clear the "is duplicate name" banner
-      this.set('isAlertNameDuplicate', isDuplicateName);
+        // If the user edits the alert name, we want to stop auto-generating it.
+        if (userModified) {
+          this.set('isAlertNameUserModified', true);
+        }
+        // Either add or clear the "is duplicate name" banner
+        this.set('isAlertNameDuplicate', isDuplicateName);
       });
     },
 

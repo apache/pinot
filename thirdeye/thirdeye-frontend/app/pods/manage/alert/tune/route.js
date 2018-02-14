@@ -9,8 +9,9 @@ import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
 import { isPresent } from "@ember/utils";
+import { later } from "@ember/runloop";
 import { checkStatus, postProps, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
-import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups, extractSeverity } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups, extractSeverity, getDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 /**
  * Basic alert page defaults
@@ -18,6 +19,7 @@ import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups, extractSeverity } 
 const durationDefault = '3m';
 const defaultSeverity = '0.3';
 const dateFormat = 'YYYY-MM-DD';
+const displayDateFormat = 'YYYY-MM-DD HH:mm';
 const startDateDefault = buildDateEod(3, 'month').valueOf();
 const endDateDefault = moment().valueOf();
 
@@ -228,7 +230,7 @@ export default Route.extend({
   beforeModel(transition) {
     const { duration, startDate } = transition.queryParams;
 
-    // Default to 1 month of anomalies to show if no dates present in query params
+    // Default to 3 months of anomalies to show if no dates present in query params
     if (!duration || (duration !== 'custom' && duration !== '3m') || !startDate) {
       this.transitionTo({ queryParams: {
         duration: durationDefault,
@@ -241,12 +243,8 @@ export default Route.extend({
   model(params, transition) {
     const { id, alertData } = this.modelFor('manage.alert');
     if (!id) { return; }
-
-    const {
-      duration,
-      startDate,
-      endDate
-    } = transition.queryParams;
+    // Fetch saved duration data
+    const { duration, startDate, endDate } = getDuration();
 
     // Prepare endpoints for the initial eval, mttd, projected metrics calls
     const tuneParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
@@ -285,7 +283,9 @@ export default Route.extend({
       alertData,
       duration,
       loadError,
-      alertEvalMetrics,
+      startDate,
+      endDate,
+      alertEvalMetrics
     } = model;
 
     // Conditionally add select option for severity
@@ -300,6 +300,7 @@ export default Route.extend({
       customPercentChange,
       customMttdChange
     } = processDefaultTuningParams(alertData);
+    Object.assign(model, { customPercentChange, customMttdChange });
 
     controller.setProperties({
       alertData,
@@ -317,6 +318,14 @@ export default Route.extend({
       timeRangeOptions: setUpTimeRangeOptions([durationDefault], duration)
     });
     controller.initialize();
+
+    // Ensure date range picker gets populated correctly
+    later(this, () => {
+      controller.setProperties({
+        activeRangeStart: moment(Number(startDate)).format(displayDateFormat),
+        activeRangeEnd: moment(Number(endDate)).format(displayDateFormat)
+      });
+    });
   },
 
   resetController(controller, isExiting) {
