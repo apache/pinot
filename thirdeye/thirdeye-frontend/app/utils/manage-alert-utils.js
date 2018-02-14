@@ -1,6 +1,7 @@
 import Ember from 'ember';
 import _ from 'lodash';
 import moment from 'moment';
+import { isPresent } from "@ember/utils";
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
 
 /**
@@ -271,7 +272,7 @@ export function buildAnomalyStats(alertEvalMetrics, anomalyStats, showProjected 
     stat.showProjected = showProjected;
     stat.value = isTotal ? origData : formatEvalMetric(origData, isPercentageMetric);
     stat.valueUnits = isFinite(origData) ? stat.units : null;
-    if (newData) {
+    if (isPresent(newData)) {
       stat.projected = isTotal ? newData : formatEvalMetric(newData, isPercentageMetric);
       stat.projectedUnits = isFinite(newData) ? stat.units : null;
       stat.showDirectionIcon = isFinite(origData) && isFinite(newData) && origData !== newData;

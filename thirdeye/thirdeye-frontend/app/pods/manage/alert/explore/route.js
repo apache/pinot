@@ -7,10 +7,10 @@ import RSVP from "rsvp";
 import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
-import { later } from "@ember/runloop"
+import { later } from "@ember/runloop";
 import { set, get, setProperties } from '@ember/object';
-import { isPresent, isEmpty, isNone, isBlank } from "@ember/utils";
-import { checkStatus, postProps, parseProps, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
+import { isPresent } from "@ember/utils";
+import { checkStatus, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
 import { enhanceAnomalies, toIdGroups, setUpTimeRangeOptions, getTopDimensions, buildMetricDataUrl, extractSeverity, getDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 /**
@@ -349,10 +349,10 @@ export default Route.extend({
     controller.initialize();
 
     // Ensure date range picker gets populated correctly
-    later(this, function() {
+    later(this, () => {
       controller.setProperties({
-        activeRangeStart: moment(config.startStamp).format(this.get('displayDateFormat')),
-        activeRangeEnd: moment(config.endStamp).format(this.get('displayDateFormat')),
+        activeRangeStart: moment(config.startStamp).format(displayDateFormat),
+        activeRangeEnd: moment(config.endStamp).format(displayDateFormat)
       });
     });
 

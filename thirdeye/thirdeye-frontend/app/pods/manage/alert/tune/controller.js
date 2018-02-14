@@ -6,7 +6,7 @@
 import _ from 'lodash';
 import Controller from '@ember/controller';
 import moment from 'moment';
-import { isNone, isPresent } from "@ember/utils"
+import { isPresent } from "@ember/utils";
 import { computed, set } from '@ember/object';
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
 import { buildAnomalyStats, setDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
@@ -158,23 +158,17 @@ export default Controller.extend({
   anomalyStats: computed(
     'alertEvalMetrics',
     'isTuneAmountPercent',
-    'isTunePreviewActive',
     'customPercentChange',
-    'selectedSeverityOption',
     'alertEvalMetrics.projected',
     function() {
       const {
         isTuneAmountPercent,
-        isTunePreviewActive,
         alertEvalMetrics: metrics,
-        customPercentChange: severity,
-        selectedSeverityOption
+        customPercentChange: severity
       } = this.getProperties(
         'isTuneAmountPercent',
-        'isTunePreviewActive',
         'alertEvalMetrics',
-        'customPercentChange',
-        'selectedSeverityOption'
+        'customPercentChange'
       );
       const severityUnit = isTuneAmountPercent ? '%' : '';
       const isPerfDataReady = _.has(metrics, 'current');

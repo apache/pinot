@@ -9,9 +9,9 @@ import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
 import { isPresent } from "@ember/utils";
-import { later } from "@ember/runloop"
+import { later } from "@ember/runloop";
 import { checkStatus, postProps, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
-import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups, extractSeverity, setDuration, getDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { enhanceAnomalies, setUpTimeRangeOptions, toIdGroups, extractSeverity, getDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 /**
  * Basic alert page defaults
@@ -285,7 +285,7 @@ export default Route.extend({
       loadError,
       startDate,
       endDate,
-      alertEvalMetrics,
+      alertEvalMetrics
     } = model;
 
     // Conditionally add select option for severity
@@ -320,10 +320,10 @@ export default Route.extend({
     controller.initialize();
 
     // Ensure date range picker gets populated correctly
-    later(this, function() {
+    later(this, () => {
       controller.setProperties({
-        activeRangeStart: moment(Number(startDate)).format(this.get('displayDateFormat')),
-        activeRangeEnd: moment(Number(endDate)).format(this.get('displayDateFormat')),
+        activeRangeStart: moment(Number(startDate)).format(displayDateFormat),
+        activeRangeEnd: moment(Number(endDate)).format(displayDateFormat)
       });
     });
   },
