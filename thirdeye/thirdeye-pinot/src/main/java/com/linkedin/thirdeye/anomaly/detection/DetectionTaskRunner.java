@@ -175,6 +175,10 @@ public class DetectionTaskRunner implements TaskRunner {
 
     DataFilter dataFilter = DataFilterFactory.fromSpec(anomalyFunctionSpec.getDataFilter());
     for (DimensionMap dimensionMap : anomalyDetectionInputContext.getDimensionMapMetricTimeSeriesMap().keySet()) {
+      if (Thread.interrupted()) {
+        throw new IllegalStateException("Thread interrupted. Aborting.");
+      }
+
       // Skip anomaly detection if the current time series does not pass data filter, which may check if the traffic
       // or total count of the data has enough volume for produce sufficient confidence anomaly results
       MetricTimeSeries metricTimeSeries =
