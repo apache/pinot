@@ -252,6 +252,25 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.COMMITTED);
   }
 
+  @Test
+  public void testSegmentBuildException() throws Exception {
+    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    final long endOffset = _startOffset + 500;
+    // We should consume initially...
+    segmentDataManager._consumeOffsets.add(endOffset);
+    final SegmentCompletionProtocol.Response commitResponse = new SegmentCompletionProtocol.Response(
+        new SegmentCompletionProtocol.Response.Params().withOffset(endOffset).withStatus(
+            SegmentCompletionProtocol.ControllerResponseStatus.COMMIT));
+    segmentDataManager._responses.add(commitResponse);
+    segmentDataManager._failSegmentBuild = true;
+
+    consumer.run();
+    Assert.assertTrue(segmentDataManager._buildSegmentCalled);
+    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.ERROR);
+  }
+
+
   // Test hold, catchup. hold, commit
   @Test
   public void testCommitAfterCatchup() throws Exception {
@@ -627,6 +646,7 @@ public class LLRealtimeSegmentDataManagerTest {
     public LinkedList<SegmentCompletionProtocol.Response> _responses = new LinkedList<>();
     public boolean _commitSegmentCalled = false;
     public boolean _buildSegmentCalled = false;
+    public boolean _failSegmentBuild = false;
     public boolean _buildAndReplaceCalled = false;
     public int _stopWaitTimeMs = 100;
     private boolean _downloadAndReplaceCalled = false;
@@ -760,6 +780,9 @@ public class LLRealtimeSegmentDataManagerTest {
     @Override
     protected String buildSegmentInternal(boolean forCommit) {
       _buildSegmentCalled = true;
+      if (_failSegmentBuild) {
+        return null;
+      }
       if (!forCommit) {
         return _segmentDir;
       }
