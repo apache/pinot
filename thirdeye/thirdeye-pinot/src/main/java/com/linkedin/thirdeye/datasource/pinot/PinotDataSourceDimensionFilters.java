@@ -47,8 +47,15 @@ public class PinotDataSourceDimensionFilters {
    * @return dimension filters map
    */
   public Map<String, List<String>> getDimensionFilters(String dataset) {
-    DateTime startDateTime = new DateTime(System.currentTimeMillis()).minusDays(7);
-    DateTime endDateTime = new DateTime(System.currentTimeMillis());
+    long maxTime = System.currentTimeMillis();
+    try {
+      maxTime = this.pinotThirdEyeDataSource.getMaxDataTime(dataset);
+    } catch (Exception e) {
+      // left blank
+    }
+
+    DateTime endDateTime = new DateTime(maxTime);
+    DateTime startDateTime = endDateTime.minusDays(7);
 
     Map<String, List<String>> filters = null;
     try {
