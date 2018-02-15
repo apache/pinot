@@ -32,6 +32,9 @@ import org.slf4j.LoggerFactory;
 public class ClusterStateVerifier extends PinotZKChanger {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterStateVerifier.class);
 
+  private static int MIN_SLEEP_BETWEEN_CHECKS_MILLIS = 100;
+  private static int MAX_SLEEP_BETWEEN_CHECKS_MILLIS = 30_000;
+
   public ClusterStateVerifier(String zkAddress, String clusterName) {
     super(zkAddress, clusterName);
   }
@@ -47,8 +50,8 @@ public class ClusterStateVerifier extends PinotZKChanger {
     final ExecutorService executor = Executors.newSingleThreadExecutor();
     final Future<Boolean> future = executor.submit(new Callable<Boolean>() {
       @Override
-      public Boolean call() {
-        return isClusterStable(tableNames);
+      public Boolean call() throws Exception {
+        return waitForClusterStable(tableNames, timeoutSec);
       }
     });
 
@@ -74,18 +77,42 @@ public class ClusterStateVerifier extends PinotZKChanger {
    * @param tableNames list of table names which are about to scan
    * @return
    */
-  private boolean isClusterStable(final List<String> tableNames) {
-    LOGGER.info("Start scanning the stability of all the tables... Num of tables: {}", tableNames.size());
-    int numUnstablePartitions = 0;
-    for (String tableName : tableNames) {
-      numUnstablePartitions = super.isStable(tableName);
-      if (numUnstablePartitions != 0) {
-        LOGGER.error("Attention: Table {} is not stable. numUnstablePartitions: {} ", tableName, numUnstablePartitions);
-        break;
+  private boolean waitForClusterStable(final List<String> tableNames, final long timeoutSec)
+      throws InterruptedException{
+    final long startTimeMillis = System.currentTimeMillis();
+    final long maxEndTimeMillis = startTimeMillis + TimeUnit.MILLISECONDS.convert(timeoutSec, TimeUnit.SECONDS);
+
+    boolean stable = false;
+    int iteration = 0;
+    long sleepTimeMillis = (maxEndTimeMillis - startTimeMillis)/10;
+    if (sleepTimeMillis < MIN_SLEEP_BETWEEN_CHECKS_MILLIS) {
+      sleepTimeMillis = MIN_SLEEP_BETWEEN_CHECKS_MILLIS;
+    } else if (sleepTimeMillis > MAX_SLEEP_BETWEEN_CHECKS_MILLIS) {
+      sleepTimeMillis = MAX_SLEEP_BETWEEN_CHECKS_MILLIS;
+    }
+
+    while (!stable) {
+      iteration++;
+      LOGGER.info("Start scanning the stability of {} tables, iteration {}",
+          tableNames.size(), iteration);
+      int numUnstablePartitions = 0;
+      for (String tableName : tableNames) {
+        numUnstablePartitions = super.isStable(tableName);
+        if (numUnstablePartitions != 0) {
+          LOGGER.error("Table {} is not stable. numUnstablePartitions: {} ", tableName, numUnstablePartitions);
+          break;
+        }
+      }
+      stable = (numUnstablePartitions == 0);
+      if (!stable) {
+        if (System.currentTimeMillis() >= maxEndTimeMillis) {
+          break;
+        }
+        Thread.sleep(sleepTimeMillis);
       }
     }
-    LOGGER.info("Finish scanning.");
-    return numUnstablePartitions == 0;
+    LOGGER.info("Finished scanning.");
+    return stable;
   }
 
   /**
