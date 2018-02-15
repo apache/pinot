@@ -27,6 +27,7 @@ export default Component.extend({
   didReceiveAttrs() {
     const { selectedUrn, anomalyRange } = getProperties(this, 'selectedUrn', 'anomalyRange');
 
+    // if no metric selected, reset to null
     if (!selectedUrn || !anomalyRange || !selectedUrn.startsWith('thirdeye:metric:')) {
       this.setProperties({ maxTime: null });
       return;

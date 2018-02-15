@@ -15,55 +15,38 @@ const ROOTCAUSE_SETUP_MODE_NONE = "none";
  * converts RCA backend granularity strings into units understood by moment.js
  */
 const toMetricGranularity = (attrGranularity) => {
-  let [count, unit] = attrGranularity.split('_');
+  const UNIT_MAPPING = {
+    MINUTES: 'minute',
+    HOURS: 'hour',
+    DAYS: 'day'
+  };
 
-  switch (unit) {
-    case 'MINUTES':
-      unit = 'minute';
-      break;
-
-    case 'HOURS':
-      unit = 'hour';
-      break;
-
-    case 'DAYS':
-      unit = 'day';
-      break;
-  }
-
-  return [parseInt(count, 10), unit];
+  const [count, unit] = attrGranularity.split('_');
+  return [parseInt(count, 10), UNIT_MAPPING[unit]];
 };
 
 /**
  * Returns the anomaly time range offset (in granularity units) based on metric granularity
  */
 const toAnomalyOffset = (granularity) => {
-  switch (granularity[1]) {
-    case 'minute':
-      return -30;
-    case 'hour':
-      return -3;
-    case 'day':
-      return -1;
-    default:
-      return -1;
-  }
+  const UNIT_MAPPING = {
+    minute: -30,
+    hour: -3,
+    day: -1
+  };
+  return UNIT_MAPPING[granularity[1]] || -1;
 };
 
 /**
  * Returns the analysis time range offset (in days) based on metric granularity
  */
 const toAnalysisOffset = (granularity) => {
-  switch (granularity[1]) {
-    case 'minute':
-      return -1;
-    case 'hour':
-      return -3;
-    case 'day':
-      return -7;
-    default:
-      return -1;
-  }
+  const UNIT_MAPPING = {
+    minute: -1,
+    hour: -3,
+    day: -7
+  };
+  return UNIT_MAPPING[granularity[1]] || -1;
 };
 
 export default Ember.Route.extend(AuthenticatedRouteMixin, {
@@ -91,7 +74,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
     if (metricId) {
       metricUrn = `thirdeye:metric:${metricId}`;
-      metricEntity = fetch(`/rootcause/raw?framework=identity&urns=${metricUrn}`).then(checkStatus).then(res => res[0]).catch(() => undefined);
+      metricEntity = fetch(`/rootcause/raw?framework=identity&urns=${metricUrn}`).then(checkStatus).then(res => res[0]).catch(() => {});
     }
 
     if (anomalyId) {
@@ -99,12 +82,12 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     }
 
     if (sessionId) {
-      session = fetch(`/session/${sessionId}`).then(checkStatus).catch(() => undefined);
+      session = fetch(`/session/${sessionId}`).then(checkStatus).catch(() => {});
     }
 
     if (anomalyUrn) {
-      anomalyContext = fetch(`/rootcause/raw?framework=anomalyContext&urns=${anomalyUrn}`).then(checkStatus).catch(() => undefined);
-      anomalySessions = fetch(`/session/query?anomalyId=${anomalyId}`).then(checkStatus).catch(() => undefined);
+      anomalyContext = fetch(`/rootcause/raw?framework=anomalyContext&urns=${anomalyUrn}`).then(checkStatus).catch(() => {});
+      anomalySessions = fetch(`/session/query?anomalyId=${anomalyId}`).then(checkStatus).catch(() => {});
     }
 
     return RSVP.hash({

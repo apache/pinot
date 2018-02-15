@@ -633,10 +633,12 @@ export default Ember.Controller.extend({
 
     const newSelectedUrns = new Set(selectedUrns);
 
-    const contextMetricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
-    contextMetricUrns.forEach(urn => newSelectedUrns.add(urn));
-    contextMetricUrns.map(toCurrentUrn).forEach(urn => newSelectedUrns.add(urn));
-    contextMetricUrns.map(toBaselineUrn).forEach(urn => newSelectedUrns.add(urn));
+    filterPrefix(context.urns, 'thirdeye:metric:')
+      .forEach(urn => {
+        newSelectedUrns.add(urn);
+        newSelectedUrns.add(toCurrentUrn(urn));
+        newSelectedUrns.add(toBaselineUrn(urn));
+      });
 
     // events
     const groupedEvents = Object.values(entities)
@@ -648,20 +650,22 @@ export default Ember.Controller.extend({
         return agg;
       }, {});
 
+    // add events passing threshold
     Object.values(groupedEvents)
       .forEach(arr => {
-        const topk = arr.filter(e => e.score >= ROOTCAUSE_SETUP_EVENTS_SCORE_THRESHOLD);
-        topk.forEach(e => newSelectedUrns.add(e.urn));
+        arr
+          .filter(e => e.score >= ROOTCAUSE_SETUP_EVENTS_SCORE_THRESHOLD)
+          .forEach(e => newSelectedUrns.add(e.urn));
       });
 
     // metrics
-    const metricUrns = filterPrefix(Object.keys(entities), 'thirdeye:metric:')
-      .filter(urn => urn in scores)
-      .filter(urn => scores[urn] >= ROOTCAUSE_SETUP_METRICS_SCORE_THRESHOLD);
-
-    metricUrns.forEach(urn => newSelectedUrns.add(urn));
-    metricUrns.map(toCurrentUrn).forEach(urn => newSelectedUrns.add(urn));
-    metricUrns.map(toBaselineUrn).forEach(urn => newSelectedUrns.add(urn));
+    filterPrefix(Object.keys(entities), 'thirdeye:metric:')
+      .filter(urn => (urn in scores) && (scores[urn] >= ROOTCAUSE_SETUP_METRICS_SCORE_THRESHOLD))
+      .forEach(urn => {
+        newSelectedUrns.add(urn);
+        newSelectedUrns.add(toCurrentUrn(urn));
+        newSelectedUrns.add(toBaselineUrn(urn));
+      });
 
     if (_.isEqual(selectedUrns, newSelectedUrns)) { return; }
 
