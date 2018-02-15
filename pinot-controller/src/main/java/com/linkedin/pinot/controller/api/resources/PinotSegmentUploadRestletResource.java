@@ -69,6 +69,8 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.container.AsyncResponse;
+import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
@@ -81,6 +83,7 @@ import org.apache.helix.model.IdealState;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
+import org.glassfish.jersey.server.ManagedAsync;
 import org.joda.time.Interval;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -239,26 +242,36 @@ public class PinotSegmentUploadRestletResource {
   }
 
   @POST
+  @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/segments")
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
-  public SuccessResponse uploadSegmentAsMultiPart(FormDataMultiPart multiPart,
+  public void uploadSegmentAsMultiPart(FormDataMultiPart multiPart,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
-      @Context HttpHeaders headers, @Context Request request) {
-    return uploadSegmentInternal(multiPart, null, enableParallelPushProtection, headers, request);
+      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+    try {
+      asyncResponse.resume(uploadSegmentInternal(multiPart, null, enableParallelPushProtection, headers, request));
+    } catch (Throwable t) {
+      asyncResponse.resume(t);
+    }
   }
 
   @POST
+  @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/segments")
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
   // TODO Does it even work if the segment is sent as a JSON body? Need to compare with the other API
-  public SuccessResponse uploadSegmentAsJson(String segmentJsonStr,    // If segment is present as json body
+  public void uploadSegmentAsJson(String segmentJsonStr,    // If segment is present as json body
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
-      @Context HttpHeaders headers, @Context Request request) {
-    return uploadSegmentInternal(null, segmentJsonStr, enableParallelPushProtection, headers, request);
+      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+    try {
+      asyncResponse.resume(uploadSegmentInternal(null, segmentJsonStr, enableParallelPushProtection, headers, request));
+    } catch (Throwable t) {
+      asyncResponse.resume(t);
+    }
   }
 
   private SuccessResponse uploadSegmentInternal(FormDataMultiPart multiPart, String segmentJsonStr,

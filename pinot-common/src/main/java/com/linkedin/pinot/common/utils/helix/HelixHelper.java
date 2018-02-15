@@ -17,20 +17,18 @@ package com.linkedin.pinot.common.utils.helix;
 
 import com.google.common.base.Function;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.SegmentAssignmentStrategyType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import javax.annotation.Nullable;
+import org.I0Itec.zkclient.exception.ZkBadVersionException;
 import org.apache.helix.AccessOption;
-import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -58,9 +56,6 @@ public class HelixHelper {
 
   public static final String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
 
-  public static final Map<String, SegmentAssignmentStrategyType> SEGMENT_ASSIGNMENT_STRATEGY_MAP =
-      new HashMap<String, SegmentAssignmentStrategyType>();
-
   /**
    * Updates the ideal state, retrying if necessary in case of concurrent updates to the ideal state.
    *
@@ -68,6 +63,7 @@ public class HelixHelper {
    * @param resourceName The resource for which to update the ideal state
    * @param updater A function that returns an updated ideal state given an input ideal state
    */
+  // TODO: since updater always update ideal state in place, it should return boolean indicating whether the ideal state get changed.
   public static void updateIdealState(final HelixManager helixManager, final String resourceName,
       final Function<IdealState, IdealState> updater, RetryPolicy policy) {
     try {
@@ -75,52 +71,50 @@ public class HelixHelper {
         @Override
         public Boolean call() {
           HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
-          PropertyKey propertyKey = dataAccessor.keyBuilder().idealStates(resourceName);
+          PropertyKey idealStateKey = dataAccessor.keyBuilder().idealStates(resourceName);
+          IdealState idealState = dataAccessor.getProperty(idealStateKey);
 
-          // Create an updated version of the ideal state
-          IdealState idealState = dataAccessor.getProperty(propertyKey);
-          PropertyKey key = dataAccessor.keyBuilder().idealStates(resourceName);
-          String path = key.getPath();
-          // Make a copy of the the idealState above to pass it to the updater, instead of querying again,
-          // as the state my change between the queries.
+          // Make a copy of the the idealState above to pass it to the updater
+          // NOTE: new IdealState(idealState.getRecord()) does not work because it's shallow copy for map fields and
+          // list fields
           ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
           IdealState idealStateCopy = new IdealState(
               (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
-          IdealState updatedIdealState;
 
+          IdealState updatedIdealState;
           try {
             updatedIdealState = updater.apply(idealStateCopy);
           } catch (Exception e) {
-            LOGGER.error("Caught exception while updating ideal state", e);
+            LOGGER.error("Caught exception while updating ideal state for resource: {}", resourceName, e);
             return false;
           }
 
           // If there are changes to apply, apply them
           if (!EqualityUtils.isEqual(idealState, updatedIdealState) && updatedIdealState != null) {
-            BaseDataAccessor<ZNRecord> baseDataAccessor = dataAccessor.getBaseDataAccessor();
-            boolean success;
 
             // If the ideal state is large enough, enable compression
             if (MAX_PARTITION_COUNT_IN_UNCOMPRESSED_IDEAL_STATE < updatedIdealState.getPartitionSet().size()) {
               updatedIdealState.getRecord().setBooleanField("enableCompression", true);
             }
 
+            // Check version and set ideal state
             try {
-              success =
-                  baseDataAccessor.set(path, updatedIdealState.getRecord(), idealState.getRecord().getVersion(),
-                      AccessOption.PERSISTENT);
-            } catch (Exception e) {
-              boolean idealStateIsCompressed = updatedIdealState.getRecord().getBooleanField("enableCompression", false);
-
-              LOGGER.warn("Caught exception while updating ideal state for resource {} (compressed={}), retrying.",
-                  resourceName, idealStateIsCompressed, e);
+              if (dataAccessor.getBaseDataAccessor()
+                  .set(idealStateKey.getPath(), updatedIdealState.getRecord(), idealState.getRecord().getVersion(),
+                      AccessOption.PERSISTENT)) {
+                return true;
+              } else {
+                LOGGER.warn("Failed to update ideal state for resource: {}", resourceName);
+                return false;
+              }
+            } catch (ZkBadVersionException e) {
+              LOGGER.warn("Version changed while updating ideal state for resource: {}", resourceName);
               return false;
-            }
-
-            if (success) {
-              return true;
-            } else {
-              LOGGER.warn("Failed to update ideal state for resource {}, retrying.", resourceName);
+            } catch (Exception e) {
+              boolean idealStateIsCompressed =
+                  updatedIdealState.getRecord().getBooleanField("enableCompression", false);
+              LOGGER.warn("Caught exception while updating ideal state for resource: {} (compressed={})", resourceName,
+                  idealStateIsCompressed, e);
               return false;
             }
           } else {
@@ -359,38 +353,36 @@ public class HelixHelper {
    * Add the new specified segment to the idealState of the specified table in the specified cluster.
    *
    * @param helixManager The HelixManager object to access the helix cluster.
-   * @param tableName Name of the table to which the new segment is to be added.
+   * @param tableNameWithType Name of the table to which the new segment is to be added.
    * @param segmentName Name of the new segment to be added
-   * @param getInstancesForSegment Callable returning list of instances where the segment should be uploaded.
+   * @param assignedInstances List of assigned instances
    */
-  public static void addSegmentToIdealState(HelixManager helixManager, final String tableName, final String segmentName,
-      final Callable<List<String>> getInstancesForSegment) {
+  public static void addSegmentToIdealState(HelixManager helixManager, final String tableNameWithType,
+      final String segmentName, final List<String> assignedInstances) {
 
     Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
       @Override
       public IdealState apply(IdealState idealState) {
-        List<String> targetInstances = null;
-        try {
-          targetInstances = getInstancesForSegment.call();
-        } catch (Exception e) {
-          LOGGER.error("Unable to get new instances for uploading segment {}, table {}", segmentName, tableName, e);
-          return null;
-        }
-
-        if (targetInstances == null || targetInstances.size() == 0) {
-          LOGGER.warn("No instances assigned for segment {}, table {}", segmentName, tableName);
+        Set<String> partitions = idealState.getPartitionSet();
+        if (partitions.contains(segmentName)) {
+          LOGGER.warn("Segment already exists in the ideal state for segment: {} of table: {}, do not update",
+              segmentName, tableNameWithType);
         } else {
-          for (final String instance : targetInstances) {
-            idealState.setPartitionState(segmentName, instance, ONLINE);
+          if (assignedInstances.isEmpty()) {
+            LOGGER.warn("No instance assigned for segment: {} of table: {}", segmentName, tableNameWithType);
+          } else {
+            int numPartitions = partitions.size() + 1;
+            for (String instance : assignedInstances) {
+              idealState.setPartitionState(segmentName, instance, ONLINE);
+            }
+            idealState.setNumPartitions(numPartitions);
           }
         }
-
-        idealState.setNumPartitions(idealState.getNumPartitions() + 1);
         return idealState;
       }
     };
 
-    updateIdealState(helixManager, tableName, updater, DEFAULT_RETRY_POLICY);
+    updateIdealState(helixManager, tableNameWithType, updater, DEFAULT_RETRY_POLICY);
   }
 
   public static List<String> getEnabledInstancesWithTag(HelixAdmin helixAdmin, String helixClusterName,
