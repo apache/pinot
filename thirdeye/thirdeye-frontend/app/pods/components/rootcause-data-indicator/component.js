@@ -32,11 +32,9 @@ export default Component.extend({
       return;
     }
 
-    const id = selectedUrn.split(':')[2];
-
-    fetch(`/data/maxDataTime/metricId/${id}`)
+    fetch(`/rootcause/raw?framework=identity&urns=${selectedUrn}`)
       .then(checkStatus)
-      .then(res => setProperties(this, { maxTime: res }));
+      .then(res => setProperties(this, { maxTime: parseInt(res[0].attributes.maxTime[0], 10) }));
   },
 
   /**
