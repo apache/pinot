@@ -37,7 +37,7 @@ const toMetricGranularity = (attrGranularity) => {
 /**
  * Returns the anomaly time range offset (in granularity units) based on metric granularity
  */
-const anomalyOffsetFromGranularity = (granularity) => {
+const toAnomalyOffset = (granularity) => {
   switch (granularity[1]) {
     case 'minute':
       return -30;
@@ -53,7 +53,7 @@ const anomalyOffsetFromGranularity = (granularity) => {
 /**
  * Returns the analysis time range offset (in days) based on metric granularity
  */
-const analysisOffsetFromGranularity = (granularity) => {
+const toAnalysisOffset = (granularity) => {
   switch (granularity[1]) {
     case 'minute':
       return -1;
@@ -206,12 +206,12 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
         const metricGranularity = toMetricGranularity(granularity);
 
         const anomalyRangeEnd = moment(maxTime).startOf(metricGranularity[1]).valueOf();
-        const anomalyRangeStartOffset = anomalyOffsetFromGranularity(metricGranularity);
+        const anomalyRangeStartOffset = toAnomalyOffset(metricGranularity);
         const anomalyRangeStart = moment(anomalyRangeEnd).add(anomalyRangeStartOffset, metricGranularity[1]).valueOf();
         const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
 
         const analysisRangeEnd = moment(anomalyRangeEnd).startOf('day').add(1, 'day').valueOf();
-        const analysisRangeStartOffset = analysisOffsetFromGranularity(metricGranularity);
+        const analysisRangeStartOffset = toAnalysisOffset(metricGranularity);
         const analysisRangeStart = moment(anomalyRangeEnd).add(analysisRangeStartOffset, 'day').valueOf();
         const analysisRange = [analysisRangeStart, analysisRangeEnd];
 
@@ -219,7 +219,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
           urns: new Set([metricUrn]),
           anomalyRange,
           analysisRange,
-          granularity,
+          granularity: (granularity === '1_DAYS') ? '1_HOURS' : granularity,
           compareMode,
           anomalyUrns: new Set()
         };
