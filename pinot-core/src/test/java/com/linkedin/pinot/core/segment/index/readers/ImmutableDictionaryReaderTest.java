@@ -97,27 +97,31 @@ public class ImmutableDictionaryReaderTest {
     _stringValues = stringSet.toArray(new String[NUM_VALUES]);
     Arrays.sort(_stringValues);
 
-    boolean[] isSorted = {true};
-    SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, _intValues,
-        new DimensionFieldSpec(INT_COLUMN_NAME, FieldSpec.DataType.INT, true), TEMP_DIR, '\0');
-    dictionaryCreator.build(isSorted);
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, _intValues,
+        new DimensionFieldSpec(INT_COLUMN_NAME, FieldSpec.DataType.INT, true), TEMP_DIR)) {
+      dictionaryCreator.build();
+    }
 
-    dictionaryCreator = new SegmentDictionaryCreator(false, _longValues,
-        new DimensionFieldSpec(LONG_COLUMN_NAME, FieldSpec.DataType.LONG, true), TEMP_DIR, '\0');
-    dictionaryCreator.build(isSorted);
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, _longValues,
+        new DimensionFieldSpec(LONG_COLUMN_NAME, FieldSpec.DataType.LONG, true), TEMP_DIR)) {
+      dictionaryCreator.build();
+    }
 
-    dictionaryCreator = new SegmentDictionaryCreator(false, _floatValues,
-        new DimensionFieldSpec(FLOAT_COLUMN_NAME, FieldSpec.DataType.FLOAT, true), TEMP_DIR, '\0');
-    dictionaryCreator.build(isSorted);
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, _floatValues,
+        new DimensionFieldSpec(FLOAT_COLUMN_NAME, FieldSpec.DataType.FLOAT, true), TEMP_DIR)) {
+      dictionaryCreator.build();
+    }
 
-    dictionaryCreator = new SegmentDictionaryCreator(false, _doubleValues,
-        new DimensionFieldSpec(DOUBLE_COLUMN_NAME, FieldSpec.DataType.DOUBLE, true), TEMP_DIR, '\0');
-    dictionaryCreator.build(isSorted);
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, _doubleValues,
+        new DimensionFieldSpec(DOUBLE_COLUMN_NAME, FieldSpec.DataType.DOUBLE, true), TEMP_DIR)) {
+      dictionaryCreator.build();
+    }
 
-    dictionaryCreator = new SegmentDictionaryCreator(false, _stringValues,
-        new DimensionFieldSpec(STRING_COLUMN_NAME, FieldSpec.DataType.STRING, true), TEMP_DIR, '\0');
-    dictionaryCreator.build(isSorted);
-    _numBytesPerStringValue = dictionaryCreator.getStringColumnMaxLength();
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, _stringValues,
+        new DimensionFieldSpec(STRING_COLUMN_NAME, FieldSpec.DataType.STRING, true), TEMP_DIR)) {
+      dictionaryCreator.build();
+      _numBytesPerStringValue = dictionaryCreator.getStringColumnMaxLength();
+    }
   }
 
   @Test

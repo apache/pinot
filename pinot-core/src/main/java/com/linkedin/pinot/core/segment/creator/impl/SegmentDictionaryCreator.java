@@ -27,9 +27,6 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
@@ -38,12 +35,12 @@ import org.slf4j.LoggerFactory;
 
 public class SegmentDictionaryCreator implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDictionaryCreator.class);
+  private static final Charset UTF_8 = Charset.forName("UTF-8");
+
   private final Object sortedList;
   private final FieldSpec spec;
   private final File dictionaryFile;
   private final int rowCount;
-  private final char  paddingChar;
-  private static final Charset utf8CharSet = Charset.forName("UTF-8");
 
   private Int2IntOpenHashMap intValueToIndexMap;
   private Long2IntOpenHashMap longValueToIndexMap;
@@ -53,7 +50,7 @@ public class SegmentDictionaryCreator implements Closeable {
 
   private int stringColumnMaxLength = 0;
 
-  public SegmentDictionaryCreator(boolean hasNulls, Object sortedList, FieldSpec spec, File indexDir, char paddingChar)
+  public SegmentDictionaryCreator(boolean hasNulls, Object sortedList, FieldSpec spec, File indexDir)
       throws IOException {
     rowCount = ArrayUtils.getLength(sortedList);
 
@@ -101,7 +98,6 @@ public class SegmentDictionaryCreator implements Closeable {
     }
     this.sortedList = sortedList;
     this.spec = spec;
-    this.paddingChar = paddingChar;
     dictionaryFile = new File(indexDir, spec.getName() + V1Constants.Dict.FILE_EXTENSION);
     FileUtils.touch(dictionaryFile);
   }
@@ -110,7 +106,7 @@ public class SegmentDictionaryCreator implements Closeable {
   public void close() throws IOException {
   }
 
-  public void build(boolean[] isSorted) throws Exception {
+  public void build() throws Exception {
     switch (spec.getDataType()) {
       case INT:
         final FixedByteSingleValueMultiColWriter intDictionaryWrite =
@@ -165,49 +161,25 @@ public class SegmentDictionaryCreator implements Closeable {
         doubleDictionaryWrite.close();
         break;
       case STRING:
-      case BOOLEAN:
-        Object[] sortedObjects = (Object[]) sortedList;
+        // TODO: here we call getBytes() multiple times, could be optimized
+        String[] sortedStrings = (String[]) sortedList;
+
+        // Get the maximum length of all entries
         stringColumnMaxLength = 1; // make sure that there is non-zero sized dictionary JIRA:PINOT-2947
-        for (final Object e : sortedObjects) {
-          String val = e.toString();
-          int length = val.getBytes(utf8CharSet).length;
+        for (String entry : sortedStrings) {
+          int length = entry.getBytes(UTF_8).length;
           if (stringColumnMaxLength < length) {
             stringColumnMaxLength = length;
           }
         }
 
         final FixedByteSingleValueMultiColWriter stringDictionaryWrite =
-            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1,
-                new int[] { stringColumnMaxLength });
-
-        final String[] revised = new String[rowCount];
-        Map<String, String> revisedMap = new HashMap<String, String>();
-        for (int i = 0; i < rowCount; i++) {
-          final String toWrite = sortedObjects[i].toString();
-          String entry = getPaddedString(toWrite, stringColumnMaxLength, paddingChar);
-          revised[i] = entry;
-          if (isSorted[0] && i> 0 && (revised[i-1].compareTo(entry) > 0)) {
-            isSorted[0] = false;
-          }
-          assert (revised[i].getBytes(utf8CharSet).length == stringColumnMaxLength);
-          revisedMap.put(revised[i], toWrite);
-        }
-        if (revisedMap.size() != sortedObjects.length) {
-          // Two strings map to the same padded string in the current column
-          throw new RuntimeException("Number of entries in dictionary != number of unique values in the data in column "
-              + spec.getName());
-        }
-        Arrays.sort(revised);
-
+            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1, new int[]{stringColumnMaxLength});
         stringValueToIndexMap = new Object2IntOpenHashMap<>(rowCount);
-        for (int i = 0; i < revised.length; i++) {
-          stringDictionaryWrite.setString(i, 0, revised[i]);
-
-          // No need to store padded value, we can store and lookup by raw value. In certain cases, original sorted order
-          // may be different from revised sorted order [PINOT-2730], so would need to use the original order in value
-          // to index map.
-          String origString = revisedMap.get(revised[i]);
-          stringValueToIndexMap.put(origString, i);
+        for (int i = 0; i < rowCount; i++) {
+          String entry = sortedStrings[i];
+          stringDictionaryWrite.setString(i, 0, getPaddedString(entry, stringColumnMaxLength));
+          stringValueToIndexMap.put(entry, i);
         }
         stringDictionaryWrite.close();
         break;
@@ -282,23 +254,19 @@ public class SegmentDictionaryCreator implements Closeable {
   }
 
   /**
-   * Given an input string and a target length append the padding characters to the string
-   * to make it of desired length. If length of string >= target length, returns the original string.
-   *
-   * @param inputString
-   * @param targetLength
-   * @param paddingChar should be in range u0000 to u007F, other chars would occupy more than one byte under utf-8
-   * @return
+   * Given an input string and a target length, appends padding characters (<code>'\0'</code>) to the string to make it
+   * of desired length.
    */
-  public static String getPaddedString(String inputString, int targetLength, char paddingChar) {
-    if (inputString.length() >= targetLength) {
+  public static String getPaddedString(String inputString, int targetLength) {
+    byte[] bytes = inputString.getBytes(UTF_8);
+    if (bytes.length == targetLength) {
       return inputString;
     }
 
     StringBuilder stringBuilder = new StringBuilder(inputString);
-    final int padding = targetLength - inputString.getBytes(utf8CharSet).length;
-    for (int i = 0; i < padding; i++) {
-      stringBuilder.append(paddingChar);
+    int numBytesToPad = targetLength - bytes.length;
+    for (int i = 0; i < numBytesToPad; i++) {
+      stringBuilder.append(V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
     }
     return stringBuilder.toString();
   }

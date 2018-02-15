@@ -303,11 +303,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Create dictionary.
     // We will have only one value in the dictionary.
-    SegmentDictionaryCreator segmentDictionaryCreator =
-        new SegmentDictionaryCreator(false/*hasNulls*/, sortedArray, fieldSpec, _indexDir,
-            V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
-    segmentDictionaryCreator.build(new boolean[]{true}/*isSorted*/);
-    segmentDictionaryCreator.close();
+    try (SegmentDictionaryCreator creator = new SegmentDictionaryCreator(false/*hasNulls*/, sortedArray, fieldSpec,
+        _indexDir)) {
+      creator.build();
+    }
 
     // Create forward index.
     if (isSingleValue) {

@@ -24,9 +24,9 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
-import com.linkedin.pinot.startree.hll.HllConfig;
 import com.linkedin.pinot.core.startree.hll.SegmentWithHllIndexCreateHelper;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import com.linkedin.pinot.startree.hll.HllConfig;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.util.Arrays;
@@ -178,7 +178,6 @@ public class ColumnMetadataTest {
   public void testPaddingCharacter() throws Exception {
     // Build the Segment metadata.
     SegmentGeneratorConfig config = CreateSegmentConfigWithoutCreator();
-    config.setPaddingCharacter('\0');
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
