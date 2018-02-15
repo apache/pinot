@@ -608,8 +608,8 @@ export default Ember.Controller.extend({
    * @private
    */
   _setupContext() {
-    const { context, loadingFrameworks, entities, scores } =
-      this.getProperties('context', 'loadingFrameworks', 'entities', 'scores');
+    const { context } =
+      this.getProperties('context');
 
     const contextMetricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
 
@@ -623,6 +623,7 @@ export default Ember.Controller.extend({
 
   /**
    * Select top-scoring entities by default if metric selected for the first time.
+   * Idempotent addition of urns to support multiple execution while data loading.
    *
    * @private
    */

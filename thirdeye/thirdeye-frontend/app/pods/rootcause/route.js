@@ -11,6 +11,61 @@ const ROOTCAUSE_SETUP_MODE_CONTEXT = "context";
 const ROOTCAUSE_SETUP_MODE_SELECTED = "selected";
 const ROOTCAUSE_SETUP_MODE_NONE = "none";
 
+/**
+ * converts RCA backend granularity strings into units understood by moment.js
+ */
+const toGranularity = (attrGranularity) => {
+  let [count, unit] = attrGranularity.split('_');
+
+  switch (unit) {
+    case 'MINUTES':
+      unit = 'minute';
+      break;
+
+    case 'HOURS':
+      unit = 'hour';
+      break;
+
+    case 'DAYS':
+      unit = 'day';
+      break;
+  }
+
+  return [parseInt(count, 10), unit];
+};
+
+/**
+ * Returns the anomaly time range offset (in granularity units) based on metric granularity
+ */
+const anomalyOffsetFromGranularity = (granularity) => {
+  switch (granularity[1]) {
+    case 'minute':
+      return -15;
+    case 'hour':
+      return -3;
+    case 'day':
+      return -1;
+    default:
+      return -1;
+  }
+};
+
+/**
+ * Returns the analysis time range offset (in days) based on metric granularity
+ */
+const analysisOffsetFromGranularity = (granularity) => {
+  switch (granularity[1]) {
+    case 'minute':
+      return -1;
+    case 'hour':
+      return -3;
+    case 'day':
+      return -7;
+    default:
+      return -1;
+  }
+};
+
 export default Ember.Route.extend(AuthenticatedRouteMixin, {
   authService: Ember.inject.service('session'),
 
@@ -32,11 +87,11 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
   model(params) {
     const { metricId, anomalyId, sessionId } = params;
 
-    let metricUrn, metricMaxTime, anomalyUrn, session, anomalyContext, anomalySessions;
+    let metricUrn, metricEntity, anomalyUrn, session, anomalyContext, anomalySessions;
 
     if (metricId) {
       metricUrn = `thirdeye:metric:${metricId}`;
-      metricMaxTime = fetch(`/data/maxDataTime/metricId/${metricId}`).then(checkStatus).catch(() => undefined);
+      metricEntity = fetch(`/rootcause/raw?framework=identity&urns=${metricUrn}`).then(checkStatus).then(res => res[0]).catch(() => undefined);
     }
 
     if (anomalyId) {
@@ -54,7 +109,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
     return RSVP.hash({
       metricId,
-      metricMaxTime,
+      metricEntity,
       anomalyId,
       sessionId,
       metricUrn,
@@ -66,21 +121,30 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
   },
 
   afterModel(model, transition) {
-    const { metricMaxTime } = model;
+    const { metricEntity } = model;
 
-    let time = moment().valueOf();
-    if (metricMaxTime) {
-      time = metricMaxTime;
+    let displayGranularity = '1_HOURS';
+    let granularity = [1, 'hour'];
+    let anomalyRangeEnd = moment().startOf('hour').valueOf();
+    let anomalyRangeStartOffset = -3;
+    let analysisRangeEnd = moment(anomalyRangeEnd).startOf('day').add(1, 'day').valueOf();
+    let analysisRangeStartOffset = -3;
+
+    if (metricEntity) {
+      displayGranularity = metricEntity.attributes.granularity[0];
+      granularity = toGranularity(displayGranularity);
+      anomalyRangeEnd = moment(parseInt(metricEntity.attributes.maxTime[0], 10)).startOf(granularity[1]).valueOf();
+      anomalyRangeStartOffset = anomalyOffsetFromGranularity(granularity);
+      analysisRangeEnd = moment(anomalyRangeEnd).startOf('day').add(1, 'day').valueOf();
+      analysisRangeStartOffset = analysisOffsetFromGranularity(granularity);
     }
 
-    const maxTime = moment(time).startOf('hour').valueOf();
-
     const defaultParams = {
-      anomalyRangeStart:  moment(maxTime).subtract(3, 'hours').valueOf(),
-      anomalyRangeEnd: moment(maxTime).valueOf(),
-      analysisRangeStart: moment(maxTime).endOf('day').subtract(1, 'week').valueOf() + 1,
-      analysisRangeEnd: moment(maxTime).endOf('day').valueOf() + 1,
-      granularity: '1_HOURS',
+      anomalyRangeStart:  moment(anomalyRangeEnd).add(anomalyRangeStartOffset, granularity[1]).valueOf(),
+      anomalyRangeEnd,
+      analysisRangeStart: moment(analysisRangeEnd).add(analysisRangeStartOffset, 'day').valueOf(),
+      analysisRangeEnd,
+      granularity: displayGranularity,
       compareMode: 'WoW'
     };
 
