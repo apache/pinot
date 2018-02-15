@@ -52,7 +52,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.math.IntRange;
 
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
@@ -82,7 +81,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private int totalConversions;
   private int totalNullCols;
   private int docIdCounter;
-  private char paddingCharacter;
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
@@ -106,7 +104,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     this.totalNulls = segmentIndexCreationInfo.getTotalNulls();
     this.totalConversions = segmentIndexCreationInfo.getTotalConversions();
     this.totalNullCols = segmentIndexCreationInfo.getTotalNullCols();
-    this.paddingCharacter = segmentCreationSpec.getPaddingCharacter();
 
     Collection<FieldSpec> fieldSpecs = schema.getAllFieldSpecs();
     Set<String> invertedIndexColumns = new HashSet<>();
@@ -117,7 +114,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     // Initialize creators for dictionary, forward index and inverted index
-    boolean[] isSorted = new boolean[1];
     for (FieldSpec fieldSpec : fieldSpecs) {
       String columnName = fieldSpec.getName();
       ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(columnName);
@@ -132,13 +128,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         // Initialize dictionary creator
         SegmentDictionaryCreator dictionaryCreator =
             new SegmentDictionaryCreator(hasNulls, indexCreationInfo.getSortedUniqueElementsArray(), fieldSpec,
-                _indexDir, paddingCharacter);
+                _indexDir);
         _dictionaryCreatorMap.put(columnName, dictionaryCreator);
 
-        // This step might change the order of the dictionary, thus change whether all the values are sorted
-        isSorted[0] = indexCreationInfo.isSorted();
-        dictionaryCreator.build(isSorted);
-        indexCreationInfo.setSorted(isSorted[0]);
+        // Create dictionary
+        dictionaryCreator.build();
 
         // Initialize forward index creator
         int cardinality = indexCreationInfo.getDistinctValueCount();
@@ -271,8 +265,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         new PropertiesConfiguration(new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
     properties.setProperty(SEGMENT_CREATOR_VERSION, config.getCreatorVersion());
-    properties.setProperty(SEGMENT_PADDING_CHARACTER,
-        StringEscapeUtils.escapeJava(Character.toString(config.getPaddingCharacter())));
+    properties.setProperty(SEGMENT_PADDING_CHARACTER, String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR));
     properties.setProperty(SEGMENT_NAME, segmentName);
     properties.setProperty(TABLE_NAME, config.getTableName());
     properties.setProperty(DIMENSIONS, config.getDimensions());

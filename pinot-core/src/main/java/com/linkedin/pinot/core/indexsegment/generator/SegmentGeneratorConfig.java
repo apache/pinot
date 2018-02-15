@@ -28,7 +28,6 @@ import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.SegmentNameGenerator;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.util.AvroUtils;
 import com.linkedin.pinot.startree.hll.HllConfig;
 import java.io.File;
@@ -90,7 +89,6 @@ public class SegmentGeneratorConfig {
   private boolean _enableStarTreeIndex = false;
   private StarTreeIndexSpec _starTreeIndexSpec = null;
   private String _creatorVersion = null;
-  private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
   private HllConfig _hllConfig = null;
   private SegmentNameGenerator _segmentNameGenerator = null;
   private SegmentPartitionConfig _segmentPartitionConfig = null;
@@ -136,7 +134,6 @@ public class SegmentGeneratorConfig {
     _enableStarTreeIndex = config._enableStarTreeIndex;
     _starTreeIndexSpec = config._starTreeIndexSpec;
     _creatorVersion = config._creatorVersion;
-    _paddingCharacter = config._paddingCharacter;
     _hllConfig = config._hllConfig;
     _segmentNameGenerator = config._segmentNameGenerator;
     _segmentPartitionConfig = config._segmentPartitionConfig;
@@ -294,14 +291,6 @@ public class SegmentGeneratorConfig {
 
   public void setCreatorVersion(String creatorVersion) {
     _creatorVersion = creatorVersion;
-  }
-
-  public char getPaddingCharacter() {
-    return _paddingCharacter;
-  }
-
-  public void setPaddingCharacter(char paddingCharacter) {
-    _paddingCharacter = paddingCharacter;
   }
 
   public String getSegmentNamePostfix() {
