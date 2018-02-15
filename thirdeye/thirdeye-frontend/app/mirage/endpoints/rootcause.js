@@ -15,7 +15,9 @@ export default function(server) {
         inverse : [ "false" ],
         dataset : [ "thirdeye" ],
         derived : [ "false" ],
-        additive : [ "true" ]
+        additive : [ "true" ],
+        maxTime: [ 1517846400000 ],
+        granularity: [ "1_HOURS" ]
       }
     }, {
       urn : "thirdeye:timerange:anomaly:1512400800000:1512428100000",
@@ -64,13 +66,6 @@ export default function(server) {
       id: 1,
       alias: "pageViews"
     };
-  });
-
-  /**
-   * Retrieves timestamp of last element in timeseries
-   */
-  server.get('/data/maxDataTime/metricId/1', () => {
-    return 1517846399998;
   });
 
   /**
@@ -124,7 +119,14 @@ export default function(server) {
    */
   server.get('/aggregation/aggregate', () => {
     return {};
-  });
+});
+
+  /**
+   * TODO: Once API is finalized, have this call return something meaningful
+   */
+  server.get('/aggregation/query', () => {
+    return {};
+});
 
   /**
    * TODO: Once API is finalized, have this call return something meaningful
