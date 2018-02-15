@@ -51,6 +51,7 @@ import org.apache.http.entity.mime.content.FileBody;
 import org.apache.http.entity.mime.content.InputStreamBody;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 
 
 public class FileUploadDownloadClient implements Closeable {
@@ -235,9 +236,15 @@ public class FileUploadDownloadClient implements Closeable {
       controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
     }
     StatusLine statusLine = response.getStatusLine();
+    String message;
+    try {
+      message = EntityUtils.toString(response.getEntity());
+    } catch (Exception e) {
+      message = "No message";
+    }
     String errorMessage =
-        String.format("Got error status code: %d with reason: %s while sending request: %s", statusLine.getStatusCode(),
-            statusLine.getReasonPhrase(), request.getURI());
+        String.format("Got error status code: %d with reason: %s while sending request: %s\nMessage: %s", statusLine.getStatusCode(),
+            statusLine.getReasonPhrase(), request.getURI(), message);
     if (controllerHost != null) {
       errorMessage =
           String.format("%s to controller: %s, version: %s", errorMessage, controllerHost, controllerVersion);

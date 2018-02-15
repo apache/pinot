@@ -36,7 +36,7 @@ class ControllerApplicationException extends WebApplicationException {
   }
 
   ControllerApplicationException(Logger logger, String message, int status, @Nullable Throwable e) {
-    super(message, status);
+    super(Response.status(status).entity(message).build());
     if (status >= 300 && status < 500) {
       if (e == null) {
         logger.info(message);
