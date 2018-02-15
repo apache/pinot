@@ -14,7 +14,7 @@ const ROOTCAUSE_SETUP_MODE_NONE = "none";
 /**
  * converts RCA backend granularity strings into units understood by moment.js
  */
-const toGranularity = (attrGranularity) => {
+const toMetricGranularity = (attrGranularity) => {
   let [count, unit] = attrGranularity.split('_');
 
   switch (unit) {
@@ -40,7 +40,7 @@ const toGranularity = (attrGranularity) => {
 const anomalyOffsetFromGranularity = (granularity) => {
   switch (granularity[1]) {
     case 'minute':
-      return -15;
+      return -30;
     case 'hour':
       return -3;
     case 'day':
@@ -121,30 +121,12 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
   },
 
   afterModel(model, transition) {
-    const { metricEntity } = model;
-
-    let displayGranularity = '1_HOURS';
-    let granularity = [1, 'hour'];
-    let anomalyRangeEnd = moment().startOf('hour').valueOf();
-    let anomalyRangeStartOffset = -3;
-    let analysisRangeEnd = moment(anomalyRangeEnd).startOf('day').add(1, 'day').valueOf();
-    let analysisRangeStartOffset = -3;
-
-    if (metricEntity) {
-      displayGranularity = metricEntity.attributes.granularity[0];
-      granularity = toGranularity(displayGranularity);
-      anomalyRangeEnd = moment(parseInt(metricEntity.attributes.maxTime[0], 10)).startOf(granularity[1]).valueOf();
-      anomalyRangeStartOffset = anomalyOffsetFromGranularity(granularity);
-      analysisRangeEnd = moment(anomalyRangeEnd).startOf('day').add(1, 'day').valueOf();
-      analysisRangeStartOffset = analysisOffsetFromGranularity(granularity);
-    }
-
     const defaultParams = {
-      anomalyRangeStart:  moment(anomalyRangeEnd).add(anomalyRangeStartOffset, granularity[1]).valueOf(),
-      anomalyRangeEnd,
-      analysisRangeStart: moment(analysisRangeEnd).add(analysisRangeStartOffset, 'day').valueOf(),
-      analysisRangeEnd,
-      granularity: displayGranularity,
+      anomalyRangeStart: moment().startOf('hour').subtract(3, 'hour').valueOf(),
+      anomalyRangeEnd: moment().startOf('hour').valueOf(),
+      analysisRangeStart: moment().startOf('day').subtract(6, 'day').valueOf(),
+      analysisRangeEnd: moment().startOf('day').add(1, 'day').valueOf(),
+      granularity: '1_HOURS',
       compareMode: 'WoW'
     };
 
@@ -184,6 +166,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       anomalyRangeEnd,
       anomalyId,
       metricId,
+      metricEntity,
       sessionId,
       metricUrn,
       anomalyUrn,
@@ -217,17 +200,33 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
     // metric-initialized context
     if (metricId && metricUrn) {
-      context = {
-        urns: new Set([metricUrn]),
-        anomalyRange,
-        analysisRange,
-        granularity,
-        compareMode,
-        anomalyUrns: new Set()
-      };
+      if (!_.isEmpty(metricEntity)) {
+        const maxTime = parseInt(metricEntity.attributes.maxTime[0], 10);
+        const granularity = metricEntity.attributes.granularity[0];
+        const metricGranularity = toMetricGranularity(granularity);
 
-      selectedUrns = new Set([metricUrn, toCurrentUrn(metricUrn), toBaselineUrn(metricUrn)]);
-      setupMode = ROOTCAUSE_SETUP_MODE_SELECTED;
+        const anomalyRangeEnd = moment(maxTime).startOf(metricGranularity[1]).valueOf();
+        const anomalyRangeStartOffset = anomalyOffsetFromGranularity(metricGranularity);
+        const anomalyRangeStart = moment(anomalyRangeEnd).add(anomalyRangeStartOffset, metricGranularity[1]).valueOf();
+        const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
+
+        const analysisRangeEnd = moment(anomalyRangeEnd).startOf('day').add(1, 'day').valueOf();
+        const analysisRangeStartOffset = analysisOffsetFromGranularity(metricGranularity);
+        const analysisRangeStart = moment(anomalyRangeEnd).add(analysisRangeStartOffset, 'day').valueOf();
+        const analysisRange = [analysisRangeStart, analysisRangeEnd];
+
+        context = {
+          urns: new Set([metricUrn]),
+          anomalyRange,
+          analysisRange,
+          granularity,
+          compareMode,
+          anomalyUrns: new Set()
+        };
+
+        selectedUrns = new Set([metricUrn, toCurrentUrn(metricUrn), toBaselineUrn(metricUrn)]);
+        setupMode = ROOTCAUSE_SETUP_MODE_SELECTED;
+      }
     }
 
     // anomaly-initialized context
