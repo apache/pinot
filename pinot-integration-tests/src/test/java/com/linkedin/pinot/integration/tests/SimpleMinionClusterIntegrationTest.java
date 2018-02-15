@@ -16,7 +16,6 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Function;
-import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -37,7 +36,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.helix.task.TaskState;
@@ -89,22 +88,35 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
 
   @Test
   public void testStopAndResumeTaskQueue() throws Exception {
+    // Hold the task
+    TestTaskExecutor.HOLD.set(true);
+
     // Should create the task queues and generate a task
-    Assert.assertEquals(_taskManager.scheduleTasks().size(), 1);
-    Assert.assertEquals(_helixTaskResourceManager.getTaskQueues().size(), 2);
+    Assert.assertTrue(_taskManager.scheduleTasks().containsKey(TestTaskGenerator.TASK_TYPE));
+    Assert.assertTrue(_helixTaskResourceManager.getTaskQueues()
+        .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(TestTaskGenerator.TASK_TYPE)));
 
     // Should generate one more task
-    Assert.assertEquals(_taskManager.scheduleTasks().size(), 1);
+    Assert.assertTrue(_taskManager.scheduleTasks().containsKey(TestTaskGenerator.TASK_TYPE));
 
     // Should not generate more tasks
-    Assert.assertTrue(_taskManager.scheduleTasks().isEmpty());
+    Assert.assertFalse(_taskManager.scheduleTasks().containsKey(TestTaskGenerator.TASK_TYPE));
 
-    // Check if all tasks IN_PROGRESS
-    Collection<TaskState> taskStates = _helixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).values();
-    Assert.assertEquals(taskStates.size(), 2);
-    for (TaskState taskState : taskStates) {
-      Assert.assertEquals(taskState, TaskState.IN_PROGRESS);
-    }
+    // Wait at most 60 seconds for all tasks IN_PROGRESS
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+      @Override
+      public Boolean apply(@Nullable Void input) {
+        Collection<TaskState> taskStates =
+            _helixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).values();
+        Assert.assertEquals(taskStates.size(), 2);
+        for (TaskState taskState : taskStates) {
+          if (taskState != TaskState.IN_PROGRESS) {
+            return false;
+          }
+        }
+        return true;
+      }
+    }, 60_000L, "Failed to get all tasks IN_PROGRESS");
 
     // Stop the task queue
     _helixTaskResourceManager.stopTaskQueue(TestTaskGenerator.TASK_TYPE);
@@ -125,8 +137,9 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       }
     }, 60_000L, "Failed to get all tasks STOPPED");
 
-    // Resume the task queue
+    // Resume the task queue, and let the task complete
     _helixTaskResourceManager.resumeTaskQueue(TestTaskGenerator.TASK_TYPE);
+    TestTaskExecutor.HOLD.set(false);
 
     // Wait at most 60 seconds for all tasks COMPLETED
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
@@ -197,6 +210,8 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   }
 
   public static class TestTaskExecutor extends BaseTaskExecutor {
+    private static final AtomicBoolean HOLD = new AtomicBoolean();
+
     @Override
     public void executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) {
       Assert.assertTrue(MINION_CONTEXT.getDataDir().exists());
@@ -212,11 +227,11 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       Assert.assertTrue(rawTableName.equals(TABLE_NAME_1) || rawTableName.equals(TABLE_NAME_2));
       Assert.assertEquals(configs.get("tableType"), TableType.OFFLINE.toString());
 
-      Uninterruptibles.sleepUninterruptibly(5, TimeUnit.SECONDS);
-
-      if (_cancelled) {
-        throw new TaskCancelledException("Task has been cancelled");
-      }
+      do {
+        if (_cancelled) {
+          throw new TaskCancelledException("Task has been cancelled");
+        }
+      } while (HOLD.get());
     }
   }
 }
