@@ -73,6 +73,31 @@ public final class FixedByteValueReaderWriter implements Closeable {
     _dataBuffer.putInt(index * INT_SIZE_IN_BYTES, value);
   }
 
+  public void writeLong(int index, long value) {
+    _dataBuffer.putLong(index * LONG_SIZE_IN_BYTES, value);
+  }
+
+  public void writeFloat(int index, float value) {
+    _dataBuffer.putFloat(index * FLOAT_SIZE_IN_BYTES, value);
+  }
+
+  public void writeDouble(int index, double value) {
+    _dataBuffer.putDouble(index * DOUBLE_SIZE_IN_BYTES, value);
+  }
+
+  public void writeUnpaddedString(int index, int numBytesPerValue, byte[] value) {
+    int startIndex = index * numBytesPerValue;
+    int endIndex = startIndex + numBytesPerValue;
+
+    int i = startIndex;
+    for (byte b : value) {
+      _dataBuffer.putByte(i++, b);
+    }
+    while (i < endIndex) {
+      _dataBuffer.putByte(i++, (byte) 0);
+    }
+  }
+
   @Override
   public void close() {
     _dataBuffer.close();

@@ -20,14 +20,11 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -37,7 +34,6 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.segment.store.ColumnIndexType;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
-import com.linkedin.pinot.core.util.AvroUtils;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
@@ -78,7 +74,7 @@ public class LoadersTest {
     _v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
   }
 
-  private void constructV1Segment() throws Exception {
+  private Schema constructV1Segment() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     SegmentGeneratorConfig segmentGeneratorConfig =
@@ -89,6 +85,7 @@ public class LoadersTest {
     driver.build();
 
     _indexDir = new File(INDEX_DIR, driver.getSegmentName());
+    return segmentGeneratorConfig.getSchema();
   }
 
   @Test
@@ -119,23 +116,27 @@ public class LoadersTest {
     IndexSegment indexSegment = Loaders.IndexSegment.load(_indexDir, ReadMode.mmap);
     Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1.toString());
     Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
+    indexSegment.destroy();
 
     // Set segment version to v1, should not convert the segment
     indexSegment = Loaders.IndexSegment.load(_indexDir, _v1IndexLoadingConfig);
     Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1.toString());
     Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
+    indexSegment.destroy();
 
     // Set segment version to v3, should convert the segment to v3
     indexSegment = Loaders.IndexSegment.load(_indexDir, _v3IndexLoadingConfig);
     Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3.toString());
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
+    indexSegment.destroy();
   }
 
   @Test
   public void testPadding() throws Exception {
     // Old Format
-    TarGzCompressionUtils.unTar(
-        new File(TestUtils.getFileFromResourceUrl(Loaders.class.getClassLoader().getResource(PADDING_OLD))), INDEX_DIR);
+    URL resourceUrl = Loaders.class.getClassLoader().getResource(PADDING_OLD);
+    Assert.assertNotNull(resourceUrl);
+    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(resourceUrl)), INDEX_DIR);
     File segmentDirectory = new File(INDEX_DIR, "paddingOld");
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor("name");
@@ -153,9 +154,9 @@ public class LoadersTest {
     Assert.assertEquals(dict.indexOf("lynda%%"), 1);
 
     // New Format Padding character %
-    TarGzCompressionUtils.unTar(
-        new File(TestUtils.getFileFromResourceUrl(Loaders.class.getClassLoader().getResource(PADDING_PERCENT))),
-        INDEX_DIR);
+    resourceUrl = Loaders.class.getClassLoader().getResource(PADDING_PERCENT);
+    Assert.assertNotNull(resourceUrl);
+    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(resourceUrl)), INDEX_DIR);
     segmentDirectory = new File(INDEX_DIR, "paddingPercent");
     segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
     columnMetadata = segmentMetadata.getColumnMetadataFor("name");
@@ -173,9 +174,9 @@ public class LoadersTest {
     Assert.assertEquals(dict.indexOf("lynda%%"), 1);
 
     // New Format Padding character Null
-    TarGzCompressionUtils.unTar(
-        new File(TestUtils.getFileFromResourceUrl(Loaders.class.getClassLoader().getResource(PADDING_NULL))),
-        INDEX_DIR);
+    resourceUrl = Loaders.class.getClassLoader().getResource(PADDING_NULL);
+    Assert.assertNotNull(resourceUrl);
+    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(resourceUrl)), INDEX_DIR);
     segmentDirectory = new File(INDEX_DIR, "paddingNull");
     segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
     columnMetadata = segmentMetadata.getColumnMetadataFor("name");
@@ -194,71 +195,23 @@ public class LoadersTest {
   }
 
   /**
-   * Test for the case where a new column is added to the schema and the segment is reloaded.
-   * If the column is of datatype STRING and default null value="", we should be able to handle it gracefully
-   * @throws Exception
+   * Tests loading default string column with empty ("") default null value.
    */
   @Test
-  public void testLoadSegmentWithNewStringColumnDefaultEmptyValue() throws Exception {
+  public void testDefaultEmptyValueStringColumn() throws Exception {
+    Schema schema = constructV1Segment();
+    schema.addField(new DimensionFieldSpec("SVString", FieldSpec.DataType.STRING, true, ""));
+    schema.addField(new DimensionFieldSpec("MVString", FieldSpec.DataType.STRING, false, ""));
 
-    // create a segment
-    Schema schema = AvroUtils.extractSchemaFromAvro(_avroFile);
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
-    segmentGeneratorConfig.setTableName("testTable");
-    segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    segmentGeneratorConfig.setSegmentName("testSegment");
-    segmentGeneratorConfig.setFormat(FileFormat.AVRO);
-    segmentGeneratorConfig.setInputFilePath(_avroFile.getAbsolutePath());
+    IndexSegment indexSegment = Loaders.IndexSegment.load(_indexDir, _v1IndexLoadingConfig, schema);
+    Assert.assertEquals(indexSegment.getDataSource("SVString").getDictionary().get(0), "");
+    Assert.assertEquals(indexSegment.getDataSource("MVString").getDictionary().get(0), "");
+    indexSegment.destroy();
 
-    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig);
-    driver.build();
-
-    File segmentDir = new File(INDEX_DIR, "testSegment");
-
-    // load the segment
-    boolean exception = false;
-    try {
-      loadSegment(segmentDir, schema);
-    } catch (Exception e) {
-      exception = true;
-    }
-    Assert.assertFalse(exception);
-
-    // add a new column to the schema -> string, default null value ""
-    schema.addField(new DimensionFieldSpec("d2", FieldSpec.DataType.STRING, true, ""));
-
-    // load segment
-    try {
-      IndexSegment indexSegment = loadSegment(segmentDir, schema);
-      String d2Value = (String) indexSegment.getDataSource("d2").getDictionary().get(0);
-      Assert.assertEquals(d2Value, "");
-    } catch (Exception e) {
-      exception = true;
-    }
-    Assert.assertFalse(exception);
-
-    // add a new column to the schema -> string, default null value "", multivalue
-    schema.addField(new DimensionFieldSpec("d3", FieldSpec.DataType.STRING, false, ""));
-
-    // load segment
-    try {
-      IndexSegment indexSegment = loadSegment(segmentDir, schema);
-      String d3Value = (String) indexSegment.getDataSource("d3").getDictionary().get(0);
-      Assert.assertEquals(d3Value, "");
-    } catch (Exception e) {
-      exception = true;
-    }
-    Assert.assertFalse(exception);
-  }
-
-
-  private IndexSegment loadSegment(File segmentDir, Schema schema) throws Exception {
-    IndexLoadingConfig config = new IndexLoadingConfig();
-    config.setSegmentVersion(SegmentVersion.v3);
-    config.setReadMode(ReadMode.mmap);
-    IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentDir, config, schema);
-    return indexSegment;
+    indexSegment = Loaders.IndexSegment.load(_indexDir, _v3IndexLoadingConfig, schema);
+    Assert.assertEquals(indexSegment.getDataSource("SVString").getDictionary().get(0), "");
+    Assert.assertEquals(indexSegment.getDataSource("MVString").getDictionary().get(0), "");
+    indexSegment.destroy();
   }
 
   @AfterClass

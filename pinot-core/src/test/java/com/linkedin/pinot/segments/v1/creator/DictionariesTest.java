@@ -389,14 +389,14 @@ public class DictionariesTest {
         new String(new byte[]{67, -61, -76, 116, 101, 32, 100, 39, 73, 118, 111, 105, 114, 101}); // "Côte d'Ivoire";
     Arrays.sort(inputStrings);
 
-    SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir);
-    dictionaryCreator.build();
-
-    for (String inputString : inputStrings) {
-      Assert.assertTrue(dictionaryCreator.indexOfSV(inputString) >= 0, "Value not found in dictionary " + inputString);
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(inputStrings, fieldSpec, indexDir)) {
+      dictionaryCreator.build();
+      for (String inputString : inputStrings) {
+        Assert.assertTrue(dictionaryCreator.indexOfSV(inputString) >= 0,
+            "Value not found in dictionary " + inputString);
+      }
     }
 
-    dictionaryCreator.close();
     FileUtils.deleteQuietly(indexDir);
   }
 
@@ -409,14 +409,13 @@ public class DictionariesTest {
     indexDir.deleteOnExit();
     FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true);
 
-    SegmentDictionaryCreator dictionaryCreator =
-        new SegmentDictionaryCreator(false, new String[]{""}, fieldSpec, indexDir);
-    dictionaryCreator.build();
+    try (SegmentDictionaryCreator dictionaryCreator =
+        new SegmentDictionaryCreator(new String[]{""}, fieldSpec, indexDir)) {
+      dictionaryCreator.build();
+      Assert.assertEquals(dictionaryCreator.getNumBytesPerString(), 0);
+      Assert.assertEquals(dictionaryCreator.indexOfSV(""), 0);
+    }
 
-    Assert.assertEquals(dictionaryCreator.getStringColumnMaxLength(), 1);
-    Assert.assertEquals(dictionaryCreator.indexOfSV(""), 0);
-
-    dictionaryCreator.close();
     FileUtils.deleteQuietly(indexDir);
   }
 

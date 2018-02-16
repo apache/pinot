@@ -127,8 +127,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
         // Initialize dictionary creator
         SegmentDictionaryCreator dictionaryCreator =
-            new SegmentDictionaryCreator(hasNulls, indexCreationInfo.getSortedUniqueElementsArray(), fieldSpec,
-                _indexDir);
+            new SegmentDictionaryCreator(indexCreationInfo.getSortedUniqueElementsArray(), fieldSpec, _indexDir);
         _dictionaryCreatorMap.put(columnName, dictionaryCreator);
 
         // Create dictionary
@@ -326,7 +325,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       String column = entry.getKey();
       ColumnIndexCreationInfo columnIndexCreationInfo = entry.getValue();
       SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(column);
-      int dictionaryElementSize = (dictionaryCreator != null) ? dictionaryCreator.getStringColumnMaxLength() : 0;
+      int dictionaryElementSize = (dictionaryCreator != null) ? dictionaryCreator.getNumBytesPerString() : 0;
 
       // TODO: after fixing the server-side dependency on HAS_INVERTED_INDEX and deployed, set HAS_INVERTED_INDEX properly
       // The hasInvertedIndex flag in segment metadata is picked up in ColumnMetadata, and will be used during the query

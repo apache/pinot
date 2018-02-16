@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
@@ -105,6 +106,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     this.config = config;
     this.createStarTree = config.isEnableStarTreeIndex();
     recordReader = dataSource.getRecordReader();
+    Preconditions.checkState(recordReader.hasNext(), "No record in data source");
     dataSchema = recordReader.getSchema();
 
     if (config.getHllConfig() != null) {
