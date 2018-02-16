@@ -16,6 +16,7 @@ import java.util.Set;
  * by a key-value pair. Note, that dimension names may require standardization across different
  * metrics. The URN namespace is defined as 'thirdeye:dimension:{name}:{value}:{type}'.
  */
+@Deprecated
 public class DimensionEntity extends Entity {
   public static final EntityType TYPE = new EntityType("thirdeye:dimension:");
 

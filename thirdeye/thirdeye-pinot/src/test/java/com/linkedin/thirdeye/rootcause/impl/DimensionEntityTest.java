@@ -3,7 +3,7 @@ package com.linkedin.thirdeye.rootcause.impl;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-
+@Deprecated
 public class DimensionEntityTest {
   @Test
   public void testFromDimension() {

@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.google.common.collect.Multimap;
+import com.google.common.collect.TreeMultimap;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.MaxScoreSet;
 import java.io.UnsupportedEncodingException;
@@ -13,6 +15,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang.StringUtils;
 
 
 /**
@@ -195,6 +198,9 @@ public class EntityUtils {
     } else if(AnomalyEventEntity.TYPE.isType(urn)) {
       return AnomalyEventEntity.fromURN(urn, score);
 
+    } else if(DimensionsEntity.TYPE.isType(urn)) {
+      return DimensionsEntity.fromURN(urn, score);
+      
     }
     throw new IllegalArgumentException(String.format("Could not parse URN '%s'", urn));
   }
@@ -320,4 +326,47 @@ public class EntityUtils {
       throw new IllegalStateException(e);
     }
   }
+
+  /**
+   * Decodes filter string fragments to a dimensions multimap
+   *
+   * @param filterStrings dimension fragments
+   * @return dimensions multimap
+   */
+  public static Multimap<String, String> decodeDimensions(List<String> filterStrings) {
+    Multimap<String, String> filters = TreeMultimap.create();
+
+    for(String filterString : filterStrings) {
+      if (StringUtils.isBlank(filterString)) {
+        continue;
+      }
+
+      String[] parts = EntityUtils.decodeURNComponent(filterString).split("=", 2);
+      if (parts.length != 2) {
+        throw new IllegalArgumentException(String.format("Could not parse filter string '%s'", filterString));
+      }
+
+      filters.put(parts[0], parts[1]);
+    }
+
+    return filters;
+  }
+
+  /**
+   * Encodes dimensions multimap to filter strings.
+   *
+   * @param filters dimensions multimap
+   * @return filter string fragments
+   */
+  public static List<String> encodeDimensions(Multimap<String, String> filters) {
+    List<String> output = new ArrayList<>();
+
+    Multimap<String, String> sorted = TreeMultimap.create(filters);
+    for(Map.Entry<String, String> entry : sorted.entries()) {
+      output.add(EntityUtils.encodeURNComponent(String.format("%s=%s", entry.getKey(), entry.getValue())));
+    }
+
+    return output;
+  }
+
 }
