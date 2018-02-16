@@ -483,9 +483,17 @@ public class DetectionJobResource {
    */
   private void anomalyFunctionSpeedup(long functionId) {
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
-    anomalyFunction.setWindowSize(170);
-    anomalyFunction.setWindowUnit(TimeUnit.HOURS);
-    anomalyFunction.setCron("0 0 0 ? * MON *");
+    TimeUnit dataTimeUnit = anomalyFunction.getBucketUnit();
+    switch (dataTimeUnit) {
+      case MINUTES:
+        anomalyFunction.setWindowSize(170);
+        anomalyFunction.setWindowUnit(TimeUnit.HOURS);
+        anomalyFunction.setCron("0 0 0 ? * MON *");
+        break;
+      case HOURS:
+        anomalyFunction.setCron("0 0 0/6 1/1 * ? *");
+      default:
+    }
     anomalyFunctionDAO.update(anomalyFunction);
   }
 
