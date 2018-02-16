@@ -10,6 +10,13 @@ import _ from 'lodash';
 const ROOTCAUSE_TAB_DIMENSIONS = 'dimensions';
 const ROOTCAUSE_TAB_METRICS = 'metrics';
 
+const ROOTCAUSE_SETUP_MODE_CONTEXT = "context";
+const ROOTCAUSE_SETUP_MODE_SELECTED = "selected";
+const ROOTCAUSE_SETUP_MODE_NONE = "none";
+
+const ROOTCAUSE_SETUP_EVENTS_SCORE_THRESHOLD = Number.POSITIVE_INFINITY;
+const ROOTCAUSE_SETUP_METRICS_SCORE_THRESHOLD = Number.POSITIVE_INFINITY;
+
 const ROOTCAUSE_SERVICE_ROUTE = 'route';
 const ROOTCAUSE_SERVICE_ENTITIES = 'entities';
 const ROOTCAUSE_SERVICE_TIMESERIES = 'timeseries';
@@ -33,9 +40,18 @@ export default Ember.Controller.extend({
   //
   // notifications
   //
+
+  /**
+   * Errors from routing
+   * @type {Set}
+   */
   routeErrors: null, // Set
 
-  sessionUpdateWarning: null, // string
+  /**
+   * Warning for concurrent session modification
+   * @type {string}
+   */
+  sessionUpdateWarning: null,
 
   //
   // services
@@ -57,6 +73,11 @@ export default Ember.Controller.extend({
   //
   // user details
   //
+
+  /**
+   * Active user name
+   * @type {string}
+   */
   username: Ember.computed.reads('authService.data.authenticated.name'),
 
   //
@@ -65,6 +86,7 @@ export default Ember.Controller.extend({
 
   /**
    * rootcause search context
+   * @type {object}
    *
    * {
    *   urns: Set,
@@ -75,42 +97,55 @@ export default Ember.Controller.extend({
    *   granularity: string
    * }
    */
-  context: null, //
+  context: null,
 
   /**
    * entity urns selected for display
+   * @type {Set}
    */
-  selectedUrns: null, // Set
+  selectedUrns: null,
 
   /**
    * entity urns marked as invisible
+   * @type {Set}
    */
-  invisibleUrns: null, // Set
+  invisibleUrns: null,
 
   /**
    * entity urns currently being hovered over
+   * @type {Set}
    */
-  hoverUrns: null, // Set
+  hoverUrns: null,
 
   /**
    * (event) entity urns passing the filter side-bar
+   * @type {Set}
    */
   filteredUrns: null,
 
   /**
    * displayed investigation tab ('metrics', 'dimensions', ...)
+   * @type {string}
    */
-  activeTab: null, // ""
+  activeTab: null,
 
   /**
    * display mode for timeseries chart
+   * @type {string}
    */
-  timeseriesMode: null, // ""
+  timeseriesMode: null,
 
   /**
    * urn of the currently focused entity in the legend component
+   * @type {string}
    */
   focusedUrn: null,
+
+  /**
+   * toggle for running _setupForMetric() on selection of the first metric
+   * @type {boolean}
+   */
+  setupMode: ROOTCAUSE_SETUP_MODE_NONE,
 
   //
   // session data
@@ -158,8 +193,9 @@ export default Ember.Controller.extend({
 
   /**
    * side-bar filter config
+   * @type {object}
    */
-  filterConfig: filterBarConfig, // {}
+  filterConfig: filterBarConfig,
 
   /**
    * Default settings
@@ -198,7 +234,7 @@ export default Ember.Controller.extend({
    *
    * breakdowns:   de-aggregated metric values over multiple time windows (anomaly, baseline, ...)
    *               (typically displayed in dimension heatmap)
-   * 
+   *
    * scores:       entity scores as computed by backend pipelines (e.g. metric anomality score)
    *               (typically displayed in metrics table)
    */
@@ -206,16 +242,16 @@ export default Ember.Controller.extend({
     'context',
     'entities',
     'selectedUrns',
-    'entitiesService',
-    'timeseriesService',
-    'aggregatesService',
-    'breakdownsService',
     'activeTab',
     function () {
-      const { context, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, activeTab } =
-        this.getProperties('context', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'activeTab');
+      const { context, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, activeTab, setupMode } =
+        this.getProperties('context', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'activeTab', 'setupMode');
 
       if (!context || !selectedUrns) {
+        return;
+      }
+
+      if (setupMode === ROOTCAUSE_SETUP_MODE_CONTEXT) {
         return;
       }
 
@@ -254,11 +290,43 @@ export default Ember.Controller.extend({
         .reduce((agg, l) => agg.concat(l), []);
 
       aggregatesService.request(context, new Set(offsetUrns));
-      
+
       // scores
       const scoresUrns = aggregatesUrns;
-      
+
       scoresService.request(context, new Set(scoresUrns));
+    }
+  ),
+
+  /**
+   * Setup observer for context and default selection
+   * May run multiple times while entities are loading.
+   */
+  _setupObserver: Ember.observer(
+    'context',
+    'entities',
+    'scores',
+    'setupMode',
+    function () {
+      const { setupMode } =
+        this.getProperties('setupMode');
+
+      switch (setupMode) {
+        case ROOTCAUSE_SETUP_MODE_NONE:
+          // left blank
+          break;
+
+        case ROOTCAUSE_SETUP_MODE_CONTEXT:
+          this._setupContext();
+          break;
+
+        case ROOTCAUSE_SETUP_MODE_SELECTED:
+          this._setupSelected();
+          break;
+
+        default:
+          throw new Error(`Unknown setup mode '${setupMode}'`);
+      }
     }
   ),
 
@@ -376,11 +444,11 @@ export default Ember.Controller.extend({
   isLoadingAggregates: Ember.computed.gt('aggregatesService.pending.size', 0),
 
   isLoadingBreakdowns: Ember.computed.gt('breakdownsService.pending.size', 0),
-  
+
   isLoadingScores: Ember.computed.gt('scoresService.pending.size', 0),
-  
+
   loadingFrameworks: Ember.computed.reads('entitiesService.pending'),
-  
+
   //
   // error indicators
   //
@@ -528,6 +596,83 @@ export default Ember.Controller.extend({
     if (!sessionId) { return; }
 
     this._checkSession();
+  },
+
+  //
+  // default selection
+  //
+
+  /**
+   * Transition to route for metric id
+   *
+   * @private
+   */
+  _setupContext() {
+    const { context } =
+      this.getProperties('context');
+
+    const contextMetricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
+
+    if (_.isEmpty(contextMetricUrns)) { return; }
+
+    const metricUrn = contextMetricUrns[0];
+    const metricId = metricUrn.split(':')[2];
+
+    this.transitionToRoute({ queryParams: { metricId } });
+  },
+
+  /**
+   * Select top-scoring entities by default if metric selected for the first time.
+   * Idempotent addition of urns to support multiple execution while data loading.
+   *
+   * @private
+   */
+  _setupSelected() {
+    const { context, entities, scores, selectedUrns, loadingFrameworks, isLoadingScores } =
+      this.getProperties('context', 'entities', 'scores', 'selectedUrns', 'loadingFrameworks', 'isLoadingScores');
+
+    const newSelectedUrns = new Set(selectedUrns);
+
+    filterPrefix(context.urns, 'thirdeye:metric:')
+      .forEach(urn => {
+        newSelectedUrns.add(urn);
+        newSelectedUrns.add(toCurrentUrn(urn));
+        newSelectedUrns.add(toBaselineUrn(urn));
+      });
+
+    // events
+    const groupedEvents = Object.values(entities)
+      .filter(e => e.type === 'event')
+      .reduce((agg, e) => {
+        const type = e.eventType;
+        agg[type] = agg[type] || [];
+        agg[type].push(e);
+        return agg;
+      }, {});
+
+    // add events passing threshold
+    Object.values(groupedEvents)
+      .forEach(arr => {
+        arr
+          .filter(e => e.score >= ROOTCAUSE_SETUP_EVENTS_SCORE_THRESHOLD)
+          .forEach(e => newSelectedUrns.add(e.urn));
+      });
+
+    // metrics
+    filterPrefix(Object.keys(entities), 'thirdeye:metric:')
+      .filter(urn => (urn in scores) && (scores[urn] >= ROOTCAUSE_SETUP_METRICS_SCORE_THRESHOLD))
+      .forEach(urn => {
+        newSelectedUrns.add(urn);
+        newSelectedUrns.add(toCurrentUrn(urn));
+        newSelectedUrns.add(toBaselineUrn(urn));
+      });
+
+    if (_.isEqual(selectedUrns, newSelectedUrns)) { return; }
+
+    this.setProperties({
+      selectedUrns: newSelectedUrns,
+      setupMode: (loadingFrameworks.size > 0 || isLoadingScores) ? ROOTCAUSE_SETUP_MODE_SELECTED : ROOTCAUSE_SETUP_MODE_NONE
+    });
   },
 
   //

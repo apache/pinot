@@ -7,17 +7,60 @@ import { toCurrentUrn, toBaselineUrn, filterPrefix, dateFormatFull } from 'third
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
 
-const queryParamsConfig = {
-  refreshModel: false,
-  replace: false
+const ROOTCAUSE_SETUP_MODE_CONTEXT = "context";
+const ROOTCAUSE_SETUP_MODE_SELECTED = "selected";
+const ROOTCAUSE_SETUP_MODE_NONE = "none";
+
+/**
+ * converts RCA backend granularity strings into units understood by moment.js
+ */
+const toMetricGranularity = (attrGranularity) => {
+  const UNIT_MAPPING = {
+    MINUTES: 'minute',
+    HOURS: 'hour',
+    DAYS: 'day'
+  };
+
+  const [count, unit] = attrGranularity.split('_');
+  return [parseInt(count, 10), UNIT_MAPPING[unit]];
+};
+
+/**
+ * Returns the anomaly time range offset (in granularity units) based on metric granularity
+ */
+const toAnomalyOffset = (granularity) => {
+  const UNIT_MAPPING = {
+    minute: -30,
+    hour: -3,
+    day: -1
+  };
+  return UNIT_MAPPING[granularity[1]] || -1;
+};
+
+/**
+ * Returns the analysis time range offset (in days) based on metric granularity
+ */
+const toAnalysisOffset = (granularity) => {
+  const UNIT_MAPPING = {
+    minute: -1,
+    hour: -3,
+    day: -7
+  };
+  return UNIT_MAPPING[granularity[1]] || -1;
 };
 
 export default Ember.Route.extend(AuthenticatedRouteMixin, {
   authService: Ember.inject.service('session'),
 
   queryParams: {
-    metricId: queryParamsConfig,
-    sessionId: queryParamsConfig,
+    metricId: {
+      refreshModel: true,
+      replace: true
+    },
+    sessionId: {
+      refreshModel: false,
+      replace: false
+    },
     anomalyId: {
       refreshModel: true,
       replace: false
@@ -27,10 +70,11 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
   model(params) {
     const { metricId, anomalyId, sessionId } = params;
 
-    let metricUrn, anomalyUrn, session, anomalyContext, anomalySessions;
+    let metricUrn, metricEntity, anomalyUrn, session, anomalyContext, anomalySessions;
 
     if (metricId) {
       metricUrn = `thirdeye:metric:${metricId}`;
+      metricEntity = fetch(`/rootcause/raw?framework=identity&urns=${metricUrn}`).then(checkStatus).then(res => res[0]).catch(() => {});
     }
 
     if (anomalyId) {
@@ -38,16 +82,17 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     }
 
     if (sessionId) {
-      session = fetch(`/session/${sessionId}`).then(checkStatus).catch(() => undefined);
+      session = fetch(`/session/${sessionId}`).then(checkStatus).catch(() => {});
     }
 
     if (anomalyUrn) {
-      anomalyContext = fetch(`/rootcause/raw?framework=anomalyContext&urns=${anomalyUrn}`).then(checkStatus).catch(() => undefined);
-      anomalySessions = fetch(`/session/query?anomalyId=${anomalyId}`).then(checkStatus).catch(() => undefined);
+      anomalyContext = fetch(`/rootcause/raw?framework=anomalyContext&urns=${anomalyUrn}`).then(checkStatus).catch(() => {});
+      anomalySessions = fetch(`/session/query?anomalyId=${anomalyId}`).then(checkStatus).catch(() => {});
     }
 
     return RSVP.hash({
       metricId,
+      metricEntity,
       anomalyId,
       sessionId,
       metricUrn,
@@ -59,13 +104,11 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
   },
 
   afterModel(model, transition) {
-    const maxTime = moment().startOf('hour').valueOf();
-
     const defaultParams = {
-      anomalyRangeStart:  moment(maxTime).subtract(3, 'hours').valueOf(),
-      anomalyRangeEnd: moment(maxTime).valueOf(),
-      analysisRangeStart: moment(maxTime).endOf('day').subtract(1, 'week').valueOf() + 1,
-      analysisRangeEnd: moment(maxTime).endOf('day').valueOf() + 1,
+      anomalyRangeStart: moment().startOf('hour').subtract(3, 'hour').valueOf(),
+      anomalyRangeEnd: moment().startOf('hour').valueOf(),
+      analysisRangeStart: moment().startOf('day').subtract(6, 'day').valueOf(),
+      analysisRangeEnd: moment().startOf('day').add(1, 'day').valueOf(),
       granularity: '1_HOURS',
       compareMode: 'WoW'
     };
@@ -106,6 +149,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       anomalyRangeEnd,
       anomalyId,
       metricId,
+      metricEntity,
       sessionId,
       metricUrn,
       anomalyUrn,
@@ -134,20 +178,38 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
     let sessionUpdatedBy = '';
     let sessionUpdatedTime = '';
     let sessionModified = true;
+    let setupMode = ROOTCAUSE_SETUP_MODE_CONTEXT;
     let routeErrors = new Set();
 
     // metric-initialized context
     if (metricId && metricUrn) {
-      context = {
-        urns: new Set([metricUrn]),
-        anomalyRange,
-        analysisRange,
-        granularity,
-        compareMode,
-        anomalyUrns: new Set()
-      };
+      if (!_.isEmpty(metricEntity)) {
+        const maxTime = parseInt(metricEntity.attributes.maxTime[0], 10);
+        const granularity = metricEntity.attributes.granularity[0];
+        const metricGranularity = toMetricGranularity(granularity);
 
-      selectedUrns = new Set([metricUrn, toCurrentUrn(metricUrn), toBaselineUrn(metricUrn)]);
+        const anomalyRangeEnd = moment(maxTime).startOf(metricGranularity[1]).valueOf();
+        const anomalyRangeStartOffset = toAnomalyOffset(metricGranularity);
+        const anomalyRangeStart = moment(anomalyRangeEnd).add(anomalyRangeStartOffset, metricGranularity[1]).valueOf();
+        const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
+
+        const analysisRangeEnd = moment(anomalyRangeEnd).startOf('day').add(1, 'day').valueOf();
+        const analysisRangeStartOffset = toAnalysisOffset(metricGranularity);
+        const analysisRangeStart = moment(anomalyRangeEnd).add(analysisRangeStartOffset, 'day').valueOf();
+        const analysisRange = [analysisRangeStart, analysisRangeEnd];
+
+        context = {
+          urns: new Set([metricUrn]),
+          anomalyRange,
+          analysisRange,
+          granularity: (granularity === '1_DAYS') ? '1_HOURS' : granularity,
+          compareMode,
+          anomalyUrns: new Set()
+        };
+
+        selectedUrns = new Set([metricUrn, toCurrentUrn(metricUrn), toBaselineUrn(metricUrn)]);
+        setupMode = ROOTCAUSE_SETUP_MODE_SELECTED;
+      }
     }
 
     // anomaly-initialized context
@@ -179,6 +241,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
 
         selectedUrns = new Set([...metricUrns, ...metricUrns.map(toCurrentUrn), ...metricUrns.map(toBaselineUrn), anomalyUrn]);
         sessionName = 'New Investigation of #' + anomalyId + ' (' + moment().format(dateFormatFull) + ')';
+        setupMode = ROOTCAUSE_SETUP_MODE_SELECTED;
 
       } else {
         routeErrors.add(`Could not find anomalyId ${anomalyId}`);
@@ -206,6 +269,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
         sessionUpdatedBy = updatedBy;
         sessionUpdatedTime = updated;
         sessionModified = false;
+        setupMode = ROOTCAUSE_SETUP_MODE_NONE;
 
       } else {
         routeErrors.add(`Could not find sessionId ${sessionId}`);
@@ -223,6 +287,7 @@ export default Ember.Route.extend(AuthenticatedRouteMixin, {
       sessionUpdatedTime,
       sessionModified,
       selectedUrns,
+      setupMode,
       context
     });
   }

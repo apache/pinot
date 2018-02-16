@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources.v2.rootcause;
 
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dashboard.resources.v2.ResourceUtils;
@@ -11,6 +12,7 @@ import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.impl.EntityUtils;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
@@ -40,19 +42,24 @@ public class MetricEntityFormatter extends RootCauseEntityFormatter {
   public static final String ATTR_INVERSE = "inverse";
   public static final String ATTR_DERIVED = "derived";
   public static final String ATTR_ADDITIVE = "additive";
+  public static final String ATTR_GRANULARITY = "granularity";
+  public static final String ATTR_MAX_TIME = "maxTime";
   public static final String ATTR_EXTERNAL_URLS = "externalUrls";
 
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
+  private final LoadingCache<String, Long> maxTimeCache;
 
-  public MetricEntityFormatter(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) {
+  public MetricEntityFormatter(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, LoadingCache<String, Long> maxTimeCache) {
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
+    this.maxTimeCache = maxTimeCache;
   }
 
   public MetricEntityFormatter() {
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
+    this.maxTimeCache = ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache();
   }
 
   @Override
@@ -74,11 +81,21 @@ public class MetricEntityFormatter extends RootCauseEntityFormatter {
       throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for metric id %d", metric.getDataset(), metric.getId()));
     }
 
+    long maxTime = -1;
+    try {
+      // TODO adjust this +1 once maxTime cache returns end exclusive
+      maxTime = this.maxTimeCache.get(dataset.getDataset()) + 1;
+    } catch (Exception ex) {
+      // left blank
+    }
+
     Multimap<String, String> attributes = ArrayListMultimap.create();
     attributes.put(ATTR_DATASET, metric.getDataset());
     attributes.put(ATTR_INVERSE, String.valueOf(metric.isInverseMetric()));
     attributes.put(ATTR_DERIVED, String.valueOf(metric.isDerived()));
     attributes.put(ATTR_ADDITIVE, String.valueOf(dataset.isAdditive()));
+    attributes.put(ATTR_GRANULARITY, dataset.bucketTimeGranularity().toAggregationGranularityString());
+    attributes.put(ATTR_MAX_TIME, String.valueOf(maxTime));
 
     TimeRangeEntity range = estimateTimeRange(e);
     MetricSlice slice = MetricSlice.from(metric.getId(), range.getStart(), range.getEnd(), e.getFilters());

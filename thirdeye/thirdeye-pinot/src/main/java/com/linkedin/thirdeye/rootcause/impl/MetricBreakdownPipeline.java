@@ -23,6 +23,7 @@ import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -61,12 +62,17 @@ public class MetricBreakdownPipeline extends Pipeline {
   public static final String PROP_K = "k";
   public static final int PROP_K_DEFAULT = -1;
 
+  public static final String PROP_INCLUDE_DIMENSIONS = "includeDimensions";
+  public static final String PROP_EXCLUDE_DIMENSIONS = "excludeDimensions";
+
   public static final long TIMEOUT = 120000;
 
   private final QueryCache cache;
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
   private final ExecutorService executor;
+  private final Set<String> includeDimensions;
+  private final Set<String> excludeDimensions;
   private final int k;
 
   /**
@@ -78,14 +84,19 @@ public class MetricBreakdownPipeline extends Pipeline {
    * @param datasetDAO dataset config DAO
    * @param cache query cache for running contribution analysis
    * @param executor executor service for parallel task execution
+   * @param includeDimensions dimensions to break down on (all if empty)
+   * @param excludeDimensions dimensions not to break down on
+   * @param k number of top-ranking elements to emit
    */
   public MetricBreakdownPipeline(String outputName, Set<String> inputNames, MetricConfigManager metricDAO,
-      DatasetConfigManager datasetDAO, QueryCache cache, ExecutorService executor, int k) {
+      DatasetConfigManager datasetDAO, QueryCache cache, ExecutorService executor, Set<String> includeDimensions, Set<String> excludeDimensions, int k) {
     super(outputName, inputNames);
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
     this.cache = cache;
     this.executor = executor;
+    this.includeDimensions = includeDimensions;
+    this.excludeDimensions = excludeDimensions;
     this.k = k;
   }
 
@@ -103,6 +114,18 @@ public class MetricBreakdownPipeline extends Pipeline {
     this.cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
     this.executor = Executors.newFixedThreadPool(MapUtils.getInteger(properties, PROP_PARALLELISM, PROP_PARALLELISM_DEFAULT));
     this.k = MapUtils.getInteger(properties, PROP_K, PROP_K_DEFAULT);
+
+    if (properties.containsKey(PROP_INCLUDE_DIMENSIONS)) {
+      this.includeDimensions = new HashSet<>((Collection<String>) properties.get(PROP_INCLUDE_DIMENSIONS));
+    } else {
+      this.includeDimensions = new HashSet<>();
+    }
+
+    if (properties.containsKey(PROP_EXCLUDE_DIMENSIONS)) {
+      this.excludeDimensions = new HashSet<>((Collection<String>) properties.get(PROP_EXCLUDE_DIMENSIONS));
+    } else {
+      this.excludeDimensions = new HashSet<>();
+    }
   }
 
   @Override
@@ -219,7 +242,13 @@ public class MetricBreakdownPipeline extends Pipeline {
 
     Collection<Future<DataFrame>> futures = new ArrayList<>();
     for(String dimension : dataset.getDimensions()) {
-      futures.add(getContributionDeltaPackedAsync(current, baseline, dimension));
+      if (this.excludeDimensions.contains(dimension)) {
+        continue;
+      }
+
+      if (this.includeDimensions.isEmpty() || this.includeDimensions.contains(dimension)) {
+        futures.add(getContributionDeltaPackedAsync(current, baseline, dimension));
+      }
     }
 
     final long timeout = System.currentTimeMillis() + TIMEOUT;
