@@ -60,7 +60,7 @@ public class ClientSSLContextGenerator {
   }
 
   public ClientSSLContextGenerator(Configuration sslConfig) {
-    if (sslConfig.getBoolean(CONFIG_OF_ENABLE_SERVER_VERIFICATION)) {
+    if (sslConfig.getBoolean(CONFIG_OF_ENABLE_SERVER_VERIFICATION, true)) {
       _serverCACertFile = sslConfig.getString(CONFIG_OF_SERVER_CA_CERT);
     } else {
       _serverCACertFile = null;
