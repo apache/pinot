@@ -41,7 +41,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
 
   public DetectionOnBoardJobRunner(DetectionOnboardJobContext jobContext, List<DetectionOnboardTask> tasks,
       DetectionOnboardJobStatus jobStatus) {
-    this(jobContext, tasks, jobStatus, 5, TimeUnit.MINUTES);
+    this(jobContext, tasks, jobStatus, 30, TimeUnit.MINUTES);
   }
 
   public DetectionOnBoardJobRunner(DetectionOnboardJobContext jobContext, List<DetectionOnboardTask> tasks,
