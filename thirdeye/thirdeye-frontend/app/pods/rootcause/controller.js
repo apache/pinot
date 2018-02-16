@@ -310,7 +310,7 @@ export default Controller.extend({
    * Setup observer for context and default selection
    * May run multiple times while entities are loading.
    */
-  _setupObserver: Ember.observer(
+  _setupObserver: observer(
     'context',
     'entities',
     'scores',
