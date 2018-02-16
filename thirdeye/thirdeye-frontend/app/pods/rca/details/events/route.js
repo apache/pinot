@@ -1,8 +1,10 @@
-import Ember from 'ember';
+import { later } from '@ember/runloop';
+import { inject as service } from '@ember/service';
+import Route from '@ember/routing/route';
 import { Actions } from 'thirdeye-frontend/actions/events';
 
-export default Ember.Route.extend({
-  redux: Ember.inject.service(),
+export default Route.extend({
+  redux: service(),
 
   /**
    * Massages Query Params from URL and dispatch redux actions
@@ -63,7 +65,7 @@ export default Ember.Route.extend({
           start = start || oldParams.analysisStart;
           end = end || oldParams.analysisEnd;
 
-          Ember.run.later(() => {
+          later(() => {
             redux.dispatch(Actions.updateDates(
               Number(start),
               Number(end)
@@ -85,7 +87,7 @@ export default Ember.Route.extend({
           });
         }
 
-        Ember.run.later(() => {
+        later(() => {
           redux.dispatch(Actions.loaded());
         });
       }

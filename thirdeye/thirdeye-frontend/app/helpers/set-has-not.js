@@ -1,4 +1,4 @@
-import Ember from 'ember';
+import { helper } from '@ember/component/helper';
 
 /**
  * Returns true if the set does not contain the value
@@ -10,4 +10,4 @@ export function setHasNot([set = new Set(), value = null]) {
   return !set.has(value);
 }
 
-export default Ember.Helper.helper(setHasNot);
+export default helper(setHasNot);

@@ -3,13 +3,15 @@
  * @module manage/alerts/controller
  * @exports alerts controller
  */
-import Ember from 'ember';
+import { computed, set } from '@ember/object';
+
+import Controller from '@ember/controller';
 import fetch from 'fetch';
 import _ from 'lodash';
 import { task, timeout } from 'ember-concurrency';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
-export default Ember.Controller.extend({
+export default Controller.extend({
   queryParams: ['selectedSearchMode', 'alertId', 'testMode'],
   /**
    * Alerts Search Mode options
@@ -56,7 +58,7 @@ export default Ember.Controller.extend({
   pageSize: 10,
 
   // Number of pages to display
-  paginationSize: Ember.computed(
+  paginationSize: computed(
     'pagesNum',
     'pageSize',
     function() {
@@ -68,7 +70,7 @@ export default Ember.Controller.extend({
   ),
 
   // Total Number of pages to display
-  pagesNum: Ember.computed(
+  pagesNum: computed(
     'selectedAlerts.length',
     'pageSize',
     function() {
@@ -79,7 +81,7 @@ export default Ember.Controller.extend({
   ),
 
   // Groups array for search filter 'search by Subscriber Groups'
-  subscriberGroupNames: Ember.computed('model.subscriberGroups', function() {
+  subscriberGroupNames: computed('model.subscriberGroups', function() {
     const groupNames = this.get('model.subscriberGroups');
 
     return groupNames
@@ -90,7 +92,7 @@ export default Ember.Controller.extend({
   }),
 
   // App names array for search filter 'search by Application'
-  applicationNames: Ember.computed('model.applications', function() {
+  applicationNames: computed('model.applications', function() {
     const appNames = this.get('model.applications');
 
     return appNames
@@ -99,7 +101,7 @@ export default Ember.Controller.extend({
   }),
 
   // creates the page Array for view
-  viewPages: Ember.computed(
+  viewPages: computed(
     'pages',
     'currentPage',
     'paginationSize',
@@ -121,7 +123,7 @@ export default Ember.Controller.extend({
   ),
 
   // alerts with pagination
-  paginatedSelectedAlerts: Ember.computed(
+  paginatedSelectedAlerts: computed(
     'selectedAlerts.@each',
     'pageSize',
     'currentPage',
@@ -163,8 +165,8 @@ export default Ember.Controller.extend({
             return alert.id === id;
           });
           if (foundAlert) {
-            Ember.set(foundAlert, 'application', config.application);
-            Ember.set(foundAlert, 'group', config.name);
+            set(foundAlert, 'application', config.application);
+            set(foundAlert, 'group', config.name);
           }
         }
       }

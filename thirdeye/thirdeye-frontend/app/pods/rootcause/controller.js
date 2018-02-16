@@ -1,5 +1,18 @@
-import Ember from 'ember';
-import { filterObject, filterPrefix, toBaselineUrn, toCurrentUrn, toOffsetUrn, toFilters, appendFilters, dateFormatFull } from 'thirdeye-frontend/utils/rca-utils';
+import { observer, computed } from '@ember/object';
+import { later, debounce } from '@ember/runloop';
+import { reads, gt, or } from '@ember/object/computed';
+import { inject as service } from '@ember/service';
+import Controller from '@ember/controller';
+import {
+  filterObject,
+  filterPrefix,
+  toBaselineUrn,
+  toCurrentUrn,
+  toOffsetUrn,
+  toFilters,
+  appendFilters,
+  dateFormatFull
+} from 'thirdeye-frontend/utils/rca-utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
 import filterBarConfig from 'thirdeye-frontend/mocks/filterBarConfig';
 import fetch from 'fetch';
@@ -30,7 +43,7 @@ const ROOTCAUSE_SESSION_PERMISSIONS_READ_WRITE = 'READ_WRITE';
 
 // TODO: Update module import to comply by new Ember standards
 
-export default Ember.Controller.extend({
+export default Controller.extend({
   queryParams: [
     'metricId',
     'anomalyId',
@@ -56,29 +69,24 @@ export default Ember.Controller.extend({
   //
   // services
   //
-  authService: Ember.inject.service('session'),
+  authService: service('session'),
 
-  entitiesService: Ember.inject.service('rootcause-entities-cache'),
+  entitiesService: service('rootcause-entities-cache'),
 
-  timeseriesService: Ember.inject.service('rootcause-timeseries-cache'),
+  timeseriesService: service('rootcause-timeseries-cache'),
 
-  aggregatesService: Ember.inject.service('rootcause-aggregates-cache'),
+  aggregatesService: service('rootcause-aggregates-cache'),
 
-  breakdownsService: Ember.inject.service('rootcause-breakdowns-cache'),
+  breakdownsService: service('rootcause-breakdowns-cache'),
 
-  scoresService: Ember.inject.service('rootcause-scores-cache'),
+  scoresService: service('rootcause-scores-cache'),
 
-  sessionService: Ember.inject.service('rootcause-session-datasource'),
+  sessionService: service('rootcause-session-datasource'),
 
   //
   // user details
   //
-
-  /**
-   * Active user name
-   * @type {string}
-   */
-  username: Ember.computed.reads('authService.data.authenticated.name'),
+  username: reads('authService.data.authenticated.name'),
 
   //
   // user selection
@@ -212,7 +220,7 @@ export default Ember.Controller.extend({
 
     // This is a flag for the acceptance test for rootcause to prevent it from timing out because of this run loop
     if (config.environment !== 'test') {
-      Ember.run.later(this, this._onCheckSessionTimer, ROOTCAUSE_SESSION_TIMER_INTERVAL);
+      later(this, this._onCheckSessionTimer, ROOTCAUSE_SESSION_TIMER_INTERVAL);
     }
   },
 
@@ -238,7 +246,7 @@ export default Ember.Controller.extend({
    * scores:       entity scores as computed by backend pipelines (e.g. metric anomality score)
    *               (typically displayed in metrics table)
    */
-  _contextObserver: Ember.observer(
+  _contextObserver: observer(
     'context',
     'entities',
     'selectedUrns',
@@ -302,7 +310,7 @@ export default Ember.Controller.extend({
    * Setup observer for context and default selection
    * May run multiple times while entities are loading.
    */
-  _setupObserver: Ember.observer(
+  _setupObserver: observer(
     'context',
     'entities',
     'scores',
@@ -337,32 +345,32 @@ export default Ember.Controller.extend({
   /**
    * Subscribed entities cache
    */
-  entities: Ember.computed.reads('entitiesService.entities'),
+  entities: reads('entitiesService.entities'),
 
   /**
    * Subscribed timeseries cache
    */
-  timeseries: Ember.computed.reads('timeseriesService.timeseries'),
+  timeseries: reads('timeseriesService.timeseries'),
 
   /**
    * Subscribed aggregates cache
    */
-  aggregates: Ember.computed.reads('aggregatesService.aggregates'),
+  aggregates: reads('aggregatesService.aggregates'),
 
   /**
    * Subscribed breakdowns cache
    */
-  breakdowns: Ember.computed.reads('breakdownsService.breakdowns'),
+  breakdowns: reads('breakdownsService.breakdowns'),
 
   /**
    * Subscribed scores cache
    */
-  scores: Ember.computed.reads('scoresService.scores'),
+  scores: reads('scoresService.scores'),
 
   /**
    * Primary metric urn for rootcause search
    */
-  metricUrn: Ember.computed(
+  metricUrn: computed(
     'context',
     function () {
       const { context } = this.getProperties('context');
@@ -377,7 +385,7 @@ export default Ember.Controller.extend({
   /**
    * Visible series and events in timeseries chart
    */
-  chartSelectedUrns: Ember.computed(
+  chartSelectedUrns: computed(
     'entities',
     'selectedUrns',
     'invisibleUrns',
@@ -395,7 +403,7 @@ export default Ember.Controller.extend({
   /**
    * (Event) entities for event table as filtered by the side bar
    */
-  eventTableEntities: Ember.computed(
+  eventTableEntities: computed(
     'entities',
     'filteredUrns',
     function () {
@@ -412,7 +420,7 @@ export default Ember.Controller.extend({
   /**
    * (Event) entities for filtering in the side bar
    */
-  eventFilterEntities: Ember.computed(
+  eventFilterEntities: computed(
     'entities',
     function () {
       const { entities } = this.getProperties('entities');
@@ -423,7 +431,7 @@ export default Ember.Controller.extend({
   /**
    * Visible entities for tooltip
    */
-  tooltipEntities: Ember.computed(
+  tooltipEntities: computed(
     'entities',
     'invisibleUrns',
     'hoverUrns',
@@ -437,34 +445,34 @@ export default Ember.Controller.extend({
   //
   // loading indicators
   //
-  isLoadingEntities: Ember.computed.gt('entitiesService.pending.size', 0),
+  isLoadingEntities: gt('entitiesService.pending.size', 0),
 
-  isLoadingTimeseries: Ember.computed.gt('timeseriesService.pending.size', 0),
+  isLoadingTimeseries: gt('timeseriesService.pending.size', 0),
 
-  isLoadingAggregates: Ember.computed.gt('aggregatesService.pending.size', 0),
+  isLoadingAggregates: gt('aggregatesService.pending.size', 0),
 
-  isLoadingBreakdowns: Ember.computed.gt('breakdownsService.pending.size', 0),
+  isLoadingBreakdowns: gt('breakdownsService.pending.size', 0),
 
-  isLoadingScores: Ember.computed.gt('scoresService.pending.size', 0),
+  isLoadingScores: gt('scoresService.pending.size', 0),
 
-  loadingFrameworks: Ember.computed.reads('entitiesService.pending'),
+  loadingFrameworks: reads('entitiesService.pending'),
 
   //
   // error indicators
   //
-  hasErrorsRoute: Ember.computed.gt('routeErrors.size', 0),
+  hasErrorsRoute: gt('routeErrors.size', 0),
 
-  hasErrorsEntities: Ember.computed.gt('entitiesService.errors.size', 0),
+  hasErrorsEntities: gt('entitiesService.errors.size', 0),
 
-  hasErrorsTimeseries: Ember.computed.gt('timeseriesService.errors.size', 0),
+  hasErrorsTimeseries: gt('timeseriesService.errors.size', 0),
 
-  hasErrorsAggregates: Ember.computed.gt('aggregatesService.errors.size', 0),
+  hasErrorsAggregates: gt('aggregatesService.errors.size', 0),
 
-  hasErrorsBreakdowns: Ember.computed.gt('breakdownsService.errors.size', 0),
+  hasErrorsBreakdowns: gt('breakdownsService.errors.size', 0),
 
-  hasErrorsScores: Ember.computed.gt('scoresService.errors.size', 0),
+  hasErrorsScores: gt('scoresService.errors.size', 0),
 
-  hasServiceErrors: Ember.computed.or(
+  hasServiceErrors: or(
     'hasErrorsEntities',
     'hasErrorsTimeseries',
     'hasErrorsAggregates',
@@ -475,7 +483,7 @@ export default Ember.Controller.extend({
   //
   // session handling
   //
-  sessionCanSave: Ember.computed(
+  sessionCanSave: computed(
     'sessionPermissions',
     'sessionOwner',
     'username',
@@ -490,7 +498,7 @@ export default Ember.Controller.extend({
     }
   ),
 
-  sessionCanCopy: Ember.computed(
+  sessionCanCopy: computed(
     'sessionId',
     'sessionPermissions',
     'sessionOwner',
@@ -591,7 +599,7 @@ export default Ember.Controller.extend({
     // debounce: do not run if destroyed
     if (this.isDestroyed) { return; }
 
-    Ember.run.debounce(this, this._onCheckSessionTimer, ROOTCAUSE_SESSION_TIMER_INTERVAL);
+    debounce(this, this._onCheckSessionTimer, ROOTCAUSE_SESSION_TIMER_INTERVAL);
 
     if (!sessionId) { return; }
 

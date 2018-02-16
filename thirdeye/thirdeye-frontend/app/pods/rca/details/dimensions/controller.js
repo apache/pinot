@@ -1,7 +1,8 @@
-import Ember from 'ember';
+import { debounce, later } from '@ember/runloop';
+import Controller from '@ember/controller';
 import moment from 'moment';
 
-export default Ember.Controller.extend({
+export default Controller.extend({
   queryParams: ['dimension'],
   dimension: 'All',
 
@@ -50,7 +51,7 @@ export default Ember.Controller.extend({
      */
     setDateParams([start, end]) {
       this.set('tableIsLoading', true);
-      Ember.run.debounce(this, this.get('actions.setNewDate'), { start, end }, 500);
+      debounce(this, this.get('actions.setNewDate'), { start, end }, 500);
     },
 
     /**
@@ -60,7 +61,7 @@ export default Ember.Controller.extend({
     onTabChange(tab) {
       const currentTab = this.get('selectedTab');
       if (currentTab !== tab) {
-        Ember.run.later(() => {
+        later(() => {
           this.setProperties({
             selectedTab: tab
           });

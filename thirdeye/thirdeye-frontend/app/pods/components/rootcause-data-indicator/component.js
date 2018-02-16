@@ -1,5 +1,9 @@
 import Component from '@ember/component';
-import { computed, setProperties, getProperties } from '@ember/object';
+import {
+  computed,
+  setProperties,
+  getProperties
+} from '@ember/object';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import moment from 'moment';
 import fetch from 'fetch';

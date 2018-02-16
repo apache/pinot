@@ -1,8 +1,10 @@
-import Ember from 'ember';
+import { later } from '@ember/runloop';
+import { inject as service } from '@ember/service';
+import Route from '@ember/routing/route';
 import { Actions } from 'thirdeye-frontend/actions/dimensions';
 
-export default Ember.Route.extend({
-  redux: Ember.inject.service(),
+export default Route.extend({
+  redux: service(),
   model(params, transition) {
     const redux = this.get('redux');
     const { metricId } = transition.params['rca.details'];
@@ -39,7 +41,7 @@ export default Ember.Route.extend({
         start = start || oldParams.analysisStart;
         end = end || oldParams.analysisEnd;
 
-        Ember.run.later(() => {
+        later(() => {
           redux.dispatch(Actions.fetchHeatMapData(
             Number(start),
             Number(end)

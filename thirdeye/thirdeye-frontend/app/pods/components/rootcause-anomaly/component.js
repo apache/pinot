@@ -1,7 +1,18 @@
 import Component from "@ember/component";
-import { computed, setProperties, getProperties, get } from '@ember/object';
+import {
+  computed,
+  setProperties,
+  getProperties,
+  get
+} from '@ember/object';
 import moment from 'moment';
-import { filterPrefix, toOffsetUrn, toColorDirection, isInverse, toMetricLabel } from 'thirdeye-frontend/utils/rca-utils';
+import {
+  filterPrefix,
+  toOffsetUrn,
+  toColorDirection,
+  isInverse,
+  toMetricLabel
+} from 'thirdeye-frontend/utils/rca-utils';
 import { humanizeChange } from 'thirdeye-frontend/utils/utils';
 import { equal, reads } from '@ember/object/computed';
 

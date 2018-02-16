@@ -1,6 +1,12 @@
 import Component from '@ember/component';
 import moment from 'moment';
-import { computed, get, set, getProperties, setProperties } from '@ember/object';
+import {
+  computed,
+  get,
+  set,
+  getProperties,
+  setProperties
+} from '@ember/object';
 import translate from 'thirdeye-frontend/utils/translate';
 
 /**

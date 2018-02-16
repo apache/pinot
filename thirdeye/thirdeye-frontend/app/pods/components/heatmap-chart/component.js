@@ -1,7 +1,7 @@
-import Ember from 'ember';
+import $ from 'jquery';
+import Component from '@ember/component';
+import { get } from '@ember/object';
 import d3 from 'd3';
-
-const { get } = Ember;
 
 // TODO: move to utils file
 const getBackgroundColor = function (factor = 0, inverse = false) {
@@ -26,7 +26,7 @@ const getTextColor = function (factor = 0, inverse = false) {
   return opacity < 0.5 ? '#000000' : '#ffffff';
 };
 
-export default Ember.Component.extend({
+export default Component.extend({
   cells: null, // {}
 
   /**
@@ -86,7 +86,7 @@ export default Ember.Component.extend({
           });
         });
 
-      const domElem = Ember.$(dimensionPlaceHolderId);
+      const domElem = $(dimensionPlaceHolderId);
       const height = domElem.height();
       const width = domElem.width();
       const treeMap = d3.layout.treemap()

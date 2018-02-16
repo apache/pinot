@@ -1,6 +1,14 @@
 import Helper from '@ember/component/helper';
 import { htmlSafe } from '@ember/string';
-import { filterPrefix, toBaselineUrn, toCurrentUrn, toMetricLabel, toEventLabel, toColorDirection, isInverse } from 'thirdeye-frontend/utils/rca-utils';
+import {
+  filterPrefix,
+  toBaselineUrn,
+  toCurrentUrn,
+  toMetricLabel,
+  toEventLabel,
+  toColorDirection,
+  isInverse
+} from 'thirdeye-frontend/utils/rca-utils';
 import { humanizeChange, humanizeFloat } from 'thirdeye-frontend/utils/utils';
 import moment from 'moment';
 import d3 from 'd3';

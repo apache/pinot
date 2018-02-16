@@ -1,4 +1,4 @@
-import Ember from 'ember';
+import { helper } from '@ember/component/helper';
 
 /**
  * Returns the value referred to by key in dict. Avoids resolving dot-syntax as done by the builtin
@@ -13,5 +13,5 @@ export function getSafe([dict, key]) {
   return dict[key];
 }
 
-export default Ember.Helper.helper(getSafe);
+export default helper(getSafe);
 

@@ -1,4 +1,7 @@
-import Ember from 'ember';
+import { isArray } from '@ember/array';
+import { computed } from '@ember/object';
+import { later } from '@ember/runloop';
+import Component from '@ember/component';
 import _ from 'lodash';
 
 const GRANULARITY_MAPPING = {
@@ -34,7 +37,7 @@ const filterRow = (rows, startIndex, endIndex) => {
   return newRows;
 };
 
-export default Ember.Component.extend({
+export default Component.extend({
   metrics: null,
   showDetails: false,
   granularity: 'DAYS',
@@ -50,7 +53,7 @@ export default Ember.Component.extend({
   didRender(...args) {
     this._super(args);
 
-    Ember.run.later(() => {
+    later(() => {
       this.attrs.stopLoading();
     });
   },
@@ -58,7 +61,7 @@ export default Ember.Component.extend({
   /**
    * Determines the date format based on granularity
    */
-  dateFormat: Ember.computed('granularity', function() {
+  dateFormat: computed('granularity', function() {
     const granularity = this.get('granularity');
     return GRANULARITY_MAPPING[granularity];
   }),
@@ -66,28 +69,28 @@ export default Ember.Component.extend({
   /**
    * Contribution data of the primary metric
    */
-  primaryMetricRows: Ember.computed('primaryMetric', function() {
+  primaryMetricRows: computed('primaryMetric', function() {
     const metrics = this.get('primaryMetric');
 
-    return Ember.isArray(metrics) ? [...metrics] : [Object.assign({}, metrics)];
+    return isArray(metrics) ? [...metrics] : [Object.assign({}, metrics)];
   }),
 
   /**
    * Contribution data of the related metrics
    */
-  relatedMetricRows: Ember.computed('relatedMetrics', function() {
+  relatedMetricRows: computed('relatedMetrics', function() {
     const metrics = this.get('relatedMetrics');
 
-    return Ember.isArray(metrics) ? [...metrics] : [Object.assign({}, metrics)];
+    return isArray(metrics) ? [...metrics] : [Object.assign({}, metrics)];
   }),
 
   /**
    * Contribution data of the dimension
    */
-  dimensionRows: Ember.computed('dimensions', function() {
+  dimensionRows: computed('dimensions', function() {
     const dimensions = this.get('dimensions');
 
-    return Ember.isArray(dimensions) ? [...dimensions] : [Object.assign({}, dimensions)];
+    return isArray(dimensions) ? [...dimensions] : [Object.assign({}, dimensions)];
   }),
 
   /**
@@ -96,7 +99,7 @@ export default Ember.Component.extend({
    * @param {Number} start Start date in unix ms
    * @return {Number} The start Index
    */
-  startIndex: Ember.computed('dates', 'start', function() {
+  startIndex: computed('dates', 'start', function() {
     const dates = this.get('dates');
     const start = this.get('start');
 
@@ -114,7 +117,7 @@ export default Ember.Component.extend({
    * @param {Number} end end date in unix ms
    * @return {Number} The end Index
    */
-  endIndex: Ember.computed('dates', 'end', function() {
+  endIndex: computed('dates', 'end', function() {
     const dates = this.get('dates');
     const end = this.get('end');
 
@@ -129,7 +132,7 @@ export default Ember.Component.extend({
   /**
    * Filters the date to return only those in range
    */
-  filteredDates: Ember.computed(
+  filteredDates: computed(
     'startIndex',
     'endIndex',
     'dates',
@@ -145,7 +148,7 @@ export default Ember.Component.extend({
     }
   ),
 
-  filteredPrimaryMetricRows: Ember.computed(
+  filteredPrimaryMetricRows: computed(
     'startIndex',
     'endIndex',
     'primaryMetricRows',
@@ -159,7 +162,7 @@ export default Ember.Component.extend({
     }
   ),
 
-  filteredRelatedMetricRows: Ember.computed(
+  filteredRelatedMetricRows: computed(
     'startIndex',
     'endIndex',
     'relatedMetricRows',
@@ -173,7 +176,7 @@ export default Ember.Component.extend({
     }
   ),
 
-  filteredDimensionRows: Ember.computed(
+  filteredDimensionRows: computed(
     'startIndex',
     'endIndex',
     'dimensionRows',

@@ -3,10 +3,10 @@
  * @module  components/te-navbar
  * @exports anomaly-navbar
  */
-import Ember from 'ember';
+import Component from '@ember/component';
 import config from '../../../config/environment';
 
-export default Ember.Component.extend({
+export default Component.extend({
 
   /**
    * Component's tag name

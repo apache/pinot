@@ -3,11 +3,14 @@
  * @module  application
  * @exports application
  */
-import Ember from 'ember';
+import { inject as service } from '@ember/service';
 
-export default Ember.Controller.extend({
-  showNavbar: Ember.computed.alias('model'),
-  session: Ember.inject.service(),
+import { alias } from '@ember/object/computed';
+import Controller from '@ember/controller';
+
+export default Controller.extend({
+  showNavbar: alias('model'),
+  session: service(),
 
   /**
    * Global navbar items

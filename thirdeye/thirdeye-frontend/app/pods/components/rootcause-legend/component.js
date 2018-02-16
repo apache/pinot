@@ -1,7 +1,15 @@
-import Ember from 'ember';
-import { toCurrentUrn, toBaselineUrn, filterPrefix, hasPrefix, toMetricLabel, toEventLabel } from 'thirdeye-frontend/utils/rca-utils';
+import { computed } from '@ember/object';
+import Component from '@ember/component';
+import {
+  toCurrentUrn,
+  toBaselineUrn,
+  filterPrefix,
+  hasPrefix,
+  toMetricLabel,
+  toEventLabel
+} from 'thirdeye-frontend/utils/rca-utils';
 
-export default Ember.Component.extend({
+export default Component.extend({
   entities: null, // {}
 
   selectedUrns: null, // Set
@@ -14,7 +22,7 @@ export default Ember.Component.extend({
 
   classNames: ['rootcause-legend'],
 
-  validUrns: Ember.computed(
+  validUrns: computed(
     'entities',
     'selectedUrns',
     function () {
@@ -23,7 +31,7 @@ export default Ember.Component.extend({
     }
   ),
 
-  metrics: Ember.computed(
+  metrics: computed(
     'entities',
     'validUrns',
     function () {
@@ -41,7 +49,7 @@ export default Ember.Component.extend({
    * a Mapping of event Types to a mapping of urns
    * @type {Objectgit sta}
    */
-  events: Ember.computed(
+  events: computed(
     'entities',
     'validUrns',
     function () {
@@ -59,7 +67,7 @@ export default Ember.Component.extend({
     }
   ),
 
-  colors: Ember.computed(
+  colors: computed(
     'entities',
     'validUrns',
     function () {
@@ -73,14 +81,14 @@ export default Ember.Component.extend({
     }
   ),
 
-  hasMetrics: Ember.computed(
+  hasMetrics: computed(
     'metrics',
     function () {
       return Object.keys(this.get('metrics')).length > 0;
     }
   ),
 
-  hasEvents: Ember.computed(
+  hasEvents: computed(
     'events',
     function () {
       return Object.keys(this.get('events')).length > 0;

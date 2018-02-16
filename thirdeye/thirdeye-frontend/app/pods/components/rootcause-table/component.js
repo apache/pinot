@@ -1,9 +1,10 @@
-import Ember from 'ember';
+import { computed } from '@ember/object';
+import Component from '@ember/component';
 import _ from 'lodash';
 import moment from 'moment';
 import { toEventLabel } from 'thirdeye-frontend/utils/rca-utils';
 
-export default Ember.Component.extend({
+export default Component.extend({
   columns: null, // []
 
   entities: null, // {}
@@ -17,7 +18,7 @@ export default Ember.Component.extend({
    * Sets the 'isSelected' property to respond to table selection
    * @type {Object} - object with keys as urns and values as entities
    */
-  records: Ember.computed(
+  records: computed(
     'entities',
     'selectedUrns',
     function () {
@@ -34,7 +35,7 @@ export default Ember.Component.extend({
    * Add human readable date properties to the list of values
    * @type {Array[Objects]} - array of entities
    */
-  data: Ember.computed(
+  data: computed(
     'records',
     function () {
       let values = Object.values(this.get('records'));
@@ -61,7 +62,7 @@ export default Ember.Component.extend({
    * Keeps track of items that are selected in the table
    * @type {Array}
    */
-  preselectedItems: Ember.computed(
+  preselectedItems: computed(
     'records',
     'selectedUrns',
     function () {

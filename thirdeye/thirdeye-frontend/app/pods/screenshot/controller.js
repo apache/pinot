@@ -1,7 +1,9 @@
-import Ember from 'ember';
+import { alias } from '@ember/object/computed';
+import { computed } from '@ember/object';
+import Controller from '@ember/controller';
 import moment from 'moment';
 
-export default Ember.Controller.extend({
+export default Controller.extend({
   // Default Legend text and color
   legendText: {
     dotted: {
@@ -23,7 +25,7 @@ export default Ember.Controller.extend({
   },
 
   // Displaying points for screenshot for n < 100
-  point: Ember.computed('anomaly.dates', function() {
+  point: computed('anomaly.dates', function() {
     const datesCount = this.get('anomaly.dates.length');
     return {
       show: datesCount <= 100
@@ -31,15 +33,15 @@ export default Ember.Controller.extend({
   }),
 
   // Primary Anomaly details
-  anomaly: Ember.computed.alias('model.anomalyDetailsList.firstObject'),
+  anomaly: alias('model.anomalyDetailsList.firstObject'),
 
   // Name of the metric for legend
-  metricName: Ember.computed.alias('anomaly.metric'),
+  metricName: alias('anomaly.metric'),
 
   /** Data Massaging the anomaly for the graph component
    * @returns {Object}
    */
-  primaryMetric: Ember.computed(
+  primaryMetric: computed(
     'anomaly',
     'metricName',
     function() {
@@ -63,21 +65,21 @@ export default Ember.Controller.extend({
    * Formats dates into ms unix
    * @returns {Array}
    */
-  dates: Ember.computed('anomaly.dates.@each', function() {
+  dates: computed('anomaly.dates.@each', function() {
     const dates = this.getWithDefault('anomaly.dates', []);
     const unixDates = dates.map((date) => moment(date).valueOf());
 
     return ['date', ...unixDates];
   }),
 
-  current: Ember.computed.alias('anomaly.currentValues'),
-  expected: Ember.computed.alias('anomaly.baselineValues'),
+  current: alias('anomaly.currentValues'),
+  expected: alias('anomaly.baselineValues'),
 
   /**
    * Data Massages current and expected values for the graph component
    * @returns {Array}
    */
-  columns: Ember.computed(
+  columns: computed(
     'current',
     'expected',
     'metricName',

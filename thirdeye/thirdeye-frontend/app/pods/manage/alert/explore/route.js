@@ -11,7 +11,15 @@ import { later } from "@ember/runloop";
 import { set, get, setProperties } from '@ember/object';
 import { isPresent } from "@ember/utils";
 import { checkStatus, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
-import { enhanceAnomalies, toIdGroups, setUpTimeRangeOptions, getTopDimensions, buildMetricDataUrl, extractSeverity, getDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
+import {
+  enhanceAnomalies,
+  toIdGroups,
+  setUpTimeRangeOptions,
+  getTopDimensions,
+  buildMetricDataUrl,
+  extractSeverity,
+  getDuration
+} from 'thirdeye-frontend/utils/manage-alert-utils';
 
 /**
  * Shorthand for setting date defaults

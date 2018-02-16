@@ -1,8 +1,9 @@
-import Ember from 'ember';
+import { inject as service } from '@ember/service';
+import Controller from '@ember/controller';
 
-export default Ember.Controller.extend({
+export default Controller.extend({
   errorMessage: null,
-  session: Ember.inject.service(),
+  session: service(),
   queryParams: ['fromUrl'],
   fromUrl: null,
 

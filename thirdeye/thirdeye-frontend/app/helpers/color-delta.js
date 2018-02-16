@@ -1,4 +1,4 @@
-import Ember from 'ember';
+import { helper } from '@ember/component/helper';
 import { toColorDirection } from 'thirdeye-frontend/utils/rca-utils';
 
 /**
@@ -13,4 +13,4 @@ export function colorDelta([value = 'N/A', inverse = false]) {
   return toColorDirection(value, inverse);
 }
 
-export default Ember.Helper.helper(colorDelta);
+export default helper(colorDelta);

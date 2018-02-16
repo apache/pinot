@@ -3,11 +3,15 @@
  * @module self-serve/create/import-metric
  * @exports import-metric
  */
-import Ember from 'ember';
+import { and } from '@ember/object/computed';
+
+import { isPresent } from '@ember/utils';
+import { computed } from '@ember/object';
+import Controller from '@ember/controller';
 import fetch from 'fetch';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
-export default Ember.Controller.extend({
+export default Controller.extend({
   /**
    * Import Defaults
    */
@@ -25,7 +29,7 @@ export default Ember.Controller.extend({
    * @method isSubmitDisabled
    * @return {Boolean} isDisabled
    */
-  isSubmitDisabled: Ember.computed(
+  isSubmitDisabled: computed(
     'importExistingDashboardName',
     'importCustomNewDataset',
     'importCustomNewMetric',
@@ -39,14 +43,14 @@ export default Ember.Controller.extend({
       const newMetricField = this.get('importCustomNewMetric');
       const newRrdField = this.get('importCustomNewRrd');
       // If existing dashboard field is filled, release submit button.
-      if (Ember.isPresent(existingNameField) && !isExistingNameError) {
+      if (isPresent(existingNameField) && !isExistingNameError) {
         isDisabled = false;
       }
       // If any of the 'import custom' fields are filled, assume user will go the RRD import route. Disable submit.
-      if (Ember.isPresent(newNameField) || Ember.isPresent(newRrdField) || Ember.isPresent(newMetricField)) {
+      if (isPresent(newNameField) || isPresent(newRrdField) || isPresent(newMetricField)) {
         isDisabled = true;
         // Enable submit if all required RRD fields are present
-        if (Ember.isPresent(newNameField) && Ember.isPresent(newRrdField) && Ember.isPresent(newMetricField)) {
+        if (isPresent(newNameField) && isPresent(newRrdField) && isPresent(newMetricField)) {
           isDisabled = false;
         }
       }
@@ -59,7 +63,7 @@ export default Ember.Controller.extend({
    * @method isExistingDashboardNameFieldDisabled
    * @return {Boolean} isExistingDashFieldDisabled
    */
-  isExistingDashFieldDisabled: Ember.computed(
+  isExistingDashFieldDisabled: computed(
     'importExistingDashboardName',
     'importCustomNewDataset',
     'importCustomNewMetric',
@@ -70,7 +74,7 @@ export default Ember.Controller.extend({
       const name = this.get('importCustomNewDataset');
       const metric = this.get('importCustomNewMetric');
       const isSubmitted = this.get('isSubmitDone');
-      return Ember.isPresent(rrd) || Ember.isPresent(name) || Ember.isPresent(metric) || isSubmitted;
+      return isPresent(rrd) || isPresent(name) || isPresent(metric) || isSubmitted;
     }
   ),
 
@@ -79,7 +83,7 @@ export default Ember.Controller.extend({
    * @method isFormDisabled
    * @return {Boolean} isFormDisabled
    */
-  isFormDisabled: Ember.computed.and('isExistingDashFieldDisabled', 'isCustomDashFieldDisabled'),
+  isFormDisabled: and('isExistingDashFieldDisabled', 'isCustomDashFieldDisabled'),
 
   /**
    * Validates whether the entered dashboard name exists in inGraphs

@@ -1,6 +1,6 @@
+import { hash } from 'rsvp';
 import { type } from './utils';
 import fetch from 'fetch';
-import Ember from 'ember';
 import moment from 'moment';
 import { COMPARE_MODE_MAPPING } from './constants';
 
@@ -171,7 +171,7 @@ function fetchRelatedMetricData() {
       return hash;
     }, {});
 
-    return Ember.RSVP.hash(promiseHash)
+    return hash(promiseHash)
       .then(res => dispatch(loadRelatedMetricsData(res)))
       .catch(() => {
         dispatch(requestFail());

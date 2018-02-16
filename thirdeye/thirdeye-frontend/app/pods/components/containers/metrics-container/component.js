@@ -1,4 +1,4 @@
-import Ember from 'ember';
+import Component from '@ember/component';
 import { connect } from 'ember-redux';
 import _ from 'lodash';
 
@@ -50,5 +50,5 @@ function actions() {
   return {};
 }
 
-export default connect(select, actions)(Ember.Component.extend({
+export default connect(select, actions)(Component.extend({
 }));

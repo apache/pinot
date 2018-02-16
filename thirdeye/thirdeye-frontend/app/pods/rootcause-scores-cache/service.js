@@ -1,10 +1,14 @@
-import Ember from 'ember';
-import { trimTimeRanges, filterPrefix, toBaselineRange } from 'thirdeye-frontend/utils/rca-utils';
+import Service from '@ember/service';
+import {
+  trimTimeRanges,
+  filterPrefix,
+  toBaselineRange
+} from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
 
-export default Ember.Service.extend({
+export default Service.extend({
   scores: null, // {}
 
   context: null, // {}

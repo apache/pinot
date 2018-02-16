@@ -16,10 +16,13 @@
  * @exports entity-filter
  */
 
-import Ember from 'ember';
+import { set } from '@ember/object';
+
+import { isPresent } from '@ember/utils';
+import Component from '@ember/component';
 import _ from 'lodash';
 
-export default Ember.Component.extend({
+export default Component.extend({
   /**
    * Overwrite the init function
    * @param {Object} args - Attributes for this component
@@ -35,7 +38,7 @@ export default Ember.Component.extend({
       let filterKeys = [];
 
       // Dedupe and remove null or empty values
-      filterKeys = Array.from(new Set(block.filterKeys.filter(value => Ember.isPresent(value))));
+      filterKeys = Array.from(new Set(block.filterKeys.filter(value => isPresent(value))));
       // Generate a name and Id for each one based on provided filter keys
       filterKeys.forEach((filter) => {
         filtersArray.push({
@@ -69,7 +72,7 @@ export default Ember.Component.extend({
      */
     onFilterSelection(category, filterObj) {
       // Note: toggleProperty will not be able to find 'filterObj', as it is not an observed property
-      Ember.set(filterObj, 'isActive', !filterObj.isActive);
+      set(filterObj, 'isActive', !filterObj.isActive);
 
       if (filterObj.isActive) {
         this.get('alertFilters').push({ category, filter: filterObj.name, isActive: filterObj.isActive });
@@ -89,7 +92,7 @@ export default Ember.Component.extend({
      */
     toggleDisplay(clickedBlock) {
       // Note: toggleProperty will not be able to find 'filterBlocks', as it is not an observed property
-      Ember.set(clickedBlock, 'isHidden', !clickedBlock.isHidden);
+      set(clickedBlock, 'isHidden', !clickedBlock.isHidden);
     }
   }
 });
