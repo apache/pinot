@@ -53,8 +53,6 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class RCAFrameworkRunner {
-  private static final String ROOTCAUSE_LOGGER_NAME = "com.linkedin.thirdeye.rootcause";
-
   private static final String CLI_THIRDEYE_CONFIG = "thirdeye-config";
   private static final String CLI_WINDOW_SIZE = "window-size";
   private static final String CLI_BASELINE_OFFSET = "baseline-offset";
@@ -65,6 +63,11 @@ public class RCAFrameworkRunner {
   private static final String CLI_INTERACTIVE = "interactive";
   private static final String CLI_VERBOSE = "verbose";
   private static final String CLI_FRAMEWORK = "framework";
+  private static final String CLI_LOG = "log";
+  private static final String CLI_LOG_DEBUG = "log-debug";
+  private static final String CLI_LOG_INFO = "log-info";
+  private static final String CLI_LOG_WARN = "log-warn";
+  private static final String CLI_LOG_ERROR = "log-error";
 
   private static final DateTimeFormatter ISO8601 = ISODateTimeFormat.basicDateTimeNoMillis();
 
@@ -85,6 +88,12 @@ public class RCAFrameworkRunner {
     options.addOption(null, CLI_INTERACTIVE, false, "enters interacive REPL mode (specified entities will be added automatically)");
     options.addOption("v",  CLI_VERBOSE, false, "verbose output mode (set RCA log level to DEBUG)");
 
+    options.addOption(null, CLI_LOG, true, "default log level (default: INFO)");
+    options.addOption(null, CLI_LOG_DEBUG, true, "debug loggers (packages, separated by comma)");
+    options.addOption(null, CLI_LOG_INFO, true, "info loggers (packages, separated by comma)");
+    options.addOption(null, CLI_LOG_WARN, true, "warn loggers (packages, separated by comma)");
+    options.addOption(null, CLI_LOG_ERROR, true, "error loggers (packages, separated by comma)");
+
     Parser parser = new BasicParser();
     CommandLine cmd = null;
     try {
@@ -101,11 +110,21 @@ public class RCAFrameworkRunner {
     }
 
     // runtime logger config
-    ((Logger)LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME)).setLevel(Level.WARN);
-    ((Logger)LoggerFactory.getLogger(ROOTCAUSE_LOGGER_NAME)).setLevel(Level.INFO);
+    setLogger(Logger.ROOT_LOGGER_NAME, Level.INFO);
 
+    if (cmd.hasOption(CLI_LOG))
+      setLogger(Logger.ROOT_LOGGER_NAME, Level.valueOf(cmd.getOptionValue(CLI_LOG)));
+    if (cmd.hasOption(CLI_LOG_DEBUG))
+      setLogger(cmd.getOptionValue(CLI_LOG_DEBUG), Level.DEBUG);
+    if (cmd.hasOption(CLI_LOG_INFO))
+      setLogger(cmd.getOptionValue(CLI_LOG_INFO), Level.INFO);
+    if (cmd.hasOption(CLI_LOG_WARN))
+      setLogger(cmd.getOptionValue(CLI_LOG_WARN), Level.WARN);
+    if (cmd.hasOption(CLI_LOG_ERROR))
+      setLogger(cmd.getOptionValue(CLI_LOG_ERROR), Level.ERROR);
+    
     if(cmd.hasOption(CLI_VERBOSE))
-      ((Logger)LoggerFactory.getLogger(ROOTCAUSE_LOGGER_NAME)).setLevel(Level.DEBUG);
+      setLogger(Logger.ROOT_LOGGER_NAME, Level.DEBUG);
 
     // config
     File config = new File(cmd.getOptionValue(CLI_THIRDEYE_CONFIG));
@@ -295,5 +314,11 @@ public class RCAFrameworkRunner {
     Option optConfig = new Option(opt, longOpt, hasArg, description);
     optConfig.setRequired(true);
     options.addOption(optConfig);
+  }
+
+  private static void setLogger(String loggerString, Level level) {
+    for (String logger : loggerString.split(",")) {
+      ((Logger)LoggerFactory.getLogger(logger)).setLevel(level);
+    }
   }
 }
