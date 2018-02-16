@@ -299,7 +299,7 @@ public class PinotHelixTaskResourceManager {
    * @return Helix JobQueue name
    */
   @Nonnull
-  protected static String getHelixJobQueueName(@Nonnull String taskType) {
+  public static String getHelixJobQueueName(@Nonnull String taskType) {
     return TASK_QUEUE_PREFIX + taskType;
   }
 
