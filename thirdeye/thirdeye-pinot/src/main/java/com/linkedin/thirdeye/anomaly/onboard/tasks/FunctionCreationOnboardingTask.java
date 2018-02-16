@@ -290,7 +290,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       case HOURS:
         anomalyFunctionSpec.setType("REGRESSION_GAUSSIAN_SCAN");
         anomalyFunctionSpec.setCron("0 0 14 1/1 * ? *");
-        anomalyFunctionSpec.setWindowSize(84);
+        anomalyFunctionSpec.setWindowSize(24);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
         anomalyFunctionSpec.setProperties("");
         break;
