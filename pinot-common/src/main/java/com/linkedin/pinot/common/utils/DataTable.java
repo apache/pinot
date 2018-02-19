@@ -41,7 +41,6 @@ public interface DataTable {
   @Nonnull
   byte[] toBytes()
       throws IOException;
-
   @Nonnull
   Map<String, String> getMetadata();
 

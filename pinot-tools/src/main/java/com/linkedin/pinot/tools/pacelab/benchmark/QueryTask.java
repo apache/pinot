@@ -24,7 +24,7 @@ import java.util.Random;
 public class QueryTask implements Runnable{
     protected Properties config;
     protected String[] queries;
-    protected Random rand = new Random();
+    protected Random rand = new Random(System.currentTimeMillis());
     protected PostQueryCommand postQueryCommand;
     protected String _dataDir;
     protected int _testDuration;
