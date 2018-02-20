@@ -124,4 +124,17 @@ public class PqlUtilsTest {
         + "key6 >= \"value6\" AND "
         + "key7 IN (\"value71\'\", \'value72\"\')");
   }
+
+  @Test
+  public  void testQuote() {
+    Assert.assertEquals(PqlUtils.quote("123"), "123");
+    Assert.assertEquals(PqlUtils.quote("abc"), "\"abc\"");
+    Assert.assertEquals(PqlUtils.quote("123\'"), "\"123\'\"");
+    Assert.assertEquals(PqlUtils.quote("abc\""), "\'abc\"\'");
+  }
+  
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public  void testQuoteFail() {
+    PqlUtils.quote("123\"\'");
+  }
 }

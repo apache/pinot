@@ -361,19 +361,22 @@ public class PqlUtils {
   }
 
   /**
-   * Surrounds a value with quote characters that are not contained in the value itself.
+   * Surrounds a value with appropriate quote characters.
    *
    * @param value value to be quoted
    * @return quoted value
    * @throws IllegalArgumentException if no unused quote char can be found
    */
-  private static String quote(String value) {
-    String quoteChar = "\"";
-    if (value.contains(quoteChar)) {
-      quoteChar = "\'";
-    }
-    if (value.contains(quoteChar)) {
-      throw new IllegalArgumentException(String.format("Could not find quote char for expression: %s", value));
+  static String quote(String value) {
+    String quoteChar = "";
+    if (!StringUtils.isNumeric(value)) {
+      quoteChar = "\"";
+      if (value.contains(quoteChar)) {
+        quoteChar = "\'";
+      }
+      if (value.contains(quoteChar)) {
+        throw new IllegalArgumentException(String.format("Could not find quote char for expression: %s", value));
+      }
     }
     return String.format("%s%s%s", quoteChar, value, quoteChar);
   }
