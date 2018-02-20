@@ -49,7 +49,7 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Override
   public Object get(int dictionaryId) {
-    return new String(_byteStore.get(dictionaryId));
+    return new String(_byteStore.get(dictionaryId), UTF_8);
   }
 
   @Override
@@ -71,7 +71,7 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   }
 
   private String getInternal(int dictId) {
-    return new String(_byteStore.get(dictId));
+    return new String(_byteStore.get(dictId), UTF_8);
   }
 
   @Override
@@ -127,7 +127,7 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
     String[] sortedValues = new String[numValues];
 
     for (int i = 0; i < numValues; i++) {
-      sortedValues[i] = new String(getInternal(i));
+      sortedValues[i] = getInternal(i);
     }
 
     Arrays.sort(sortedValues);
