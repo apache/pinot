@@ -122,8 +122,7 @@
         <div class="wow-card-body">
           {{formatNumber (formatDouble currentValue)}}
         </div>
-        <div class="wow-card-footer">&nbsp</div>
-        <div class="wow-card-footer">&nbsp</div>
+        <div class="wow-card-footer"></div>
       </li>
 
       {{#each wowResults as |wow|}}
@@ -136,10 +135,9 @@
             <span class="anomaly-change-delta {{colorDelta wow.change}}">({{formatPercent wow.change}})</span>
           </div>
           <div class="wow-card-footer">
-            <a href="{{wow.newUrl}}" target="_blank" class="thirdeye-link">Root Cause Analysis</a>
-          </div>
-          <div class="wow-card-footer">
-            <a href="{{wow.betaUrl}}" target="_blank" class="thirdeye-link">Root Cause Analysis (beta)</a>
+             {{#if wow.isLast}} 
+               <a href="{{wow.betaUrl}}" target="_blank" class="thirdeye-link">Root Cause Analysis</a>
+             {{/if}}
           </div>
         </li>
       {{/each}}

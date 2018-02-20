@@ -88,6 +88,7 @@ InvestigateView.prototype = {
           `compareMode=${wow.compareMode}&filters=${anomalyFunctionDimension}&granularity=${granularity}`;
 
         wow.betaUrl = `app/#/rootcause?anomalyId=${this.anomalyId}`
+        wow.isLast = wow.compareMode == 'Wo3W'
 
         return wow;
       });
