@@ -36,28 +36,28 @@ export default Component.extend({
       className: 'metrics-table__column metrics-table__column--small'
     }, {
       propertyName: 'wo1w',
-      template: 'custom/metrics-table-changes/wo1w',
+      template: 'custom/metrics-table-offset',
       sortedBy: 'sortable_wo1w',
       title: 'WoW',
       disableFiltering: true,
       className: 'metrics-table__column metrics-table__column--small'
     }, {
       propertyName: 'wo2w',
-      template: 'custom/metrics-table-changes/wo2w',
+      template: 'custom/metrics-table-offset',
       sortedBy: 'sortable_wo2w',
       title: 'Wo2W',
       disableFiltering: true,
       className: 'metrics-table__column metrics-table__column--small'
     }, {
       propertyName: 'wo3w',
-      template: 'custom/metrics-table-changes/wo3w',
+      template: 'custom/metrics-table-offset',
       sortedBy: 'sortable_wo3w',
       title: 'Wo3W',
       disableFiltering: true,
       className: 'metrics-table__column metrics-table__column--small'
     }, {
       propertyName: 'wo4w',
-      template: 'custom/metrics-table-changes/wo4w',
+      template: 'custom/metrics-table-offset',
       sortedBy: 'sortable_wo4w',
       title: 'Wo4W',
       disableFiltering: true,
