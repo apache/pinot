@@ -19,7 +19,6 @@ import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.ReplicaGroupStrategyConfig;
@@ -27,6 +26,7 @@ import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableCustomConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.config.TagConfig;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.TenantConfig;
 import com.linkedin.pinot.common.data.Schema;
@@ -46,7 +46,6 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentO
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.SchemaUtils;
-import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
@@ -54,8 +53,12 @@ import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.pojos.Instance;
+import com.linkedin.pinot.controller.helix.PartitionAssignment;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.ResponseStatus;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy;
+import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentsFactory;
+import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfig;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyEnum;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyFactory;
@@ -68,8 +71,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -88,8 +89,6 @@ import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
-import org.apache.helix.controller.stages.ClusterDataCache;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -2092,131 +2091,20 @@ public class PinotHelixResourceManager {
   }
 
   @Nonnull
-  public ZNRecord rebalanceTable(final String rawTableName, boolean dryRun, TableType tableType) {
-    TableConfig tableConfig = getTableConfig(rawTableName, tableType);
-    int targetNumReplicas;
-    if (tableType == TableType.REALTIME) {
-      String replicasString = tableConfig.getValidationConfig().getReplicasPerPartition();
-      try {
-        targetNumReplicas = Integer.parseInt(replicasString);
-      } catch (Exception e) {
-        throw new RuntimeException("Invalid value for replicasPerPartition:'" + replicasString + "'", e);
-      }
-    } else {
-      targetNumReplicas = Integer.parseInt(tableConfig.getValidationConfig().getReplication());
-    }
-    final String tenantName = tableConfig.getTenantConfig().getServer();
-    final String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
+  public ZNRecord rebalanceTable(final String rawTableName, TableType tableType, RebalanceUserConfig rebalanceUserConfig) {
 
-    IdealState newIdealState;
-    if (dryRun) {
-      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
-      newIdealState = getRebalancedIdealState(idealState, targetNumReplicas, tableNameWithType, tenantName);
-    } else {
-      newIdealState = rebalanceResource(targetNumReplicas, tableNameWithType, tenantName);
-    }
+    TableConfig tableConfig = getTableConfig(rawTableName, tableType);
+    String tableNameWithType = tableConfig.getTableName();
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+
+    RebalanceSegmentStrategy rebalanceSegmentsStrategy =
+        RebalanceSegmentsFactory.getInstance().getRebalanceSegmentsStrategy(tableConfig);
+    PartitionAssignment newPartitionAssignment =
+        rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
+    IdealState newIdealState = rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig, rebalanceUserConfig, newPartitionAssignment);
     return newIdealState.getRecord();
   }
 
-  private IdealState rebalanceResource(final int targetNumReplicas, final String tableNameWithType, final String tenantName) {
-    HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, new Function<IdealState, IdealState>() {
-      @Nullable
-      @Override
-      public IdealState apply(@Nullable IdealState idealState) {
-        return getRebalancedIdealState(idealState, targetNumReplicas, tableNameWithType, tenantName);
-      }
-    }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000, 2.0f));
-
-    return  _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
-  }
-
-  private IdealState getRebalancedIdealState(IdealState idealState, final int targetNumReplicas, final String tableNameWithType, final String tenantName) {
-    int numReplicasInIdealState = Integer.parseInt(idealState.getReplicas());
-    final TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    List<Map.Entry<String, Map<String,String>>> removedEntries = new LinkedList<>();
-    if (numReplicasInIdealState > targetNumReplicas) {
-      // We need to reduce the number of replicas per helix partition.
-      for (String segmentId : idealState.getPartitionSet()) {
-        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentId);
-        if (instanceStateMap.size() > targetNumReplicas) {
-          Set<String> keys = instanceStateMap.keySet();
-          while (instanceStateMap.size() > targetNumReplicas) {
-            instanceStateMap.remove(keys.iterator().next());
-          }
-        } else if (instanceStateMap.size() < targetNumReplicas) {
-          LOGGER.warn("Table {}, segment {} has {} replicas, less than {} (requested number of replicas",
-              idealState.getResourceName(), segmentId, instanceStateMap.size(), targetNumReplicas);
-        }
-      }
-    } else {
-      final Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
-      if (tableType == TableType.REALTIME) {
-        removeSegmentsNotBalancable(mapFields, removedEntries);
-      }
-
-      // Number of replicas is either the same or higher, so invoke Helix rebalancer.
-      LinkedHashMap<String, Integer> states = new LinkedHashMap<>();
-      List<String> partitions = Lists.newArrayList(idealState.getPartitionSet());
-      states.put("OFFLINE", 0);
-      states.put("ONLINE", targetNumReplicas);
-      Set<String> currentHosts = new HashSet<>();
-      for (String segment : mapFields.keySet()) {
-        currentHosts.addAll(mapFields.get(segment).keySet());
-      }
-      AutoRebalanceStrategy rebalanceStrategy = new AutoRebalanceStrategy(tableNameWithType, partitions, states);
-
-      String serverTenant = ControllerTenantNameBuilder.getTenantName(tenantName, tableType.getServerType());
-      List<String> instancesInClusterWithTag = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, serverTenant);
-      List<String> enabledInstancesWithTag =
-          HelixHelper.getEnabledInstancesWithTag(_helixAdmin, _helixClusterName, serverTenant);
-      LOGGER.info("Current nodes for table {}: {}", tableNameWithType, currentHosts);
-      LOGGER.info("New nodes for table {}: {}", tableNameWithType, instancesInClusterWithTag);
-      LOGGER.info("Enabled nodes for table: {}", tableNameWithType, enabledInstancesWithTag);
-      ZNRecord newZnRecord =
-          rebalanceStrategy.computePartitionAssignment(instancesInClusterWithTag, enabledInstancesWithTag,
-              mapFields, new ClusterDataCache());
-      final Map<String, Map<String, String>> newMapping = newZnRecord.getMapFields();
-      for (Map.Entry<String, Map<String, String>> entry : newMapping.entrySet()) {
-        idealState.setInstanceStateMap(entry.getKey(), entry.getValue());
-      }
-      // If we removed any entries, add them back here
-      for (Map.Entry<String, Map<String, String>> entry: removedEntries) {
-        idealState.setInstanceStateMap(entry.getKey(), entry.getValue());
-      }
-    }
-    idealState.setReplicas(Integer.toString(targetNumReplicas));
-    return idealState;
-  }
-
-  // Keep only those segments that are LLC and in ONLINE state.
-  private void removeSegmentsNotBalancable(Map<String, Map<String, String>> mapFields, List<Map.Entry<String, Map<String, String>>> removedEntries) {
-    // Keep only those segments that are LLC and in ONLINE state.
-    Iterator<Map.Entry<String, Map<String, String>>> it = mapFields.entrySet().iterator();
-    while (it.hasNext()) {
-      Map.Entry<String, Map<String, String>> entry = it.next();
-      final String segmentName = entry.getKey();
-      boolean keep = false;
-      if (SegmentName.isLowLevelConsumerSegmentName(segmentName)) {
-        // Check the states. If any of the instances are ONLINE, then we keep the segment for rebalancing,
-        // Otherwise, we remove it, and add it back after helix re-balances the segments.
-        Map<String, String> stateMap = entry.getValue();
-        for (String state : stateMap.values()) {
-          if (state.equals(SegmentOnlineOfflineStateModel.ONLINE)) {
-            keep = true;
-            break;
-          }
-        }
-      }
-      if (!keep) {
-        removedEntries.add(entry);
-        it.remove();
-      }
-    }
-    if (mapFields.isEmpty()) {
-      // Nothing to do, let the user know via an exception (ideally a status, but...)
-      throw new RuntimeException("No LLC partitions in ONLINE state in this table");
-    }
-  }
 
   /**
    * Check if an Instance exists in the Helix cluster.

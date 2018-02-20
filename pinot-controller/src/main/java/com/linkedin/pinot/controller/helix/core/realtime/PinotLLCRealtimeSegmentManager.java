@@ -21,7 +21,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.MinMaxPriorityQueue;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.ColumnPartitionConfig;
-import com.linkedin.pinot.common.config.RealtimeTagConfig;
+import com.linkedin.pinot.common.config.TagConfig;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -43,12 +43,11 @@ import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.events.MetadataEventNotifierFactory;
+import com.linkedin.pinot.controller.helix.PartitionAssignment;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
-import com.linkedin.pinot.controller.helix.core.realtime.partition.RealtimePartition;
-import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentStrategy;
-import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentStrategyFactory;
+import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentGenerator;
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumer;
@@ -118,6 +117,7 @@ public class PinotLLCRealtimeSegmentManager {
   private final ControllerMetrics _controllerMetrics;
   private final Lock[] _idealstateUpdateLocks;
   private final TableConfigCache _tableConfigCache;
+  private final StreamPartitionAssignmentGenerator _streamPartitionAssignmentGenerator;
 
   public boolean getIsSplitCommitEnabled() {
     return _controllerConf.getAcceptSplitCommit();
@@ -169,6 +169,7 @@ public class PinotLLCRealtimeSegmentManager {
       _idealstateUpdateLocks[i] = new ReentrantLock();
     }
     _tableConfigCache = new TableConfigCache(_propertyStore);
+    _streamPartitionAssignmentGenerator = new StreamPartitionAssignmentGenerator(_propertyStore);
   }
 
   public static PinotLLCRealtimeSegmentManager getInstance() {
@@ -213,12 +214,12 @@ public class PinotLLCRealtimeSegmentManager {
    * The topic name is being used as a dummy helix resource name. We do not read or write to zk in this
    * method.
    */
-  public void setupHelixEntries(RealtimeTagConfig realtimeTagConfig, KafkaStreamMetadata kafkaStreamMetadata, int nPartitions, final List<String> instanceNames,
+  public void setupHelixEntries(TagConfig tagConfig, KafkaStreamMetadata kafkaStreamMetadata, int nPartitions, final List<String> instanceNames,
       IdealState idealState, boolean create) {
 
     // TODO: introduce some abstraction, to make PinotLLCRealtimeSegmentManager handle all types of streams
 
-    TableConfig tableConfig = realtimeTagConfig.getTableConfig();
+    TableConfig tableConfig = tagConfig.getTableConfig();
     final int nReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
     final String topicName = kafkaStreamMetadata.getKafkaTopicName();
     final String realtimeTableName = tableConfig.getTableName();
@@ -229,9 +230,12 @@ public class PinotLLCRealtimeSegmentManager {
           instanceNames.size() + ") for table " + realtimeTableName + " topic " + topicName);
     }
 
-    Map<String, ZNRecord> newPartitionAssignment = generatePartitionAssignment(tableConfig, nPartitions, instanceNames);
-
-    writeKafkaPartitionAssignment(newPartitionAssignment);
+    List<String> realtimeTablesWithSameTenant =
+        getRealtimeTablesWithServerTenant(tagConfig.getServerTenantName());
+    Map<String, PartitionAssignment> newPartitionAssignment =
+        _streamPartitionAssignmentGenerator.generatePartitionAssignment(tableConfig, nPartitions, instanceNames,
+            realtimeTablesWithSameTenant);
+    _streamPartitionAssignmentGenerator.writeKafkaPartitionAssignment(newPartitionAssignment);
     setupInitialSegments(tableConfig, kafkaStreamMetadata, newPartitionAssignment.get(realtimeTableName), idealState,
         create, flushSize);
   }
@@ -259,32 +263,22 @@ public class PinotLLCRealtimeSegmentManager {
     _helixResourceManager.deleteSegments(realtimeTableName, segmentsToRemove);
   }
 
-  protected void writeKafkaPartitionAssignment(Map<String, ZNRecord> tableNameToPartitionAssignment) {
-    for (Map.Entry<String, ZNRecord> entry : tableNameToPartitionAssignment.entrySet()) {
-      final String path = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(entry.getKey());
-      _propertyStore.set(path, entry.getValue(), AccessOption.PERSISTENT);
-    }
-  }
 
-  public ZNRecord getKafkaPartitionAssignment(final String realtimeTableName) {
+  private ZNRecord getKafkaPartitionAssignment(final String realtimeTableName) {
     final String path = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(realtimeTableName);
     return _propertyStore.get(path, null, AccessOption.PERSISTENT);
   }
 
-  public List<RealtimePartition> getPartitionsList(String realtimeTableName) {
-    List<RealtimePartition> partitionAssignments = null;
+  public PartitionAssignment getPartitionAssignment(final String realtimeTableName) {
+    PartitionAssignment partitionAssignment = null;
     ZNRecord kafkaPartitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
     if (kafkaPartitionAssignment != null) {
-      Map<String, List<String>> listFields = kafkaPartitionAssignment.getListFields();
-      partitionAssignments = new ArrayList<>(listFields.size());
-      for (Map.Entry<String, List<String>> entry : listFields.entrySet()) {
-        partitionAssignments.add(new RealtimePartition(entry.getKey(), entry.getValue()));
-      }
+      partitionAssignment = new PartitionAssignment(realtimeTableName, kafkaPartitionAssignment.getListFields());
     }
-    return partitionAssignments;
+    return partitionAssignment;
   }
 
-  protected void setupInitialSegments(TableConfig tableConfig, KafkaStreamMetadata kafkaStreamMetadata, ZNRecord partitionAssignment,
+  protected void setupInitialSegments(TableConfig tableConfig, KafkaStreamMetadata kafkaStreamMetadata, PartitionAssignment partitionAssignment,
       IdealState idealState, boolean create, int flushSize) {
     final String realtimeTableName = tableConfig.getTableName();
     final int nReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
@@ -303,7 +297,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
     // Map of segment names to the server-instances that hold the segment.
     final Map<String, List<String>> idealStateEntries = new HashMap<String, List<String>>(4);
-    final Map<String, List<String>> partitionToServersMap = partitionAssignment.getListFields();
+    final Map<String, List<String>> partitionToServersMap = partitionAssignment.getPartitionToInstances();
     final int nPartitions = partitionToServersMap.size();
 
     // Create one segment entry in PROPERTYSTORE for each kafka partition.
@@ -367,7 +361,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   void updateFlushThresholdForSegmentMetadata(LLCRealtimeSegmentZKMetadata segmentZKMetadata,
-      ZNRecord partitionAssignment, int tableFlushSize) {
+      PartitionAssignment partitionAssignment, int tableFlushSize) {
     // If config does not have a flush threshold, use the default.
     if (tableFlushSize < 1) {
       tableFlushSize = KafkaHighLevelStreamProviderConfig.getDefaultMaxRealtimeRowsCount();
@@ -376,13 +370,13 @@ public class PinotLLCRealtimeSegmentManager {
     // Gather list of instances for this partition
     Object2IntMap<String> partitionCountForInstance = new Object2IntLinkedOpenHashMap<>();
     String segmentPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionRange();
-    for (String instanceName : partitionAssignment.getListField(segmentPartitionId)) {
+    for (String instanceName : partitionAssignment.getInstancesListForPartition(segmentPartitionId)) {
       partitionCountForInstance.put(instanceName, 0);
     }
 
     // Find the maximum number of partitions served for each instance that is serving this segment
     int maxPartitionCountPerInstance = 1;
-    for (Map.Entry<String, List<String>> partitionAndInstanceList : partitionAssignment.getListFields().entrySet()) {
+    for (Map.Entry<String, List<String>> partitionAndInstanceList : partitionAssignment.getPartitionToInstances().entrySet()) {
       for (String instance : partitionAndInstanceList.getValue()) {
         if (partitionCountForInstance.containsKey(instance)) {
           int partitionCountForThisInstance = partitionCountForInstance.getInt(instance);
@@ -657,21 +651,21 @@ public class PinotLLCRealtimeSegmentManager {
     final ZNRecord oldZnRecord = oldSegMetadata.toZNRecord();
     final String oldZnodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, committingSegmentNameStr);
 
-    final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
+    final PartitionAssignment partitionAssignment = getPartitionAssignment(realtimeTableName);
     // If an LLC table is dropped (or cleaned up), we will get null here. In that case we should not be
     // creating a new segment
     if (partitionAssignment == null) {
       LOGGER.warn("Kafka partition assignment not found for {}", realtimeTableName);
       throw new RuntimeException("Kafka partition assignment not found. Not committing segment");
     }
-    List<String> newInstances = partitionAssignment.getListField(Integer.toString(partitionId));
+    List<String> newInstances = partitionAssignment.getInstancesListForPartition(Integer.toString(partitionId));
 
     // Construct segment metadata and idealstate for the new segment
     final int newSeqNum = oldSeqNum + 1;
     final long newStartOffset = nextOffset;
     LLCSegmentName newHolder = new LLCSegmentName(oldSegmentName.getTableName(), partitionId, newSeqNum, now);
     final String newSegmentNameStr = newHolder.getSegmentName();
-    final int numPartitions = partitionAssignment.getListFields().size();
+    final int numPartitions = partitionAssignment.getNumPartitions();
 
     ZNRecord newZnRecord =
         makeZnRecordForNewSegment(rawTableName, newInstances.size(), newStartOffset, newHolder, numPartitions);
@@ -904,7 +898,7 @@ public class PinotLLCRealtimeSegmentManager {
     IdealState idealState = getTableIdealState(realtimeTableName);
     Set<String> segmentNamesIS = idealState.getPartitionSet();
 
-    final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
+    final PartitionAssignment partitionAssignment = getPartitionAssignment(realtimeTableName);
     for (Map.Entry<Integer, MinMaxPriorityQueue<LLCSegmentName>> entry : partitionToLatestSegments.entrySet()) {
       final LLCSegmentName segmentName = entry.getValue().pollFirst();
       final String segmentId = segmentName.getSegmentName();
@@ -913,7 +907,7 @@ public class PinotLLCRealtimeSegmentManager {
         LOGGER.info("{}:Repairing segment for partition {}. Segment {} not found in idealstate", realtimeTableName,
             partitionId, segmentId);
 
-        List<String> newInstances = partitionAssignment.getListField(Integer.toString(partitionId));
+        List<String> newInstances = partitionAssignment.getInstancesListForPartition(Integer.toString(partitionId));
         LOGGER.info("{}: Assigning segment {} to {}", realtimeTableName, segmentId, newInstances);
         // TODO Re-write num-partitions in metadata if needed.
         // If there was a prev segment in the same partition, then we need to fix it to be ONLINE.
@@ -980,9 +974,9 @@ public class PinotLLCRealtimeSegmentManager {
   public void createConsumingSegment(final String realtimeTableName, final Set<Integer> nonConsumingPartitions,
       final List<String> llcSegments, final TableConfig tableConfig) {
     final KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
-    final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
+    final PartitionAssignment partitionAssignment = getPartitionAssignment(realtimeTableName);
     final HashMap<Integer, LLCSegmentName> ncPartitionToLatestSegment = new HashMap<>(nonConsumingPartitions.size());
-    final int nReplicas = partitionAssignment.getListField("0").size(); // Number of replicas (should be same for all partitions)
+    final int nReplicas = partitionAssignment.getInstancesListForPartition("0").size(); // Number of replicas (should be same for all partitions)
 
     // For each non-consuming partition, find the latest segment (i.e. segment with highest seq number) for that partition.
     // (null if there is none).
@@ -1007,7 +1001,7 @@ public class PinotLLCRealtimeSegmentManager {
         LLCSegmentName latestSegment = ncPartitionToLatestSegment.get(partition);
         long startOffset;
         int nextSeqNum;
-        List<String> instances = partitionAssignment.getListField(Integer.toString(partition));
+        List<String> instances = partitionAssignment.getInstancesListForPartition(Integer.toString(partition));
         if (latestSegment == null) {
           // No segment yet in partition, Create a new one with a starting offset as per table config specification.
           nextSeqNum = STARTING_SEQUENCE_NUMBER;
@@ -1079,7 +1073,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private void createSegment(String realtimeTableName, int numReplicas, int partitionId, int seqNum,
-      List<String> serverInstances, long startOffset, ZNRecord partitionAssignment) {
+      List<String> serverInstances, long startOffset, PartitionAssignment partitionAssignment) {
     LOGGER.info("Attempting to auto-create a segment for partition {} of table {}", partitionId, realtimeTableName);
     final List<String> propStorePaths = new ArrayList<>(1);
     final List<ZNRecord> propStoreEntries = new ArrayList<>(1);
@@ -1088,7 +1082,7 @@ public class PinotLLCRealtimeSegmentManager {
     LLCSegmentName newSegmentName = new LLCSegmentName(tableName, partitionId, seqNum, now);
     final String newSegmentNameStr = newSegmentName.getSegmentName();
     ZNRecord newZnRecord = makeZnRecordForNewSegment(realtimeTableName, numReplicas, startOffset,
-        newSegmentName, partitionAssignment.getListFields().size());
+        newSegmentName, partitionAssignment.getNumPartitions());
 
     final LLCRealtimeSegmentZKMetadata newSegmentZKMetadata = new LLCRealtimeSegmentZKMetadata(newZnRecord);
 
@@ -1169,14 +1163,14 @@ public class PinotLLCRealtimeSegmentManager {
    */
   public void updateKafkaPartitionsIfNecessary(TableConfig tableConfig) {
 
-    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
+    TagConfig tagConfig = new TagConfig(tableConfig, _helixManager);
 
     final String realtimeTableName = tableConfig.getTableName();
-    final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
-    final Map<String, List<String>> partitionToServersMap = partitionAssignment.getListFields();
+    final PartitionAssignment partitionAssignment = getPartitionAssignment(realtimeTableName);
+    final Map<String, List<String>> partitionToServersMap = partitionAssignment.getPartitionToInstances();
     final KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
 
-    String consumingServersTag = realtimeTagConfig.getConsumingRealtimeServerTag();
+    String consumingServersTag = tagConfig.getConsumingServerTag();
     final List<String> currentInstances = getInstances(consumingServersTag);
 
     // Previous partition count is what we find in the Kafka partition assignment znode.
@@ -1231,59 +1225,16 @@ public class PinotLLCRealtimeSegmentManager {
       _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.SHORT_OF_LIVE_INSTANCES, 0);
     }
 
-    Map<String, ZNRecord> newPartitionAssignment = generatePartitionAssignment(tableConfig, currentPartitionCount,
-        currentInstances);
-    writeKafkaPartitionAssignment(newPartitionAssignment);
-    // FIXME: Some race conditions to consider
-    // 1) One kafka partition change is detected in the master controller and validation manager is updating a bunch of znodes.
-    // During this time if a table gets added in another controller, it will try to update the same set of znodes
-    // 2) A controller fails after updating some znodes and not others
+    List<String> realtimeTablesWithSameTenant =
+        getRealtimeTablesWithServerTenant(tagConfig.getServerTenantName());
+    Map<String, PartitionAssignment> newPartitionAssignment =
+        _streamPartitionAssignmentGenerator.generatePartitionAssignment(tableConfig, currentPartitionCount,
+            currentInstances, realtimeTablesWithSameTenant);
+    _streamPartitionAssignmentGenerator.writeKafkaPartitionAssignment(newPartitionAssignment);
     LOGGER.info("Successfully updated Kafka partition assignment for table {}", realtimeTableName);
   }
 
-  /**
-   * Generates partition assignment for given table, given num partitions over given instances
-   */
-  protected Map<String, ZNRecord> generatePartitionAssignment(TableConfig tableConfig, int numPartitions,
-      List<String> instanceNames) {
 
-    // all realtime tables in same tenant
-    List<String> realtimeTablesWithSameTenant =
-        getRealtimeTablesWithServerTenant(tableConfig.getTenantConfig().getServer());
-
-    // get table configs for all tables in same tenant
-    List<TableConfig> allTableConfigsInTenant = new ArrayList<>(realtimeTablesWithSameTenant.size());
-
-    // get current partition assignments for all tables in same tenant
-    Map<String, List<RealtimePartition>> tableNameToPartitionsList = new HashMap<>(realtimeTablesWithSameTenant.size());
-
-    for (String tableName : realtimeTablesWithSameTenant) {
-      allTableConfigsInTenant.add(getRealtimeTableConfig(tableName));
-      List<RealtimePartition> partitionsList = getPartitionsList(tableName);
-      if (partitionsList != null) {
-        tableNameToPartitionsList.put(tableName, partitionsList);
-      }
-    }
-
-    StreamPartitionAssignmentStrategy streamPartitionAssignmentStrategy =
-        StreamPartitionAssignmentStrategyFactory.getStreamPartitionAssignmentStrategy(tableConfig);
-
-    streamPartitionAssignmentStrategy.init(allTableConfigsInTenant, instanceNames, tableNameToPartitionsList);
-    Map<String, List<RealtimePartition>> newPartitionAssignment = streamPartitionAssignmentStrategy.
-        generatePartitionAssignment(tableConfig, numPartitions);
-
-    Map<String, ZNRecord> tableNameToZNRecord = new HashMap<>(newPartitionAssignment.size());
-    for (Map.Entry<String, List<RealtimePartition>> entry : newPartitionAssignment.entrySet()) {
-      String realtimeTableName = entry.getKey();
-      List<RealtimePartition> realtimePartitions = entry.getValue();
-      ZNRecord znRecord = new ZNRecord(realtimeTableName);
-      for (RealtimePartition realtimePartition : realtimePartitions) {
-        znRecord.setListField(realtimePartition.getPartitionNum(), realtimePartition.getInstanceNames());
-      }
-      tableNameToZNRecord.put(realtimeTableName, znRecord);
-    }
-    return tableNameToZNRecord;
-  }
 
   /**
    * Get all realtime tables with given tenant

@@ -29,6 +29,7 @@ import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.helix.PartitionAssignment;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
@@ -181,12 +182,12 @@ public class ValidationManager {
   void validateLLCSegments(final String realtimeTableName, TableConfig tableConfig) {
     LOGGER.info("Validating LLC Segments for {}", realtimeTableName);
     Map<String, String> streamConfigs = tableConfig.getIndexingConfig().getStreamConfigs();
-    ZNRecord partitionAssignment = _llcRealtimeSegmentManager.getKafkaPartitionAssignment(realtimeTableName);
+    PartitionAssignment partitionAssignment = _llcRealtimeSegmentManager.getPartitionAssignment(realtimeTableName);
     if (partitionAssignment == null) {
       LOGGER.warn("No partition assignment found for table {}", realtimeTableName);
       return;
     }
-    Map<String, List<String>> partitionToHostsMap = partitionAssignment.getListFields();
+    Map<String, List<String>> partitionToHostsMap = partitionAssignment.getPartitionToInstances();
     // Keep a set of kafka partitions, and remove the partition when we find a segment in CONSUMING state in
     // that partition.
     Set<Integer> nonConsumingKafkaPartitions = new HashSet<>(partitionToHostsMap.size());

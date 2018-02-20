@@ -31,6 +31,7 @@ import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
+import com.linkedin.pinot.controller.helix.PartitionAssignment;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
@@ -46,7 +47,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
@@ -106,10 +106,10 @@ public class ValidationManagerTest {
     _pinotHelixResourceManager.addTable(_offlineTableConfig);
   }
 
-  private void makeMockPinotLLCRealtimeSegmentManager(ZNRecord kafkaPartitionAssignment) {
+  private void makeMockPinotLLCRealtimeSegmentManager(PartitionAssignment kafkaPartitionAssignment) {
     _segmentManager = mock(PinotLLCRealtimeSegmentManager.class);
     Mockito.doNothing().when(_segmentManager).updateKafkaPartitionsIfNecessary(Mockito.any(TableConfig.class));
-    when(_segmentManager.getKafkaPartitionAssignment(anyString())).thenReturn(kafkaPartitionAssignment);
+    when(_segmentManager.getPartitionAssignment(anyString())).thenReturn(kafkaPartitionAssignment);
   }
 
   @Test
@@ -348,11 +348,11 @@ public class ValidationManagerTest {
     final List<String> hosts = Arrays.asList(new String[]{S1, S2, S3});
     final HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
 
-    ZNRecord znRecord = new ZNRecord(topicName);
+    PartitionAssignment partitionAssignment = new PartitionAssignment(topicName);
     for (int i = 0; i < kafkaPartitionCount; i++) {
-      znRecord.setListField(Integer.toString(i), hosts);
+      partitionAssignment.addPartition(Integer.toString(i), hosts);
     }
-    makeMockPinotLLCRealtimeSegmentManager(znRecord);
+    makeMockPinotLLCRealtimeSegmentManager(partitionAssignment);
 
     long msSinceEpoch = 1540;
 

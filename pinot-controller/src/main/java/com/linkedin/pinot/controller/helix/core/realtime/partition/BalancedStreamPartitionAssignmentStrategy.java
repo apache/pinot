@@ -18,6 +18,7 @@ package com.linkedin.pinot.controller.helix.core.realtime.partition;
 import com.linkedin.pinot.common.config.StreamConsumptionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
+import com.linkedin.pinot.controller.helix.PartitionAssignment;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -64,11 +65,11 @@ public class BalancedStreamPartitionAssignmentStrategy implements StreamPartitio
 
   private List<String> _tablesForPartitionAssignment;
   private List<String> _instanceNames;
-  private Map<String, List<RealtimePartition>> _tableNameToPartitionsList;
+  private Map<String, PartitionAssignment> _tableNameToPartitionAssignment;
 
   @Override
   public void init(List<TableConfig> allTablesInTenant, List<String> instanceNames,
-      Map<String, List<RealtimePartition>> tableNameToPartitionsList) {
+      Map<String, PartitionAssignment> tableNameToPartitionAssignment) {
 
     // NOTE: we only consider those tables which have explicitly stated that their streamPartitionAssignmentStrategy
     // is Balanced. We treat Uniform strategy as our default, which writes only a single table,
@@ -84,13 +85,13 @@ public class BalancedStreamPartitionAssignmentStrategy implements StreamPartitio
       }
     }
     _instanceNames = instanceNames;
-    _tableNameToPartitionsList = tableNameToPartitionsList;
+    _tableNameToPartitionAssignment = tableNameToPartitionAssignment;
   }
 
   @Override
-  public Map<String, List<RealtimePartition>> generatePartitionAssignment(TableConfig tableConfig, int numPartitions) {
+  public Map<String, PartitionAssignment> generatePartitionAssignment(TableConfig tableConfig, int numPartitions) {
 
-    Map<String, List<RealtimePartition>> newPartitionAssignment =
+    Map<String, PartitionAssignment> newPartitionAssignment =
         new HashMap<>(_tablesForPartitionAssignment.size());
 
     // get num replicas
@@ -99,13 +100,12 @@ public class BalancedStreamPartitionAssignmentStrategy implements StreamPartitio
     // get num partitions
     Map<String, Integer> tableToNumPartitions = new HashMap<>(_tablesForPartitionAssignment.size());
     for (String realtimeTableName : _tablesForPartitionAssignment) {
-      List<RealtimePartition> partitionsList = _tableNameToPartitionsList.get(realtimeTableName);
-      if (partitionsList != null) {
-        tableToNumPartitions.put(realtimeTableName, partitionsList.size());
+      PartitionAssignment partitionAssignment = _tableNameToPartitionAssignment.get(realtimeTableName);
+      if (partitionAssignment != null) {
+        tableToNumPartitions.put(realtimeTableName, partitionAssignment.getNumPartitions());
       }
     }
     tableToNumPartitions.put(tableConfig.getTableName(), numPartitions);
-
 
     Map<String, Map<String, String>> currentPartitions = new HashMap<>(_tablesForPartitionAssignment.size());
     List<String> newPartitions = new ArrayList<>();
@@ -113,13 +113,14 @@ public class BalancedStreamPartitionAssignmentStrategy implements StreamPartitio
     for (String realtimeTableName : _tablesForPartitionAssignment) {
 
       // construct current partitions map
-      List<RealtimePartition> partitionsList = _tableNameToPartitionsList.get(realtimeTableName);
-      if (partitionsList != null) {
+      PartitionAssignment partitionAssignment = _tableNameToPartitionAssignment.get(realtimeTableName);
+      if (partitionAssignment != null) {
 
-        for (RealtimePartition partition : partitionsList) {
-          String key = realtimeTableName + PARTITION_JOINER + partition.getPartitionNum();
+        Map<String, List<String>> partitionToInstances = _tableNameToPartitionAssignment.get(realtimeTableName).getPartitionToInstances();
+        for (Map.Entry<String, List<String>> partition : partitionToInstances.entrySet()) {
+          String key = realtimeTableName + PARTITION_JOINER + partition.getKey();
           Map<String, String> value = new HashMap<>();
-          for (String instance : partition.getInstanceNames()) {
+          for (String instance : partition.getValue()) {
             value.put(instance, RealtimeSegmentOnlineOfflineStateModel.ONLINE);
           }
           currentPartitions.put(key, value);
@@ -154,12 +155,12 @@ public class BalancedStreamPartitionAssignmentStrategy implements StreamPartitio
       String tableName = partitionName.substring(0, lastIndex);
       String partitionNumber = partitionName.substring(lastIndex + 1);
 
-      List<RealtimePartition> partitionsForTable = newPartitionAssignment.get(tableName);
-      if (partitionsForTable == null) {
-        partitionsForTable = new ArrayList<>();
-        newPartitionAssignment.put(tableName, partitionsForTable);
+      PartitionAssignment partitionAssignmentForTable = newPartitionAssignment.get(tableName);
+      if (partitionAssignmentForTable == null) {
+        partitionAssignmentForTable = new PartitionAssignment(tableName);
+        newPartitionAssignment.put(tableName, partitionAssignmentForTable);
       }
-      partitionsForTable.add(new RealtimePartition(partitionNumber, entry.getValue()));
+      partitionAssignmentForTable.addPartition(partitionNumber, entry.getValue());
     }
 
     return newPartitionAssignment;

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.helix.core.realtime.partition;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.controller.helix.PartitionAssignment;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -38,21 +39,21 @@ import java.util.Random;
  * This example assumes that the random point picked was at the first server i.e. Server_s1.company.com
  *
  {
-   "id":"KafkaTopicName"
-   ,"simpleFields":{
-   }
-   ,"listFields":{
-     "0":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
-     ,"1":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
-     ,"2":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
-     ,"3":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
-     ,"4":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
-     ,"5":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
-     ,"6":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
-     ,"7":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
-   }
-   ,"mapFields":{
-   }
+ "id":"KafkaTopicName"
+ ,"simpleFields":{
+ }
+ ,"listFields":{
+ "0":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
+ ,"1":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
+ ,"2":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
+ ,"3":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
+ ,"4":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
+ ,"5":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
+ ,"6":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
+ ,"7":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
+ }
+ ,"mapFields":{
+ }
  }
  *
  */
@@ -64,7 +65,7 @@ public class UniformStreamPartitionAssignmentStrategy implements StreamPartition
 
   @Override
   public void init(List<TableConfig> allTablesInTenant, List<String> instanceNames,
-      Map<String, List<RealtimePartition>> tableNameToPartitionsList) {
+      Map<String, PartitionAssignment> tableNameToPartitionsAssignment) {
     _instanceNames = instanceNames;
     // TODO: this strategy does not read other tables in the tenant and their partition assignments for now
     // This is because we want to avoid the race conditions we might encounter,
@@ -72,13 +73,14 @@ public class UniformStreamPartitionAssignmentStrategy implements StreamPartition
   }
 
   @Override
-  public Map<String, List<RealtimePartition>> generatePartitionAssignment(TableConfig tableConfig, int numPartitions) {
+  public Map<String, PartitionAssignment> generatePartitionAssignment(TableConfig tableConfig, int numPartitions) {
 
-    Map<String, List<RealtimePartition>> newPartitionAssignment = new HashMap<>(1);
+    Map<String, PartitionAssignment> newPartitionAssignment = new HashMap<>(1);
 
+    String tableName = tableConfig.getTableName();
     int numReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
 
-    List<RealtimePartition> realtimePartitions = new ArrayList<>(numPartitions);
+    Map<String, List<String>> realtimePartitionToInstances = new HashMap<>(numPartitions);
     int serverId = rand.nextInt(_instanceNames.size());
     for (int p = 0; p < numPartitions; p++) {
       List<String> instances = new ArrayList<>(numReplicas);
@@ -88,12 +90,9 @@ public class UniformStreamPartitionAssignmentStrategy implements StreamPartition
           serverId = 0;
         }
       }
-      realtimePartitions.add(new RealtimePartition(String.valueOf(p), instances));
+      realtimePartitionToInstances.put(String.valueOf(p), instances);
     }
-
-    newPartitionAssignment.put(tableConfig.getTableName(), realtimePartitions);
+    newPartitionAssignment.put(tableName, new PartitionAssignment(tableName, realtimePartitionToInstances));
     return newPartitionAssignment;
   }
-
-
 }

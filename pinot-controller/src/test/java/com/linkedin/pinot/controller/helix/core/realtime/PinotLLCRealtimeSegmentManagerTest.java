@@ -19,28 +19,25 @@ package com.linkedin.pinot.controller.helix.core.realtime;
 import com.google.common.io.Files;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.IndexingConfig;
-import com.linkedin.pinot.common.config.RoutingConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.StreamConsumptionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.config.TagConfig;
 import com.linkedin.pinot.common.config.TenantConfig;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.RoutingTableBuilderName;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.resources.LLCSegmentCompletionHandlers;
+import com.linkedin.pinot.controller.helix.PartitionAssignment;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
-import com.linkedin.pinot.controller.helix.core.realtime.partition.BalancedStreamPartitionAssignmentStrategy;
-import com.linkedin.pinot.controller.helix.core.realtime.partition.RealtimePartition;
+import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentGenerator;
 import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentStrategyEnum;
-import com.linkedin.pinot.controller.helix.core.realtime.partition.UniformStreamPartitionAssignmentStrategy;
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
@@ -61,6 +58,7 @@ import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.zookeeper.data.Stat;
 import org.joda.time.Interval;
 import org.testng.Assert;
@@ -69,6 +67,7 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
+
 
 
 public class PinotLLCRealtimeSegmentManagerTest {
@@ -136,10 +135,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
         DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY );
     KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
     segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
-    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
-    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, nPartitions, instances, null, true);
+    TagConfig tagConfig = new TagConfig(tableConfig, null);
+    segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nPartitions, instances, null, true);
 
-    Map<String, List<String>> assignmentMap = segmentManager._allPartitionAssignments.get(rtTableName).getListFields();
+    Map<String, List<String>> assignmentMap = segmentManager.getAllPartitionAssignments().get(rtTableName).getPartitionToInstances();
     Assert.assertEquals(assignmentMap.size(), nPartitions);
     // The map looks something like this:
     // {
@@ -166,194 +165,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Assert.assertTrue(partitionSet.isEmpty());    // We should have no more partitions left.
   }
 
-  /**
-   * Tests generatePartitionAssignment, as initiated by different tables, in scenarios:
-   * 1. new table with BalancedAssignmentStrategy
-   * 2. change in instances/partitions/replicas
-   * 3. another table with BalancedAssignmentStrategy in the same tenant
-   * 4. another table with BalancedAssignmentStrategy in new tenant
-   * 5. table with UniformAssignmentStrategy in same tenant
-   * 6. table with UniformAssignmentStrategy in new tenant
-   *
-   * For each of the scenarios, verifies that only the required tables undergo a partition assignment
-   */
-  @Test
-  public void testGeneratePartitionAssignment() {
-    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(false, null);
-    List<String> instances = getInstanceList(4);
-    String table1 = "rtTable1_REALTIME";
-    String table2 = "rtTable2_REALTIME";
-    String partitionAwareTable1 = "rtPartitionAwareTable1_REALTIME";
-    String table4 = "rtTable4_REALTIME";
-    String partitionAwareTable2 = "rtPartitionAwareTable2_REALTIME";
-    String partitionAwareTable3 = "rtPartitionAwareTable3_REALTIME";
-    String topic1 = "topic1";
-    String topic2 = "topic2";
-    String topic3 = "topic3";
-    String topic4 = "topic4";
-    String topic5 = "topic5";
-    String topic6 = "topic6";
-    String aTenant = "aTenant";
-    String anotherTenant = "anotherTenant";
-    String yetAnotherTenant = "yetAnotherTenant";
-    int nReplicas = 2;
-    Map<String, Integer> kafkaPartitionsMap = new HashMap<>(1);
-
-    // new table: 1st table in server tenant, with BalancedStreamPartitionAssignment
-    int nKafkaPartitions1 = 8;
-    TableConfig tableConfig1 =
-        makeTableConfig(table1, nReplicas, KAFKA_OFFSET, DUMMY_HOST,  topic1, aTenant,
-            StreamPartitionAssignmentStrategyEnum.BalancedStreamPartitionAssignment);
-    segmentManager.addTableToStore(table1, tableConfig1, nKafkaPartitions1);
-    kafkaPartitionsMap.put(table1, nKafkaPartitions1);
-    Map<String, ZNRecord> newPartitionAssignment = segmentManager.generatePartitionAssignment(tableConfig1,
-        nKafkaPartitions1, instances);
-    // verify that only the required tables got a new partition assignment
-    Assert.assertEquals(newPartitionAssignment.size(), 1);
-    Assert.assertTrue(newPartitionAssignment.containsKey(table1));
-    segmentManager._allPartitionAssignments.putAll(newPartitionAssignment);
-    validatePartitionAssignment(segmentManager, kafkaPartitionsMap, nReplicas, instances);
-
-    // change partitions
-    nKafkaPartitions1 = 10;
-    kafkaPartitionsMap.put(table1, nKafkaPartitions1);
-    segmentManager.addTableToStore(table1, tableConfig1, nKafkaPartitions1);
-    newPartitionAssignment = segmentManager.generatePartitionAssignment(tableConfig1, nKafkaPartitions1, instances);
-    Assert.assertEquals(newPartitionAssignment.size(), 1);
-    Assert.assertTrue(newPartitionAssignment.containsKey(table1));
-    segmentManager._allPartitionAssignments.putAll(newPartitionAssignment);
-    validatePartitionAssignment(segmentManager, kafkaPartitionsMap, nReplicas, instances);
-
-    // change instances
-    instances = getInstanceList(6);
-    newPartitionAssignment = segmentManager.generatePartitionAssignment(tableConfig1, nKafkaPartitions1, instances);
-    Assert.assertEquals(newPartitionAssignment.size(), 1);
-    Assert.assertTrue(newPartitionAssignment.containsKey(table1));
-    segmentManager._allPartitionAssignments.putAll(newPartitionAssignment);
-    validatePartitionAssignment(segmentManager, kafkaPartitionsMap, nReplicas, instances);
-
-
-    // new table: 2nd table in same tenant with BalancedStreamPartitionAssignment
-    int nKafkaPartitions2 = 6;
-    TableConfig tableConfig2 =
-        makeTableConfig(table2, nReplicas, KAFKA_OFFSET, DUMMY_HOST,  topic2, aTenant,
-            StreamPartitionAssignmentStrategyEnum.BalancedStreamPartitionAssignment);
-    segmentManager.addTableToStore(table2, tableConfig2, nKafkaPartitions2);
-    kafkaPartitionsMap.put(table2, nKafkaPartitions2);
-    newPartitionAssignment = segmentManager.generatePartitionAssignment(tableConfig2, nKafkaPartitions2, instances);
-    Assert.assertEquals(newPartitionAssignment.size(), 2);
-    Assert.assertTrue(newPartitionAssignment.containsKey(table1));
-    Assert.assertTrue(newPartitionAssignment.containsKey(table2));
-    segmentManager._allPartitionAssignments.putAll(newPartitionAssignment);
-    validatePartitionAssignment(segmentManager, kafkaPartitionsMap, nReplicas, instances);
-
-    // change partitions
-    nKafkaPartitions2 = 12;
-    segmentManager.addTableToStore(table2, tableConfig2, nKafkaPartitions2);
-    kafkaPartitionsMap.put(table2, nKafkaPartitions2);
-    newPartitionAssignment = segmentManager.generatePartitionAssignment(tableConfig2, nKafkaPartitions2, instances);
-    Assert.assertEquals(newPartitionAssignment.size(), 2);
-    Assert.assertTrue(newPartitionAssignment.containsKey(table1));
-    Assert.assertTrue(newPartitionAssignment.containsKey(table2));
-    segmentManager._allPartitionAssignments.putAll(newPartitionAssignment);
-    validatePartitionAssignment(segmentManager, kafkaPartitionsMap, nReplicas, instances);
-
-    // change instances
-    instances = getInstanceList(5);
-    newPartitionAssignment = segmentManager.generatePartitionAssignment(tableConfig2, nKafkaPartitions2, instances);
-    Assert.assertEquals(newPartitionAssignment.size(), 2);
-    Assert.assertTrue(newPartitionAssignment.containsKey(table1));
-    Assert.assertTrue(newPartitionAssignment.containsKey(table2));
-    segmentManager._allPartitionAssignments.putAll(newPartitionAssignment);
-    validatePartitionAssignment(segmentManager, kafkaPartitionsMap, nReplicas, instances);
-
-    // new table: 3rd table in same tenant, but with UniformStreamPartitionAssignment strategy
-    int partitionAwareNKafkaPartitions1 = 4;
-    TableConfig partitionAwareTableConfig1 =
-        makeTableConfig(partitionAwareTable1, nReplicas, KAFKA_OFFSET, DUMMY_HOST,  topic3, aTenant,
-            StreamPartitionAssignmentStrategyEnum.UniformStreamPartitionAssignment);
-    segmentManager.addTableToStore(partitionAwareTable1, partitionAwareTableConfig1, partitionAwareNKafkaPartitions1);
-    kafkaPartitionsMap.put(partitionAwareTable1, partitionAwareNKafkaPartitions1);
-    newPartitionAssignment = segmentManager.generatePartitionAssignment(partitionAwareTableConfig1,
-        partitionAwareNKafkaPartitions1, instances);
-    Assert.assertEquals(newPartitionAssignment.size(), 1);
-    Assert.assertTrue(newPartitionAssignment.containsKey(partitionAwareTable1));
-    segmentManager._allPartitionAssignments.putAll(newPartitionAssignment);
-    validatePartitionAssignment(segmentManager, kafkaPartitionsMap, nReplicas, instances);
-
-    // change partitions of partitionAwareTable1
-    partitionAwareNKafkaPartitions1 = 6;
-    segmentManager.addTableToStore(partitionAwareTable1, partitionAwareTableConfig1, partitionAwareNKafkaPartitions1);
-    kafkaPartitionsMap.put(partitionAwareTable1, partitionAwareNKafkaPartitions1);
-    newPartitionAssignment = segmentManager.generatePartitionAssignment(partitionAwareTableConfig1,
-        partitionAwareNKafkaPartitions1, instances);
-    Assert.assertEquals(newPartitionAssignment.size(), 1);
-    Assert.assertTrue(newPartitionAssignment.containsKey(partitionAwareTable1));
-    segmentManager._allPartitionAssignments.putAll(newPartitionAssignment);
-    validatePartitionAssignment(segmentManager, kafkaPartitionsMap, nReplicas, instances);
-
-    // change partitions of table2
-    nKafkaPartitions2 = 14;
-    segmentManager.addTableToStore(table2, tableConfig2, nKafkaPartitions2);
-    kafkaPartitionsMap.put(table2, nKafkaPartitions2);
-    newPartitionAssignment = segmentManager.generatePartitionAssignment(tableConfig2, nKafkaPartitions2, instances);
-    Assert.assertEquals(newPartitionAssignment.size(), 2);
-    Assert.assertTrue(newPartitionAssignment.containsKey(table1));
-    Assert.assertTrue(newPartitionAssignment.containsKey(table2));
-    segmentManager._allPartitionAssignments.putAll(newPartitionAssignment);
-    validatePartitionAssignment(segmentManager, kafkaPartitionsMap, nReplicas, instances);
-
-    // change instances, detected by partitionAwareTable1
-    instances = getInstanceList(8);
-    newPartitionAssignment = segmentManager.generatePartitionAssignment(partitionAwareTableConfig1,
-        partitionAwareNKafkaPartitions1, instances);
-    Assert.assertEquals(newPartitionAssignment.size(), 1);
-    Assert.assertTrue(newPartitionAssignment.containsKey(partitionAwareTable1));
-    segmentManager._allPartitionAssignments.putAll(newPartitionAssignment);
-    validatePartitionAssignment(segmentManager, kafkaPartitionsMap, nReplicas, instances);
-
-    // new table in another tenant with BalancedStreamPartitionAssignment
-    int nKafkaPartitions4 = 8;
-    TableConfig tableConfig4 =
-        makeTableConfig(table4, nReplicas, KAFKA_OFFSET, DUMMY_HOST,  topic4, anotherTenant,
-            StreamPartitionAssignmentStrategyEnum.BalancedStreamPartitionAssignment);
-    segmentManager.addTableToStore(table4, tableConfig4, nKafkaPartitions4);
-    kafkaPartitionsMap.put(table4, nKafkaPartitions4);
-    newPartitionAssignment = segmentManager.generatePartitionAssignment(tableConfig4, nKafkaPartitions4, instances);
-    Assert.assertEquals(newPartitionAssignment.size(), 1);
-    Assert.assertTrue(newPartitionAssignment.containsKey(table4));
-    segmentManager._allPartitionAssignments.putAll(newPartitionAssignment);
-    validatePartitionAssignment(segmentManager, kafkaPartitionsMap, nReplicas, instances);
-
-    // new table with partition aware in yetAnotherTenant
-    int partitionAwareNKafkaPartitions2 = 8;
-    TableConfig partitionAwareTableConfig2 =
-        makeTableConfig(partitionAwareTable2, nReplicas, KAFKA_OFFSET, DUMMY_HOST,  topic5, yetAnotherTenant,
-            StreamPartitionAssignmentStrategyEnum.UniformStreamPartitionAssignment);
-    segmentManager.addTableToStore(partitionAwareTable2, partitionAwareTableConfig2, partitionAwareNKafkaPartitions2);
-    kafkaPartitionsMap.put(partitionAwareTable2, partitionAwareNKafkaPartitions2);
-    newPartitionAssignment = segmentManager.generatePartitionAssignment(partitionAwareTableConfig2,
-        partitionAwareNKafkaPartitions2, instances);
-    Assert.assertEquals(newPartitionAssignment.size(), 1);
-    Assert.assertTrue(newPartitionAssignment.containsKey(partitionAwareTable2));
-    segmentManager._allPartitionAssignments.putAll(newPartitionAssignment);
-    validatePartitionAssignment(segmentManager, kafkaPartitionsMap, nReplicas, instances);
-
-    // new table with partition aware in yetAnotherTenant
-    int partitionAwareNKafkaPartitions3 = 8;
-    TableConfig partitionAwareTableConfig3 =
-        makeTableConfig(partitionAwareTable3, nReplicas, KAFKA_OFFSET, DUMMY_HOST,  topic6, yetAnotherTenant,
-            StreamPartitionAssignmentStrategyEnum.UniformStreamPartitionAssignment);
-    segmentManager.addTableToStore(partitionAwareTable3, partitionAwareTableConfig3, partitionAwareNKafkaPartitions3);
-    kafkaPartitionsMap.put(partitionAwareTable3, partitionAwareNKafkaPartitions3);
-    newPartitionAssignment = segmentManager.generatePartitionAssignment(partitionAwareTableConfig3,
-        partitionAwareNKafkaPartitions3, instances);
-    Assert.assertEquals(newPartitionAssignment.size(), 1);
-    Assert.assertTrue(newPartitionAssignment.containsKey(partitionAwareTable3));
-    segmentManager._allPartitionAssignments.putAll(newPartitionAssignment);
-    validatePartitionAssignment(segmentManager, kafkaPartitionsMap, nReplicas, instances);
-  }
-
 
   @Test
   public void testInitialSegmentAssignments() throws Exception {
@@ -377,8 +188,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
     segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
     KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
-    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
-    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, nPartitions, instances, idealState, !existingIS);
+    TagConfig tagConfig = new TagConfig(tableConfig, null);
+    segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nPartitions, instances, idealState, !existingIS);
 
     final String actualRtTableName = segmentManager._realtimeTableName;
     final Map<String, List<String>> idealStateEntries = segmentManager._idealStateEntries;
@@ -444,16 +255,16 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager.addTableToStore(rtTableName, tableConfig, 8);
     KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
     IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, 10);
-    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
+    TagConfig tagConfig = new TagConfig(tableConfig, null);
     try {
-      segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, 8, instances, idealState, false);
+      segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, 8, instances, idealState, false);
       Assert.fail("Did not get expected exception when setting up helix with existing segments in propertystore");
     } catch (RuntimeException e) {
       // Expected
     }
 
     try {
-      segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, 8, instances, idealState, true);
+      segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, 8, instances, idealState, true);
       Assert.fail("Did not get expected exception when setting up helix with existing segments in propertystore");
     } catch (RuntimeException e) {
       // Expected
@@ -481,8 +292,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
     segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
     KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
-    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
-    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, nPartitions, instances, idealState,
+    TagConfig tagConfig = new TagConfig(tableConfig, null);
+    segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nPartitions, instances, idealState,
         !existingIS);
     // Now commit the first segment of partition 6.
     final int committingPartition = 6;
@@ -531,8 +342,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
     segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
     KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
-    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
-    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, nPartitions, instances, idealState,
+    TagConfig tagConfig = new TagConfig(tableConfig, null);
+    segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nPartitions, instances, idealState,
         !existingIS);
     // Now commit the first segment of partition 6.
     final int committingPartition = 6;
@@ -624,12 +435,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(mockValidationConfig.getReplicasPerPartitionNumber()).thenReturn(nReplicas);
     when(mockTableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
     Map<String, String> streamConfigMap = new HashMap<>(1);
-    /*
-    streamConfigMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-            CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), "simple");
-    streamConfigMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-        CommonConstants.Helix.DataSource.Realtime.Kafka.TOPIC_NAME), topicName);
-        */
+
+    //streamConfigMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
+    //        CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), "simple");
+    //streamConfigMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
+    //    CommonConstants.Helix.DataSource.Realtime.Kafka.TOPIC_NAME), topicName);
+
 
     streamConfigMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX, CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), "simple");
     streamConfigMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX, CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX,
@@ -693,17 +504,17 @@ public class PinotLLCRealtimeSegmentManagerTest {
         DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
     segmentManager.addTableToStore(rtTableName, tableConfig, nKafkaPartitions);
     KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
-    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
+    TagConfig tagConfig = new TagConfig(tableConfig, null);
     // Setup initial entries
-    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, nKafkaPartitions, instances, null, true);
+    segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nKafkaPartitions, instances, null, true);
 
-    Map<String, ZNRecord> partitionAssignment = segmentManager._allPartitionAssignments;
+    Map<String, PartitionAssignment> partitionAssignment = segmentManager.getAllPartitionAssignments();
     segmentManager._currentTable = rtTableName;
     segmentManager._currentInstanceList = instances;
 
     // Call to update the partition list should do nothing.
     segmentManager.updateKafkaPartitionsIfNecessary(tableConfig);
-    Assert.assertTrue(segmentManager._allPartitionAssignments == partitionAssignment);
+    Assert.assertTrue(segmentManager.getAllPartitionAssignments() == partitionAssignment);
 
     // Change the number of kafka partitions to 9, and we should generate a new partition assignment
     nKafkaPartitions = 9;
@@ -716,14 +527,14 @@ public class PinotLLCRealtimeSegmentManagerTest {
     instances = getInstanceList(nInstances-1);
     segmentManager._currentInstanceList = instances;
     segmentManager.updateKafkaPartitionsIfNecessary(tableConfig);
-    Assert.assertTrue(partitionAssignment == segmentManager._allPartitionAssignments);
+    Assert.assertTrue(partitionAssignment == segmentManager.getAllPartitionAssignments());
 
     // Change the number of servers to 1 more, and we should update it again.
     nInstances++;
     instances = getInstanceList(nInstances);
     segmentManager._currentInstanceList = instances;
     segmentManager.updateKafkaPartitionsIfNecessary(tableConfig);
-    Assert.assertTrue(partitionAssignment != segmentManager._allPartitionAssignments);
+    Assert.assertTrue(partitionAssignment != segmentManager.getAllPartitionAssignments());
     partitionAssignment = validatePartitionAssignment(segmentManager, kafkaPartitionsMap, nReplicas, instances);
 
     // Change the replica count to one more, and we should update the assignment
@@ -732,7 +543,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
         DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
     segmentManager.addTableToStore(rtTableName, tableConfig, nKafkaPartitions);
     segmentManager.updateKafkaPartitionsIfNecessary(tableConfig);
-    Assert.assertTrue(partitionAssignment != segmentManager._allPartitionAssignments);
+    Assert.assertTrue(partitionAssignment != segmentManager.getAllPartitionAssignments());
     partitionAssignment = validatePartitionAssignment(segmentManager, kafkaPartitionsMap, nReplicas, instances);
 
     // Change the list of servers while keeping the number of servers the same.
@@ -742,25 +553,25 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._currentInstanceList = instances;
     Assert.assertEquals(nInstances, segmentManager._currentInstanceList.size());
     segmentManager.updateKafkaPartitionsIfNecessary(tableConfig);
-    Assert.assertTrue(partitionAssignment != segmentManager._allPartitionAssignments);
+    Assert.assertTrue(partitionAssignment != segmentManager.getAllPartitionAssignments());
     partitionAssignment = validatePartitionAssignment(segmentManager, kafkaPartitionsMap, nReplicas, instances);
   }
 
-  private Map<String, ZNRecord> validatePartitionAssignment(FakePinotLLCRealtimeSegmentManager segmentManager,
+  private Map<String, PartitionAssignment> validatePartitionAssignment(FakePinotLLCRealtimeSegmentManager segmentManager,
       Map<String, Integer> nKafkaPartitions, int nReplicas, List<String> instances) {
-    Map<String, ZNRecord> partitionAssignment;
+    Map<String, PartitionAssignment> partitionAssignments;
     Map<String, List<String>> partitionToServerListMap;
-    partitionAssignment = segmentManager._allPartitionAssignments;
-    for (Map.Entry<String, ZNRecord> entry : partitionAssignment.entrySet()) {
+    partitionAssignments = segmentManager.getAllPartitionAssignments();
+    for (Map.Entry<String, PartitionAssignment> entry : partitionAssignments.entrySet()) {
       String tableName = entry.getKey();
-      partitionToServerListMap = entry.getValue().getListFields();
+      partitionToServerListMap = entry.getValue().getPartitionToInstances();
       Assert.assertEquals(partitionToServerListMap.size(), nKafkaPartitions.get(tableName).intValue());
       for (List<String> serverList : partitionToServerListMap.values()) {
         Assert.assertEquals(serverList.size(), nReplicas);
         Assert.assertTrue(instances.containsAll(serverList));
       }
     }
-    return partitionAssignment;
+    return partitionAssignments;
   }
 
   public void testAutoReplaceConsumingSegment(final String tableConfigStartOffset) throws Exception {
@@ -782,8 +593,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
     segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
     KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
-    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
-    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, nPartitions, instances, idealState, false);
+    TagConfig tagConfig = new TagConfig(tableConfig, null);
+    segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nPartitions, instances, idealState, false);
     // Add another segment for each partition
     long now = System.currentTimeMillis();
     List<String> existingSegments = new ArrayList<>(segmentManager._idealStateEntries.keySet());
@@ -973,9 +784,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
           DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
       segmentManager.addTableToStore(realtimeTableName, tableConfig, nPartitions);
       KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
-      RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
-      segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, nPartitions, instances, idealState, false);
-      ZNRecord partitionAssignment = segmentManager.getKafkaPartitionAssignment(realtimeTableName);
+      TagConfig tagConfig = new TagConfig(tableConfig, null);
+      segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nPartitions, instances, idealState, false);
+      PartitionAssignment partitionAssignment = segmentManager.getPartitionAssignment(realtimeTableName);
 
       for (int p = 0; p < nPartitions; p++) {
         int curSeq = random.nextInt(maxSeq);  // Current segment sequence ID for that partition
@@ -997,7 +808,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
               status = CommonConstants.Segment.Realtime.Status.IN_PROGRESS;
             }
           }
-          List<String> instancesForThisSeg = partitionAssignment.getListField(Integer.toString(p));
+          List<String> instancesForThisSeg = partitionAssignment.getInstancesListForPartition(Integer.toString(p));
           for (String instance : instancesForThisSeg) {
             idealState.setPartitionState(segNameStr, instance, state);
           }
@@ -1074,8 +885,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
     segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
     KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
-    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
-    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, nPartitions, instances, idealState,
+    TagConfig tagConfig = new TagConfig(tableConfig, null);
+    segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nPartitions, instances, idealState,
         !existingIS);
   }
 
@@ -1147,6 +958,38 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
   }
 
+  static class MockStreamPartitionAssignmentGenerator extends StreamPartitionAssignmentGenerator {
+
+    private Map<String, TableConfig> _tableConfigsStore;
+    private Map<String, PartitionAssignment> _tableNameToPartitionsListMap;
+    Map<String, PartitionAssignment> _allPartitionAssignments;
+
+    public MockStreamPartitionAssignmentGenerator(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+      super(propertyStore);
+      _tableConfigsStore = new HashMap<>(1);
+      _tableNameToPartitionsListMap = new HashMap<>(1);
+    }
+
+    @Override
+    public void writeKafkaPartitionAssignment(Map<String, PartitionAssignment> tableNameToPartitionAssignment) {
+      _allPartitionAssignments = tableNameToPartitionAssignment;
+    }
+
+    @Override
+    protected TableConfig getRealtimeTableConfig(String tableNameWithType) {
+      return _tableConfigsStore.get(tableNameWithType);
+    }
+
+    @Override
+    protected Map<String, List<String>> getPartitionsToInstances(String realtimeTableName) {
+      Map<String, List<String>> partitonToInstances = null;
+      if (_tableNameToPartitionsListMap.get(realtimeTableName) != null) {
+        partitonToInstances = _tableNameToPartitionsListMap.get(realtimeTableName).getPartitionToInstances();
+      }
+      return partitonToInstances;
+    }
+
+  }
 
   static class FakePinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
 
@@ -1158,12 +1001,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
     public Map<String, List<String>> _idealStateEntries = new HashMap<>(1);
     public List<String> _paths = new ArrayList<>(16);
     public List<ZNRecord> _records = new ArrayList<>(16);
-    public Map<String, ZNRecord> _allPartitionAssignments = new HashMap<>(1);
-    public ZNRecord _currentTablePartitionAssignment;
     public String _startOffset;
     public boolean _createNew;
     public int _nReplicas;
     public Map<String, LLCRealtimeSegmentZKMetadata> _metadataMap = new HashMap<>(4);
+    public MockStreamPartitionAssignmentGenerator _streamPartitionAssignmentGenerator;
+    public PartitionAssignment _currentTablePartitionAssignment;
 
     public List<String> _newInstances;
     public List<String> _oldSegmentNameStr = new ArrayList<>(16);
@@ -1193,6 +1036,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     private TableConfigStore _tableConfigStore;
 
     protected FakePinotLLCRealtimeSegmentManager(boolean setupInitialSegments, List<String> existingLLCSegments) {
+
       super(null, clusterName, null, null, null, CONTROLLER_CONF, new ControllerMetrics(new MetricsRegistry()));
       try {
         TableConfigCache mockCache = mock(TableConfigCache.class);
@@ -1206,6 +1050,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
         tableConfigCacheField.setAccessible(true);
         tableConfigCacheField.set(this, mockCache);
 
+        _streamPartitionAssignmentGenerator = new MockStreamPartitionAssignmentGenerator(null);
+        Field streamPartitionAssignmentGeneratorField = PinotLLCRealtimeSegmentManager.class.getDeclaredField("_streamPartitionAssignmentGenerator");
+        streamPartitionAssignmentGeneratorField.setAccessible(true);
+        streamPartitionAssignmentGeneratorField.set(this, _streamPartitionAssignmentGenerator);
       } catch (Exception e) {
         Utils.rethrowException(e);
       }
@@ -1278,7 +1126,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected void setupInitialSegments(TableConfig tableConfig, KafkaStreamMetadata kafkaStreamMetadata, ZNRecord partitionAssignment,
+    protected void setupInitialSegments(TableConfig tableConfig, KafkaStreamMetadata kafkaStreamMetadata, PartitionAssignment partitionAssignment,
         IdealState idealState, boolean create, int flushSize) {
       _realtimeTableName = tableConfig.getTableName();
       _currentTablePartitionAssignment = partitionAssignment;
@@ -1315,12 +1163,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
       _nCallsToUpdateHelix++;
     }
 
-    protected void writeKafkaPartitionAssignment(Map<String, ZNRecord> kafkaPartitionAssignments) {
-      _allPartitionAssignments = kafkaPartitionAssignments;
+    public Map<String, PartitionAssignment> getAllPartitionAssignments() {
+      return _streamPartitionAssignmentGenerator._allPartitionAssignments;
     }
 
-    public ZNRecord getKafkaPartitionAssignment(final String realtimeTableName) {
-      return _allPartitionAssignments.get(realtimeTableName);
+    @Override
+    public PartitionAssignment getPartitionAssignment(String realtimeTableName) {
+      return _streamPartitionAssignmentGenerator._allPartitionAssignments.get(realtimeTableName);
     }
 
     @Override
@@ -1453,7 +1302,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     PinotLLCRealtimeSegmentManager realtimeSegmentManager = new FakePinotLLCRealtimeSegmentManager(false,
         Collections.<String>emptyList());
 
-    ZNRecord partitionAssignment = new ZNRecord("fakeTable_REALTIME");
+    PartitionAssignment partitionAssignment = new PartitionAssignment("fakeTable_REALTIME");
     // 4 partitions assigned to 4 servers, 4 replicas => the segments should have 250k rows each (1M / 4)
     for(int segmentId = 1; segmentId <= 4; ++segmentId) {
       List<String> instances = new ArrayList<>();
@@ -1462,7 +1311,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
         instances.add("Server_1.2.3.4_123" + replicaId);
       }
 
-      partitionAssignment.setListField(Integer.toString(segmentId), instances);
+      partitionAssignment.addPartition(Integer.toString(segmentId), instances);
     }
 
     // Check that each segment has 250k rows each
@@ -1474,7 +1323,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     // 4 partitions assigned to 4 servers, 2 partitions/server => the segments should have 500k rows each (1M / 2)
-    partitionAssignment.getListFields().clear();
+    partitionAssignment.getPartitionToInstances().clear();
     for(int segmentId = 1; segmentId <= 4; ++segmentId) {
       List<String> instances = new ArrayList<>();
 
@@ -1482,7 +1331,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
         instances.add("Server_1.2.3.4_123" + ((replicaId + segmentId) % 4));
       }
 
-      partitionAssignment.setListField(Integer.toString(segmentId), instances);
+      partitionAssignment.addPartition(Integer.toString(segmentId), instances);
     }
 
     // Check that each segment has 500k rows each
@@ -1494,11 +1343,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     // 4 partitions assigned to 4 servers, 1 partition/server => the segments should have 1M rows each (1M / 1)
-    partitionAssignment.getListFields().clear();
+    partitionAssignment.getPartitionToInstances().clear();
     for(int segmentId = 1; segmentId <= 4; ++segmentId) {
       List<String> instances = new ArrayList<>();
       instances.add("Server_1.2.3.4_123" + segmentId);
-      partitionAssignment.setListField(Integer.toString(segmentId), instances);
+      partitionAssignment.addPartition(Integer.toString(segmentId), instances);
     }
 
     // Check that each segment has 1M rows each
@@ -1514,7 +1363,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     for(int replicaId = 1; replicaId <= 4; ++replicaId) {
       instances.add("Server_1.2.3.4_123" + replicaId);
     }
-    partitionAssignment.setListField("5", instances);
+    partitionAssignment.addPartition("5", instances);
 
     // Check that each segment has 500k rows each
     for(int segmentId = 1; segmentId <= 4; ++segmentId) {

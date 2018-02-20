@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import org.apache.helix.HelixManager;
 
@@ -23,23 +24,25 @@ import org.apache.helix.HelixManager;
  * Wrapper class over TableConfig
  * This class will help answer questions about what are consuming/completed tags for a table
  */
-public class RealtimeTagConfig {
+public class TagConfig {
 
   private TableConfig _tableConfig;
 
   private String _serverTenant;
+  private String _offlineServerTag;
   private String _consumingRealtimeServerTag;
   private String _completedRealtimeServerTag;
 
   private boolean _moveCompletedSegments = false;
 
-  public RealtimeTagConfig(TableConfig realtimeTableConfig, HelixManager helixManager) {
+  public TagConfig(TableConfig tableConfig, HelixManager helixManager) {
 
-    _tableConfig = realtimeTableConfig;
+    _tableConfig = tableConfig;
 
     // TODO: we will introduce TENANTS config in property store, which should return the consuming/completed tags
     // once we have that, below code will change to fetching TENANT from property store and returning the consuming/completed values
-    _serverTenant = realtimeTableConfig.getTenantConfig().getServer();
+    _serverTenant = tableConfig.getTenantConfig().getServer();
+    _offlineServerTag = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(_serverTenant);
     _consumingRealtimeServerTag = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(_serverTenant);
     _completedRealtimeServerTag = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(_serverTenant);
     if (!_consumingRealtimeServerTag.equals(_completedRealtimeServerTag)) {
@@ -51,12 +54,16 @@ public class RealtimeTagConfig {
     return _tableConfig;
   }
 
-  public String getConsumingRealtimeServerTag() {
+  public String getConsumingServerTag() {
     return _consumingRealtimeServerTag;
   }
 
-  public String getCompletedRealtimeServerTag() {
-    return _completedRealtimeServerTag;
+  public String getCompletedServerTag() {
+    if (_tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
+      return _completedRealtimeServerTag;
+    } else {
+      return _offlineServerTag;
+    }
   }
 
   public String getServerTenantName() {

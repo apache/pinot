@@ -27,6 +27,8 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
+import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfig;
+import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfigProperties;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -388,10 +390,12 @@ public class PinotTableRestletResource {
       @ApiParam(value = "true|false", required = true, defaultValue = "true") @QueryParam("dryrun") Boolean dryRun
   )
   {
+    RebalanceUserConfig rebalanceUserConfig = new RebalanceUserConfig();
+    rebalanceUserConfig.addConfig(RebalanceUserConfigProperties.DRYRUN, String.valueOf(dryRun));
     if (tableType.equalsIgnoreCase(CommonConstants.Helix.TableType.OFFLINE.name())) {
-      return _pinotHelixResourceManager.rebalanceTable(tableName, dryRun, CommonConstants.Helix.TableType.OFFLINE);
+      return _pinotHelixResourceManager.rebalanceTable(tableName, CommonConstants.Helix.TableType.OFFLINE, rebalanceUserConfig);
     } else if (tableType.equalsIgnoreCase(CommonConstants.Helix.TableType.REALTIME.name())) {
-      return _pinotHelixResourceManager.rebalanceTable(tableName, dryRun, CommonConstants.Helix.TableType.REALTIME);
+      return _pinotHelixResourceManager.rebalanceTable(tableName, CommonConstants.Helix.TableType.REALTIME, rebalanceUserConfig);
     } else {
       throw new ControllerApplicationException(LOGGER, "Illegal table type " + tableType, Response.Status.BAD_REQUEST);
     }
