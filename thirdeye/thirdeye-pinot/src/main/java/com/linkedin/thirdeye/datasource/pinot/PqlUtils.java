@@ -276,6 +276,20 @@ public class PqlUtils {
     return String.format(" %s >= %s AND %s < %s", timeField, startUnits, timeField, endUnits);
   }
 
+  /**
+   * Generates PQL WHERE clause for a given filter map. The supported operation are:
+   * <pre>
+   *   key, value (equals, <b>OR</b> semantics)
+   *   key, !value (not equals, AND semantics)
+   *   key, &gt;value (greater than, AND semantics)
+   *   key, &gt;=value (greater than or equal, AND semantics)
+   *   key, &lt;value (less than, AND semantics)
+   *   key, &lt;=value (less than or equal, AND semantics)
+   * </pre>
+   *
+   * @param dimensionValues multimap of filters
+   * @return where-clause string
+   */
   static String getDimensionWhereClause(Multimap<String, String> dimensionValues) {
     List<String> components = new ArrayList<>();
     for (Map.Entry<String, Collection<String>> entry : dimensionValues.asMap().entrySet()) {
