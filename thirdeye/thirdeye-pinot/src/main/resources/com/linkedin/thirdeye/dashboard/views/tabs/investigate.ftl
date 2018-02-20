@@ -122,8 +122,8 @@
         <div class="wow-card-body">
           {{formatNumber (formatDouble currentValue)}}
         </div>
-        <div class="wow-card-footer">
-        </div>
+        <div class="wow-card-footer">&nbsp</div>
+        <div class="wow-card-footer">&nbsp</div>
       </li>
 
       {{#each wowResults as |wow|}}
@@ -137,6 +137,9 @@
           </div>
           <div class="wow-card-footer">
             <a href="{{wow.newUrl}}" target="_blank" class="thirdeye-link">Root Cause Analysis</a>
+          </div>
+          <div class="wow-card-footer">
+            <a href="{{wow.betaUrl}}" target="_blank" class="thirdeye-link">Root Cause Analysis (beta)</a>
           </div>
         </li>
       {{/each}}

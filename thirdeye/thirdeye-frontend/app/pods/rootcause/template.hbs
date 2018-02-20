@@ -131,7 +131,14 @@
           }}
         </div>
         <div class="col-xs-2">
-          <a class="thirdeye-link thirdeye-link--settings" {{action "onPrimarySelection"}}>+ add to chart</a>
+          <a class="thirdeye-link thirdeye-link--settings" {{action "onPrimarySelection"}}>
+            + add to chart
+            {{#tooltip-on-element
+              class="te-tooltip"
+              isShown=metricUrn}}
+              Click here to load metric
+            {{/tooltip-on-element}}
+          </a>
         </div>
       </div>
       <div class="card-container__row card-container__row--flex row">
