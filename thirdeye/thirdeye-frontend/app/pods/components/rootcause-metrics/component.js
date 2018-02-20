@@ -18,7 +18,7 @@ const ROOTCAUSE_METRICS_SORT_PROPERTY_METRIC = 'metric';
 const ROOTCAUSE_METRICS_SORT_PROPERTY_DATASET = 'dataset';
 const ROOTCAUSE_METRICS_SORT_PROPERTY_CHANGE = 'change';
 const ROOTCAUSE_METRICS_SORT_PROPERTY_SCORE = 'score';
-
+const OFFSETS = ['wo1w', 'wo2w', 'wo3w', 'wo4w', 'baseline'];
 const ROOTCAUSE_METRICS_OUTPUT_MODE_ASC = 'asc';
 const ROOTCAUSE_METRICS_OUTPUT_MODE_DESC = 'desc';
 
@@ -221,20 +221,78 @@ export default Component.extend({
   /**
    * Change values from multiple offsets to current time range, keyed by offset, then by metric urn
    * @type {Object}
+   * @example
+   * {
+   *  baseline: {
+   *    thirdeye:metric:1: 0.2222222,
+   *    thirdeye:metric:2: 0
+   *  },
+   *  wo1w: {
+   *    thirdeye:metric:1: NaN,
+   *    thirdeye:metric:2: 0
+   *  },
+   *  wo2w: {...},
+   *  wo3w: {...},
+   *  wo4w: {...}
+   * }
    */
   changesOffset: computed(
     'entities',
     'aggregates',
     function () {
       const { entities, aggregates } = this.getProperties('entities', 'aggregates'); // poll observer
+      let dict = {};
 
-      const offsets = ['wo1w', 'wo2w', 'wo3w', 'wo4w', 'baseline'];
-      const dict = {};
-      offsets.forEach(offset => dict[offset] = this._computeChangesForOffset(offset));
+      OFFSETS.forEach(offset => dict[offset] = this._computeChangesForOffset(offset));
 
       return dict;
     }
   ),
+
+  /**
+   * Baseline values from multiple offsets to current time range, keyed by offset, then by metric urn
+   * @type {Object}
+   * @example
+   * {
+   *  baseline: {
+   *    thirdeye:metric:1: 123,
+   *    thirdeye:metric:2: 0
+   *  },
+   *  wo1w: {
+   *    thirdeye:metric:1: 123,
+   *    thirdeye:metric:2: 0
+   *  },
+   *  wo2w: {...},
+   *  wo3w: {...},
+   *  wo4w: {...}
+   * }
+   */
+  baselineScores: Ember.computed(
+    'entities',
+    'aggregates',
+    function () {
+      let dict = {};
+
+      OFFSETS.forEach(offset => dict[offset] = this._computeBaselineScore(offset));
+      return dict;
+    }
+  ),
+
+  /**
+   * Compute scores from a given offset to the current time range
+   *
+   * @param {String} offset time range offset, e.g. 'baseline', 'wow', 'wo2w', ...
+   * @returns {Object} scores, keyed by metric urn
+   */
+  _computeBaselineScore(offset) {
+    const { entities, aggregates } = this.getProperties('entities', 'aggregates');
+    const score = filterPrefix(Object.keys(entities), ['thirdeye:metric:'])
+      .reduce((agg, urn) => {
+        agg[urn] = aggregates[toOffsetUrn(urn, offset)];
+        return agg;
+      }, {});
+    return score;
+  },
 
   /**
    * Formatted change strings for 'changesOffset'

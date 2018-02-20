@@ -1,0 +1,20 @@
+.metrics-table {
+  &__column {
+    vertical-align: middle !important; // override ember-models-table
+    &--small {
+      width: 100px;
+    }
+
+    &--large {
+      width: 440px;
+    }
+  }
+
+  &--positive {
+    color: $te-green;
+  }
+
+  &--negative {
+    color: $te-red;
+  }
+}
