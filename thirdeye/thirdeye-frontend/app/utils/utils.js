@@ -1,4 +1,3 @@
-import { isNone } from '@ember/utils';
 import moment from 'moment';
 
 /**
