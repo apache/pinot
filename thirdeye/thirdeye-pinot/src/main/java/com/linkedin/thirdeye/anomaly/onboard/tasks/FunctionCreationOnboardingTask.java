@@ -9,7 +9,6 @@ import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -26,12 +25,10 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
-import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -88,7 +85,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
   public static final String DEFAULT_ALERT_FILTER_TYPE = "AUTOTUNE";
   public static final String DEFAULT_URL_DECODER = "UTF-8";
 
-  private AnomalyFunctionManager anoomalyFunctionDAO;
+  private AnomalyFunctionManager anomalyFunctionDAO;
   private AlertConfigManager alertConfigDAO;
   private DatasetConfigManager datasetConfigDAO;
   private MetricConfigManager metricConfigDAO;
@@ -97,7 +94,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     super(TASK_NAME);
     DAORegistry daoRegistry = DAORegistry.getInstance();
     this.alertConfigDAO = daoRegistry.getAlertConfigDAO();
-    this.anoomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
+    this.anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
     this.datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
     this.metricConfigDAO = daoRegistry.getMetricConfigDAO();
   }
@@ -134,7 +131,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
 
     // Get pre-created function name
     // TODO Once pipeline refactor is done, this logic should be changed to be new function creation
-    AnomalyFunctionDTO anomalyFunction = anoomalyFunctionDAO.findWhereNameEquals(configuration.getString(FUNCTION_NAME));
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findWhereNameEquals(configuration.getString(FUNCTION_NAME));
     if (anomalyFunction == null) {
       throw new IllegalArgumentException(String.format("No function with name %s is found in the system",
           configuration.getString(FUNCTION_NAME)));
@@ -221,7 +218,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       anomalyFunction.setRequiresCompletenessCheck(configuration.getBoolean(REQUIRE_DATA_COMPLETENESS,
           defaultFunctionSpec.isRequiresCompletenessCheck()));
 
-      anoomalyFunctionDAO.update(anomalyFunction);
+      anomalyFunctionDAO.update(anomalyFunction);
 
       executionContext.setExecutionResult(ANOMALY_FUNCTION_CONFIG, anomalyFunction);
     } catch (Exception e) {
@@ -239,7 +236,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       alertFilter.put(ALERT_FILTER_MTTD, configuration.getString(ALERT_FILTER_MTTD));
     }
     anomalyFunction.setAlertFilter(alertFilter);
-    this.anoomalyFunctionDAO.update(anomalyFunction);
+    this.anomalyFunctionDAO.update(anomalyFunction);
 
     // create alert config
     AlertConfigDTO alertConfig = null;
