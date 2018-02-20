@@ -48,6 +48,7 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   public static final String FUNCTION_PROPERTIES = "properties";
   public static final String FUNCTION_IS_ACTIVE = "isActive";
   public static final String CRON_EXPRESSION = "cron";
+  public static final String REQUIRE_DATA_COMPLETENESS = "requireDataCompleteness";
   public static final String ALERT_ID = "alertId";
   public static final String ALERT_NAME = "alertName";
   public static final String ALERT_CRON = "alertCron";

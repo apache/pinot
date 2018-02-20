@@ -68,6 +68,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
   public static final String PROPERTIES = DefaultDetectionOnboardJob.FUNCTION_PROPERTIES;
   public static final String IS_ACTIVE = DefaultDetectionOnboardJob.FUNCTION_IS_ACTIVE;
   public static final String CRON_EXPRESSION = DefaultDetectionOnboardJob.CRON_EXPRESSION;
+  public static final String REQUIRE_DATA_COMPLETENESS = DefaultDetectionOnboardJob.REQUIRE_DATA_COMPLETENESS;
   public static final String ALERT_FILTER_PATTERN = DefaultDetectionOnboardJob.AUTOTUNE_PATTERN;
   public static final String ALERT_FILTER_TYPE = DefaultDetectionOnboardJob.AUTOTUNE_TYPE;
   public static final String ALERT_FILTER_FEATURES = DefaultDetectionOnboardJob.AUTOTUNE_FEATURES;
@@ -217,6 +218,8 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       anomalyFunction.setBucketSize(dataGranularity.getSize());
       anomalyFunction.setBucketUnit(dataGranularity.getUnit());
       anomalyFunction.setIsActive(configuration.getBoolean(IS_ACTIVE, DEFAULT_IS_ACTIVE));
+      anomalyFunction.setRequiresCompletenessCheck(configuration.getBoolean(REQUIRE_DATA_COMPLETENESS,
+          defaultFunctionSpec.isRequiresCompletenessCheck()));
 
       anoomalyFunctionDAO.update(anomalyFunction);
 
@@ -286,6 +289,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
         anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
         anomalyFunctionSpec.setFrequency(new TimeGranularity(15, TimeUnit.MINUTES));
         anomalyFunctionSpec.setProperties("");
+        anomalyFunctionSpec.setRequiresCompletenessCheck(false);
         break;
       case HOURS:
         anomalyFunctionSpec.setType("REGRESSION_GAUSSIAN_SCAN");
@@ -293,6 +297,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
         anomalyFunctionSpec.setWindowSize(24);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
         anomalyFunctionSpec.setProperties("");
+        anomalyFunctionSpec.setRequiresCompletenessCheck(false);
         break;
       case DAYS:
         anomalyFunctionSpec.setType("SPLINE_REGRESSION_VANILLA");
@@ -300,6 +305,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
         anomalyFunctionSpec.setWindowSize(1);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.DAYS);
         anomalyFunctionSpec.setProperties("");
+        anomalyFunctionSpec.setRequiresCompletenessCheck(true);
         break;
       default:
         anomalyFunctionSpec.setType("WEEK_OVER_WEEK_RULE");
@@ -307,6 +313,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
         anomalyFunctionSpec.setWindowSize(6);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
         anomalyFunctionSpec.setProperties("");
+        anomalyFunctionSpec.setRequiresCompletenessCheck(false);
         break;
     }
     return anomalyFunctionSpec;
