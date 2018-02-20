@@ -201,7 +201,6 @@ export default Component.extend({
     'entities',
     'aggregates',
     function () {
-      const { entities, aggregates } = this.getProperties('entities', 'aggregates'); // poll observer
       return this._computeChangesForOffset('baseline');
     }
   ),
@@ -240,7 +239,6 @@ export default Component.extend({
     'entities',
     'aggregates',
     function () {
-      const { entities, aggregates } = this.getProperties('entities', 'aggregates'); // poll observer
       let dict = {};
 
       OFFSETS.forEach(offset => dict[offset] = this._computeChangesForOffset(offset));
@@ -267,7 +265,7 @@ export default Component.extend({
    *  wo4w: {...}
    * }
    */
-  baselineScores: Ember.computed(
+  baselineScores: computed(
     'entities',
     'aggregates',
     function () {
