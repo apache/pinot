@@ -169,7 +169,12 @@ public class ServerSegmentCompletionProtocolHandler {
   private SegmentCompletionProtocol.Response sendRequest(String url) {
     try {
       String responseStr = _fileUploadDownloadClient.sendSegmentCompletionProtocolRequest(url, OTHER_REQUESTS_TIMEOUT);
-      return new SegmentCompletionProtocol.Response(responseStr);
+      SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(responseStr);
+      LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
+      if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
+        ControllerLeaderLocator.getInstance().refreshControllerLeader();
+      }
+      return response;
     } catch (Exception e) {
       // Catch all exceptions, we want the protocol to handle the case assuming the request was never sent.
       LOGGER.error("Could not send request {}", url, e);
@@ -180,7 +185,12 @@ public class ServerSegmentCompletionProtocolHandler {
   private SegmentCompletionProtocol.Response uploadSegment(String url, final String segmentName, final File segmentTarFile) {
     try {
       String responseStr = _fileUploadDownloadClient.uploadSegment(url, segmentName, segmentTarFile, SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS);
-      return new SegmentCompletionProtocol.Response(responseStr);
+      SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(responseStr);
+      LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
+      if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
+        ControllerLeaderLocator.getInstance().refreshControllerLeader();
+      }
+      return response;
     } catch (Exception e) {
       // Catch all exceptions, we want the protocol to handle the case assuming the request was never sent.
       LOGGER.error("Could not send request {}", url, e);
