@@ -3,6 +3,7 @@
     vertical-align: middle !important; // override ember-models-table
     &--small {
       width: 100px;
+      text-align: right;
     }
 
     &--large {
@@ -10,11 +11,21 @@
     }
   }
 
-  &--positive {
-    color: $te-green;
+  &__change {
+    margin: 0;
+    padding: 0;
+
+    &--positive {
+      color: $te-green;
+    }
+
+    &--negative {
+      color: $te-red;
+    }
   }
 
-  &--negative {
-    color: $te-red;
+  &__value {
+    margin: 0;
+    padding: 0;
   }
 }

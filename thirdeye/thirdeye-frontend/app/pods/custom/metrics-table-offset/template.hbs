@@ -1,6 +1,6 @@
-<p class="metrics-table__baseline-score">
-  {{get record (concat column.propertyName ".score")}}
+<p class="metrics-table__change metrics-table__change--{{get record (concat column.propertyName ".direction")}}">
+  {{get record (concat column.propertyName ".change")}}
 </p>
-<p class="metrics-table--{{record.wo1w.direction}}">
+<p class="metrics-table__value">
   {{get record (concat column.propertyName ".value")}}
 </p>

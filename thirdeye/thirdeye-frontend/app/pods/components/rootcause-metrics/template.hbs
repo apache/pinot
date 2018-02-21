@@ -1,60 +1,19 @@
-<div class="row">
-  <div class="col-xs-4">
-    {{#if (eq selectedView "card")}}
-      sort
-      | <a {{action "toggleSort" "metric"}}>metric</a>
-      | <a {{action "toggleSort" "dataset"}}>dataset</a>
-      | <a {{action "toggleSort" "change"}}>change</a>
-      | <a {{action "toggleSort" "score"}}>score</a>
-    {{/if}}
-  </div>
-  <div class="col-xs-4">
-    {{#if isLoading}}
-      <span class="rootcause-metric-spinner">{{ember-spinner scale=0.5}}</span>
-    {{/if}}
-  </div>
-  <div class="col-xs-4">
-    <ul class="rootcause-metric__display-view">
-      <li class="rootcause-metric__display-option rootcause-metric__display-option--{{if (eq selectedView "table") "active"}}" {{action "selectView" 'table'}}>
-        Table
-      </li>
-      <li class="rootcause-metric__display-option">|</li>
-      <li class="rootcause-metric__display-option rootcause-metric__display-option--{{if (eq selectedView "card") "active"}}" {{action "selectView" 'card'}}>
-        Card
-      </li>
-    </ul>
-  </div>
-</div>
-
-{{#if (eq selectedView "card")}}
+{{#if isLoading}}
   <div class="row">
-    {{#each urns as |urn|}}
-      <div class="col-lg-3 col-md-4 col-xs-6">
-        <div class="rootcause-metric__card
-          {{if (set-has selectedUrns urn) "rootcause-metric__card--selected"}}"
-          {{action "toggleSelection" urn}}>
-          <div class="rootcause-metric__title">
-            <span class="rootcause-metric__name">{{get-safe metrics urn}}</span>
-            <span class="rootcause-metric__dataset">{{get-safe datasets urn}}</span>
-          </div>
-          <span class="rootcause-metric__change rootcause-metric__change--{{get-safe directions urn}}">
-            {{get-safe changesFormatted urn}}
-          </span>
-        </div>
-      </div>
-    {{else}}
-      No Metrics.
-    {{/each}}
+    <div class="col-xs-12 rootcause-metric__spinner-text">
+      Loading additional metric data ...
+      {{ember-spinner scale=0.5}}
+    </div>
   </div>
-{{else}}
-  {{metrics-table
-    urns=urns
-    links=links
-    scores=scores
-    selectedUrns=selectedUrns
-    entities=entities
-    changesOffset=changesOffset
-    baselineScores=baselineScores
-    changesOffsetFormatted=changesOffsetFormatted
-    toggleSelection=(action "toggleSelection")}}
 {{/if}}
+
+{{update-table
+  data=metricsTableData
+  columns=metricsTableColumns
+  preselectedItems=preselectedItems
+  showColumnsDropdown=false
+  showGlobalFilter=false
+  filteringIgnoreCase=true
+  multipleExpand=true
+  multipleSelect=true
+  sendDisplayDataChangedAction=true}}
