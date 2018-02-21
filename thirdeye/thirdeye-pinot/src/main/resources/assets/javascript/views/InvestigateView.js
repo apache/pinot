@@ -82,19 +82,14 @@ InvestigateView.prototype = {
         const heatMapBaselineEnd = anomalyRegionEnd.clone().subtract(offset, 'days');
         const tab = hasIngraph ? 'events' : 'dimensions';
         wow.change *= 100;
-        wow.url = `thirdeye#analysis?metricId=${metricId}&dimension=${dimension}&currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&` +
-            `baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&` +
-            `compareMode=${wow.compareMode}&filters={}&granularity=${granularity}&` +
-            `heatMapCurrentStart=${anomalyRegionStart.valueOf()}&` +
-            `heatMapCurrentEnd=${anomalyRegionEnd.valueOf()}&heatMapBaselineStart=${heatMapBaselineStart.valueOf()}&` +
-            `heatMapBaselineEnd=${heatMapBaselineEnd.valueOf()}&filters=${anomalyFunctionDimension}&heatMapFilters=${anomalyFunctionDimension}`;
-
-        // valueOf is needed since we want all date time query params to be display in unix ms
-        // Omitting it, doesn't consistently yield the expected result
-        wow.newUrl = `app#/rca/${metricId}/${tab}?analysisStart=${anomalyRegionStart.valueOf()}&analysisEnd=${anomalyRegionEnd.valueOf()}&` +
+        wow.newUrl = `app/#/rca/${metricId}/${tab}?analysisStart=${anomalyRegionStart.valueOf()}&analysisEnd=${anomalyRegionEnd.valueOf()}&` +
           `displayStart=${displayStart}&displayEnd=${displayEnd}&` +
           `startDate=${currentViewStart}&endDate=${currentViewEnd}&` +
           `compareMode=${wow.compareMode}&filters=${anomalyFunctionDimension}&granularity=${granularity}`;
+
+        wow.betaUrl = `app/#/rootcause?anomalyId=${this.anomalyId}`
+        wow.isLast = wow.compareMode == 'Wo3W'
+
         return wow;
       });
   },
