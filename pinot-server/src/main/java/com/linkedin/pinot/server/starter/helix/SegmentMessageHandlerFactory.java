@@ -29,9 +29,10 @@ import org.apache.helix.model.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMessageHandlerFactory.class);
+
+  private static final List<String> _messageTypes = ImmutableList.of(Message.MessageType.USER_DEFINE_MSG.name());
 
   // We only allow limited number of segments refresh/reload happen at the same time
   // The reason for that is segment refresh/reload will temporarily use double-sized memory
@@ -93,7 +94,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
 
   @Override
   public List<String> getMessageTypes() {
-    return ImmutableList.of(Message.MessageType.USER_DEFINE_MSG.name());
+    return _messageTypes;
   }
 
   @Override
