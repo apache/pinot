@@ -16,10 +16,11 @@ import {
   humanizeFloat,
   humanizeScore
 } from 'thirdeye-frontend/utils/utils';
+import _ from 'lodash';
 
 export default Component.extend({
   classNames: ['rootcause-metrics'],
-  
+
   /**
    * Columns for metrics table
    * @type Object[]
@@ -79,9 +80,7 @@ export default Component.extend({
       propertyName: 'score',
       title: 'Outlier',
       disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small',
-      sortPrecedence: 0,
-      sortDirection: 'desc'
+      className: 'metrics-table__column metrics-table__column--small'
     }, {
       template: 'custom/rca-metric-links',
       propertyName: 'links',
@@ -190,7 +189,7 @@ export default Component.extend({
       const { selectedUrns, entities, aggregates, scores, links } =
         this.getProperties('selectedUrns', 'entities', 'aggregates', 'scores', 'links');
 
-      return filterPrefix(Object.keys(entities), 'thirdeye:metric:')
+      const rows = filterPrefix(Object.keys(entities), 'thirdeye:metric:')
         .map(urn => {
           return {
             urn,
@@ -212,6 +211,8 @@ export default Component.extend({
             sortable_wo4w: this._makeChange(urn, 'wo4w', aggregates)
           };
         });
+      
+      return _.sortBy(rows, (row) => -1 * scores[row.urn]);
     }
   ),
 
