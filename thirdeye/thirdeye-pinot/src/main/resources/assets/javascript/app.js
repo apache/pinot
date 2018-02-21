@@ -17,8 +17,8 @@ $(document).ready(function() {
 
     // checking if user is authenticated
     // redirects to the login screen if not
-    // $.get('/auth/')
-    //     .done(function() {
+    $.get('/auth/')
+        .done(function() {
             constants = new Constants();
             HASH_PARAMS = new HashParams();
             HASH_PARAMS.init();
@@ -30,9 +30,9 @@ $(document).ready(function() {
             HASH_SERVICE.registerController('app', app);
             HASH_SERVICE.routeTo('app');
             createNavClickHandler();
-        // })
-        // .fail(function() {
-        //     var fromUrl = encodeURIComponent(window.location.href);
-        //     window.location.replace('/app/#/login?fromUrl=' + fromUrl);
-        // });
+        })
+        .fail(function() {
+            var fromUrl = encodeURIComponent(window.location.href);
+            window.location.replace('/app/#/login?fromUrl=' + fromUrl);
+        });
 });
