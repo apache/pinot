@@ -345,6 +345,22 @@ public class DataFrameUtils {
    * @param slice metric data slice
    * @param dimensions dimensions to group by
    * @param reference unique identifier for request
+   * @return RequestContainer
+   * @throws Exception
+   */
+  public static RequestContainer makeAggregateRequest(MetricSlice slice, List<String> dimensions, String reference) throws Exception {
+    MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
+    DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
+    return makeAggregateRequest(slice, dimensions, reference, metricDAO, datasetDAO);
+  }
+
+   /**
+   * Constructs and wraps a request for a metric with derived expressions. Resolves all
+   * required dependencies from the Thirdeye database.
+   *
+   * @param slice metric data slice
+   * @param dimensions dimensions to group by
+   * @param reference unique identifier for request
    * @param metricDAO metric config DAO
    * @param datasetDAO dataset config DAO
    * @return RequestContainer

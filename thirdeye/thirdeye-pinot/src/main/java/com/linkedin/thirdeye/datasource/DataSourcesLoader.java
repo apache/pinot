@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.datasource;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -27,7 +28,7 @@ public class DataSourcesLoader {
  public static DataSources fromDataSourcesPath(String dataSourcesPath) {
    DataSources dataSources = null;
    try {
-     dataSources = OBJECT_MAPPER.readValue(new File(dataSourcesPath), DataSources.class);
+     dataSources = OBJECT_MAPPER.readValue(new URL(dataSourcesPath), DataSources.class);
    } catch (IOException e) {
      LOG.error("Exception in reading data sources file {}", dataSourcesPath, e);
    }

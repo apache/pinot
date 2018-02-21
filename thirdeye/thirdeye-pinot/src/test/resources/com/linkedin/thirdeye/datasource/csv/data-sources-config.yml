@@ -1,0 +1,4 @@
+dataSourceConfigs:
+  - className: com.linkedin.thirdeye.datasource.csv.CSVThirdEyeDataSource
+    properties:
+        business: file:/home/jihzhang/Desktop/thirdeye/pinot/thirdeye/thirdeye-pinot/target/test-classes/com/linkedin/thirdeye/datasource/csv/business.csv

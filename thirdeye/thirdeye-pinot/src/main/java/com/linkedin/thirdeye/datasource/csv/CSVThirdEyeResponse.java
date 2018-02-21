@@ -45,8 +45,8 @@ public class CSVThirdEyeResponse extends BaseThirdEyeResponse {
     }
 
     List<Double> metrics = new ArrayList<>();
-    for (String metric : request.getMetricNames()){
-      metrics.add(dataframe.getDouble(metric, rowId));
+    for(MetricFunction function : request.getMetricFunctions()){
+      metrics.add(dataframe.getDouble(function.getFunctionName().toString(), rowId));
     }
     return new ThirdEyeResponseRow(timeBucketId, dimensions, metrics);
   }
@@ -63,7 +63,7 @@ public class CSVThirdEyeResponse extends BaseThirdEyeResponse {
       String dimension = groupKeyColumns.get(i);
       rowMap.put(dimension, dataframe.getString(dimension, rowId));
     }
-    rowMap.put(metricFunction.toString(), dataframe.getString(metricFunction.toString(), rowId));
+    rowMap.put(metricFunction.toString(), dataframe.getString(metricFunction.getFunctionName().name(), rowId));
     return rowMap;
   }
 }

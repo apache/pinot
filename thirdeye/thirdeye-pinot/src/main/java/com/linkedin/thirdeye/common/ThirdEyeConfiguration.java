@@ -6,11 +6,12 @@ import java.util.List;
 
 import io.dropwizard.Configuration;
 
-public abstract class ThirdEyeConfiguration extends Configuration {
+public class ThirdEyeConfiguration extends Configuration {
   /**
    * Root directory for all other configuration
    */
   private String rootDir = "";
+  private String dataSourcesPath;
 
   private List<String> whitelistDatasets = new ArrayList<>();
 
@@ -27,6 +28,9 @@ public abstract class ThirdEyeConfiguration extends Configuration {
   private boolean cors = false;
 
   public String getDataSourcesPath() {
+    if (dataSourcesPath != null){
+      return dataSourcesPath;
+    }
     return getRootDir() + "/data-sources/data-sources-config.yml";
   }
 
@@ -116,4 +120,7 @@ public abstract class ThirdEyeConfiguration extends Configuration {
     this.failureToAddress = failureToAddress;
   }
 
+  public void setDataSourcesPath(String dataSourcesPath) {
+    this.dataSourcesPath = dataSourcesPath;
+  }
 }

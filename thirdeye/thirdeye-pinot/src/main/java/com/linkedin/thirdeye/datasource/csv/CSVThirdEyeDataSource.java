@@ -4,7 +4,10 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.Series;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
@@ -22,25 +25,37 @@ import static com.linkedin.thirdeye.dataframe.Series.SeriesType.*;
 
 public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
   public static final String COL_TIMESTAMP = "timestamp";
-  Map<String, DataFrame> dataSources;
+  Map<String, DataFrame> dataSets;
 
-  public static CSVThirdEyeDataSource fromDataFrame(Map<String, DataFrame> dataSources) {
-    return new CSVThirdEyeDataSource(new HashMap<String, DataFrame>(dataSources));
+  public static CSVThirdEyeDataSource fromDataFrame(Map<String, DataFrame> dataSets) {
+    return new CSVThirdEyeDataSource(new InputMap(dataSets));
   }
 
-  public static CSVThirdEyeDataSource fromUrl(Map<String, URL> dataSources) throws Exception {
+  public static CSVThirdEyeDataSource fromUrl(Map<String, URL> dataSets) throws Exception {
     Map<String, DataFrame> dataframes = new HashMap<>();
-    for (Map.Entry<String, URL> source : dataSources.entrySet()) {
+    for (Map.Entry<String, URL> source : dataSets.entrySet()) {
       try (InputStreamReader reader = new InputStreamReader(source.getValue().openStream())) {
         dataframes.put(source.getKey(), DataFrame.fromCsv(reader));
       }
     }
 
-    return new CSVThirdEyeDataSource(dataframes);
+    return new CSVThirdEyeDataSource(new InputMap(dataframes));
   }
 
-  CSVThirdEyeDataSource(Map<String, DataFrame> dataSources) {
-    this.dataSources = dataSources;
+  CSVThirdEyeDataSource(InputMap dataSets) {
+    this.dataSets = dataSets;
+  }
+
+  public CSVThirdEyeDataSource(Map<String, String> properties) throws Exception{
+    Map<String, DataFrame> dataframes = new HashMap<>();
+
+    for(Map.Entry<String, String> property: properties.entrySet()){
+      try (InputStreamReader reader = new InputStreamReader(new URL(property.getValue()).openStream())) {
+        dataframes.put(property.getKey(), DataFrame.fromCsv(reader));
+      }
+    }
+
+    this.dataSets = dataframes;
   }
 
   @Override
@@ -53,10 +68,15 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
     DataFrame df = new DataFrame();
     for(MetricFunction function : request.getMetricFunctions()){
       MetricAggFunction functionName = function.getFunctionName();
+      MetricConfigDTO configDTO = DAORegistry.getInstance().getMetricConfigDAO().findById(function.getMetricId());
+      if(configDTO == null){
+        throw new IllegalArgumentException(String.format("Can not find metric id %d", function.getMetricId()));
+      }
       if (functionName == MetricAggFunction.SUM){
-        Double sum = dataSources.get(request.getDataSource()).getDoubles(function.getMetricName()).sum().doubleValue();
+        Double sum = dataSets.get(function.getDataset()).getDoubles(configDTO.getName()).sum().doubleValue();
         df.addSeries(functionName.toString(), sum);
       }
+      df.addSeries(COL_TIMESTAMP, LongSeries.buildFrom(-1));
     }
     CSVThirdEyeResponse response = new CSVThirdEyeResponse(
         request,
@@ -68,7 +88,7 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
 
   @Override
   public List<String> getDatasets() throws Exception {
-    return new ArrayList<>(dataSources.keySet());
+    return new ArrayList<>(dataSets.keySet());
   }
 
   @Override
@@ -83,18 +103,18 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
 
   @Override
   public long getMaxDataTime(String dataset) throws Exception {
-    if (!dataSources.containsKey(dataset)) {
+    if (!dataSets.containsKey(dataset)) {
       throw new IllegalArgumentException();
     }
-    return dataSources.get(dataset).getLongs(COL_TIMESTAMP).max().longValue();
+    return dataSets.get(dataset).getLongs(COL_TIMESTAMP).max().longValue();
   }
 
   @Override
   public Map<String, List<String>> getDimensionFilters(String dataset) throws Exception {
-    if (!dataSources.containsKey(dataset)) {
+    if (!dataSets.containsKey(dataset)) {
       throw new IllegalArgumentException();
     }
-    Map<String, Series> data = dataSources.get(dataset).getSeries();
+    Map<String, Series> data = dataSets.get(dataset).getSeries();
     Map<String, List<String>> output = new HashMap<>();
     for (Map.Entry<String, Series> entry : data.entrySet()){
       if(entry.getValue().type() == STRING){
@@ -103,4 +123,13 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
     }
     return output;
   }
+
+
+  private static class InputMap extends HashMap<String, DataFrame>{
+    InputMap(Map<String, DataFrame> map){
+      super(map);
+    }
+  }
 }
+
+

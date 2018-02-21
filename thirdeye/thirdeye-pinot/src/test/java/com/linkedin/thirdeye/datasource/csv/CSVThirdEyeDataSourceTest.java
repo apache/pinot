@@ -4,6 +4,10 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
@@ -102,8 +106,20 @@ public class CSVThirdEyeDataSourceTest {
 
   @Test
   public void testExecuteSingleRequest() throws Exception {
+    DAOTestBase testDAOProvider = DAOTestBase.getInstance();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+
+
+    MetricConfigDTO configDTO = new MetricConfigDTO();
+    configDTO.setName("views");
+    configDTO.setDataset("source");
+    configDTO.setAlias("source::views");
+
+    daoRegistry.getMetricConfigDAO().save(configDTO);
+    Assert.assertNotNull(configDTO.getId());
+
     ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
-        .addMetricFunction(new MetricFunction(MetricAggFunction.SUM, "views", 0L, "source", null, null))
+        .addMetricFunction(new MetricFunction(MetricAggFunction.SUM, "views", configDTO.getId(), "source", null, null))
         .setDataSource("source")
         .build("ref");
     ThirdEyeResponse expectedResponse = new CSVThirdEyeResponse(
@@ -111,7 +127,8 @@ public class CSVThirdEyeDataSourceTest {
         new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
         new DataFrame()
             .addSeries("SUM_views", 1000)
-        );
+    );
+
     ThirdEyeResponse response = dataSource.execute(request);
     Assert.assertEquals(response.getRequest(), expectedResponse.getRequest());
     Assert.assertEquals(response.getNumRows(), expectedResponse.getNumRows());
