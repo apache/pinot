@@ -23,6 +23,13 @@ cache:
 dist: precise
 sudo: false
 
+addons:
+  apt:
+    sources:
+    - google-chrome
+    packages:
+    - google-chrome-stable
+
 install:
   - ./.travis_install.sh
 
