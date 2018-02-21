@@ -1,30 +1,30 @@
 import { moduleForComponent, test } from 'ember-qunit';
 import hbs from 'htmlbars-inline-precompile';
 
-moduleForComponent('metrics-table', 'Integration | Component | metrics table', {
+moduleForComponent('rootcause-metrics', 'Integration | Component | rootcause metrics', {
   integration: true
 });
 
 test('it renders', function(assert) {
   this.setProperties({
-    urns: [],
     entities: {},
-    links: {},
+    aggregates: {},
+    scores: {},
     selectedUrns: {},
-    toggleSelection: () => {}
+    onSelection: () => {}
   });
 
   this.render(hbs`
-    {{metrics-table
-      urns=urns
+    {{rootcause-metrics
       entities=entities
-      links=links
+      aggregates=aggregates
+      scores=scores
       selectedUrns=selectedUrns
-      toggleSelection=(action toggleSelection)
+      onSelection=(action onSelection)
     }}
   `);
 
-  const table = this.$('.metrics-table');
+  const table = this.$('.rootcause-metrics');
   assert.ok(table.length, 'It should render properly');
   assert.ok(table.find('.table-header').length, 'It should have headers');
 });

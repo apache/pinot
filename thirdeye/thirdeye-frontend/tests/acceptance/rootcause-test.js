@@ -15,10 +15,7 @@ const ANOMALY_TITLE = '.rootcause-anomaly__title';
 const ANOMALY_VALUE = '.rootcause-anomaly__props-value';
 const ANOMALY_STATUS = '.ember-radio-button.checked';
 const SAVE_BTN = '.te-button';
-const DISPLAY_VIEW = '.rootcause-metric__display-view';
-const METRICS_TABLE = '.metrics-table';
-const DISPLAY_OPTION = '.rootcause-metric__display-option';
-const METRIC_CARD = '.rootcause-metric__card';
+const METRICS_TABLE = '.rootcause-metrics';
 const HEATMAP_DROPDOWN = '#select-heatmap-mode';
 const SELECTED_HEATMAP_MODE = '.ember-power-select-selected-item';
 const EVENTS_FILTER_BAR = '.filter-bar';
@@ -125,20 +122,9 @@ test('Metrics, Dimensions, and Events tabs exist and should have correct informa
     find(`${TABS} a`).get(0).innerText,
     'Metrics',
     'default tab is correct');
-  assert.equal(
-    find(DISPLAY_VIEW).get(0).innerText.replace(/ /g, ''), // remove white space in text
-    'Table|Card',
-    'metrics viewing options are correct');
   assert.ok(
     find(METRICS_TABLE).get(0),
-    'metrics table exist when table view is selected');
-
-  // Click on card view
-  await click(find(DISPLAY_OPTION).get(2));
-
-  assert.ok(
-    find(METRIC_CARD).get(0),
-    'metric card is present when card view is selected');
+    'metrics table exist');
 
   // Click on Dimensions tab
   await click(find(`${TABS} a`).get(1));
