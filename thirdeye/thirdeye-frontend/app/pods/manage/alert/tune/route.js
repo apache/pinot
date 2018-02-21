@@ -57,7 +57,7 @@ const severityMap = {
 const sensitivityDefaults = {
   selectedSeverityOption: 'Percentage of Change',
   selectedTunePattern: 'Up and Down',
-  defaultPercentChange: '30',
+  defaultPercentChange: '0.3',
   defaultMttdChange: '5'
 };
 
@@ -125,8 +125,10 @@ const processDefaultTuningParams = (alertData) => {
     }
   }
 
-  // Load saved severity type
-  const savedSeverityPattern = alertFeatures ? alertFeatures : 'weight';
+  // TODO: enable once issue resolved in backend (not saving selection to new feature string)
+  // savedSeverityPattern = alertFeatures ? alertFeatures : 'weight';
+  const savedSeverityPattern = alertMttd ? alertMttd[1].split('=')[0] : 'weight';
+  const isAbsValue = savedSeverityPattern === 'deviation';
   for (var severityKey in severityMap) {
     if (savedSeverityPattern === severityMap[severityKey]) {
       selectedSeverityOption = severityKey;
@@ -139,7 +141,8 @@ const processDefaultTuningParams = (alertData) => {
 
   // Load saved severity value
   const severityValue = alertMttd ? alertMttd[1].split('=')[1] : 'N/A';
-  const customPercentChange = !isNaN(severityValue) ? Number(severityValue) * 100 : defaultPercentChange;
+  const rawPercentChange = !isNaN(severityValue) ? Number(severityValue) : defaultPercentChange;
+  const customPercentChange = isAbsValue ? rawPercentChange : rawPercentChange * 100;
 
   return { selectedSeverityOption, selectedTunePattern, customPercentChange, customMttdChange };
 };

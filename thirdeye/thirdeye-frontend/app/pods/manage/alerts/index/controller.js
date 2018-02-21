@@ -236,6 +236,14 @@ export default Controller.extend({
       this.set('resultsActive', true);
     },
 
+    // Handle transition to alert page while refreshing the duration cache.
+    navigateToAlertPage(alertId) {
+      if (localStorage.getItem('duration') !== null) {
+        localStorage.removeItem('duration');
+      }
+      this.transitionToRoute('manage.alert', alertId);
+    },
+
     // Handles filtering of alerts in response to filter selection
     userDidSelectFilter(filterArr) {
       let task = {};

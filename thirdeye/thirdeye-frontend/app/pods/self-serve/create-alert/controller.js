@@ -19,6 +19,7 @@ import {
 } from "@ember/utils";
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import {
+  setMetricData,
   buildMetricDataUrl,
   getTopDimensions
 } from 'thirdeye-frontend/utils/manage-alert-utils';
@@ -52,6 +53,7 @@ export default Controller.extend({
   graphEmailLinkProps: '',
   dimensionCount: 7,
   availableDimensions: 0,
+  selectedSeverityOption: 'Percentage of Change',
   legendText: {
     dotted: {
       text: 'WoW'
@@ -178,12 +180,14 @@ export default Controller.extend({
         isCustom: isCustomFilterPossible
       };
 
+      // TODO: move this shared logic into utils
       if (isCustomFilterPossible) {
-        const mttdVal = Number(customMttdChange).toFixed(2);
-        const severityThresholdVal = (Number(customPercentChange)/100).toFixed(2);
+        const mttdVal = Number.isNaN(Number(customMttdChange)) ? 0 : Number(customMttdChange).toFixed(2);
+        const severityThresholdVal = Number.isNaN(Number(customPercentChange)) ? 0 : Number(customPercentChange).toFixed(2);
+        const finalSeverity = severityMap[selectedSeverity] === 'deviation' ? severityThresholdVal : (severityThresholdVal/100).toFixed(2);
         Object.assign(filterObj, {
           features: `window_size_in_hour,${severityMap[selectedSeverity]}`,
-          mttd: `window_size_in_hour=${mttdVal};${severityMap[selectedSeverity]}=${severityThresholdVal}`
+          mttd: `window_size_in_hour=${mttdVal};${severityMap[selectedSeverity]}=${finalSeverity}`
         });
       }
 
@@ -301,9 +305,11 @@ export default Controller.extend({
     const metricUrl = buildMetricDataUrl({ maxTime, filters, dimension, granularity, id: metric.id });
 
     // Fetch new graph metric data
+    // TODO: const metricData = await fetch(metricUrl).then(checkStatus)
     fetch(metricUrl).then(checkStatus)
       .then(metricData => {
         this.setProperties({
+          metricId: metric.id,
           isMetricSelected: true,
           isMetricDataLoading: false,
           showGraphLegend: true,
@@ -329,6 +335,7 @@ export default Controller.extend({
         this.clearAll();
         this.setProperties({
           isMetricDataLoading: false,
+          isMetricDataInvalid: true,
           selectMetricErrMsg: error
         });
       });
@@ -748,7 +755,8 @@ export default Controller.extend({
       isAlertNameDuplicate: false,
       graphEmailLinkProps: '',
       bsAlertBannerType: 'success',
-      selectedFilters: JSON.stringify({})
+      selectedFilters: JSON.stringify({}),
+      selectedSeverityOption: 'Percentage of Change'
     });
     this.send('refreshModel');
   },
@@ -1042,13 +1050,19 @@ export default Controller.extend({
      */
     onSubmit() {
       const {
+        metricId,
+        selectedMetric,
         isDuplicateEmail,
         onboardFunctionPayload,
         alertGroupNewRecipient: newEmails
-      } = this.getProperties('isDuplicateEmail', 'onboardFunctionPayload', 'alertGroupNewRecipient');
+      } = this.getProperties('metricId', 'selectedMetric', 'isDuplicateEmail', 'onboardFunctionPayload', 'alertGroupNewRecipient');
       const newEmailsArr = newEmails ? newEmails.replace(/ /g, '').split(',') : [];
       const isEmailError = !this.isEmailValid(newEmailsArr);
 
+      // TODO: cache latest selected metric data using session storage
+      // setMetricData(metricId, selectedMetric);
+
+      // Update validation properties
       this.setProperties({
         isEmailError,
         isProcessingForm: true,

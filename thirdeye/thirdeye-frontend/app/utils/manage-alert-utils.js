@@ -94,7 +94,7 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
       isUserReported: anomaly.anomalyResultSource === 'USER_LABELED_ANOMALY',
       startDateStr: moment(anomaly.anomalyStart).format('MMM D, hh:mm A'),
       durationStr: noZeroDurationArr.join(', '),
-      severityScore: score ? score.toFixed(2) : 'N/A',
+      severityScore: score && !isNaN(score) ? score.toFixed(2) : 'N/A',
       shownCurrent: anomaly.current,
       shownBaseline: anomaly.baseline,
       showResponseSaved: false,
@@ -307,6 +307,28 @@ export function getDuration() {
 }
 
 /**
+ * Caches metric data to local storage in order to persist it across pages
+ * NOTE: not in use yet
+ * @method setMetricData
+ * @param {Number} metricId - id of selected metric
+ * @param {Object} metricData - payload for graphable metric data
+ * @return {undefined}
+ */
+export function setMetricData(metricId, metricData) {
+  localStorage.setItem(metricId, JSON.stringify(metricData));
+}
+
+/**
+ * Retrieves metric data from local storage in order to persist it across pages
+ * NOTE: not in use yet
+ * @method getMetricData
+ * @return {Object}
+ */
+export function getMetricData(metricId) {
+  return JSON.parse(localStorage.getItem(metricId));
+}
+
+/**
  * When fetching current and projected MTTD (minimum time to detect) data, we need to supply the
  * endpoint with a severity threshold. This decides whether to use the default or not.
  * @method extractSeverity
@@ -333,5 +355,7 @@ export default {
   extractSeverity,
   setDuration,
   getDuration,
+  setMetricData,
+  getMetricData,
   evalObj
 };

@@ -63,7 +63,6 @@ export default Controller.extend({
     const repRunStatus = this.get('repRunStatus');
     this.setProperties({
       filters: {},
-      //metricData: {},
       loadedWowData: [],
       predefinedRanges: {},
       missingAnomalyProps: {},
@@ -230,11 +229,14 @@ export default Controller.extend({
       const {
         alertData,
         alertEvalMetrics,
-        defaultSeverity
-      } = this.getProperties('alertData', 'alertEvalMetrics', 'defaultSeverity');
+        DEFAULT_SEVERITY: defaultSeverity
+      } = this.getProperties('alertData', 'alertEvalMetrics', 'DEFAULT_SEVERITY');
       const features = getWithDefault(alertData, 'alertFilter.features', null);
-      const severityUnit = features && features.split(',')[1] !== 'deviation' ? '%' : '';
-      const mttdWeight = Number(extractSeverity(alertData, defaultSeverity)) * 100;
+      const mttdStr = _.has(alertData, 'alertFilter.mttd') ? alertData.alertFilter.mttd.split(';') : null;
+      const severityUnitFeatures = (features && features.split(',')[1] !== 'deviation') ? '%' : '';
+      const severityUnit = (!mttdStr || mttdStr && mttdStr[1].split('=')[0] !== 'deviation') ? '%' : '';
+      const mttdWeight = Number(extractSeverity(alertData, defaultSeverity));
+      const convertedWeight = severityUnit === '%' ? mttdWeight * 100 : mttdWeight;
       const statsCards = [
           {
             title: 'Number of anomalies',
@@ -266,12 +268,12 @@ export default Controller.extend({
             text: 'Among all anomalies that happened, the % of them detected by the system.'
           },
           {
-            title: `MTTD for > ${mttdWeight}${severityUnit} change`,
+            title: `MTTD for > ${convertedWeight}${severityUnit} change`,
             key: 'mttd',
             units: 'hrs',
             tooltip: false,
             hideProjected: true,
-            text: `Minimum time to detect for anomalies with > ${mttdWeight}${severityUnit} change`
+            text: `Minimum time to detect for anomalies with > ${convertedWeight}${severityUnit} change`
           }
         ];
 
@@ -508,7 +510,9 @@ export default Controller.extend({
       activeRangeEnd: '',
       alertEvalMetrics: {}
     });
+    // Cancel controller concurrency tasks
     this.get('checkReplayStatus').cancelAll();
+    this.get('checkForNewAnomalies').cancelAll();
   },
 
   /**

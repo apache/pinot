@@ -8,12 +8,15 @@ import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
 import { later } from "@ember/runloop";
-import { set, get, setProperties } from '@ember/object';
+import { task, timeout } from 'ember-concurrency';
 import { isPresent } from "@ember/utils";
+import { set, get, setProperties, getWithDefault } from '@ember/object';
 import { checkStatus, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
 import {
   enhanceAnomalies,
   toIdGroups,
+  setMetricData,
+  getMetricData,
   setUpTimeRangeOptions,
   getTopDimensions,
   buildMetricDataUrl,
@@ -28,16 +31,24 @@ const dateFormat = 'YYYY-MM-DD';
 const displayDateFormat = 'YYYY-MM-DD HH:mm';
 
 /**
+ * Basic alert page constants
+ */
+const DEFAULT_SEVERITY = 0.3;
+const PAGINATION_DEFAULT = 10;
+const DIMENSION_COUNT = 7;
+const DURATION_DEFAULT = '3m';
+const METRIC_DATA_COLOR = 'blue';
+
+/**
  * Basic alert page defaults
  */
-const defaultSeverity = 0.3;
-const paginationDefault = 10;
-const dimensionCount = 7;
-const durationDefault = '3m';
-const metricDataColor = 'blue';
+const endDateDefault = moment();
+const resolutionOptions = ['All Resolutions'];
+const dimensionOptions = ['All Dimensions'];
+const wowOptions = ['Wow', 'Wo2W', 'Wo3W', 'Wo4W'];
 const durationMap = { m:'month', d:'day', w:'week' };
 const startDateDefault = buildDateEod(3, 'month').valueOf();
-const endDateDefault = moment();
+const baselineOptions = [{ name: 'Predicted', isActive: true }];
 
 /**
  * Response type options for anomalies
@@ -60,6 +71,13 @@ const anomalyResponseObj = [
     status: 'New Trend'
   }
 ];
+
+/**
+ * Build WoW array from basic options
+ */
+const newWowList = wowOptions.map((item) => {
+  return { name: item, isActive: false };
+});
 
 /**
  * Fetches all anomaly data for found anomalies - downloads all 'pages' of data from server
@@ -158,7 +176,7 @@ export default Route.extend({
     // Default to 1 month of anomalies to show if no dates present in query params
     if (!duration || !startDate) {
       this.transitionTo({ queryParams: {
-        duration: durationDefault,
+        duration: DURATION_DEFAULT,
         startDate: startDateDefault,
         endDate: endDateDefault
       }});
@@ -171,7 +189,7 @@ export default Route.extend({
 
     // Fetch saved time range
     const {
-      duration = durationDefault,
+      duration = DURATION_DEFAULT,
       startDate = startDateDefault,
       endDate = endDateDefault
     } = getDuration();
@@ -179,7 +197,7 @@ export default Route.extend({
     // Prepare endpoints for eval, mttd, projected metrics calls
     const dateParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
     const evalUrl = `/detection-job/eval/filter/${id}?${dateParams}`;
-    const mttdUrl = `/detection-job/eval/mttd/${id}?severity=${extractSeverity(alertData, defaultSeverity)}`;
+    const mttdUrl = `/detection-job/eval/mttd/${id}?severity=${extractSeverity(alertData, DEFAULT_SEVERITY)}`;
     const performancePromiseHash = {
       current: fetch(`${evalUrl}&isProjected=FALSE`).then(checkStatus),
       projected: fetch(`${evalUrl}&isProjected=TRUE`).then(checkStatus),
@@ -316,41 +334,25 @@ export default Route.extend({
       rawAnomalyData
     } = model;
 
-    // Initial value setup for displayed option lists
-    let subD = {};
-    let anomalyData = [];
-    let rawAnomalies = [];
-    const notCreateError = jobId !== -1;
-    const resolutionOptions = ['All Resolutions'];
-    const dimensionOptions = ['All Dimensions'];
-    const wowOptions = ['Wow', 'Wo2W', 'Wo3W', 'Wo4W'];
-    const baselineOptions = [{ name: 'Predicted', isActive: true }];
-    const responseOptions = anomalyResponseObj.map(response => response.name);
-    const timeRangeOptions = setUpTimeRangeOptions(['3m'], duration);
-    const alertDimension = exploreDimensions ? exploreDimensions.split(',')[0] : '';
-    const isReplayPending = isPresent(jobId) && jobId !== -1;
-    const newWowList = wowOptions.map((item) => {
-      return { name: item, isActive: false };
-    });
-
     // Prime the controller
     controller.setProperties({
       loadError,
       jobId,
       alertData,
       alertId: id,
-      defaultSeverity,
-      isReplayPending,
+      DEFAULT_SEVERITY,
       anomalyDataUrl,
       baselineOptions,
-      responseOptions,
-      timeRangeOptions,
       anomalyResponseObj,
       alertEvalMetrics,
       anomaliesLoaded: false,
       isMetricDataInvalid: false,
       isMetricDataLoading: true,
-      alertHasDimensions: isPresent(exploreDimensions)
+      isReplayPending: isPresent(jobId) && jobId !== -1,
+      alertHasDimensions: isPresent(exploreDimensions),
+      timeRangeOptions: setUpTimeRangeOptions(['3m'], duration),
+      baselineOptionsLoading: anomalyIds && anomalyIds.length > 0,
+      responseOptions: anomalyResponseObj.map(response => response.name)
     });
 
     // Kick off controller defaults and replay status check
@@ -364,64 +366,18 @@ export default Route.extend({
       });
     });
 
-    // Fetch all anomalies we have Ids for. Enhance the data and populate power-select filter options.
-    // TODO: look into possibility of bundling calls or using async/await: https://github.com/linkedin/pinot/pull/2468
-    if (notCreateError) {
-      fetchCombinedAnomalies(anomalyIds)
-        .then((rawAnomalyData) => {
-          rawAnomalies = rawAnomalyData;
-          return fetchSeverityScores(anomalyIds);
-        })
-        .then((severityScores) => {
-          anomalyData = enhanceAnomalies(rawAnomalies, severityScores);
-          resolutionOptions.push(...new Set(anomalyData.map(record => record.anomalyFeedback)));
-          dimensionOptions.push(...new Set(anomalyData.map(anomaly => anomaly.dimensionString)));
-          controller.setProperties({
-            anomaliesLoaded: true,
-            anomalyData,
-            resolutionOptions,
-            dimensionOptions
-          });
-          return this.fetchCombinedAnomalyChangeData(anomalyData);
-        })
-        // Load and display rest of options once data is loaded ('2week', 'Last Week')
-        .then((wowData) => {
-          anomalyData.forEach((anomaly) => {
-            anomaly.wowData = wowData[anomaly.anomalyId] || {};
-          });
-          controller.setProperties({
-            anomalyData,
-            baselineOptions: [baselineOptions[0], ...newWowList]
-          });
-          return fetch(metricDataUrl).then(checkStatus);
-        })
-        // Fetch and load graph metric data. Stop spinner/loader
-        .then((metricData) => {
-          Object.assign(metricData, { color: metricDataColor });
-          controller.setProperties({
-            metricData,
-            alertDimension,
-            topDimensions: [],
-            isMetricDataLoading: false
-          });
-          // If alert has dimensions set, load them into graph once replay is done.
-          if (exploreDimensions && !isReplayPending) {
-            controller.set('topDimensions', getTopDimensions(metricData, dimensionCount));
-          }
-        })
-        .catch((errors) => {
-          controller.setProperties({
-            isMetricDataInvalid: true,
-            isMetricDataLoading: false,
-            graphMessageText: 'Error loading metric data'
-          });
-        });
+    // Begin loading anomaly and graph data as concurrency tasks
+    // See https://github.com/linkedin/pinot/pull/2518#discussion-diff-169751380R366
+    if (jobId !== -1) {
+      this.get('loadAnomalyData').perform(anomalyIds);
+      this.get('loadGraphData').perform(metricDataUrl, exploreDimensions);
     }
   },
 
   resetController(controller, isExiting) {
     this._super(...arguments);
 
+    // Cancel all pending concurrency tasks in controller
     if (isExiting) {
       controller.clearAll();
     }
@@ -430,6 +386,7 @@ export default Route.extend({
   /**
    * Fetches change rate data for each available anomaly id
    * @method fetchCombinedAnomalyChangeData
+   * @param {Array} anomalyData - array of processed anomalies
    * @returns {RSVP promise}
    */
   fetchCombinedAnomalyChangeData(anomalyData) {
@@ -442,6 +399,98 @@ export default Route.extend({
 
     return RSVP.hash(promises);
   },
+
+  /**
+   * Performs the repetitive task of setting graph properties based on
+   * returned metric data and dimension data
+   * @method setGraphProperties
+   * @param {Object} metricData - returned metric timeseries data
+   * @param {String} exploreDimensions - string of metric dimensions
+   * @returns {RSVP promise}
+   */
+  setGraphProperties(metricData, exploreDimensions) {
+    const alertDimension = exploreDimensions ? exploreDimensions.split(',')[0] : '';
+    Object.assign(metricData, { color: METRIC_DATA_COLOR });
+    this.controller.setProperties({
+      metricData,
+      alertDimension,
+      topDimensions: [],
+      isMetricDataLoading: false
+    });
+    // If alert has dimensions set, load them into graph once replay is done.
+    if (exploreDimensions && !this.controller.isReplayPending) {
+      this.controller.set('topDimensions', getTopDimensions(metricData, DIMENSION_COUNT));
+    }
+  },
+
+  /**
+   * Fetch all anomalies we have Ids for. Enhance the data and populate power-select filter options.
+   * Using ember concurrency parent/child tasks. When parent is cancelled, so are children
+   * http://ember-concurrency.com/docs/child-tasks.
+   * TODO: complete concurrency task error handling and refactor child tasks for cuncurrency.
+   * @param {Array} anomalyIds - the IDs of anomalies that have been reported for this alert.
+   * @return {undefined}
+   */
+  loadAnomalyData: task(function * (anomalyIds) {
+    yield timeout(300);
+    // Load data for each anomaly Id
+    const rawAnomalies = yield fetchCombinedAnomalies(anomalyIds);
+    // Fetch and append severity score to each anomaly record
+    const severityScores = yield fetchSeverityScores(anomalyIds);
+    // Process anomaly records to make them template-ready
+    const anomalyData = yield enhanceAnomalies(rawAnomalies, severityScores);
+    // Prepare de-duped power-select option arrays
+    resolutionOptions.push(...new Set(anomalyData.map(record => record.anomalyFeedback)));
+    dimensionOptions.push(...new Set(anomalyData.map(anomaly => anomaly.dimensionString)));
+    // Push anomaly data into controller
+    this.controller.setProperties({
+      anomaliesLoaded: true,
+      anomalyData,
+      resolutionOptions,
+      dimensionOptions
+    });
+    // Fetch and append extra WoW data for each anomaly record
+    const wowData = yield this.fetchCombinedAnomalyChangeData(anomalyData);
+    anomalyData.forEach((anomaly) => {
+      anomaly.wowData = wowData[anomaly.anomalyId] || {};
+    });
+    // Load enhanced dataset into controller (WoW options will appear)
+    this.controller.setProperties({
+      anomalyData,
+      baselineOptionsLoading: false,
+      baselineOptions: [baselineOptions[0], ...newWowList]
+    });
+  // We use .cancelOn('deactivate') to make sure the task cancels when the user leaves the route.
+  // We use restartable to ensure that only one instance of the task is running at a time, hence
+  // any time setupController performs the task, any prior instances are canceled.
+  }).cancelOn('deactivate').restartable(),
+
+  /**
+   * Concurrenty task to ping the job-info endpoint to check status of an ongoing replay job.
+   * If there is no progress after a set time, we display an error message.
+   * @param {Number} jobId - the id for the newly triggered replay job
+   * @param {String} functionName - user-provided new function name (used to validate creation)
+   * @return {undefined}
+   */
+  loadGraphData: task(function * (metricDataUrl, exploreDimensions) {
+    yield timeout(300);
+    const metricId = getWithDefault(this, 'currentModel.config.id', null);
+    const isGraphDataLocal = metricId && localStorage.getItem(metricId) !== null;
+
+    // Fetch and load graph metric data.
+    fetch(metricDataUrl).then(checkStatus)
+      .then((metricData) => {
+        // Load graph with metric data from timeseries API
+        this.setGraphProperties(metricData, exploreDimensions);
+      })
+      .catch((errors) => {
+        this.controller.setProperties({
+          isMetricDataInvalid: true,
+          isMetricDataLoading: false,
+          graphMessageText: 'Error loading metric data'
+        });
+      });
+  }).cancelOn('deactivate').restartable(),
 
   actions: {
     /**
