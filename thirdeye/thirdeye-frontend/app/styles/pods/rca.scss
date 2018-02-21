@@ -46,15 +46,15 @@
 .card-container {
   background-color: white;
   border: 1px solid $te-grey--border;
-  margin-top: $te-spacing-lg;
-  margin-bottom: $te-spacing-lg;
+  margin-top: $te-spacing--md;
+  margin-bottom: $te-spacing--md;
 
   &--padded {
-    padding: 24px;
+    padding: $te-spacing--md;
   }
 
   &--space-around {
-    margin: 24px;
+    margin: $te-spacing--md;
   }
 
   &--flush-top {
@@ -70,7 +70,7 @@
   }
 
   &__row {
-    padding: 12px $te-spacing-lg;
+    padding: 12px $te-spacing--md;
     &--flex {
       display: flex;
       align-items: flex-end;
@@ -80,7 +80,7 @@
   &__header {
     display: flex;
     border-bottom: 1px solid $te-grey--border;
-    padding: 12px $te-spacing-lg;
+    padding: 10px $te-spacing--md;
     color: app-shade(black, 0.85);
 
     &--no-border {
@@ -101,13 +101,13 @@
   }
 
   &__subnav {
-    margin-right: $te-spacing-lg;
+    margin-right: $te-spacing--md;
     font-size: 17px;
   }
 
   &__body,
   &__footer {
-    padding: $te-spacing-lg;
+    padding: $te-spacing--md;
     &--flush-bottom {
       padding-bottom: 0;
     }

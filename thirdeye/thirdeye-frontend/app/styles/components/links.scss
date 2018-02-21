@@ -3,7 +3,7 @@
 .thirdeye-link {
   cursor: pointer;
   color: $te-blue-7;
-  padding: 0 8px;
+  padding: 0 $te-spacing--sm;
   text-decoration: none;
   &:hover,
   &:focus {

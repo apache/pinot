@@ -1,14 +1,14 @@
 .events-summary {
   display: flex;
   width: 100%;
-  margin-top: $te-spacing-lg;
+  margin-top: $te-spacing--lg;
   border: 1px solid $te-border-color;
   border-bottom: 0;
 }
 
 .events-summary__item {
   padding: $te-spacing;
-  padding-top: $te-spacing-lg;
+  padding-top: $te-spacing--lg;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
