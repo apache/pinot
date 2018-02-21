@@ -12,6 +12,9 @@
   }
 
   &__change {
+    margin: 0;
+    padding: 0;
+
     &--positive {
       color: $te-green;
     }
@@ -22,6 +25,7 @@
   }
 
   &__value {
-
+    margin: 0;
+    padding: 0;
   }
 }

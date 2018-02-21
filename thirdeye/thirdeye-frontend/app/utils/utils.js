@@ -29,10 +29,26 @@ export function checkStatus(response, mode = 'get', recoverBlank = false) {
 }
 
 /**
- * Formatter for the human-readable floating point numbers numbers
+ * Helper for testing a number (or reference) for a valid display value
+ * @param {float} f float number
+ */
+function isValidForDisplay(f) {
+  return !(isNone(f) || typeof f !== 'number' || Number.isNaN(f));
+}
+
+/**
+ * Formatter for human-readable floating point numbers
+ * @param {float} f float number
+ * @return {string} human-readable number string
+ *
+ * @example
+ * 5.678    =>   5.68
+ * 2.9e11   => 290.00B
+ * 1.234e-4 =>   0.12m
  */
 export function humanizeFloat(f) {
-  if (isNone(f) || typeof f !== 'number' || Number.isNaN(f)) { return '-'; }
+  if (!isValidForDisplay(f)) { return '-'; }
+
   const log10 = Math.log10(Math.abs(f));
 
   let suffix = '', shift = 0;
@@ -65,9 +81,11 @@ export function humanizeFloat(f) {
 
 /**
  * Formatter for the human-readable change values in percent with 1 decimal
+ * @param {float} f float number
+ * @return {string} human-readable change string
  */
 export function humanizeChange(f) {
-  if (isNone(f) || typeof f !== 'number' || Number.isNaN(f)) { return '-'; }
+  if (!isValidForDisplay(f)) { return '-'; }
   if (Math.abs(f) < 10.0) {
     return `${f > 0 ? '+' : ''}${Math.round(f * 100).toFixed(1)}%`;
   } else {
@@ -77,9 +95,11 @@ export function humanizeChange(f) {
 
 /**
  * Formatter for human-readable entity scores with 2 decimals
+ * @param {float} f float number
+ * @return {string} human-readable score string
  */
 export function humanizeScore(f) {
-  if (isNone(f) || typeof f !== 'number' || Number.isNaN(f)) { return '-'; }
+  if (!isValidForDisplay(f)) { return '-'; }
   return f.toFixed(2);
 }
 
