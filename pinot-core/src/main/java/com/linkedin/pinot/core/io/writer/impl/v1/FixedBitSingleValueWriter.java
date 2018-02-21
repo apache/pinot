@@ -27,8 +27,10 @@ public class FixedBitSingleValueWriter implements SingleColumnSingleValueWriter 
   private FixedBitIntReaderWriter dataFileWriter;
 
   public FixedBitSingleValueWriter(File file, int rows, int columnSizeInBits) throws Exception {
+    // Convert to long in order to avoid int overflow
+    long length =  ((long) rows * columnSizeInBits + Byte.SIZE - 1) / Byte.SIZE;
     PinotDataBuffer dataBuffer =
-        PinotDataBuffer.fromFile(file, 0, (rows * columnSizeInBits + Byte.SIZE - 1) / Byte.SIZE, ReadMode.mmap,
+        PinotDataBuffer.fromFile(file, 0, (int) length, ReadMode.mmap,
             FileChannel.MapMode.READ_WRITE, file.getAbsolutePath());
     dataFileWriter = new FixedBitIntReaderWriter(dataBuffer, rows, columnSizeInBits);
   }
