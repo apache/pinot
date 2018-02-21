@@ -32,24 +32,54 @@ export function checkStatus(response, mode = 'get', recoverBlank = false) {
  * Formatter for the human-readable floating point numbers numbers
  */
 export function humanizeFloat(f) {
-  if (isNone(f) || Number.isNaN(f)) { return '-'; }
-  const fixed = Math.max(3 - Math.max(Math.floor(Math.log10(f)) + 1, 0), 0);
-  return f.toFixed(fixed);
+  if (isNone(f) || typeof f !== 'number' || Number.isNaN(f)) { return '-'; }
+  const log10 = Math.log10(Math.abs(f));
+
+  let suffix = '', shift = 0;
+  if (log10 >= 15) {
+    return '+inf';
+  } else if (log10 >= 12) { // 1,000,000,000,000
+    suffix = 'T';
+    shift = -12;
+  } else if (log10 >= 9) { // 1,000,000,000
+    suffix = 'B';
+    shift = -9;
+  } else if (log10 >= 6) { // 1,000,000
+    suffix = 'M';
+    shift = -6;
+  } else if (log10 >= 3) { // 1,000
+    suffix = 'K';
+    shift = -3;
+  } else if (log10 >= -2) { // 0.01
+    suffix = '';
+    shift = 0;
+  } else if (log10 >= -5) { // 0.000,01
+    suffix = 'm';
+    shift = 3;
+  } else {
+    return '-inf';
+  }
+
+  return `${(f * Math.pow(10, shift)).toFixed(2)}${suffix}`;
 }
 
 /**
  * Formatter for the human-readable change values in percent with 1 decimal
  */
 export function humanizeChange(f) {
-  if (isNone(f) || Number.isNaN(f)) { return '-'; }
-  return `${f > 0 ? '+' : ''}${(Math.round(f * 1000) / 10.0).toFixed(1)}%`;
+  if (isNone(f) || typeof f !== 'number' || Number.isNaN(f)) { return '-'; }
+  if (Math.abs(f) < 10.0) {
+    return `${f > 0 ? '+' : ''}${Math.round(f * 100).toFixed(1)}%`;
+  } else {
+    return `${f > 0 ? '+' : '-'}1000%+`;
+  }
 }
 
 /**
  * Formatter for human-readable entity scores with 2 decimals
  */
 export function humanizeScore(f) {
-  if (isNone(f) || Number.isNaN(f)) { return '-'; }
+  if (isNone(f) || typeof f !== 'number' || Number.isNaN(f)) { return '-'; }
   return f.toFixed(2);
 }
 

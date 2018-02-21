@@ -7,6 +7,7 @@ import {
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import moment from 'moment';
 import fetch from 'fetch';
+import _ from 'lodash';
 
 export default Component.extend({
   //
@@ -39,7 +40,13 @@ export default Component.extend({
 
     fetch(`/rootcause/raw?framework=identity&urns=${selectedUrn}`)
       .then(checkStatus)
-      .then(res => setProperties(this, { maxTime: parseInt(res[0].attributes.maxTime[0], 10) }));
+      .then(res => {
+        if (_.isEmpty(res[0].attributes.maxTime)) {
+          setProperties(this, { maxTime: null });
+        } else {
+          setProperties(this, { maxTime: parseInt(res[0].attributes.maxTime[0], 10) });
+        }
+      });
   },
 
   /**
