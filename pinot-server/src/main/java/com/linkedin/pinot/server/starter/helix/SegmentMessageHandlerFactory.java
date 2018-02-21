@@ -15,9 +15,11 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.messages.SegmentRefreshMessage;
 import com.linkedin.pinot.common.messages.SegmentReloadMessage;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
+import java.util.List;
 import java.util.concurrent.Semaphore;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
@@ -27,9 +29,10 @@ import org.apache.helix.model.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMessageHandlerFactory.class);
+
+  private static final List<String> _messageTypes = ImmutableList.of(Message.MessageType.USER_DEFINE_MSG.name());
 
   // We only allow limited number of segments refresh/reload happen at the same time
   // The reason for that is segment refresh/reload will temporarily use double-sized memory
@@ -87,6 +90,11 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
   @Override
   public String getMessageType() {
     return Message.MessageType.USER_DEFINE_MSG.toString();
+  }
+
+  @Override
+  public List<String> getMessageTypes() {
+    return _messageTypes;
   }
 
   @Override
