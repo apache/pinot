@@ -69,7 +69,8 @@ public class StreamPartitionAssignmentStrategyFactory {
         streamPartitionAssignmentStrategy = new BalancedStreamPartitionAssignmentStrategy();
         break;
       default:
-
+        LOGGER.error("Unable to create stream partition assignment strategy with name:{} for table:{}",
+            partitionAssignmentStrategyEnum, tableConfig.getTableName());
     }
     return streamPartitionAssignmentStrategy;
   }
