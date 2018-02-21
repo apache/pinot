@@ -10,7 +10,7 @@ import Route from '@ember/routing/route';
 import { later } from "@ember/runloop";
 import { task, timeout } from 'ember-concurrency';
 import { isPresent } from "@ember/utils";
-import { set, get, setProperties } from '@ember/object';
+import { set, get, setProperties, getWithDefault } from '@ember/object';
 import { checkStatus, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
 import {
   enhanceAnomalies,
@@ -31,13 +31,17 @@ const dateFormat = 'YYYY-MM-DD';
 const displayDateFormat = 'YYYY-MM-DD HH:mm';
 
 /**
+ * Basic alert page constants
+ */
+const DEFAULT_SEVERITY = 0.3;
+const PAGINATION_DEFAULT = 10;
+const DIMENSION_COUNT = 7;
+const DURATION_DEFAULT = '3m';
+const METRIC_DATA_COLOR = 'blue';
+
+/**
  * Basic alert page defaults
  */
-const defaultSeverity = 0.3;
-const paginationDefault = 10;
-const dimensionCount = 7;
-const durationDefault = '3m';
-const metricDataColor = 'blue';
 const endDateDefault = moment();
 const resolutionOptions = ['All Resolutions'];
 const dimensionOptions = ['All Dimensions'];
@@ -172,7 +176,7 @@ export default Route.extend({
     // Default to 1 month of anomalies to show if no dates present in query params
     if (!duration || !startDate) {
       this.transitionTo({ queryParams: {
-        duration: durationDefault,
+        duration: DURATION_DEFAULT,
         startDate: startDateDefault,
         endDate: endDateDefault
       }});
@@ -185,7 +189,7 @@ export default Route.extend({
 
     // Fetch saved time range
     const {
-      duration = durationDefault,
+      duration = DURATION_DEFAULT,
       startDate = startDateDefault,
       endDate = endDateDefault
     } = getDuration();
@@ -193,7 +197,7 @@ export default Route.extend({
     // Prepare endpoints for eval, mttd, projected metrics calls
     const dateParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
     const evalUrl = `/detection-job/eval/filter/${id}?${dateParams}`;
-    const mttdUrl = `/detection-job/eval/mttd/${id}?severity=${extractSeverity(alertData, defaultSeverity)}`;
+    const mttdUrl = `/detection-job/eval/mttd/${id}?severity=${extractSeverity(alertData, DEFAULT_SEVERITY)}`;
     const performancePromiseHash = {
       current: fetch(`${evalUrl}&isProjected=FALSE`).then(checkStatus),
       projected: fetch(`${evalUrl}&isProjected=TRUE`).then(checkStatus),
@@ -336,7 +340,7 @@ export default Route.extend({
       jobId,
       alertData,
       alertId: id,
-      defaultSeverity,
+      DEFAULT_SEVERITY,
       anomalyDataUrl,
       baselineOptions,
       anomalyResponseObj,
@@ -363,6 +367,7 @@ export default Route.extend({
     });
 
     // Begin loading anomaly and graph data as concurrency tasks
+    // See https://github.com/linkedin/pinot/pull/2518#discussion-diff-169751380R366
     if (jobId !== -1) {
       this.get('loadAnomalyData').perform(anomalyIds);
       this.get('loadGraphData').perform(metricDataUrl, exploreDimensions);
@@ -405,7 +410,7 @@ export default Route.extend({
    */
   setGraphProperties(metricData, exploreDimensions) {
     const alertDimension = exploreDimensions ? exploreDimensions.split(',')[0] : '';
-    Object.assign(metricData, { color: metricDataColor });
+    Object.assign(metricData, { color: METRIC_DATA_COLOR });
     this.controller.setProperties({
       metricData,
       alertDimension,
@@ -414,7 +419,7 @@ export default Route.extend({
     });
     // If alert has dimensions set, load them into graph once replay is done.
     if (exploreDimensions && !this.controller.isReplayPending) {
-      this.controller.set('topDimensions', getTopDimensions(metricData, dimensionCount));
+      this.controller.set('topDimensions', getTopDimensions(metricData, DIMENSION_COUNT));
     }
   },
 
@@ -469,7 +474,7 @@ export default Route.extend({
    */
   loadGraphData: task(function * (metricDataUrl, exploreDimensions) {
     yield timeout(300);
-    const metricId = this.currentModel.config ? this.currentModel.config.id : null;
+    const metricId = getWithDefault(this, 'currentModel.config.id', null);
     const isGraphDataLocal = metricId && localStorage.getItem(metricId) !== null;
 
     // Fetch and load graph metric data.

@@ -125,8 +125,9 @@ const processDefaultTuningParams = (alertData) => {
     }
   }
 
-  // Load saved severity type
-  const savedSeverityPattern = alertFeatures ? alertFeatures : 'weight';
+  // TODO: enable once issue resolved in backend (not saving selection to new feature string)
+  // savedSeverityPattern = alertFeatures ? alertFeatures : 'weight';
+  const savedSeverityPattern = alertMttd ? alertMttd[1].split('=')[0] : 'weight';
   const isAbsValue = savedSeverityPattern === 'deviation';
   for (var severityKey in severityMap) {
     if (savedSeverityPattern === severityMap[severityKey]) {

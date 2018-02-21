@@ -180,6 +180,7 @@ export default Controller.extend({
         isCustom: isCustomFilterPossible
       };
 
+      // TODO: move this shared logic into utils
       if (isCustomFilterPossible) {
         const mttdVal = Number.isNaN(Number(customMttdChange)) ? 0 : Number(customMttdChange).toFixed(2);
         const severityThresholdVal = Number.isNaN(Number(customPercentChange)) ? 0 : Number(customPercentChange).toFixed(2);
@@ -304,6 +305,7 @@ export default Controller.extend({
     const metricUrl = buildMetricDataUrl({ maxTime, filters, dimension, granularity, id: metric.id });
 
     // Fetch new graph metric data
+    // TODO: const metricData = await fetch(metricUrl).then(checkStatus)
     fetch(metricUrl).then(checkStatus)
       .then(metricData => {
         this.setProperties({
