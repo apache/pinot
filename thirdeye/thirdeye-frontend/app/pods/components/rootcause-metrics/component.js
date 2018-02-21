@@ -8,7 +8,8 @@ import {
   filterPrefix,
   toMetricLabel,
   isInverse,
-  toColorDirection
+  toColorDirection,
+  makeSortable
 } from 'thirdeye-frontend/utils/rca-utils';
 import {
   humanizeChange,
@@ -17,6 +18,8 @@ import {
 } from 'thirdeye-frontend/utils/utils';
 
 export default Component.extend({
+  classNames: ['rootcause-metrics'],
+  
   /**
    * Columns for metrics table
    * @type Object[]
@@ -31,7 +34,7 @@ export default Component.extend({
       className: 'metrics-table__column metrics-table__column--large'
     }, {
       propertyName: 'current',
-      template: 'custom/metrics-table-offset',
+      template: 'custom/metrics-table-current',
       sortedBy: 'sortable_current',
       title: 'current',
       disableFiltering: true,
@@ -76,7 +79,9 @@ export default Component.extend({
       propertyName: 'score',
       title: 'Outlier',
       disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
+      className: 'metrics-table__column metrics-table__column--small',
+      sortPrecedence: 0,
+      sortDirection: 'desc'
     }, {
       template: 'custom/rca-metric-links',
       propertyName: 'links',
@@ -243,7 +248,7 @@ export default Component.extend({
   _makeChange(urn, offset, aggregates) {
     const current = aggregates[toOffsetUrn(urn, 'current')] || Number.NaN;
     const value = aggregates[toOffsetUrn(urn, offset)] || Number.NaN;
-    return current / value - 1;
+    return makeSortable(current / value - 1);
   },
 
   /**
