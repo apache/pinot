@@ -78,7 +78,8 @@ public class PinotByteBuffer extends PinotDataBuffer {
     Preconditions.checkNotNull(file);
     Preconditions.checkArgument(start >= 0);
     Preconditions.checkArgument(length >= 0 && length < Integer.MAX_VALUE,
-        "Mapping files larger than 2GB is not supported, file: " + file.toString() + ", context: " + context);
+        "Mapping files larger than 2GB is not supported, file: " + file.toString() + ", context: " + context
+            + ", length: " + length);
     Preconditions.checkNotNull(context);
 
     if (openMode == FileChannel.MapMode.READ_ONLY) {
