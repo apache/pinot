@@ -39,7 +39,12 @@ export default Component.extend({
 
     fetch(`/rootcause/raw?framework=identity&urns=${selectedUrn}`)
       .then(checkStatus)
-      .then(res => setProperties(this, { maxTime: parseInt(res[0].attributes.maxTime[0], 10) }));
+      .then(res => {
+        let maxTime = res[0].attributes.maxTime;
+        if (maxTime) {
+          setProperties(this, { maxTime: parseInt(maxTime[0], 10) });
+        }
+      });
   },
 
   /**
