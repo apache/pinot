@@ -31,7 +31,7 @@ public class CSVThirdEyeResponseTest {
         request,
         new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
         new DataFrame().addSeries("timestamp", 100).addSeries("country", "us")
-        .addSeries("AVG", 1000)
+        .addSeries("AVG_views", 1000)
     );
   }
 

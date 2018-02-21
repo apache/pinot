@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
@@ -29,9 +30,9 @@ public class CSVThirdEyeDataSourceTest {
 
     Map<String, DataFrame> sources = new HashMap<>();
     sources.put("source", new DataFrame()
-        .addSeries("timestamp", 100)
-        .addSeries("views", 1000)
-        .addSeries("country", "us"));
+        .addSeries("timestamp", 0, 3600000, 7200000, 10800000)
+        .addSeries("views", 1000, 1001, 1002, 1003)
+        .addSeries("country", "us", "us", "us", "us"));
     sources.put("other", new DataFrame());
     Map<Long, String> metricNameMap = new HashMap<>();
     metricNameMap.put(1L, "views");
@@ -82,7 +83,7 @@ public class CSVThirdEyeDataSourceTest {
 
   @Test
   public void testGetMaxDataTime() throws Exception{
-    Assert.assertEquals(dataSource.getMaxDataTime("source"), 100);
+    Assert.assertEquals(dataSource.getMaxDataTime("source"), 10800000);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -102,7 +103,7 @@ public class CSVThirdEyeDataSourceTest {
   }
 
   @Test
-  public void testExecuteSingleRequest() throws Exception {
+  public void testExecuteAggregation() throws Exception {
     ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
         .addMetricFunction(new MetricFunction(MetricAggFunction.SUM, "views", 1L, "source", null, null))
         .setDataSource("source")
@@ -111,11 +112,75 @@ public class CSVThirdEyeDataSourceTest {
         request,
         new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
         new DataFrame()
-            .addSeries("SUM_views", 1000)
+            .addSeries("SUM_views", 4006d)
+            .addSeries("timestamp", -1L)
     );
 
     ThirdEyeResponse response = dataSource.execute(request);
-    Assert.assertEquals(response.getRequest(), expectedResponse.getRequest());
-    Assert.assertEquals(response.getNumRows(), expectedResponse.getNumRows());
+    Assert.assertEquals(response, expectedResponse);
+
+  }
+
+  @Test
+  public void testExecuteTimeSeries() throws Exception {
+    ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
+        .addMetricFunction(new MetricFunction(MetricAggFunction.SUM, "views", 1L, "source", null, null))
+        .setDataSource("source")
+        .setGroupByTimeGranularity(new TimeGranularity(1, TimeUnit.HOURS))
+        .build("ref");
+    ThirdEyeResponse expectedResponse = new CSVThirdEyeResponse(
+        request,
+        new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
+        new DataFrame()
+            .addSeries("SUM_views", 1000d, 1001d, 1002d, 1003d)
+            .addSeries("timestamp", 0, 3600000, 7200000, 10800000)
+    );
+
+    ThirdEyeResponse response = dataSource.execute(request);
+    Assert.assertEquals(response, expectedResponse);
+
+  }
+
+  @Test
+  public void testExecuteSelectTimeSeries() throws Exception {
+    ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
+        .addMetricFunction(new MetricFunction(MetricAggFunction.SUM, "views", 1L, "source", null, null))
+        .setDataSource("source")
+        .setGroupByTimeGranularity(new TimeGranularity(1, TimeUnit.HOURS))
+        .setStartTimeInclusive(2000000)
+        .setEndTimeExclusive(10800000)
+        .build("ref");
+    ThirdEyeResponse expectedResponse = new CSVThirdEyeResponse(
+        request,
+        new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
+        new DataFrame()
+            .addSeries("SUM_views", 1001d, 1002d)
+            .addSeries("timestamp", 3600000, 7200000)
+    );
+
+    ThirdEyeResponse response = dataSource.execute(request);
+    Assert.assertEquals(response, expectedResponse);
+
+  }
+
+  @Test
+  public void testExecuteSelectAggregation() throws Exception {
+    ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
+        .addMetricFunction(new MetricFunction(MetricAggFunction.SUM, "views", 1L, "source", null, null))
+        .setDataSource("source")
+        .setStartTimeInclusive(1000000)
+        .setEndTimeExclusive(11000000)
+        .build("ref");
+    ThirdEyeResponse expectedResponse = new CSVThirdEyeResponse(
+        request,
+        new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
+        new DataFrame()
+            .addSeries("SUM_views", 3006d)
+            .addSeries("timestamp", -1L)
+    );
+
+    ThirdEyeResponse response = dataSource.execute(request);
+    Assert.assertEquals(response, expectedResponse);
+
   }
 }

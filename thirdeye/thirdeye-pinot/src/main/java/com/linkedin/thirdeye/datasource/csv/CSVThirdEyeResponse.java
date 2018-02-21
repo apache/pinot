@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.joda.time.DateTime;
 
 
@@ -46,7 +47,7 @@ public class CSVThirdEyeResponse extends BaseThirdEyeResponse {
 
     List<Double> metrics = new ArrayList<>();
     for(MetricFunction function : request.getMetricFunctions()){
-      metrics.add(dataframe.getDouble(function.getFunctionName().toString(), rowId));
+      metrics.add(dataframe.getDouble(function.toString(), rowId));
     }
     return new ThirdEyeResponseRow(timeBucketId, dimensions, metrics);
   }
@@ -63,7 +64,25 @@ public class CSVThirdEyeResponse extends BaseThirdEyeResponse {
       String dimension = groupKeyColumns.get(i);
       rowMap.put(dimension, dataframe.getString(dimension, rowId));
     }
-    rowMap.put(metricFunction.toString(), dataframe.getString(metricFunction.getFunctionName().name(), rowId));
+    rowMap.put(metricFunction.toString(), dataframe.getString(metricFunction.toString(), rowId));
     return rowMap;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    CSVThirdEyeResponse response = (CSVThirdEyeResponse) o;
+    return Objects.equals(dataframe, response.dataframe);
+  }
+
+  @Override
+  public int hashCode() {
+
+    return Objects.hash(dataframe);
   }
 }

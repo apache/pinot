@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -67,16 +68,41 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
   }
 
   @Override
-  public ThirdEyeResponse execute(ThirdEyeRequest request) throws Exception {
+  public ThirdEyeResponse execute(final ThirdEyeRequest request) throws Exception {
     DataFrame df = new DataFrame();
     for(MetricFunction function : request.getMetricFunctions()){
-      MetricAggFunction functionName = function.getFunctionName();
 
-      if (functionName == MetricAggFunction.SUM){
-        Double sum = dataSets.get(function.getDataset()).getDoubles(translator.translate(function.getMetricId())).sum().doubleValue();
-        df.addSeries(functionName.toString(), sum);
+      MetricAggFunction aggFunction = function.getFunctionName();
+      DataFrame data = dataSets.get(function.getDataset());
+      if (request.getStartTimeInclusive() != null){
+        data = data.filter(new Series.LongConditional() {
+          @Override
+          public boolean apply(long... values) {
+            return values[0] >= request.getStartTimeInclusive().getMillis();
+          }
+        }, COL_TIMESTAMP);
       }
-      df.addSeries(COL_TIMESTAMP, LongSeries.buildFrom(-1));
+
+      if (request.getEndTimeExclusive() != null) {
+        data = data.filter(new Series.LongConditional() {
+          @Override
+          public boolean apply(long... values) {
+            return values[0] < request.getEndTimeExclusive().getMillis();
+          }
+        }, COL_TIMESTAMP);
+      }
+      data = data.dropNull();
+
+      DoubleSeries series = data.getDoubles(translator.translate(function.getMetricId()));
+      if (request.getGroupByTimeGranularity() != null){
+        df.addSeries(function.toString(), series);
+        df.addSeries(COL_TIMESTAMP, data.get(COL_TIMESTAMP));
+      } else {
+        if (aggFunction == MetricAggFunction.SUM){
+          df.addSeries(function.toString(), series.sum());
+        }
+        df.addSeries(COL_TIMESTAMP, LongSeries.buildFrom(-1));
+      }
     }
     CSVThirdEyeResponse response = new CSVThirdEyeResponse(
         request,
