@@ -229,8 +229,8 @@ export default Controller.extend({
       const {
         alertData,
         alertEvalMetrics,
-        defaultSeverity
-      } = this.getProperties('alertData', 'alertEvalMetrics', 'defaultSeverity');
+        DEFAULT_SEVERITY: defaultSeverity
+      } = this.getProperties('alertData', 'alertEvalMetrics', 'DEFAULT_SEVERITY');
       const features = getWithDefault(alertData, 'alertFilter.features', null);
       const mttdStr = _.has(alertData, 'alertFilter.mttd') ? alertData.alertFilter.mttd.split(';') : null;
       const severityUnitFeatures = (features && features.split(',')[1] !== 'deviation') ? '%' : '';
