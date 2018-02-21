@@ -4,15 +4,10 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
-import java.io.InputStream;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.Collections;
@@ -38,8 +33,10 @@ public class CSVThirdEyeDataSourceTest {
         .addSeries("views", 1000)
         .addSeries("country", "us"));
     sources.put("other", new DataFrame());
+    Map<Long, String> metricNameMap = new HashMap<>();
+    metricNameMap.put(1L, "views");
 
-    dataSource = CSVThirdEyeDataSource.fromDataFrame(sources);
+    dataSource = CSVThirdEyeDataSource.fromDataFrame(sources, metricNameMap);
   }
 
   @Test
@@ -49,7 +46,7 @@ public class CSVThirdEyeDataSourceTest {
     sources.put("b", new DataFrame());
     sources.put("c", new DataFrame());
 
-    CSVThirdEyeDataSource dataSource = CSVThirdEyeDataSource.fromDataFrame(sources);
+    CSVThirdEyeDataSource dataSource = CSVThirdEyeDataSource.fromDataFrame(sources, Collections.<Long, String>emptyMap());
     Assert.assertEquals(new HashSet<>(dataSource.getDatasets()), sources.keySet());
     Assert.assertNotSame(new HashSet<>(dataSource.getDatasets()), sources.keySet());
   }
@@ -61,7 +58,7 @@ public class CSVThirdEyeDataSourceTest {
     Map<String, URL> sources = new HashMap<>();
     sources.put("business", business);
 
-    CSVThirdEyeDataSource dataSource = CSVThirdEyeDataSource.fromUrl(sources);
+    CSVThirdEyeDataSource dataSource = CSVThirdEyeDataSource.fromUrl(sources, Collections.<Long, String>emptyMap());
 
     Map<String, List<String>> dimensions = new HashMap<>();
     dimensions.put("country", Arrays.asList("us", "cn"));
@@ -80,7 +77,7 @@ public class CSVThirdEyeDataSourceTest {
 
   @Test
   public void testGetDatasets() throws Exception{
-    Assert.assertEquals(new HashSet(dataSource.getDatasets()), new HashSet(Arrays.asList("source", "other")));
+    Assert.assertEquals(new HashSet<>(dataSource.getDatasets()), new HashSet<>(Arrays.asList("source", "other")));
   }
 
   @Test
@@ -96,7 +93,7 @@ public class CSVThirdEyeDataSourceTest {
   @Test
   public void testGetDimensionFilters() throws Exception{
     Assert.assertEquals(dataSource.getDimensionFilters("source"),
-        Collections.singletonMap("country", Arrays.asList("us")));
+        Collections.singletonMap("country", Collections.singletonList("us")));
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -106,20 +103,8 @@ public class CSVThirdEyeDataSourceTest {
 
   @Test
   public void testExecuteSingleRequest() throws Exception {
-    DAOTestBase testDAOProvider = DAOTestBase.getInstance();
-    DAORegistry daoRegistry = DAORegistry.getInstance();
-
-
-    MetricConfigDTO configDTO = new MetricConfigDTO();
-    configDTO.setName("views");
-    configDTO.setDataset("source");
-    configDTO.setAlias("source::views");
-
-    daoRegistry.getMetricConfigDAO().save(configDTO);
-    Assert.assertNotNull(configDTO.getId());
-
     ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
-        .addMetricFunction(new MetricFunction(MetricAggFunction.SUM, "views", configDTO.getId(), "source", null, null))
+        .addMetricFunction(new MetricFunction(MetricAggFunction.SUM, "views", 1L, "source", null, null))
         .setDataSource("source")
         .build("ref");
     ThirdEyeResponse expectedResponse = new CSVThirdEyeResponse(

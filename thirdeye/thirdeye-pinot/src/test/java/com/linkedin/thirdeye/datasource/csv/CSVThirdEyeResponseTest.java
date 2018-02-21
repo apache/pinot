@@ -7,7 +7,7 @@ import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponseRow;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -25,7 +25,7 @@ public class CSVThirdEyeResponseTest {
         .setStartTimeInclusive(0)
         .setEndTimeExclusive(100)
         .addGroupBy("country")
-        .addMetricFunction(new MetricFunction(MetricAggFunction.AVG, "views", 0l, "source", null, null))
+        .addMetricFunction(new MetricFunction(MetricAggFunction.AVG, "views", 0L, "source", null, null))
         .build("");
     response = new CSVThirdEyeResponse(
         request,
@@ -44,8 +44,8 @@ public class CSVThirdEyeResponseTest {
   @Test
   public void testGetRow(){
     ThirdEyeResponseRow responseRow = response.getRow(0);
-    Assert.assertEquals(responseRow.getDimensions(), Arrays.asList("us"));
-    Assert.assertEquals(responseRow.getMetrics(), Arrays.asList(1000.0));
+    Assert.assertEquals(responseRow.getDimensions(), Collections.singletonList("us"));
+    Assert.assertEquals(responseRow.getMetrics(), Collections.singletonList(1000.0));
     Assert.assertEquals(responseRow.getTimeBucketId(), 0);
   }
 
@@ -61,7 +61,7 @@ public class CSVThirdEyeResponseTest {
     map.put("AVG_views", "1000");
     Assert.assertEquals(
         response.getRow(
-            new MetricFunction(MetricAggFunction.AVG, "views", 0l, "source", null, null),
+            new MetricFunction(MetricAggFunction.AVG, "views", 0L, "source", null, null),
         0), map);
   }
 

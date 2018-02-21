@@ -26,12 +26,13 @@ import static com.linkedin.thirdeye.dataframe.Series.SeriesType.*;
 public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
   public static final String COL_TIMESTAMP = "timestamp";
   Map<String, DataFrame> dataSets;
+  TranslateDelegator translator;
 
-  public static CSVThirdEyeDataSource fromDataFrame(Map<String, DataFrame> dataSets) {
-    return new CSVThirdEyeDataSource(new InputMap(dataSets));
+  public static CSVThirdEyeDataSource fromDataFrame(Map<String, DataFrame> dataSets, Map<Long, String> metricNameMap) {
+    return new CSVThirdEyeDataSource(dataSets, metricNameMap);
   }
 
-  public static CSVThirdEyeDataSource fromUrl(Map<String, URL> dataSets) throws Exception {
+  public static CSVThirdEyeDataSource fromUrl(Map<String, URL> dataSets, Map<Long, String> metricNameMap) throws Exception {
     Map<String, DataFrame> dataframes = new HashMap<>();
     for (Map.Entry<String, URL> source : dataSets.entrySet()) {
       try (InputStreamReader reader = new InputStreamReader(source.getValue().openStream())) {
@@ -39,16 +40,16 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
       }
     }
 
-    return new CSVThirdEyeDataSource(new InputMap(dataframes));
+    return new CSVThirdEyeDataSource(dataframes, metricNameMap);
   }
 
-  CSVThirdEyeDataSource(InputMap dataSets) {
+  CSVThirdEyeDataSource(Map<String, DataFrame> dataSets, Map<Long, String> metricNameMap) {
     this.dataSets = dataSets;
+    this.translator = new StaticTranslator(metricNameMap);
   }
 
   public CSVThirdEyeDataSource(Map<String, String> properties) throws Exception{
     Map<String, DataFrame> dataframes = new HashMap<>();
-
     for(Map.Entry<String, String> property: properties.entrySet()){
       try (InputStreamReader reader = new InputStreamReader(new URL(property.getValue()).openStream())) {
         dataframes.put(property.getKey(), DataFrame.fromCsv(reader));
@@ -56,6 +57,8 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
     }
 
     this.dataSets = dataframes;
+    this.translator = new DAOTranslator();
+
   }
 
   @Override
@@ -68,12 +71,9 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
     DataFrame df = new DataFrame();
     for(MetricFunction function : request.getMetricFunctions()){
       MetricAggFunction functionName = function.getFunctionName();
-      MetricConfigDTO configDTO = DAORegistry.getInstance().getMetricConfigDAO().findById(function.getMetricId());
-      if(configDTO == null){
-        throw new IllegalArgumentException(String.format("Can not find metric id %d", function.getMetricId()));
-      }
+
       if (functionName == MetricAggFunction.SUM){
-        Double sum = dataSets.get(function.getDataset()).getDoubles(configDTO.getName()).sum().doubleValue();
+        Double sum = dataSets.get(function.getDataset()).getDoubles(translator.translate(function.getMetricId())).sum().doubleValue();
         df.addSeries(functionName.toString(), sum);
       }
       df.addSeries(COL_TIMESTAMP, LongSeries.buildFrom(-1));
@@ -124,10 +124,32 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
     return output;
   }
 
+  private interface TranslateDelegator{
+    String translate(Long metricId);
+  }
 
-  private static class InputMap extends HashMap<String, DataFrame>{
-    InputMap(Map<String, DataFrame> map){
-      super(map);
+  private static class DAOTranslator implements TranslateDelegator {
+    @Override
+    public String translate(Long metricId) {
+      MetricConfigDTO configDTO = DAORegistry.getInstance().getMetricConfigDAO().findById(metricId);
+      if(configDTO == null){
+        throw new IllegalArgumentException(String.format("Can not find metric id %d", metricId));
+      }
+      return configDTO.getName();
+    }
+  }
+
+  private static class StaticTranslator implements TranslateDelegator{
+
+    Map<Long, String> staticMap;
+
+    public StaticTranslator(Map<Long, String> staticMap) {
+      this.staticMap = staticMap;
+    }
+
+    @Override
+    public String translate(Long metricId) {
+      return staticMap.get(metricId);
     }
   }
 }
