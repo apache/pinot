@@ -26,7 +26,6 @@ import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableCustomConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.config.TagConfig;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.TenantConfig;
 import com.linkedin.pinot.common.data.Schema;
@@ -57,7 +56,7 @@ import com.linkedin.pinot.controller.helix.PartitionAssignment;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.ResponseStatus;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy;
-import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentsFactory;
+import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfig;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyEnum;
@@ -2098,7 +2097,7 @@ public class PinotHelixResourceManager {
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
 
     RebalanceSegmentStrategy rebalanceSegmentsStrategy =
-        RebalanceSegmentsFactory.getInstance().getRebalanceSegmentsStrategy(tableConfig);
+        RebalanceSegmentStrategyFactory.getInstance().getRebalanceSegmentsStrategy(tableConfig);
     PartitionAssignment newPartitionAssignment =
         rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
     IdealState newIdealState = rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig, rebalanceUserConfig, newPartitionAssignment);

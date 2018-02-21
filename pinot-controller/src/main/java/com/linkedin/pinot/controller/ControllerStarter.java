@@ -34,7 +34,7 @@ import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceMan
 import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
-import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentsFactory;
+import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.validation.ValidationManager;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -154,7 +154,7 @@ public class ControllerStarter {
       _segmentStatusChecker.start();
 
       LOGGER.info("Creating rebalance segments factory");
-      RebalanceSegmentsFactory.createInstance(_helixResourceManager.getHelixZkManager());
+      RebalanceSegmentStrategyFactory.createInstance(_helixResourceManager.getHelixZkManager());
 
       String accessControlFactoryClass = _config.getAccessControlFactoryClass();
       LOGGER.info("Use class: {} as the access control factory", accessControlFactoryClass);

@@ -23,26 +23,26 @@ import org.apache.helix.HelixManager;
 /**
  * Singleton factory class, to fetch the right rebalance segments strategy based on table config
  */
-public class RebalanceSegmentsFactory {
+public class RebalanceSegmentStrategyFactory {
 
-  private static RebalanceSegmentsFactory INSTANCE = null;
+  private static RebalanceSegmentStrategyFactory INSTANCE = null;
 
   private HelixManager _helixManager;
 
-  private RebalanceSegmentsFactory(HelixManager helixManager) {
+  private RebalanceSegmentStrategyFactory(HelixManager helixManager) {
     _helixManager = helixManager;
   }
 
   public static void createInstance(HelixManager helixManager) {
     if (INSTANCE != null) {
-      throw new RuntimeException("Instance already created for " + RebalanceSegmentsFactory.class.getName());
+      throw new RuntimeException("Instance already created for " + RebalanceSegmentStrategyFactory.class.getName());
     }
-    INSTANCE = new RebalanceSegmentsFactory(helixManager);
+    INSTANCE = new RebalanceSegmentStrategyFactory(helixManager);
   }
 
-  public static RebalanceSegmentsFactory getInstance() {
+  public static RebalanceSegmentStrategyFactory getInstance() {
     if (INSTANCE == null) {
-      throw new RuntimeException("Instance not yet created for " + RebalanceSegmentsFactory.class.getName());
+      throw new RuntimeException("Instance not yet created for " + RebalanceSegmentStrategyFactory.class.getName());
     }
     return INSTANCE;
   }
