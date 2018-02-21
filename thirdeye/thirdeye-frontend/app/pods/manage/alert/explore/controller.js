@@ -234,7 +234,7 @@ export default Controller.extend({
       const features = getWithDefault(alertData, 'alertFilter.features', null);
       const mttdStr = _.has(alertData, 'alertFilter.mttd') ? alertData.alertFilter.mttd.split(';') : null;
       const severityUnitFeatures = (features && features.split(',')[1] !== 'deviation') ? '%' : '';
-      const severityUnit = (mttdStr && mttdStr[1].split('=')[0] !== 'deviation') ? '%' : '';
+      const severityUnit = (!mttdStr || mttdStr && mttdStr[1].split('=')[0] !== 'deviation') ? '%' : '';
       const mttdWeight = Number(extractSeverity(alertData, defaultSeverity));
       const convertedWeight = severityUnit === '%' ? mttdWeight * 100 : mttdWeight;
       const statsCards = [

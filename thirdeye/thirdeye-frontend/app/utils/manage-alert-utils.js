@@ -94,7 +94,7 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
       isUserReported: anomaly.anomalyResultSource === 'USER_LABELED_ANOMALY',
       startDateStr: moment(anomaly.anomalyStart).format('MMM D, hh:mm A'),
       durationStr: noZeroDurationArr.join(', '),
-      severityScore: score && !Number.isNaN(score) ? score.toFixed(2) : 'N/A',
+      severityScore: score && !isNaN(score) ? score.toFixed(2) : 'N/A',
       shownCurrent: anomaly.current,
       shownBaseline: anomaly.baseline,
       showResponseSaved: false,
