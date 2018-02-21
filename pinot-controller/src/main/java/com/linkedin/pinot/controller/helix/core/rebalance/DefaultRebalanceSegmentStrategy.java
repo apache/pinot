@@ -253,13 +253,14 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
         consumingSegments.add(entry.getKey());
       }
     }
+    // TODO: check that targetNumReplicas and replicas in newPartitionAssignment match
     // update ideal state of consuming segments, based on new stream partition assignment
     Map<String, List<String>> partitionToInstanceMap = newPartitionAssignment.getPartitionToInstances();
     for (String segmentName : consumingSegments) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
       int partitionId = llcSegmentName.getPartitionId();
       Map<String, String> instanceStateMap = new HashMap<>();
-      for (String instance : partitionToInstanceMap.get(partitionId)) {
+      for (String instance : partitionToInstanceMap.get(String.valueOf(partitionId))) {
         instanceStateMap.put(instance, RealtimeSegmentOnlineOfflineStateModel.CONSUMING);
       }
       idealState.setInstanceStateMap(llcSegmentName.getSegmentName(), instanceStateMap);
