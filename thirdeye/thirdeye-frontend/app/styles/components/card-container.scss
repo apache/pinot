@@ -1,4 +1,6 @@
 .card-container {
+  background-color: white;
+
   &--padded {
       padding: $te-spacing--md;
   }
@@ -23,8 +25,12 @@
     border: 1px solid $te-grey--border;
   }
 
+  &--lg {
+    margin-top: $te-spacing--lg;
+    margin-bottom: $te-spacing--lg;
+  }
+
   &--md {
-    background-color: white;
     margin-top: $te-spacing--md;
     margin-bottom: $te-spacing--md;
   }
