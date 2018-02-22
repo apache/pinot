@@ -24,17 +24,19 @@ dist: precise
 sudo: false
 
 addons:
-  apt:
-    sources:
-    - google-chrome
-    packages:
-    - google-chrome-stable
+  chrome: stable
+
+before_install:
+  - npm config set spin false
+  - npm install -g npm@4
+  - npm --version
 
 install:
   - ./.travis_install.sh
 
 script:
   - ./.travis_test.sh
+  - ./thirdeye/thirdeye-frontend/node_modules/.bin/ember test --silent --skip-cleanup
 
 branches:
   only:
