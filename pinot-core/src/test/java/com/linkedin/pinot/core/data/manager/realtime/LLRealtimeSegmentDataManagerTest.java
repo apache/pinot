@@ -491,9 +491,9 @@ public class LLRealtimeSegmentDataManagerTest {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.INITIAL_CONSUMING);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
-      segmentDataManager.setNumRowsConsumed(maxRowsInSegment - 1);
+      segmentDataManager.setNumRowsIndexed(maxRowsInSegment - 1);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
-      segmentDataManager.setNumRowsConsumed(maxRowsInSegment);
+      segmentDataManager.setNumRowsIndexed(maxRowsInSegment);
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
       Assert.assertEquals(segmentDataManager.getStopReason(), SegmentCompletionProtocol.REASON_ROW_LIMIT);
     }
@@ -822,6 +822,10 @@ public class LLRealtimeSegmentDataManagerTest {
 
     public void setNumRowsConsumed(int numRows) {
       setInt(numRows, "_numRowsConsumed");
+    }
+
+    public  void setNumRowsIndexed(int numRows) {
+      setInt(numRows, "_numRowsIndexed");
     }
 
     public void setFinalOffset(long offset) {

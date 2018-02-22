@@ -45,6 +45,7 @@ public class IndexingConfigTest {
     json.put("onHeapDictionaryColumns", Arrays.asList(expectedOnHeapDictionaryColumns));
     json.put("loadMode", "MMAP");
     json.put("keyThatIsUnknown", "randomValue");
+    json.put("aggregateMetrics", "true");
 
     ObjectMapper mapper = new ObjectMapper();
     JsonNode jsonNode = mapper.readTree(json.toString());
@@ -68,6 +69,8 @@ public class IndexingConfigTest {
     for (int i = 0; i < expectedOnHeapDictionaryColumns.length; i++) {
       Assert.assertEquals(actualOnHeapDictionaryColumns.get(i), expectedOnHeapDictionaryColumns[i]);
     }
+
+    Assert.assertTrue(indexingConfig.getAggregateMetrics());
   }
 
   @Test

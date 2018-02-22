@@ -39,8 +39,11 @@ import org.slf4j.LoggerFactory;
 public class RealtimeSegmentStatsHistory implements Serializable {
   public static Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentStatsHistory.class);
   private static final long serialVersionUID = 1L;  // Change this if a new field is added to this class
+  private static final int DEFAULT_ROWS_TO_INDEX = 100000;
+
   // XXX MAX_NUM_ENTRIES should be a final variable, but we need to modify it for testing.
   private static int MAX_NUM_ENTRIES = 16;  // Max number of past segments for which stats are kept
+
   // Fields to be serialzied.
   private int _cursor = 0;
   private SegmentStats[] _entries;
@@ -78,6 +81,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   public static class SegmentStats implements Serializable {
     private static final long serialVersionUID = 1L;
     private int _numRowsConsumed;   // Number of rows consumed
+    private int _numRowsIndexed = DEFAULT_ROWS_TO_INDEX; // numRowsIndexed can be <= numRowsConsumed when aggregateMetrics is true.
     private int _numSeconds;        // Number of seconds taken to consume them
     private long _memUsedBytes;          // Memory used for consumption (bytes)
     private Map<String, ColumnStats> _colNameToStats = new HashMap();
@@ -88,6 +92,14 @@ public class RealtimeSegmentStatsHistory implements Serializable {
 
     public void setNumRowsConsumed(int numRowsConsumed) {
       _numRowsConsumed = numRowsConsumed;
+    }
+
+    public int getNumRowsIndexed() {
+      return _numRowsIndexed;
+    }
+
+    public void setNumRowsIndexed(int numRowsIndexed) {
+      _numRowsIndexed = numRowsIndexed;
     }
 
     public int getNumSeconds() {
@@ -217,6 +229,10 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     return _isFull;
   }
 
+  public synchronized boolean isEmpty() {
+    return getNumntriesToScan() == 0;
+  }
+
   public synchronized void addSegmentStats(SegmentStats segmentStats) {
     _entries[_cursor] = segmentStats;
     if (_cursor >= _arraySize -1) {
@@ -285,6 +301,21 @@ public class RealtimeSegmentStatsHistory implements Serializable {
       }
     }
     return DEFAULT_EST_AVG_COL_SIZE;
+  }
+
+  public synchronized int getEstimatedRowsToIndex() {
+    int numEntriesToScan = getNumntriesToScan();
+    if (numEntriesToScan == 0) {
+      return DEFAULT_ROWS_TO_INDEX;
+    }
+
+    long numRowsIndexed = 0;
+    for (int i = 0; i < numEntriesToScan; i++) {
+      SegmentStats segmentStats = getSegmentStatsAt(i);
+      numRowsIndexed += segmentStats.getNumRowsIndexed();
+    }
+
+    return (numRowsIndexed > 0) ? (int) (numRowsIndexed / numEntriesToScan) : DEFAULT_ROWS_TO_INDEX;
   }
 
   public SegmentStats getSegmentStatsAt(int index) {
