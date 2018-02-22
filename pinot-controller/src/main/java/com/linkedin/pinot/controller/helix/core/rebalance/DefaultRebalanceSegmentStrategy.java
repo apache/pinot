@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.controller.helix.core.rebalance;
 
-import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TagConfig;
@@ -26,7 +25,6 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.Realtime
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.PartitionAssignment;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentGenerator;
@@ -40,7 +38,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -56,7 +53,7 @@ import org.slf4j.LoggerFactory;
  * Basic rebalance segments strategy, which rebalances offline segments using autorebalance strategy,
  * and consuming segments using the partition assignment strategy for the table
  */
-public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy {
+public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrategy {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultRebalanceSegmentStrategy.class);
 
@@ -69,6 +66,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   public DefaultRebalanceSegmentStrategy(HelixManager helixManager) {
+    super(helixManager);
     _helixManager = helixManager;
     _helixAdmin = helixManager.getClusterManagmentTool();
     _helixClusterName = helixManager.getClusterName();
@@ -144,27 +142,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
     return idealState;
   }
 
-  /**
-   * Helper method to update idealstate with the new segment assignment
-   *
-   * @param tableNameWithType Table name with type
-   * @param numReplica The number of replica
-   * @param segmentAssignmentMapping Segment assignment mapping
-   */
-  private void updateIdealStateWithNewSegmentMapping(final String tableNameWithType, final int numReplica,
-      final Map<String, Map<String, String>> segmentAssignmentMapping) {
-    HelixHelper.updateIdealState(_helixManager, tableNameWithType, new Function<IdealState, IdealState>() {
-      @Nullable
-      @Override
-      public IdealState apply(@Nullable IdealState idealState) {
-        for (Map.Entry<String, Map<String, String>> entry : segmentAssignmentMapping.entrySet()) {
-          idealState.setInstanceStateMap(entry.getKey(), entry.getValue());
-        }
-        idealState.setReplicas(Integer.toString(numReplica));
-        return idealState;
-      }
-    }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000, 2.0f));
-  }
+
 
   /**
    * Rebalances serving segments based on autorebalance strategy
