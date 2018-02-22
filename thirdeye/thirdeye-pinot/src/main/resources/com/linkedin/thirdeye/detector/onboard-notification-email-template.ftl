@@ -79,7 +79,7 @@
           <tr>
             <td colspan="2" style="color: #606060; font-size: 14px; line-height: 20px; text-align: center; padding-bottom: 60px;">
               <a style="color: #FFFFFF; font-size: 16px; font-weight: bold; line-height: 20px; padding: 8px; text-decoration: none; background-color: #0073B1; border-radius: 2px;"
-                target="_blank" href="${dashboardHost}/app/#/manage/alerts/${functionId}">Review alert</a>
+                target="_blank" href="${dashboardHost}/app/#/manage/alert/${functionId}">Review alert</a>
             </td>
           </tr>
 
