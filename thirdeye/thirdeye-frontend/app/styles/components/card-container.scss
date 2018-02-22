@@ -1,5 +1,8 @@
 .card-container {
   background-color: white;
+  margin-top: $te-spacing--lg;
+  margin-bottom: $te-spacing--lg;
+  border: 1px solid $te-grey--border;
 
   &--padded {
     padding: $te-spacing--lg;
@@ -21,13 +24,8 @@
       0 2px 3px 0 app-shade(black, 0.2);
   }
 
-  &--border-grey {
-    border: 1px solid $te-grey--border;
-  }
-
-  &--lg {
-    margin-top: $te-spacing--lg;
-    margin-bottom: $te-spacing--lg;
+  &--no-border {
+    border: none;
   }
 
   &--md {
@@ -72,11 +70,10 @@
   }
 
   &__body {
+    padding: $te-spacing--lg;
+
     &--padding-md {
       padding: $te-spacing--md;
-    }
-    &--padding-lg {
-      padding: $te-spacing--lg;
     }
     &--flush-bottom {
       padding-bottom: 0;

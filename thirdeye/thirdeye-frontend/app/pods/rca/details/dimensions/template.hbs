@@ -1,4 +1,4 @@
-<section class="card-container__body--padding-lg">
+<section class="card-container__body">
   {{#containers/dimensions-container as |dimensions|}}
     <div class="row rca-header">
       <div class="col-xs-9">
@@ -47,7 +47,7 @@
             showDimensions=true}}
         {{/if}}
 
-          <div class="contribution-table card-container card-container--lg card-container--border-grey">
+          <div class="contribution-table card-container">
             <div class="contribution-table__header">
               <div class="contribution-table__subnav">
                 <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "change") "thirdeye-link--active"}}" href="#" {{action "onTabChange" "change"}}>Trend Analysis</a>
@@ -56,7 +56,7 @@
                 <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "details") "thirdeye-link--active"}}"  href="#" {{action "onTabChange" "details"}}>Contribution Analysis</a>
               </div>
             </div>
-            <div class="contribution-table__body card-container__body--padding-lg">
+            <div class="contribution-table__body card-container__body">
               {{#if (or dimensions.loading (not summary.loaded))}}
                 <div class="spinner-wrapper">
                   {{ember-spinner}}
