@@ -32,7 +32,6 @@
 .manage-alert-container {
   min-height: 200px;
   letter-spacing: 0.5px;
-  margin-top: $te-content-container-margin;
 
   &__title {
     @include app-sub-title-mixin;
