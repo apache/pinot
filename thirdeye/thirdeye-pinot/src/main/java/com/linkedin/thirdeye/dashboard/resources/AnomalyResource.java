@@ -704,6 +704,8 @@ public class AnomalyResource {
    *      the end time of the monitoring window (exclusive)
    * @param mode
    *      the mode of the baseline calculation
+   * @param dimension
+   *      the dimension string in JSON format
    * @return
    *      the Map that maps dimension string to the AnomalyTimelinesView
    * @throws Exception
@@ -713,7 +715,8 @@ public class AnomalyResource {
   @Produces(MediaType.APPLICATION_JSON)
   public Response getTimeSeriesAndBaselineData(@PathParam("id") long functionId,
       @QueryParam("start") String startTimeIso, @QueryParam("end") String endTimeIso,
-      @QueryParam("mode") @DefaultValue("ONLINE") String mode) throws Exception {
+      @QueryParam("mode") @DefaultValue("ONLINE") String mode,
+      @QueryParam("dimension") @NotNull String dimension) throws Exception {
     AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(functionId);
     if (anomalyFunctionSpec == null) {
       LOG.warn("Cannot find anomaly function {}", functionId);
@@ -737,39 +740,44 @@ public class AnomalyResource {
       return Response.status(Response.Status.BAD_REQUEST).entity("Start time is after end time").build();
     }
 
+    // Get DimensionMap from input dimension String
+    Multimap<String, String> functionFilters = anomalyFunctionSpec.getFilterSet();
+    String[] exploreDimensions = anomalyFunctionSpec.getExploreDimensions().split(",");
+    Map<String, String> inputDimension = OBJECT_MAPPER.readValue(dimension, Map.class);
+    DimensionMap dimensionsToBeEvaluated = new DimensionMap();
+    for (String exploreDimension : exploreDimensions) {
+      if (!inputDimension.containsKey(exploreDimension)) {
+        String msg = String.format("Query %s doesn't specify the value of explore dimension %s", dimension, exploreDimension);
+        LOG.error(msg);
+        throw new WebApplicationException(msg);
+      } else {
+        dimensionsToBeEvaluated.put(exploreDimension, inputDimension.get(exploreDimension));
+      }
+    }
+
     // Get the anomaly time lines view of the anomaly function on each dimension
-    List<DimensionMap> dimensions = enumerateDimensionMapCombinations(anomalyFunctionSpec);
     HashMap<String, AnomalyTimelinesView> dimensionMapAnomalyTimelinesViewMap = new HashMap<>();
     AnomaliesResource anomaliesResource = new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory);
     DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(anomalyFunctionSpec.getCollection());
-    for (DimensionMap dimensionMap : dimensions) {
-      AnomalyTimelinesView anomalyTimelinesView = null;
-      if (mode.equalsIgnoreCase("ONLINE")) {
-        // If online, use the monitoring time window to query time range and generate the baseline
-        anomalyTimelinesView =
-            anomaliesResource.getTimelinesViewInMonitoringWindow(anomalyFunctionSpec, datasetConfigDTO, startTime,
-                endTime, dimensionMap);
-      } else {
-        // If offline, request baseline in user-defined data range
-        List<Pair<Long, Long>> dataRangeIntervals = new ArrayList<>();
-        dataRangeIntervals.add(new Pair<Long, Long>(endTime.getMillis(), endTime.getMillis()));
-        dataRangeIntervals.add(new Pair<Long, Long>(startTime.getMillis(), endTime.getMillis()));
-        anomalyTimelinesView =
-            anomaliesResource.getTimelinesViewInMonitoringWindow(anomalyFunctionSpec, datasetConfigDTO,
-                dataRangeIntervals, dimensionMap);
-      }
-      dimensionMapAnomalyTimelinesViewMap.put(dimensionMap.toJavaString(), anomalyTimelinesView);
+    AnomalyTimelinesView anomalyTimelinesView = null;
+    if (mode.equalsIgnoreCase("ONLINE")) {
+      // If online, use the monitoring time window to query time range and generate the baseline
+      anomalyTimelinesView =
+          anomaliesResource.getTimelinesViewInMonitoringWindow(anomalyFunctionSpec, datasetConfigDTO, startTime,
+              endTime, dimensionsToBeEvaluated);
+    } else {
+      // If offline, request baseline in user-defined data range
+      List<Pair<Long, Long>> dataRangeIntervals = new ArrayList<>();
+      dataRangeIntervals.add(new Pair<Long, Long>(endTime.getMillis(), endTime.getMillis()));
+      dataRangeIntervals.add(new Pair<Long, Long>(startTime.getMillis(), endTime.getMillis()));
+      anomalyTimelinesView =
+          anomaliesResource.getTimelinesViewInMonitoringWindow(anomalyFunctionSpec, datasetConfigDTO,
+              dataRangeIntervals, dimensionsToBeEvaluated);
     }
+    anomalyTimelinesView = amendAnomalyTimelinesViewWithAnomalyResults(anomalyFunctionSpec, anomalyTimelinesView,
+        dimensionsToBeEvaluated);
 
-    // Amend the anomaly time lines view by adding merged anomaly information
-    for (String dimension : dimensionMapAnomalyTimelinesViewMap.keySet()) {
-      DimensionMap dimensionMap = new DimensionMap(dimension);
-      AnomalyTimelinesView anomalyTimelinesView = amendAnomalyTimelinesViewWithAnomalyResults(anomalyFunctionSpec,
-          dimensionMapAnomalyTimelinesViewMap.get(dimension), dimensionMap);
-      dimensionMapAnomalyTimelinesViewMap.put(dimension, anomalyTimelinesView);
-    }
-
-    return Response.ok(dimensionMapAnomalyTimelinesViewMap).build();
+    return Response.ok(anomalyTimelinesView).build();
   }
 
   /**
@@ -815,6 +823,10 @@ public class AnomalyResource {
           TimeSeries anomalyExpected = timeSeriesTuple._2();
 
           for (long timestamp : anomalyObserved.timestampSet()) {
+            // Preventing the append data points outside of view window
+            if (!timeSeriesInterval.contains(timestamp)) {
+              continue;
+            }
             // align timestamp to the begin of the day if Bucket is in DAYS
             long indexTimestamp = timestamp;
             if (TimeUnit.DAYS.toMillis(1l) == bucketMillis) {
@@ -836,7 +848,7 @@ public class AnomalyResource {
           continue;
         }
 
-        // Strategy 2: override the timeseries by the current and baseline values inside
+        // Strategy 2: override the timeseries by the current and baseline values inside raw anomaly
         if (mergedAnomalyResult.getAnomalyResults().size() > 0) {
           for (RawAnomalyResultDTO rawAnomalyResult : mergedAnomalyResult.getAnomalyResults()) {
             if (!observed.hasTimestamp(rawAnomalyResult.getStartTime())) {
