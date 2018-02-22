@@ -2,7 +2,7 @@
   background-color: white;
 
   &--padded {
-      padding: $te-spacing--md;
+    padding: $te-spacing--md;
   }
 
   &--space-around {
@@ -73,7 +73,12 @@
 
   &__body,
   &__footer {
-    padding: $te-spacing--md;
+    &--padding-md {
+      padding: $te-spacing--md;
+    }
+    &--padding-lg {
+      padding: $te-spacing--lg;
+    }
     &--flush-bottom {
       padding-bottom: 0;
     }

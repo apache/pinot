@@ -39,7 +39,7 @@
     <div class="card-container__header card-container__header--no-border card-container__header--flush-bottom">
       <span class="card-container__title">Root cause Analysis</span>
     </div>
-    <div class="card-container__body card-container__body--flush-bottom">
+    <div class="card-container__body--padding-md card-container__body--flush-bottom">
       {{#if selectedUrns.size}}
           <div class="rootcause-wrapper">
             {{rootcause-legend
@@ -170,7 +170,7 @@
           </div>
         </div>
 
-        <div class="card-container__body">
+        <div class="card-container__body--padding-md">
           <div class="row">
             <div class="col-xs-12">
               {{#if (eq activeTab "dimensions")}}
