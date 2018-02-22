@@ -36,7 +36,6 @@ install:
 
 script:
   - ./.travis_test.sh
-  - ./thirdeye/thirdeye-frontend/node_modules/.bin/ember test --silent --skip-cleanup
 
 branches:
   only:

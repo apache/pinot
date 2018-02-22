@@ -42,6 +42,14 @@ if [ $? -eq 0 ]; then
   else
     exit 1
   fi
+
+  ./thirdeye-frontend/node_modules/.bin/ember test --silent --skip-cleanup
+  failed=$?
+  if [ $failed -eq 0 ]; then
+    exit 0
+  else
+    exit 1
+  fi
 fi
 
 # Only run tests for JDK 7
