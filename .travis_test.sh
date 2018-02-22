@@ -33,17 +33,17 @@ if [ $? -eq 0 ]; then
   fi
 
   cd thirdeye
-  mvn test
-  failed=$?
+  # mvn test
+  # failed=$?
   # Remove Pinot/ThirdEye files from local Maven repository to avoid a useless cache rebuild
-  rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
-  if [ $failed -eq 0 ]; then
-    exit 0
-  else
-    exit 1
-  fi
+  # rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
+  # if [ $failed -eq 0 ]; then
+  #   exit 0
+  # else
+  #   exit 1
+  # fi
 
-  ./thirdeye-frontend/node_modules/.bin/ember test --silent --skip-cleanup
+  ./thirdeye-frontend/node_modules/.bin/ember test --silent --skip-cleanup --launch Chrome
   failed=$?
   if [ $failed -eq 0 ]; then
     exit 0
