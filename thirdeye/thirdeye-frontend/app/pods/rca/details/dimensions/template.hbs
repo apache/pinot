@@ -2,7 +2,7 @@
   {{#containers/dimensions-container as |dimensions|}}
     <div class="row rca-header">
       <div class="col-xs-9">
-          <h3 class="te-sub-title te-sub-title--flush">Dimensions Analysis</h3> 
+          <h3 class="te-sub-title te-sub-title--flush">Dimensions Analysis</h3>
           {{#if dimensions.loaded}}
             <span>(Investigation Period: {{moment-format dimensions.regionStart dateFormat}} -
               {{moment-format dimensions.regionEnd dateFormat}})</span>
@@ -10,7 +10,7 @@
       </div>
       <div class="col-xs-3 pull-right">
         <label class="te-label" for="select-dimension">Break Dimensions by: </label>
-          {{#power-select 
+          {{#power-select
             triggerId="select-dimension"
             selected=dimension
             options=dimensions.keys
@@ -34,7 +34,7 @@
             showGraphLegend=false
             showLegend=true
             showSubchart=true
-            primaryMetric=summary.primaryMetric 
+            primaryMetric=summary.primaryMetric
             dimensions=dimensions.subdimensions
             selectedDimensions=summary.selectedDimensions
             analysisStart=dimensions.regionStart
@@ -46,7 +46,7 @@
             onSelection=(action actions.onSelection)
             showDimensions=true}}
         {{/if}}
-        
+
           <div class="contribution-table card-container">
             <div class="contribution-table__header">
               <div class="contribution-table__subnav">
@@ -54,7 +54,7 @@
               </div>
               <div class="contribution-table__subnav">
                 <a class="thirdeye-link thirdeye-link--nav {{if (eq selectedTab "details") "thirdeye-link--active"}}"  href="#" {{action "onTabChange" "details"}}>Contribution Analysis</a>
-              </div> 
+              </div>
             </div>
             <div class="contribution-table__body card-container__body">
               {{#if (or dimensions.loading (not summary.loaded))}}
@@ -64,7 +64,7 @@
               {{else if (eq selectedTab "details")}}
                 {{#if dimensions.heatmapLoaded}}
                   {{outlet}}
-                {{else}} 
+                {{else}}
                   <div class="spinner-wrapper">
                     {{ember-spinner}}
                   </div>
@@ -78,8 +78,8 @@
                 <div class="row rca-header">
                   <div class="col-xs-9"></div>
                   <div class="col-xs-3 pull-right">
-                    {{#x-toggle 
-                      value=showDetails 
+                    {{#x-toggle
+                      value=showDetails
                       classNames="te-toggle pull-right"
                       theme='ios'
                       showLabels=true
@@ -90,7 +90,7 @@
                           <span class="te-label">{{if showDetails 'Hide Details' 'Show Details'}}</span>
                         {{/toggle.label}}
                         {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
-                    {{/x-toggle}} 
+                    {{/x-toggle}}
                   </div>
                 </div>
                 {{contribution-table
@@ -102,7 +102,7 @@
                   dimensions=dimensions.subdimensions
                   showDetails=showDetails
                   stopLoading=(action "onRendering")
-                }} 
+                }}
               {{/if}}
             </div>
           </div>

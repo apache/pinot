@@ -35,11 +35,11 @@
     }}
   {{/if}}
 
-  <div class="row card-container card-container--box-shadow">
+  <div class="row card-container card-container--md card-container--box-shadow">
     <div class="card-container__header card-container__header--no-border card-container__header--flush-bottom">
       <span class="card-container__title">Root cause Analysis</span>
     </div>
-    <div class="card-container__body card-container__body--flush-bottom">
+    <div class="card-container__body--padding-md card-container__body--flush-bottom">
       {{#if selectedUrns.size}}
           <div class="rootcause-wrapper">
             {{rootcause-legend
@@ -77,7 +77,7 @@
             </div>
           </div>
       {{else}}
-        <div class="card-container card-container--flush-top">
+        <div class="card-container card-container--md card-container--flush-top">
           {{rootcause-placeholder
             message="Please select a metric and click on '+ add to chart' below. The root cause graph will load here."
             iconClass="glyphicon glyphicon-equalizer"}}
@@ -122,7 +122,7 @@
       {{/if}}
     {{/if}}
 
-    <div class="card-container card-container--space-around card-container--flush-top">
+    <div class="card-container card-container--md card-container--space-around card-container--flush-top">
       <div class="card-container__row card-container__row--flex row">
         <div class="col-xs-10">
           {{rootcause-select-metric-dimension
@@ -170,7 +170,7 @@
           </div>
         </div>
 
-        <div class="card-container__body">
+        <div class="card-container__body card-container__body--padding-md">
           <div class="row">
             <div class="col-xs-12">
               {{#if (eq activeTab "dimensions")}}

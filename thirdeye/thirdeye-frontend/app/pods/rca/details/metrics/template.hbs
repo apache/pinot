@@ -4,14 +4,14 @@
 
         <div class="rca-header row">
           <div class="col-xs-9">
-            <h3 class="te-sub-title te-sub-title--flush">Metrics Correlation</h3> 
+            <h3 class="te-sub-title te-sub-title--flush">Metrics Correlation</h3>
             <span>(Investigation Period: {{moment-format metricList.regionStart dateFormat}} -
           {{moment-format metricList.regionEnd dateFormat}})</span>
           </div>
           <div class="rca-actions col-xs-3">
             {{#if metricList.loaded}}
-              {{#x-toggle 
-                value=splitView 
+              {{#x-toggle
+                value=splitView
                 classNames="te-toggle pull-right"
                 theme='ios'
                 showLabels=true
@@ -41,7 +41,7 @@
             {{#if splitView}}
               {{anomaly-graph
                 componentId='correlated-metrics'
-                primaryMetric=summary.primaryMetric 
+                primaryMetric=summary.primaryMetric
                 showGraphLegend=false
                 showLegend=false
                 showMetrics=true
@@ -68,7 +68,7 @@
                   onSelection=(action actions.onMetricSelection)
                   onSubchartChange=(action "onDateChange")
                   showGraphLegend=false}}
-                  
+
               {{/each}}
             {{else}}
               {{anomaly-graph
