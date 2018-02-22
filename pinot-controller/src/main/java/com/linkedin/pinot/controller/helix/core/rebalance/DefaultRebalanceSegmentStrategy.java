@@ -77,7 +77,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
 
   @Override
   public PartitionAssignment rebalancePartitionAssignment(IdealState idealState, TableConfig tableConfig,
-      RebalanceUserConfig rebalanceUserConfig) {
+      RebalanceUserParams rebalanceUserParams) {
     PartitionAssignment partitionAssignment = null;
 
     if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
@@ -97,10 +97,10 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
       partitionAssignment = consumingPartitionAssignment.get(tableNameWithType);
 
       boolean dryRun =
-          Boolean.valueOf(rebalanceUserConfig.getConfig(RebalanceUserConfigProperties.DRYRUN, DEFAULT_DRY_RUN));
+          Boolean.valueOf(rebalanceUserParams.getConfig(RebalanceUserParamConstants.DRYRUN, DEFAULT_DRY_RUN));
       if (!dryRun) {
         LOGGER.info("Dry run. Skip writing stream partition assignment to property store");
-        streamPartitionAssignmentGenerator.writeKafkaPartitionAssignment(consumingPartitionAssignment);
+        streamPartitionAssignmentGenerator.writeStreamPartitionAssignment(consumingPartitionAssignment);
       }
     }
     return partitionAssignment;
@@ -108,7 +108,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
 
   @Override
   public IdealState rebalanceIdealState(IdealState idealState, TableConfig tableConfig,
-      RebalanceUserConfig rebalanceUserConfig, PartitionAssignment newPartitionAssignment) {
+      RebalanceUserParams rebalanceUserParams, PartitionAssignment newPartitionAssignment) {
 
     String tableNameWithType = tableConfig.getTableName();
     CommonConstants.Helix.TableType tableType = tableConfig.getTableType();
@@ -116,7 +116,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
     // if realtime, rebalance consuming segments
     if (tableType.equals(CommonConstants.Helix.TableType.REALTIME)) {
       boolean rebalanceConsuming = Boolean.valueOf(
-          rebalanceUserConfig.getConfig(RebalanceUserConfigProperties.REBALANCE_CONSUMING,
+          rebalanceUserParams.getConfig(RebalanceUserParamConstants.REBALANCE_CONSUMING,
               DEFAULT_REBALANCE_CONSUMING));
       if (rebalanceConsuming) {
         rebalanceConsumingSegments(idealState, newPartitionAssignment);
@@ -136,7 +136,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
     }
     rebalanceServing(idealState, tableConfig, targetNumReplicas);
     boolean dryRun =
-        Boolean.valueOf(rebalanceUserConfig.getConfig(RebalanceUserConfigProperties.DRYRUN, DEFAULT_DRY_RUN));
+        Boolean.valueOf(rebalanceUserParams.getConfig(RebalanceUserParamConstants.DRYRUN, DEFAULT_DRY_RUN));
     if (!dryRun) {
       updateIdealStateWithNewSegmentMapping(tableNameWithType, targetNumReplicas,
           idealState.getRecord().getMapFields());

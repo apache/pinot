@@ -30,20 +30,20 @@ public interface RebalanceSegmentStrategy {
    * Rebalances and writes partition assignments involved in the rebalance of the table
    * @param idealState old ideal state
    * @param tableConfig table config of table tor rebalance
-   * @param rebalanceUserConfig custom user configs for specific rebalance strategies
+   * @param rebalanceUserParams custom user configs for specific rebalance strategies
    * @return rebalanced partition assignments
    */
   PartitionAssignment rebalancePartitionAssignment(IdealState idealState, TableConfig tableConfig,
-      RebalanceUserConfig rebalanceUserConfig);
+      RebalanceUserParams rebalanceUserParams);
 
   /**
    * Rebalances segments and writes ideal state of table
    * @param idealState old ideal state
    * @param tableConfig table config of table tor rebalance
-   * @param rebalanceUserConfig custom user configs for specific rebalance strategies
+   * @param rebalanceUserParams custom user configs for specific rebalance strategies
    * @param newPartitionAssignment new rebalaned partition assignments as part of the resource rebalance
    * @return rebalanced ideal state
    */
-  IdealState rebalanceIdealState(IdealState idealState, TableConfig tableConfig, RebalanceUserConfig rebalanceUserConfig,
+  IdealState rebalanceIdealState(IdealState idealState, TableConfig tableConfig, RebalanceUserParams rebalanceUserParams,
       PartitionAssignment newPartitionAssignment);
 }

@@ -82,14 +82,14 @@ public class StreamPartitionAssignmentGenerator {
    */
   protected Map<String, List<String>> getPartitionsToInstances(String realtimeTableName) {
     Map<String, List<String>> partitionToInstanceMap = null;
-    ZNRecord kafkaPartitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
-    if (kafkaPartitionAssignment != null) {
-      partitionToInstanceMap = kafkaPartitionAssignment.getListFields();
+    ZNRecord streamPartitionAssignment = getStreamPartitionAssignment(realtimeTableName);
+    if (streamPartitionAssignment != null) {
+      partitionToInstanceMap = streamPartitionAssignment.getListFields();
     }
     return partitionToInstanceMap;
   }
 
-  protected ZNRecord getKafkaPartitionAssignment(final String realtimeTableName) {
+  protected ZNRecord getStreamPartitionAssignment(final String realtimeTableName) {
     final String path = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(realtimeTableName);
     return _propertyStore.get(path, null, AccessOption.PERSISTENT);
   }
@@ -98,7 +98,7 @@ public class StreamPartitionAssignmentGenerator {
    * Given map of table name to stream partition assignment, construct and write znodes to property store one by one
    * @param newPartitionAssignment
    */
-  public void writeKafkaPartitionAssignment(Map<String, PartitionAssignment> newPartitionAssignment) {
+  public void writeStreamPartitionAssignment(Map<String, PartitionAssignment> newPartitionAssignment) {
     for (Map.Entry<String, PartitionAssignment> entry : newPartitionAssignment.entrySet()) {
       ZNRecord znRecord = new ZNRecord(entry.getKey());
       Map<String, List<String>> partitionToInstances = entry.getValue().getPartitionToInstances();

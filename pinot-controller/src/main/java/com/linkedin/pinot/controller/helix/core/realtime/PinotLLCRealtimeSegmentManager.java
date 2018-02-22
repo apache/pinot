@@ -235,7 +235,7 @@ public class PinotLLCRealtimeSegmentManager {
     Map<String, PartitionAssignment> newPartitionAssignment =
         _streamPartitionAssignmentGenerator.generatePartitionAssignment(tableConfig, nPartitions, instanceNames,
             realtimeTablesWithSameTenant);
-    _streamPartitionAssignmentGenerator.writeKafkaPartitionAssignment(newPartitionAssignment);
+    _streamPartitionAssignmentGenerator.writeStreamPartitionAssignment(newPartitionAssignment);
     setupInitialSegments(tableConfig, kafkaStreamMetadata, newPartitionAssignment.get(realtimeTableName), idealState,
         create, flushSize);
   }
@@ -1230,7 +1230,7 @@ public class PinotLLCRealtimeSegmentManager {
     Map<String, PartitionAssignment> newPartitionAssignment =
         _streamPartitionAssignmentGenerator.generatePartitionAssignment(tableConfig, currentPartitionCount,
             currentInstances, realtimeTablesWithSameTenant);
-    _streamPartitionAssignmentGenerator.writeKafkaPartitionAssignment(newPartitionAssignment);
+    _streamPartitionAssignmentGenerator.writeStreamPartitionAssignment(newPartitionAssignment);
     LOGGER.info("Successfully updated Kafka partition assignment for table {}", realtimeTableName);
   }
 

@@ -57,7 +57,7 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.Res
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
-import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfig;
+import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserParams;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyEnum;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyFactory;
@@ -2090,7 +2090,7 @@ public class PinotHelixResourceManager {
   }
 
   @Nonnull
-  public ZNRecord rebalanceTable(final String rawTableName, TableType tableType, RebalanceUserConfig rebalanceUserConfig) {
+  public ZNRecord rebalanceTable(final String rawTableName, TableType tableType, RebalanceUserParams rebalanceUserParams) {
 
     TableConfig tableConfig = getTableConfig(rawTableName, tableType);
     String tableNameWithType = tableConfig.getTableName();
@@ -2099,8 +2099,9 @@ public class PinotHelixResourceManager {
     RebalanceSegmentStrategy rebalanceSegmentsStrategy =
         RebalanceSegmentStrategyFactory.getInstance().getRebalanceSegmentsStrategy(tableConfig);
     PartitionAssignment newPartitionAssignment =
-        rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
-    IdealState newIdealState = rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig, rebalanceUserConfig, newPartitionAssignment);
+        rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserParams);
+    IdealState newIdealState = rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig,
+        rebalanceUserParams, newPartitionAssignment);
     return newIdealState.getRecord();
   }
 

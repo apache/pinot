@@ -971,7 +971,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    public void writeKafkaPartitionAssignment(Map<String, PartitionAssignment> tableNameToPartitionAssignment) {
+    public void writeStreamPartitionAssignment(Map<String, PartitionAssignment> tableNameToPartitionAssignment) {
       _allPartitionAssignments = tableNameToPartitionAssignment;
     }
 

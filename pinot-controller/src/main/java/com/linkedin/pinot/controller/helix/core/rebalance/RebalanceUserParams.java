@@ -23,7 +23,7 @@ import java.util.Map;
 /**
  * Custom user config provided in rebalance, which will vary according to rebalance strategy
  */
-public class RebalanceUserConfig {
+public class RebalanceUserParams {
 
   private Map<String, String> _configs = new HashMap<>(1);
 

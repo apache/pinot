@@ -19,7 +19,7 @@ package com.linkedin.pinot.controller.helix.core.rebalance;
 /**
  * Constants for rebalance user config properties
  */
-public class RebalanceUserConfigProperties {
+public class RebalanceUserParamConstants {
 
   public static final String DRYRUN = "dryRun";
   public static final String REBALANCE_CONSUMING = "rebalanceConsuming";

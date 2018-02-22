@@ -27,8 +27,8 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
-import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfig;
-import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfigProperties;
+import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserParams;
+import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserParamConstants;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -387,15 +387,19 @@ public class PinotTableRestletResource {
   public ZNRecord rebalance(
       @ApiParam(value = "Name of the table to rebalance", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "offline|realtime", required = true) @QueryParam("type") String tableType,
-      @ApiParam(value = "true|false", required = true, defaultValue = "true") @QueryParam("dryrun") Boolean dryRun
+      @ApiParam(value = "true|false", required = true, defaultValue = "true") @QueryParam("dryrun") Boolean dryRun,
+      @ApiParam(value = "true|false", required = false, defaultValue = "false") @QueryParam("rebalanceConsuming") Boolean rebalanceConsuming
   )
   {
-    RebalanceUserConfig rebalanceUserConfig = new RebalanceUserConfig();
-    rebalanceUserConfig.addConfig(RebalanceUserConfigProperties.DRYRUN, String.valueOf(dryRun));
+    RebalanceUserParams rebalanceUserParams = new RebalanceUserParams();
+    rebalanceUserParams.addConfig(RebalanceUserParamConstants.DRYRUN, String.valueOf(dryRun));
+    rebalanceUserParams.addConfig(RebalanceUserParamConstants.REBALANCE_CONSUMING, String.valueOf(rebalanceConsuming));
     if (tableType.equalsIgnoreCase(CommonConstants.Helix.TableType.OFFLINE.name())) {
-      return _pinotHelixResourceManager.rebalanceTable(tableName, CommonConstants.Helix.TableType.OFFLINE, rebalanceUserConfig);
+      return _pinotHelixResourceManager.rebalanceTable(tableName, CommonConstants.Helix.TableType.OFFLINE,
+          rebalanceUserParams);
     } else if (tableType.equalsIgnoreCase(CommonConstants.Helix.TableType.REALTIME.name())) {
-      return _pinotHelixResourceManager.rebalanceTable(tableName, CommonConstants.Helix.TableType.REALTIME, rebalanceUserConfig);
+      return _pinotHelixResourceManager.rebalanceTable(tableName, CommonConstants.Helix.TableType.REALTIME,
+          rebalanceUserParams);
     } else {
       throw new ControllerApplicationException(LOGGER, "Illegal table type " + tableType, Response.Status.BAD_REQUEST);
     }

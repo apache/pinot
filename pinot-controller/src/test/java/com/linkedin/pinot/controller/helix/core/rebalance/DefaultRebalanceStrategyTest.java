@@ -135,9 +135,9 @@ public class DefaultRebalanceStrategyTest {
     setInstanceStateMapForIdealState(idealState, nSegments, nReplicas, instances, offlineTableName, "ONLINE",
         "offline");
 
-    RebalanceUserConfig rebalanceUserConfig = new RebalanceUserConfig();
-    rebalanceUserConfig.addConfig(RebalanceUserConfigProperties.DRYRUN, "true");
-    rebalanceUserConfig.addConfig(RebalanceUserConfigProperties.REBALANCE_CONSUMING, "false");
+    RebalanceUserParams rebalanceUserParams = new RebalanceUserParams();
+    rebalanceUserParams.addConfig(RebalanceUserParamConstants.DRYRUN, "true");
+    rebalanceUserParams.addConfig(RebalanceUserParamConstants.REBALANCE_CONSUMING, "false");
 
     IdealState rebalancedIdealState;
     int targetNumReplicas = nReplicas;
@@ -147,19 +147,19 @@ public class DefaultRebalanceStrategyTest {
         .setNumReplicas(targetNumReplicas)
         .build();
     rebalancedIdealState =
-        testRebalance(idealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances, false);
+        testRebalance(idealState, tableConfig, rebalanceUserParams, targetNumReplicas, nSegments, instances, false);
 
     // increase i (i > n*r)
     instances = getInstanceList(12);
     when(mockHelixAdmin.getInstancesInClusterWithTag(anyString(), anyString())).thenReturn(instances);
     when(mockHelixAdmin.getInstancesInCluster(anyString())).thenReturn(instances);
     rebalancedIdealState =
-        testRebalance(rebalancedIdealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances,
+        testRebalance(rebalancedIdealState, tableConfig, rebalanceUserParams, targetNumReplicas, nSegments, instances,
             true);
 
     // rebalance with no change
     rebalancedIdealState =
-        testRebalance(rebalancedIdealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances,
+        testRebalance(rebalancedIdealState, tableConfig, rebalanceUserParams, targetNumReplicas, nSegments, instances,
             false);
 
     // remove unused servers
@@ -174,7 +174,7 @@ public class DefaultRebalanceStrategyTest {
     when(mockHelixAdmin.getInstancesInClusterWithTag(anyString(), anyString())).thenReturn(instances);
     when(mockHelixAdmin.getInstancesInCluster(anyString())).thenReturn(instances);
     rebalancedIdealState =
-        testRebalance(rebalancedIdealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances,
+        testRebalance(rebalancedIdealState, tableConfig, rebalanceUserParams, targetNumReplicas, nSegments, instances,
             false);
 
     // remove used servers
@@ -182,7 +182,7 @@ public class DefaultRebalanceStrategyTest {
     when(mockHelixAdmin.getInstancesInClusterWithTag(anyString(), anyString())).thenReturn(instances);
     when(mockHelixAdmin.getInstancesInCluster(anyString())).thenReturn(instances);
     rebalancedIdealState =
-        testRebalance(rebalancedIdealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances,
+        testRebalance(rebalancedIdealState, tableConfig, rebalanceUserParams, targetNumReplicas, nSegments, instances,
             true);
 
     // replace servers
@@ -191,7 +191,7 @@ public class DefaultRebalanceStrategyTest {
     when(mockHelixAdmin.getInstancesInClusterWithTag(anyString(), anyString())).thenReturn(instances);
     when(mockHelixAdmin.getInstancesInCluster(anyString())).thenReturn(instances);
     rebalancedIdealState =
-        testRebalance(rebalancedIdealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances,
+        testRebalance(rebalancedIdealState, tableConfig, rebalanceUserParams, targetNumReplicas, nSegments, instances,
             true);
 
     // reduce targetNumReplicas
@@ -200,7 +200,7 @@ public class DefaultRebalanceStrategyTest {
         .setNumReplicas(targetNumReplicas)
         .build();
     rebalancedIdealState =
-        testRebalance(rebalancedIdealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances,
+        testRebalance(rebalancedIdealState, tableConfig, rebalanceUserParams, targetNumReplicas, nSegments, instances,
             true);
 
     // increase targetNumReplicas
@@ -208,7 +208,7 @@ public class DefaultRebalanceStrategyTest {
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(offlineTableName)
         .setNumReplicas(targetNumReplicas)
         .build();
-    testRebalance(rebalancedIdealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances,
+    testRebalance(rebalancedIdealState, tableConfig, rebalanceUserParams, targetNumReplicas, nSegments, instances,
         true);
   }
 
@@ -243,9 +243,9 @@ public class DefaultRebalanceStrategyTest {
     setInstanceStateMapForIdealState(idealState, newPartitionAssignment, nConsumingSegments, nReplicas,
         consumingInstances, realtimeTableName, "CONSUMING", "consuming");
 
-    RebalanceUserConfig rebalanceUserConfig = new RebalanceUserConfig();
-    rebalanceUserConfig.addConfig(RebalanceUserConfigProperties.DRYRUN, "true");
-    rebalanceUserConfig.addConfig(RebalanceUserConfigProperties.REBALANCE_CONSUMING, "true");
+    RebalanceUserParams rebalanceUserParams = new RebalanceUserParams();
+    rebalanceUserParams.addConfig(RebalanceUserParamConstants.DRYRUN, "true");
+    rebalanceUserParams.addConfig(RebalanceUserParamConstants.REBALANCE_CONSUMING, "true");
 
     IdealState rebalancedIdealState;
     int targetNumReplicas = nReplicas;
@@ -256,7 +256,7 @@ public class DefaultRebalanceStrategyTest {
 
     // no change
     rebalancedIdealState =
-        testRebalanceRealtime(idealState, tableConfig, rebalanceUserConfig, newPartitionAssignment, targetNumReplicas,
+        testRebalanceRealtime(idealState, tableConfig, rebalanceUserParams, newPartitionAssignment, targetNumReplicas,
             nCompletedSegments, nConsumingSegments, completedInstances, consumingInstances);
 
     // reduce replicas
@@ -269,7 +269,7 @@ public class DefaultRebalanceStrategyTest {
         .setNumReplicas(targetNumReplicas)
         .build();
     rebalancedIdealState =
-        testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserConfig, newPartitionAssignment,
+        testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserParams, newPartitionAssignment,
             targetNumReplicas, nCompletedSegments, nConsumingSegments, completedInstances, consumingInstances);
 
     // increase replicas
@@ -280,7 +280,7 @@ public class DefaultRebalanceStrategyTest {
         .setNumReplicas(targetNumReplicas)
         .build();
     rebalancedIdealState =
-        testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserConfig, newPartitionAssignment,
+        testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserParams, newPartitionAssignment,
             targetNumReplicas, nCompletedSegments, nConsumingSegments, completedInstances, consumingInstances);
 
     // remove completed server
@@ -289,7 +289,7 @@ public class DefaultRebalanceStrategyTest {
     when(mockHelixAdmin.getInstancesInClusterWithTag(anyString(), anyString())).thenReturn(completedInstances);
     when(mockHelixAdmin.getInstancesInCluster(anyString())).thenReturn(completedInstances);
     rebalancedIdealState =
-        testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserConfig, newPartitionAssignment,
+        testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserParams, newPartitionAssignment,
             targetNumReplicas, nCompletedSegments, nConsumingSegments, completedInstances, consumingInstances);
 
     // add completed server
@@ -298,7 +298,7 @@ public class DefaultRebalanceStrategyTest {
     when(mockHelixAdmin.getInstancesInClusterWithTag(anyString(), anyString())).thenReturn(completedInstances);
     when(mockHelixAdmin.getInstancesInCluster(anyString())).thenReturn(completedInstances);
     rebalancedIdealState =
-        testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserConfig, newPartitionAssignment,
+        testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserParams, newPartitionAssignment,
             targetNumReplicas, nCompletedSegments, nConsumingSegments, completedInstances, consumingInstances);
 
     // remove consuming server
@@ -307,7 +307,7 @@ public class DefaultRebalanceStrategyTest {
     setPartitionAssignment(newPartitionAssignment, targetNumReplicas, consumingInstances);
 
     rebalancedIdealState =
-        testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserConfig, newPartitionAssignment,
+        testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserParams, newPartitionAssignment,
             targetNumReplicas, nCompletedSegments, nConsumingSegments, completedInstances, consumingInstances);
 
     // add consuming server
@@ -316,15 +316,15 @@ public class DefaultRebalanceStrategyTest {
     setPartitionAssignment(newPartitionAssignment, targetNumReplicas, consumingInstances);
 
     rebalancedIdealState =
-        testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserConfig, newPartitionAssignment,
+        testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserParams, newPartitionAssignment,
             targetNumReplicas, nCompletedSegments, nConsumingSegments, completedInstances, consumingInstances);
 
     // change partition assignment, but keep rebalanceConsuming false
     nConsumingInstances = 2;
     consumingInstances = getConsumingInstanceList(nConsumingInstances);
     setPartitionAssignment(newPartitionAssignment, targetNumReplicas, consumingInstances);
-    rebalanceUserConfig.addConfig(RebalanceUserConfigProperties.REBALANCE_CONSUMING, "false");
-    testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserConfig, newPartitionAssignment,
+    rebalanceUserParams.addConfig(RebalanceUserParamConstants.REBALANCE_CONSUMING, "false");
+    testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserParams, newPartitionAssignment,
         targetNumReplicas, nCompletedSegments, nConsumingSegments, completedInstances, consumingInstances);
   }
 
@@ -344,23 +344,23 @@ public class DefaultRebalanceStrategyTest {
   }
 
   private IdealState testRebalance(IdealState idealState, TableConfig tableConfig,
-      RebalanceUserConfig rebalanceUserConfig, int targetNumReplicas, int nSegments, List<String> instances,
+      RebalanceUserParams rebalanceUserParams, int targetNumReplicas, int nSegments, List<String> instances,
       boolean changeExpected) {
     Map<String, Map<String, String>> prevAssignment = getPrevAssignment(idealState);
     IdealState rebalancedIdealState =
-        _rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig, rebalanceUserConfig, null);
+        _rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig, rebalanceUserParams, null);
     validateIdealState(rebalancedIdealState, nSegments, targetNumReplicas, instances, prevAssignment, changeExpected);
     return rebalancedIdealState;
   }
 
   private IdealState testRebalanceRealtime(IdealState idealState, TableConfig tableConfig,
-      RebalanceUserConfig rebalanceUserConfig, PartitionAssignment newPartitionAssignment, int targetNumReplicas,
+      RebalanceUserParams rebalanceUserParams, PartitionAssignment newPartitionAssignment, int targetNumReplicas,
       int nSegmentsCompleted, int nSegmentsConsuming, List<String> instancesCompleted, List<String> instancesConsuming) {
     IdealState rebalancedIdealState =
-        _rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig, rebalanceUserConfig,
+        _rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig, rebalanceUserParams,
             newPartitionAssignment);
     validateIdealStateRealtime(rebalancedIdealState, nSegmentsCompleted, nSegmentsConsuming, targetNumReplicas,
-        instancesCompleted, instancesConsuming, rebalanceUserConfig);
+        instancesCompleted, instancesConsuming, rebalanceUserParams);
     return rebalancedIdealState;
   }
 
@@ -376,12 +376,12 @@ public class DefaultRebalanceStrategyTest {
 
   private void validateIdealStateRealtime(IdealState rebalancedIdealState, int nSegmentsCompleted,
       int nSegmentsConsuming, int targetNumReplicas, List<String> instancesCompleted, List<String> instancesConsuming,
-      RebalanceUserConfig rebalanceUserConfig) {
+      RebalanceUserParams rebalanceUserParams) {
     Assert.assertEquals(rebalancedIdealState.getPartitionSet().size(), nSegmentsCompleted + nSegmentsConsuming);
     for (String segment : rebalancedIdealState.getPartitionSet()) {
       Map<String, String> instanceStateMap = rebalancedIdealState.getInstanceStateMap(segment);
       Assert.assertEquals(instanceStateMap.size(), targetNumReplicas);
-      String rebalanceConsuming = rebalanceUserConfig.getConfig(RebalanceUserConfigProperties.REBALANCE_CONSUMING);
+      String rebalanceConsuming = rebalanceUserParams.getConfig(RebalanceUserParamConstants.REBALANCE_CONSUMING);
       if (segment.contains("consuming")) {
         if (rebalanceConsuming != null && rebalanceConsuming.equals("true")) {
           Assert.assertTrue(instancesConsuming.containsAll(instanceStateMap.keySet()));
