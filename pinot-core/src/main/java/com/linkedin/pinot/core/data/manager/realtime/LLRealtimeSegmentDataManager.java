@@ -311,17 +311,21 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             _kafkaStreamMetadata.getKafkaFetchTimeoutMillis());
         consecutiveErrorCount = 0;
       } catch (TimeoutException e) {
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
         handleTransientKafkaErrors(e);
         continue;
       } catch (SimpleConsumerWrapper.TransientConsumerException e) {
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
         handleTransientKafkaErrors(e);
         continue;
       } catch (SimpleConsumerWrapper.PermanentConsumerException e) {
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
         segmentLogger.warn("Kafka permanent exception when fetching messages, stopping consumption", e);
         throw e;
       } catch (Exception e) {
         // Unknown exception from Kafka. Treat as a transient exception.
         // One such exception seen so far is java.net.SocketTimeoutException
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
         handleTransientKafkaErrors(e);
         continue;
       }
@@ -444,6 +448,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           if (_shouldStop) {
             break;
           }
+          _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
 
           if (_state == State.INITIAL_CONSUMING) {
             initialConsumptionEnd = now();
@@ -752,6 +757,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   public void goOnlineFromConsuming(RealtimeSegmentZKMetadata metadata) throws InterruptedException {
     LLCRealtimeSegmentZKMetadata llcMetadata = (LLCRealtimeSegmentZKMetadata)metadata;
     // Remove the segment file before we do anything else.
+    _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     removeSegmentFile();
     _leaseExtender.removeSegment(_segmentNameStr);
     final long endOffset = llcMetadata.getEndOffset();
@@ -821,8 +827,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     } catch (Exception e) {
       // We will end up downloading the segment, so this is not a serious problem
       segmentLogger.warn("Exception when catching up to final offset", e);
+      _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
       return false;
     }
+    _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     if (_currentOffset != endOffset) {
       // Timeout?
       segmentLogger.error("Could not consume up to {} (current offset {})", endOffset, _currentOffset);
