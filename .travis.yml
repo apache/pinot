@@ -4,6 +4,9 @@ env:
   - RUN_INTEGRATION_TESTS=true
   - RUN_INTEGRATION_TESTS=false
 
+before_script:
+  - npm install
+
 jdk:
   - oraclejdk7
   - openjdk7
@@ -27,6 +30,7 @@ addons:
   chrome: stable
 
 before_install:
+  - nvm install 4 CC=clang CXX=clang++
   - npm config set spin false
   - npm install -g npm@4
   - npm --version
