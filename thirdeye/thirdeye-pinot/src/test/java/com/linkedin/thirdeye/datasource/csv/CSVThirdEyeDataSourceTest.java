@@ -33,10 +33,10 @@ public class CSVThirdEyeDataSourceTest {
 
     Map<String, DataFrame> sources = new HashMap<>();
     sources.put("source", new DataFrame()
-        .addSeries("timestamp", 0, 3600000, 7200000, 10800000, 0, 3600000, 7200000, 10800000)
-        .addSeries("views", 1000, 1001, 1002, 1003, 2000, 2001, 2002, 2003)
-        .addSeries("country", "us", "us", "us", "us", "cn", "cn", "cn", "cn")
-        .addSeries("browser", "chrome", "chrome","chrome","chrome","chrome","chrome","chrome","safari"));
+        .addSeries("timestamp", 0, 1, 3600000, 7200000, 10800000, 0, 3600000, 7200000, 10800000)
+        .addSeries("views", 1000, 88, 1001, 1002, 1003, 2000, 2001, 2002, 2003)
+        .addSeries("country", "us", "us", "us", "us", "us", "cn", "cn", "cn", "cn")
+        .addSeries("browser", "chrome", "chrome", "chrome","chrome","chrome","chrome","chrome","chrome","safari"));
     sources.put("other", new DataFrame());
     Map<Long, String> metricNameMap = new HashMap<>();
     metricNameMap.put(1L, "views");
@@ -119,7 +119,7 @@ public class CSVThirdEyeDataSourceTest {
         request,
         new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
         new DataFrame()
-            .addSeries("SUM_views", 12012d)
+            .addSeries("SUM_views", 12100d)
             .addSeries("timestamp", -1L)
     );
 
@@ -140,7 +140,7 @@ public class CSVThirdEyeDataSourceTest {
         new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
         new DataFrame()
             .addSeries("timestamp", 0, 3600000, 7200000, 10800000)
-            .addSeries("SUM_views", 3000, 3002, 3004, 3006)
+            .addSeries("SUM_views", 3088, 3002, 3004, 3006)
     );
 
     ThirdEyeResponse response = dataSource.execute(request);
@@ -233,7 +233,7 @@ public class CSVThirdEyeDataSourceTest {
         new DataFrame()
             .addSeries("country", "us", "cn", "cn")
             .addSeries("browser", "chrome", "chrome", "safari")
-            .addSeries("SUM_views", 4006, 6003, 2003)
+            .addSeries("SUM_views", 4094, 6003, 2003)
     );
 
     ThirdEyeResponse response = dataSource.execute(request);
@@ -255,7 +255,7 @@ public class CSVThirdEyeDataSourceTest {
         new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
         new DataFrame()
             .addSeries("country", "us", "cn")
-            .addSeries("SUM_views", 4006, 8006)
+            .addSeries("SUM_views", 4094, 8006)
     );
 
     ThirdEyeResponse response = dataSource.execute(request);
@@ -272,15 +272,17 @@ public class CSVThirdEyeDataSourceTest {
         .addMetricFunction(new MetricFunction(MetricAggFunction.SUM, "views", 1L, "source", null, null))
         .setDataSource("source")
         .setGroupByTimeGranularity(new TimeGranularity(1, TimeUnit.HOURS))
-        .addGroupBy(Arrays.asList("country"))
+        .addGroupBy(Arrays.asList("country", "browser"))
         .build("ref");
 
     ThirdEyeResponse expectedResponse = new CSVThirdEyeResponse(
         request,
         new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
         new DataFrame()
-            .addSeries("country", "us", "cn")
-            .addSeries("SUM_views", 4006, 8006)
+            .addSeries("timestamp", 0, 3600000, 7200000, 10800000, 0, 3600000, 7200000, 10800000)
+            .addSeries("country", "us", "us","us","us", "cn", "cn","cn","cn")
+            .addSeries("browser", "chrome", "chrome", "chrome", "chrome", "chrome", "chrome", "chrome", "safari")
+            .addSeries("SUM_views", 1088, 1001, 1002, 1003, 2000, 2001, 2002, 2003)
     );
 
     ThirdEyeResponse response = dataSource.execute(request);

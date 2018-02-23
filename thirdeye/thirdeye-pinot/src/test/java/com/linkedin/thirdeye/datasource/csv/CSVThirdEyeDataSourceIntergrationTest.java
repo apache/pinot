@@ -61,7 +61,7 @@ public class CSVThirdEyeDataSourceIntergrationTest {
     Assert.assertNotNull(configDTO.getId());
 
     ThirdEyeConfiguration thirdEyeConfiguration = new ThirdEyeConfiguration();
-    thirdEyeConfiguration.setDataSourcesPath(dataSourcesConfig.toString());
+    thirdEyeConfiguration.setDataSources(dataSourcesConfig.toString());
 
     ThirdEyeCacheRegistry.initializeCachesWithoutRefreshing(thirdEyeConfiguration);
     ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
@@ -74,7 +74,5 @@ public class CSVThirdEyeDataSourceIntergrationTest {
 
     Assert.assertEquals(df.getDoubles(DataFrameUtils.COL_VALUE).toList(), Collections.singletonList(1503d));
   }
-
-
 
 }

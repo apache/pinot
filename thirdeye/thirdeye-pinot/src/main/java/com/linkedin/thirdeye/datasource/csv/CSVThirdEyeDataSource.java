@@ -8,7 +8,9 @@ import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Grouping;
 import com.linkedin.thirdeye.dataframe.LongSeries;
+import com.linkedin.thirdeye.dataframe.ObjectSeries;
 import com.linkedin.thirdeye.dataframe.Series;
+import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.MetricFunction;
@@ -74,9 +76,16 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
   public ThirdEyeResponse execute(final ThirdEyeRequest request) throws Exception {
     DataFrame df = new DataFrame();
     for(MetricFunction function : request.getMetricFunctions()){
+      final String inputName = translator.translate(function.getMetricId());
+      final String outputName = function.toString();
 
-      MetricAggFunction aggFunction = function.getFunctionName();
+      final MetricAggFunction aggFunction = function.getFunctionName();
+      if (aggFunction != MetricAggFunction.SUM) {
+        throw new IllegalArgumentException(String.format("Aggregation function '%s' not supported yet.", aggFunction));
+      }
+
       DataFrame data = dataSets.get(function.getDataset());
+
       if (request.getStartTimeInclusive() != null){
         data = data.filter(new Series.LongConditional() {
           @Override
@@ -110,24 +119,60 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
 
       data = data.dropNull();
 
+      //
+      // with grouping
+      //
       if(request.getGroupBy() != null && request.getGroupBy().size() != 0){
         Grouping.DataFrameGrouping dataFrameGrouping = data.groupByValue(request.getGroupBy());
         List<String> aggregationExps = new ArrayList<>();
-        for (String groupByCols : request.getGroupBy()){
-          aggregationExps.add(groupByCols + ":first");
+        final String[] groupByColumns = request.getGroupBy().toArray(new String[0]);
+        for (String groupByCol : groupByColumns){
+          aggregationExps.add(groupByCol + ":first");
         }
-        aggregationExps.add(function.getMetricName() + ":sum");
-        df = dataFrameGrouping.aggregate(aggregationExps);
-        df.dropSeries("key");
-        df.renameSeries(function.getMetricName(), function.toString());
+        aggregationExps.add(inputName + ":sum");
+
+        if (request.getGroupByTimeGranularity() != null){
+          // group by both time granularity and column
+          List<DataFrame.Tuple> tuples = dataFrameGrouping.aggregate(aggregationExps).getSeries().get("key").getObjects().toListTyped();
+          for (final DataFrame.Tuple key : tuples){
+            DataFrame filteredData = data.filter(new Series.StringConditional() {
+              @Override
+              public boolean apply(String... values) {
+                for(int i = 0; i < groupByColumns.length; i++){
+                  if (values[i] != key.getValues()[i]){
+                    return false;
+                  }
+                }
+                return true;
+              }
+            }, groupByColumns);
+            filteredData = filteredData.dropNull().groupByInterval(COL_TIMESTAMP, request.getGroupByTimeGranularity().toMillis()).aggregate(aggregationExps);
+            if(df.size() == 0){
+              df = filteredData;
+            } else {
+              df = df.append(filteredData);
+            }
+          }
+          df.renameSeries(inputName, outputName);
+
+        } else {
+          // group by columns only
+          df = dataFrameGrouping.aggregate(aggregationExps);
+          df.dropSeries("key");
+          df.renameSeries(inputName, outputName);
+        }
+
+      //
+      // without dimension grouping
+      //
       } else {
         if (request.getGroupByTimeGranularity() != null){
-          df = data.groupByInterval(COL_TIMESTAMP, request.getGroupByTimeGranularity().toMillis()).aggregate(function.getMetricName() + ":sum");
-          df.renameSeries(function.getMetricName(), function.toString());
+          // group by time granularity only
+          df = data.groupByInterval(COL_TIMESTAMP, request.getGroupByTimeGranularity().toMillis()).aggregate(inputName + ":sum");
+          df.renameSeries(inputName, outputName);
         } else {
-          if (aggFunction == MetricAggFunction.SUM){
-            df.addSeries(function.toString(), data.getDoubles(translator.translate(function.getMetricId())).sum());
-          }
+          // aggregation only
+          df.addSeries(outputName, data.getDoubles(inputName).sum());
           df.addSeries(COL_TIMESTAMP, LongSeries.buildFrom(-1));
         }
       }
