@@ -144,6 +144,7 @@ public abstract class QueryScheduler {
     byte[] responseData = serializeDataTable(request, result);
     TimerContext timerContext = request.getTimerContext();
     @Nonnull Map<String, String> resultMeta = result.getMetadata();
+
     /*
     LOGGER.info("Processed timestamp={}, requestId={},table={},reqSegments={},prunedToSegmentCount={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
         System.currentTimeMillis(),
@@ -162,7 +163,7 @@ public abstract class QueryScheduler {
 
     //String segmentList= request.getInstanceRequest().getSearchSegments().toString();
 
-    LOGGER.info("RequestProcessed${},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+    LOGGER.info("RequestProcessed${},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             System.currentTimeMillis(),
             request.getInstanceRequest().getRequestId(),
             request.getTableName(),
@@ -172,11 +173,13 @@ public abstract class QueryScheduler {
             request.getSegmntsAfterPruning().toString(),
             getMetadataValue(resultMeta, DataTable.EXECUTOR_CPU_TIME),
             timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
+            timerContext.getPhaseDurationMs(ServerQueryPhase.RESPONSE_SERIALIZATION),
             timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME),
             request.getBrokerId(),
             getMetadataValue(resultMeta, DataTable.NUM_DOCS_SCANNED_METADATA_KEY),
             getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY),
             getMetadataValue(resultMeta, DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY),
+            responseData.length,
             getMetadataValue(resultMeta, DataTable.TOTAL_DOCS_METADATA_KEY),
             name());
 

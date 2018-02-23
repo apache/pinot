@@ -136,4 +136,5 @@ public class ServerQueryRequest {
   {
     return segmentsAfterPruning;
   }
+
 }
