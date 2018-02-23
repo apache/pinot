@@ -804,6 +804,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           break;
       }
     } catch (Exception e) {
+      throw(e);
+    } finally {
       _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     }
   }
@@ -826,10 +828,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     } catch (Exception e) {
       // We will end up downloading the segment, so this is not a serious problem
       segmentLogger.warn("Exception when catching up to final offset", e);
-      _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
       return false;
     }
-    _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     if (_currentOffset != endOffset) {
       // Timeout?
       segmentLogger.error("Could not consume up to {} (current offset {})", endOffset, _currentOffset);
