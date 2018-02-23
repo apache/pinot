@@ -13,7 +13,7 @@ import {
   isInverse,
   toMetricLabel
 } from 'thirdeye-frontend/utils/rca-utils';
-import { humanizeChange } from 'thirdeye-frontend/utils/utils';
+import { humanizeChange, humanizeFloat } from 'thirdeye-frontend/utils/utils';
 import { equal, reads } from '@ember/object/computed';
 
 const ROOTCAUSE_HIDDEN_DEFAULT = 'default';
@@ -281,7 +281,7 @@ export default Component.extend({
         const change = curr / value - 1;
 
         anomalyInfo[offset] = {
-          value, // numerical value to display
+          value: humanizeFloat(value), // numerical value to display
           change: humanizeChange(change), // text of % change with + or - sign
           direction: toColorDirection(change, isInverse(metricUrn, entities))
         };
