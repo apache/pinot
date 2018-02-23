@@ -786,7 +786,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
       TagConfig tagConfig = new TagConfig(tableConfig, null);
       segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nPartitions, instances, idealState, false);
-      PartitionAssignment partitionAssignment = segmentManager.getPartitionAssignment(realtimeTableName);
+      PartitionAssignment partitionAssignment = segmentManager.getStreamPartitionAssignment(realtimeTableName);
 
       for (int p = 0; p < nPartitions; p++) {
         int curSeq = random.nextInt(maxSeq);  // Current segment sequence ID for that partition
@@ -981,12 +981,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected Map<String, List<String>> getPartitionsToInstances(String realtimeTableName) {
-      Map<String, List<String>> partitonToInstances = null;
-      if (_tableNameToPartitionsListMap.get(realtimeTableName) != null) {
-        partitonToInstances = _tableNameToPartitionsListMap.get(realtimeTableName).getPartitionToInstances();
-      }
-      return partitonToInstances;
+    public PartitionAssignment getStreamPartitionAssignment(String realtimeTableName) {
+      return _tableNameToPartitionsListMap.get(realtimeTableName);
     }
 
   }
@@ -1168,7 +1164,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    public PartitionAssignment getPartitionAssignment(String realtimeTableName) {
+    public PartitionAssignment getStreamPartitionAssignment(String realtimeTableName) {
       return _streamPartitionAssignmentGenerator._allPartitionAssignments.get(realtimeTableName);
     }
 

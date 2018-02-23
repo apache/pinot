@@ -109,7 +109,7 @@ public class ValidationManagerTest {
   private void makeMockPinotLLCRealtimeSegmentManager(PartitionAssignment kafkaPartitionAssignment) {
     _segmentManager = mock(PinotLLCRealtimeSegmentManager.class);
     Mockito.doNothing().when(_segmentManager).updateKafkaPartitionsIfNecessary(Mockito.any(TableConfig.class));
-    when(_segmentManager.getPartitionAssignment(anyString())).thenReturn(kafkaPartitionAssignment);
+    when(_segmentManager.getStreamPartitionAssignment(anyString())).thenReturn(kafkaPartitionAssignment);
   }
 
   @Test

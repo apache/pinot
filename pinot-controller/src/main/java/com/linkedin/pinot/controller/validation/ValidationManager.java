@@ -182,7 +182,7 @@ public class ValidationManager {
   void validateLLCSegments(final String realtimeTableName, TableConfig tableConfig) {
     LOGGER.info("Validating LLC Segments for {}", realtimeTableName);
     Map<String, String> streamConfigs = tableConfig.getIndexingConfig().getStreamConfigs();
-    PartitionAssignment partitionAssignment = _llcRealtimeSegmentManager.getPartitionAssignment(realtimeTableName);
+    PartitionAssignment partitionAssignment = _llcRealtimeSegmentManager.getStreamPartitionAssignment(realtimeTableName);
     if (partitionAssignment == null) {
       LOGGER.warn("No partition assignment found for table {}", realtimeTableName);
       return;

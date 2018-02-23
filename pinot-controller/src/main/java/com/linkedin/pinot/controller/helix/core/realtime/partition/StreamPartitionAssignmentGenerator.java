@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime.partition;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.controller.helix.PartitionAssignment;
@@ -41,6 +42,25 @@ public class StreamPartitionAssignmentGenerator {
   }
 
   /**
+   * Creates a stream partition assignment from the partition assignment znode for the given realtime table
+   * @param realtimeTableName
+   * @return
+   */
+  public PartitionAssignment getStreamPartitionAssignment(String realtimeTableName) {
+    PartitionAssignment partitionAssignment = null;
+    ZNRecord streamPartitionAssignment = getStreamPartitionAssignmentFromPropertyStore(realtimeTableName);
+    if (streamPartitionAssignment != null) {
+      partitionAssignment = new PartitionAssignment(realtimeTableName, streamPartitionAssignment.getListFields());
+    }
+    return partitionAssignment;
+  }
+
+  private ZNRecord getStreamPartitionAssignmentFromPropertyStore(final String realtimeTableName) {
+    final String path = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(realtimeTableName);
+    return _propertyStore.get(path, null, AccessOption.PERSISTENT);
+  }
+
+  /**
    * Generates partition assignment for given table, given num partitions over given instances
    */
   public Map<String, PartitionAssignment> generatePartitionAssignment(TableConfig tableConfig, int numPartitions,
@@ -54,9 +74,8 @@ public class StreamPartitionAssignmentGenerator {
 
     for (String tableName : allTables) {
       allTableConfigs.add(getRealtimeTableConfig(tableName));
-      Map<String, List<String>> partitionToInstancesMap = getPartitionsToInstances(tableName);
-      if (partitionToInstancesMap != null) {
-        PartitionAssignment partitionAssignment = new PartitionAssignment(tableName, partitionToInstancesMap);
+      PartitionAssignment partitionAssignment = getStreamPartitionAssignment(tableName);
+      if (partitionAssignment != null) {
         tableNameToPartitionAssignment.put(tableName, partitionAssignment);
       }
     }
@@ -71,27 +90,9 @@ public class StreamPartitionAssignmentGenerator {
     return newPartitionAssignment;
   }
 
+  @VisibleForTesting
   protected TableConfig getRealtimeTableConfig(String tableNameWithType) {
     return ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-  }
-
-  /**
-   * Given a realtime table name, fetches the stream partition assignment for that table from property store
-   * @param realtimeTableName
-   * @return
-   */
-  protected Map<String, List<String>> getPartitionsToInstances(String realtimeTableName) {
-    Map<String, List<String>> partitionToInstanceMap = null;
-    ZNRecord streamPartitionAssignment = getStreamPartitionAssignment(realtimeTableName);
-    if (streamPartitionAssignment != null) {
-      partitionToInstanceMap = streamPartitionAssignment.getListFields();
-    }
-    return partitionToInstanceMap;
-  }
-
-  protected ZNRecord getStreamPartitionAssignment(final String realtimeTableName) {
-    final String path = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(realtimeTableName);
-    return _propertyStore.get(path, null, AccessOption.PERSISTENT);
   }
 
   /**

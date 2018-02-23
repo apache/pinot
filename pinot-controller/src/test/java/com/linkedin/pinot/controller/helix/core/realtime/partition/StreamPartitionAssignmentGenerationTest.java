@@ -543,13 +543,8 @@ public class StreamPartitionAssignmentGenerationTest {
     }
 
     @Override
-    protected Map<String, List<String>> getPartitionsToInstances(String realtimeTableName) {
-      Map<String, List<String>> partitionToInstances = null;
-      PartitionAssignment partitionAssignment = _tableNameToPartitionsListMap.get(realtimeTableName);
-      if (partitionAssignment != null) {
-        partitionToInstances = partitionAssignment.getPartitionToInstances();
-      }
-      return  partitionToInstances;
+    public PartitionAssignment getStreamPartitionAssignment(String realtimeTableName) {
+      return _tableNameToPartitionsListMap.get(realtimeTableName);
     }
   }
 }
