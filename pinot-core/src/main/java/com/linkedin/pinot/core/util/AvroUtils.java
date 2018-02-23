@@ -16,12 +16,21 @@
 package com.linkedin.pinot.core.util;
 
 import com.google.common.base.Preconditions;
+
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.core.data.GenericRow;
+
+import org.apache.avro.Schema.Field;
+import org.apache.avro.SchemaBuilder;
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -31,11 +40,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
-import org.apache.avro.Schema.Field;
-import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
 
 
 public class AvroUtils {
@@ -144,6 +148,63 @@ public class AvroUtils {
 
     org.apache.avro.Schema avroSchema = new org.apache.avro.Schema.Parser().parse(avroSchemaFile);
     return getPinotSchemaFromAvroSchema(avroSchema, fieldTypes, timeUnit);
+  }
+
+  /**
+   * Helper method to build Avro schema from Pinot schema.
+   *
+   * @param pinotSchema Pinot schema.
+   * @return Avro schema.
+   */
+  public static org.apache.avro.Schema getAvroSchemaFromPinotSchema(com.linkedin.pinot.common.data.Schema pinotSchema) {
+    SchemaBuilder.FieldAssembler<org.apache.avro.Schema> fieldAssembler = SchemaBuilder.record("record").fields();
+
+    for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
+      FieldSpec.DataType dataType = fieldSpec.getDataType();
+      if (fieldSpec.isSingleValueField()) {
+        switch (dataType) {
+          case INT:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().intType().noDefault();
+            break;
+          case LONG:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().longType().noDefault();
+            break;
+          case FLOAT:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().floatType().noDefault();
+            break;
+          case DOUBLE:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().doubleType().noDefault();
+            break;
+          case STRING:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().stringType().noDefault();
+            break;
+          default:
+            throw new RuntimeException("Unsupported data type: " + dataType);
+        }
+      } else {
+        switch (dataType) {
+          case INT:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().intType().noDefault();
+            break;
+          case LONG:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().longType().noDefault();
+            break;
+          case FLOAT:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().floatType().noDefault();
+            break;
+          case DOUBLE:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().doubleType().noDefault();
+            break;
+          case STRING:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().array().items().stringType().noDefault();
+            break;
+          default:
+            throw new RuntimeException("Unsupported data type: " + dataType);
+        }
+      }
+    }
+
+    return fieldAssembler.endRecord();
   }
 
   /**
