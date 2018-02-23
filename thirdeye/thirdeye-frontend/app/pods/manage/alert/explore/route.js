@@ -15,13 +15,11 @@ import { checkStatus, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils'
 import {
   enhanceAnomalies,
   toIdGroups,
-  setMetricData,
-  getMetricData,
+  getDuration,
   setUpTimeRangeOptions,
   getTopDimensions,
   buildMetricDataUrl,
-  extractSeverity,
-  getDuration
+  extractSeverity
 } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 /**
@@ -78,46 +76,6 @@ const anomalyResponseObj = [
 const newWowList = wowOptions.map((item) => {
   return { name: item, isActive: false };
 });
-
-/**
- * Fetches all anomaly data for found anomalies - downloads all 'pages' of data from server
- * in order to handle sorting/filtering on the entire set locally. Start/end date are not used here.
- * @param {Array} anomalyIds - list of all found anomaly ids
- * @returns {RSVP promise}
- */
-const fetchCombinedAnomalies = (anomalyIds) => {
-  if (anomalyIds.length) {
-    const idGroups = toIdGroups(anomalyIds);
-    const anomalyPromiseHash = idGroups.map((group, index) => {
-      let idStringParams = `anomalyIds=${encodeURIComponent(idGroups[index].toString())}`;
-      let getAnomalies = fetch(`/anomalies/search/anomalyIds/0/0/${index + 1}?${idStringParams}`).then(checkStatus);
-      return RSVP.resolve(getAnomalies);
-    });
-    return RSVP.all(anomalyPromiseHash);
-  } else {
-    return RSVP.resolve([]);
-  }
-};
-
-/**
- * Fetches severity scores for all anomalies
- * TODO: Move this and other shared requests to a common service
- * @param {Array} anomalyIds - list of all found anomaly ids
- * @returns {RSVP promise}
- */
-const fetchSeverityScores = (anomalyIds) => {
-  if (anomalyIds && anomalyIds.length) {
-    const anomalyPromiseHash = anomalyIds.map((id) => {
-      return RSVP.hash({
-        id,
-        score: fetch(`/dashboard/anomalies/score/${id}`).then(checkStatus)
-      });
-    });
-    return RSVP.allSettled(anomalyPromiseHash);
-  } else {
-    return RSVP.resolve([]);
-  }
-};
 
 /**
  * Derives start/end timestamps based on queryparams and user-selected time range with certain fall-backs/defaults
@@ -282,7 +240,7 @@ export default Route.extend({
     return RSVP.hash(anomalyPromiseHash)
       .then((data) => {
         const totalAnomalies = data.anomalyIds.length;
-        Object.assign(model.alertEvalMetrics.projected, { mttd: data.projectedMttd });
+        Object.assign(alertEvalMetrics.projected, { mttd: data.projectedMttd });
         Object.assign(config, { id: data.metricsByName.length ? data.metricsByName.pop().id : '' });
         Object.assign(model, {
           anomalyIds: data.anomalyIds,
@@ -379,25 +337,10 @@ export default Route.extend({
 
     // Cancel all pending concurrency tasks in controller
     if (isExiting) {
+      this.get('loadAnomalyData').cancelAll();
+      this.get('loadGraphData').cancelAll();
       controller.clearAll();
     }
-  },
-
-  /**
-   * Fetches change rate data for each available anomaly id
-   * @method fetchCombinedAnomalyChangeData
-   * @param {Array} anomalyData - array of processed anomalies
-   * @returns {RSVP promise}
-   */
-  fetchCombinedAnomalyChangeData(anomalyData) {
-    let promises = {};
-
-    anomalyData.forEach((anomaly) => {
-      let id = anomaly.anomalyId;
-      promises[id] = fetch(`/anomalies/${id}`).then(checkStatus);
-    });
-
-    return RSVP.hash(promises);
   },
 
   /**
@@ -424,6 +367,77 @@ export default Route.extend({
   },
 
   /**
+   * Fetches all anomaly data for found anomalies - downloads all 'pages' of data from server
+   * in order to handle sorting/filtering on the entire set locally. Start/end date are not used here.
+   * @param {Array} anomalyIds - list of all found anomaly ids
+   * @returns {RSVP promise}
+   */
+  fetchCombinedAnomalies: task(function * (anomalyIds) {
+    yield timeout(300);
+    if (anomalyIds.length) {
+      const idGroups = toIdGroups(anomalyIds);
+      const anomalyPromiseHash = idGroups.map((group, index) => {
+        let idStringParams = `anomalyIds=${encodeURIComponent(idGroups[index].toString())}`;
+        let url = `/anomalies/search/anomalyIds/0/0/${index + 1}?${idStringParams}`;
+        let getAnomalies = this.get('fetchAnomalyEntity').perform(url);
+        return RSVP.resolve(getAnomalies);
+      });
+      return RSVP.all(anomalyPromiseHash);
+    } else {
+      return RSVP.resolve([]);
+    }
+  }),
+
+  /**
+   * Fetches change rate data for each available anomaly id
+   * @method fetchCombinedAnomalyChangeData
+   * @param {Array} anomalyData - array of processed anomalies
+   * @returns {RSVP promise}
+   */
+  fetchCombinedAnomalyChangeData: task(function * (anomalyData) {
+    yield timeout(300);
+    let promises = [];
+
+    anomalyData.forEach((anomaly) => {
+      let id = anomaly.anomalyId;
+      promises[id] = this.get('fetchAnomalyEntity').perform(`/anomalies/${id}`);
+    });
+
+    return RSVP.hash(promises);
+  }),
+
+  /**
+   * Fetches severity scores for all anomalies
+   * TODO: Move this and other shared requests to a common service
+   * @param {Array} anomalyIds - list of all found anomaly ids
+   * @returns {RSVP promise}
+   */
+  fetchSeverityScores: task(function * (anomalyIds) {
+    yield timeout(300);
+    if (anomalyIds && anomalyIds.length) {
+      const anomalyPromiseHash = anomalyIds.map((id) => {
+        return RSVP.hash({
+          id,
+          score: this.get('fetchAnomalyEntity').perform(`/dashboard/anomalies/score/${id}`)
+        });
+      });
+      return RSVP.allSettled(anomalyPromiseHash);
+    } else {
+      return RSVP.resolve([]);
+    }
+  }),
+
+  /**
+   * Fetch any single entity as a cancellable concurrency task
+   * @param {String} url - endpoint for fetch
+   * @returns {fetch promise}
+   */
+  fetchAnomalyEntity: task(function * (url) {
+    yield timeout(300);
+    return fetch(url).then(checkStatus);
+  }),
+
+  /**
    * Fetch all anomalies we have Ids for. Enhance the data and populate power-select filter options.
    * Using ember concurrency parent/child tasks. When parent is cancelled, so are children
    * http://ember-concurrency.com/docs/child-tasks.
@@ -434,9 +448,9 @@ export default Route.extend({
   loadAnomalyData: task(function * (anomalyIds) {
     yield timeout(300);
     // Load data for each anomaly Id
-    const rawAnomalies = yield fetchCombinedAnomalies(anomalyIds);
+    const rawAnomalies = yield this.get('fetchCombinedAnomalies').perform(anomalyIds);
     // Fetch and append severity score to each anomaly record
-    const severityScores = yield fetchSeverityScores(anomalyIds);
+    const severityScores = yield this.get('fetchSeverityScores').perform(anomalyIds);
     // Process anomaly records to make them template-ready
     const anomalyData = yield enhanceAnomalies(rawAnomalies, severityScores);
     // Prepare de-duped power-select option arrays
@@ -450,7 +464,7 @@ export default Route.extend({
       dimensionOptions
     });
     // Fetch and append extra WoW data for each anomaly record
-    const wowData = yield this.fetchCombinedAnomalyChangeData(anomalyData);
+    const wowData = yield this.get('fetchCombinedAnomalyChangeData').perform(anomalyData);
     anomalyData.forEach((anomaly) => {
       anomaly.wowData = wowData[anomaly.anomalyId] || {};
     });
@@ -473,23 +487,19 @@ export default Route.extend({
    * @return {undefined}
    */
   loadGraphData: task(function * (metricDataUrl, exploreDimensions) {
-    yield timeout(300);
-    const metricId = getWithDefault(this, 'currentModel.config.id', null);
-    const isGraphDataLocal = metricId && localStorage.getItem(metricId) !== null;
-
-    // Fetch and load graph metric data.
-    fetch(metricDataUrl).then(checkStatus)
-      .then((metricData) => {
-        // Load graph with metric data from timeseries API
-        this.setGraphProperties(metricData, exploreDimensions);
-      })
-      .catch((errors) => {
-        this.controller.setProperties({
-          isMetricDataInvalid: true,
-          isMetricDataLoading: false,
-          graphMessageText: 'Error loading metric data'
-        });
+    try {
+      const metricId = getWithDefault(this, 'currentModel.config.id', null);
+      // Fetch and load graph metric data from either local store or API
+      const metricData = yield fetch(metricDataUrl).then(checkStatus);
+      // Load graph with metric data from timeseries API
+      yield this.setGraphProperties(metricData, exploreDimensions);
+    } catch (e) {
+      this.controller.setProperties({
+        isMetricDataInvalid: true,
+        isMetricDataLoading: false,
+        graphMessageText: 'Error loading metric data'
       });
+    }
   }).cancelOn('deactivate').restartable(),
 
   actions: {
@@ -508,6 +518,9 @@ export default Route.extend({
         isOverViewModeActive: false,
         isEditModeActive: true
       });
+      // Cancel route's main concurrency tasks
+      this.get('loadAnomalyData').cancelAll();
+      this.get('loadGraphData').cancelAll();
     },
 
     /**

@@ -14,6 +14,7 @@ export default Controller.extend({
   queryParams: ['jobId', 'functionName'],
   jobId: null,
   functionName: null,
+  isOverviewLoaded: true,
 
   actions: {
 

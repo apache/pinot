@@ -238,8 +238,8 @@ export default Controller.extend({
 
     // Handle transition to alert page while refreshing the duration cache.
     navigateToAlertPage(alertId) {
-      if (localStorage.getItem('duration') !== null) {
-        localStorage.removeItem('duration');
+      if (sessionStorage.getItem('duration') !== null) {
+        sessionStorage.removeItem('duration');
       }
       this.transitionToRoute('manage.alert', alertId);
     },

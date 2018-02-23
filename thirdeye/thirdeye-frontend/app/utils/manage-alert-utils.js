@@ -16,7 +16,9 @@ export function formatEvalMetric(metric, isPercentage = false) {
   const multiplier = isPercentage ? 100 : 1;
   const convertedNum = metric * multiplier;
   const formattedNum = isWhole ? convertedNum : convertedNum.toFixed(1);
-  return isFinite(metric) ? formattedNum : shown;
+  let displayNum = isFinite(metric) ? formattedNum : shown;
+  // Prevent meaninglessly large numbers
+  return (Number(displayNum) > 10000) ? 'N/A' : displayNum;
 }
 
 /**
@@ -293,7 +295,7 @@ export function buildAnomalyStats(alertEvalMetrics, anomalyStats, showProjected 
  * @return {undefined}
  */
 export function setDuration(duration, startDate, endDate) {
-  localStorage.setItem('duration', JSON.stringify({ duration, startDate, endDate }));
+  sessionStorage.setItem('duration', JSON.stringify({ duration, startDate, endDate }));
 }
 
 /**
@@ -303,29 +305,7 @@ export function setDuration(duration, startDate, endDate) {
  * @return {Object}
  */
 export function getDuration() {
-  return JSON.parse(localStorage.getItem('duration'));
-}
-
-/**
- * Caches metric data to local storage in order to persist it across pages
- * NOTE: not in use yet
- * @method setMetricData
- * @param {Number} metricId - id of selected metric
- * @param {Object} metricData - payload for graphable metric data
- * @return {undefined}
- */
-export function setMetricData(metricId, metricData) {
-  localStorage.setItem(metricId, JSON.stringify(metricData));
-}
-
-/**
- * Retrieves metric data from local storage in order to persist it across pages
- * NOTE: not in use yet
- * @method getMetricData
- * @return {Object}
- */
-export function getMetricData(metricId) {
-  return JSON.parse(localStorage.getItem(metricId));
+  return JSON.parse(sessionStorage.getItem('duration'));
 }
 
 /**
@@ -355,7 +335,5 @@ export default {
   extractSeverity,
   setDuration,
   getDuration,
-  setMetricData,
-  getMetricData,
   evalObj
 };

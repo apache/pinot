@@ -12,22 +12,22 @@ export default Route.extend({
     if (!id) { return; }
 
     return {
-       alertData,
-       email,
-       allConfigGroups,
-       allAppNames
+      alertData,
+      email,
+      allConfigGroups,
+      allAppNames
     };
   },
 
   afterModel(model) {
-   const {
+    const {
       alertData,
       email: groupByAlertId,
       allConfigGroups,
       allAppNames
-   } = model;
+    } = model;
 
-   const {
+    const {
       id,
       filters,
       bucketSize,

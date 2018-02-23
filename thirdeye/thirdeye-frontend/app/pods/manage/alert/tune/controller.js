@@ -38,9 +38,11 @@ export default Controller.extend({
       selectedSortMode: '',
       activeRangeStart: '',
       activeRangeEnd: '',
+      removedAnomalies: 0,
       sortColumnStartUp: false,
       sortColumnScoreUp: false,
       sortColumnChangeUp: false,
+      isAnomalyTableLoading: false,
       sortColumnResolutionUp: false,
       isPerformanceDataLoading: false
     });
@@ -103,7 +105,7 @@ export default Controller.extend({
       const featureString = `window_size_in_hour,${severityMap[selectedSeverity]}`;
       const mttdString = `window_size_in_hour=${mttdVal};${severityMap[selectedSeverity]}=${severityThresholdVal}`;
       const patternString = patternMap[selectedPattern] ? `&pattern=${encodeURIComponent(patternMap[selectedPattern])}` : '';
-      const configString = `&features=${encodeURIComponent(featureString)}&mttd=${encodeURIComponent(mttdString)}${patternString}`;
+      const configString = `&tuningFeatures=${encodeURIComponent(featureString)}&mttd=${encodeURIComponent(mttdString)}${patternString}`;
       return { configString, severityVal: severityThresholdVal };
     }
   ),
@@ -173,34 +175,34 @@ export default Controller.extend({
       const severityUnit = isTuneAmountPercent ? '%' : '';
       const isPerfDataReady = _.has(metrics, 'current');
       const statsCards = [
-          {
-            title: 'Estimated number of anomalies',
-            key: 'totalAlerts',
-            tooltip: false,
-            text: 'Estimated number of anomalies  based on alert settings'
-          },
-          {
-            title: 'Estimated precision',
-            key: 'precision',
-            units: '%',
-            tooltip: false,
-            text: 'Among all anomalies sent by the alert, the % of them that are true.'
-          },
-          {
-            title: 'Estimated recall',
-            key: 'recall',
-            units: '%',
-            tooltip: false,
-            text: 'Among all anomalies that happened, the % of them sent by the alert.'
-          },
-          {
-            title: `MTTD for > ${severity}${severityUnit} change`,
-            key: 'mttd',
-            units: 'hrs',
-            tooltip: false,
-            text: `Minimum time to detect for anomalies with > ${severity}${severityUnit} change`
-          }
-        ];
+        {
+          title: 'Estimated number of anomalies',
+          key: 'totalAlerts',
+          tooltip: false,
+          text: 'Estimated number of anomalies  based on alert settings'
+        },
+        {
+          title: 'Estimated precision',
+          key: 'precision',
+          units: '%',
+          tooltip: false,
+          text: 'Among all anomalies sent by the alert, the % of them that are true.'
+        },
+        {
+          title: 'Estimated recall',
+          key: 'recall',
+          units: '%',
+          tooltip: false,
+          text: 'Among all anomalies that happened, the % of them sent by the alert.'
+        },
+        {
+          title: `MTTD for > ${severity}${severityUnit} change`,
+          key: 'mttd',
+          units: 'hrs',
+          tooltip: false,
+          text: `Minimum time to detect for anomalies with > ${severity}${severityUnit} change`
+        }
+      ];
 
       return isPerfDataReady ? buildAnomalyStats(metrics, statsCards, false) : [];
     }

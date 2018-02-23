@@ -39,7 +39,7 @@ export default Route.extend({
         functionName: null,
         jobId
       }});
-      // Save duration to localstorage for guaranteed availability
+      // Save duration to sessionStorage for guaranteed availability
       setDuration(durationDefault, startDateDefault, endDateDefault);
     }
   },
@@ -117,16 +117,28 @@ export default Route.extend({
       isLoadError,
       isEditModeActive,
       alertData: newAlertData,
+      isTransitionDone: true,
       isOverViewModeActive: !isEditModeActive,
       isReplayPending: isPresent(jobId)
     });
   },
 
   actions: {
+    /**
+     * Set loader on start of transition
+     */
     willTransition(transition) {
+      this.controller.set('isTransitionDone', false);
       if (transition.targetName === 'manage.alert.index') {
         this.refresh();
       }
+    },
+
+    /**
+     * Once transition is complete, remove loader
+     */
+    didTransition() {
+      this.controller.set('isTransitionDone', true);
     },
 
     /**

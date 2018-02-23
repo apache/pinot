@@ -238,44 +238,44 @@ export default Controller.extend({
       const mttdWeight = Number(extractSeverity(alertData, defaultSeverity));
       const convertedWeight = severityUnit === '%' ? mttdWeight * 100 : mttdWeight;
       const statsCards = [
-          {
-            title: 'Number of anomalies',
-            key: 'totalAlerts',
-            tooltip: false,
-            hideProjected: false,
-            text: 'Actual number of alerts received'
-          },
-          {
-            title: 'Response Rate',
-            key: 'responseRate',
-            units: '%',
-            tooltip: false,
-            hideProjected: true,
-            text: '% of anomalies that are reviewed.'
-          },
-          {
-            title: 'Precision',
-            key: 'precision',
-            units: '%',
-            tooltip: false,
-            text: 'Among all anomalies reviewed, the % of them that are true.'
-          },
-          {
-            title: 'Recall',
-            key: 'recall',
-            units: '%',
-            tooltip: false,
-            text: 'Among all anomalies that happened, the % of them detected by the system.'
-          },
-          {
-            title: `MTTD for > ${convertedWeight}${severityUnit} change`,
-            key: 'mttd',
-            units: 'hrs',
-            tooltip: false,
-            hideProjected: true,
-            text: `Minimum time to detect for anomalies with > ${convertedWeight}${severityUnit} change`
-          }
-        ];
+        {
+          title: 'Number of anomalies',
+          key: 'totalAlerts',
+          tooltip: false,
+          hideProjected: false,
+          text: 'Actual number of alerts received'
+        },
+        {
+          title: 'Response Rate',
+          key: 'responseRate',
+          units: '%',
+          tooltip: false,
+          hideProjected: true,
+          text: '% of anomalies that are reviewed.'
+        },
+        {
+          title: 'Precision',
+          key: 'precision',
+          units: '%',
+          tooltip: false,
+          text: 'Among all anomalies reviewed, the % of them that are true.'
+        },
+        {
+          title: 'Recall',
+          key: 'recall',
+          units: '%',
+          tooltip: false,
+          text: 'Among all anomalies that happened, the % of them detected by the system.'
+        },
+        {
+          title: `MTTD for > ${convertedWeight}${severityUnit} change`,
+          key: 'mttd',
+          units: 'hrs',
+          tooltip: false,
+          hideProjected: true,
+          text: `Minimum time to detect for anomalies with > ${convertedWeight}${severityUnit} change`
+        }
+      ];
 
       return buildAnomalyStats(alertEvalMetrics, statsCards, true);
     }
@@ -696,15 +696,25 @@ export default Controller.extend({
      * @param {Object} rangeOption - the selected range object
      */
     onRangeOptionClick(rangeOption) {
-      const rangeFormat = 'YYYY-MM-DD';
+      const rangeFormat = 'YYYY-MM-DD HH:mm';
       const defaultEndDate = buildDateEod(1, 'day').valueOf();
+      const timeRangeOptions = this.get('timeRangeOptions');
       const duration = rangeOption.value;
-      const startDate = moment(rangeOption.start).valueOf;
+      const startDate = moment(rangeOption.start).valueOf();
       const endDate = moment(defaultEndDate).valueOf();
-      // Trigger reload in model with new time range. Transition for 'custom' dates is handled by 'onRangeSelection'
+
       if (rangeOption.value !== 'custom') {
+        // Set date picker defaults to new start/end dates
+        this.setProperties({
+          activeRangeStart: moment(rangeOption.start).format(rangeFormat),
+          activeRangeEnd: moment(defaultEndDate).format(rangeFormat)
+        });
+        // Reset options and highlight selected one
+        timeRangeOptions.forEach(op => set(op, 'isActive', false));
+        set(rangeOption, 'isActive', true);
         // Cache chosen time range
         setDuration(duration, startDate, endDate);
+        // Reload model according to new timerange
         this.transitionToRoute({ queryParams: { mode: 'explore', duration, startDate, endDate }});
       }
     },
