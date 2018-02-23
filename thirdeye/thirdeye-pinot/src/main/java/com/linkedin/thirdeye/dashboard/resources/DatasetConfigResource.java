@@ -1,15 +1,17 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Strings;
-
+import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.util.JsonResponseUtil;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -20,17 +22,11 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-
 import org.apache.commons.lang.NullArgumentException;
+import org.apache.commons.lang.StringUtils;
 import org.codehaus.jackson.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.util.JsonResponseUtil;
 
 @Path(value = "/thirdeye-admin/dataset-config")
 @Produces(MediaType.APPLICATION_JSON)
@@ -60,29 +56,32 @@ public class DatasetConfigResource {
       @QueryParam("timeColumn") String timeColumn,
       @QueryParam("timeDuration") Integer timeDuration,
       @QueryParam("timeFormat") String timeFormat,
-      @QueryParam("timezone") TimeUnit timeUnit,
+      @QueryParam("timeUnit") String timeUnit,
       @QueryParam("timezone") String timezone) {
     try {
       DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();
       datasetConfigDTO.setDataset(dataset);
       datasetConfigDTO.setDimensions(toList(dimensions));
-      if (!Strings.isNullOrEmpty(dimensionsHaveNoPreAggregation)) {
+      if (!StringUtils.isBlank(dimensionsHaveNoPreAggregation)) {
         datasetConfigDTO.setDimensionsHaveNoPreAggregation(toList(dimensionsHaveNoPreAggregation));
       }
       datasetConfigDTO.setActive(active);
       datasetConfigDTO.setAdditive(additive);
       datasetConfigDTO.setNonAdditiveBucketSize(nonAdditiveBucketSize);
-      datasetConfigDTO.setNonAdditiveBucketUnit(TimeUnit.valueOf(nonAdditiveBucketUnit));
+      if(!StringUtils.isBlank(nonAdditiveBucketUnit)){
+        datasetConfigDTO.setNonAdditiveBucketUnit(TimeUnit.valueOf(nonAdditiveBucketUnit));
+      }
       datasetConfigDTO.setPreAggregatedKeyword(preAggregatedKeyword);
       datasetConfigDTO.setTimeColumn(timeColumn);
       datasetConfigDTO.setTimeDuration(timeDuration);
       datasetConfigDTO.setTimeFormat(timeFormat);
-      datasetConfigDTO.setTimeUnit(timeUnit);
+      datasetConfigDTO.setTimeUnit(TimeUnit.valueOf(timeUnit));
       datasetConfigDTO.setTimezone(timezone);
       Long id = datasetConfigDAO.save(datasetConfigDTO);
       datasetConfigDTO.setId(id);
       return JsonResponseUtil.buildResponseJSON(datasetConfigDTO).toString();
     } catch (Exception e) {
+      LOG.error("Couldn't create dataset {}", dataset, e);
       return JsonResponseUtil.buildErrorResponseJSON("Failed to create dataset:" + dataset).toString();
     }
   }
