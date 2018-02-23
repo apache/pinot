@@ -311,21 +311,17 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             _kafkaStreamMetadata.getKafkaFetchTimeoutMillis());
         consecutiveErrorCount = 0;
       } catch (TimeoutException e) {
-        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
         handleTransientKafkaErrors(e);
         continue;
       } catch (SimpleConsumerWrapper.TransientConsumerException e) {
-        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
         handleTransientKafkaErrors(e);
         continue;
       } catch (SimpleConsumerWrapper.PermanentConsumerException e) {
-        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
         segmentLogger.warn("Kafka permanent exception when fetching messages, stopping consumption", e);
         throw e;
       } catch (Exception e) {
         // Unknown exception from Kafka. Treat as a transient exception.
         // One such exception seen so far is java.net.SocketTimeoutException
-        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
         handleTransientKafkaErrors(e);
         continue;
       }
@@ -445,10 +441,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           if (_state.shouldConsume()) {
             consumeLoop();  // Consume until we reached the end criteria, or we are stopped.
           }
+          _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
           if (_shouldStop) {
             break;
           }
-          _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
 
           if (_state == State.INITIAL_CONSUMING) {
             initialConsumptionEnd = now();
@@ -755,57 +751,60 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   public void goOnlineFromConsuming(RealtimeSegmentZKMetadata metadata) throws InterruptedException {
-    LLCRealtimeSegmentZKMetadata llcMetadata = (LLCRealtimeSegmentZKMetadata)metadata;
-    // Remove the segment file before we do anything else.
     _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
-    removeSegmentFile();
-    _leaseExtender.removeSegment(_segmentNameStr);
-    final long endOffset = llcMetadata.getEndOffset();
-    segmentLogger.info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {})",
-        _state.toString(), _startOffset, endOffset);
-    stop();
-    segmentLogger.info("Consumer thread stopped in state {}", _state.toString());
+    try {
+      LLCRealtimeSegmentZKMetadata llcMetadata = (LLCRealtimeSegmentZKMetadata)metadata;
+      // Remove the segment file before we do anything else.
+      removeSegmentFile();
+      _leaseExtender.removeSegment(_segmentNameStr);
+      final long endOffset = llcMetadata.getEndOffset();
+      segmentLogger.info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {})", _state.toString(), _startOffset, endOffset);
+      stop();
+      segmentLogger.info("Consumer thread stopped in state {}", _state.toString());
 
-    switch (_state) {
-      case COMMITTED:
-      case RETAINED:
-        // Nothing to do. we already built local segment and swapped it with in-memory data.
-        segmentLogger.info("State {}. Nothing to do", _state.toString());
-        break;
-      case DISCARDED:
-      case ERROR:
-        segmentLogger.info("State {}. Downloading to replace", _state.toString());
-        downloadSegmentAndReplace(llcMetadata);
-        break;
-      case CATCHING_UP:
-      case HOLDING:
-      case INITIAL_CONSUMING:
-        // Allow to catch up upto final offset, and then replace.
-        if (_currentOffset > endOffset) {
-          // We moved ahead of the offset that is committed in ZK.
-          segmentLogger.warn("Current offset {} ahead of the offset in zk {}. Downloading to replace", _currentOffset,
-              endOffset);
+      switch (_state) {
+        case COMMITTED:
+        case RETAINED:
+          // Nothing to do. we already built local segment and swapped it with in-memory data.
+          segmentLogger.info("State {}. Nothing to do", _state.toString());
+          break;
+        case DISCARDED:
+        case ERROR:
+          segmentLogger.info("State {}. Downloading to replace", _state.toString());
           downloadSegmentAndReplace(llcMetadata);
-        } else if (_currentOffset == endOffset) {
-          segmentLogger.info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
-          buildSegmentAndReplace();
-        } else {
-          segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
-          boolean success = catchupToFinalOffset(endOffset,
-              TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
-          if (success) {
-            segmentLogger.info("Caught up to offset {}", _currentOffset);
+          break;
+        case CATCHING_UP:
+        case HOLDING:
+        case INITIAL_CONSUMING:
+          // Allow to catch up upto final offset, and then replace.
+          if (_currentOffset > endOffset) {
+            // We moved ahead of the offset that is committed in ZK.
+            segmentLogger.warn("Current offset {} ahead of the offset in zk {}. Downloading to replace", _currentOffset,
+                endOffset);
+            downloadSegmentAndReplace(llcMetadata);
+          } else if (_currentOffset == endOffset) {
+            segmentLogger.info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
             buildSegmentAndReplace();
           } else {
-            segmentLogger.info("Could not catch up to offset (current = {}). Downloading to replace", _currentOffset);
-            downloadSegmentAndReplace(llcMetadata);
+            segmentLogger.info("Attempting to catch up from offset {} to {} ", _currentOffset, endOffset);
+            boolean success = catchupToFinalOffset(endOffset,
+                TimeUnit.MILLISECONDS.convert(MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS, TimeUnit.SECONDS));
+            if (success) {
+              segmentLogger.info("Caught up to offset {}", _currentOffset);
+              buildSegmentAndReplace();
+            } else {
+              segmentLogger.info("Could not catch up to offset (current = {}). Downloading to replace", _currentOffset);
+              downloadSegmentAndReplace(llcMetadata);
+            }
           }
-        }
-        break;
-      default:
-        segmentLogger.info("Downloading to replace segment while in state {}", _state.toString());
-        downloadSegmentAndReplace(llcMetadata);
-        break;
+          break;
+        default:
+          segmentLogger.info("Downloading to replace segment while in state {}", _state.toString());
+          downloadSegmentAndReplace(llcMetadata);
+          break;
+      }
+    } catch (Exception e) {
+      _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     }
   }
 
