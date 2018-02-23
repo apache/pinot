@@ -363,14 +363,14 @@ export default Route.extend({
    * @return {undefined}
    */
   triggerTuningSequence: task(function * (configObj) {
+    const { configString, severityVal} = configObj;
+    const {
+      id: alertId,
+      startDate,
+      endDate,
+      tuneIdUrl
+    } = this.currentModel;
     try {
-      const { configString, severityVal} = configObj;
-      const {
-        id: alertId,
-        startDate,
-        endDate,
-        tuneIdUrl
-      } = this.currentModel;
       // Send the new tuning settings to backend to get an auto-tune Id
       const tuneId = yield fetch(tuneIdUrl + configString, postProps('')).then(checkStatus);
       // Use the autotune Id to fetch new performance metrics for this alert, and load them into the template
