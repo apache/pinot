@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.common;
 
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,7 +13,7 @@ public class ThirdEyeConfiguration extends Configuration {
    * Root directory for all other configuration
    */
   private String rootDir = "";
-  private String dataSourcesPath;
+  private String dataSources = "data-sources/data-sources-config.yml";
 
   private List<String> whitelistDatasets = new ArrayList<>();
 
@@ -27,11 +29,34 @@ public class ThirdEyeConfiguration extends Configuration {
    */
   private boolean cors = false;
 
-  public String getDataSourcesPath() {
-    if (dataSourcesPath != null){
-      return dataSourcesPath;
+  /**
+   * Convert relative path to absolute URL
+   *
+   * Supported cases:
+   * <pre>
+   *   file:/....myDir/data-sources-config.yml
+   *   myDir/data-sources-config.yml
+   * </pre>
+   *
+   * @return
+   */
+  public URL getDataSourcesAsUrl() {
+    try {
+      return new URL(this.dataSources);
+    } catch (MalformedURLException ignore) {
+      // ignore
     }
-    return getRootDir() + "/data-sources/data-sources-config.yml";
+
+    try {
+      URL rootUrl = new URL(String.format("file:%s/", this.rootDir));
+      return new URL(rootUrl, this.dataSources);
+    } catch (MalformedURLException e) {
+      throw new IllegalArgumentException(String.format("Could not parse relative path for rootDir '%s' and datSources '%s'", this.rootDir, this.dataSources));
+    }
+  }
+
+  public String getDataSources() {
+    return dataSources;
   }
 
   public String getRootDir() {
@@ -120,7 +145,7 @@ public class ThirdEyeConfiguration extends Configuration {
     this.failureToAddress = failureToAddress;
   }
 
-  public void setDataSourcesPath(String dataSourcesPath) {
-    this.dataSourcesPath = dataSourcesPath;
+  public void setDataSources(String dataSources) {
+    this.dataSources = dataSources;
   }
 }

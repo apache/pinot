@@ -1,6 +1,12 @@
 package com.linkedin.thirdeye.auto.onboard;
 
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.datasource.DataSourceConfig;
+import com.linkedin.thirdeye.datasource.DataSources;
+import com.linkedin.thirdeye.datasource.DataSourcesLoader;
 import java.lang.reflect.Constructor;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -8,12 +14,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datasource.DataSourceConfig;
-import com.linkedin.thirdeye.datasource.DataSources;
-import com.linkedin.thirdeye.datasource.DataSourcesLoader;
 
 /**
  * This is a service to onboard datasets automatically to thirdeye from the different data sources
@@ -36,10 +36,10 @@ public class AutoOnboardService implements Runnable {
     this.runFrequency = config.getAutoOnboardConfiguration().getRunFrequency();
     scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
-    String dataSourcesPath = config.getDataSourcesPath();
-    dataSources = DataSourcesLoader.fromDataSourcesPath(dataSourcesPath);
+    URL dataSourcesUrl = config.getDataSourcesAsUrl();
+    dataSources = DataSourcesLoader.fromDataSourcesUrl(dataSourcesUrl);
     if (dataSources == null) {
-      throw new IllegalStateException("Could not create data sources config from path " + dataSourcesPath);
+      throw new IllegalStateException("Could not create data sources config from path " + dataSourcesUrl);
     }
     for (DataSourceConfig dataSourceConfig : dataSources.getDataSourceConfigs()) {
       String autoLoadClassName = dataSourceConfig.getAutoLoadClassName();

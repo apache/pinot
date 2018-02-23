@@ -1,9 +1,14 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.linkedin.thirdeye.auto.onboard.AutoOnboard;
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
+import com.linkedin.thirdeye.datasource.DataSourceConfig;
+import com.linkedin.thirdeye.datasource.DataSources;
+import com.linkedin.thirdeye.datasource.DataSourcesLoader;
 import java.lang.reflect.Constructor;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
-
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -11,16 +16,9 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
-
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.thirdeye.auto.onboard.AutoOnboard;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.datasource.DataSourceConfig;
-import com.linkedin.thirdeye.datasource.DataSources;
-import com.linkedin.thirdeye.datasource.DataSourcesLoader;
 
 
 /**
@@ -34,10 +32,10 @@ public class AutoOnboardResource {
   private static final Logger LOG = LoggerFactory.getLogger(AutoOnboardResource.class);
 
   public AutoOnboardResource(ThirdEyeConfiguration thirdeyeConfig) {
-    String dataSourcesPath = thirdeyeConfig.getDataSourcesPath();
-    DataSources dataSources = DataSourcesLoader.fromDataSourcesPath(dataSourcesPath);
+    URL dataSourcesUrl = thirdeyeConfig.getDataSourcesAsUrl();
+    DataSources dataSources = DataSourcesLoader.fromDataSourcesUrl(dataSourcesUrl);
     if (dataSources == null) {
-      throw new IllegalStateException("Could not create data sources config from path " + dataSourcesPath);
+      throw new IllegalStateException("Could not create data sources config from path " + dataSourcesUrl);
     }
     for (DataSourceConfig dataSourceConfig : dataSources.getDataSourceConfigs()) {
       String autoLoadClassName = dataSourceConfig.getAutoLoadClassName();

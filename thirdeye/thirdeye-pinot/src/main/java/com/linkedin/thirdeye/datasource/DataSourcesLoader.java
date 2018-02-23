@@ -22,15 +22,15 @@ public class DataSourcesLoader {
 
  /**
   * Returns datasources config from yml file
-  * @param dataSourceConfigPath
+  * @param dataSourcesUrl URL to data sources config
   * @return DataSources
   */
- public static DataSources fromDataSourcesPath(String dataSourcesPath) {
+ public static DataSources fromDataSourcesUrl(URL dataSourcesUrl) {
    DataSources dataSources = null;
    try {
-     dataSources = OBJECT_MAPPER.readValue(new URL(dataSourcesPath), DataSources.class);
+     dataSources = OBJECT_MAPPER.readValue(dataSourcesUrl, DataSources.class);
    } catch (IOException e) {
-     LOG.error("Exception in reading data sources file {}", dataSourcesPath, e);
+     LOG.error("Exception in reading data sources file {}", dataSourcesUrl, e);
    }
    return dataSources;
  }

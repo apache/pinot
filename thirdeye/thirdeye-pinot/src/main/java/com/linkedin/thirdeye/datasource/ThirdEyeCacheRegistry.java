@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.datasource;
 
 import com.google.common.base.Preconditions;
+import java.net.URL;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -80,10 +81,10 @@ public class ThirdEyeCacheRegistry {
   private static void initDataSources(ThirdEyeConfiguration thirdeyeConfig) {
     try {
       // Initialize adaptors to time series databases.
-      String dataSourcesPath = thirdeyeConfig.getDataSourcesPath();
-      DataSources dataSources = DataSourcesLoader.fromDataSourcesPath(dataSourcesPath);
+      URL dataSourcesUrl = thirdeyeConfig.getDataSourcesAsUrl();
+      DataSources dataSources = DataSourcesLoader.fromDataSourcesUrl(dataSourcesUrl);
       if (dataSources == null) {
-        throw new IllegalStateException("Could not create data sources from path " + dataSourcesPath);
+        throw new IllegalStateException("Could not create data sources from path " + dataSourcesUrl);
       }
       // Query Cache
       Map<String, ThirdEyeDataSource> thirdEyeDataSourcesMap = DataSourcesLoader.getDataSourceMap(dataSources);
