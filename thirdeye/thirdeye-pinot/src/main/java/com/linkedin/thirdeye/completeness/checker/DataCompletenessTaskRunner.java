@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
@@ -189,8 +190,10 @@ public class DataCompletenessTaskRunner implements TaskRunner {
       LOG.info("Timing out {} entries older than {} i.e. {} and still not complete",
           findAllByTimeOlderThanAndStatus.size(), timeOutOlderThanMillis, new DateTime(timeOutOlderThanMillis));
       for (DataCompletenessConfigDTO config : findAllByTimeOlderThanAndStatus) {
-        config.setTimedOut(true);
-        DAO_REGISTRY.getDataCompletenessConfigDAO().update(config);
+        if (!config.isTimedOut()) {
+          config.setTimedOut(true);
+          DAO_REGISTRY.getDataCompletenessConfigDAO().update(config);
+        }
       }
     } catch (Exception e) {
       LOG.error("Exception data completeness cleanup task", e);
@@ -279,7 +282,11 @@ public class DataCompletenessTaskRunner implements TaskRunner {
   private void runCompletenessCheck(String dataset, Map<String, Long> bucketNameToBucketValueMS,
       Map<String, Long> bucketNameToCount, DataCompletenessAlgorithm dataCompletenessAlgorithm,
       Double expectedCompleteness) {
-    for (Entry<String, Long> entry : bucketNameToBucketValueMS.entrySet()) {
+    Set<Entry<String, Long>> entries = bucketNameToBucketValueMS.entrySet();
+    if (entries.size() > 0) {
+      LOG.info("Checking {} completeness entries", entries.size());
+    }
+    for (Entry<String, Long> entry : entries) {
       String bucketName = entry.getKey();
       Long bucketValue = entry.getValue();
       Long currentCount = 0L;
