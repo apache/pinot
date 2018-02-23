@@ -271,7 +271,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         Preconditions.checkState(defaultValue instanceof String);
         String stringDefaultValue = (String) defaultValue;
         // Length of the UTF-8 encoded byte array.
-        dictionaryElementSize = stringDefaultValue.getBytes("UTF8").length;
+        // Default size should be 1, to gracefully handle empty strings
+        dictionaryElementSize = Math.max(stringDefaultValue.getBytes("UTF8").length, 1);
         sortedArray = new String[]{stringDefaultValue};
         break;
       case INT:
