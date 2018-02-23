@@ -93,7 +93,7 @@ export default Service.extend({
       .then(checkStatus)
       .then(res => this._extractTimeseries(res, urn))
       .then(res => this._complete(context, res))
-      // .catch(error => this._handleError(urn, error));
+      .catch(error => this._handleError(urn, error));
   },
 
   _handleError(urn, error) {
