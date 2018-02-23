@@ -67,6 +67,7 @@ public class TestPrecisionRecallEvaluator {
     assertEquals(evaluator.getPrecision(), 0.125, 0.0001);
     assertEquals(evaluator.getRecall(), 1, 0.00001);
     assertEquals(evaluator.getPrecisionInResponse(), 1.0, 0.00001);
+    assertEquals(evaluator.getResponseRate(), 1.0/8, 0.00001);
 
     // test data with 1 positive feedback, 1 false alarm
     anomalyResultDTOS.add(notifiedFalseAnomaly);
@@ -74,13 +75,16 @@ public class TestPrecisionRecallEvaluator {
     assertEquals(evaluator.getPrecision(), 0.1111, 0.0001);
     assertEquals(evaluator.getRecall(), 1, 0.00001);
     assertEquals(evaluator.getPrecisionInResponse(), 0.5, 0.00001);
+    assertEquals(evaluator.getResponseRate(), 2.0/9, 0.00001);
 
     // test data with 1 positive feedback, 1 user report anomaly, 1 false alarm
     anomalyResultDTOS.add(userReportAnomaly);
     evaluator.init(anomalyResultDTOS);
-    assertEquals(evaluator.getPrecision(),0.1111, 0.0001);
+    // counting user report anomalies as part of the total anomalies
+    assertEquals(evaluator.getPrecision(),0.1, 0.0001);
     assertEquals(evaluator.getRecall(), 0.5, 0.00001);
-    assertEquals(evaluator.getPrecisionInResponse(), 0.5, 0.00001);
+    assertEquals(evaluator.getPrecisionInResponse(), 1.0/3, 0.00001);
+    assertEquals(evaluator.getResponseRate(), 3.0/10, 0.00001);
   }
 
 

@@ -53,7 +53,7 @@ public class PrecisionRecallEvaluator {
   private int userReportTrueAnomaly; // Anomaly is user reported: true anomaly that was not sent out
   private int userReportTrueAnomalyNewTrend; // Anomaly is user reported: true anomaly new trend that was not sent out
   private boolean isProjected = false;
-      // isProjected to indicate if calculating system performance or alert filter's projected performance
+  // isProjected to indicate if calculating system performance or alert filter's projected performance
 
   public static final String PRECISION = "precision";
   public static final String WEIGHTED_PRECISION = "weightedPrecision";
@@ -109,7 +109,8 @@ public class PrecisionRecallEvaluator {
   }
 
   public int getTotalResponses() {
-    return notifiedFalseAlarm + notifiedTrueAnomaly + notifiedTrueAnomalyNewTrend;
+    return notifiedFalseAlarm + notifiedTrueAnomaly + notifiedTrueAnomalyNewTrend + userReportTrueAnomaly
+        + userReportTrueAnomalyNewTrend;
   }
 
   public int getTotalAlerts() {
