@@ -170,11 +170,14 @@
 
   {{#if isTunePreviewActive}}
     <div class="te-horizontal-cards te-content-block">
-      <h4 class="te-self-serve__block-title">{{anomalyData.length}} Anomalies removed with these settings</h4>
-      {{#if diffedAnomalies}}
+      <h4 class="te-self-serve__block-title">{{removedAnomalies}} Anomalies removed with these settings</h4>
+      {{#if (gt removedAnomalies 0)}}
         <p class="te-self-serve__block-subtext">The following previously sent anomalies <span class="stronger">would not have been sent</span> under the new settings.</p>
       {{else}}
         <p class="te-self-serve__block-subtext">These settings would result in <span class="stronger">NO reduction</span> of sent anomalies</p>
+      {{/if}}
+      {{#if isAnomalyTableLoading}}
+        <div class="spinner-wrapper-self-serve spinner-wrapper-self-serve__content-block">{{ember-spinner}}</div>
       {{/if}}
 
       {{!-- Alert anomaly table --}}

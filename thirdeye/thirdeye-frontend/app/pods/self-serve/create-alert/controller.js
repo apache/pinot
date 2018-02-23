@@ -19,7 +19,6 @@ import {
 } from "@ember/utils";
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import {
-  setMetricData,
   buildMetricDataUrl,
   getTopDimensions
 } from 'thirdeye-frontend/utils/manage-alert-utils';
@@ -696,7 +695,7 @@ export default Controller.extend({
 
       // Do we have custom sensitivity settings to add?
       if (alertFilterObj.isCustom) {
-        Object.assign(newAlertObj, { features: alertFilterObj.features, mttd: alertFilterObj.mttd });
+        Object.assign(newAlertObj, { tuningFeatures: alertFilterObj.features, mttd: alertFilterObj.mttd });
       }
 
       // Add filters property if present
@@ -1058,9 +1057,6 @@ export default Controller.extend({
       } = this.getProperties('metricId', 'selectedMetric', 'isDuplicateEmail', 'onboardFunctionPayload', 'alertGroupNewRecipient');
       const newEmailsArr = newEmails ? newEmails.replace(/ /g, '').split(',') : [];
       const isEmailError = !this.isEmailValid(newEmailsArr);
-
-      // TODO: cache latest selected metric data using session storage
-      // setMetricData(metricId, selectedMetric);
 
       // Update validation properties
       this.setProperties({

@@ -10,6 +10,7 @@ import moment from 'moment';
 import Route from '@ember/routing/route';
 import { isPresent } from "@ember/utils";
 import { later } from "@ember/runloop";
+import { task } from 'ember-concurrency';
 import {
   checkStatus,
   postProps,
@@ -126,7 +127,6 @@ const processDefaultTuningParams = (alertData) => {
   }
 
   // TODO: enable once issue resolved in backend (not saving selection to new feature string)
-  // savedSeverityPattern = alertFeatures ? alertFeatures : 'weight';
   const savedSeverityPattern = alertMttd ? alertMttd[1].split('=')[0] : 'weight';
   const isAbsValue = savedSeverityPattern === 'deviation';
   for (var severityKey in severityMap) {
@@ -346,6 +346,7 @@ export default Route.extend({
     this._super(...arguments);
 
     if (isExiting) {
+      this.get('triggerTuningSequence').cancelAll();
       controller.clearAll();
     }
   },
@@ -353,6 +354,55 @@ export default Route.extend({
   saveAutoTuneSettings(id) {
     return fetch(`/detection-job/update/filter/${id}`, postProps('')).then(checkStatus);
   },
+
+  /**
+   * This concurrency task fetches anomaly performance metrics and data for all anomalies which
+   * would not be included in the notification set under the user-selected tuning settings.
+   * @method triggerTuningSequence
+   * @param {Object} configObj - the user-selected type and value of tuning severity thresholds
+   * @return {undefined}
+   */
+  triggerTuningSequence: task(function * (configObj) {
+    const { configString, severityVal} = configObj;
+    const {
+      id: alertId,
+      startDate,
+      endDate,
+      tuneIdUrl
+    } = this.currentModel;
+    try {
+      // Send the new tuning settings to backend to get an auto-tune Id
+      const tuneId = yield fetch(tuneIdUrl + configString, postProps('')).then(checkStatus);
+      // Use the autotune Id to fetch new performance metrics for this alert, and load them into the template
+      const performanceData = yield RSVP.hash(tuningPromiseHash(startDate, endDate, tuneId[0], alertId, severityVal));
+      const idsRemoved = anomalyDiff(performanceData.idListA, performanceData.idListB).idsRemoved;
+      const projectedStats = performanceData.projectedEval;
+      Object.assign(projectedStats, { mttd: performanceData.projectedMttd });
+      this.controller.set('alertEvalMetrics.projected', projectedStats);
+      this.controller.setProperties({
+        removedAnomalies: idsRemoved.length,
+        isTunePreviewActive: true,
+        isAnomalyTableLoading: true,
+        isPerformanceDataLoading: false
+      });
+      // Fetch all anomaly data for the list of removed anomalies
+      const rawAnomalyData = yield fetchCombinedAnomalies(idsRemoved);
+      // Fetch severity scores for each anomaly
+      const severityScores = yield fetchSeverityScores(idsRemoved);
+      const anomalyData = enhanceAnomalies(rawAnomalyData, severityScores);
+      this.controller.setProperties({
+        anomalyData,
+        autoTuneId: tuneId[0],
+        isAnomalyTableLoading: false,
+        tableStats: anomalyTableStats(anomalyData)
+      });
+    } catch(error) {
+      this.controller.setProperties({
+        loadError: true,
+        loadErrorMsg: error
+      });
+    }
+  }).cancelOn('deactivate').restartable(),
 
   actions: {
 
@@ -395,52 +445,7 @@ export default Route.extend({
 
     // User clicks "preview", having configured performance settings
     triggerTuningSequence(configObj) {
-      const { configString, severityVal} = configObj;
-      const {
-        id: alertId,
-        startDate,
-        endDate,
-        tuneIdUrl
-      } = this.currentModel;
-      let projectedStats = {};
-      let rawAnomalies = [];
-      let idsRemoved = [];
-
-      fetch(tuneIdUrl + configString, postProps('')).then(checkStatus)
-        .then((tuneId) => {
-          const autoTuneId = tuneId[0];
-          this.controller.set('autoTuneId', autoTuneId);
-          return RSVP.hash(tuningPromiseHash(startDate, endDate, autoTuneId, alertId, severityVal));
-        })
-        .then((data) => {
-          idsRemoved = anomalyDiff(data.idListA, data.idListB).idsRemoved;
-          projectedStats = data.projectedEval;
-          projectedStats.mttd = data.projectedMttd;
-          this.controller.set('alertEvalMetrics.projected', projectedStats);
-          this.controller.setProperties({
-            isTunePreviewActive: true,
-            isPerformanceDataLoading: false
-          });
-          return fetchCombinedAnomalies(idsRemoved);
-        })
-        .then((rawAnomalyData) => {
-          rawAnomalies = rawAnomalyData;
-          return fetchSeverityScores(idsRemoved);
-        })
-        .then((severityScores) => {
-          const anomalyData = enhanceAnomalies(rawAnomalies, severityScores);
-          this.controller.setProperties({
-            anomalyData,
-            tableStats: anomalyTableStats(anomalyData)
-          });
-        })
-        // Got errors?
-        .catch((err) => {
-          this.controller.setProperties({
-            loadError: true,
-            loadErrorMsg: err
-          });
-        });
+      this.get('triggerTuningSequence').perform(configObj);
     }
   }
 });

@@ -130,6 +130,9 @@
         <p class="te-alert-page-pending__text">{{errorText}}</p>
       </div>
     {{else}}
+      {{#if (not isTransitionDone)}}
+        <div class="spinner-wrapper spinner-wrapper--card">{{ember-spinner}}</div>
+      {{/if}}
       {{outlet}}
     {{/if}}
   </div>
