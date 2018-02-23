@@ -58,7 +58,7 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultRebalanceSegmentStrategy.class);
 
   protected static final String DEFAULT_DRY_RUN = "true";
-  protected static final String DEFAULT_REBALANCE_CONSUMING = "false";
+  protected static final String DEFAULT_INCLUDE_CONSUMING = "false";
 
   private HelixManager _helixManager;
   private HelixAdmin _helixAdmin;
@@ -76,12 +76,11 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
   @Override
   public PartitionAssignment rebalancePartitionAssignment(IdealState idealState, TableConfig tableConfig,
       RebalanceUserParams rebalanceUserParams) {
-    PartitionAssignment partitionAssignment = null;
+    PartitionAssignment partitionAssignment = new PartitionAssignment(tableConfig.getTableName());
 
-    boolean rebalanceConsuming = Boolean.valueOf(
-        rebalanceUserParams.getConfig(RebalanceUserParamConstants.REBALANCE_CONSUMING,
-            DEFAULT_REBALANCE_CONSUMING));
-    if (rebalanceConsuming) {
+    boolean includeConsuming = Boolean.valueOf(
+        rebalanceUserParams.getConfig(RebalanceUserParamConstants.INCLUDE_CONSUMING, DEFAULT_INCLUDE_CONSUMING));
+    if (includeConsuming) {
       LOGGER.info("Rebalancing partition assignment for table {}", tableConfig.getTableName());
 
       if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
@@ -109,7 +108,7 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
         }
       }
     } else {
-      LOGGER.info("rebalanceConsuming = false. No need to rebalance partition assignment for {}", tableConfig.getTableType());
+      LOGGER.info("includeConsuming = false. No need to rebalance partition assignment for {}", tableConfig.getTableType());
     }
     return partitionAssignment;
   }
@@ -124,10 +123,9 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
 
     // if realtime, rebalance consuming segments
     if (tableType.equals(CommonConstants.Helix.TableType.REALTIME)) {
-      boolean rebalanceConsuming = Boolean.valueOf(
-          rebalanceUserParams.getConfig(RebalanceUserParamConstants.REBALANCE_CONSUMING,
-              DEFAULT_REBALANCE_CONSUMING));
-      if (rebalanceConsuming) {
+      boolean includeConsuming = Boolean.valueOf(
+          rebalanceUserParams.getConfig(RebalanceUserParamConstants.INCLUDE_CONSUMING, DEFAULT_INCLUDE_CONSUMING));
+      if (includeConsuming) {
         rebalanceConsumingSegments(idealState, newPartitionAssignment);
       }
     }
@@ -148,7 +146,7 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
         Boolean.valueOf(rebalanceUserParams.getConfig(RebalanceUserParamConstants.DRYRUN, DEFAULT_DRY_RUN));
     if (!dryRun) {
       LOGGER.info("Updating ideal state for table {}", tableNameWithType);
-      updateIdealStateWithNewSegmentMapping(tableNameWithType, targetNumReplicas,
+      updateIdealState(tableNameWithType, targetNumReplicas,
           idealState.getRecord().getMapFields());
     } else {
       LOGGER.info("Dry run. Skip writing ideal state");

@@ -389,12 +389,12 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table to rebalance") @Nonnull @PathParam("tableName") String tableName,
       @ApiParam(value = "offline|realtime") @Nonnull @QueryParam("type") String tableType,
       @ApiParam(value = "true|false") @Nonnull @QueryParam("dryrun") Boolean dryRun,
-      @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("rebalanceConsuming") Boolean rebalanceConsuming
+      @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming
   )
   {
     RebalanceUserParams rebalanceUserParams = new RebalanceUserParams();
     rebalanceUserParams.addConfig(RebalanceUserParamConstants.DRYRUN, String.valueOf(dryRun));
-    rebalanceUserParams.addConfig(RebalanceUserParamConstants.REBALANCE_CONSUMING, String.valueOf(rebalanceConsuming));
+    rebalanceUserParams.addConfig(RebalanceUserParamConstants.INCLUDE_CONSUMING, String.valueOf(includeConsuming));
 
     if (tableType.equalsIgnoreCase(CommonConstants.Helix.TableType.OFFLINE.name())) {
       return _pinotHelixResourceManager.rebalanceTable(tableName, CommonConstants.Helix.TableType.OFFLINE,

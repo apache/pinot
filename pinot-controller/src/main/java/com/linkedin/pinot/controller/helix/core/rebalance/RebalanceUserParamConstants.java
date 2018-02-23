@@ -22,5 +22,6 @@ package com.linkedin.pinot.controller.helix.core.rebalance;
 public class RebalanceUserParamConstants {
 
   public static final String DRYRUN = "dryRun";
-  public static final String REBALANCE_CONSUMING = "rebalanceConsuming";
+  /** Whether consuming segments should also be rebalanced or not */
+  public static final String INCLUDE_CONSUMING = "includeConsuming";
 }

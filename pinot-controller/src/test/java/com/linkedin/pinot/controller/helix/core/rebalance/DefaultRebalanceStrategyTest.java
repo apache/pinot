@@ -137,7 +137,7 @@ public class DefaultRebalanceStrategyTest {
 
     RebalanceUserParams rebalanceUserParams = new RebalanceUserParams();
     rebalanceUserParams.addConfig(RebalanceUserParamConstants.DRYRUN, "true");
-    rebalanceUserParams.addConfig(RebalanceUserParamConstants.REBALANCE_CONSUMING, "false");
+    rebalanceUserParams.addConfig(RebalanceUserParamConstants.INCLUDE_CONSUMING, "false");
 
     IdealState rebalancedIdealState;
     int targetNumReplicas = nReplicas;
@@ -245,7 +245,7 @@ public class DefaultRebalanceStrategyTest {
 
     RebalanceUserParams rebalanceUserParams = new RebalanceUserParams();
     rebalanceUserParams.addConfig(RebalanceUserParamConstants.DRYRUN, "true");
-    rebalanceUserParams.addConfig(RebalanceUserParamConstants.REBALANCE_CONSUMING, "true");
+    rebalanceUserParams.addConfig(RebalanceUserParamConstants.INCLUDE_CONSUMING, "true");
 
     IdealState rebalancedIdealState;
     int targetNumReplicas = nReplicas;
@@ -323,7 +323,7 @@ public class DefaultRebalanceStrategyTest {
     nConsumingInstances = 2;
     consumingInstances = getConsumingInstanceList(nConsumingInstances);
     setPartitionAssignment(newPartitionAssignment, targetNumReplicas, consumingInstances);
-    rebalanceUserParams.addConfig(RebalanceUserParamConstants.REBALANCE_CONSUMING, "false");
+    rebalanceUserParams.addConfig(RebalanceUserParamConstants.INCLUDE_CONSUMING, "false");
     testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserParams, newPartitionAssignment,
         targetNumReplicas, nCompletedSegments, nConsumingSegments, completedInstances, consumingInstances);
   }
@@ -381,7 +381,7 @@ public class DefaultRebalanceStrategyTest {
     for (String segment : rebalancedIdealState.getPartitionSet()) {
       Map<String, String> instanceStateMap = rebalancedIdealState.getInstanceStateMap(segment);
       Assert.assertEquals(instanceStateMap.size(), targetNumReplicas);
-      String rebalanceConsuming = rebalanceUserParams.getConfig(RebalanceUserParamConstants.REBALANCE_CONSUMING);
+      String rebalanceConsuming = rebalanceUserParams.getConfig(RebalanceUserParamConstants.INCLUDE_CONSUMING);
       if (segment.contains("consuming")) {
         if (rebalanceConsuming != null && rebalanceConsuming.equals("true")) {
           Assert.assertTrue(instancesConsuming.containsAll(instanceStateMap.keySet()));

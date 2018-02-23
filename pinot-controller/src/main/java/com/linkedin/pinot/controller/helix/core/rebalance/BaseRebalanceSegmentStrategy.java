@@ -42,7 +42,7 @@ public abstract class BaseRebalanceSegmentStrategy implements RebalanceSegmentSt
    * @param numReplica The number of replica
    * @param segmentAssignmentMapping Segment assignment mapping
    */
-  void updateIdealStateWithNewSegmentMapping(final String tableNameWithType, final int numReplica,
+  void updateIdealState(final String tableNameWithType, final int numReplica,
       final Map<String, Map<String, String>> segmentAssignmentMapping) {
     HelixHelper.updateIdealState(_helixManager, tableNameWithType, new Function<IdealState, IdealState>() {
       @Nullable
