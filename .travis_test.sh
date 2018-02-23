@@ -43,7 +43,7 @@ if [ $? -eq 0 ]; then
   #   exit 1
   # fi
   cd thirdeye-frontend
-  npm install
+  yarn install -non-interactive && bower install
   ./node_modules/.bin/ember test --silent --skip-cleanup --launch Chrome
   failed=$?
   if [ $failed -eq 0 ]; then
