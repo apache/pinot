@@ -1,10 +1,12 @@
 package com.linkedin.thirdeye.datasource.csv;
 
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
+import com.linkedin.thirdeye.dataframe.Grouping;
 import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -16,6 +18,7 @@ import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -91,19 +94,45 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
           }
         }, COL_TIMESTAMP);
       }
+
+      if (request.getFilterSet() != null){
+        Multimap<String, String> filters = request.getFilterSet();
+        for (final Map.Entry<String, Collection<String>> filter : filters.asMap().entrySet()){
+          data = data.filter(new Series.StringConditional() {
+            @Override
+            public boolean apply(String... values) {
+              return filter.getValue().contains(values[0]);
+            }
+          }, filter.getKey());
+        }
+
+      }
+
       data = data.dropNull();
 
-      DoubleSeries series = data.getDoubles(translator.translate(function.getMetricId()));
-      if (request.getGroupByTimeGranularity() != null){
-        df.addSeries(function.toString(), series);
-        df.addSeries(COL_TIMESTAMP, data.get(COL_TIMESTAMP));
-      } else {
-        if (aggFunction == MetricAggFunction.SUM){
-          df.addSeries(function.toString(), series.sum());
+      if(request.getGroupBy() != null && request.getGroupBy().size() != 0){
+        Grouping.DataFrameGrouping dataFrameGrouping = data.groupByValue(request.getGroupBy());
+        List<String> aggregationExps = new ArrayList<>();
+        for (String groupByCols : request.getGroupBy()){
+          aggregationExps.add(groupByCols + ":first");
         }
-        df.addSeries(COL_TIMESTAMP, LongSeries.buildFrom(-1));
+        aggregationExps.add(function.getMetricName() + ":sum");
+        df = dataFrameGrouping.aggregate(aggregationExps);
+        df.dropSeries("key");
+        df.renameSeries(function.getMetricName(), function.toString());
+      } else {
+        if (request.getGroupByTimeGranularity() != null){
+          df = data.groupByInterval(COL_TIMESTAMP, request.getGroupByTimeGranularity().toMillis()).aggregate(function.getMetricName() + ":sum");
+          df.renameSeries(function.getMetricName(), function.toString());
+        } else {
+          if (aggFunction == MetricAggFunction.SUM){
+            df.addSeries(function.toString(), data.getDoubles(translator.translate(function.getMetricId())).sum());
+          }
+          df.addSeries(COL_TIMESTAMP, LongSeries.buildFrom(-1));
+        }
       }
     }
+
     CSVThirdEyeResponse response = new CSVThirdEyeResponse(
         request,
         new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
