@@ -302,7 +302,7 @@ export default Component.extend({
     const { metricUrn, aggregates, baseline } = getProperties(this, 'metricUrn', 'aggregates', 'baseline');
 
     if (offset === 'baseline') {
-      return baseline;
+      return parseFloat(baseline);
     }
 
     return aggregates[toOffsetUrn(metricUrn, offset)];
