@@ -40,6 +40,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
@@ -385,15 +386,16 @@ public class PinotTableRestletResource {
   @Path("/tables/{tableName}/rebalance")
   @ApiOperation(value = "Rebalances segments of a table across servers", notes = "Rebalances segments of a table across servers")
   public ZNRecord rebalance(
-      @ApiParam(value = "Name of the table to rebalance", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "offline|realtime", required = true) @QueryParam("type") String tableType,
-      @ApiParam(value = "true|false", required = true, defaultValue = "true") @QueryParam("dryrun") Boolean dryRun,
-      @ApiParam(value = "true|false", required = false, defaultValue = "false") @QueryParam("rebalanceConsuming") Boolean rebalanceConsuming
+      @ApiParam(value = "Name of the table to rebalance") @Nonnull @PathParam("tableName") String tableName,
+      @ApiParam(value = "offline|realtime") @Nonnull @QueryParam("type") String tableType,
+      @ApiParam(value = "true|false") @Nonnull @QueryParam("dryrun") Boolean dryRun,
+      @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("rebalanceConsuming") Boolean rebalanceConsuming
   )
   {
     RebalanceUserParams rebalanceUserParams = new RebalanceUserParams();
     rebalanceUserParams.addConfig(RebalanceUserParamConstants.DRYRUN, String.valueOf(dryRun));
     rebalanceUserParams.addConfig(RebalanceUserParamConstants.REBALANCE_CONSUMING, String.valueOf(rebalanceConsuming));
+
     if (tableType.equalsIgnoreCase(CommonConstants.Helix.TableType.OFFLINE.name())) {
       return _pinotHelixResourceManager.rebalanceTable(tableName, CommonConstants.Helix.TableType.OFFLINE,
           rebalanceUserParams);

@@ -58,4 +58,10 @@ public class PartitionAssignment {
   public int getNumPartitions() {
     return _partitionToInstances.size();
   }
+
+  @Override
+  public String toString() {
+    return "PartitionAssignment{" + "_tableName='" + _tableName + '\'' + ", _partitionToInstances="
+        + _partitionToInstances + '}';
+  }
 }

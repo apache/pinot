@@ -50,4 +50,9 @@ public class RebalanceUserParams {
       }
     }
   }
+
+  @Override
+  public String toString() {
+    return "RebalanceUserParams{" + "_configs=" + _configs + '}';
+  }
 }
