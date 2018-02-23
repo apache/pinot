@@ -57,6 +57,21 @@ export default Route.extend({
   },
 
   /**
+   * Send a DELETE request to the function delete endpoint.
+   * @method removeThirdEyeFunction
+   * @param {Number} functionId - The id of the alert to remove
+   * @return {Promise}
+   */
+  removeThirdEyeFunction(functionId) {
+    const postProps = {
+      method: 'delete',
+      headers: { 'content-type': 'text/plain' }
+    };
+    const url = '/dashboard/anomaly-function?id=' + functionId;
+    return fetch(url, postProps).then(checkStatus);
+  },
+
+  /**
    * Concurrenty task to ping the job-info endpoint to check status of an ongoing replay job.
    * If there is no progress after a set time, we display an error message.
    * @param {Number} jobId - the id for the newly triggered replay job
@@ -110,9 +125,9 @@ export default Route.extend({
     triggerOnboardingJob(data) {
       const newName = JSON.parse(data.payload).functionName;
       const createAlertUrl = `/function-onboard/create-function?name=${newName}`;
-      const updateAlertUrl = `/detection-onboard/create-job?jobName=${data.jobName}&payload=${encodeURIComponent(data.payload)}`;
+      const updateAlertUrl = `/detection-onboardx/create-job?jobName=${data.jobName}&payload=${encodeURIComponent(data.payload)}`;
       let onboardStartTime = moment();
-      let newFunctionId = '';
+      let newFunctionId = null;
 
       fetch(createAlertUrl, postProps('')).then(checkStatus)
         .then((result) => {
@@ -123,6 +138,10 @@ export default Route.extend({
           this.get('checkJobCreateStatus').perform(result.jobId, newName, newFunctionId);
         })
         .catch((err) => {
+          // Remove incomplete alert (created but not updated)
+          if (newFunctionId) {
+            this.removeThirdEyeFunction(newFunctionId);
+          }
           // Error state will be handled on alert page
           this.jumpToAlertPage(-1, -1, newName);
         });
