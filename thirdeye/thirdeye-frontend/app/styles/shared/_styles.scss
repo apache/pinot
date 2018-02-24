@@ -38,6 +38,15 @@ body {
   }
 }
 
+.te-icon {
+  &__inline-link {
+    color: $te-link-blue;
+    font-size: 16px;
+    vertical-align: middle;
+    padding-bottom: 2px;
+  }
+}
+
 .te-form {
   margin-top: $te-default-element-spacing;
 
@@ -85,6 +94,7 @@ body {
 
     &--custom {
       display: block;
+      margin: -12px 0 0 36px;
     }
   }
 
@@ -239,6 +249,14 @@ body {
 
   &__block-subtext {
     margin: -5px 0 25px 0;
+
+    &--narrow {
+      margin-bottom: 0px;
+    }
+
+    &--normal {
+      margin: 0;
+    }
   }
 }
 
