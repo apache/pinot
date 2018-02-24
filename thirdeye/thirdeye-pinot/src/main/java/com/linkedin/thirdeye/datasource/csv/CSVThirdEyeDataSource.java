@@ -18,6 +18,7 @@ import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import java.io.InputStreamReader;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -57,7 +58,7 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
   public CSVThirdEyeDataSource(Map<String, String> properties) throws Exception{
     Map<String, DataFrame> dataframes = new HashMap<>();
     for(Map.Entry<String, String> property: properties.entrySet()){
-      try (InputStreamReader reader = new InputStreamReader(new URL(property.getValue()).openStream())) {
+      try (InputStreamReader reader = new InputStreamReader(makeUrlFromPath(property.getValue()).openStream())) {
         dataframes.put(property.getKey(), DataFrame.fromCsv(reader));
       }
     }
@@ -251,6 +252,15 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource{
     public String translate(Long metricId) {
       return staticMap.get(metricId);
     }
+  }
+
+  private URL makeUrlFromPath(String input){
+      try {
+        return new URL(input);
+      } catch (MalformedURLException ignore) {
+        // ignore
+      }
+      return this.getClass().getResource(input);
   }
 }
 

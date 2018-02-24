@@ -100,8 +100,12 @@ public class CSVThirdEyeDataSourceTest {
     Map<String, List<String>> expectedMap = new HashMap<>();
     expectedMap.put("country", Arrays.asList("cn", "us"));
     expectedMap.put("browser", Arrays.asList("chrome", "safari"));
-    Assert.assertEquals(dataSource.getDimensionFilters("source"),
-        expectedMap);
+    Map<String, List<String>> actualMap = dataSource.getDimensionFilters("source");
+    Assert.assertEquals(new HashSet<>(actualMap.get("browser")),
+        new HashSet<>(expectedMap.get("browser")));
+    Assert.assertEquals(new HashSet<>(actualMap.get("country")),
+        new HashSet<>(expectedMap.get("country")));
+
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
