@@ -52,7 +52,6 @@ export default Controller.extend({
   graphEmailLinkProps: '',
   dimensionCount: 7,
   availableDimensions: 0,
-  //selectedSeverityOption: 'Percentage of Change',
   legendText: {
     dotted: {
       text: 'WoW'
@@ -770,7 +769,6 @@ export default Controller.extend({
       graphEmailLinkProps: '',
       bsAlertBannerType: 'success',
       selectedFilters: JSON.stringify({})
-      //selectedSeverityOption: 'Percentage of Change'
     });
     this.send('refreshModel');
   },
