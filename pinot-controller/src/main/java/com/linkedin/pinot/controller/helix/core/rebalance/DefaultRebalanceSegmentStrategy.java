@@ -19,14 +19,12 @@ package com.linkedin.pinot.controller.helix.core.rebalance;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TagConfig;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.helix.PartitionAssignment;
-import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentGenerator;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -73,55 +71,77 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
     _propertyStore = helixManager.getHelixPropertyStore();
   }
 
+  /**
+   * Rebalance partition assignment only for realtime tables, and if includeConsuming=true
+   * @param idealState old ideal state
+   * @param tableConfig table config of table tor rebalance
+   * @param rebalanceUserParams custom user configs for specific rebalance strategies
+   * @return
+   */
   @Override
   public PartitionAssignment rebalancePartitionAssignment(IdealState idealState, TableConfig tableConfig,
       RebalanceUserParams rebalanceUserParams) {
-    PartitionAssignment partitionAssignment = new PartitionAssignment(tableConfig.getTableName());
+    PartitionAssignment newPartitionAssignment = new PartitionAssignment(tableConfig.getTableName());
 
-    boolean includeConsuming = Boolean.valueOf(
-        rebalanceUserParams.getConfig(RebalanceUserParamConstants.INCLUDE_CONSUMING, DEFAULT_INCLUDE_CONSUMING));
-    if (includeConsuming) {
-      LOGGER.info("Rebalancing partition assignment for table {}", tableConfig.getTableName());
+    if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
+      LOGGER.info("Rebalancing stream partition assignment for table {}", tableConfig.getTableName());
 
-      if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
+      boolean includeConsuming = Boolean.valueOf(
+          rebalanceUserParams.getConfig(RebalanceUserParamConstants.INCLUDE_CONSUMING, DEFAULT_INCLUDE_CONSUMING));
+      if (includeConsuming) {
 
-        StreamPartitionAssignmentGenerator streamPartitionAssignmentGenerator = new StreamPartitionAssignmentGenerator(_propertyStore);
-        TagConfig tagConfig = new TagConfig(tableConfig, _helixManager);
-        List<String> consumingInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, tagConfig.getConsumingServerTag());
         String tableNameWithType = tableConfig.getTableName();
-        // FIXME: where should this come from? from kafka metadata stream or just read from znode how many are existing?
-        int numPartitions = getKafkaPartitionCount(tableConfig);
 
-        Map<String, PartitionAssignment> consumingPartitionAssignment =
+        StreamPartitionAssignmentGenerator streamPartitionAssignmentGenerator =
+            new StreamPartitionAssignmentGenerator(_propertyStore);
+        PartitionAssignment streamPartitionAssignment =
+            streamPartitionAssignmentGenerator.getStreamPartitionAssignment(tableNameWithType);
+        int numPartitions = streamPartitionAssignment.getNumPartitions();
+
+        TagConfig tagConfig = new TagConfig(tableConfig, _helixManager);
+        List<String> consumingInstances =
+            _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, tagConfig.getConsumingServerTag());
+
+        Map<String, PartitionAssignment> tableNameToStreamPartitionAssignmentMap =
             streamPartitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions,
                 consumingInstances, Lists.newArrayList(tableNameWithType));
-        partitionAssignment = consumingPartitionAssignment.get(tableNameWithType);
+        newPartitionAssignment = tableNameToStreamPartitionAssignmentMap.get(tableNameWithType);
 
         boolean dryRun =
             Boolean.valueOf(rebalanceUserParams.getConfig(RebalanceUserParamConstants.DRYRUN, DEFAULT_DRY_RUN));
         if (!dryRun) {
           LOGGER.info("Updating stream partition assignment for table {}", tableNameWithType);
-          streamPartitionAssignmentGenerator.writeStreamPartitionAssignment(consumingPartitionAssignment);
+          streamPartitionAssignmentGenerator.writeStreamPartitionAssignment(tableNameToStreamPartitionAssignmentMap);
         } else {
           LOGGER.info("Dry run. Skip writing stream partition assignment to property store");
-          LOGGER.info("Partition assignment for table {} is {}", tableNameWithType, partitionAssignment);
+          LOGGER.info("Partition assignment for table {} is {}", tableNameWithType, newPartitionAssignment);
         }
+      } else {
+        LOGGER.info("includeConsuming = false. No need to rebalance partition assignment for {}",
+            tableConfig.getTableType());
       }
-    } else {
-      LOGGER.info("includeConsuming = false. No need to rebalance partition assignment for {}", tableConfig.getTableType());
     }
-    return partitionAssignment;
+    return newPartitionAssignment;
   }
 
+  /**
+   * If realtime table and includeConsuming=true, rebalance consuming segments. NewPartitionAssignment will be used only in this case
+   * Always rebalance completed (online) segments, NewPartitionAssignment unused in this case
+   * @param idealState old ideal state
+   * @param tableConfig table config of table tor rebalance
+   * @param rebalanceUserParams custom user configs for specific rebalance strategies
+   * @param newPartitionAssignment new rebalanced partition assignments as part of the resource rebalance
+   * @return
+   */
   @Override
   public IdealState rebalanceIdealState(IdealState idealState, TableConfig tableConfig,
       RebalanceUserParams rebalanceUserParams, PartitionAssignment newPartitionAssignment) {
 
-    LOGGER.info("Rebalancing ideal state for table {}", tableConfig.getTableName());
     String tableNameWithType = tableConfig.getTableName();
     CommonConstants.Helix.TableType tableType = tableConfig.getTableType();
+    LOGGER.info("Rebalancing ideal state for table {}", tableNameWithType);
 
-    // if realtime, rebalance consuming segments
+    // if realtime and includeConsuming, then rebalance consuming segments
     if (tableType.equals(CommonConstants.Helix.TableType.REALTIME)) {
       boolean includeConsuming = Boolean.valueOf(
           rebalanceUserParams.getConfig(RebalanceUserParamConstants.INCLUDE_CONSUMING, DEFAULT_INCLUDE_CONSUMING));
@@ -129,7 +149,8 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
         rebalanceConsumingSegments(idealState, newPartitionAssignment);
       }
     }
-    // rebalance serving segments
+
+    // get target num replicas
     int targetNumReplicas;
     if (tableType.equals(CommonConstants.Helix.TableType.REALTIME)) {
       String replicasString = tableConfig.getValidationConfig().getReplicasPerPartition();
@@ -141,102 +162,24 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
     } else {
       targetNumReplicas = Integer.parseInt(tableConfig.getValidationConfig().getReplication());
     }
-    rebalanceServing(idealState, tableConfig, targetNumReplicas);
+
+    // always rebalance serving segments
+    rebalanceServingSegments(idealState, tableConfig, targetNumReplicas);
+
+    // update if not dryRun
     boolean dryRun =
         Boolean.valueOf(rebalanceUserParams.getConfig(RebalanceUserParamConstants.DRYRUN, DEFAULT_DRY_RUN));
     if (!dryRun) {
       LOGGER.info("Updating ideal state for table {}", tableNameWithType);
-      updateIdealState(tableNameWithType, targetNumReplicas,
-          idealState.getRecord().getMapFields());
+      updateIdealState(tableNameWithType, targetNumReplicas, idealState.getRecord().getMapFields());
     } else {
       LOGGER.info("Dry run. Skip writing ideal state");
     }
     return idealState;
   }
 
-
-
   /**
-   * Rebalances serving segments based on autorebalance strategy
-   * @param idealState
-   * @param tableConfig
-   * @param targetNumReplicas
-   * @return
-   */
-  protected IdealState rebalanceServing(IdealState idealState, TableConfig tableConfig, int targetNumReplicas) {
-
-    LOGGER.info("Rebalancing serving segments for table {}", tableConfig.getTableName());
-    TagConfig tagConfig = new TagConfig(tableConfig, _helixManager);
-    List<String> servingInstances =
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, tagConfig.getCompletedServerTag());
-    List<String> enabledServingInstances =
-        HelixHelper.getEnabledInstancesWithTag(_helixAdmin, _helixClusterName, tagConfig.getCompletedServerTag());
-
-    int numReplicasInIdealState = Integer.parseInt(idealState.getReplicas());
-
-    if (numReplicasInIdealState > targetNumReplicas) { // We need to reduce the number of replicas per helix partition.
-
-      for (String segmentId : idealState.getPartitionSet()) {
-        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentId);
-        if (instanceStateMap.size() > targetNumReplicas) {
-          Set<String> keys = instanceStateMap.keySet();
-          while (instanceStateMap.size() > targetNumReplicas) {
-            instanceStateMap.remove(keys.iterator().next());
-          }
-        } else if (instanceStateMap.size() < targetNumReplicas) {
-          LOGGER.warn("Table {}, segment {} has {} replicas, less than {} (requested number of replicas",
-              idealState.getResourceName(), segmentId, instanceStateMap.size(), targetNumReplicas);
-        }
-      }
-    } else { // Number of replicas is either the same or higher, so invoke Helix rebalancer.
-
-      final Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
-
-      List<Map.Entry<String, Map<String, String>>> removedEntries = new LinkedList<>();
-      if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
-        // FIXME: what about those in OFFLINE states?
-        removeSegmentsNotBalanceable(mapFields, removedEntries);
-      }
-
-      if (mapFields.isEmpty()) {// if ideal state had only CONSUMING segments so far, mapFields will be empty
-        // we do not need to do anything in that case
-        LOGGER.info("No LLC segments in ONLINE state for table {}", tableConfig.getTableName());
-      }
-      else {
-
-        String tableNameWithType = tableConfig.getTableName();
-
-        LinkedHashMap<String, Integer> states = new LinkedHashMap<>();
-        List<String> partitions = Lists.newArrayList(idealState.getPartitionSet());
-        states.put(RealtimeSegmentOnlineOfflineStateModel.OFFLINE, 0);
-        states.put(RealtimeSegmentOnlineOfflineStateModel.ONLINE, targetNumReplicas);
-        Set<String> currentHosts = new HashSet<>();
-        for (String segment : mapFields.keySet()) {
-          currentHosts.addAll(mapFields.get(segment).keySet());
-        }
-        AutoRebalanceStrategy rebalanceStrategy = new AutoRebalanceStrategy(tableNameWithType, partitions, states);
-
-        LOGGER.info("Current nodes for table {}: {}", tableNameWithType, currentHosts);
-        LOGGER.info("New nodes for table {}: {}", tableNameWithType, servingInstances);
-        LOGGER.info("Enabled nodes for table: {} {}", tableNameWithType, enabledServingInstances);
-        ZNRecord newZnRecord =
-            rebalanceStrategy.computePartitionAssignment(servingInstances, enabledServingInstances, mapFields, new ClusterDataCache());
-        final Map<String, Map<String, String>> newMapping = newZnRecord.getMapFields();
-        for (Map.Entry<String, Map<String, String>> entry : newMapping.entrySet()) {
-          idealState.setInstanceStateMap(entry.getKey(), entry.getValue());
-        }
-      }
-      // If we removed any entries, add them back here
-      for (Map.Entry<String, Map<String, String>> entry : removedEntries) {
-        idealState.setInstanceStateMap(entry.getKey(), entry.getValue());
-      }
-    }
-    idealState.setReplicas(Integer.toString(targetNumReplicas));
-    return idealState;
-  }
-
-  /**
-   * Rebalances consuming segments based on partition assignment of the stream partitions
+   * Rebalances consuming segments based on stream partition assignment
    * @param idealState
    * @param newPartitionAssignment
    */
@@ -265,6 +208,85 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
     }
   }
 
+  /**
+   * Rebalances serving segments based on autorebalance strategy
+   * @param idealState
+   * @param tableConfig
+   * @param targetNumReplicas
+   * @return
+   */
+  protected IdealState rebalanceServingSegments(IdealState idealState, TableConfig tableConfig, int targetNumReplicas) {
+
+    LOGGER.info("Rebalancing serving segments for table {}", tableConfig.getTableName());
+
+    int numReplicasInIdealState = Integer.parseInt(idealState.getReplicas());
+    if (numReplicasInIdealState > targetNumReplicas) {
+      // We need to reduce the number of replicas per helix partition.
+
+      for (String segmentId : idealState.getPartitionSet()) {
+        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentId);
+        if (instanceStateMap.size() > targetNumReplicas) {
+          Set<String> keys = instanceStateMap.keySet();
+          while (instanceStateMap.size() > targetNumReplicas) {
+            instanceStateMap.remove(keys.iterator().next());
+          }
+        } else if (instanceStateMap.size() < targetNumReplicas) {
+          LOGGER.warn("Table {}, segment {} has {} replicas, less than {} (requested number of replicas",
+              idealState.getResourceName(), segmentId, instanceStateMap.size(), targetNumReplicas);
+        }
+      }
+    } else {
+      // Number of replicas is either the same or higher, so invoke Helix rebalancer.
+
+      final Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
+
+      List<Map.Entry<String, Map<String, String>>> removedEntries = new LinkedList<>();
+      if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
+        // FIXME: what about those in OFFLINE states?
+        removeSegmentsNotBalanceable(mapFields, removedEntries);
+      }
+
+      if (!mapFields.isEmpty()) {
+
+        String tableNameWithType = tableConfig.getTableName();
+
+        LinkedHashMap<String, Integer> states = new LinkedHashMap<>();
+        List<String> partitions = Lists.newArrayList(idealState.getPartitionSet());
+        states.put(RealtimeSegmentOnlineOfflineStateModel.OFFLINE, 0);
+        states.put(RealtimeSegmentOnlineOfflineStateModel.ONLINE, targetNumReplicas);
+        Set<String> currentHosts = new HashSet<>();
+        for (String segment : mapFields.keySet()) {
+          currentHosts.addAll(mapFields.get(segment).keySet());
+        }
+        TagConfig tagConfig = new TagConfig(tableConfig, _helixManager);
+        List<String> servingInstances =
+            _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, tagConfig.getCompletedServerTag());
+        List<String> enabledServingInstances =
+            HelixHelper.getEnabledInstancesWithTag(_helixAdmin, _helixClusterName, tagConfig.getCompletedServerTag());
+
+        AutoRebalanceStrategy rebalanceStrategy = new AutoRebalanceStrategy(tableNameWithType, partitions, states);
+
+        LOGGER.info("Current nodes for table {}: {}", tableNameWithType, currentHosts);
+        LOGGER.info("New nodes for table {}: {}", tableNameWithType, servingInstances);
+        LOGGER.info("Enabled nodes for table: {} {}", tableNameWithType, enabledServingInstances);
+        ZNRecord newZnRecord =
+            rebalanceStrategy.computePartitionAssignment(servingInstances, enabledServingInstances, mapFields,
+                new ClusterDataCache());
+        final Map<String, Map<String, String>> newMapping = newZnRecord.getMapFields();
+        for (Map.Entry<String, Map<String, String>> entry : newMapping.entrySet()) {
+          idealState.setInstanceStateMap(entry.getKey(), entry.getValue());
+        }
+      }
+
+      // If we removed any entries, add them back here
+      for (Map.Entry<String, Map<String, String>> entry : removedEntries) {
+        idealState.setInstanceStateMap(entry.getKey(), entry.getValue());
+      }
+    }
+    idealState.setReplicas(Integer.toString(targetNumReplicas));
+    return idealState;
+  }
+
   // Keep only those segments that are LLC and in ONLINE state.
   private void removeSegmentsNotBalanceable(Map<String, Map<String, String>> mapFields,
       List<Map.Entry<String, Map<String, String>>> removedEntries) {
@@ -290,11 +312,5 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
         it.remove();
       }
     }
-  }
-
-  protected int getKafkaPartitionCount(TableConfig tableConfig) {
-    final KafkaStreamMetadata kafkaStreamMetadata =
-        new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
-    return PinotTableIdealStateBuilder.getPartitionCount(kafkaStreamMetadata);
   }
 }
