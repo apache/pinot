@@ -829,6 +829,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // We will end up downloading the segment, so this is not a serious problem
       segmentLogger.warn("Exception when catching up to final offset", e);
       return false;
+    } finally {
+      _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     }
     if (_currentOffset != endOffset) {
       // Timeout?
