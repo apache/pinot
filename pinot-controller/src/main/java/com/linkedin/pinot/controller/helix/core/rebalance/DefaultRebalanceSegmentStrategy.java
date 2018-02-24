@@ -36,6 +36,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -55,8 +56,8 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultRebalanceSegmentStrategy.class);
 
-  protected static final String DEFAULT_DRY_RUN = "true";
-  protected static final String DEFAULT_INCLUDE_CONSUMING = "false";
+  private static final boolean DEFAULT_DRY_RUN = true;
+  private static final boolean DEFAULT_INCLUDE_CONSUMING = false;
 
   private HelixManager _helixManager;
   private HelixAdmin _helixAdmin;
@@ -75,19 +76,19 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
    * Rebalance partition assignment only for realtime tables, and if includeConsuming=true
    * @param idealState old ideal state
    * @param tableConfig table config of table tor rebalance
-   * @param rebalanceUserParams custom user configs for specific rebalance strategies
+   * @param rebalanceUserConfig custom user configs for specific rebalance strategies
    * @return
    */
   @Override
   public PartitionAssignment rebalancePartitionAssignment(IdealState idealState, TableConfig tableConfig,
-      RebalanceUserParams rebalanceUserParams) {
+      Configuration rebalanceUserConfig) {
     PartitionAssignment newPartitionAssignment = new PartitionAssignment(tableConfig.getTableName());
 
     if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
       LOGGER.info("Rebalancing stream partition assignment for table {}", tableConfig.getTableName());
 
-      boolean includeConsuming = Boolean.valueOf(
-          rebalanceUserParams.getConfig(RebalanceUserParamConstants.INCLUDE_CONSUMING, DEFAULT_INCLUDE_CONSUMING));
+      boolean includeConsuming =
+          rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.INCLUDE_CONSUMING, DEFAULT_INCLUDE_CONSUMING);
       if (includeConsuming) {
 
         String tableNameWithType = tableConfig.getTableName();
@@ -107,8 +108,7 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
                 consumingInstances, Lists.newArrayList(tableNameWithType));
         newPartitionAssignment = tableNameToStreamPartitionAssignmentMap.get(tableNameWithType);
 
-        boolean dryRun =
-            Boolean.valueOf(rebalanceUserParams.getConfig(RebalanceUserParamConstants.DRYRUN, DEFAULT_DRY_RUN));
+        boolean dryRun = rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN, DEFAULT_DRY_RUN);
         if (!dryRun) {
           LOGGER.info("Updating stream partition assignment for table {}", tableNameWithType);
           streamPartitionAssignmentGenerator.writeStreamPartitionAssignment(tableNameToStreamPartitionAssignmentMap);
@@ -129,13 +129,13 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
    * Always rebalance completed (online) segments, NewPartitionAssignment unused in this case
    * @param idealState old ideal state
    * @param tableConfig table config of table tor rebalance
-   * @param rebalanceUserParams custom user configs for specific rebalance strategies
+   * @param rebalanceUserConfig custom user configs for specific rebalance strategies
    * @param newPartitionAssignment new rebalanced partition assignments as part of the resource rebalance
    * @return
    */
   @Override
   public IdealState rebalanceIdealState(IdealState idealState, TableConfig tableConfig,
-      RebalanceUserParams rebalanceUserParams, PartitionAssignment newPartitionAssignment) {
+      Configuration rebalanceUserConfig, PartitionAssignment newPartitionAssignment) {
 
     String tableNameWithType = tableConfig.getTableName();
     CommonConstants.Helix.TableType tableType = tableConfig.getTableType();
@@ -143,8 +143,8 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
 
     // if realtime and includeConsuming, then rebalance consuming segments
     if (tableType.equals(CommonConstants.Helix.TableType.REALTIME)) {
-      boolean includeConsuming = Boolean.valueOf(
-          rebalanceUserParams.getConfig(RebalanceUserParamConstants.INCLUDE_CONSUMING, DEFAULT_INCLUDE_CONSUMING));
+      boolean includeConsuming =
+          rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.INCLUDE_CONSUMING, DEFAULT_INCLUDE_CONSUMING);
       if (includeConsuming) {
         rebalanceConsumingSegments(idealState, newPartitionAssignment);
       }
@@ -167,8 +167,7 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
     rebalanceServingSegments(idealState, tableConfig, targetNumReplicas);
 
     // update if not dryRun
-    boolean dryRun =
-        Boolean.valueOf(rebalanceUserParams.getConfig(RebalanceUserParamConstants.DRYRUN, DEFAULT_DRY_RUN));
+    boolean dryRun = rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN, DEFAULT_DRY_RUN);
     if (!dryRun) {
       LOGGER.info("Updating ideal state for table {}", tableNameWithType);
       updateIdealState(tableNameWithType, targetNumReplicas, idealState.getRecord().getMapFields());
@@ -310,7 +309,8 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
       boolean keep = false;
       if (SegmentName.isLowLevelConsumerSegmentName(segmentName)) {
         Map<String, String> instanceStateMap = entry.getValue();
-        if (instanceStateMap.values().contains(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)) {
+        if (instanceStateMap.values()
+            .contains(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)) {
           keep = true;
         }
       }

@@ -18,6 +18,7 @@ package com.linkedin.pinot.controller.helix.core.rebalance;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.controller.helix.PartitionAssignment;
+import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.IdealState;
 
 
@@ -30,20 +31,20 @@ public interface RebalanceSegmentStrategy {
    * Rebalances and writes partition assignments involved in the rebalance of the table
    * @param idealState old ideal state
    * @param tableConfig table config of table tor rebalance
-   * @param rebalanceUserParams custom user configs for specific rebalance strategies
+   * @param rebalanceUserConfig custom user configs for specific rebalance strategies
    * @return rebalanced partition assignments
    */
   PartitionAssignment rebalancePartitionAssignment(IdealState idealState, TableConfig tableConfig,
-      RebalanceUserParams rebalanceUserParams);
+      Configuration rebalanceUserConfig);
 
   /**
    * Rebalances segments and writes ideal state of table
    * @param idealState old ideal state
    * @param tableConfig table config of table tor rebalance
-   * @param rebalanceUserParams custom user configs for specific rebalance strategies
+   * @param rebalanceUserConfig custom user configs for specific rebalance strategies
    * @param newPartitionAssignment new rebalaned partition assignments as part of the resource rebalance
    * @return rebalanced ideal state
    */
-  IdealState rebalanceIdealState(IdealState idealState, TableConfig tableConfig, RebalanceUserParams rebalanceUserParams,
+  IdealState rebalanceIdealState(IdealState idealState, TableConfig tableConfig, Configuration rebalanceUserConfig,
       PartitionAssignment newPartitionAssignment);
 }

@@ -57,7 +57,6 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.Res
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
-import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserParams;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyEnum;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyFactory;
@@ -77,6 +76,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration.Configuration;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -2090,7 +2090,7 @@ public class PinotHelixResourceManager {
   }
 
   @Nonnull
-  public ZNRecord rebalanceTable(final String rawTableName, TableType tableType, RebalanceUserParams rebalanceUserParams) {
+  public ZNRecord rebalanceTable(final String rawTableName, TableType tableType, Configuration rebalanceUserConfig) {
 
     TableConfig tableConfig = getTableConfig(rawTableName, tableType);
     String tableNameWithType = tableConfig.getTableName();
@@ -2099,9 +2099,9 @@ public class PinotHelixResourceManager {
     RebalanceSegmentStrategy rebalanceSegmentsStrategy =
         RebalanceSegmentStrategyFactory.getInstance().getRebalanceSegmentsStrategy(tableConfig);
     PartitionAssignment newPartitionAssignment =
-        rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserParams);
+        rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
     IdealState newIdealState = rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig,
-        rebalanceUserParams, newPartitionAssignment);
+        rebalanceUserConfig, newPartitionAssignment);
     return newIdealState.getRecord();
   }
 
