@@ -220,19 +220,20 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
     LOGGER.info("Rebalancing serving segments for table {}", tableConfig.getTableName());
 
     int numReplicasInIdealState = Integer.parseInt(idealState.getReplicas());
+
     if (numReplicasInIdealState > targetNumReplicas) {
       // We need to reduce the number of replicas per helix partition.
 
-      for (String segmentId : idealState.getPartitionSet()) {
-        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentId);
+      for (String segmentName : idealState.getPartitionSet()) {
+        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
         if (instanceStateMap.size() > targetNumReplicas) {
           Set<String> keys = instanceStateMap.keySet();
           while (instanceStateMap.size() > targetNumReplicas) {
             instanceStateMap.remove(keys.iterator().next());
           }
         } else if (instanceStateMap.size() < targetNumReplicas) {
-          LOGGER.warn("Table {}, segment {} has {} replicas, less than {} (requested number of replicas",
-              idealState.getResourceName(), segmentId, instanceStateMap.size(), targetNumReplicas);
+          LOGGER.warn("Table {}, segment {} has {} replicas, less than {} (requested number of replicas)",
+              idealState.getResourceName(), segmentName, instanceStateMap.size(), targetNumReplicas);
         }
       }
     } else {
@@ -242,8 +243,7 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
 
       List<Map.Entry<String, Map<String, String>>> removedEntries = new LinkedList<>();
       if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
-        // FIXME: what about those in OFFLINE states?
-        removeSegmentsNotBalanceable(mapFields, removedEntries);
+        filterSegmentsForRealtimeRebalance(mapFields, removedEntries);
       }
 
       if (!mapFields.isEmpty()) {
@@ -287,29 +287,36 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
     return idealState;
   }
 
-  // Keep only those segments that are LLC and in ONLINE state.
-  private void removeSegmentsNotBalanceable(Map<String, Map<String, String>> mapFields,
+  /**
+   * Remove all segments from the ideal state, other than LLC ONLINE segments. We only want LLC ONLINE segments for this rebalance
+   * We do not want to rebalance CONSUMING segments as part of this rebalance, it is done separately
+   *
+   * If any segments were OFFLINE instead of ONLINE, we will not rebalance them,
+   * as that state was likely achieved because of some manual operation
+   * @param mapFields
+   * @param removedEntries
+   */
+  private void filterSegmentsForRealtimeRebalance(Map<String, Map<String, String>> mapFields,
       List<Map.Entry<String, Map<String, String>>> removedEntries) {
-    // Keep only those segments that are LLC and in ONLINE state.
-    Iterator<Map.Entry<String, Map<String, String>>> it = mapFields.entrySet().iterator();
-    while (it.hasNext()) {
-      Map.Entry<String, Map<String, String>> entry = it.next();
+
+    Iterator<Map.Entry<String, Map<String, String>>> mapFieldsIterator = mapFields.entrySet().iterator();
+    while (mapFieldsIterator.hasNext()) {
+      // Check segment name and states.
+      // If any of the instances are ONLINE, then we keep the segment for rebalancing,
+      // Otherwise, we remove it. It will be added back after helix re-balances the segments
+
+      Map.Entry<String, Map<String, String>> entry = mapFieldsIterator.next();
       final String segmentName = entry.getKey();
       boolean keep = false;
       if (SegmentName.isLowLevelConsumerSegmentName(segmentName)) {
-        // Check the states. If any of the instances are ONLINE, then we keep the segment for rebalancing,
-        // Otherwise, we remove it, and add it back after helix re-balances the segments.
-        Map<String, String> stateMap = entry.getValue();
-        for (String state : stateMap.values()) {
-          if (state.equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)) {
-            keep = true;
-            break;
-          }
+        Map<String, String> instanceStateMap = entry.getValue();
+        if (instanceStateMap.values().contains(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)) {
+          keep = true;
         }
       }
       if (!keep) {
         removedEntries.add(entry);
-        it.remove();
+        mapFieldsIterator.remove();
       }
     }
   }
