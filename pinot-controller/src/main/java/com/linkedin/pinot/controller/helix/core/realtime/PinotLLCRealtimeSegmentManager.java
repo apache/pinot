@@ -1212,6 +1212,43 @@ public class PinotLLCRealtimeSegmentManager {
       _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.SHORT_OF_LIVE_INSTANCES, 0);
     }
 
+
+    /**
+     *
+     * NOTE: There is a race condition here, between the validation manager and a new table creation,
+     * as both the flows want to read all stream partitions in a tenant and write all stream partitions back (depending on the stream partition strategy of course)
+     *
+     * Scenario:
+     * Lead controller is trying to update all stream partition assignments in a tenant, because it found a new partition for a table
+     * Non-lead controller gets a call to add a new table, in the same tenant
+     *
+     * Steps:
+     *
+     *    Lead controller        |    Non-lead controller
+     *    ----------------------------------------------------
+     *    Validation manager     |
+     *    reads all partitions   |
+     *                           |
+     *                           |New table creation
+     *                           |reads all partitions
+     *                           |
+     *    Validation manager     |
+     *    writes new partition   |
+     *    assignments            |
+     *                           |
+     *                           |Table creation writes
+     *                           |new partition assignments,
+     *                           |overriding the new partition
+     *                           |written by validation manager
+     *                           |
+     *   -------------------------------------------------------
+     *   We have lost the new partition written by the validation manager.
+     *   However, it will be corrected when the validation manager runs the next time, which is after 1 hour
+     *   The partition will make it to the ideal state in the run after that.
+     *   As we can see, although we have this race condition,
+     *   it is costing us only an additional hour's delay in getting the partition to the ideal state
+     *   For now, we will tolerate this delay.
+     */
     List<String> realtimeTablesWithSameTenant =
         getRealtimeTablesWithServerTenant(tagConfig.getServerTenantName());
     Map<String, PartitionAssignment> newPartitionAssignment =

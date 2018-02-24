@@ -183,17 +183,17 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
    * @param newPartitionAssignment
    */
   private void rebalanceConsumingSegments(IdealState idealState, PartitionAssignment newPartitionAssignment) {
-    List<String> consumingSegments = new ArrayList<>();
     LOGGER.info("Rebalancing consuming segments for table {}", idealState.getResourceName());
+
+    List<String> consumingSegments = new ArrayList<>();
     Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
-    // FIXME: is this sufficient to get all consuming segments? what is someone went into error/offline?
     for (Map.Entry<String, Map<String, String>> entry : mapFields.entrySet()) {
       Collection<String> instanceStates = entry.getValue().values();
       if (instanceStates.contains(RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
         consumingSegments.add(entry.getKey());
       }
     }
-    // TODO: check that targetNumReplicas and replicas in newPartitionAssignment match
+
     // update ideal state of consuming segments, based on new stream partition assignment
     Map<String, List<String>> partitionToInstanceMap = newPartitionAssignment.getPartitionToInstances();
     for (String segmentName : consumingSegments) {
