@@ -243,10 +243,10 @@ export default Controller.extend({
           key: 'totalAlerts',
           tooltip: false,
           hideProjected: false,
-          text: 'Actual number of alerts received'
+          text: 'Actual number of alerts sent'
         },
         {
-          title: 'Response Rate',
+          title: 'Review Rate',
           key: 'responseRate',
           units: '%',
           tooltip: false,
@@ -258,14 +258,14 @@ export default Controller.extend({
           key: 'precision',
           units: '%',
           tooltip: false,
-          text: 'Among all anomalies reviewed, the % of them that are true.'
+          text: '% of true anomalies among alerted anomalies.'
         },
         {
           title: 'Recall',
           key: 'recall',
           units: '%',
           tooltip: false,
-          text: 'Among all anomalies that happened, the % of them detected by the system.'
+          text: '% of true alerted anomalies among the total true anomalies.'
         },
         {
           title: `MTTD for > ${convertedWeight}${severityUnit} change`,

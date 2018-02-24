@@ -36,7 +36,10 @@
 
     <div class="te-horizontal-cards te-content-block">
       <h4 class="te-self-serve__block-title">Alert Performance</h4>
-      <a class="te-pill-selectors__side-link" {{action "onClickTuneSensitivity" this}}>Customize sensitivity</a>
+      <p class="te-self-serve__block-subtext te-self-serve__block-subtext--narrow">All estimated performance numbers are based on reviewed anomalies.</p>
+      <a class="te-pill-selectors__side-link" {{action "onClickTuneSensitivity" this}}>
+        <i class="glyphicon glyphicon-cog te-icon__inline-link"></i> Customize sensitivity
+      </a>
       <div class="te-horizontal-cards__container">
         {{!-- Alert anomaly stats cards --}}
         {{anomaly-stats-block
@@ -45,6 +48,9 @@
           anomalyStats=anomalyStats
         }}
       </div>
+      {{#if repRunStatus}}
+        <p class="te-self-serve__block-subtext te-self-serve__block-subtext--normal">Replay in progress. Please check back later...</p>
+      {{/if}}
     </div>
 
     {{#if isReportSuccess}}

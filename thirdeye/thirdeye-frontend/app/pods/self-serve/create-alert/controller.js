@@ -52,7 +52,6 @@ export default Controller.extend({
   graphEmailLinkProps: '',
   dimensionCount: 7,
   availableDimensions: 0,
-  selectedSeverityOption: 'Percentage of Change',
   legendText: {
     dotted: {
       text: 'WoW'
@@ -106,16 +105,16 @@ export default Controller.extend({
   /**
    * Options for patterns of interest field. These may eventually load from the backend.
    */
-  patternsOfInterest: ['Up and Down', 'Up only', 'Down only'],
+  patternsOfInterest: ['Higher or lower than expected', 'Higher than expected', 'Lower than expected'],
 
   /**
    * Mapping user readable pattern and sensitivity to DB values
    */
   optionMap: {
     pattern: {
-      'Up and Down': 'UP,DOWN',
-      'Up only': 'UP',
-      'Down only': 'DOWN'
+      'Higher or lower than expected': 'UP,DOWN',
+      'Higher than expected': 'UP',
+      'Lower than expected': 'DOWN'
     },
     sensitivity: {
       'Robust (Low)': 'LOW',
@@ -405,6 +404,18 @@ export default Controller.extend({
   ),
 
   /**
+   * Allows us to enable/disable the custom tuning options
+   * @type {Boolean}
+   */
+  isCustomFieldsDisabled: computed(
+    'selectedTuneType',
+    'isMetricSelected',
+    function() {
+      const isEnabled = this.get('selectedTuneType') === 'custom' && this.get('isMetricSelected');
+      return !isEnabled;
+  }),
+
+  /**
    * Determines cases in which the granularity field should be disabled
    * @method isGranularitySelectDisabled
    * @return {Boolean}
@@ -567,24 +578,27 @@ export default Controller.extend({
     'selectedMetricOption',
     function() {
       const {
+        optionMap,
         selectedPattern,
         selectedDimension,
         selectedGranularity,
         selectedApplication,
         selectedMetricOption
       } = this.getProperties(
+        'optionMap',
         'selectedPattern',
         'selectedDimension',
         'selectedGranularity',
         'selectedApplication',
         'selectedMetricOption'
       );
-      const pattern = selectedPattern ? `${selectedPattern.camelize()}_` : '';
+      const pattern = selectedPattern ? optionMap.pattern[selectedPattern] : null;
+      const formattedPattern = pattern ? `${pattern.toLowerCase().replace(',',' ').camelize()}_` : '';
       const dimension = selectedDimension ? `${selectedDimension.camelize()}_` : '';
       const granularity = selectedGranularity ? selectedGranularity.toLowerCase().camelize() : '';
       const app = selectedApplication ? `${selectedApplication.camelize()}_` : 'applicationName_';
       const metric = selectedMetricOption ? `${selectedMetricOption.name.camelize()}_` : 'metricName_';
-      return `${app}${metric}${dimension}${pattern}${granularity}`;
+      return `${app}${metric}${dimension}${formattedPattern}${granularity}`;
     }
   ),
 
@@ -628,7 +642,7 @@ export default Controller.extend({
   selectedConfigGroupSubtitle: computed(
     'selectedConfigGroup',
     function () {
-      return `Alerts Monitored by: ${this.get('selectedConfigGroup.name')}`;
+      return `See all alerts monitored by: ${this.get('selectedConfigGroup.name')}`;
     }
   ),
 
@@ -754,8 +768,7 @@ export default Controller.extend({
       isAlertNameDuplicate: false,
       graphEmailLinkProps: '',
       bsAlertBannerType: 'success',
-      selectedFilters: JSON.stringify({}),
-      selectedSeverityOption: 'Percentage of Change'
+      selectedFilters: JSON.stringify({})
     });
     this.send('refreshModel');
   },

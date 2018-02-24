@@ -25,9 +25,6 @@
           showGraphLegend=false
           onSelection=(action "onSelection")
         }}
-        <div class="te-form__note">
-          NOTE: If you find the metric shown above is inconsistent, please email <a class="thirdeye-link-secondary" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a>.
-        </div>
       {{else}}
         <div class="te-graph-alert__content">
           <div class="glyphicon glyphicon-{{if isMetricDataInvalid 'alert' 'equalizer'}} te-graph-alert__icon{{if isMetricDataInvalid '--warning'}}"></div>
@@ -36,4 +33,7 @@
       {{/if}}
     {{/if}}
   </div>
+    <div class="te-form__note">
+      NOTE: If you find the metric shown above is inconsistent, please email <a class="thirdeye-link-secondary" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a>.
+    </div>
 </div>

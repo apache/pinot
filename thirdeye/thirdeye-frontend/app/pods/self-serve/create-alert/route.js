@@ -125,7 +125,7 @@ export default Route.extend({
     triggerOnboardingJob(data) {
       const newName = JSON.parse(data.payload).functionName;
       const createAlertUrl = `/function-onboard/create-function?name=${newName}`;
-      const updateAlertUrl = `/detection-onboardx/create-job?jobName=${data.jobName}&payload=${encodeURIComponent(data.payload)}`;
+      const updateAlertUrl = `/detection-onboard/create-job?jobName=${data.jobName}&payload=${encodeURIComponent(data.payload)}`;
       let onboardStartTime = moment();
       let newFunctionId = null;
 
