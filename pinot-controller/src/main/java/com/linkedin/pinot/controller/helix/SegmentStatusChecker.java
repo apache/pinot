@@ -272,21 +272,6 @@ public class SegmentStatusChecker {
           nErrors);
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE,
           (nSegments > 0) ? (100 - (nOffline * 100 / nSegments)) : 100);
-
-      // Emit estimated sizes of realtime/offline tables.
-      TableSizeReader.TableSizeDetails tableSizeDetails = _tableSizeReader.getTableSizeDetails(tableName,
-          _config.getServerAdminRequestTimeoutSeconds() * 1000);
-      if (tableSizeDetails != null) {
-        if (tableSizeDetails.realtimeSegments != null) {
-          long realtimeTableEstimatedSize = tableSizeDetails.realtimeSegments.estimatedSizeInBytes;
-          _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.REALTIME_TABLE_ESTIMATED_SIZE, realtimeTableEstimatedSize);
-        }
-        if (tableSizeDetails.offlineSegments != null) {
-          long offlineTableEstimatedSize = tableSizeDetails.offlineSegments.estimatedSizeInBytes;
-          _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE, offlineTableEstimatedSize);
-        }
-      }
-
       if (nOffline > 0) {
         LOGGER.warn("Table {} has {} segments with no online replicas", tableName, nOffline);
       }
