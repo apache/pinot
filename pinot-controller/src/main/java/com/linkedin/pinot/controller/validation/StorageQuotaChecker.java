@@ -107,6 +107,8 @@ public class StorageQuotaChecker {
     TableSizeReader.SegmentSizeDetails sizeDetails = tableSubtypeSize.segments.get(segmentName);
     long existingSegmentSizeBytes = sizeDetails != null ?  sizeDetails.estimatedSizeInBytes : 0;
 
+    _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE, existingSegmentSizeBytes);
+
     long estimatedFinalSizeBytes = tableSubtypeSize.estimatedSizeInBytes - existingSegmentSizeBytes + incomingSegmentSizeBytes;
     if (estimatedFinalSizeBytes <= allowedStorageBytes) {
       String message = String.format("Estimated size: %d bytes is within the configured quota of %d (bytes) for table %s. Incoming segment size: %d (bytes)",
