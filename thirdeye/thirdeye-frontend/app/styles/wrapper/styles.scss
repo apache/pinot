@@ -7,12 +7,6 @@ body {
   color: lighten(black, 40%);
 }
 
-.spinner-wrapper {
-  margin: $te-default-element-spacing;
-  height: 250px;
-  position: relative;
-}
-
 .spinner-wrapper-self-serve {
   position: absolute;
   margin: 190px 0 0 0;
@@ -20,6 +14,11 @@ body {
 
   &__content-block {
     margin-top: 60px;
+  }
+
+  &__custom {
+    margin-left: -15px;
+    margin-top: 214px;
   }
 }
 
@@ -47,6 +46,17 @@ body {
     &--slim {
       margin-bottom: 0;
     }
+
+    &--graph {
+      margin-top: -55px;
+    }
+  }
+
+  &__title {
+    border-bottom: none;
+    font-weight: 600;
+    font-size: 17px;
+    color: app-shade(black, 0.85);
   }
 
   &__section-submit {
@@ -59,6 +69,12 @@ body {
   &__sub-label,
   &__super-label {
     color: rgba(0,0,0,0.45);
+    font-size: 14px;
+    font-weight: normal;
+    text-align: left;
+    background: none;
+    background-color: white;
+    line-height: 32px;
 
     &--strong {
       font-weight: 600;

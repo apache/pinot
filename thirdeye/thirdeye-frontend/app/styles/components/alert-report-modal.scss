@@ -2,6 +2,12 @@
   &__body {
     height: 60vh;
     margin-top: 0;
+    border: none;
+    padding: 24px;
+  }
+
+  &__field-wrapper {
+    margin-top: 20px;
   }
 }
 
@@ -12,4 +18,8 @@
 
 .te-report-title {
   margin: 0;
+  border-bottom: none;
+  font-weight: 600;
+  font-size: 17px;
+  color: app-shade(black, 0.85);
 }

@@ -105,9 +105,7 @@
             <div class="te-form__super-label">...{{if isDimensionFetchDone 'Displaying' 'Loading'}} top {{availableDimensions}} contributing subDimensions for <span class="stronger">{{selectedDimension}}</span></div>
           {{/if}}
         {{/if}}
-        {{#if isMetricDataLoading}}
-          <div class="spinner-wrapper--self-serve">{{ember-spinner}}</div>
-        {{/if}}
+        {{#if isMetricDataLoading}}{{ember-spinner}}{{/if}}
         {{#if isMetricSelected}}
           {{anomaly-graph
             primaryMetric=selectedMetric

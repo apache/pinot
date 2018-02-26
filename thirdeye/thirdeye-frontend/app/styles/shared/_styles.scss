@@ -529,6 +529,13 @@ body {
     font-weight: 500;
     color: app-shade(black, 8);
     position: relative;
+
+    &:last-child {
+      max-width: 90px;
+      text-align: center;
+      padding: 4px 0 0 0;
+      vertical-align: baseline;
+    }
   }
 
   &__cell-head {
@@ -606,7 +613,7 @@ body {
   &__select {
     display: inline-block;
     margin-right: 30px;
-    width: 170px;
+    width: 180px;
   }
 
   &__link-wrapper {
