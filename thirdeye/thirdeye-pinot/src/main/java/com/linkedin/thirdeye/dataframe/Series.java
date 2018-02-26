@@ -8,6 +8,9 @@ import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
 import org.apache.commons.lang.ArrayUtils;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
 
 
 /**
@@ -1156,6 +1159,34 @@ public abstract class Series {
    */
   public Grouping.SeriesGrouping groupByExpandingWindow() {
     return new Grouping.SeriesGrouping(this, Grouping.GroupingByExpandingWindow.from(this.size()));
+  }
+
+  /**
+   * Returns a SeriesGrouping based on a time period from an origin.
+   *
+   * @see Grouping.GroupingByPeriod
+   *
+   * @param origin start time stamp
+   * @param bucketSize time bucket size
+   *
+   * @return SeriesGrouping
+   */
+  public Grouping.SeriesGrouping groupByPeriod(DateTime origin, Period bucketSize) {
+    return new Grouping.SeriesGrouping(this, Grouping.GroupingByPeriod.from(this.getLongs(), origin, bucketSize));
+  }
+
+  /**
+   * Returns a SeriesGrouping based on a time period.
+   *
+   * @see Grouping.GroupingByPeriod
+   *
+   * @param timezone time zone to interpret timestamps in
+   * @param bucketSize time bucket size
+   *
+   * @return SeriesGrouping
+   */
+  public Grouping.SeriesGrouping groupByPeriod(DateTimeZone timezone, Period bucketSize) {
+    return new Grouping.SeriesGrouping(this, Grouping.GroupingByPeriod.from(this.getLongs(), timezone, bucketSize));
   }
 
   /* *************************************************************************

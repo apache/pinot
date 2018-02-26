@@ -8,7 +8,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import org.apache.commons.lang.ArrayUtils;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeFieldType;
+import org.joda.time.DateTimeZone;
+import org.joda.time.DurationFieldType;
+import org.joda.time.LocalDateTime;
+import org.joda.time.Period;
+import org.joda.time.PeriodType;
 
 
 public abstract class Grouping {
@@ -62,7 +70,7 @@ public abstract class Grouping {
   GroupingDataFrame count(Series s) {
     long[] values = new long[this.size()];
     for(int i=0; i<this.size(); i++) {
-      values[i++] = this.apply(s, i).size();
+      values[i] = this.apply(s, i).size();
     }
     return makeResult(LongSeries.buildFrom(values));
   }
@@ -1057,6 +1065,85 @@ public abstract class Grouping {
     public static GroupingByExpandingWindow from(int size) {
       return new GroupingByExpandingWindow(LongSeries.sequence(0, size), size);
     }
+  }
+
+  /**
+   * Represents a SeriesGrouping based on the time period from an origin.
+   * The Origin can either be provided or be estimated based on the input data.
+   * Handles timezone-specific properties, such as DST and time leaps.
+   */
+  public static final class GroupingByPeriod extends Grouping {
+    final long[] cutoffs;
+
+    private GroupingByPeriod(long[] cutoffs) {
+      super(LongSeries.buildFrom(cutoffs));
+      this.cutoffs = cutoffs;
+    }
+
+    @Override
+    Series apply(Series s, int groupIndex) {
+      final long lower = this.cutoffs[groupIndex];
+      final long upper = groupIndex + 1 < this.cutoffs.length ?
+          this.cutoffs[groupIndex + 1] : Long.MAX_VALUE;
+
+      return s.filter(new Series.LongConditional() {
+        @Override
+        public boolean apply(long... values) {
+          return values[0] >= lower && values[0] < upper;
+        }
+      }).dropNull();
+    }
+
+    private static long[] makeCutoffs(DateTime origin, DateTime max, Period bucketSize) {
+      List<Long> offsets = new ArrayList<>();
+      DateTime offset = origin;
+      while (offset.isBefore(max) || offset.isEqual(max)) {
+        offsets.add(offset.getMillis());
+        offset = offset.plus(bucketSize);
+      }
+      return ArrayUtils.toPrimitive(offsets.toArray(new Long[offsets.size()]));
+    }
+
+    public static GroupingByPeriod from(LongSeries timestamps, DateTimeZone timezone, Period bucketSize) {
+      DateTime origin = makeOrigin(new DateTime(timestamps.min().longValue(), timezone), bucketSize);
+      return from(timestamps, origin, bucketSize);
+    }
+
+    public static GroupingByPeriod from(LongSeries timestamps, DateTime origin, Period bucketSize) {
+      DateTime max = new DateTime(timestamps.max().longValue(), origin.getZone());
+      return new GroupingByPeriod(makeCutoffs(origin, max, bucketSize));
+    }
+
+    private static DateTime makeOrigin(DateTime first, Period period) {
+      if (period.getYears() > 0) {
+        return first.year().roundFloorCopy().toDateTime();
+
+      } else if (period.getMonths() > 0) {
+        return first.monthOfYear().roundFloorCopy().toDateTime();
+
+      } else if (period.getWeeks() > 0) {
+        return first.weekOfWeekyear().roundFloorCopy().toDateTime();
+
+      } else if (period.getDays() > 0) {
+        return first.dayOfYear().roundFloorCopy().toDateTime();
+
+      } else if (period.getHours() > 0) {
+        return first.hourOfDay().roundFloorCopy().toDateTime();
+
+      } else if (period.getMinutes() > 0) {
+        return first.minuteOfHour().roundFloorCopy().toDateTime();
+
+      } else if (period.getSeconds() > 0) {
+        return first.secondOfMinute().roundFloorCopy().toDateTime();
+
+      } else if (period.getMillis() > 0) {
+        return first.millisOfSecond().roundFloorCopy().toDateTime();
+
+      }
+
+      throw new IllegalArgumentException(String.format("Unsupported Period '%s'", period));
+    }
+
   }
 
   /**
