@@ -41,6 +41,7 @@ export default Component.extend({
 
   /**
    * Pre-select all dimensions option if none else available
+   * TODO: use this.get('dimensionOptions.firstObject')
    */
   init() {
     this._super(...arguments);

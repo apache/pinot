@@ -530,12 +530,9 @@ body {
     color: app-shade(black, 8);
     position: relative;
 
-    &--limited {
-      max-width: 155px;
-    }
-
-    &--last {
-      max-width: 100px;
+    &:last-child {
+      max-width: 90px;
+      text-align: center;
       padding: 4px 0 0 0;
       vertical-align: baseline;
     }
@@ -616,7 +613,7 @@ body {
   &__select {
     display: inline-block;
     margin-right: 30px;
-    width: 170px;
+    width: 180px;
   }
 
   &__link-wrapper {

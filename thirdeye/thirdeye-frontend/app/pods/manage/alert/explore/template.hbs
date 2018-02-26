@@ -55,7 +55,7 @@
 
     {{#if isReportSuccess}}
       {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
-        <strong>Success:</strong> Anomaly reported for dates <strong>{{reportedRange}}</strong>.
+        <strong>Success:</strong> Anomaly reported for dates <strong>{{reportedRange}}</strong>. Reloading anomalies...
       {{/bs-alert}}
     {{/if}}
 
@@ -249,7 +249,7 @@
                     </li>
                   </ul>
                  </td>
-                 <td class="te-anomaly-table__cell te-anomaly-table__cell--limited">
+                 <td class="te-anomaly-table__cell">
                     {{#if anomaly.showResponseSaved}}
                       <i class="te-anomaly-table__icon--status glyphicon glyphicon-ok-circle"></i>
                     {{/if}}
@@ -274,7 +274,7 @@
                       {{/power-select}}
                     {{/if}}
                  </td>
-                 <td class="te-anomaly-table__cell te-anomaly-table__cell--last">
+                 <td class="te-anomaly-table__cell">
                     <div class="te-anomaly-table__link-wrapper">
                       <a target="_blank" class="te-anomaly-table__link" href="app/#/rootcause?anomalyId={{anomaly.anomalyId}}">Investigate</a>
                     </div>

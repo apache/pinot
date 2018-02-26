@@ -596,7 +596,10 @@ export default Controller.extend({
             isReportSuccess: true,
             reportedRange: `${startStr} - ${endStr}`
           });
-          this.send('refreshModel');
+          // Reload after save confirmation
+          later(this, function() {
+            this.send('refreshModel');
+          }, 1000);
         })
         // If failure, leave modal open and report
         .catch((err) => {
