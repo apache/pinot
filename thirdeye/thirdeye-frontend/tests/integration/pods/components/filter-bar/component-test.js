@@ -1,6 +1,6 @@
 import { moduleForComponent, test } from 'ember-qunit';
 import hbs from 'htmlbars-inline-precompile';
-import config from 'thirdeye-frontend/mocks/filterBarConfig';
+import config from 'thirdeye-frontend/shared/filterBarConfig';
 
 moduleForComponent('filter-bar', 'Integration | Component | filter bar', {
   integration: true
