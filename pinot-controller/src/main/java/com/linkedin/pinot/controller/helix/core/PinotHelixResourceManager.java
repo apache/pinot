@@ -95,6 +95,9 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.zookeeper.data.Stat;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -2090,7 +2093,8 @@ public class PinotHelixResourceManager {
   }
 
   @Nonnull
-  public ZNRecord rebalanceTable(final String rawTableName, TableType tableType, Configuration rebalanceUserConfig) {
+  public JSONObject rebalanceTable(final String rawTableName, TableType tableType, Configuration rebalanceUserConfig)
+      throws JSONException {
 
     TableConfig tableConfig = getTableConfig(rawTableName, tableType);
     String tableNameWithType = tableConfig.getTableName();
@@ -2102,7 +2106,16 @@ public class PinotHelixResourceManager {
         rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
     IdealState newIdealState = rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig,
         rebalanceUserConfig, newPartitionAssignment);
-    return newIdealState.getRecord();
+
+    JSONObject jsonObject = new JSONObject();
+    try {
+      jsonObject.put("partitionAssignment", newPartitionAssignment);
+      jsonObject.put("idealState", newIdealState);
+    } catch (JSONException e) {
+      LOGGER.error("Exception in constructing json response for rebalance table {}", tableNameWithType, e);
+      throw(e);
+    }
+    return jsonObject;
   }
 
 

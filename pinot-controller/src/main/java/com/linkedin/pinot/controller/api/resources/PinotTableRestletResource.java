@@ -51,7 +51,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.helix.ZNRecord;
+import org.apache.commons.lang3.EnumUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -386,25 +386,27 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/rebalance")
   @ApiOperation(value = "Rebalances segments of a table across servers", notes = "Rebalances segments of a table across servers")
-  public ZNRecord rebalance(
+  public String rebalance(
       @ApiParam(value = "Name of the table to rebalance") @Nonnull @PathParam("tableName") String tableName,
       @ApiParam(value = "offline|realtime") @Nonnull @QueryParam("type") String tableType,
       @ApiParam(value = "true|false") @Nonnull @QueryParam("dryrun") Boolean dryRun,
-      @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming
-  )
-  {
+      @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming) {
+
+    if (!EnumUtils.isValidEnum(CommonConstants.Helix.TableType.class, tableType.toUpperCase())) {
+      throw new ControllerApplicationException(LOGGER, "Illegal table type " + tableType, Response.Status.BAD_REQUEST);
+    }
+
     Configuration rebalanceUserConfig = new PropertiesConfiguration();
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DRYRUN, dryRun);
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.INCLUDE_CONSUMING, includeConsuming);
 
-    if (tableType.equalsIgnoreCase(CommonConstants.Helix.TableType.OFFLINE.name())) {
-      return _pinotHelixResourceManager.rebalanceTable(tableName, CommonConstants.Helix.TableType.OFFLINE,
-          rebalanceUserConfig);
-    } else if (tableType.equalsIgnoreCase(CommonConstants.Helix.TableType.REALTIME.name())) {
-      return _pinotHelixResourceManager.rebalanceTable(tableName, CommonConstants.Helix.TableType.REALTIME,
-          rebalanceUserConfig);
-    } else {
-      throw new ControllerApplicationException(LOGGER, "Illegal table type " + tableType, Response.Status.BAD_REQUEST);
+    try {
+      JSONObject jsonObject = _pinotHelixResourceManager.rebalanceTable(tableName,
+          CommonConstants.Helix.TableType.valueOf(tableType.toUpperCase()), rebalanceUserConfig);
+      return jsonObject.toString();
+    } catch (JSONException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
+
 }

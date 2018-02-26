@@ -113,7 +113,6 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
           streamPartitionAssignmentGenerator.writeStreamPartitionAssignment(tableNameToStreamPartitionAssignmentMap);
         } else {
           LOGGER.info("Dry run. Skip writing stream partition assignment to property store");
-          LOGGER.info("Partition assignment for table {} is {}", tableNameWithType, newPartitionAssignment);
         }
       } else {
         LOGGER.info("includeConsuming = false. No need to rebalance partition assignment for {}",
@@ -251,7 +250,7 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
         String tableNameWithType = tableConfig.getTableName();
 
         LinkedHashMap<String, Integer> states = new LinkedHashMap<>();
-        List<String> partitions = Lists.newArrayList(idealState.getPartitionSet());
+        List<String> segments = Lists.newArrayList(idealState.getPartitionSet());
         states.put(RealtimeSegmentOnlineOfflineStateModel.OFFLINE, 0);
         states.put(RealtimeSegmentOnlineOfflineStateModel.ONLINE, targetNumReplicas);
         Set<String> currentHosts = new HashSet<>();
@@ -262,7 +261,7 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
         List<String> enabledServingInstances = new ArrayList<>();
         getServingInstances(tableConfig, servingInstances, enabledServingInstances);
 
-        AutoRebalanceStrategy rebalanceStrategy = new AutoRebalanceStrategy(tableNameWithType, partitions, states);
+        AutoRebalanceStrategy rebalanceStrategy = new AutoRebalanceStrategy(tableNameWithType, segments, states);
 
         LOGGER.info("Current nodes for table {}: {}", tableNameWithType, currentHosts);
         LOGGER.info("New nodes for table {}: {}", tableNameWithType, servingInstances);
