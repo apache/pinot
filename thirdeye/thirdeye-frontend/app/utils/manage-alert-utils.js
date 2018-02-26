@@ -76,6 +76,7 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
     const changeRate = (anomaly.current && anomaly.baseline) ? ((anomaly.current - anomaly.baseline) / anomaly.baseline * 100).toFixed(2) : 0;
     const changeDirection = (anomaly.current > anomaly.baseline) ? '-' : '+';
     const changeDirectionLabel = changeRate < 0 ? 'down' : 'up';
+    const isNullChangeRate = Number.isNaN(Number(changeRate));
 
     // We want to display only non-zero duration values in our table
     const noZeroDurationArr = _.remove(durationArr, function(item) {
@@ -91,14 +92,15 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
     Object.assign(anomaly, {
       changeRate,
       changeDirection,
+      isNullChangeRate,
       changeDirectionLabel,
       shownChangeRate: changeRate,
       isUserReported: anomaly.anomalyResultSource === 'USER_LABELED_ANOMALY',
       startDateStr: moment(anomaly.anomalyStart).format('MMM D, hh:mm A'),
       durationStr: noZeroDurationArr.join(', '),
       severityScore: score && !isNaN(score) ? score.toFixed(2) : 'N/A',
-      shownCurrent: anomaly.current,
-      shownBaseline: anomaly.baseline,
+      shownCurrent: Number(anomaly.current) > 0 ? anomaly.current : 'N/A',
+      shownBaseline: Number(anomaly.baseline) > 0 ? anomaly.baseline : 'N/A',
       showResponseSaved: false,
       showResponseFailed: false
     });

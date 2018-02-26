@@ -306,6 +306,7 @@ export default Route.extend({
       anomaliesLoaded: false,
       isMetricDataInvalid: false,
       isMetricDataLoading: true,
+      alertDimension: exploreDimensions,
       isReplayPending: isPresent(jobId) && jobId !== -1,
       alertHasDimensions: isPresent(exploreDimensions),
       timeRangeOptions: setUpTimeRangeOptions(['3m'], duration),
@@ -362,7 +363,12 @@ export default Route.extend({
     });
     // If alert has dimensions set, load them into graph once replay is done.
     if (exploreDimensions && !this.controller.isReplayPending) {
-      this.controller.set('topDimensions', getTopDimensions(metricData, DIMENSION_COUNT));
+      const topDimensions = getTopDimensions(metricData, DIMENSION_COUNT);
+      this.controller.setProperties({
+        topDimensions,
+        isDimensionFetchDone: true,
+        availableDimensions: topDimensions.length
+      });
     }
   },
 
@@ -447,15 +453,19 @@ export default Route.extend({
    */
   loadAnomalyData: task(function * (anomalyIds) {
     yield timeout(300);
+    const hasDimensions = this.currentModel.exploreDimensions && this.currentModel.exploreDimensions.length;
     // Load data for each anomaly Id
     const rawAnomalies = yield this.get('fetchCombinedAnomalies').perform(anomalyIds);
     // Fetch and append severity score to each anomaly record
     const severityScores = yield this.get('fetchSeverityScores').perform(anomalyIds);
     // Process anomaly records to make them template-ready
     const anomalyData = yield enhanceAnomalies(rawAnomalies, severityScores);
-    // Prepare de-duped power-select option arrays
+    // Prepare de-duped power-select option array for anomaly feedback
     resolutionOptions.push(...new Set(anomalyData.map(record => record.anomalyFeedback)));
-    dimensionOptions.push(...new Set(anomalyData.map(anomaly => anomaly.dimensionString)));
+    // Populate dimensions power-select options if dimensions exist
+    if (hasDimensions) {
+      dimensionOptions.push(...new Set(anomalyData.map(anomaly => anomaly.dimensionString)));
+    }
     // Push anomaly data into controller
     this.controller.setProperties({
       anomaliesLoaded: true,
@@ -508,6 +518,16 @@ export default Route.extend({
     */
     refreshModel() {
       this.refresh();
+    },
+
+    /**
+    * Refresh anomaly data when changes are made
+    */
+    refreshAnomalyTable() {
+      const ids = this.currentModel.anomalyIds;
+      if (ids && ids.length) {
+        this.get('loadAnomalyData').perform(ids);
+      }
     },
 
     /**

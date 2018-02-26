@@ -529,6 +529,16 @@ body {
     font-weight: 500;
     color: app-shade(black, 8);
     position: relative;
+
+    &--limited {
+      max-width: 155px;
+    }
+
+    &--last {
+      max-width: 100px;
+      padding: 4px 0 0 0;
+      vertical-align: baseline;
+    }
   }
 
   &__cell-head {

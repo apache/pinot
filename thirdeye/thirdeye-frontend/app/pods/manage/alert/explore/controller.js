@@ -70,6 +70,7 @@ export default Controller.extend({
       replayErrorMailtoStr: '',
       selectedTimeRange: '',
       selectedFilters: JSON.stringify({}),
+      timePickerIncrement: 5,
       openReportModal: false,
       isAlertReady: false,
       isGraphReady: false,
@@ -80,6 +81,8 @@ export default Controller.extend({
       sortColumnStartUp: false,
       sortColumnScoreUp: false,
       sortColumnChangeUp: false,
+      isFetchingDimensions: false,
+      isDimensionFetchDone: false,
       sortColumnResolutionUp: false,
       checkReplayInterval: 2000, // 2 seconds
       selectedDimension: 'All Dimensions',
@@ -182,23 +185,6 @@ export default Controller.extend({
       return anomalies.slice((currentPage - 1) * pageSize, currentPage * pageSize);
     }
   ),
-
-  /**
-   * Indicates the allowed date range picker increment based on granularity
-   * @type {Number}
-   */
-  timePickerIncrement: computed('alertData.windowUnit', function() {
-    const granularity = this.get('alertData.windowUnit').toLowerCase();
-
-    switch(granularity) {
-      case 'days':
-        return 1440;
-      case 'hours':
-        return 60;
-      default:
-        return 5;
-    }
-  }),
 
   /**
    * date-time-picker: indicates the date format to be used based on granularity
@@ -603,7 +589,14 @@ export default Controller.extend({
       const { alertId, missingAnomalyProps } = this.getProperties('alertId', 'missingAnomalyProps');
       this.reportAnomaly(alertId, missingAnomalyProps)
         .then((result) => {
-          this.set('isReportSuccess', true);
+          const rangeFormat = 'YYYY-MM-DD HH:mm';
+          const startStr = moment(missingAnomalyProps.startTime).format(rangeFormat);
+          const endStr = moment(missingAnomalyProps.endTime).format(rangeFormat);
+          this.setProperties({
+            isReportSuccess: true,
+            reportedRange: `${startStr} - ${endStr}`
+          });
+          this.send('refreshModel');
         })
         // If failure, leave modal open and report
         .catch((err) => {

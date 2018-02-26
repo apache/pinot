@@ -40,6 +40,17 @@ export default Component.extend({
   timePickerIncrement: 30,
 
   /**
+   * Pre-select all dimensions option if none else available
+   */
+  init() {
+    this._super(...arguments);
+    const dimensionOptions = this.get('dimensionOptions');
+    if (dimensionOptions && dimensionOptions.length === 1 && dimensionOptions[0] === 'All Dimensions') {
+      this.set('selectedDimension', dimensionOptions[0]);
+    }
+  },
+
+  /**
    * Collects all input data for the post request
    * @method reportAnomalyPayload
    * @return {Object} Post data
