@@ -26,13 +26,10 @@ import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.helix.PartitionAssignment;
 import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentGenerator;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -185,19 +182,21 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
   private void rebalanceConsumingSegments(IdealState idealState, PartitionAssignment newPartitionAssignment) {
     LOGGER.info("Rebalancing consuming segments for table {}", idealState.getResourceName());
 
-    List<String> consumingSegments = new ArrayList<>();
-    Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
-    for (Map.Entry<String, Map<String, String>> entry : mapFields.entrySet()) {
-      Collection<String> instanceStates = entry.getValue().values();
-      if (instanceStates.contains(RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
-        consumingSegments.add(entry.getKey());
+    // for each partition, the segment with latest sequence number should be in CONSUMING
+    Map<Integer, LLCSegmentName> partitionIdToLatestSegment = new HashMap<>(newPartitionAssignment.getNumPartitions());
+    for (String segmentName : idealState.getPartitionSet()) {
+      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+      int partitionId = llcSegmentName.getPartitionId();
+      LLCSegmentName latestSegmentForPartition = partitionIdToLatestSegment.get(partitionId);
+      if (latestSegmentForPartition == null
+          || llcSegmentName.getSequenceNumber() > latestSegmentForPartition.getSequenceNumber()) {
+        partitionIdToLatestSegment.put(partitionId, llcSegmentName);
       }
     }
 
     // update ideal state of consuming segments, based on new stream partition assignment
     Map<String, List<String>> partitionToInstanceMap = newPartitionAssignment.getPartitionToInstances();
-    for (String segmentName : consumingSegments) {
-      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+    for (LLCSegmentName llcSegmentName : partitionIdToLatestSegment.values()) {
       int partitionId = llcSegmentName.getPartitionId();
       Map<String, String> instanceStateMap = new HashMap<>();
       for (String instance : partitionToInstanceMap.get(String.valueOf(partitionId))) {
@@ -240,7 +239,7 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
 
       final Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
 
-      List<Map.Entry<String, Map<String, String>>> removedEntries = new LinkedList<>();
+      Map<String, Map<String, String>> removedEntries = new LinkedHashMap<>();
       if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
         filterSegmentsForRealtimeRebalance(mapFields, removedEntries);
       }
@@ -278,7 +277,7 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
       }
 
       // If we removed any entries, add them back here
-      for (Map.Entry<String, Map<String, String>> entry : removedEntries) {
+      for (Map.Entry<String, Map<String, String>> entry : removedEntries.entrySet()) {
         idealState.setInstanceStateMap(entry.getKey(), entry.getValue());
       }
     }
@@ -296,14 +295,12 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
    * @param removedEntries
    */
   private void filterSegmentsForRealtimeRebalance(Map<String, Map<String, String>> mapFields,
-      List<Map.Entry<String, Map<String, String>>> removedEntries) {
+      Map<String, Map<String, String>> removedEntries) {
 
     Iterator<Map.Entry<String, Map<String, String>>> mapFieldsIterator = mapFields.entrySet().iterator();
     while (mapFieldsIterator.hasNext()) {
-      // Check segment name and states.
-      // If any of the instances are ONLINE, then we keep the segment for rebalancing,
-      // Otherwise, we remove it. It will be added back after helix re-balances the segments
 
+      // Only keep LLC segments in ONLINE state for rebalance
       Map.Entry<String, Map<String, String>> entry = mapFieldsIterator.next();
       final String segmentName = entry.getKey();
       boolean keep = false;
@@ -315,7 +312,7 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
         }
       }
       if (!keep) {
-        removedEntries.add(entry);
+        removedEntries.put(segmentName, entry.getValue());
         mapFieldsIterator.remove();
       }
     }

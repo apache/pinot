@@ -63,34 +63,54 @@ public class DefaultRebalanceStrategyTest {
     return Lists.newArrayList(instanceArray);
   }
 
-  private void setInstanceStateMapForIdealState(IdealState idealState, int nSegments, int nReplicas,
-      List<String> instances, String tableName, String state, String segmentPrefix) {
+  private void setInstanceStateMapForIdealStateOffline(IdealState idealState, int nSegments, int nReplicas,
+      List<String> instances, String tableName) {
     int i = 0;
     for (int s = 0; s < nSegments; s++) {
       Map<String, String> instanceStateMap = new HashMap<>(nReplicas);
       for (int r = 0; r < nReplicas; r++) {
-        instanceStateMap.put(instances.get(i++), state);
+        instanceStateMap.put(instances.get(i++), "ONLINE");
         if (i == instances.size()) {
           i = 0;
         }
       }
-      idealState.setInstanceStateMap(segmentPrefix + tableName + "__" + s + "__0__1234", instanceStateMap);
+      idealState.setInstanceStateMap(tableName + "__" + s + "__0__1234", instanceStateMap);
     }
   }
 
-  private void setInstanceStateMapForIdealState(IdealState idealState, PartitionAssignment partitionAssignment,
-      int nSegments, int nReplicas, List<String> instances, String tableName, String state, String segmentPrefix) {
+  private void setInstanceStateMapForIdealStateRealtimeCompleted(IdealState idealState, int nPartitions,
+      int nIterationsCompleted, int nReplicas, List<String> instances, String tableName) {
     int i = 0;
-    for (int s = 0; s < nSegments; s++) {
+    for (int it = 0; it < nIterationsCompleted; it++) {
+      for (int p = 0; p < nPartitions; p++) {
+        Map<String, String> instanceStateMap = new HashMap<>(nReplicas);
+        for (int r = 0; r < nReplicas; r++) {
+          instanceStateMap.put(instances.get(i++), "ONLINE");
+          if (i == instances.size()) {
+            i = 0;
+          }
+        }
+        idealState.setInstanceStateMap("completed" + tableName + "__" + p + "__" + it + "__1234", instanceStateMap);
+      }
+    }
+  }
+
+  private void setInstanceStateMapForIdealStateRealtimeConsuming(IdealState idealState,
+      PartitionAssignment partitionAssignment, int nPartitions, int seqNum, int nReplicas, List<String> instances,
+      String tableName) {
+    int i = 0;
+    for (int p = 0; p < nPartitions; p++) {
       Map<String, String> instanceStateMap = new HashMap<>(nReplicas);
       for (int r = 0; r < nReplicas; r++) {
-        instanceStateMap.put(instances.get(i++), state);
+        instanceStateMap.put(instances.get(i++), "CONSUMING");
         if (i == instances.size()) {
           i = 0;
         }
       }
-      idealState.setInstanceStateMap(segmentPrefix + tableName + "__" + s + "__0__1234", instanceStateMap);
-      partitionAssignment.addPartition(String.valueOf(s), Lists.newArrayList(instanceStateMap.keySet()));
+      idealState.setInstanceStateMap("consuming" + tableName + "__" + p + "__" + seqNum + "__1234", instanceStateMap);
+      if (partitionAssignment != null) {
+        partitionAssignment.addPartition(String.valueOf(p), Lists.newArrayList(instanceStateMap.keySet()));
+      }
     }
   }
 
@@ -134,8 +154,7 @@ public class DefaultRebalanceStrategyTest {
         .setMaxPartitionsPerNode(1);
     IdealState idealState = customModeIdealStateBuilder.build();
     idealState.setInstanceGroupTag(offlineTableName);
-    setInstanceStateMapForIdealState(idealState, nSegments, nReplicas, instances, offlineTableName, "ONLINE",
-        "offline");
+    setInstanceStateMapForIdealStateOffline(idealState, nSegments, nReplicas, instances, offlineTableName);
 
     Configuration rebalanceUserConfig = new PropertiesConfiguration();
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DRYRUN, true);
@@ -222,8 +241,10 @@ public class DefaultRebalanceStrategyTest {
 
     // new ideal state, i instances, r replicas, p partitions (p consuming segments, n*p completed segments), REALTIME table
     int nReplicas = 2;
+    int nPartitions = 4;
+    int nIterationsCompleted = 2;
     int nConsumingSegments = 4;
-    int nCompletedSegments = 8;
+    int nCompletedSegments = nPartitions * nIterationsCompleted;
     int nCompletedInstances = 6;
     int nConsumingInstances = 3;
     PartitionAssignment newPartitionAssignment = new PartitionAssignment(realtimeTableName);
@@ -240,10 +261,10 @@ public class DefaultRebalanceStrategyTest {
         .setMaxPartitionsPerNode(1);
     IdealState idealState = customModeIdealStateBuilder.build();
     idealState.setInstanceGroupTag(realtimeTableName);
-    setInstanceStateMapForIdealState(idealState, nCompletedSegments, nReplicas, completedInstances, realtimeTableName,
-        "ONLINE", "completed");
-    setInstanceStateMapForIdealState(idealState, newPartitionAssignment, nConsumingSegments, nReplicas,
-        consumingInstances, realtimeTableName, "CONSUMING", "consuming");
+    setInstanceStateMapForIdealStateRealtimeCompleted(idealState, nPartitions, nIterationsCompleted, nReplicas,
+        completedInstances, realtimeTableName);
+    setInstanceStateMapForIdealStateRealtimeConsuming(idealState, newPartitionAssignment, nConsumingSegments, 2,
+        nReplicas, consumingInstances, realtimeTableName);
 
     Configuration rebalanceUserConfig = new PropertiesConfiguration();
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DRYRUN, true);
@@ -345,9 +366,8 @@ public class DefaultRebalanceStrategyTest {
     }
   }
 
-  private IdealState testRebalance(IdealState idealState, TableConfig tableConfig,
-      Configuration rebalanceUserConfig, int targetNumReplicas, int nSegments, List<String> instances,
-      boolean changeExpected) {
+  private IdealState testRebalance(IdealState idealState, TableConfig tableConfig, Configuration rebalanceUserConfig,
+      int targetNumReplicas, int nSegments, List<String> instances, boolean changeExpected) {
     Map<String, Map<String, String>> prevAssignment = getPrevAssignment(idealState);
     IdealState rebalancedIdealState =
         _rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig, rebalanceUserConfig, null);
@@ -357,7 +377,8 @@ public class DefaultRebalanceStrategyTest {
 
   private IdealState testRebalanceRealtime(IdealState idealState, TableConfig tableConfig,
       Configuration rebalanceUserConfig, PartitionAssignment newPartitionAssignment, int targetNumReplicas,
-      int nSegmentsCompleted, int nSegmentsConsuming, List<String> instancesCompleted, List<String> instancesConsuming) {
+      int nSegmentsCompleted, int nSegmentsConsuming, List<String> instancesCompleted,
+      List<String> instancesConsuming) {
     IdealState rebalancedIdealState =
         _rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig, rebalanceUserConfig,
             newPartitionAssignment);
