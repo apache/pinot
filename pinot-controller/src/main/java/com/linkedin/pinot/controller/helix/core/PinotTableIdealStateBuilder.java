@@ -16,7 +16,7 @@
 package com.linkedin.pinot.controller.helix.core;
 
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TagConfig;
+import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
@@ -211,10 +211,10 @@ public class PinotTableIdealStateBuilder {
     final int nPartitions = getPartitionCount(kafkaMetadata);
     LOGGER.info("Assigning {} partitions to instances for simple consumer for table {}", nPartitions, realtimeTableName);
 
-    TagConfig tagConfig = new TagConfig(realtimeTableConfig, helixManager);
+    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(realtimeTableConfig, helixManager);
     final List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName,
-        tagConfig.getConsumingServerTag());
-    segmentManager.setupHelixEntries(tagConfig, kafkaMetadata, nPartitions, realtimeInstances, idealState, create);
+        realtimeTagConfig.getConsumingServerTag());
+    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaMetadata, nPartitions, realtimeInstances, idealState, create);
   }
 
   public static int getPartitionCount(KafkaStreamMetadata kafkaMetadata) {

@@ -17,8 +17,9 @@
 package com.linkedin.pinot.controller.helix.core.rebalance;
 
 import com.google.common.collect.Lists;
+import com.linkedin.pinot.common.config.OfflineTagConfig;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TagConfig;
+import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
@@ -26,6 +27,7 @@ import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.helix.PartitionAssignment;
 import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentGenerator;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -96,9 +98,9 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
             streamPartitionAssignmentGenerator.getStreamPartitionAssignment(tableNameWithType);
         int numPartitions = streamPartitionAssignment.getNumPartitions();
 
-        TagConfig tagConfig = new TagConfig(tableConfig, _helixManager);
+        RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
         List<String> consumingInstances =
-            _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, tagConfig.getConsumingServerTag());
+            _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, realtimeTagConfig.getConsumingServerTag());
 
         Map<String, PartitionAssignment> tableNameToStreamPartitionAssignmentMap =
             streamPartitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions,
@@ -256,11 +258,9 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
         for (String segment : mapFields.keySet()) {
           currentHosts.addAll(mapFields.get(segment).keySet());
         }
-        TagConfig tagConfig = new TagConfig(tableConfig, _helixManager);
-        List<String> servingInstances =
-            _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, tagConfig.getCompletedServerTag());
-        List<String> enabledServingInstances =
-            HelixHelper.getEnabledInstancesWithTag(_helixAdmin, _helixClusterName, tagConfig.getCompletedServerTag());
+        List<String> servingInstances = new ArrayList<>();
+        List<String> enabledServingInstances = new ArrayList<>();
+        getServingInstances(tableConfig, servingInstances, enabledServingInstances);
 
         AutoRebalanceStrategy rebalanceStrategy = new AutoRebalanceStrategy(tableNameWithType, partitions, states);
 
@@ -316,5 +316,19 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
         mapFieldsIterator.remove();
       }
     }
+  }
+
+  private void getServingInstances(TableConfig tableConfig, List<String> servingInstances,
+      List<String> enabledServingInstances) {
+    String tag;
+    if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
+      RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
+      tag = realtimeTagConfig.getCompletedServerTag();
+    } else {
+      OfflineTagConfig offlineTagConfig = new OfflineTagConfig(tableConfig, _helixManager);
+      tag = offlineTagConfig.getOfflineServerTag();
+    }
+    servingInstances.addAll(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, tag));
+    enabledServingInstances.addAll(HelixHelper.getEnabledInstancesWithTag(_helixAdmin, _helixClusterName, tag));
   }
 }

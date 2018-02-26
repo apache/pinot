@@ -27,6 +27,7 @@ import java.util.Map;
 public class PartitionAssignment {
 
   private String _tableName;
+  // TODO: include replica in the key, by creating a class PartitionKey to encapsulate partitionId and replicaNum
   private Map<String, List<String>> _partitionToInstances;
 
   public PartitionAssignment(String tableName) {

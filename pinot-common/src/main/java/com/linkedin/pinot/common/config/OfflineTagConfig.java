@@ -15,34 +15,26 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import org.apache.helix.HelixManager;
 
 
 /**
- * Abstract base class for tag configs
+ * Wrapper class over TableConfig for an offline table
+ * This class will help answer questions about what are server tags for a table
  */
-public class TagConfig {
+public class OfflineTagConfig extends TagConfig {
 
-  TableConfig _tableConfig;
+  private String _offlineServerTag;
 
-  String _serverTenant;
+  public OfflineTagConfig(TableConfig tableConfig, HelixManager helixManager) {
+    super(tableConfig, helixManager);
 
-  public TagConfig(TableConfig tableConfig, HelixManager helixManager) {
-
-    _tableConfig = tableConfig;
-
-    // TODO: we will introduce TENANTS config in property store, which should return the server tags
-    // once we have that, below code will change to fetching TENANT from property store and returning the consuming/completed values
-    _serverTenant = tableConfig.getTenantConfig().getServer();
+    _offlineServerTag = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(_serverTenant);
   }
 
-  public TableConfig getTableConfig() {
-    return _tableConfig;
+  public String getOfflineServerTag() {
+    return _offlineServerTag;
   }
-
-  public String getServerTenantName() {
-    return _serverTenant;
-  }
-
 }
 

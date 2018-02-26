@@ -23,7 +23,7 @@ import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.StreamConsumptionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.config.TagConfig;
+import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.TenantConfig;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
@@ -135,8 +135,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY );
     KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
     segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
-    TagConfig tagConfig = new TagConfig(tableConfig, null);
-    segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nPartitions, instances, null, true);
+    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
+    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, nPartitions, instances, null, true);
 
     Map<String, List<String>> assignmentMap = segmentManager.getAllPartitionAssignments().get(rtTableName).getPartitionToInstances();
     Assert.assertEquals(assignmentMap.size(), nPartitions);
@@ -188,8 +188,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
     segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
     KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
-    TagConfig tagConfig = new TagConfig(tableConfig, null);
-    segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nPartitions, instances, idealState, !existingIS);
+    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
+    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, nPartitions, instances, idealState, !existingIS);
 
     final String actualRtTableName = segmentManager._realtimeTableName;
     final Map<String, List<String>> idealStateEntries = segmentManager._idealStateEntries;
@@ -255,16 +255,16 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager.addTableToStore(rtTableName, tableConfig, 8);
     KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
     IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, 10);
-    TagConfig tagConfig = new TagConfig(tableConfig, null);
+    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
     try {
-      segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, 8, instances, idealState, false);
+      segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, 8, instances, idealState, false);
       Assert.fail("Did not get expected exception when setting up helix with existing segments in propertystore");
     } catch (RuntimeException e) {
       // Expected
     }
 
     try {
-      segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, 8, instances, idealState, true);
+      segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, 8, instances, idealState, true);
       Assert.fail("Did not get expected exception when setting up helix with existing segments in propertystore");
     } catch (RuntimeException e) {
       // Expected
@@ -292,8 +292,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
     segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
     KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
-    TagConfig tagConfig = new TagConfig(tableConfig, null);
-    segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nPartitions, instances, idealState,
+    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
+    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, nPartitions, instances, idealState,
         !existingIS);
     // Now commit the first segment of partition 6.
     final int committingPartition = 6;
@@ -342,8 +342,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
     segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
     KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
-    TagConfig tagConfig = new TagConfig(tableConfig, null);
-    segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nPartitions, instances, idealState,
+    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
+    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, nPartitions, instances, idealState,
         !existingIS);
     // Now commit the first segment of partition 6.
     final int committingPartition = 6;
@@ -504,9 +504,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
         DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
     segmentManager.addTableToStore(rtTableName, tableConfig, nKafkaPartitions);
     KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
-    TagConfig tagConfig = new TagConfig(tableConfig, null);
+    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
     // Setup initial entries
-    segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nKafkaPartitions, instances, null, true);
+    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, nKafkaPartitions, instances, null, true);
 
     Map<String, PartitionAssignment> partitionAssignment = segmentManager.getAllPartitionAssignments();
     segmentManager._currentTable = rtTableName;
@@ -593,8 +593,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
     segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
     KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
-    TagConfig tagConfig = new TagConfig(tableConfig, null);
-    segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nPartitions, instances, idealState, false);
+    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
+    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, nPartitions, instances, idealState, false);
     // Add another segment for each partition
     long now = System.currentTimeMillis();
     List<String> existingSegments = new ArrayList<>(segmentManager._idealStateEntries.keySet());
@@ -784,8 +784,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
           DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
       segmentManager.addTableToStore(realtimeTableName, tableConfig, nPartitions);
       KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
-      TagConfig tagConfig = new TagConfig(tableConfig, null);
-      segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nPartitions, instances, idealState, false);
+      RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
+      segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, nPartitions, instances, idealState, false);
       PartitionAssignment partitionAssignment = segmentManager.getStreamPartitionAssignment(realtimeTableName);
 
       for (int p = 0; p < nPartitions; p++) {
@@ -885,8 +885,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
     segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
     KafkaStreamMetadata kafkaStreamMetadata = makeKafkaStreamMetadata(topic, KAFKA_OFFSET, DUMMY_HOST);
-    TagConfig tagConfig = new TagConfig(tableConfig, null);
-    segmentManager.setupHelixEntries(tagConfig, kafkaStreamMetadata, nPartitions, instances, idealState,
+    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, null);
+    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaStreamMetadata, nPartitions, instances, idealState,
         !existingIS);
   }
 
