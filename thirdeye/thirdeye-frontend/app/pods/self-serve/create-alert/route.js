@@ -7,7 +7,6 @@ import fetch from 'fetch';
 import RSVP from 'rsvp';
 import _ from 'lodash';
 import moment from 'moment';
-import { isArray } from "@ember/array";
 import Route from '@ember/routing/route';
 import { task, timeout } from 'ember-concurrency';
 import { postProps, checkStatus } from 'thirdeye-frontend/utils/utils';
@@ -135,7 +134,11 @@ export default Route.extend({
           return fetch(updateAlertUrl, postProps('')).then(checkStatus);
         })
         .then((result) => {
-          this.get('checkJobCreateStatus').perform(result.jobId, newName, newFunctionId);
+          if (result.jobStatus && result.jobStatus.toLowerCase() === 'failed') {
+            throw new Error(result);
+          } else {
+            this.get('checkJobCreateStatus').perform(result.jobId, newName, newFunctionId);
+          }
         })
         .catch((err) => {
           // Remove incomplete alert (created but not updated)

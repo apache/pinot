@@ -14,32 +14,9 @@ import { computed, set } from '@ember/object';
 import { getWithDefault } from '@ember/object';
 import { isEmpty, isPresent } from "@ember/utils";
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import { formatConfigGroupProps } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Controller.extend({
-
-  /**
-   * Array to define alerts table columns for selected config group
-   */
-  alertsTableColumns: [
-    {
-      propertyName: 'id',
-      title: 'Id',
-      className: 'te-form__table-index'
-    },
-    {
-      propertyName: 'name',
-      title: 'Alert Name'
-    },
-    {
-      propertyName: 'metric',
-      title: 'Alert Metric',
-      className: 'te-form__table-metric'
-    },
-    {
-      propertyName: 'type',
-      title: 'Alert Type'
-    }
-  ],
 
   /**
    * Important initializations
@@ -58,26 +35,44 @@ export default Controller.extend({
   isExiting: false, // exit detection
 
   /**
+   * Set initial view values for selected config group alerts
+   * @method initialize
+   * @return {undefined}
+   */
+  initialize() {
+    this.prepareFunctions(this.get('selectedConfigGroup')).then(functionData => {
+      this.set('selectedGroupFunctions', functionData);
+    });
+  },
+
+  /**
    * The config group that the current alert belongs to
    * @type {Object}
    */
   originalConfigGroup: reads('model.originalConfigGroup'),
 
   /**
-   * Returns the list of existing config groups and updates it if a new one is added.
-   * @method allAlertsConfigGroups
-   * @return {Array} list of existing config groups
+   * Filter all existing alert groups down to only those that are active and belong to the
+   * currently selected application team.
+   * @method filteredConfigGroups
+   * @param {Object} selectedApplication - user-selected application object
+   * @return {Array} activeGroups - filtered list of groups that are active
    */
-  allAlertsConfigGroups: computed(
-    'isNewConfigGroupSaved',
+  filteredConfigGroups: computed(
+    'selectedApplication',
     'alertConfigGroups',
-    'newConfigGroupObj',
     function() {
-      const groupsFromModel = this.get('alertConfigGroups');
-      if (this.get('isNewConfigGroupSaved')) {
-        return groupsFromModel.concat(this.get('newConfigGroupObj'));
+      const {
+        selectedApplication,
+        alertConfigGroups
+      } = this.getProperties('selectedApplication', 'alertConfigGroups');
+      const appName = selectedApplication ? selectedApplication.application : null;
+      const activeGroups = alertConfigGroups ? alertConfigGroups.filterBy('active') : [];
+      const groupsWithAppName = activeGroups.filter(group => isPresent(group.application));
+      if (isPresent(appName)) {
+        return groupsWithAppName.filter(group => group.application.toLowerCase().includes(appName));
       } else {
-        return groupsFromModel;
+        return activeGroups;
       }
     }
   ),
@@ -202,7 +197,7 @@ export default Controller.extend({
    * @method isSubmitDisabled
    * @return {Boolean} show/hide submit
    */
-  isSubmitDisabled: or('{isEmptyEmail,isEmailError,isDuplicateEmail,isProcessingForm}'),
+  isSubmitDisabled: or('{isEmptyEmail,isEmailError,isDuplicateEmail,isProcessingForm,isAlertNameDuplicate}'),
 
   /**
    * Fetches an alert function record by name.
@@ -236,33 +231,22 @@ export default Controller.extend({
    * @param {Object} newId - conditional param to help us tag any function that was "just added"
    * @return {RSVP.Promise} A new list of functions (alerts)
    */
-  prepareFunctions(configGroup, newId = 0) {
+  prepareFunctions(configGroup) {
+    const existingFunctionList = configGroup.emailConfig ? configGroup.emailConfig.functionIds : [];
     const newFunctionList = [];
-    const existingFunctionList = _.has(configGroup, 'emailConfig') ? configGroup.emailConfig.functionIds : [];
     let cnt = 0;
 
     // Build object for each function(alert) to display in results table
     return new RSVP.Promise((resolve) => {
-      existingFunctionList.forEach((functionId) => {
+      for (var functionId of existingFunctionList) {
         this.fetchFunctionById(functionId).then(functionData => {
-          newFunctionList.push({
-            number: cnt + 1,
-            id: functionData.id,
-            name: functionData.functionName,
-            metric: functionData.metric + '::' + functionData.collection,
-            type: functionData.type,
-            active: functionData.isActive,
-            isNewId: functionData.id === newId
-          });
+          newFunctionList.push(formatConfigGroupProps(functionData));
           cnt ++;
           if (existingFunctionList.length === cnt) {
-            if (newId) {
-              newFunctionList.reverse();
-            }
             resolve(newFunctionList);
           }
         });
-      });
+      }
     });
   },
 
@@ -330,26 +314,28 @@ export default Controller.extend({
    * Actions for edit alert form view
    */
   actions: {
+
     /**
      * Make sure alert name does not already exist in the system
      * @method validateAlertName
      * @param {String} name - The new alert name
+     * @param {Boolean} userModified - Up to this moment, is the new name auto-generated, or user modified?
+     * If user-modified, we will stop modifying it dynamically (via 'isAlertNameUserModified')
      * @return {undefined}
      */
     validateAlertName(name) {
-      const originalName = this.get('alertFunctionName');
       let isDuplicateName = false;
-      if (name === originalName) { return; }
-
       this.fetchAlertByName(name).then(alert => {
         for (var resultObj of alert) {
           if (resultObj.functionName === name) {
             isDuplicateName = true;
           }
         }
+        // Either add or clear the "is duplicate name" banner
         this.set('isAlertNameDuplicate', isDuplicateName);
       });
     },
+
 
     /**
      * Verify that email address does not already exist in alert group. If it does, remove it and alert user.

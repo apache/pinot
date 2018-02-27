@@ -15,6 +15,7 @@ body {
 
 .stronger {
   font-weight: bold;
+  color: app-shade(black, 7);
 }
 
 .te-title {
@@ -153,6 +154,10 @@ body {
       display: inline-block;
       color: app-shade(black, 7);
     }
+  }
+
+  &__new-sub {
+    margin-top: 13px;
   }
 }
 

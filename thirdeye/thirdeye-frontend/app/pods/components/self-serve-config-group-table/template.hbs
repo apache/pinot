@@ -1,0 +1,17 @@
+<div class="form-group col-xs-12">
+  {{#if data.length}}
+    {{#bs-accordion as |acc|}}
+      {{#acc.item class="te-form__custom-label" title=title}}
+        {{models-table
+          data=data
+          columns=alertsTableColumns
+          showGlobalFilter=false
+          showColumnsDropdown=false
+          filteringIgnoreCase=true
+        }}
+      {{/acc.item}}
+    {{/bs-accordion}}
+  {{else}}
+    <span class="alert-group-functions__item--id">No alerts are monitored by this group yet.</span>
+  {{/if}}
+</div>

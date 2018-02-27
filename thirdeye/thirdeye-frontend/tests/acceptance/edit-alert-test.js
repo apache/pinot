@@ -7,17 +7,17 @@ const METRIC_NAME = `#select-metric`;
 const GRANULARITY = `#select-granularity`;
 const ALERT_NAME = `#anomaly-form-function-name`;
 const STATUS = '.te-toggle--form span';
-const EDIT_LINK = '/manage/alerts/edit';
+const EDIT_LINK = '/manage/alert/edit';
 const STATUS_TOGGLER = '.x-toggle-btn';
 const SUBMIT_BUTTON = '.te-button--submit';
 
 test(`visiting ${EDIT_LINK} and checking that fields render correctly and edit is successful`, async (assert) => {
   const alert = server.create('alert');
-  await visit(`/manage/alerts/${alert.id}`);
+  await visit(`/manage/alert/${alert.id}`);
 
   assert.equal(
     currentURL(),
-    '/manage/alerts/1',
+    '/manage/alert/1',
     'correctly redirects to edit alerts page'
   );
   assert.equal(
@@ -47,7 +47,7 @@ test(`visiting ${EDIT_LINK} and checking that fields render correctly and edit i
     'correctly redirects to manage alerts page after edit'
   );
 
-  await visit(`/manage/alerts/${alert.id}`);
+  await visit(`/manage/alert/${alert.id}`);
 
   assert.equal(
     find(ALERT_NAME).get(0).value,

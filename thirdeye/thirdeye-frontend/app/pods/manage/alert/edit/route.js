@@ -55,14 +55,6 @@ export default Route.extend({
     });
   },
 
-  resetController(controller, isExiting) {
-    this._super(...arguments);
-
-    if (isExiting) {
-      controller.clearAll();
-    }
-  },
-
   setupController(controller, model) {
     this._super(controller, model);
 
@@ -104,6 +96,8 @@ export default Route.extend({
       loadErrorMessage,
       granularity: `${bucketSize}_${bucketUnit}`
     });
+
+    controller.initialize();
   },
 
   actions: {

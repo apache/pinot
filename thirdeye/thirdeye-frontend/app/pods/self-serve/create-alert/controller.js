@@ -8,6 +8,7 @@ import { reads } from '@ember/object/computed';
 import RSVP from "rsvp";
 import _ from 'lodash';
 import fetch from 'fetch';
+import moment from 'moment';
 import Controller from '@ember/controller';
 import { computed, set } from '@ember/object';
 import { task, timeout } from 'ember-concurrency';
@@ -20,6 +21,7 @@ import {
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import {
   buildMetricDataUrl,
+  formatConfigGroupProps,
   getTopDimensions
 } from 'thirdeye-frontend/utils/manage-alert-utils';
 
@@ -77,29 +79,6 @@ export default Controller.extend({
     'selectedPattern',
     'alertFunctionName',
     'selectedAppName'
-  ],
-
-  /**
-   * Array to define alerts table columns for selected config group
-   */
-  alertsTableColumns: [
-    {
-      propertyName: 'id',
-      title: 'Id',
-      className: 'te-form__table-index'
-    },
-    {
-      propertyName: 'name',
-      title: 'Alert Name'
-    },
-    {
-      propertyName: 'metric',
-      title: 'Alert Metric'
-    },
-    {
-      propertyName: 'type',
-      title: 'Alert Type'
-    }
   ],
 
   /**
@@ -347,29 +326,18 @@ export default Controller.extend({
    * @param {Object} newId - conditional param to help us tag any function that was "just added"
    * @return {RSVP.Promise} A new list of functions (alerts)
    */
-  prepareFunctions(configGroup, newId = 0) {
-    const newFunctionList = [];
+  prepareFunctions(configGroup) {
     const existingFunctionList = configGroup.emailConfig ? configGroup.emailConfig.functionIds : [];
+    const newFunctionList = [];
     let cnt = 0;
 
     // Build object for each function(alert) to display in results table
     return new RSVP.Promise((resolve) => {
       for (var functionId of existingFunctionList) {
         this.fetchFunctionById(functionId).then(functionData => {
-          newFunctionList.push({
-            number: cnt + 1,
-            id: functionData.id,
-            name: functionData.functionName,
-            metric: functionData.metric + '::' + functionData.collection,
-            type: functionData.type,
-            active: functionData.isActive,
-            isNewId: functionData.id === newId
-          });
+          newFunctionList.push(formatConfigGroupProps(functionData));
           cnt ++;
           if (existingFunctionList.length === cnt) {
-            if (newId) {
-              newFunctionList.reverse();
-            }
             resolve(newFunctionList);
           }
         });
@@ -413,7 +381,8 @@ export default Controller.extend({
     function() {
       const isEnabled = this.get('selectedTuneType') === 'custom' && this.get('isMetricSelected');
       return !isEnabled;
-  }),
+    }
+  ),
 
   /**
    * Determines cases in which the granularity field should be disabled
@@ -593,7 +562,7 @@ export default Controller.extend({
         'selectedMetricOption'
       );
       const pattern = selectedPattern ? optionMap.pattern[selectedPattern] : null;
-      const formattedPattern = pattern ? `${pattern.toLowerCase().replace(',',' ').camelize()}_` : '';
+      const formattedPattern = pattern ? `${pattern.toLowerCase().replace(',', ' ').camelize()}_` : '';
       const dimension = selectedDimension ? `${selectedDimension.camelize()}_` : '';
       const granularity = selectedGranularity ? selectedGranularity.toLowerCase().camelize() : '';
       const app = selectedApplication ? `${selectedApplication.camelize()}_` : 'applicationName_';
@@ -686,7 +655,8 @@ export default Controller.extend({
         'alertFilterObj'
       );
 
-      const jobName = `${functionName}:${selectedMetricOption.id}`;
+      // Construct a unique-enough job name for this alert
+      const jobName = `${functionName}:${selectedMetricOption.id}${moment().valueOf()}`;
       const newAlertObj = {
         functionName,
         collection: selectedMetricOption.dataset,
@@ -1062,12 +1032,10 @@ export default Controller.extend({
      */
     onSubmit() {
       const {
-        metricId,
-        selectedMetric,
         isDuplicateEmail,
         onboardFunctionPayload,
         alertGroupNewRecipient: newEmails
-      } = this.getProperties('metricId', 'selectedMetric', 'isDuplicateEmail', 'onboardFunctionPayload', 'alertGroupNewRecipient');
+      } = this.getProperties('isDuplicateEmail', 'onboardFunctionPayload', 'alertGroupNewRecipient');
       const newEmailsArr = newEmails ? newEmails.replace(/ /g, '').split(',') : [];
       const isEmailError = !this.isEmailValid(newEmailsArr);
 

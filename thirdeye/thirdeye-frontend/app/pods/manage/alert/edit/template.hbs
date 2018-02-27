@@ -19,21 +19,20 @@
         class="form-control te-input te-input--read-only"
         placeholder="Add a descriptive alert name"
         value=alertFunctionName
-        focus-out="validateAlertName"
-        key-up="validateAlertName"
+        key-up=(action "validateAlertName" alertFunctionName)
       }}
     </div>
 
     {{!-- Field: App Name --}}
     <div class="form-group col-xs-10">
-      <label for="anomaly-form-app-name" class="control-label te-label required">Related Application, Product or Team</label>
+      <label for="anomaly-form-app-name" class="control-label te-label required">Alert belongs to</label>
       {{#power-select
         options=allApplications
         selected=selectedApplication
         searchField="application"
         onchange=(action "onSelectAppName")
         loadingMessage="Waiting for the server...."
-        placeholder="Select an existing product/team name"
+        placeholder="Pick a related Application, Product or Team"
         searchPlaceholder="Type to filter..."
         triggerId="anomaly-form-app-name"
         triggerClass="te-form__select"
@@ -65,9 +64,9 @@
 
     {{!-- Field: Select Existing Subscription Group --}}
     <div class="form-group col-sm-6">
-      <label for="config-group" class="control-label te-label">Add This Alert To An Existing Subscription Group</label>
+      <label for="config-group" class="control-label te-label te-label--taller">Add this alert to an existing <span class="stronger">{{selectedApplication.application}}</span> subscription group</label>
       {{#power-select
-        options=allAlertsConfigGroups
+        options=filteredConfigGroups
         selected=selectedConfigGroup
         searchField="name"
         onchange=(action "onSelectConfigGroup")
@@ -82,8 +81,8 @@
       {{/power-select}}
     </div>
     {{!--  Fields for new alert group creation --}}
-    <div class="form-group col-sm-6">
-      <label for="config-group-new-name" class="control-label te-label"><strong>Or</strong> Provide A New Subscription Group Name</label>
+    <div class="form-group te-form__new-sub col-sm-6">
+      <label for="config-group-new-name" class="control-label te-label"><strong>Or</strong> create new subscription group</label>
       {{#if isGroupNameDuplicate}}
         <div class="te-form__alert--warning alert-warning">Warning: <strong>{{newConfigGroupName}}</strong> already exists. Please try another name.</div>
       {{/if}}
@@ -97,31 +96,20 @@
         focus-out="validateNewGroupName"
       }}
     </div>
+
     {{!-- Alert Group Metadata --}}
     {{#if selectedConfigGroup}}
-      <div class="form-group col-xs-12">
-        {{#if selectedGroupFunctions.length}}
-          {{#bs-accordion as |acc|}}
-            {{#acc.item class="te-form__custom-label" title=selectedConfigGroupSubtitle}}
-              {{models-table
-                data=selectedGroupFunctions
-                columns=alertsTableColumns
-                showGlobalFilter=false
-                showColumnsDropdown=false
-                filteringIgnoreCase=true
-              }}
-            {{/acc.item}}
-          {{/bs-accordion}}
-        {{else}}
-          <span class="alert-group-functions__item--id">No alerts are monitored by this group yet.</span>
-        {{/if}}
-      </div>
+      {{self-serve-config-group-table
+        title=selectedConfigGroupSubtitle
+        data=selectedGroupFunctions
+      }}
     {{/if}}
+
     {{!-- Field: new alert group recipient emails --}}
     <div class="form-group col-xs-12">
       <label for="config-group" class="control-label te-label">
-        Add Alert Notification Recipients *
-        <div class="te-form__sub-label">Current recipients: <span class="te-form__sub-label--strong">{{if selectedConfigGroupRecipients selectedConfigGroupRecipients "None"}}</span></div>
+        Recipients in subscription group:
+        <div class="te-form__sub-label">Current recipients: <span class="te-form__sub-label--strong">{{if selectedConfigGroupRecipients selectedConfigGroupRecipients "No recipients yet"}}</span></div>
       </label>
       {{#if isDuplicateEmail}}
         <div class="te-form__alert--warning alert-warning">Warning: <strong>{{duplicateEmails}}</strong> is already included in this group.</div>

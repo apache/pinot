@@ -288,6 +288,24 @@ export function buildAnomalyStats(alertEvalMetrics, anomalyStats, showProjected 
 }
 
 /**
+ * Returns selected alert object properties for config group table display
+ * @param {Object} alertData - a single alert record
+ * @param {Number} cnt - record index
+ * @returns {Array}
+ */
+export function formatConfigGroupProps(alertData, cnt) {
+  return {
+    number: cnt + 1,
+    id: alertData.id,
+    name: alertData.functionName,
+    metric: alertData.metric + '::' + alertData.collection,
+    owner: alertData.createdBy || 'N/A',
+    status: alertData.isActive ? 'active' : 'inactive',
+    isNewId: alertData.id === 0
+  };
+}
+
+/**
  * Caches duration data to local storage in order to persist it across pages
  * TODO: Move this to self-serve services
  * @method setDuration
@@ -332,6 +350,7 @@ export default {
   enhanceAnomalies,
   getTopDimensions,
   setUpTimeRangeOptions,
+  formatConfigGroupProps,
   buildAnomalyStats,
   buildMetricDataUrl,
   extractSeverity,
