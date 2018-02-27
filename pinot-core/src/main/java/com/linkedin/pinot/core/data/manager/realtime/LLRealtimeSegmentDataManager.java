@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.data.manager.realtime;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
@@ -168,6 +169,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private volatile long _currentOffset;
   private volatile State _state;
   private volatile int _numRowsConsumed = 0;
+  private volatile int _numRowsIndexed = 0; // Can be different from _numRowsConsumed when metrics update is enabled.
   private volatile int consecutiveErrorCount = 0;
   private long _startTimeMs = 0;
   private final String _segmentNameStr;
@@ -201,7 +203,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private Logger segmentLogger = LOGGER;
   private final String _tableStreamName;
   private final PinotDataBufferMemoryManager _memoryManager;
-  private AtomicLong _lastUpdatedRawDocuments = new AtomicLong(0);
+  private AtomicLong _lastUpdatedRowsIndexed = new AtomicLong(0);
   private final String _instanceId;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
   private final long _consumeStartTime;
@@ -230,12 +232,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             _consumeEndTime += TimeUnit.HOURS.toMillis(TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
             return false;
           }
-          segmentLogger.info("Stopping consumption due to time limit start={} now={} numRows={}", _startTimeMs, now, _numRowsConsumed);
+          segmentLogger.info(
+              "Stopping consumption due to time limit start={} now={} numRowsConsumed={} numRowsIndexed={}",
+              _startTimeMs, now, _numRowsConsumed, _numRowsIndexed);
           _stopReason = SegmentCompletionProtocol.REASON_TIME_LIMIT;
           return true;
-        } else if (_numRowsConsumed >= _segmentMaxRowCount) {
-          segmentLogger.info("Stopping consumption due to row limit nRows={} maxNRows={}", _numRowsConsumed,
-              _segmentMaxRowCount);
+        } else if (_numRowsIndexed >= _segmentMaxRowCount) {
+          segmentLogger.info("Stopping consumption due to row limit nRows={} numRowsIndexed={}, numRowsConsumed={}",
+              _numRowsIndexed, _numRowsConsumed, _segmentMaxRowCount);
           _stopReason = SegmentCompletionProtocol.REASON_ROW_LIMIT;
           return true;
         }
@@ -383,7 +387,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         //    is a rare case, and we really don't know how to handle this at this time.
         //    Throw an exception.
         //
-        segmentLogger.error("Buffer full with {} rows consumed (row limit {})", _numRowsConsumed, _segmentMaxRowCount);
+        segmentLogger.error("Buffer full with {} rows consumed (row limit {}, indexed {})", _numRowsConsumed,
+            _numRowsIndexed, _segmentMaxRowCount);
         throw new RuntimeException("Realtime segment full");
       }
 
@@ -416,6 +421,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
 
       _currentOffset = messagesAndOffsets.getNextKafkaMessageOffsetAtIndex(index);
+      _numRowsIndexed = _realtimeSegment.getNumDocsIndexed();
       _numRowsConsumed++;
       kafkaMessageCount++;
     }
@@ -804,7 +810,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           break;
       }
     } catch (Exception e) {
-      throw(e);
+      Utils.rethrowException(e);
     } finally {
       _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     }
@@ -980,7 +986,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setRealtimeSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(indexLoadingConfig.isRealtimeOffheapAllocation())
             .setMemoryManager(_memoryManager)
-            .setStatsHistory(realtimeTableDataManager.getStatsHistory());
+            .setStatsHistory(realtimeTableDataManager.getStatsHistory())
+            .setAggregateMetrics(indexingConfig.getAggregateMetrics());
 
     // Create message decoder
     _messageDecoder = _pinotKafkaConsumerFactory.getDecoder(kafkaStreamProviderConfig);
@@ -1062,17 +1069,26 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   // This should be done during commit? We may not always commit when we build a segment....
   // TODO Call this method when we are loading the segment, which we do from table datamanager afaik
   private void updateCurrentDocumentCountMetrics() {
-    int currentRawDocs = _realtimeSegment.getNumDocsIndexed();
-    _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.DOCUMENT_COUNT, (currentRawDocs - _lastUpdatedRawDocuments
-        .get()));
-    _lastUpdatedRawDocuments.set(currentRawDocs);
+
+    // When updating of metrics is enabled, numRowsIndexed can be <= numRowsConsumed. This is because when in this
+    // case when a new row with existing dimension combination comes in, we find the existing row and update metrics.
+
+    // Number of rows indexed should be used for DOCUMENT_COUNT metric, and also for segment flush. Whereas,
+    // Number of rows consumed should be used for consumption metric.
+    long rowsIndexed = _numRowsIndexed - _lastUpdatedRowsIndexed.get();
+    _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.DOCUMENT_COUNT,
+        rowsIndexed);
+    _lastUpdatedRowsIndexed.set(_numRowsIndexed);
     final long now = now();
     final int rowsConsumed = _numRowsConsumed - _lastConsumedCount;
     final long prevTime = _lastConsumedCount == 0 ? _consumeStartTime : _lastLogTime;
     // Log every minute or 100k events
-    if (now - prevTime > TimeUnit.MINUTES.toMillis(TIME_THRESHOLD_FOR_LOG_MINUTES) || rowsConsumed >= MSG_COUNT_THRESHOLD_FOR_LOG) {
-      segmentLogger.info("Consumed {} events from (rate:{}/s), currentOffset={}, numRowsSoFar={}", rowsConsumed,
-            (float) (rowsConsumed) * 1000 / (now - prevTime), _currentOffset, _numRowsConsumed);
+    if (now - prevTime > TimeUnit.MINUTES.toMillis(TIME_THRESHOLD_FOR_LOG_MINUTES)
+        || rowsConsumed >= MSG_COUNT_THRESHOLD_FOR_LOG) {
+      segmentLogger.info(
+          "Consumed {} events from (rate:{}/s), currentOffset={}, numRowsConsumedSoFar={}, numRowsIndexedSoFar={}",
+          rowsConsumed, (float) (rowsConsumed) * 1000 / (now - prevTime), _currentOffset, _numRowsConsumed,
+          _numRowsIndexed);
       _lastConsumedCount = _numRowsConsumed;
       _lastLogTime = now;
     }

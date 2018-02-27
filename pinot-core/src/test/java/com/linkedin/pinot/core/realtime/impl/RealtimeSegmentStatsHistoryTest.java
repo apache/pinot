@@ -34,6 +34,7 @@ public class RealtimeSegmentStatsHistoryTest {
     segmentStats.setMemUsedBytes(segmentId);
     segmentStats.setNumSeconds(segmentId);
     segmentStats.setNumRowsConsumed(segmentId);
+    segmentStats.setNumRowsIndexed(segmentId);
     for (int i = 0; i < 2; i++) {
       RealtimeSegmentStatsHistory.ColumnStats columnStats = new RealtimeSegmentStatsHistory.ColumnStats();
       columnStats.setAvgColumnSize(segmentId*100 + i);
@@ -57,6 +58,7 @@ public class RealtimeSegmentStatsHistoryTest {
       segmentStats.setMemUsedBytes(100);
       segmentStats.setNumSeconds(101);
       segmentStats.setNumRowsConsumed(102);
+      segmentStats.setNumRowsIndexed(103);
 
       RealtimeSegmentStatsHistory.ColumnStats columnStats = new RealtimeSegmentStatsHistory.ColumnStats();
       columnStats.setAvgColumnSize(0);
@@ -71,6 +73,7 @@ public class RealtimeSegmentStatsHistoryTest {
       RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
       Assert.assertTrue(history.getEstimatedAvgColSize(columName) > 0);
       Assert.assertTrue(history.getEstimatedCardinality(columName) > 0);
+      Assert.assertEquals(history.getEstimatedRowsToIndex(), 103);
     }
   }
 
@@ -241,6 +244,7 @@ public class RealtimeSegmentStatsHistoryTest {
     Assert.assertEquals(columnStats.getAvgColumnSize(), 400);
 
     Assert.assertEquals(segmentStats.getNumRowsConsumed(), 500);
+    Assert.assertEquals(segmentStats.getNumRowsIndexed(), 0); // Input file does not have this field.
     Assert.assertEquals(segmentStats.getMemUsedBytes(), 600);
     Assert.assertEquals(segmentStats.getNumSeconds(), 700);
 
