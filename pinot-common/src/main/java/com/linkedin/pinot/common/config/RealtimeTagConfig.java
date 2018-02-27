@@ -48,7 +48,7 @@ public class RealtimeTagConfig extends TagConfig {
     return _completedRealtimeServerTag;
   }
 
-  public boolean isMoveCompletedSegments() {
+  public boolean isRelocateCompletedSegments() {
     return _moveCompletedSegments;
   }
 }

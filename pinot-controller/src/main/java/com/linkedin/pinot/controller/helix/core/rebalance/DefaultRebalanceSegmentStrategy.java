@@ -195,6 +195,12 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
       }
     }
 
+    // Because we pick the latest segment in each partition instead of all CONSUMING segments,
+    // it is possible that we turn an OFFLINE state into CONSUMING state in the process.
+    // That should be okay, since the only way a CONSUMING segment can become OFFLINE is
+    // when there are temporary or permanent issues consuming from the incoming event stream.
+    // If it turns back into CONSUMING, we will attempt to consume again (and may fail again if the fault is permanent)
+
     // update ideal state of consuming segments, based on new stream partition assignment
     Map<String, List<String>> partitionToInstanceMap = newPartitionAssignment.getPartitionToInstances();
     for (LLCSegmentName llcSegmentName : partitionIdToLatestSegment.values()) {
