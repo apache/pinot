@@ -15,20 +15,45 @@ import java.util.Objects;
 import org.joda.time.DateTime;
 
 
+/**
+ * The response of ThirdEye if the data source is a CSV file.
+ * Used by {@link CSVThirdEyeDataSource}
+ */
 public class CSVThirdEyeResponse extends BaseThirdEyeResponse {
   private static final String COL_TIMESTAMP = CSVThirdEyeDataSource.COL_TIMESTAMP;
+  /**
+   * The Dataframe.
+   */
   DataFrame dataframe;
 
+  /**
+   * Instantiates a new Csv third eye response.
+   *
+   * @param request the ThirdEye request
+   * @param dataTimeSpec the data time spec
+   * @param df the data frame
+   */
   public CSVThirdEyeResponse(ThirdEyeRequest request, TimeSpec dataTimeSpec, DataFrame df) {
     super(request, dataTimeSpec);
     this.dataframe = df;
   }
 
+  /**
+   * Get the number of rows in the data frame.
+   *
+   * @return the number of rows in the data frame
+   */
   @Override
   public int getNumRows() {
     return dataframe.size();
   }
 
+  /**
+   * Get a row from the data frame.
+   *
+   * @param rowId row number
+   * @return a ThirdEyeResponseRow
+   */
   @Override
   public ThirdEyeResponseRow getRow(int rowId)  {
     if(rowId >= dataframe.size()){
@@ -52,11 +77,24 @@ public class CSVThirdEyeResponse extends BaseThirdEyeResponse {
     return new ThirdEyeResponseRow(timeBucketId, dimensions, metrics);
   }
 
+  /**
+   * Get the number of rows for a metric function.
+   *
+   * @param metricFunction a MetricFunction
+   * @return the number of rows for this metric function
+   */
   @Override
   public int getNumRowsFor(MetricFunction metricFunction) {
     return dataframe.size();
   }
 
+
+  /**
+   * Get the row that corresponds to a metric function.
+   *
+   * @param metricFunction a MetricFunction
+   * @return the row that corresponds to a metric function
+   */
   @Override
   public Map<String, String> getRow(MetricFunction metricFunction, int rowId) {
     Map<String, String> rowMap = new HashMap<>();
