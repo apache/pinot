@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.common.config;
 
-import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.startree.hll.HllConfig;
 import java.lang.reflect.Field;
@@ -40,7 +39,6 @@ public class SegmentsValidationAndRetentionConfig {
 
   private String segmentAssignmentStrategy;
   private ReplicaGroupStrategyConfig replicaGroupStrategyConfig;
-  private StarTreeIndexSpec starTreeConfig;
   private HllConfig hllConfig;
 
   // Number of replicas per partition of low-level kafka consumers. This config is used for realtime tables only.
@@ -134,14 +132,6 @@ public class SegmentsValidationAndRetentionConfig {
     this.replicaGroupStrategyConfig = replicaGroupStrategyConfig;
   }
 
-  public StarTreeIndexSpec getStarTreeConfig() {
-    return starTreeConfig;
-  }
-
-  public void setStarTreeConfig(StarTreeIndexSpec starTreeConfig) {
-    this.starTreeConfig = starTreeConfig;
-  }
-
   public HllConfig getHllConfig() {
     return hllConfig;
   }
@@ -214,7 +204,6 @@ public class SegmentsValidationAndRetentionConfig {
         EqualityUtils.isEqual(timeType, that.timeType) &&
         EqualityUtils.isEqual( segmentAssignmentStrategy, that.segmentAssignmentStrategy) &&
         EqualityUtils.isEqual(replicaGroupStrategyConfig, that.replicaGroupStrategyConfig) &&
-        EqualityUtils.isEqual(starTreeConfig, that.starTreeConfig) &&
         EqualityUtils.isEqual(hllConfig, that.hllConfig) &&
         EqualityUtils.isEqual(replicasPerPartition, that.replicasPerPartition);
   }
@@ -231,7 +220,6 @@ public class SegmentsValidationAndRetentionConfig {
     result = EqualityUtils.hashCodeOf(result, timeType);
     result = EqualityUtils.hashCodeOf(result, segmentAssignmentStrategy);
     result = EqualityUtils.hashCodeOf(result, replicaGroupStrategyConfig);
-    result = EqualityUtils.hashCodeOf(result, starTreeConfig);
     result = EqualityUtils.hashCodeOf(result, hllConfig);
     result = EqualityUtils.hashCodeOf(result, replicasPerPartition);
     return result;

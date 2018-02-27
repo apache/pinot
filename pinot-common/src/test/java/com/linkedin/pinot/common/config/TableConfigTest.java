@@ -49,7 +49,6 @@ public class TableConfigTest {
       Assert.assertNull(tableConfigToCompare.getQuotaConfig());
       Assert.assertNull(tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig());
       Assert.assertNull(tableConfigToCompare.getValidationConfig().getHllConfig());
-      Assert.assertNull(tableConfigToCompare.getValidationConfig().getStarTreeConfig());
 
       ZNRecord znRecord = TableConfig.toZnRecord(tableConfig);
       tableConfigToCompare = TableConfig.fromZnRecord(znRecord);
@@ -57,7 +56,6 @@ public class TableConfigTest {
       Assert.assertNull(tableConfigToCompare.getQuotaConfig());
       Assert.assertNull(tableConfig.getValidationConfig().getReplicaGroupStrategyConfig());
       Assert.assertNull(tableConfigToCompare.getValidationConfig().getHllConfig());
-      Assert.assertNull(tableConfigToCompare.getValidationConfig().getStarTreeConfig());
     }
     {
       // With quota config
@@ -145,7 +143,7 @@ public class TableConfigTest {
       starTreeIndexSpec.setSkipStarNodeCreationForDimensions(dims);
 
       TableConfig tableConfig = tableConfigBuilder.build();
-      tableConfig.getValidationConfig().setStarTreeConfig(starTreeIndexSpec);
+      tableConfig.getIndexingConfig().setStarTreeIndexSpec(starTreeIndexSpec);
 
       // Serialize then de-serialize
       JSONObject jsonConfig = TableConfig.toJSONConfig(tableConfig);
@@ -206,10 +204,10 @@ public class TableConfigTest {
       throws Exception {
     // Check that the segment assignment configuration does exist.
     Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
-    Assert.assertNotNull(tableConfigToCompare.getValidationConfig().getStarTreeConfig());
+    Assert.assertNotNull(tableConfigToCompare.getIndexingConfig().getStarTreeIndexSpec());
 
     // Check that the configurations are correct.
-    StarTreeIndexSpec starTreeIndexSpec = tableConfigToCompare.getValidationConfig().getStarTreeConfig();
+    StarTreeIndexSpec starTreeIndexSpec = tableConfigToCompare.getIndexingConfig().getStarTreeIndexSpec();
 
     Set<String> dims = new HashSet<>();
     dims.add("dims");
