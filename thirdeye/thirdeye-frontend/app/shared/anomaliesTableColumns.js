@@ -25,7 +25,7 @@ export default [
     disableFiltering: true
   },
   {
-    propertyName: 'resolution',
+    propertyName: 'feedback',
     title: 'Resolution',
     className: 'anomalies-table__column',
     disableFiltering: true

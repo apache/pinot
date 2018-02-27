@@ -1,1 +1,12 @@
-{{outlet}}
+<div class="container card-container">
+  <div class="te-anomaly-table">
+    {{models-table
+      data=model
+      columns=columns
+      showColumnsDropdown=false
+      showGlobalFilter=false
+      filteringIgnoreCase=true
+      multipleExpand=true
+    }}
+  </div>
+</div>
