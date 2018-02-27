@@ -38,6 +38,7 @@ Router.map(function() {
   });
   this.route('screenshot', { path: 'screenshot/:anomalyId' });
   this.route('rootcause');
+  this.route('home');
 });
 
 export default Router;
