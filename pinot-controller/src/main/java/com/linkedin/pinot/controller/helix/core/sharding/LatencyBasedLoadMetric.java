@@ -70,6 +70,7 @@ public class LatencyBasedLoadMetric implements ServerLoadMetric {
 
     @Override
     public double computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState, String instance, String tableName) {
+        /*
         Map<String,Double> serverLoadMap = helixResourceManager.getServerLoadMap();
         if(serverLoadMap.containsKey(instance))
         {
@@ -79,18 +80,22 @@ public class LatencyBasedLoadMetric implements ServerLoadMetric {
         {
             return 0;
         }
+        */
+        return 0;
     }
 
     @Override
     public void updateServerLoadMetric(PinotHelixResourceManager helixResourceManager, String instance, Double currentLoadMetric, String tableName, SegmentMetadata segmentMetadata) {
+        /*
         Pair<Float,Float> tableCostRecord = _tableLatencyMap.get(tableName);
         double newServerLoadMetric = currentLoadMetric + (segmentMetadata.getTotalDocs()/tableCostRecord.getFirst())*tableCostRecord.getSecond();
         helixResourceManager.updateServerLoadMap(instance,newServerLoadMetric);
+        */
     }
 
     @Override
     public void resetServerLoadMetric(PinotHelixResourceManager helixResourceManager, String instance) {
-        helixResourceManager.updateServerLoadMap(instance,0D);
+        //helixResourceManager.updateServerLoadMap(instance,0D);
     }
 
   /*public static void main(String args[]){

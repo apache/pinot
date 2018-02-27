@@ -25,11 +25,11 @@ import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
-import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.SegmentNameGenerator;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.startree.hll.HllConfig;
+import com.linkedin.pinot.core.util.AvroUtils;
+import com.linkedin.pinot.startree.hll.HllConfig;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
@@ -54,16 +55,18 @@ import org.slf4j.LoggerFactory;
 /**
  * Configuration properties used in the creation of index segments.
  */
+@SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentGeneratorConfig {
   public enum TimeColumnType {
-    EPOCH,
-    SIMPLE_DATE
+    EPOCH, SIMPLE_DATE
   }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
 
   private Map<String, String> _customProperties = new HashMap<>();
   private Set<String> _rawIndexCreationColumns = new HashSet<>();
+  private Map<String, ChunkCompressorFactory.CompressionType> _rawIndexCompressionType = new HashMap<>();
   private List<String> _invertedIndexCreationColumns = new ArrayList<>();
   private String _dataDir = null;
   private String _inputFilePath = null;
@@ -84,16 +87,16 @@ public class SegmentGeneratorConfig {
   private String _readerConfigFile = null;
   private RecordReaderConfig _readerConfig = null;
   private boolean _enableStarTreeIndex = false;
-  private String _starTreeIndexSpecFile = null;
   private StarTreeIndexSpec _starTreeIndexSpec = null;
   private String _creatorVersion = null;
-  private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
   private HllConfig _hllConfig = null;
   private SegmentNameGenerator _segmentNameGenerator = null;
   private SegmentPartitionConfig _segmentPartitionConfig = null;
   private int _sequenceId = -1;
   private TimeColumnType _timeColumnType = TimeColumnType.EPOCH;
   private String _simpleDateFormat = null;
+  // Use on-heap or off-heap memory to generate index (currently only affect inverted index)
+  private boolean _onHeap = false;
 
   public SegmentGeneratorConfig() {
   }
@@ -108,6 +111,7 @@ public class SegmentGeneratorConfig {
     Preconditions.checkNotNull(config);
     _customProperties.putAll(config._customProperties);
     _rawIndexCreationColumns.addAll(config._rawIndexCreationColumns);
+    _rawIndexCompressionType.putAll(config._rawIndexCompressionType);
     _invertedIndexCreationColumns.addAll(config._invertedIndexCreationColumns);
     _dataDir = config._dataDir;
     _inputFilePath = config._inputFilePath;
@@ -128,15 +132,15 @@ public class SegmentGeneratorConfig {
     _readerConfigFile = config._readerConfigFile;
     _readerConfig = config._readerConfig;
     _enableStarTreeIndex = config._enableStarTreeIndex;
-    _starTreeIndexSpecFile = config._starTreeIndexSpecFile;
     _starTreeIndexSpec = config._starTreeIndexSpec;
     _creatorVersion = config._creatorVersion;
-    _paddingCharacter = config._paddingCharacter;
     _hllConfig = config._hllConfig;
-    _segmentVersion = config._segmentVersion;
-    _segmentName = config._segmentName;
     _segmentNameGenerator = config._segmentNameGenerator;
+    _segmentPartitionConfig = config._segmentPartitionConfig;
     _sequenceId = config._sequenceId;
+    _timeColumnType = config._timeColumnType;
+    _simpleDateFormat = config._simpleDateFormat;
+    _onHeap = config._onHeap;
   }
 
   public SegmentGeneratorConfig(Schema schema) {
@@ -289,14 +293,6 @@ public class SegmentGeneratorConfig {
     _creatorVersion = creatorVersion;
   }
 
-  public char getPaddingCharacter() {
-    return _paddingCharacter;
-  }
-
-  public void setPaddingCharacter(char paddingCharacter) {
-    _paddingCharacter = paddingCharacter;
-  }
-
   public String getSegmentNamePostfix() {
     return _segmentNamePostfix;
   }
@@ -312,7 +308,7 @@ public class SegmentGeneratorConfig {
     if (_segmentTimeColumnName != null) {
       return _segmentTimeColumnName;
     }
-    return getQualifyingDimensions(FieldType.TIME);
+    return getQualifyingFields(FieldType.TIME);
   }
 
   public void setTimeColumnName(String timeColumnName) {
@@ -334,13 +330,10 @@ public class SegmentGeneratorConfig {
     if (_segmentTimeUnit != null) {
       return _segmentTimeUnit;
     } else {
-      if (_schema.getTimeFieldSpec() != null) {
-        if (_schema.getTimeFieldSpec().getOutgoingGranularitySpec() != null) {
-          return _schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType();
-        }
-        if (_schema.getTimeFieldSpec().getIncomingGranularitySpec() != null) {
-          return _schema.getTimeFieldSpec().getIncomingGranularitySpec().getTimeType();
-        }
+      TimeFieldSpec timeFieldSpec = _schema.getTimeFieldSpec();
+      if (timeFieldSpec != null) {
+        // Outgoing granularity is always non-null.
+        return timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
       }
       return TimeUnit.DAYS;
     }
@@ -433,20 +426,23 @@ public class SegmentGeneratorConfig {
     _enableStarTreeIndex = enableStarTreeIndex;
   }
 
-  public String getStarTreeIndexSpecFile() {
-    return _starTreeIndexSpecFile;
-  }
-
-  public void setStarTreeIndexSpecFile(String starTreeIndexSpecFile) {
-    _starTreeIndexSpecFile = starTreeIndexSpecFile;
-  }
-
   public StarTreeIndexSpec getStarTreeIndexSpec() {
     return _starTreeIndexSpec;
   }
 
   public void setStarTreeIndexSpec(StarTreeIndexSpec starTreeIndexSpec) {
     _starTreeIndexSpec = starTreeIndexSpec;
+  }
+
+  /**
+   * Enable star tree generation with the given indexing spec.
+   * <p>NOTE: DO NOT remove the setter and getter for these two fields, they are required for ser/de.
+   *
+   * @param starTreeIndexSpec Optional indexing spec for star tree
+   */
+  public void enableStarTreeIndex(@Nullable StarTreeIndexSpec starTreeIndexSpec) {
+    setEnableStarTreeIndex(true);
+    setStarTreeIndexSpec(starTreeIndexSpec);
   }
 
   public HllConfig getHllConfig() {
@@ -464,16 +460,42 @@ public class SegmentGeneratorConfig {
     if (_segmentName != null) {
       return new DefaultSegmentNameGenerator(_segmentName);
     }
-    return new DefaultSegmentNameGenerator(getTimeColumnName(), getTableName(), getSegmentNamePostfix(), getSequenceId());
+    return new DefaultSegmentNameGenerator(getTimeColumnName(), getTableName(), getSegmentNamePostfix(),
+        getSequenceId());
   }
 
   public void setSegmentNameGenerator(SegmentNameGenerator segmentNameGenerator) {
     _segmentNameGenerator = segmentNameGenerator;
   }
 
+  public boolean isOnHeap() {
+    return _onHeap;
+  }
+
+  public void setOnHeap(boolean onHeap) {
+    _onHeap = onHeap;
+  }
+
+  @JsonIgnore
+  public ChunkCompressorFactory.CompressionType getColumnCompressionType(String columnName) {
+    if (_rawIndexCompressionType.containsKey(columnName)) {
+      return _rawIndexCompressionType.get(columnName);
+    }
+    return ChunkCompressorFactory.CompressionType.SNAPPY;
+  }
+
+  public Map<String, ChunkCompressorFactory.CompressionType> getRawIndexCompressionType() {
+    return _rawIndexCompressionType;
+  }
+
+  public void setRawIndexCompressionType(Map<String, ChunkCompressorFactory.CompressionType> rawIndexCompressionType) {
+    _rawIndexCompressionType.clear();
+    _rawIndexCompressionType.putAll(rawIndexCompressionType);
+  }
+
   @JsonIgnore
   public String getMetrics() {
-    return getQualifyingDimensions(FieldType.METRIC);
+    return getQualifyingFields(FieldType.METRIC);
   }
 
   /**
@@ -481,8 +503,7 @@ public class SegmentGeneratorConfig {
    * @throws IOException
    */
   @Deprecated
-  public void loadConfigFiles()
-      throws IOException {
+  public void loadConfigFiles() throws IOException {
     ObjectMapper objectMapper = new ObjectMapper();
 
     Schema schema;
@@ -506,15 +527,16 @@ public class SegmentGeneratorConfig {
     if (_readerConfigFile != null) {
       setReaderConfig(objectMapper.readValue(new File(_readerConfigFile), CSVRecordReaderConfig.class));
     }
-
-    if (_starTreeIndexSpecFile != null) {
-      setStarTreeIndexSpec(objectMapper.readValue(new File(_starTreeIndexSpecFile), StarTreeIndexSpec.class));
-    }
   }
 
   @JsonIgnore
   public String getDimensions() {
-    return getQualifyingDimensions(FieldType.DIMENSION);
+    return getQualifyingFields(FieldType.DIMENSION);
+  }
+
+  @JsonIgnore
+  public String getDateTimeColumnNames() {
+    return getQualifyingFields(FieldType.DATE_TIME);
   }
 
   public void setSegmentPartitionConfig(SegmentPartitionConfig segmentPartitionConfig) {
@@ -526,20 +548,20 @@ public class SegmentGeneratorConfig {
   }
 
   /**
-   * Returns a comma separated list of qualifying dimension name strings
+   * Returns a comma separated list of qualifying field name strings
    * @param type FieldType to filter on
-   * @return
+   * @return Comma separate qualifying fields names.
    */
   @JsonIgnore
-  private String getQualifyingDimensions(FieldType type) {
-    List<String> dimensions = new ArrayList<>();
+  private String getQualifyingFields(FieldType type) {
+    List<String> fields = new ArrayList<>();
 
     for (final FieldSpec spec : getSchema().getAllFieldSpecs()) {
       if (spec.getFieldType() == type) {
-        dimensions.add(spec.getName());
+        fields.add(spec.getName());
       }
     }
-    Collections.sort(dimensions);
-    return StringUtils.join(dimensions, ",");
+    Collections.sort(fields);
+    return StringUtils.join(fields, ",");
   }
 }

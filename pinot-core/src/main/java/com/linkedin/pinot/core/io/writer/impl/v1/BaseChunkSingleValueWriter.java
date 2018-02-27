@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.io.writer.impl.v1;
 
 import com.linkedin.pinot.core.io.compression.ChunkCompressor;
+import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.io.writer.SingleColumnSingleValueWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -40,7 +41,7 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
   protected static final int DOUBLE_SIZE = Double.SIZE / Byte.SIZE;
 
   protected final FileChannel _dataFile;
-  protected final ByteBuffer _header;
+  protected ByteBuffer _header;
   protected final ByteBuffer _chunkBuffer;
   protected final ByteBuffer _compressedBuffer;
   protected final ChunkCompressor _chunkCompressor;
@@ -52,7 +53,7 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
    * Constructor for the class.
    *
    * @param file Data file to write into
-   * @param compressor Data compressor
+   * @param compressionType Type of compression
    * @param totalDocs Total docs to write
    * @param numDocsPerChunk Number of docs per data chunk
    * @param chunkSize Size of chunk
@@ -60,22 +61,13 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
    * @param version Version of file
    * @throws FileNotFoundException
    */
-  protected BaseChunkSingleValueWriter(File file, ChunkCompressor compressor, int totalDocs, int numDocsPerChunk,
-      int chunkSize, int sizeOfEntry, int version)
+  protected BaseChunkSingleValueWriter(File file, ChunkCompressorFactory.CompressionType compressionType, int totalDocs,
+      int numDocsPerChunk, int chunkSize, int sizeOfEntry, int version)
       throws FileNotFoundException {
     _chunkSize = chunkSize;
-    _chunkCompressor = compressor;
+    _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType);
 
-    int numChunks = (totalDocs + numDocsPerChunk - 1) / numDocsPerChunk;
-    int headerSize = (numChunks + 4) * INT_SIZE; // 4 items written before chunk indexing.
-
-    _header = ByteBuffer.allocateDirect(headerSize);
-    _header.putInt(version);
-    _header.putInt(numChunks);
-    _header.putInt(numDocsPerChunk);
-    _header.putInt(sizeOfEntry);
-    _dataOffset = headerSize;
-
+    _dataOffset = writeHeader(compressionType, totalDocs, numDocsPerChunk, sizeOfEntry, version);
     _chunkBuffer = ByteBuffer.allocateDirect(chunkSize);
     _compressedBuffer = ByteBuffer.allocateDirect(chunkSize * 2);
     _dataFile = new RandomAccessFile(file, "rw").getChannel();
@@ -137,32 +129,78 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
   }
 
   /**
+   * Helper method to write header information.
+   *
+   * @param compressionType Compression type for the data
+   * @param totalDocs Total number of records
+   * @param numDocsPerChunk Number of documents per chunk
+   * @param sizeOfEntry Size of each entry
+   * @param version Version of file
+   * @return Size of header
+   */
+  private int writeHeader(ChunkCompressorFactory.CompressionType compressionType, int totalDocs, int numDocsPerChunk,
+      int sizeOfEntry, int version) {
+    int numChunks = (totalDocs + numDocsPerChunk - 1) / numDocsPerChunk;
+    int headerSize = (numChunks + 7) * INT_SIZE; // 7 items written before chunk indexing.
+
+    _header = ByteBuffer.allocateDirect(headerSize);
+
+    int offset = 0;
+    _header.putInt(version);
+    offset += INT_SIZE;
+
+    _header.putInt(numChunks);
+    offset += INT_SIZE;
+
+    _header.putInt(numDocsPerChunk);
+    offset += INT_SIZE;
+
+    _header.putInt(sizeOfEntry);
+    offset += INT_SIZE;
+
+    if (version > 1) {
+      // Write total number of docs.
+      _header.putInt(totalDocs);
+      offset += INT_SIZE;
+
+      // Write the compressor type
+      _header.putInt(compressionType.getValue());
+      offset += INT_SIZE;
+
+      // Start of chunk offsets.
+      int dataHeaderStart = offset + INT_SIZE;
+      _header.putInt(dataHeaderStart);
+    }
+
+    return headerSize;
+  }
+
+  /**
    * Helper method to compress and write the current chunk.
    * <ul>
    *   <li> Chunk header is of fixed size, so fills out any remaining offsets for partially filled chunks. </li>
-   *   <li> Compresses and writes the chunk to the data file. </li>
+   *   <li> Compresses (if required) and writes the chunk to the data file. </li>
    *   <li> Updates the header with the current chunks offset. </li>
    *   <li> Clears up the buffers, so that they can be reused. </li>
    * </ul>
    *
    */
   protected void writeChunk() {
+    int sizeToWrite;
     _chunkBuffer.flip();
-    _compressedBuffer.flip();
 
-    int compressedSize;
     try {
-      compressedSize = _chunkCompressor.compress(_chunkBuffer, _compressedBuffer);
+      sizeToWrite = _chunkCompressor.compress(_chunkBuffer, _compressedBuffer);
       _dataFile.write(_compressedBuffer, _dataOffset);
+      _compressedBuffer.clear();
     } catch (IOException e) {
       LOGGER.error("Exception caught while compressing/writing data chunk", e);
       throw new RuntimeException(e);
     }
 
     _header.putInt(_dataOffset);
-    _dataOffset += compressedSize;
+    _dataOffset += sizeToWrite;
 
     _chunkBuffer.clear();
-    _compressedBuffer.clear();
   }
 }

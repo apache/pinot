@@ -1,9 +1,11 @@
-import Ember from 'ember';
+import { later } from '@ember/runloop';
+import { inject as service } from '@ember/service';
+import Route from '@ember/routing/route';
 import moment from 'moment';
 import { Actions } from 'thirdeye-frontend/actions/metrics';
 
-export default Ember.Route.extend({
-  redux: Ember.inject.service(),
+export default Route.extend({
+  redux: service(),
 
   model(params, transition) {
     const { metricId } = transition.params['rca.details'];
@@ -42,6 +44,8 @@ export default Ember.Route.extend({
       .catch(res => res);
 
     return {
+      analysisStart,
+      analysisEnd,
       displayStart,
       displayEnd
     };
@@ -51,13 +55,15 @@ export default Ember.Route.extend({
     this._super(controller, model);
 
     const {
+      analysisStart,
+      analysisEnd,
       displayStart,
       displayEnd
     } = model;
 
     controller.setProperties({
-      analysisStart: Number(displayStart),
-      analysisEnd: Number(displayEnd),
+      analysisStart: Number(analysisStart),
+      analysisEnd: Number(analysisEnd),
       displayStart: Number(displayStart),
       displayEnd: Number(displayEnd)
     });
@@ -83,7 +89,7 @@ export default Ember.Route.extend({
           start = start || oldParams.analysisStart;
           end = end || oldParams.analysisEnd;
 
-          Ember.run.later(() => {
+          later(() => {
             redux.dispatch(Actions.updateDates(
               Number(start),
               Number(end)
@@ -92,20 +98,22 @@ export default Ember.Route.extend({
         }
 
         if (controller && displayStart) {
-          controller.setProperties({
-            displayStart: Number(displayStart),
-            analysisStart: Number(displayStart)
-          });
+          controller.set('displayStart', Number(displayStart));
         }
 
         if (controller && displayEnd) {
-          controller.setProperties({
-            displayEnd: Number(displayEnd),
-            analysisEnd: Number(displayEnd)
-          });
+          controller.set('displayEnd', Number(displayEnd));
         }
 
-        Ember.run.later(() => {
+        if (controller && start) {
+          controller.set('analysisStart', Number(start));
+        }
+
+        if (controller && end) {
+          controller.set('analysisEnd', Number(end));
+        }
+
+        later(() => {
           redux.dispatch(Actions.loaded());
         });
       }

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.Map;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
@@ -56,5 +57,26 @@ public class TableTaskConfig {
     } catch (JSONException e) {
       return e.toString();
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    TableTaskConfig that = (TableTaskConfig) o;
+
+    return EqualityUtils.isEqual(_taskTypeConfigsMap, that._taskTypeConfigsMap);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_taskTypeConfigsMap);
+    return result;
   }
 }

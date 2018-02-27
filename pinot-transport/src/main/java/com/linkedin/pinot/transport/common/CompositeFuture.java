@@ -112,7 +112,9 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
    */
   @Override
   protected void cancelUnderlyingFutures() {
+    LOGGER.info("Cancelling all underlying futures for {}", getName());
     for (ServerResponseFuture<V> entry : _futures) {
+      LOGGER.info("Cancelling future {}", entry.getName());
       entry.cancel(true);
     }
   }

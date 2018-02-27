@@ -29,6 +29,7 @@ import org.testng.annotations.Test;
 
 
 public class ServerPerfResourceTest {
+  /*
   public static final Logger LOGGER = LoggerFactory.getLogger(ServerPerfResourceTest.class);
   ResourceTestHelper testHelper = new ResourceTestHelper();
   WebTarget target;
@@ -57,5 +58,6 @@ public class ServerPerfResourceTest {
     IndexSegment indexSegment = testHelper.indexSegment;
     long expectedSegmentSize = indexSegment.getDiskSizeBytes();
     Assert.assertEquals(serverPerfMetrics.getSegmentDiskSizeInBytes(), expectedSegmentSize);
-  }
+  }*/
+
 }

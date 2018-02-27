@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.tools.pacelab.benchmark;
 
+import com.google.gson.JsonObject;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.controller.helix.core.sharding.LatencyBasedLoadMetric;
@@ -160,8 +161,10 @@ public class EventTableGenerator {
 
         Schema profileSchema = Schema.fromFile(new File(schemaFile));
         FieldExtractor extractor = FieldExtractorFactory.getPlainFieldExtractor(profileSchema);
-        RecordReader reader =  new AvroRecordReader(extractor, dataFile);
-        reader.init();
+        //RecordReader reader =  new AvroRecordReader(extractor, dataFile);
+        RecordReader reader =  new AvroRecordReader(new File(dataFile), profileSchema);
+        //reader.init();
+
         while(reader.hasNext())
         {
             tableData.add(reader.next());
@@ -491,7 +494,9 @@ public class EventTableGenerator {
         final JSONArray fields = new JSONArray();
 
         for (final FieldSpec spec : schema.getAllFieldSpecs()) {
-            fields.put(spec.getDataType().toJSONSchemaFor(spec.getName()));
+           // fields.put(spec.getDataType().toJSONSchemaFor(spec.getName()));
+            JsonObject jsonObject = spec.toAvroSchemaJsonObject();
+            fields.put(jsonObject);
         }
 
         ret.put("fields", fields);

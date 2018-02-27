@@ -39,6 +39,7 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -231,29 +232,54 @@ public class PinotSegmentRestletResource {
         tableName, Response.Status.NOT_FOUND);
   }
 
+  @POST
+  @Path("tables/{tableName}/segments/{segmentName}/reload")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Reloads one segment", notes = "Reloads one segment")
+  public SuccessResponse reloadOneSegment(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
+    segmentName = checkGetEncodedParam(segmentName);
+    CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
+    return new SuccessResponse(reloadSegmentForTable(tableName, segmentName, tableType));
+  }
+
+  @POST
+  @Path("tables/{tableName}/segments/reload")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Reloads all segments of a table", notes = "Reloads all segments")
+  public SuccessResponse reloadAllSegments(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
+    CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
+    return new SuccessResponse((reloadAllSegmentsForTable(tableName, tableType)));
+  }
+
+  @Deprecated
   @GET
   @Path("tables/{tableName}/segments/{segmentName}/reload")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reloads one segment", notes = "Reloads one segment")
-  public String reloadOneSegment(
+  public SuccessResponse reloadOneSegmentDeprecated(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam (value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
-  ) {
+      @ApiParam(value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     segmentName = checkGetEncodedParam(segmentName);
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
-    return reloadSegmentForTable(tableName, segmentName, tableType);
+    return new SuccessResponse(reloadSegmentForTable(tableName, segmentName, tableType));
   }
 
+  @Deprecated
   @GET
   @Path("tables/{tableName}/segments/reload")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Reloads all segments of a table", notes = "Reloads all segments")
-  public String reloadAllSegments(
+  public SuccessResponse reloadAllSegmentsDeprecated(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr) {
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
-    return reloadAllSegmentsForTable(tableName, tableType);
+    return new SuccessResponse((reloadAllSegmentsForTable(tableName, tableType)));
   }
 
   @GET

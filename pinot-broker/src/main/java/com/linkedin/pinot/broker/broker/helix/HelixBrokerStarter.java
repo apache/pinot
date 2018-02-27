@@ -16,8 +16,8 @@
 package com.linkedin.pinot.broker.broker.helix;
 
 import com.google.common.collect.ImmutableList;
+import com.linkedin.pinot.broker.broker.AccessControlFactory;
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
-import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
 import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
@@ -26,6 +26,7 @@ import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -63,6 +64,10 @@ public class HelixBrokerStarter {
   private final BrokerServerBuilder _brokerServerBuilder;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final LiveInstancesChangeListenerImpl _liveInstancesListener;
+  private final MetricsRegistry _metricsRegistry;
+
+  // Set after broker is started, which is actually in the constructor.
+  private AccessControlFactory _accessControlFactory;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixBrokerStarter.class);
 
@@ -95,7 +100,7 @@ public class HelixBrokerStarter {
                         + _pinotHelixProperties.getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT,
                     CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
 
-    _pinotHelixProperties.addProperty(BrokerRequestHandler.BROKER_ID_CONFIG_KEY, brokerId);
+    _pinotHelixProperties.addProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID, brokerId);
     setupHelixSystemProperties();
 
     // Remove all white-spaces from the list of zkServers (if any).
@@ -111,6 +116,7 @@ public class HelixBrokerStarter {
     _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, _spectatorHelixManager,
         pinotHelixProperties.subset(ROUTING_TABLE_PARAMS_SUBSET_KEY));
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
+    _metricsRegistry = _brokerServerBuilder.getMetricsRegistry();
     ClusterChangeMediator clusterChangeMediator =
         new ClusterChangeMediator(_helixExternalViewBasedRouting, _brokerServerBuilder.getBrokerMetrics());
     _spectatorHelixManager.addExternalViewChangeListener(clusterChangeMediator);
@@ -182,6 +188,7 @@ public class HelixBrokerStarter {
             _helixExternalViewBasedRouting.getTimeBoundaryService(), _liveInstancesListener);
     brokerServerBuilder.buildNetwork();
     brokerServerBuilder.buildHTTP();
+    _accessControlFactory = brokerServerBuilder.getAccessControlFactory();
     _helixExternalViewBasedRouting.setBrokerMetrics(brokerServerBuilder.getBrokerMetrics());
     brokerServerBuilder.start();
 
@@ -199,6 +206,10 @@ public class HelixBrokerStarter {
       }
     });
     return brokerServerBuilder;
+  }
+
+  public AccessControlFactory getAccessControlFactory() {
+    return _accessControlFactory;
   }
 
   /**
@@ -262,6 +273,10 @@ public class HelixBrokerStarter {
       LOGGER.info("Disconnecting spectator Helix manager");
       _spectatorHelixManager.disconnect();
     }
+  }
+
+  public MetricsRegistry getMetricsRegistry() {
+    return _metricsRegistry;
   }
 
   public static void main(String[] args) throws Exception {

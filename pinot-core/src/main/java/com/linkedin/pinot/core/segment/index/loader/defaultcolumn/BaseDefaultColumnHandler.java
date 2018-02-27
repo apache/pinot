@@ -237,9 +237,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    */
   protected void removeColumnV1Indices(String column) {
     // Delete existing dictionary and forward index for the column.
-    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Dict.FILE_EXTENTION));
-    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION));
-    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION));
+    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION));
+    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION));
+    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION));
 
     // Remove the column metadata information if exists.
     SegmentColumnarIndexCreator.removeColumnMetadataInfo(_segmentProperties, column);
@@ -271,7 +271,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         Preconditions.checkState(defaultValue instanceof String);
         String stringDefaultValue = (String) defaultValue;
         // Length of the UTF-8 encoded byte array.
-        dictionaryElementSize = stringDefaultValue.getBytes("UTF8").length;
+        // Default size should be 1, to gracefully handle empty strings
+        dictionaryElementSize = Math.max(stringDefaultValue.getBytes("UTF8").length, 1);
         sortedArray = new String[]{stringDefaultValue};
         break;
       case INT:
@@ -303,11 +304,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Create dictionary.
     // We will have only one value in the dictionary.
-    SegmentDictionaryCreator segmentDictionaryCreator =
-        new SegmentDictionaryCreator(false/*hasNulls*/, sortedArray, fieldSpec, _indexDir,
-            V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
-    segmentDictionaryCreator.build(new boolean[]{true}/*isSorted*/);
-    segmentDictionaryCreator.close();
+    try (SegmentDictionaryCreator creator = new SegmentDictionaryCreator(false/*hasNulls*/, sortedArray, fieldSpec,
+        _indexDir)) {
+      creator.build();
+    }
 
     // Create forward index.
     if (isSingleValue) {

@@ -78,7 +78,7 @@ public class Projection {
       String column = (String) pair.getFirst();
       if (!_mvColumns.contains(column)) {
         BlockSingleValIterator bvIter =
-            (BlockSingleValIterator) _indexSegment.getDataSource(column).getNextBlock().getBlockValueSet().iterator();
+            (BlockSingleValIterator) _indexSegment.getDataSource(column).nextBlock().getBlockValueSet().iterator();
 
         int rowId = 0;
         for (Integer docId : _filteredDocIds) {
@@ -87,7 +87,7 @@ public class Projection {
         }
       } else {
         BlockMultiValIterator bvIter =
-            (BlockMultiValIterator) _indexSegment.getDataSource(column).getNextBlock().getBlockValueSet().iterator();
+            (BlockMultiValIterator) _indexSegment.getDataSource(column).nextBlock().getBlockValueSet().iterator();
 
         int rowId = 0;
         for (Integer docId : _filteredDocIds) {

@@ -23,7 +23,7 @@ import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
@@ -36,6 +36,7 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.sql.Timestamp;
@@ -58,6 +59,7 @@ import org.yaml.snakeyaml.Yaml;
 @SuppressWarnings("FieldCanBeLocal")
 public class PerfBenchmarkDriver {
   private static final Logger LOGGER = LoggerFactory.getLogger(PerfBenchmarkDriver.class);
+  private static final long BROKER_TIMEOUT_MS = 60_000L;
 
   private final PerfBenchmarkDriverConf _conf;
   private final String _zkAddress;
@@ -208,6 +210,7 @@ public class PerfBenchmarkDriver {
     Configuration brokerConfiguration = new PropertiesConfiguration();
     String brokerInstanceName = "Broker_localhost_" + CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;
     brokerConfiguration.setProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY, brokerInstanceName);
+    brokerConfiguration.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS, BROKER_TIMEOUT_MS);
     LOGGER.info("Starting broker instance: {}", brokerInstanceName);
     new HelixBrokerStarter(_clusterName, _zkAddress, brokerConfiguration);
   }
@@ -276,8 +279,7 @@ public class PerfBenchmarkDriver {
     _helixResourceManager.addTable(tableConfig);
   }
 
-  private void uploadIndexSegments()
-      throws Exception {
+  private void uploadIndexSegments() throws Exception {
     if (!_conf.isUploadIndexes()) {
       LOGGER.info("Skipping upload index segments step.");
       return;
@@ -285,10 +287,12 @@ public class PerfBenchmarkDriver {
     String indexDirectory = _conf.getIndexDirectory();
     File[] indexFiles = new File(indexDirectory).listFiles();
     Preconditions.checkNotNull(indexFiles);
-    for (File indexFile : indexFiles) {
-      LOGGER.info("Uploading index segment: {}", indexFile.getAbsolutePath());
-      FileUploadUtils.sendSegmentFile(_controllerHost, String.valueOf(_controllerPort), indexFile.getName(),
-          indexFile, indexFile.length());
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(_controllerHost, _controllerPort);
+      for (File indexFile : indexFiles) {
+        LOGGER.info("Uploading index segment: {}", indexFile.getAbsolutePath());
+        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, indexFile.getName(), indexFile);
+      }
     }
   }
 
@@ -298,7 +302,7 @@ public class PerfBenchmarkDriver {
    * @param segmentMetadata segment metadata.
    */
   public void addSegment(SegmentMetadata segmentMetadata) {
-    _helixResourceManager.addSegment(segmentMetadata, "http://" + _controllerAddress + "/" + segmentMetadata.getName());
+    _helixResourceManager.addNewSegment(segmentMetadata, "http://" + _controllerAddress + "/" + segmentMetadata.getName());
   }
 
   public static void waitForExternalViewUpdate(String zkAddress, final String clusterName, long timeoutInMilliseconds) {

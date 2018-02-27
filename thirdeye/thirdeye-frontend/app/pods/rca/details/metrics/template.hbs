@@ -1,17 +1,17 @@
-<section class="paper-container__body">
+<section class="card-container__body">
   {{#containers/metrics-container as |metricList|}}
     {{#containers/primary-metric-container as |summary actions|}}
-      {{#if summary.loaded}}
+
         <div class="rca-header row">
           <div class="col-xs-9">
-            <h3 class="te-sub-title te-sub-title--flush">Metrics Correlation</h3> 
+            <h3 class="te-sub-title te-sub-title--flush">Metrics Correlation</h3>
             <span>(Investigation Period: {{moment-format metricList.regionStart dateFormat}} -
           {{moment-format metricList.regionEnd dateFormat}})</span>
           </div>
           <div class="rca-actions col-xs-3">
             {{#if metricList.loaded}}
-              {{#x-toggle 
-                value=splitView 
+              {{#x-toggle
+                value=splitView
                 classNames="te-toggle pull-right"
                 theme='ios'
                 showLabels=true
@@ -27,23 +27,21 @@
           </div>
         </div>
         <div class="rca-body">
-          {{#if (or metricList.loading summary.loading)}}
+          {{#if metricList.failed}}
+            Oops, something went wrong...
+
+          {{else if (or metricList.loading (not summary.loaded))}}
             <section>
-              <div class="spinner-wrapper">
+              <div class="spinner-wrapper spinner-wrapper__border">
                 {{ember-spinner}}
               </div>
             </section>
-          {{/if}}
 
-          {{#if metricList.failed}}
-            Oops, something went wrong...
-          {{/if}}
-
-          {{#if metricList.loaded}}
+          {{else if metricList.loaded}}
             {{#if splitView}}
               {{anomaly-graph
                 componentId='correlated-metrics'
-                primaryMetric=summary.primaryMetric 
+                primaryMetric=summary.primaryMetric
                 showGraphLegend=false
                 showLegend=false
                 showMetrics=true
@@ -54,11 +52,10 @@
                 analysisStart=metricList.regionStart
                 analysisEnd=metricList.regionEnd
                 onSubchartChange=(action "onDateChange")
-                onSelection=(action actions.onMetricSelection)
               }}
-              {{#each summary.selectedMetrics as |metric|}}
+              {{#each summary.selectedMetrics as |metric index|}}
                 {{anomaly-graph
-                  componentId='correlated-metrics'
+                  componentId=(concat 'correlated-metrics-' index)
                   primaryMetric=metric
                   showLegend=false
                   enableZoom=true
@@ -71,7 +68,7 @@
                   onSelection=(action actions.onMetricSelection)
                   onSubchartChange=(action "onDateChange")
                   showGraphLegend=false}}
-                  
+
               {{/each}}
             {{else}}
               {{anomaly-graph
@@ -103,8 +100,8 @@
                 </div>
               </div>
               <div class="contribution-table__body">
-                {{#if metricList.loading}}
-                  <div class="spinner-wrapper">
+                {{#if (or metricList.loading (not summary.loaded))}}
+                  <div class="spinner-wrapper spinner-wrapper">
                     {{ember-spinner}}
                   </div>
                 {{else}}
@@ -129,7 +126,6 @@
             </div>
 
         </div>
-      {{/if}}
     {{/containers/primary-metric-container}}
   {{/containers/metrics-container}}
 </section>

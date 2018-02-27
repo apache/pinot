@@ -21,7 +21,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.data.readers.RecordReader;
+import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
@@ -32,12 +32,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
-import org.apache.commons.lang.mutable.MutableLong;
 
 
 /**
@@ -82,7 +80,7 @@ public class StringDictionaryPerfTest {
     config.setSegmentName(segmentName);
 
     Random random = new Random(System.nanoTime());
-    final List<GenericRow> data = new ArrayList<>();
+    List<GenericRow> rows = new ArrayList<>(dictLength);
     Set<String> uniqueStrings = new HashSet<>(dictLength);
 
     int i = 0;
@@ -100,12 +98,11 @@ public class StringDictionaryPerfTest {
 
       GenericRow genericRow = new GenericRow();
       genericRow.init(map);
-      data.add(genericRow);
+      rows.add(genericRow);
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    RecordReader reader = getGenericRowRecordReader(schema, data);
-    driver.init(config, reader);
+    driver.init(config, new GenericRowRecordReader(rows, schema));
     driver.build();
   }
 
@@ -131,60 +128,6 @@ public class StringDictionaryPerfTest {
 
     FileUtils.deleteQuietly(_indexDir);
     System.out.println("Total time for " + TOTAL_NUM_LOOKUPS + " lookups: " + (System.currentTimeMillis() - start));
-  }
-
-  /**
-   * Returns an implementation of GenericRow record reader.
-   *
-   * @param schema Schema for the data
-   * @param data Data
-   * @return GenericRow record reader
-   */
-  private static RecordReader getGenericRowRecordReader(final Schema schema, final List<GenericRow> data) {
-    return new RecordReader() {
-      int _counter = 0;
-
-      @Override
-      public void rewind()
-          throws Exception {
-        _counter = 0;
-      }
-
-      @Override
-      public GenericRow next() {
-        return data.get(_counter++);
-      }
-
-      @Override
-      public GenericRow next(GenericRow row) {
-        return next();
-      }
-
-      @Override
-      public void init()
-          throws Exception {
-      }
-
-      @Override
-      public boolean hasNext() {
-        return _counter < data.size();
-      }
-
-      @Override
-      public Schema getSchema() {
-        return schema;
-      }
-
-      @Override
-      public Map<String, MutableLong> getNullCountMap() {
-        return null;
-      }
-
-      @Override
-      public void close()
-          throws Exception {
-      }
-    };
   }
 
   public static void main(String[] args)

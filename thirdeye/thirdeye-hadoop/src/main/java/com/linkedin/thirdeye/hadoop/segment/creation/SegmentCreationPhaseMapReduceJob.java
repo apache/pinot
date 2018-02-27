@@ -31,7 +31,6 @@ import com.linkedin.pinot.core.segment.creator.impl.stats.LongColumnPreIndexStat
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 import com.linkedin.thirdeye.hadoop.util.ThirdeyePinotSchemaUtils;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -40,7 +39,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
@@ -58,14 +56,8 @@ import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME;
-import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_OUTPUT_PATH;
-import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_THIRDEYE_CONFIG;
-import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_START_TIME;
-import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_WALLCLOCK_END_TIME;
-import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_SCHEDULE;
-import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.SEGMENT_CREATION_BACKFILL;
+import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
+import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.*;
 
 /**
  * Mapper class for SegmentCreation job, which sets configs required for
@@ -202,7 +194,6 @@ public class SegmentCreationPhaseMapReduceJob {
       segmentGeneratorConfig.setFormat(FileFormat.AVRO);
       segmentGeneratorConfig.setSegmentNamePostfix(seqId);
       segmentGeneratorConfig.setOutDir(localDiskSegmentDirectory);
-      segmentGeneratorConfig.setEnableStarTreeIndex(true);
       LOGGER.info("Setting enableStarTreeIndex");
       String minTime = ThirdEyeConstants.DATE_TIME_FORMATTER.print(segmentWallClockStartTime);
       String maxTime = ThirdEyeConstants.DATE_TIME_FORMATTER.print(segmentWallClockEndTime);
@@ -252,7 +243,7 @@ public class SegmentCreationPhaseMapReduceJob {
         }
         LOGGER.info("Setting splitOrder {}", splitOrder);
       }
-      segmentGeneratorConfig.setStarTreeIndexSpec(starTreeIndexSpec);
+      segmentGeneratorConfig.enableStarTreeIndex(starTreeIndexSpec);
       LOGGER.info("*********************************************************************");
 
       // Set time for SIMPLE_DATE_FORMAT case

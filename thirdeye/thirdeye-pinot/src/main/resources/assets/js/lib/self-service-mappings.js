@@ -1,4 +1,14 @@
+const MAPPING_TYPES = [
+  'METRIC',
+  'DIMENSION',
+  'SERVICE',
+  'DATASET',
+  'LIXTAG',
+  'CUSTOM'
+];
+
 var services;
+var datasets;
 
 function renderMappingsSelection() {
   var html = "<table style='border: 1px;width: 80%'>"
@@ -11,18 +21,22 @@ function renderMappingsSelection() {
       + "<hr/><table id='existing-mappings-data-table'></table>";
   $("#mappings-place-holder").html(html);
 
-  getData("/data/entityTypes", "admin").done(function (data) {
-    var select = "<option value='select'>Select</option>";
-    for (var i in data) {
-      select += "<option value='" + data[i] + "'>" + data[i] + "</option>";
-    }
-    $("#entityTypeSelector1").html(select);
-    $("#entityTypeSelector2").html(select);
+  // dropdown options
+  var select = "<option value='select'>Select</option>";
+  for (var i in MAPPING_TYPES) {
+    select += "<option value='" + MAPPING_TYPES[i] + "'>" + MAPPING_TYPES[i] + "</option>";
+  }
+  $("#entityTypeSelector1").html(select);
+  $("#entityTypeSelector2").html(select);
 
-    // pre load the services
-    getData("/external/services/all", "admin-mappings").done(function (data) {
-      services = data;
-    })
+  // pre load the services
+  getData("/external/services/all", "admin").done(function (data) {
+    services = data;
+  });
+
+  // pre load the datasets
+  getData("/data/datasets", "admin").done(function (data) {
+    datasets = data;
   });
 }
 
@@ -67,6 +81,7 @@ function renderEntityTypeSelector(divId) {
       }
       entityUrn.val(getUrnForPrefixEntityType(entityType) + metricId);
     });
+
   } else if (entityType === 'SERVICE') {
     entitySelect.select2({
       placeholder: "select a service",
@@ -79,6 +94,20 @@ function renderEntityTypeSelector(divId) {
         entityUrn.val(getUrnForPrefixEntityType(entityType) + serviceArr[0]['id']);
       }
     });
+
+  } else if (entityType === 'DATASET') {
+    entitySelect.select2({
+      placeholder: "select a dataset",
+      data: datasets
+    });
+    entitySelect.on("change", function (e) {
+      const $selectedElement = $(e.currentTarget);
+      const datasetArr = $selectedElement.select2('data');
+      if (datasetArr.length) {
+        entityUrn.val(getUrnForPrefixEntityType(entityType) + datasetArr[0]['id']);
+      }
+    });
+
   } else {
     entityUrn.val(getUrnForPrefixEntityType(entityType));
   }
@@ -91,8 +120,11 @@ function getUrnForPrefixEntityType(entityType) {
     case "SERVICE":
       return "thirdeye:service:";
     case "DIMENSION":
-    case "DIMENSION_VAL":
       return "thirdeye:dimension:";
+    case "LIXTAG":
+      return "thirdeye:lixtag:";
+    case "DATASET":
+      return "thirdeye:dataset:";
     default:
       return "thirdeye:";
   }
@@ -111,15 +143,11 @@ function getEntitySpecificSelectionOptions(baseId, entityType) {
 
   switch (entityType) {
     case "METRIC":
-      html += "<select style='width:100%' id='" + baseId + "_" + entityType + "'></select><div id='"
-          + baseId + "_final_urn' ></div>";
-      break;
     case "SERVICE":
+    case "DATASET":
       html += "<select style='width:100%' id='" + baseId + "_" + entityType + "'></select><div id='"
           + baseId + "_final_urn' ></div>";
       break;
-    case "DIMENSION":
-    case "DIMENSION_VAL":
     default:
       // do nothing
   }
@@ -141,6 +169,12 @@ function updateEntityMapping() {
       + entityType1 + "_TO_" + entityType2 + '", "score": "' + score + '"}';
 
   if (entityType1 == 'select' || entityType2 == 'select' || fromUrn == '' || toUrn == '' || score == '') {
+    return;
+  }
+
+  if (fromUrn.includes(" ") || fromUrn.includes(",") || fromUrn.includes(";")
+      || toUrn.includes(" ") || toUrn.includes(",") || toUrn.includes(";")) {
+    alert("Cannot contain separators except ':' (colon)");
     return;
   }
 

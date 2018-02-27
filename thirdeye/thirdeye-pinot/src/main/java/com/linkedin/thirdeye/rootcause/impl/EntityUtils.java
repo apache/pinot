@@ -1,8 +1,12 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.TreeMultimap;
 import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.MaxScoreSet;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -11,6 +15,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang.StringUtils;
 
 
 /**
@@ -144,6 +149,24 @@ public class EntityUtils {
   }
 
   /**
+   * Filters the input collection by (super) class {@code clazz}.
+   * Returns a set of typed Entities or an empty set if no matching instances are found.  URN
+   * conflicts are resolved by preserving the entity with the highest score.
+   *
+   * @param clazz (super) class to filter by
+   * @param <T> (super) class of output collection
+   * @return set of Entities with given super class
+   */
+  public static <T extends Entity> Set<T> filter(Collection<? extends Entity> entities, Class<? extends T> clazz) {
+    Set<T> filtered = new MaxScoreSet<>();
+    for (Entity e : entities) {
+      if (clazz.isInstance(e))
+        filtered.add((T) e);
+    }
+    return filtered;
+  }
+
+  /**
    * Attemps to parse {@code urn} and return a specific Entity subtype with the given {@code score}
    * Supports {@code MetricEntity}, {@code DimensionEntity}, {@code TimeRangeEntity}, and
    * {@code ServiceEntity}.
@@ -166,8 +189,18 @@ public class EntityUtils {
     } else if(ServiceEntity.TYPE.isType(urn)) {
       return ServiceEntity.fromURN(urn, score);
 
+    } else if(DatasetEntity.TYPE.isType(urn)) {
+      return DatasetEntity.fromURN(urn, score);
+
     } else if(HyperlinkEntity.TYPE.isType(urn)) {
       return HyperlinkEntity.fromURL(urn, score);
+
+    } else if(AnomalyEventEntity.TYPE.isType(urn)) {
+      return AnomalyEventEntity.fromURN(urn, score);
+
+    } else if(DimensionsEntity.TYPE.isType(urn)) {
+      return DimensionsEntity.fromURN(urn, score);
+      
     }
     throw new IllegalArgumentException(String.format("Could not parse URN '%s'", urn));
   }
@@ -255,4 +288,85 @@ public class EntityUtils {
   public static <T extends Entity> List<T> addRelated(Iterable<T> entities, Entity related) {
     return addRelated(entities, Collections.singletonList(related));
   }
+
+  /**
+   * Decode URN fragment to original data.
+   * <br/><b>NOTE:</b> compatible with JavaScript's decodeURIComponent
+   *
+   * @param value urn fragment value
+   * @return decoded value
+   */
+  public static String decodeURNComponent(String value) {
+    try {
+      return URLDecoder.decode(value, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      // must not happen, utf-8 is part of java spec
+      throw new IllegalStateException(e);
+    }
+  }
+
+  /**
+   * Encode data to URN fragment.
+   * <br/><b>NOTE:</b> similar to JavaScript's encodeURIComponent for basic ascii set
+   *
+   * @param value value
+   * @return encoded urn fragment
+   */
+  public static String encodeURNComponent(String value) {
+    try {
+      return URLEncoder.encode(value, "UTF-8")
+          .replace("+", "%20")
+          .replace("%21", "!")
+          .replace("%27", "\'")
+          .replace("%28", "(")
+          .replace("%29", ")")
+          .replace("%7E", "~");
+    } catch (UnsupportedEncodingException e) {
+      // must not happen, utf-8 is part of java spec
+      throw new IllegalStateException(e);
+    }
+  }
+
+  /**
+   * Decodes filter string fragments to a dimensions multimap
+   *
+   * @param filterStrings dimension fragments
+   * @return dimensions multimap
+   */
+  public static Multimap<String, String> decodeDimensions(List<String> filterStrings) {
+    Multimap<String, String> filters = TreeMultimap.create();
+
+    for(String filterString : filterStrings) {
+      if (StringUtils.isBlank(filterString)) {
+        continue;
+      }
+
+      String[] parts = EntityUtils.decodeURNComponent(filterString).split("=", 2);
+      if (parts.length != 2) {
+        throw new IllegalArgumentException(String.format("Could not parse filter string '%s'", filterString));
+      }
+
+      filters.put(parts[0], parts[1]);
+    }
+
+    return filters;
+  }
+
+  /**
+   * Encodes dimensions multimap to filter strings.
+   *
+   * @param filters dimensions multimap
+   * @return filter string fragments
+   */
+  public static List<String> encodeDimensions(Multimap<String, String> filters) {
+    List<String> output = new ArrayList<>();
+
+    Multimap<String, String> sorted = TreeMultimap.create(filters);
+    for(Map.Entry<String, String> entry : sorted.entries()) {
+      output.add(EntityUtils.encodeURNComponent(String.format("%s=%s", entry.getKey(), entry.getValue())));
+    }
+
+    return output;
+  }
+
 }

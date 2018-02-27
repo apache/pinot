@@ -31,7 +31,7 @@ public abstract class RootCauseEventEntityFormatter extends RootCauseEntityForma
   public static RootCauseEventEntity makeRootCauseEventEntity(EventEntity entity, String label, String link, long start, long end, String details) {
     RootCauseEventEntity out = new RootCauseEventEntity();
     out.setUrn(entity.getUrn());
-    out.setScore(Math.round(entity.getScore() * 1000) / 1000.0);
+    out.setScore(entity.getScore());
     out.setType("event");
     out.setLabel(label);
     out.setLink(link);
@@ -40,21 +40,5 @@ public abstract class RootCauseEventEntityFormatter extends RootCauseEntityForma
     out.setEnd(end);
     out.setEventType(entity.getEventType());
     return out;
-  }
-
-  /**
-   * Returns {@code true} if the entity is related to at least on TimeRangeEntity of type
-   * {@code TYPE_BASELINE}, otherwise returns {@code false}.
-   *
-   * @param e entity
-   * @return {@code true} if the entity is related to the baseline, {@code false} otherwise.
-   */
-  public static boolean isRelatedToBaseline(Entity e) {
-    for(Entity re : e.getRelated()) {
-      if(TimeRangeEntity.TYPE.isType(re))
-        if(TimeRangeEntity.fromURN(re.getUrn(), re.getScore()).getType().equals(TimeRangeEntity.TYPE_BASELINE))
-          return true;
-    }
-    return false;
   }
 }

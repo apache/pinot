@@ -17,13 +17,12 @@ package com.linkedin.pinot.core.common;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-
-import com.linkedin.pinot.core.operator.BaseOperator;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 /**
@@ -33,8 +32,6 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
  * duplicate codes and garbage collection.
  */
 public class DataFetcher {
-  private static final BlockId BLOCK_ZERO = new BlockId(0);
-
   private final Map<String, Dictionary> _columnToDictionaryMap;
   private final Map<String, BlockValSet> _columnToBlockValSetMap;
   private final Map<String, BlockValIterator> _columnToBlockValIteratorMap;
@@ -77,7 +74,7 @@ public class DataFetcher {
     _reusableMVDictIdSize = 0;
     for (String column : columnToDataSourceMap.keySet()) {
       BaseOperator dataSource = columnToDataSourceMap.get(column);
-      Block dataSourceBlock = dataSource.nextBlock(BLOCK_ZERO);
+      Block dataSourceBlock = dataSource.nextBlock();
       BlockMetadata metadata = dataSourceBlock.getMetadata();
       _columnToDictionaryMap.put(column, metadata.getDictionary());
 

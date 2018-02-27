@@ -17,10 +17,7 @@ package com.linkedin.pinot.common.segment;
 
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 
@@ -31,8 +28,6 @@ import org.joda.time.Interval;
 public interface SegmentMetadata {
 
   String getTableName();
-
-  String getIndexType();
 
   String getTimeColumn();
 
@@ -78,7 +73,6 @@ public interface SegmentMetadata {
 
   boolean hasStarTree();
 
-  @Nullable
   StarTreeMetadata getStarTreeMetadata();
 
   String getForwardIndexFileName(String column);
@@ -87,7 +81,6 @@ public interface SegmentMetadata {
 
   String getBitmapInvertedIndexFileName(String column);
 
-  @Nullable
   String getCreatorName();
 
   char getPaddingCharacter();
@@ -102,18 +95,7 @@ public interface SegmentMetadata {
    * @return derived column name if exists.
    *         null if not.
    */
-  @Nullable
   String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType);
-
-  /**
-   * Get the enabled optimizations for the segment.
-   *
-   * @return List of enabled optimizations
-   */
-  @Nullable
-  List<String> getOptimizations();
-
-  Map<String, String> toMap();
 
   boolean close();
 }

@@ -20,6 +20,9 @@ import org.apache.commons.lang.StringUtils;
 
 
 public class CommonConstants {
+
+  public static final String PREFIX_OF_SSL_SUBSET = "ssl";
+
   public static class Helix {
     public static final String IS_SHUTDOWN_IN_PROGRESS = "shutdownInProgress";
 
@@ -136,6 +139,7 @@ public class CommonConstants {
           public static final String KAFKA_FETCH_TIMEOUT_MILLIS = "kafka.fetch.timeout.ms";
           public static final String ZK_BROKER_URL = "kafka.zk.broker.url";
           public static final String KAFKA_BROKER_LIST = "kafka.broker.list";
+          public static final String CONSUMER_FACTORY = "kafka.consumer.factory.class.name";
 
           // Consumer properties
           public static final String AUTO_OFFSET_RESET = "auto.offset.reset";
@@ -155,6 +159,10 @@ public class CommonConstants {
           public static class HighLevelConsumer {
             public static final String ZK_CONNECTION_STRING = "kafka.hlc.zk.connect.string";
             public static final String GROUP_ID = "kafka.hlc.group.id";
+          }
+
+          public static class ConsumerFactory {
+            public static final String SIMPLE_CONSUMER_FACTORY_STRING = "com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory";
           }
         }
       }
@@ -198,20 +206,27 @@ public class CommonConstants {
     public static final String CONFIG_OF_HELIX_MAX_DISCONNECT_THRESHOLD = "pinot.server.flapping.maxDisconnectThreshold";
     public static final String DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS = "1";
     public static final String DEFAULT_HELIX_FLAPPING_MAX_DISCONNECT_THRESHOLD = "100";
+  }
 
-    public static class ServerMetricUris {
-      public static final String SERVER_METRICS_INFO_URI = "/ServerMetricsInfo/";
-    }
+  public static class ServerMetricUris {
+    public static final String SERVER_METRICS_INFO_URI = "/ServerMetricsInfo/";
+  }
 
+  public static class Broker {
+    public static final String CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT = "pinot.broker.query.response.limit";
+    public static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
+    public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
+    public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
+    public static final String CONFIG_OF_BROKER_ID = "pinot.broker.id";
   }
 
   public static class Server {
+    public static final String CONFIG_OF_INSTANCE_ID = "pinot.server.instance.id";
     public static final String CONFIG_OF_INSTANCE_DATA_DIR = "pinot.server.instance.dataDir";
+    public static final String CONFIG_OF_CONSUMER_DIR = "pinot.server.instance.consumerDir";
     public static final String CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR = "pinot.server.instance.segmentTarDir";
     public static final String CONFIG_OF_INSTANCE_READ_MODE = "pinot.server.instance.readMode";
     public static final String CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS = "pinot.server.instance.data.manager.class";
-    public static final String CONFIG_OF_INSTANCE_SEGMENT_METADATA_LOADER_CLASS =
-        "pinot.server.instance.segment.metadata.loader.class";
     public static final String CONFIG_OF_QUERY_EXECUTOR_PRUNER_CLASS = "pinot.server.query.executor.pruner.class";
     public static final String CONFIG_OF_QUERY_EXECUTOR_TIMEOUT = "pinot.server.query.executor.timeout";
     public static final String CONFIG_OF_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
@@ -226,6 +241,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_ENABLE_SHUTDOWN_DELAY = "pinot.server.instance.enable.shutdown.delay";
     public static final String CONFIG_OF_ENABLE_SPLIT_COMMIT = "pinot.server.instance.enable.split.commit";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap";
+    public static final String CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap.direct";
 
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
     public static final String DEFAULT_READ_MODE = "heap";
@@ -234,20 +250,25 @@ public class CommonConstants {
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "index";
     public static final String DEFAULT_INSTANCE_SEGMENT_TAR_DIR =
         DEFAULT_INSTANCE_BASE_DIR + File.separator + "segmentTar";
-    public static final String DEFAULT_SEGMENT_METADATA_LOADER_CLASS =
-        "com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader";
     public static final String DEFAULT_DATA_MANAGER_CLASS =
         "com.linkedin.pinot.server.starter.helix.HelixInstanceDataManager";
     public static final String DEFAULT_QUERY_EXECUTOR_CLASS =
         "com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl";
-    public static final String DEFAULT_QUERY_EXECUTOR_TIMEOUT = "150000";
+    public static final long DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS = 15_000L;
     public static final String DEFAULT_REQUEST_HANDLER_FACTORY_CLASS =
         "com.linkedin.pinot.server.request.SimpleRequestHandlerFactory";
     public static final String DEFAULT_SEGMENT_LOAD_MAX_RETRY_COUNT = "5";
     public static final String DEFAULT_SEGMENT_LOAD_MIN_RETRY_DELAY_MILLIS = "60000";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";
+    public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
     public static final String DEFAULT_STAR_TREE_FORMAT_VERSION = "OFF_HEAP";
     public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "TIME";
+  }
+
+  public static class Controller {
+    public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.controller.segment.fetcher";
+    public static final String HOST_HTTP_HEADER = "Pinot-Controller-Host";
+    public static final String VERSION_HTTP_HEADER = "Pinot-Controller-Version";
   }
 
   public static class Minion {
@@ -264,6 +285,7 @@ public class CommonConstants {
     public static final String DEFAULT_INSTANCE_BASE_DIR =
         System.getProperty("java.io.tmpdir") + File.separator + "PinotMinion";
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "data";
+    public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "segment.fetcher";
   }
 
   public static class Metric {
@@ -301,7 +323,14 @@ public class CommonConstants {
     public static final String CREATION_TIME = "segment.creation.time";
     public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
     public static final String PARTITION_METADATA = "segment.partition.metadata";
-    public static final String OPTIMIZATIONS = "segment.optimizations";
+    /**
+     * This field is used for parallel push protection to lock the segment globally.
+     * We put the segment upload start timestamp so that if the previous push failed without unlock the segment, the
+     * next upload won't be blocked forever.
+     */
+    public static final String SEGMENT_UPLOAD_START_TIME = "segment.upload.start.time";
+
+    public static final String CUSTOM_MAP = "custom.map";
 
     public static final String SEGMENT_BACKUP_DIR_SUFFIX = ".segment.bak";
     public static final String SEGMENT_TEMP_DIR_SUFFIX = ".segment.tmp";
@@ -310,6 +339,19 @@ public class CommonConstants {
       OFFLINE,
       REALTIME
     }
+  }
+
+  public static class SegmentFetcher {
+    public static class HdfsSegmentFetcher {
+      public static final String PRINCIPLE = "hadoop.kerberos.principle";
+      public static final String KEYTAB = "hadoop.kerberos.keytab";
+      public static final String HADOOP_CONF_PATH = "hadoop.conf.path";
+    }
+
+    public static final String RETRY = "retry.count";
+    public static final int RETRY_DEFAULT = 3;
+    public static final String RETRY_WAITIME_MS = "retry.wait.ms";
+    public static final int RETRY_WAITIME_MS_DEFAULT = 100;
   }
 
 }

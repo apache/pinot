@@ -16,7 +16,7 @@ public abstract class RootCauseEntityFormatter {
   public static RootCauseEntity makeRootCauseEntity(Entity entity, String type, String label, String link) {
     RootCauseEntity out = new RootCauseEntity();
     out.setUrn(entity.getUrn());
-    out.setScore(Math.round(entity.getScore() * 1000) / 1000.0);
+    out.setScore(entity.getScore());
     out.setType(type);
     out.setLabel(label);
     out.setLink(link);

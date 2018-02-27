@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
+import com.linkedin.thirdeye.hadoop.config.DimensionSpec;
+import com.linkedin.thirdeye.hadoop.config.DimensionType;
 import com.linkedin.thirdeye.hadoop.config.MetricSpec;
 import com.linkedin.thirdeye.hadoop.config.MetricType;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
@@ -75,6 +77,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * This phase will add a new column for every column that has topk config
  * The new column added will be called "column_topk" (containing only topk values plus any whitelist)
  * and "column" will contain all values with whitelist applied
+ * For all non topk values, the dimension value will be replaced by "other"
+ * For all non-whitelist values, the dimension value will be replaced by the defaultOtherValue specified in DimensionType
+ * This default other value can be configured, using config like thirdeye.nonwhitelist.value.dimension.d1=x
  */
 public class DerivedColumnTransformationPhaseJob extends Configured {
   private static final Logger LOGGER = LoggerFactory.getLogger(DerivedColumnTransformationPhaseJob.class);
@@ -101,11 +106,13 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
     private ThirdEyeConfig thirdeyeConfig;
     private DerivedColumnTransformationPhaseConfig config;
     private List<String> dimensionsNames;
+    private List<DimensionType> dimensionsTypes;
     private List<String> metricNames;
     private List<MetricType> metricTypes;
     private TopKDimensionValues topKDimensionValues;
     private Map<String, Set<String>> topKDimensionsMap;
-    private Map<String, Set<String>> whitelist;
+    private Map<String, List<String>> whitelist;
+    private Map<String, String> nonWhitelistValueMap;
     private String timeColumnName;
 
     private AvroMultipleOutputs avroMultipleOutputs;
@@ -125,10 +132,12 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
       thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(DERIVED_COLUMN_TRANSFORMATION_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
       config = DerivedColumnTransformationPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
       dimensionsNames = config.getDimensionNames();
+      dimensionsTypes = config.getDimensionTypes();
       metricNames = config.getMetricNames();
       metricTypes = config.getMetricTypes();
       timeColumnName = config.getTimeColumnName();
       whitelist = config.getWhitelist();
+      nonWhitelistValueMap = config.getNonWhitelistValue();
 
       outputSchema = new Schema.Parser().parse(configuration.get(DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA.toString()));
 
@@ -157,18 +166,22 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
       GenericRecord outputRecord = new Record(outputSchema);
 
       // dimensions
-      for (String dimension : dimensionsNames) {
-        String dimensionName = dimension;
-        String dimensionValue = ThirdeyeAvroUtils.getDimensionFromRecord(inputRecord, dimension);
+      for (int i = 0; i < dimensionsNames.size(); i++) {
+
+        String dimensionName = dimensionsNames.get(i);
+        DimensionType dimensionType = dimensionsTypes.get(i);
+        Object dimensionValue = ThirdeyeAvroUtils.getDimensionFromRecord(inputRecord, dimensionName);
+        String dimensionValueStr = String.valueOf(dimensionValue);
+
 
         // add original dimension value with whitelist applied
-        String whitelistDimensionValue = dimensionValue;
+        Object whitelistDimensionValue = dimensionValue;
         if (whitelist != null) {
-          Set<String> whitelistDimensions = whitelist.get(dimensionName);
+          List<String> whitelistDimensions = whitelist.get(dimensionName);
           if (CollectionUtils.isNotEmpty(whitelistDimensions)) {
             // whitelist config exists for this dimension but value not present in whitelist
-            if (!whitelistDimensions.contains(dimensionValue)) {
-              whitelistDimensionValue = ThirdEyeConstants.OTHER;
+            if (!whitelistDimensions.contains(dimensionValueStr)) {
+              whitelistDimensionValue = dimensionType.getValueFromString(nonWhitelistValueMap.get(dimensionName));
             }
           }
         }
@@ -180,14 +193,14 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
           // if topk config exists for that dimension
           if (CollectionUtils.isNotEmpty(topKDimensionValues)) {
             String topkDimensionName = dimensionName + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX;
-            String topkDimensionValue = dimensionValue;
+            Object topkDimensionValue = dimensionValue;
             // topk config exists for this dimension, but value not present in topk or whitelist
-            if (!topKDimensionValues.contains(dimensionValue) &&
+            if (!topKDimensionValues.contains(dimensionValueStr) &&
                 (whitelist == null || whitelist.get(dimensionName) == null
-                || !whitelist.get(dimensionName).contains(dimensionValue))) {
+                || !whitelist.get(dimensionName).contains(dimensionValueStr))) {
               topkDimensionValue = ThirdEyeConstants.OTHER;
             }
-            outputRecord.put(topkDimensionName, topkDimensionValue);
+            outputRecord.put(topkDimensionName, String.valueOf(topkDimensionValue));
           }
         }
       }
@@ -210,6 +223,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
     public void cleanup(Context context) throws IOException, InterruptedException {
       avroMultipleOutputs.close();
     }
+
 
   }
 
@@ -247,6 +261,9 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
     LOGGER.info("Schema : {}", avroSchema.toString(true));
 
     // ThirdEyeConfig
+    String dimensionTypesProperty = ThirdeyeAvroUtils.getDimensionTypesProperty(
+        props.getProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_NAMES.toString()), avroSchema);
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_TYPES.toString(), dimensionTypesProperty);
     String metricTypesProperty = ThirdeyeAvroUtils.getMetricTypesProperty(
         props.getProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString()),
         props.getProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString()), avroSchema);
@@ -296,10 +313,33 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
     FieldAssembler<Schema> fieldAssembler = recordBuilder.fields();
 
     // add new column for topk columns
-    for (String dimension : thirdeyeConfig.getDimensionNames()) {
-      fieldAssembler = fieldAssembler.name(dimension).type().nullable().stringType().noDefault();
-      if (topKTransformDimensionSet.contains(dimension)) {
-        fieldAssembler = fieldAssembler.name(dimension + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX).type().nullable().stringType().noDefault();
+    for (DimensionSpec dimensionSpec : thirdeyeConfig.getDimensions()) {
+      String dimensionName = dimensionSpec.getName();
+      DimensionType dimensionType = dimensionSpec.getDimensionType();
+      BaseFieldTypeBuilder<Schema> baseFieldTypeBuilder = fieldAssembler.name(dimensionName).type().nullable();
+
+      switch (dimensionType) {
+      case DOUBLE:
+        fieldAssembler = baseFieldTypeBuilder.doubleType().noDefault();
+        break;
+      case FLOAT:
+        fieldAssembler = baseFieldTypeBuilder.floatType().noDefault();
+        break;
+      case INT:
+      case SHORT:
+        fieldAssembler = baseFieldTypeBuilder.intType().noDefault();
+        break;
+      case LONG:
+        fieldAssembler = baseFieldTypeBuilder.longType().noDefault();
+        break;
+      case STRING:
+        fieldAssembler = baseFieldTypeBuilder.stringType().noDefault();
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported dimensionType " + dimensionType);
+      }
+      if (topKTransformDimensionSet.contains(dimensionName)) {
+        fieldAssembler = fieldAssembler.name(dimensionName + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX).type().nullable().stringType().noDefault();
       }
     }
 

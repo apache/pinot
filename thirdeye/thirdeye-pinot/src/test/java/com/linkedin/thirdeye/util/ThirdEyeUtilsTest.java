@@ -134,4 +134,11 @@ public class ThirdEyeUtilsTest {
     Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.0012");
   }
 
+  @Test
+  public void testGetRoundedValueNonRegularNumber() {
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(Double.NaN), Double.toString(Double.NaN));
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(Double.POSITIVE_INFINITY), Double.toString(Double.POSITIVE_INFINITY));
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(Double.NEGATIVE_INFINITY), Double.toString(Double.NEGATIVE_INFINITY));
+  }
+
 }

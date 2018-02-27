@@ -36,6 +36,10 @@ public class ServiceStatusTest {
     public ServiceStatus.Status getServiceStatus() {
       return ServiceStatus.Status.GOOD;
     }
+    @Override
+    public String getStatusDescription() {
+      return ServiceStatus.STATUS_DESCRIPTION_NONE;
+    }
   };
 
   private static final ServiceStatus.ServiceStatusCallback ALWAYS_STARTING = new ServiceStatus.ServiceStatusCallback() {
@@ -43,12 +47,20 @@ public class ServiceStatusTest {
     public ServiceStatus.Status getServiceStatus() {
       return ServiceStatus.Status.STARTING;
     }
+    @Override
+    public String getStatusDescription() {
+      return ServiceStatus.STATUS_DESCRIPTION_NONE;
+    }
   };
 
   private static final ServiceStatus.ServiceStatusCallback ALWAYS_BAD = new ServiceStatus.ServiceStatusCallback() {
     @Override
     public ServiceStatus.Status getServiceStatus() {
       return ServiceStatus.Status.BAD;
+    }
+    @Override
+    public String getStatusDescription() {
+      return ServiceStatus.STATUS_DESCRIPTION_NONE;
     }
   };
 

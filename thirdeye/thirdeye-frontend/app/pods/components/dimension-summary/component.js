@@ -1,5 +1,5 @@
-import Ember from 'ember';
+import Component from '@ember/component';
 
-export default Ember.Component.extend({
-  classNames: ['dimension-summary paper-container paper-container--padded']
+export default Component.extend({
+  classNames: ['dimension-summary card-container card-container--padded']
 });

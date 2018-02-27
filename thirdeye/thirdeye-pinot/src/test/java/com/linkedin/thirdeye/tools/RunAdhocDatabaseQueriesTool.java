@@ -5,7 +5,6 @@ import com.linkedin.thirdeye.auto.onboard.ConfigGenerator;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionStatusManager;
@@ -18,7 +17,6 @@ import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.ClassificationConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DetectionStatusManagerImpl;
@@ -31,7 +29,6 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
@@ -63,7 +60,6 @@ public class RunAdhocDatabaseQueriesTool {
   private RawAnomalyResultManager rawResultDAO;
   private MergedAnomalyResultManager mergedResultDAO;
   private MetricConfigManager metricConfigDAO;
-  private DashboardConfigManager dashboardConfigDAO;
   private OverrideConfigManager overrideConfigDAO;
   private JobManager jobDAO;
   private TaskManager taskDAO;
@@ -84,7 +80,6 @@ public class RunAdhocDatabaseQueriesTool {
     rawResultDAO = DaoProviderUtil.getInstance(RawAnomalyResultManagerImpl.class);
     mergedResultDAO = DaoProviderUtil.getInstance(MergedAnomalyResultManagerImpl.class);
     metricConfigDAO = DaoProviderUtil.getInstance(MetricConfigManagerImpl.class);
-    dashboardConfigDAO = DaoProviderUtil.getInstance(DashboardConfigManagerImpl.class);
     overrideConfigDAO = DaoProviderUtil.getInstance(OverrideConfigManagerImpl.class);
     jobDAO = DaoProviderUtil.getInstance(JobManagerImpl.class);
     taskDAO = DaoProviderUtil.getInstance(TaskManagerImpl.class);
@@ -124,13 +119,6 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
-  private void createDashboard(String dataset) {
-
-    String dashboardName = ThirdEyeUtils.getDefaultDashboardName(dataset);
-    DashboardConfigDTO dashboardConfig = dashboardConfigDAO.findByName(dashboardName);
-    dashboardConfig.setMetricIds(ConfigGenerator.getMetricIdsFromMetricConfigs(metricConfigDAO.findByDataset(dataset)));
-    dashboardConfigDAO.update(dashboardConfig);
-  }
 
   private void setAlertFilterForFunctionInCollection(String collection, List<String> metricList,
       Map<String, Map<String, String>> metricRuleMap, Map<String, String> defaultAlertFilter) {
@@ -263,11 +251,7 @@ public class RunAdhocDatabaseQueriesTool {
   }
 
   private void cleanupDataset(String dataset) {
-    List<DashboardConfigDTO> dashboardConfigs = dashboardConfigDAO.findByDataset(dataset);
-    for (DashboardConfigDTO dashboardConfig : dashboardConfigs) {
-      dashboardConfig.setActive(false);
-      dashboardConfigDAO.update(dashboardConfig);
-    }
+
     List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByDataset(dataset);
     for (MetricConfigDTO metricConfig : metricConfigs) {
       metricConfig.setActive(false);

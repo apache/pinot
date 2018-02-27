@@ -18,18 +18,18 @@ package com.linkedin.pinot.core.plan;
 import com.linkedin.pinot.common.utils.DataTable;
 
 
-public abstract class Plan {
-
-  public abstract void print();
+/**
+ * Instance level query plan.
+ */
+public interface Plan {
 
   /**
-   * Root node of the plan
-   *
-   * @return
+   * Execute the query plan and get the instance response.
    */
-  public abstract PlanNode getRoot();
+  DataTable execute();
 
-  public abstract void execute();
-
-  public abstract DataTable getInstanceResponse();
+  /**
+   * Print the query plan (for debugging only).
+   */
+  void print();
 }

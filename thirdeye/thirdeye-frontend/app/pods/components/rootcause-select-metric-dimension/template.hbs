@@ -1,0 +1,35 @@
+<div class="row">
+  <div class="col-xs-5">
+    <label class="te-label te-label--small" for="select-metric">
+      Metrics to Investigate
+      <span>
+        <i class="glyphicon glyphicon-question-sign"></i>
+        {{#tooltip-on-element class="te-tooltip"}}
+          This metric sets the context for the analysis view below. Changing the analyzed metric, dimension filters, analysis period, or baseline will change the data below. You can also add this metric to the chart above by clicking "+ add to chart".
+        {{/tooltip-on-element}}
+      </span>
+    </label>
+    {{rootcause-select-metric
+      selectedUrn=baseUrn
+      onSelection=(action "onMetric")
+    }}
+  </div>
+  <div class="col-xs-7">
+    <label class="te-label te-label--small" for="select-filters">
+      Filter by
+      <span>
+        <i class="glyphicon glyphicon-question-sign"></i>
+        {{#tooltip-on-element class="te-tooltip"}}
+          You can add additional filters to the analyzed metric if you are investigating a subset of the data, for example "countryCode::us". The available filters depend on the data set. You can also select filters in the "Dimensions" tab.
+        {{/tooltip-on-element}}
+      </span>
+    </label>
+
+    {{filter-select
+      selected=filters
+      options=filterOptions
+      triggerId="select-filters"
+      onChange=(action "onFilters")
+    }}
+  </div>
+</div>

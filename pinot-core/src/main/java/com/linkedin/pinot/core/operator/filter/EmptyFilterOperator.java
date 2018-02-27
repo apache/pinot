@@ -15,37 +15,27 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
-import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import com.linkedin.pinot.core.operator.blocks.EmptyFilterBlock;
 
 
 /**
- * Extension of {@link BaseFilterOperator} that is empty, i.e. does not match any doc ids.
+ * Singleton class which extends {@link BaseFilterOperator} that is empty, i.e. does not match any document.
  */
 public final class EmptyFilterOperator extends BaseFilterOperator {
+  private EmptyFilterOperator() {
+  }
+
   private static final String OPERATOR_NAME = "EmptyFilterOperator";
+  private static final EmptyFilterOperator INSTANCE = new EmptyFilterOperator();
 
-  @Override
-  public BaseFilterBlock nextFilterBlock(BlockId blockId) {
-    return new ExcludeEntireSegmentDocIdSetBlock();
+  public static EmptyFilterOperator getInstance() {
+    return INSTANCE;
   }
 
   @Override
-  public String getOperatorName() {
-    return OPERATOR_NAME;
-  }
-
-  @Override
-  public boolean open() {
-    return true;
-  }
-
-  @Override
-  public boolean close() {
-    return true;
+  protected BaseFilterBlock getNextBlock() {
+    return EmptyFilterBlock.getInstance();
   }
 
   @Override
@@ -53,77 +43,8 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
     return true;
   }
 
-  public static class ExcludeEntireSegmentDocIdSetBlock extends BaseFilterBlock {
-    @Override
-    public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
-      return new EmptyDocIdSet();
-    }
-
-    @Override
-    public BlockId getId() {
-      return null;
-    }
-  }
-
-  /**
-   * Implementation of {@link FilterBlockDocIdSet} that is empty.
-   */
-  public static final class EmptyDocIdSet implements FilterBlockDocIdSet {
-
-    @Override
-    public int getMinDocId() {
-      return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public int getMaxDocId() {
-      return Integer.MIN_VALUE;
-    }
-
-    @Override
-    public void setStartDocId(int startDocId) {
-      // Nothing to set.
-    }
-
-    @Override
-    public void setEndDocId(int endDocId) {
-      // Nothing to set.
-    }
-
-    @Override
-    public long getNumEntriesScannedInFilter() {
-      return 0L;
-    }
-
-    @Override
-    public BlockDocIdIterator iterator() {
-      return new EmptyDocIdSetIterator();
-    }
-
-    @Override
-    public <T> T getRaw() {
-      throw new UnsupportedOperationException();
-    }
-  }
-
-  /**
-   * Implementation of {@link BlockDocIdIterator} that is empty.
-   */
-  public static final class EmptyDocIdSetIterator implements BlockDocIdIterator {
-
-    @Override
-    public int advance(int targetDocId) {
-      return Constants.EOF;
-    }
-
-    @Override
-    public int next() {
-      return Constants.EOF;
-    }
-
-    @Override
-    public int currentDocId() {
-      return Constants.EOF;
-    }
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 }

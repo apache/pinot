@@ -50,6 +50,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.hadoop.config.DimensionType;
 import com.linkedin.thirdeye.hadoop.config.MetricType;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
@@ -124,7 +125,7 @@ public class DerivedColumnNoTransformationTest {
 
     GenericRecord input = new GenericData.Record(schema);
     input.put("d1", "abc1");
-    input.put("d2", "pqr1");
+    input.put("d2", 501L);
     input.put("d3", "xyz1");
     input.put("hoursSinceEpoch", generateRandomHoursSinceEpoch());
     input.put("m1", 10);
@@ -133,7 +134,7 @@ public class DerivedColumnNoTransformationTest {
 
     input = new GenericData.Record(schema);
     input.put("d1", "abc2");
-    input.put("d2", "pqr2");
+    input.put("d2", 502L);
     input.put("d3", "xyz2");
     input.put("hoursSinceEpoch", generateRandomHoursSinceEpoch());
     input.put("m1", 10);
@@ -154,6 +155,7 @@ public class DerivedColumnNoTransformationTest {
 
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TABLE_NAME.toString(), "collection");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_NAMES.toString(), "d1,d2,d3");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_TYPES.toString(), "STRING,LONG,STRING");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString(), "m1,m2");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString(), "INT,INT");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_NAME.toString(), "hoursSinceEpoch");
@@ -215,12 +217,14 @@ public class DerivedColumnNoTransformationTest {
     private ThirdEyeConfig thirdeyeConfig;
     private DerivedColumnTransformationPhaseConfig config;
     private List<String> dimensionsNames;
+    private List<DimensionType> dimensionTypes;
     private List<String> metricNames;
     private TopKDimensionValues topKDimensionValues;
     private Map<String, Set<String>> topKDimensionsMap;
     private String timeColumnName;
     private List<MetricType> metricTypes;
-    private Map<String, Set<String>> whitelist;
+    private Map<String, List<String>> whitelist;
+    private Map<String, String> nonWhitelistValueMap;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -230,10 +234,12 @@ public class DerivedColumnNoTransformationTest {
       thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
       config = DerivedColumnTransformationPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
       dimensionsNames = config.getDimensionNames();
+      dimensionTypes = config.getDimensionTypes();
       metricNames = config.getMetricNames();
       metricTypes = config.getMetricTypes();
       timeColumnName = config.getTimeColumnName();
       whitelist = config.getWhitelist();
+      nonWhitelistValueMap = config.getNonWhitelistValue();
 
       outputSchema = new Schema.Parser().parse(configuration.get(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_OUTPUT_SCHEMA.toString()));
 
@@ -260,18 +266,20 @@ public class DerivedColumnNoTransformationTest {
       GenericRecord outputRecord = new Record(outputSchema);
 
       // dimensions
-      for (String dimension : dimensionsNames) {
-        String dimensionName = dimension;
-        String dimensionValue = ThirdeyeAvroUtils.getDimensionFromRecord(inputRecord, dimension);
+      for (int i = 0; i < dimensionsNames.size(); i++) {
+        String dimensionName = dimensionsNames.get(i);
+        DimensionType dimensionType = dimensionTypes.get(i);
+        Object dimensionValue = ThirdeyeAvroUtils.getDimensionFromRecord(inputRecord, dimensionName);
+        String dimensionValueStr = String.valueOf(dimensionValue);
 
         // add original dimension value with whitelist applied
-        String whitelistDimensionValue = dimensionValue;
+        Object whitelistDimensionValue = dimensionValue;
         if (whitelist != null) {
-          Set<String> whitelistDimensions = whitelist.get(dimensionName);
+          List<String> whitelistDimensions = whitelist.get(dimensionName);
           if (CollectionUtils.isNotEmpty(whitelistDimensions)) {
             // whitelist config exists for this dimension but value not present in whitelist
-            if (!whitelistDimensions.contains(dimensionValue)) {
-              whitelistDimensionValue = ThirdEyeConstants.OTHER;
+            if (!whitelistDimensions.contains(dimensionValueStr)) {
+              whitelistDimensionValue = dimensionType.getValueFromString(nonWhitelistValueMap.get(dimensionName));
             }
           }
         }
@@ -283,10 +291,10 @@ public class DerivedColumnNoTransformationTest {
           // if topk config exists for that dimension
           if (CollectionUtils.isNotEmpty(topKDimensionValues)) {
             String topkDimensionName = dimensionName + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX;
-            String topkDimensionValue = dimensionValue;
+            Object topkDimensionValue = dimensionValue;
             // topk config exists for this dimension, but value not present in topk
-            if (!topKDimensionValues.contains(dimensionValue) &&
-                (whitelist == null || whitelist.get(dimensionName) == null || !whitelist.get(dimensionName).contains(dimensionValue))) {
+            if (!topKDimensionValues.contains(dimensionValueStr) &&
+                (whitelist == null || whitelist.get(dimensionName) == null || !whitelist.get(dimensionName).contains(dimensionValueStr))) {
               topkDimensionValue = ThirdEyeConstants.OTHER;
             }
             outputRecord.put(topkDimensionName, topkDimensionValue);

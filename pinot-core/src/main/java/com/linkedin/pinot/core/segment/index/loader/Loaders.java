@@ -27,8 +27,8 @@ import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
-import com.linkedin.pinot.core.startree.StarTreeInterf;
-import com.linkedin.pinot.core.startree.StarTreeSerDe;
+import com.linkedin.pinot.core.startree.OffHeapStarTree;
+import com.linkedin.pinot.core.startree.StarTree;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
@@ -67,13 +67,9 @@ public class Loaders {
       Preconditions.checkArgument(indexDir.exists(), "Index directory: {} does not exist", indexDir);
       Preconditions.checkArgument(indexDir.isDirectory(), "Index directory: {} is not a directory", indexDir);
 
-      String segmentName = indexDir.getName();
-
-      // Convert star-tree format if necessary
-      StarTreeSerDe.convertStarTreeFormatIfNeeded(indexDir, indexLoadingConfig.getStarTreeVersion());
-
       // Convert segment version if necessary
       // NOTE: this step may modify the segment metadata
+      String segmentName = indexDir.getName();
       SegmentVersion segmentVersionToLoad = indexLoadingConfig.getSegmentVersion();
       if (segmentVersionToLoad != null && !SegmentDirectoryPaths.segmentDirectoryFor(indexDir, segmentVersionToLoad)
           .isDirectory()) {
@@ -110,10 +106,10 @@ public class Loaders {
       }
 
       // Load star tree index if it exists
-      StarTreeInterf starTree = null;
+      StarTree starTree = null;
       if (segmentReader.hasStarTree()) {
         LOGGER.info("Loading star tree for segment: {}", segmentName);
-        starTree = StarTreeSerDe.fromFile(segmentReader.getStarTreeFile(), readMode);
+        starTree = new OffHeapStarTree(segmentReader.getStarTreeFile(), readMode);
       }
 
       return new IndexSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTree);

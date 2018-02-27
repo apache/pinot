@@ -69,7 +69,6 @@ public class TimeSeriesResource {
     CHANGE,
     FILLFORWARD,
     FILLZERO,
-    TIMESTAMP,
     RELATIVE,
     OFFSET,
     LOG,
@@ -101,7 +100,7 @@ public class TimeSeriesResource {
   private static final Logger LOG = LoggerFactory.getLogger(TimeSeriesResource.class);
   private static final String ALL = "All";
 
-  public static final String DECIMAL_FORMAT = "%+.1f";
+  private static final String DECIMAL_FORMAT = "%+.1f";
 
   private LoadingCache<String, Long> datasetMaxDataTimeCache = CACHE_REGISTRY_INSTANCE
       .getDatasetMaxDataTimeCache();
@@ -155,7 +154,6 @@ public class TimeSeriesResource {
    *   CHANGE        relative changes from previous to current value
    *   FILLFORWARD   fills nulls with last non-null value (first value may still be null)
    *   FILLZERO      fills nulls with 0
-   *   TIMESTAMP     absolute timestamp instead of offset (no effect on aggregated series)
    *   RELATIVE      values divided by first value of the series
    *   OFFSET        values as offset from first value of the series
    *   LOG           log10 of values
@@ -236,11 +234,6 @@ public class TimeSeriesResource {
       for (String part : transformationsString.split(",")) {
         transformations.add(TransformationType.valueOf(part.toUpperCase()));
       }
-
-      // require time granularity for timestamp transformation
-      if (transformations.contains(TransformationType.TIMESTAMP) && granularity == null) {
-        throw new IllegalArgumentException("Must provide time granularity for timestamp transformation");
-      }
     }
 
     Collection<AggregationType> aggregations = new ArrayList<>();
@@ -269,9 +262,9 @@ public class TimeSeriesResource {
         long metricId = Long.valueOf(id);
         long start = range.getStartMillis();
         long end = range.getEndMillis();
-        MetricSlice slice = MetricSlice.from(metricId, start, end, filters);
+        MetricSlice slice = MetricSlice.from(metricId, start, end, filters, granularity);
 
-        requests.put(slice, fetchMetricTimeSeriesAsync(slice, granularity));
+        requests.put(slice, fetchMetricTimeSeriesAsync(slice));
       }
     }
 
@@ -372,7 +365,7 @@ public class TimeSeriesResource {
   private static Map<String, List<? extends Number>> convertDataToMap(DataFrame data) {
     Map<String, List<? extends Number>> output = new HashMap<>();
     for (String name : data.getSeriesNames()) {
-      if (data.getIndexName().equals(name)) {
+      if (data.getIndexNames().contains(name)) {
         output.put(name, data.getLongs(name).toList());
         continue;
       }
@@ -456,8 +449,6 @@ public class TimeSeriesResource {
         return transformTimeSeriesFillForward(data);
       case FILLZERO:
         return transformTimeSeriesFillZero(data);
-      case TIMESTAMP:
-        return transformTimeSeriesTimestamp(data, start, granularity);
       case CHANGE:
         return transformTimeSeriesChange(data);
       case RELATIVE:
@@ -479,7 +470,7 @@ public class TimeSeriesResource {
   private DataFrame transformTimeSeriesCumulative(DataFrame data) {
     Grouping.DataFrameGrouping group = data.groupByExpandingWindow();
     for (String id : data.getSeriesNames()) {
-      if (data.getIndexName().equals(id))
+      if (data.getIndexNames().contains(id))
         continue;
       data.addSeries(id, group.aggregate(id, DoubleSeries.SUM).getValues());
     }
@@ -494,7 +485,7 @@ public class TimeSeriesResource {
    */
   private DataFrame transformTimeSeriesDifference(DataFrame data) {
     for (String id : data.getSeriesNames()) {
-      if (data.getIndexName().equals(id))
+      if (data.getIndexNames().contains(id))
         continue;
       DoubleSeries s = data.getDoubles(id);
       data.addSeries(id, s.subtract(s.shift(1)));
@@ -523,24 +514,6 @@ public class TimeSeriesResource {
   }
 
   /**
-   * Returns time series with time stamps in milliseconds (rather than indices)
-   *
-   * @param data query results
-   * @param start start time offset in millis
-   * @param granularity time granularity of rows
-   * @return data series with millisecond timestamps
-   */
-  private DataFrame transformTimeSeriesTimestamp(DataFrame data, final long start, final TimeGranularity granularity) {
-    data.mapInPlace(new Series.LongFunction() {
-      @Override
-      public long apply(long... values) {
-        return granularity.toMillis(values[0]) + start;
-      }
-    }, data.getIndexName());
-    return data;
-  }
-
-  /**
    * Returns time series of changes.
    *
    * @param data query results
@@ -548,7 +521,7 @@ public class TimeSeriesResource {
    */
   private DataFrame transformTimeSeriesChange(DataFrame data) {
     for (String id : data.getSeriesNames()) {
-      if (data.getIndexName().equals(id))
+      if (data.getIndexNames().contains(id))
         continue;
       DoubleSeries s = data.getDoubles(id);
       data.addSeries(id, s.divide(s.shift(1).replace(0d, DoubleSeries.NULL)).subtract(1));
@@ -564,12 +537,13 @@ public class TimeSeriesResource {
    */
   private DataFrame transformTimeSeriesRelative(DataFrame data) {
     for (String id : data.getSeriesNames()) {
-      if (data.getIndexName().equals(id))
+      if (data.getIndexNames().contains(id))
         continue;
       DoubleSeries s = data.getDoubles(id);
-      if (s.size() <= 0)
+      DoubleSeries sDrop = s.dropNull();
+      if (sDrop.isEmpty())
         continue;
-      final double base = s.first().doubleValue();
+      final double base = sDrop.first().doubleValue();
       if (base != 0.0d) {
         data.addSeries(id, s.divide(base));
       } else {
@@ -587,12 +561,13 @@ public class TimeSeriesResource {
    */
   private DataFrame transformTimeSeriesOffset(DataFrame data) {
     for (String id : data.getSeriesNames()) {
-      if (data.getIndexName().equals(id))
+      if (data.getIndexNames().contains(id))
         continue;
       DoubleSeries s = data.getDoubles(id);
-      if (s.size() <= 0)
+      DoubleSeries sDrop = s.dropNull();
+      if (sDrop.isEmpty())
         continue;
-      final double base = s.first().doubleValue();
+      final double base = sDrop.first().doubleValue();
       data.addSeries(id, s.subtract(base));
     }
     return data;
@@ -606,7 +581,7 @@ public class TimeSeriesResource {
    */
   private DataFrame transformTimeSeriesLog(DataFrame data) {
     for (String id : data.getSeriesNames()) {
-      if (data.getIndexName().equals(id))
+      if (data.getIndexNames().contains(id))
         continue;
       data.mapInPlace(new Series.DoubleFunction() {
         @Override
@@ -625,11 +600,11 @@ public class TimeSeriesResource {
    * Asynchronous call to {@code fetchMetricTimeSeries}
    * @see TimeSeriesLoader#load
    */
-  private Future<DataFrame> fetchMetricTimeSeriesAsync(final MetricSlice slice, final TimeGranularity granularity) throws Exception {
+  private Future<DataFrame> fetchMetricTimeSeriesAsync(final MetricSlice slice) throws Exception {
     return this.executor.submit(new Callable<DataFrame>() {
       @Override
       public DataFrame call() throws Exception {
-        return TimeSeriesResource.this.loader.load(slice, granularity);
+        return TimeSeriesResource.this.loader.load(slice);
       }
     });
   }

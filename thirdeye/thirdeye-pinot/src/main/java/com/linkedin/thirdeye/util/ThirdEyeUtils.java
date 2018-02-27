@@ -3,16 +3,14 @@
 package com.linkedin.thirdeye.util;
 
 import com.google.common.collect.HashMultimap;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.thirdeye.api.DimensionMap;
 
+import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
+import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
+import io.dropwizard.configuration.ConfigurationFactory;
+import io.dropwizard.jackson.Jackson;
+import java.io.File;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -24,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
+import javax.validation.Validation;
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.Period;
 import org.slf4j.Logger;
@@ -34,16 +33,12 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.CollectionSchema;
-import com.linkedin.thirdeye.api.DimensionSpec;
-import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
-import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -235,7 +230,7 @@ public abstract class ThirdEyeUtils {
 
   private static String getSDFPatternFromTimeFormat(String timeFormat) {
     String pattern = timeFormat;
-    String[] tokens = timeFormat.split(":");
+    String[] tokens = timeFormat.split(":", 2);
     if (tokens.length == 2) {
       pattern = tokens[1];
     }
@@ -280,7 +275,7 @@ public abstract class ThirdEyeUtils {
     } else {
       derivedMetricExpression = MetricConfigBean.DERIVED_METRIC_ID_PREFIX + metricConfig.getId();
     }
-    
+
     return derivedMetricExpression;
   }
 
@@ -301,57 +296,11 @@ public abstract class ThirdEyeUtils {
     return metricConfig.getName();
   }
 
-  public static Schema createSchema(CollectionSchema collectionSchema) {
-    Schema schema = new Schema();
-
-    for (DimensionSpec dimensionSpec : collectionSchema.getDimensions()) {
-      FieldSpec fieldSpec = new DimensionFieldSpec();
-      String dimensionName = dimensionSpec.getName();
-      fieldSpec.setName(dimensionName);
-      fieldSpec.setDataType(DataType.STRING);
-      fieldSpec.setSingleValueField(true);
-      schema.addField(dimensionName, fieldSpec);
-    }
-    for (MetricSpec metricSpec : collectionSchema.getMetrics()) {
-      FieldSpec fieldSpec = new MetricFieldSpec();
-      String metricName = metricSpec.getName();
-      fieldSpec.setName(metricName);
-      fieldSpec.setDataType(DataType.valueOf(metricSpec.getType().toString()));
-      fieldSpec.setSingleValueField(true);
-      schema.addField(metricName, fieldSpec);
-    }
-    TimeSpec timeSpec = collectionSchema.getTime();
-    String timeFormat = timeSpec.getFormat().equals("sinceEpoch") ? TimeFormat.EPOCH.toString()
-        : TimeFormat.SIMPLE_DATE_FORMAT.toString() + ":" + timeSpec.getFormat();
-    TimeGranularitySpec incoming =
-        new TimeGranularitySpec(DataType.LONG,
-            timeSpec.getDataGranularity().getSize(),
-            timeSpec.getDataGranularity().getUnit(),
-            timeFormat,
-            timeSpec.getColumnName());
-    TimeGranularitySpec outgoing =
-        new TimeGranularitySpec(DataType.LONG,
-            timeSpec.getDataGranularity().getSize(),
-            timeSpec.getDataGranularity().getUnit(),
-            timeFormat,
-            timeSpec.getColumnName());
-
-    schema.addField(timeSpec.getColumnName(), new TimeFieldSpec(incoming, outgoing));
-
-    schema.setSchemaName(collectionSchema.getCollection());
-
-    return schema;
-  }
-
   public static String constructMetricAlias(String datasetName, String metricName) {
     String alias = datasetName + MetricConfigBean.ALIAS_JOINER + metricName;
     return alias;
   }
 
-  public static String getDefaultDashboardName(String dataset) {
-    String dashboardName = DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset;
-    return dashboardName;
-  }
 
   //By default, query only offline, unless dataset has been marked as realtime
   public static String computeTableName(String collection) {
@@ -422,7 +371,6 @@ public abstract class ThirdEyeUtils {
     return metricConfig;
   }
 
-
   /**
    * Get rounded double value, according to the value of the double.
    * Max rounding will be upto 4 decimals
@@ -434,6 +382,16 @@ public abstract class ThirdEyeUtils {
    * @return
    */
   public static String getRoundedValue(double value) {
+    if (Double.isNaN(value) || Double.isInfinite(value)) {
+      if (Double.isNaN(value)) {
+        return Double.toString(Double.NaN);
+      }
+      if (value > 0) {
+        return Double.toString(Double.POSITIVE_INFINITY);
+      } else {
+        return Double.toString(Double.NEGATIVE_INFINITY);
+      }
+    }
     StringBuffer decimalFormatBuffer = new StringBuffer(TWO_DECIMALS_FORMAT);
     double compareValue = 0.1;
     while (value > 0 && value < compareValue && !decimalFormatBuffer.toString().equals(MAX_DECIMALS_FORMAT)) {
@@ -461,4 +419,40 @@ public abstract class ThirdEyeUtils {
     return dataSource;
   }
 
+  /**
+   * Initializes a light weight ThirdEye environment for conducting standalone experiments.
+   *
+   * @param thirdEyeConfigDir the directory to ThirdEye configurations.
+   */
+  public static void initLightWeightThirdEyeEnvironment(String thirdEyeConfigDir) {
+    System.setProperty("dw.rootDir", thirdEyeConfigDir);
+
+    // Initialize DAO Registry
+    String persistenceConfig = thirdEyeConfigDir + "/persistence.yml";
+    LOG.info("Loading persistence config from [{}]", persistenceConfig);
+    DaoProviderUtil.init(new File(persistenceConfig));
+
+    // Read configuration for data sources, etc.
+    ThirdEyeDashboardConfiguration config;
+    try {
+      String dashboardConfigFilePath = thirdEyeConfigDir + "/dashboard.yml";
+      File configFile = new File(dashboardConfigFilePath);
+      ConfigurationFactory<ThirdEyeDashboardConfiguration> factory =
+          new ConfigurationFactory<>(ThirdEyeDashboardConfiguration.class,
+              Validation.buildDefaultValidatorFactory().getValidator(), Jackson.newObjectMapper(), "");
+      config = factory.build(configFile);
+      config.setRootDir(thirdEyeConfigDir);
+    } catch (Exception e) {
+      LOG.error("Exception while constructing ThirdEye config:", e);
+      throw new RuntimeException(e);
+    }
+
+    // Initialize Cache Registry
+    try {
+      ThirdEyeCacheRegistry.initializeCachesWithoutRefreshing(config);
+    } catch (Exception e) {
+      LOG.error("Exception while loading caches:", e);
+      throw new RuntimeException(e);
+    }
+  }
 }

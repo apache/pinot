@@ -15,35 +15,17 @@
  */
 package com.linkedin.pinot.common.utils.retry;
 
-import com.linkedin.pinot.common.Utils;
-import java.util.concurrent.Callable;
-
-
 /**
- * No delay retry policy, see {@link RetryPolicies#noDelayRetryPolicy(int)}.
+ * Retry policy without delay between attempts.
  */
-public class NoDelayRetryPolicy implements RetryPolicy {
-  public NoDelayRetryPolicy(int attemptCount) {
-    _attemptCount = attemptCount;
+public class NoDelayRetryPolicy extends BaseRetryPolicy {
+
+  public NoDelayRetryPolicy(int maxNumAttempts) {
+    super(maxNumAttempts);
   }
 
-  private int _attemptCount;
-
   @Override
-  public boolean attempt(Callable<Boolean> operation) {
-    try {
-      int remainingAttempts = _attemptCount - 1;
-      boolean result = operation.call();
-
-      while (!result && 0 < remainingAttempts) {
-        result = operation.call();
-        remainingAttempts--;
-      }
-
-      return result;
-    } catch (Exception e) {
-      Utils.rethrowException(e);
-      return false;
-    }
+  protected long getNextDelayMs() {
+    return 0L;
   }
 }

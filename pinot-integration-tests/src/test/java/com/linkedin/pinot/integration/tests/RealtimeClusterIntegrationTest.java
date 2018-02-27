@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -94,7 +95,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
 
     addRealtimeTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
         getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, null, null,
-        getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getRawIndexColumns(), getTaskConfig());
+        getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getRawIndexColumns(), getTaskConfig(), null);
   }
 
   @Test
@@ -107,6 +108,41 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
   @Override
   public void testGeneratedQueriesWithMultiValues() throws Exception {
     super.testGeneratedQueriesWithMultiValues();
+  }
+
+  /**
+   * In realtime consuming segments, the dictionary is not sorted,
+   * and the dictionary based operator should not be used
+   *
+   * Adding explicit queries to test dictionary based functions,
+   * to ensure the right result is computed, wherein dictionary is not read if it is mutable
+   * @throws Exception
+   */
+  @Test
+  public void testDictionaryBasedQueries() throws Exception {
+
+    // Dictionary columns
+    // int
+    testDictionaryBasedFunctions("NASDelay");
+
+    // long
+    testDictionaryBasedFunctions("AirlineID");
+
+    // double
+    testDictionaryBasedFunctions("ArrDelayMinutes");
+
+    // float
+    testDictionaryBasedFunctions("DepDelayMinutes");
+
+    // Non Dictionary columns
+    // int
+    testDictionaryBasedFunctions("ActualElapsedTime");
+
+    // double
+    testDictionaryBasedFunctions("DepDelay");
+
+    // float
+    testDictionaryBasedFunctions("ArrDelay");
   }
 
   @Test
@@ -132,5 +168,19 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     }
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
+  }
+
+  private void testDictionaryBasedFunctions(String column) throws Exception {
+    String pqlQuery;
+    String sqlQuery;
+    pqlQuery = "SELECT MAX(" + column + ") FROM " + getTableName();
+    sqlQuery = "SELECT MAX(" + column + ") FROM " + getTableName();
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT MIN(" + column + ") FROM " + getTableName();
+    sqlQuery = "SELECT MIN(" + column + ") FROM " + getTableName();
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT MINMAXRANGE(" + column + ") FROM " + getTableName();
+    sqlQuery = "SELECT MAX(" + column + ")-MIN(" + column + ") FROM " + getTableName();
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
   }
 }

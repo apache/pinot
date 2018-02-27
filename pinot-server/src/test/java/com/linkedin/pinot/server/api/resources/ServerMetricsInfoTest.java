@@ -33,6 +33,7 @@ import java.util.List;
 
 
 public class ServerMetricsInfoTest {
+    /*
     public static final Logger LOGGER = LoggerFactory.getLogger(ServerMetricsInfoTest.class);
     ResourceTestHelper testHelper = new ResourceTestHelper();
     WebTarget target;
@@ -66,4 +67,5 @@ public class ServerMetricsInfoTest {
         server1latencies.add(metric);
         Assert.assertNotNull(server1latencies);
     }
+    */
 }

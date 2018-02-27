@@ -15,13 +15,9 @@
  */
 package com.linkedin.pinot.transport.scattergather;
 
-import java.util.Map;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.BucketingSelection;
-import com.linkedin.pinot.transport.common.ReplicaSelection;
-import com.linkedin.pinot.transport.common.ReplicaSelectionGranularity;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
+import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -32,74 +28,35 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
 public interface ScatterGatherRequest {
 
   /**
-   * Return the candidate set of servers that hosts each segment-set.
-   * The List of services are expected to be ordered so that replica-selection strategy can be
-   * applied to them to select one Service among the list for each segment.
+   * Get the routing table (map from server to list of segments).
    *
-   * @return SegmentSet to Request map.
+   * @return Map from server to list of segments
    */
-  public Map<ServerInstance, SegmentIdSet> getSegmentsServicesMap();
+  Map<String, List<String>> getRoutingTable();
 
   /**
-   * Return the requests that will be sent to the service which is hosting a group of interested segments
-   * @param service Service to which segments will be sent.
-   * @param querySegments Segments to be queried in the service identified by Service.
-   * @return byte[] request to be sent
-   */
-  public byte[] getRequestForService(ServerInstance service, SegmentIdSet querySegments);
-
-  /**
-   * Replica Selection Policy to follow when a segmentIdSet has more than one candidate nodes
-   * @return Replica selection strategy for this request.
-   **/
-  public ReplicaSelection getReplicaSelection();
-
-  /**
-   * Replica Selection granularity to follow for applying the replica selection policy.
-   * @return Replica selection granularity for this request.
-   **/
-  public ReplicaSelectionGranularity getReplicaSelectionGranularity();
-
-  /**
-   * Used by Hash based selection strategy. Hash-based routing allows groups of request
-   * to be sent to the same node. This is called bucketing. Useful for A/B testing.
-   * This is an optional field and is only used if hash-based selection is requested.
-   * If hash-based routing is requested but the bucket-key is not present, then round-robin
-   * selection is used.
-   */
-  public Object getHashKey();
-
-  /**
-   * Return the number of speculative (duplicate) requests ( to different server) that needs
-   * to be sent foe each scattered request. To turn off speculative requests, this method should
-   * return 0.
+   * Get the request to be sent to the server.
    *
-   * TODO: Currently Not implemented
+   * @param segments List of segments to be queried
+   * @return Request to be sent
    */
-  public int getNumSpeculativeRequests();
+  byte[] getRequestForService(List<String> segments);
 
   /**
-   * Used for diagnostics, A predefined selection of service can be chosen for each segments
-   * and sent to the Scatter-Gather. Scatter-Gather will honor such selection and do not override them.
-   * @return
+   * Get the request id for tracing purpose.
+   *
+   * @return Request id
    */
-  public BucketingSelection getPredefinedSelection();
+  long getRequestId();
 
   /**
-   * Request Id for tracing purpose
-   * @return
+   * Return timeout in milliseconds for the request. If the timeout gets elapsed, the request will be cancelled.
+   * Timeout with negative values are considered infinite timeout.
    */
-  public long getRequestId();
-
-  /**
-   * Return timeout in MS for the request. If the timeout gets elapsed, the request will be cancelled.  Timeout
-   * with negative values are considered infinite timeout.
-   * @return
-   */
-  public long getRequestTimeoutMS();
+  long getRequestTimeoutMs();
 
   /**
    * @return the BrokerRequest object used for this scatterGather
    */
-  public BrokerRequest getBrokerRequest();
+  BrokerRequest getBrokerRequest();
 }

@@ -3,7 +3,7 @@ function showMetricDatasetSelection() {
   $.ajax({
     type : "GET",
     url : "/data/datasets",
-    data : "{}",
+    data : encodeURIComponent("{}"),
     contentType : "application/json; charset=utf-8",
     dataType : "json",
     success : function(data) {
@@ -28,7 +28,7 @@ function getMetricSet(dataset){
   $.ajax({
     type : "GET",
     url : "/thirdeye-admin/metric-config/metrics?dataset=" + dataset,
-    data : "[]",
+    data : encodeURIComponent("[]"),
     contentType : "application/json; charset=utf-8",
     dataType : "json",
     success : function(data) {
@@ -87,6 +87,11 @@ function updateMetricConfigTable(dataset, metrics) {
       },
       active : {
         title : 'Active',
+        defaultValue : false,
+        options : [ false, true ]
+      },
+      metricAsDimension : {
+        title : 'MetricAsDimension',
         defaultValue : false,
         options : [ false, true ]
       },

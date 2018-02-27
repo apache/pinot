@@ -22,6 +22,7 @@ import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -71,6 +72,9 @@ public class DictionaryToRawIndexConverter {
 
   @Option(name = "-compressOutput", required = false, usage = "Compress (tar + gzip) output segment")
   private boolean _compressOutput = false;
+
+  @Option(name = "-compressionType", required = false, usage = "Compression Type")
+  private String _compressionType = "Snappy";
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h"}, usage = "print this message")
   private boolean _help = false;
@@ -292,15 +296,17 @@ public class DictionaryToRawIndexConverter {
     }
 
     int totalDocs = segment.getSegmentMetadata().getTotalDocs();
-    BlockSingleValIterator bvIter = (BlockSingleValIterator) dataSource.getNextBlock().getBlockValueSet().iterator();
+    BlockSingleValIterator bvIter = (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator();
 
     FieldSpec.DataType dataType = dataSourceMetadata.getDataType();
     int lengthOfLongestEntry =
         (dataType == FieldSpec.DataType.STRING) ? getLengthOfLongestEntry(bvIter, dictionary) : -1;
 
+    ChunkCompressorFactory.CompressionType compressionType =
+        ChunkCompressorFactory.CompressionType.valueOf(_compressionType);
     SingleValueRawIndexCreator rawIndexCreator =
-        SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(newSegment, column, dataType, totalDocs,
-            lengthOfLongestEntry);
+        SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(newSegment, compressionType, column, dataType,
+            totalDocs, lengthOfLongestEntry);
 
     int docId = 0;
     bvIter.reset();
@@ -325,11 +331,11 @@ public class DictionaryToRawIndexConverter {
    * @param sorted True if column is sorted, False otherwise
    */
   private void deleteForwardIndex(File segmentDir, String column, boolean sorted) {
-    File dictionaryFile = new File(segmentDir, (column + V1Constants.Dict.FILE_EXTENTION));
+    File dictionaryFile = new File(segmentDir, (column + V1Constants.Dict.FILE_EXTENSION));
     FileUtils.deleteQuietly(dictionaryFile);
 
-    String fwdIndexFileExtension = (sorted) ? V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION
-        : V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION;
+    String fwdIndexFileExtension = (sorted) ? V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION
+        : V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
     File fwdIndexFile = new File(segmentDir, (column + fwdIndexFileExtension));
     FileUtils.deleteQuietly(fwdIndexFile);
   }

@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import java.io.Serializable;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
+import org.apache.commons.lang3.StringUtils;
 
 public class AnomalyFeedbackDTO extends AnomalyFeedbackBean implements AnomalyFeedback, Serializable {
   private static final long serialVersionUID = 1L;
@@ -19,7 +20,7 @@ public class AnomalyFeedbackDTO extends AnomalyFeedbackBean implements AnomalyFe
       if (anomalyFeedback.getFeedbackType() != null) {
         this.setFeedbackType(anomalyFeedback.getFeedbackType());
       }
-      if (anomalyFeedback.getFeedbackType() != null) {
+      if (StringUtils.isNotBlank(anomalyFeedback.getComment())) {
         this.setComment(anomalyFeedback.getComment());
       }
     }

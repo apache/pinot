@@ -117,7 +117,7 @@ public class KeyedPoolImpl<T> implements KeyedPool<T> {
   }
 
   @Override
-  public ServerResponseFuture<T> checkoutObject(ServerInstance key) {
+  public ServerResponseFuture<T> checkoutObject(ServerInstance key, String context) {
     AsyncPool<T> pool = _keyedPool.get(key);
 
     if (null == pool) {
@@ -137,7 +137,7 @@ public class KeyedPoolImpl<T> implements KeyedPool<T> {
       }
     }
 
-    AsyncResponseFuture<T> future = new AsyncResponseFuture<T>(key, "Checkout future for key " + key);
+    AsyncResponseFuture<T> future = new AsyncResponseFuture<T>(key, "ConnPool checkout future for key " + key + "(" + context + ")");
     Cancellable cancellable = pool.get(future);
     future.setCancellable(cancellable);
     return future;
@@ -178,7 +178,7 @@ public class KeyedPoolImpl<T> implements KeyedPool<T> {
       List<ServerResponseFuture< NoneType>> futureList = new ArrayList<ServerResponseFuture<NoneType>>();
       for (Entry<ServerInstance, AsyncPool<T>> poolEntry : _keyedPool.entrySet()) {
         AsyncResponseFuture<NoneType> shutdownFuture = new AsyncResponseFuture<NoneType>(poolEntry.getKey(),
-            "Shutdown future for pool entry " + poolEntry.getKey());
+            "ConnPool shutdown future for pool entry " + poolEntry.getKey());
         poolEntry.getValue().shutdown(shutdownFuture);
         futureList.add(shutdownFuture);
         //Cancel waiters and notify them

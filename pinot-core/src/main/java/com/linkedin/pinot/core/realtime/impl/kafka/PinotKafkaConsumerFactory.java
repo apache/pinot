@@ -16,12 +16,27 @@
 
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import javax.annotation.Nonnull;
 
 
-public interface PinotKafkaConsumerFactory {
-  PinotKafkaConsumer buildConsumer(@Nonnull String bootstrapNodes, @Nonnull String clientId, @Nonnull String topic, @Nonnull int partition,
-      @Nonnull long connectTimeoutMillis);
+public abstract class PinotKafkaConsumerFactory {
+  public static PinotKafkaConsumerFactory create(KafkaStreamMetadata kafkaStreamMetadata) {
+    PinotKafkaConsumerFactory factory = null;
+    try {
+      factory = (PinotKafkaConsumerFactory) Class.forName(kafkaStreamMetadata.getConsumerFactoryName()).newInstance();
+    } catch (Exception e) {
+      Utils.rethrowException(e);
+    }
+    return factory;
+  }
 
-  PinotKafkaConsumer buildMetadataFetcher(@Nonnull String bootstrapNodes, @Nonnull String clientId, @Nonnull long connectTimeoutMillis);
+  public abstract PinotKafkaConsumer buildConsumer(@Nonnull String clientId, int partition, KafkaStreamMetadata kafkaStreamMetadata);
+
+  public abstract PinotKafkaConsumer buildMetadataFetcher(@Nonnull String clientId, KafkaStreamMetadata kafkaStreamMetadata);
+
+  public KafkaMessageDecoder getDecoder(KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig) throws Exception {
+    return kafkaStreamProviderConfig.getDecoder();
+  }
 }

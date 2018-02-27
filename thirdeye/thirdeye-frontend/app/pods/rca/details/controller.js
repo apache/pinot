@@ -1,17 +1,12 @@
-import Ember from 'ember';
+import { once, debounce } from '@ember/runloop';
+import { computed } from '@ember/object';
+import { reads } from '@ember/object/computed';
+import Controller from '@ember/controller';
 import moment from 'moment';
 
 const serverDateFormat = 'YYYY-MM-DD HH:mm';
 
-const isBetween = (date, start, end) => {
-  date = Number(date);
-  start = Number(start);
-  end = Number(end);
-
-  return moment(date).isBetween(start, end);
-};
-
-export default Ember.Controller.extend({
+export default Controller.extend({
   queryParams: [
     'granularity',
     'filters',
@@ -23,34 +18,42 @@ export default Ember.Controller.extend({
     'analysisStart',
     'analysisEnd'
   ],
-  granularities: Ember.computed.reads('model.granularities'),
+  granularities: reads('model.granularities'),
   noMatchesMessage: '',
   filters: null,
   compareMode: null,
   compareModeOptions: ['WoW', 'Wo2W', 'Wo3W', 'Wo4W'],
   mostRecentTask: null,
-  metricFilters: Ember.computed.reads('model.metricFilters'),
+  metricFilters: reads('model.metricFilters'),
   subchartStart: 0,
   subchartEnd: 0,
   predefinedRanges: {},
+  shouldReset: false,
 
   /**
    * Upper bound (end) for date range
    * @type {String}
    */
-  maxTime: Ember.computed('model.maxTime', function() {
-    const maxTime = this.get('model.maxTime');
+  maxTime: computed(
+    'model.maxTime',
+    'granularity',
+    function() {
+      let maxTime = this.get('model.maxTime');
+      maxTime = maxTime ? moment(maxTime) : moment();
 
-    return maxTime
-      ? moment(maxTime).format(serverDateFormat)
-      : moment().format(serverDateFormat);
-  }),
+      // edge case handling for daily granularity
+      if (this.get('granularity') === 'DAYS') {
+        maxTime.startOf('day');
+      }
+      return maxTime.format(serverDateFormat);
+    }
+  ),
 
   /**
    * Indicates the date format to be used based on granularity
    * @type {String}
    */
-  uiDateFormat: Ember.computed('granularity', function() {
+  uiDateFormat: computed('granularity', function() {
     const granularity = this.get('granularity');
 
     switch(granularity) {
@@ -67,7 +70,7 @@ export default Ember.Controller.extend({
    * Indicates the allowed date range picker increment based on granularity
    * @type {Number}
    */
-  timePickerIncrement: Ember.computed('granularity', function() {
+  timePickerIncrement: computed('granularity', function() {
     const granularity = this.get('granularity');
 
     switch(granularity) {
@@ -84,14 +87,14 @@ export default Ember.Controller.extend({
    * Determines if the date range picker should show time selection
    * @type {Boolean}
    */
-  showTimePicker: Ember.computed('granularity', function() {
+  showTimePicker: computed('granularity', function() {
     const granularity = this.get('granularity');
 
     return granularity !== 'DAYS';
   }),
 
   // converts analysisStart from unix ms to serverDateFormat
-  anomalyRegionStart: Ember.computed('analysisStart', {
+  anomalyRegionStart: computed('analysisStart', {
     get() {
       const start = this.get('analysisStart');
 
@@ -110,7 +113,7 @@ export default Ember.Controller.extend({
   }),
 
   // converts analysisEnd from unix ms to serverDateFormat
-  anomalyRegionEnd: Ember.computed('analysisEnd', {
+  anomalyRegionEnd: computed('analysisEnd', {
     get() {
       const end = this.get('analysisEnd');
 
@@ -127,10 +130,8 @@ export default Ember.Controller.extend({
   }),
 
   // converts startDate from unix ms to serverDateFormat
-  viewRegionStart: Ember.computed(
+  viewRegionStart: computed(
     'startDate',
-    'analysisStart',
-    'analysisEnd',
     {
       get() {
         const start = this.get('startDate');
@@ -146,22 +147,20 @@ export default Ember.Controller.extend({
         const analysisStart = this.get('analysisStart');
 
         if (+start > +analysisStart) {
-          this.set('analysisStart', undefined);
-          this.set('analysisEnd', undefined);
+          this.set('shouldReset', true);
         }
 
         this.set('startDate', start);
+        once(this, this.get('actions.resetAnalysisDates'));
+
         return moment(value).format(serverDateFormat);
       }
     }
   ),
 
   // converts endDate from unix ms to serverDateFormat
-  viewRegionEnd: Ember.computed(
+  viewRegionEnd: computed(
     'endDate',
-    'analysisStart',
-    'analysisEnd',
-    'model.maxTime',
     {
       get() {
         const end = this.get('endDate');
@@ -170,16 +169,16 @@ export default Ember.Controller.extend({
       },
       set(key, value) {
         if (!value || value === 'Invalid date') { return this.get('endDate') || 0; }
-        const maxTime = this.get('model.maxTime');
+        const maxTime = moment(this.get('maxTime')).valueOf();
         const end = moment(value).valueOf();
         const newEnd = (+maxTime < +end) ? maxTime : end;
         const analysisEnd = this.get('analysisEnd');
 
         if (+newEnd < +analysisEnd) {
-          this.set('analysisStart', undefined);
-          this.set('analysisEnd', undefined);
+          this.set('shouldReset', true);
         }
         this.set('endDate', newEnd);
+        once(this, this.get('actions.resetAnalysisDates'));
 
         return moment(value).format(serverDateFormat);
       }
@@ -187,14 +186,14 @@ export default Ember.Controller.extend({
   ),
 
   // min date for the anomaly region
-  minDate: Ember.computed('startDate', function() {
+  minDate: computed('startDate', function() {
     const start = this.get('startDate');
 
     return moment(+start).format(serverDateFormat);
   }),
 
   // max date for the anomaly region
-  maxDate: Ember.computed(
+  maxDate: computed(
     'endDate',
     'granularity',
     function() {
@@ -205,8 +204,7 @@ export default Ember.Controller.extend({
 
       if (granularity === 'DAYS') {
         return moment(+end)
-          .subtract(1, 'day')
-          .endOf('day')
+          .startOf('day')
           .format(serverDateFormat);
       }
 
@@ -214,7 +212,7 @@ export default Ember.Controller.extend({
     }
   ),
 
-  uiGranularity: Ember.computed(
+  uiGranularity: computed(
     'granularity',
     'model.maxTime',
     'startDate', {
@@ -228,14 +226,12 @@ export default Ember.Controller.extend({
         let analysisEnd = 0;
         let analysisStart = 0;
         let subchartStart = 0;
-        let subchartEnd = endDate.clone();
-
 
         // Handles this logic here instead of inside SetupController
         // so that query params are updating properly
         if (value === 'DAYS') {
           endDate = endDate.clone().startOf('day');
-          analysisEnd = endDate.clone();
+          analysisEnd = endDate.clone().startOf('day');
           startDate = endDate.clone().subtract(29, 'days').startOf('day').valueOf();
           analysisStart = analysisEnd.clone().subtract('1', 'day');
           subchartStart = endDate.clone().subtract(1, 'week').startOf('day');
@@ -256,11 +252,11 @@ export default Ember.Controller.extend({
           startDate,
           endDate: endDate.valueOf(),
           subchartStart: subchartStart.valueOf(),
-          subchartEnd: subchartEnd.valueOf(),
+          subchartEnd: analysisEnd.valueOf(),
           analysisEnd: analysisEnd.valueOf(),
           analysisStart: analysisStart.valueOf(),
           displayStart: subchartStart.valueOf(),
-          displayEnd: subchartEnd.valueOf()
+          displayEnd: analysisEnd.valueOf()
         });
 
         return value;
@@ -292,9 +288,9 @@ export default Ember.Controller.extend({
       });
 
       const {
-          startDate: currentStart,
-          endDate: currentEnd
-        } = this.getProperties('startDate', 'endDate');
+        startDate: currentStart,
+        endDate: currentEnd
+      } = this.getProperties('startDate', 'endDate');
       if (rangeStart <= currentStart) {
         const newStartDate = +currentStart - (currentEnd - currentStart);
 
@@ -308,7 +304,7 @@ export default Ember.Controller.extend({
      * Handles subchart date change (debounced)
      */
     setDateParams([start, end]) {
-      Ember.run.debounce(this, this.get('actions.setNewDate'), { start, end }, 2000);
+      debounce(this, this.get('actions.setNewDate'), { start, end }, 2000);
     },
 
     /**
@@ -317,6 +313,35 @@ export default Ember.Controller.extend({
      */
     onModeChange(compareMode){
       this.set('compareMode', compareMode);
+    },
+
+    /**
+     * Resets anoamly and investigations regions
+     */
+    resetAnalysisDates() {
+      let offset = 1;
+      let granularity = this.get('granularity');
+      const {
+        shouldReset,
+        startDate,
+        endDate
+      } = this.getProperties('shouldReset', 'startDate', 'endDate');
+
+      if (shouldReset) {
+        if (granularity.includes('minutes')) {
+          granularity = 'minutes';
+          offset = 5;
+        }
+
+        this.setProperties({
+          analysisStart: moment(endDate).subtract(offset, granularity),
+          analysisEnd: endDate,
+          displayStart: startDate,
+          displayEnd: endDate,
+          shouldReset: false
+        });
+      }
     }
+
   }
 });

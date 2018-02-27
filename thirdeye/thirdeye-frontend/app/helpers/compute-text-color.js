@@ -1,4 +1,4 @@
-import Ember from 'ember';
+import { helper } from '@ember/component/helper';
 
 /**
  * Template helper that computes the text color
@@ -16,4 +16,4 @@ export function computeTextColor([value = 0]) {
   }
 }
 
-export default Ember.Helper.helper(computeTextColor);
+export default helper(computeTextColor);

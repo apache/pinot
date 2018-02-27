@@ -70,30 +70,30 @@ public class NoDictionaryInPredicateEvaluatorTest {
     InPredicate inPredicate =
         new InPredicate(COLUMN_NAME, Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
     PredicateEvaluator inPredicateEvaluator =
-        InPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator(inPredicate, FieldSpec.DataType.INT);
+        InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.INT);
 
-    NotInPredicate notInPredicate =
-        new NotInPredicate(COLUMN_NAME, Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
+    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME,
+        Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
     PredicateEvaluator notInPredicateEvaluator =
-        NotInPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator(notInPredicate, FieldSpec.DataType.INT);
+        NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.INT);
 
     for (Integer value : valueSet) {
-      Assert.assertTrue(inPredicateEvaluator.apply(value));
-      Assert.assertFalse(notInPredicateEvaluator.apply(value));
+      Assert.assertTrue(inPredicateEvaluator.applySV(value));
+      Assert.assertFalse(notInPredicateEvaluator.applySV(value));
     }
 
     for (int i = 0; i < 100; i++) {
       int value = _random.nextInt();
-      Assert.assertEquals(inPredicateEvaluator.apply(value), valueSet.contains(value));
-      Assert.assertEquals(notInPredicateEvaluator.apply(value), !valueSet.contains(value));
+      Assert.assertEquals(inPredicateEvaluator.applySV(value), valueSet.contains(value));
+      Assert.assertEquals(notInPredicateEvaluator.applySV(value), !valueSet.contains(value));
     }
 
     int[] multiValues = new int[NUM_MULTI_VALUES];
     PredicateEvaluatorTestUtils.fillRandom(multiValues);
-    multiValues[_random.nextInt(multiValues.length)] =
-        Integer.parseInt(stringValues[_random.nextInt(stringValues.length)]);
-    Assert.assertTrue(inPredicateEvaluator.apply(multiValues));
-    Assert.assertFalse(notInPredicateEvaluator.apply(multiValues));
+    multiValues[_random.nextInt(NUM_MULTI_VALUES)] =
+        Integer.parseInt(stringValues[_random.nextInt(NUM_PREDICATE_VALUES)]);
+    Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+    Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
   }
 
   @Test
@@ -110,31 +110,31 @@ public class NoDictionaryInPredicateEvaluatorTest {
     InPredicate inPredicate =
         new InPredicate(COLUMN_NAME, Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
     PredicateEvaluator inPredicateEvaluator =
-        InPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator(inPredicate, FieldSpec.DataType.LONG);
+        InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.LONG);
 
-    NotInPredicate notInPredicate =
-        new NotInPredicate(COLUMN_NAME, Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
+    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME,
+        Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
     PredicateEvaluator notInPredicateEvaluator =
-        NotInPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator(notInPredicate, FieldSpec.DataType.LONG);
+        NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.LONG);
 
     for (Long value : valueSet) {
-      Assert.assertTrue(inPredicateEvaluator.apply(value));
-      Assert.assertFalse(notInPredicateEvaluator.apply(value));
+      Assert.assertTrue(inPredicateEvaluator.applySV(value));
+      Assert.assertFalse(notInPredicateEvaluator.applySV(value));
     }
 
     for (int i = 0; i < 100; i++) {
       long value = _random.nextLong();
-      Assert.assertEquals(inPredicateEvaluator.apply(value), valueSet.contains(value));
-      Assert.assertEquals(notInPredicateEvaluator.apply(value), !valueSet.contains(value));
+      Assert.assertEquals(inPredicateEvaluator.applySV(value), valueSet.contains(value));
+      Assert.assertEquals(notInPredicateEvaluator.applySV(value), !valueSet.contains(value));
     }
 
     long[] multiValues = new long[NUM_MULTI_VALUES];
     PredicateEvaluatorTestUtils.fillRandom(multiValues);
-    multiValues[_random.nextInt(multiValues.length)] =
-        Long.parseLong(stringValues[_random.nextInt(stringValues.length)]);
+    multiValues[_random.nextInt(NUM_MULTI_VALUES)] =
+        Long.parseLong(stringValues[_random.nextInt(NUM_PREDICATE_VALUES)]);
 
-    Assert.assertTrue(inPredicateEvaluator.apply(multiValues));
-    Assert.assertFalse(notInPredicateEvaluator.apply(multiValues));
+    Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+    Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
   }
 
   @Test
@@ -151,31 +151,31 @@ public class NoDictionaryInPredicateEvaluatorTest {
     InPredicate inPredicate =
         new InPredicate(COLUMN_NAME, Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
     PredicateEvaluator inPredicateEvaluator =
-        InPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator(inPredicate, FieldSpec.DataType.FLOAT);
+        InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.FLOAT);
 
-    NotInPredicate notInPredicate =
-        new NotInPredicate(COLUMN_NAME, Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
+    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME,
+        Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
     PredicateEvaluator notInPredicateEvaluator =
-        NotInPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator(notInPredicate, FieldSpec.DataType.FLOAT);
+        NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.FLOAT);
 
     for (float value : valueSet) {
-      Assert.assertTrue(inPredicateEvaluator.apply(value));
-      Assert.assertFalse(notInPredicateEvaluator.apply(value));
+      Assert.assertTrue(inPredicateEvaluator.applySV(value));
+      Assert.assertFalse(notInPredicateEvaluator.applySV(value));
     }
 
     for (int i = 0; i < 100; i++) {
       float value = _random.nextFloat();
-      Assert.assertEquals(inPredicateEvaluator.apply(value), valueSet.contains(value));
-      Assert.assertEquals(notInPredicateEvaluator.apply(value), !valueSet.contains(value));
+      Assert.assertEquals(inPredicateEvaluator.applySV(value), valueSet.contains(value));
+      Assert.assertEquals(notInPredicateEvaluator.applySV(value), !valueSet.contains(value));
     }
 
     float[] multiValues = new float[NUM_MULTI_VALUES];
     PredicateEvaluatorTestUtils.fillRandom(multiValues);
-    multiValues[_random.nextInt(multiValues.length)] =
-        Float.parseFloat(stringValues[_random.nextInt(stringValues.length)]);
+    multiValues[_random.nextInt(NUM_MULTI_VALUES)] =
+        Float.parseFloat(stringValues[_random.nextInt(NUM_PREDICATE_VALUES)]);
 
-    Assert.assertTrue(inPredicateEvaluator.apply(multiValues));
-    Assert.assertFalse(notInPredicateEvaluator.apply(multiValues));
+    Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+    Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
   }
 
   @Test
@@ -192,31 +192,31 @@ public class NoDictionaryInPredicateEvaluatorTest {
     InPredicate inPredicate =
         new InPredicate(COLUMN_NAME, Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
     PredicateEvaluator inPredicateEvaluator =
-        InPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator(inPredicate, FieldSpec.DataType.DOUBLE);
+        InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.DOUBLE);
 
-    NotInPredicate notInPredicate =
-        new NotInPredicate(COLUMN_NAME, Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
+    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME,
+        Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
     PredicateEvaluator notInPredicateEvaluator =
-        NotInPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator(notInPredicate, FieldSpec.DataType.DOUBLE);
+        NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.DOUBLE);
 
     for (double value : valueSet) {
-      Assert.assertTrue(inPredicateEvaluator.apply(value));
-      Assert.assertFalse(notInPredicateEvaluator.apply(value));
+      Assert.assertTrue(inPredicateEvaluator.applySV(value));
+      Assert.assertFalse(notInPredicateEvaluator.applySV(value));
     }
 
     for (int i = 0; i < 100; i++) {
       double value = _random.nextDouble();
-      Assert.assertEquals(inPredicateEvaluator.apply(value), valueSet.contains(value));
-      Assert.assertEquals(notInPredicateEvaluator.apply(value), !valueSet.contains(value));
+      Assert.assertEquals(inPredicateEvaluator.applySV(value), valueSet.contains(value));
+      Assert.assertEquals(notInPredicateEvaluator.applySV(value), !valueSet.contains(value));
     }
 
     double[] multiValues = new double[NUM_MULTI_VALUES];
     PredicateEvaluatorTestUtils.fillRandom(multiValues);
-    multiValues[_random.nextInt(multiValues.length)] =
-        Double.parseDouble(stringValues[_random.nextInt(stringValues.length)]);
+    multiValues[_random.nextInt(NUM_MULTI_VALUES)] =
+        Double.parseDouble(stringValues[_random.nextInt(NUM_PREDICATE_VALUES)]);
 
-    Assert.assertTrue(inPredicateEvaluator.apply(multiValues));
-    Assert.assertFalse(notInPredicateEvaluator.apply(multiValues));
+    Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+    Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
   }
 
   @Test
@@ -225,36 +225,36 @@ public class NoDictionaryInPredicateEvaluatorTest {
     Set<String> valueSet = new HashSet<>();
 
     for (int i = 0; i < 100; i++) {
-      stringValues[i] = RandomStringUtils.random(MAX_STRING_LENGTH);
+      stringValues[i] = RandomStringUtils.random(MAX_STRING_LENGTH).replace("\t", "");
       valueSet.add(stringValues[i]);
     }
 
     InPredicate inPredicate =
         new InPredicate(COLUMN_NAME, Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
     PredicateEvaluator inPredicateEvaluator =
-        InPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator(inPredicate, FieldSpec.DataType.STRING);
+        InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.STRING);
 
-    NotInPredicate notInPredicate =
-        new NotInPredicate(COLUMN_NAME, Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
+    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME,
+        Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
     PredicateEvaluator notInPredicateEvaluator =
-        NotInPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator(notInPredicate, FieldSpec.DataType.STRING);
+        NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.STRING);
 
     for (String value : valueSet) {
-      Assert.assertTrue(inPredicateEvaluator.apply(value));
-      Assert.assertFalse(notInPredicateEvaluator.apply(value));
+      Assert.assertTrue(inPredicateEvaluator.applySV(value));
+      Assert.assertFalse(notInPredicateEvaluator.applySV(value));
     }
 
     for (int i = 0; i < 100; i++) {
       String value = RandomStringUtils.random(MAX_STRING_LENGTH);
-      Assert.assertEquals(inPredicateEvaluator.apply(value), valueSet.contains(value));
-      Assert.assertEquals(notInPredicateEvaluator.apply(value), !valueSet.contains(value));
+      Assert.assertEquals(inPredicateEvaluator.applySV(value), valueSet.contains(value));
+      Assert.assertEquals(notInPredicateEvaluator.applySV(value), !valueSet.contains(value));
     }
 
     String[] multiValues = new String[NUM_MULTI_VALUES];
     PredicateEvaluatorTestUtils.fillRandom(multiValues, MAX_STRING_LENGTH);
-    multiValues[_random.nextInt(multiValues.length)] = stringValues[_random.nextInt(stringValues.length)];
+    multiValues[_random.nextInt(NUM_MULTI_VALUES)] = stringValues[_random.nextInt(NUM_PREDICATE_VALUES)];
 
-    Assert.assertTrue(inPredicateEvaluator.apply(multiValues));
-    Assert.assertFalse(notInPredicateEvaluator.apply(multiValues));
+    Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
+    Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
   }
 }

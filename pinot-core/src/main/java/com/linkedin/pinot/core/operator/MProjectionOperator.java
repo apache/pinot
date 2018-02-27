@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.operator;
 
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataBlockCache;
 import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
@@ -30,7 +29,7 @@ import java.util.Map;
  *
  *
  */
-public class MProjectionOperator extends BaseOperator {
+public class MProjectionOperator extends BaseOperator<ProjectionBlock> {
   private static final String OPERATOR_NAME = "MProjectionOperator";
 
   private final BReusableFilteredDocIdSetOperator _docIdSetOperator;
@@ -49,41 +48,18 @@ public class MProjectionOperator extends BaseOperator {
   }
 
   @Override
-  public boolean open() {
-    for (final String column : _columnToDataSourceMap.keySet()) {
-      _columnToDataSourceMap.get(column).open();
-    }
-    _docIdSetOperator.open();
-    return true;
-  }
-
-  @Override
-  public boolean close() {
-    for (final String column : _columnToDataSourceMap.keySet()) {
-      _columnToDataSourceMap.get(column).close();
-    }
-    _docIdSetOperator.close();
-    return true;
-  }
-
-  @Override
-  public ProjectionBlock getNextBlock() {
-    DocIdSetBlock docIdSetBlock = (DocIdSetBlock) _docIdSetOperator.nextBlock();
+  protected ProjectionBlock getNextBlock() {
+    DocIdSetBlock docIdSetBlock = _docIdSetOperator.nextBlock();
     if (docIdSetBlock == null) {
       _currentBlock = null;
     } else {
       _blockMap.put("_docIdSet", docIdSetBlock);
       for (String column : _columnToDataSourceMap.keySet()) {
-        _blockMap.put(column, _columnToDataSourceMap.get(column).nextBlock(new BlockId(0)));
+        _blockMap.put(column, _columnToDataSourceMap.get(column).nextBlock());
       }
       _currentBlock = new ProjectionBlock(_blockMap, _dataBlockCache, docIdSetBlock);
     }
     return _currentBlock;
-  }
-
-  @Override
-  public Block getNextBlock(BlockId blockId) {
-    throw new UnsupportedOperationException("Not supported in MProjectionOperator!");
   }
 
   @Override

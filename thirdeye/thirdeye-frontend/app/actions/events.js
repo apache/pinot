@@ -6,7 +6,9 @@ import {
   COMPARE_MODE_MAPPING,
   eventColorMapping,
   baselineEventColorMapping,
-  eventWeightMapping
+  eventWeightMapping,
+  ROOTCAUSE_ANALYSIS_DURATION_MAX,
+  ROOTCAUSE_ANOMALY_DURATION_MAX
 } from './constants';
 
 /**
@@ -100,22 +102,39 @@ const assignEventTimeInfo = (event, anomalyStart, anomalyEnd, baselineStart, bas
   }
 
   let isBaseline = false;
+  let isFuture = false;
+  let isOngoing = false;
   let {
     start: displayStart,
     end: displayEnd,
     label: displayLabel
   } = event;
-  if ((baselineStart < displayEnd && displayStart < baselineEnd)) {
-    isBaseline = true;
-    displayStart -= baselineOffset;
-    displayEnd -= baselineOffset;
-    displayLabel += " (baseline)";
+
+  // baseline event (anomaly, holiday & gcn only)
+  if (['anomaly', 'holiday', 'gcn'].includes(event.eventType)) {
+    if ((baselineStart < displayEnd && displayStart < baselineEnd)) {
+      isBaseline = true;
+      displayStart -= baselineOffset;
+      displayEnd -= baselineOffset;
+      displayLabel += " (baseline)";
+    }
   }
+
+  // upcoming event
+  if (displayStart >= analysisEnd) {
+    isFuture = true;
+    displayStart = moment(analysisEnd).subtract(1, 'hour').valueOf();
+    displayEnd = analysisEnd;
+    displayLabel += " (upcoming)";
+  }
+
+  // ongoing event
   if (displayEnd <= 0) {
+    isOngoing = true;
     displayEnd = analysisEnd;
   }
 
-  return Object.assign(event, { duration, relStart, relEnd, relDuration, isBaseline, displayStart, displayEnd, displayLabel });
+  return Object.assign(event, { duration, relStart, relEnd, relDuration, isBaseline, isFuture, isOngoing, displayStart, displayEnd, displayLabel });
 };
 
 /**
@@ -135,6 +154,29 @@ const adjustHolidayTimestamp = (event) => {
     }
   }
 
+  return event;
+};
+
+/**
+ * Helper function to append localized date/time to deployment event label
+ */
+const adjustInformedLabel = (event) => {
+  if (event.eventType === 'informed') {
+    const displayLabel = event.displayLabel + ' (' + moment(event.start).format('hh:mm a') + ')';
+    return Object.assign(event, { displayLabel });
+  }
+  return event;
+};
+
+/**
+ * Helper function to adjust investigation link for legacy RCA/anomaly page
+ */
+const adjustAnomalyLink = (event) => {
+  if (event.eventType === 'anomaly') {
+    const anomalyId = event.urn.split(':')[3];
+    const link = `/thirdeye#investigate?anomalyId=${anomalyId}`;
+    return Object.assign(event, { link });
+  }
   return event;
 };
 
@@ -208,13 +250,21 @@ function fetchEvents(start, end, mode) {
 
     if (!metricId || events.length) { return; }
 
-    const analysisStart = currentStart;
-    const analysisEnd = currentEnd;
+    const analysisStartRaw = currentStart;
+    const analysisEndRaw = currentEnd;
+
+    const analysisDurationSafe = Math.min(analysisEndRaw - analysisStartRaw, ROOTCAUSE_ANALYSIS_DURATION_MAX);
+    const analysisStart = Math.max(analysisStartRaw, analysisEndRaw - analysisDurationSafe);
+    const analysisEnd = analysisEndRaw;
 
     const diff = Math.floor((currentEnd - currentStart) / 4);
-    const anomalyEnd = end || (+currentEnd - diff);
-    const anomalyStart = start || (+currentStart + diff);
+    const anomalyEndRaw = end || (+currentEnd - diff);
+    const anomalyStartRaw = start || (+currentStart + diff);
     mode = mode || compareMode;
+
+    const anomalyDurationSafe = Math.min(anomalyEndRaw - anomalyStartRaw, ROOTCAUSE_ANOMALY_DURATION_MAX);
+    const anomalyStart = anomalyStartRaw;
+    const anomalyEnd = anomalyStartRaw + anomalyDurationSafe;
 
     const offset = COMPARE_MODE_MAPPING[compareMode] || 1;
     const baselineStart = moment(anomalyStart).clone().subtract(offset, 'week').valueOf();
@@ -232,13 +282,15 @@ function fetchEvents(start, end, mode) {
         return _.uniqBy(res, 'urn')
           .map(adjustHolidayTimestamp)
           .map(event => assignEventTimeInfo(event, anomalyStart, anomalyEnd, baselineStart, baselineEnd, analysisStart, analysisEnd))
+          .map(adjustInformedLabel)
+          .map(adjustAnomalyLink)
           .map(assignEventColor)
           .map(setWeight)
           .map(assignHumanTimeInfo)
           .sort((a, b) => (b.score - a.score));
       })
       .then(res => dispatch(loadEvents(res)
-    ));
+      ));
   };
 }
 

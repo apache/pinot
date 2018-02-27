@@ -17,10 +17,10 @@ package com.linkedin.pinot.core.predicate;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.common.predicate.BaseInPredicate;
 import com.linkedin.pinot.core.common.predicate.InPredicate;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.util.Arrays;
@@ -42,8 +42,18 @@ public class InPredicateTest {
    */
   @Test
   public void testSplitInClause() {
-    Pql2Compiler compiler = new Pql2Compiler();
     String query = "select * from foo where values in ('abc', 'xyz', '123')";
+    testSplit(query);
+  }
+
+  @Test
+  public void testSplitNotInClause() {
+    String query = "select * from foo where values not in ('abc', 'xyz', '123')";
+    testSplit(query);
+  }
+
+  private void testSplit(String query) {
+    Pql2Compiler compiler = new Pql2Compiler();
 
     String[] expectedValues = new String[]{"abc", "xyz", "123"};
     Arrays.sort(expectedValues); /* InPredicateAstNode sorts the predicate values. */
@@ -51,8 +61,8 @@ public class InPredicateTest {
     /* Test split case */
     BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query, true /*splitInClause*/);
     FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-    InPredicate predicate = (InPredicate) Predicate.newPredicate(filterQueryTree);
-    String[] actualValues = predicate.getInRange();
+    BaseInPredicate predicate = (BaseInPredicate) Predicate.newPredicate(filterQueryTree);
+    String[] actualValues = predicate.getValues();
     Arrays.sort(actualValues);
 
     Assert.assertEquals(actualValues, expectedValues);
@@ -61,8 +71,8 @@ public class InPredicateTest {
     /* Test join case */
     brokerRequest = compiler.compileToBrokerRequest(query, false /*splitInClause*/);
     filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-    predicate = (InPredicate) Predicate.newPredicate(filterQueryTree);
-    actualValues = predicate.getInRange();
+    predicate = (BaseInPredicate) Predicate.newPredicate(filterQueryTree);
+    actualValues = predicate.getValues();
     Arrays.sort(actualValues);
 
     Assert.assertEquals(actualValues, expectedValues);

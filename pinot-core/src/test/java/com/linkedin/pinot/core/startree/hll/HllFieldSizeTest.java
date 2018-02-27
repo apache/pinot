@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.startree.hll;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.linkedin.pinot.startree.hll.HllSizeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -33,17 +34,17 @@ public class HllFieldSizeTest {
       throws Exception {
     for (int i = 5; i < 10; i++) {
       HyperLogLog hll = new HyperLogLog(i);
-      Assert.assertEquals(HllUtil.getHllFieldSizeFromLog2m(i), hll.getBytes().length);
+      Assert.assertEquals(HllSizeUtils.getHllFieldSizeFromLog2m(i), hll.getBytes().length);
       LOGGER.info("Estimated: " + hll.cardinality());
       for (int j = 0; j < 100; j++) {
         hll.offer(rand.nextLong());
       }
-      Assert.assertEquals(HllUtil.getHllFieldSizeFromLog2m(i), hll.getBytes().length);
+      Assert.assertEquals(HllSizeUtils.getHllFieldSizeFromLog2m(i), hll.getBytes().length);
       LOGGER.info("Estimated: " + hll.cardinality());
       for (int j = 0; j < 9900; j++) {
         hll.offer(rand.nextLong());
       }
-      Assert.assertEquals(HllUtil.getHllFieldSizeFromLog2m(i), hll.getBytes().length);
+      Assert.assertEquals(HllSizeUtils.getHllFieldSizeFromLog2m(i), hll.getBytes().length);
       LOGGER.info("Estimated: " + hll.cardinality());
     }
   }

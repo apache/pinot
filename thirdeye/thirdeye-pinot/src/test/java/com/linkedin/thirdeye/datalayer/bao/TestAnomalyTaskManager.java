@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -19,7 +21,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 
-public class TestAnomalyTaskManager extends AbstractManagerTestBase {
+public class TestAnomalyTaskManager {
 
   private Long anomalyTaskId1;
   private Long anomalyTaskId2;
@@ -30,19 +32,25 @@ public class TestAnomalyTaskManager extends AbstractManagerTestBase {
     allowedOldTaskStatus.add(TaskStatus.WAITING);
   }
 
+  private DAOTestBase testDAOProvider;
+  private JobManager jobDAO;
+  private TaskManager taskDAO;
   @BeforeClass
   void beforeClass() {
-    super.init();
+    testDAOProvider = DAOTestBase.getInstance();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+    jobDAO = daoRegistry.getJobDAO();
+    taskDAO = daoRegistry.getTaskDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    super.cleanup();
+    testDAOProvider.cleanup();
   }
 
   @Test
   public void testCreate() throws JsonProcessingException {
-    JobDTO testAnomalyJobSpec = getTestJobSpec();
+    JobDTO testAnomalyJobSpec = DaoTestUtils.getTestJobSpec();
     anomalyJobId = jobDAO.save(testAnomalyJobSpec);
     anomalyTaskId1 = taskDAO.save(getTestTaskSpec(testAnomalyJobSpec));
     Assert.assertNotNull(anomalyTaskId1);

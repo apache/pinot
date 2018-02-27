@@ -1,38 +1,44 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-public class TestDatasetConfigManager extends AbstractManagerTestBase {
+public class TestDatasetConfigManager {
 
   private Long datasetConfigId1;
   private Long datasetConfigId2;
   private static String collection1 = "my dataset1";
   private static String collection2 = "my dataset2";
 
+  private DAOTestBase testDAOProvider;
+  private DatasetConfigManager datasetConfigDAO;
   @BeforeClass
   void beforeClass() {
-    super.init();
+    testDAOProvider = DAOTestBase.getInstance();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+    datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    super.cleanup();
+    testDAOProvider.cleanup();
   }
 
   @Test
   public void testCreate() {
 
-    DatasetConfigDTO datasetConfig1 = getTestDatasetConfig(collection1);
+    DatasetConfigDTO datasetConfig1 = DaoTestUtils.getTestDatasetConfig(collection1);
     datasetConfig1.setRequiresCompletenessCheck(true);
     datasetConfigId1 = datasetConfigDAO.save(datasetConfig1);
     Assert.assertNotNull(datasetConfigId1);
 
-    DatasetConfigDTO datasetConfig2 = getTestDatasetConfig(collection2);
+    DatasetConfigDTO datasetConfig2 = DaoTestUtils.getTestDatasetConfig(collection2);
     datasetConfig2.setActive(false);
     datasetConfig2.setRequiresCompletenessCheck(true);
     datasetConfigId2 = datasetConfigDAO.save(datasetConfig2);
@@ -55,12 +61,12 @@ public class TestDatasetConfigManager extends AbstractManagerTestBase {
   public void testUpdate() {
     DatasetConfigDTO datasetConfig = datasetConfigDAO.findById(datasetConfigId1);
     Assert.assertNotNull(datasetConfig);
-    Assert.assertFalse(datasetConfig.isMetricAsDimension());
-    datasetConfig.setMetricAsDimension(true);
+    Assert.assertFalse(datasetConfig.isRealtime());
+    datasetConfig.setRealtime(true);
     datasetConfigDAO.update(datasetConfig);
     datasetConfig = datasetConfigDAO.findById(datasetConfigId1);
     Assert.assertNotNull(datasetConfig);
-    Assert.assertTrue(datasetConfig.isMetricAsDimension());
+    Assert.assertTrue(datasetConfig.isRealtime());
   }
 
   @Test(dependsOnMethods = { "testUpdate" })

@@ -1,6 +1,8 @@
-import Ember from 'ember';
+import { later } from '@ember/runloop';
+import { computed } from '@ember/object';
+import Component from '@ember/component';
 
-export default Ember.Component.extend({
+export default Component.extend({
   events: [],
   selectedTab: 'all',
 
@@ -10,7 +12,7 @@ export default Ember.Component.extend({
   /**
    * Returns event based on the selected tab
    */
-  filteredEvents: Ember.computed(
+  filteredEvents: computed(
     'eventsInRange.@each.type',
     'selectedTab',
     function() {
@@ -28,7 +30,7 @@ export default Ember.Component.extend({
   /**
    * Returns events in a range
    */
-  eventsInRange: Ember.computed(
+  eventsInRange: computed(
     'events',
     'start',
     'end',
@@ -51,7 +53,7 @@ export default Ember.Component.extend({
 
   // Require to display a loader for long rendering
   didUpdateAttrs(...args) {
-    Ember.run.later(() => {
+    later(() => {
       this._super(args);
     });
   },

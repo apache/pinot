@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.operator;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.query.reduce.CombineService;
@@ -40,7 +39,7 @@ import org.slf4j.LoggerFactory;
 /**
  * The <code>MCombineOperator</code> class is the operator to combine selection results and aggregation only results.
  */
-public class MCombineOperator extends BaseOperator {
+public class MCombineOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MCombineOperator.class);
   private static final String OPERATOR_NAME = "MCombineOperator";
 
@@ -70,15 +69,7 @@ public class MCombineOperator extends BaseOperator {
   }
 
   @Override
-  public boolean open() {
-    for (Operator op : _operators) {
-      op.open();
-    }
-    return true;
-  }
-
-  @Override
-  public Block getNextBlock() {
+  protected IntermediateResultsBlock getNextBlock() {
     final long startTime = System.currentTimeMillis();
     final long queryEndTime = System.currentTimeMillis() + _timeOutMs;
     final int numOperators = _operators.size();
@@ -201,20 +192,7 @@ public class MCombineOperator extends BaseOperator {
   }
 
   @Override
-  public Block getNextBlock(BlockId blockId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
-  }
-
-  @Override
-  public boolean close() {
-    for (Operator op : _operators) {
-      op.close();
-    }
-    return true;
   }
 }

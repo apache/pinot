@@ -15,114 +15,61 @@
  */
 package com.linkedin.pinot.broker.routing.builder;
 
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
-import java.util.Set;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
-import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.broker.routing.ServerToSegmentSetMap;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 /**
- * Create a given number of routing tables based on random selections from ExternalView.
+ * Assign balanced number of segments to each server.
  */
-public class BalancedRandomRoutingTableBuilder extends AbstractRoutingTableBuilder {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BalancedRandomRoutingTableBuilder.class);
+public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
+  private static final int DEFAULT_NUM_ROUTING_TABLES = 10;
+  private static final String NUM_ROUTING_TABLES_KEY = "numOfRoutingTables";
 
-  private int _numberOfRoutingTables;
-
-  public BalancedRandomRoutingTableBuilder() {
-    this._numberOfRoutingTables = 10;
-  }
-
-  public BalancedRandomRoutingTableBuilder(int numberOfRoutingTables) {
-    this._numberOfRoutingTables = numberOfRoutingTables;
-  }
+  private int _numRoutingTables = DEFAULT_NUM_ROUTING_TABLES;
 
   @Override
   public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    _numberOfRoutingTables = configuration.getInt("numOfRoutingTables", 10);
+    _numRoutingTables = configuration.getInt(NUM_ROUTING_TABLES_KEY, DEFAULT_NUM_ROUTING_TABLES);
   }
 
   @Override
-  public synchronized void computeRoutingTableFromExternalView(String tableName,
-      ExternalView externalView, List<InstanceConfig> instanceConfigList) {
-
-    RoutingTableInstancePruner pruner = new RoutingTableInstancePruner(instanceConfigList);
-
-    List<Map<String, Set<String>>> routingTables = new ArrayList<Map<String, Set<String>>>();
-    for (int i = 0; i < _numberOfRoutingTables; ++i) {
-      routingTables.add(new HashMap<String, Set<String>>());
+  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
+      List<InstanceConfig> instanceConfigs) {
+    List<Map<String, List<String>>> routingTables = new ArrayList<>(_numRoutingTables);
+    for (int i = 0; i < _numRoutingTables; i++) {
+      routingTables.add(new HashMap<String, List<String>>());
     }
 
-    String[] segmentSet = externalView.getPartitionSet().toArray(new String[0]);
-    for (String segment : segmentSet) {
-      Map<String, String> instanceToStateMap = new HashMap<>(externalView.getStateMap(segment));
-      for (String instance : instanceToStateMap.keySet().toArray(new String[0])) {
-        if (!instanceToStateMap.get(instance).equals("ONLINE") || pruner.isInactive(instance)) {
-          LOGGER.info("Removing offline/inactive instance '{}' from routing table computation", instance);
-          instanceToStateMap.remove(instance);
+    RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);
+    for (String segmentName : externalView.getPartitionSet()) {
+      // List of servers that are active and are serving the segment
+      List<String> servers = new ArrayList<>();
+      for (Map.Entry<String, String> entry : externalView.getStateMap(segmentName).entrySet()) {
+        String serverName = entry.getKey();
+        if (entry.getValue().equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)
+            && !instancePruner.isInactive(serverName)) {
+          servers.add(serverName);
         }
       }
-      if (instanceToStateMap.size() > 0) {
-        List<String> instanceList = new ArrayList<String>(instanceToStateMap.keySet());
-        for (int i = 0; i < _numberOfRoutingTables; ++i) {
-          Collections.shuffle(instanceList);
-          String[] instances = instanceList.toArray(new String[instanceList.size()]);
-
-          int minInstances = Integer.MAX_VALUE;
-          int minIdx = -1;
-          int base = 2;
-          for (int k = 0; k < instances.length; ++k) {
-            int sizeOfCurrentInstance = 0;
-            if (routingTables.get(i).containsKey(instances[k])) {
-              sizeOfCurrentInstance = routingTables.get(i).get(instances[k]).size();
-            }
-            if (sizeOfCurrentInstance < minInstances) {
-              minInstances = sizeOfCurrentInstance;
-              minIdx = k;
-              base = 2;
-            }
-            if (sizeOfCurrentInstance == minInstances && (System.currentTimeMillis() % base == 0)) {
-              minIdx = k;
-              base = 2;
-            } else {
-              base++;
-            }
-          }
-          if (routingTables.get(i).containsKey(instances[minIdx])) {
-            routingTables.get(i).get(instances[minIdx]).add(segment);
-          } else {
-            Set<String> instanceSegmentSet = new HashSet<String>();
-            instanceSegmentSet.add(segment);
-            routingTables.get(i).put(instances[minIdx], instanceSegmentSet);
-          }
+      int numServers = servers.size();
+      if (numServers != 0) {
+        for (Map<String, List<String>> routingTable : routingTables) {
+          // Assign the segment to the server with least segments assigned
+          routingTable.get(getServerWithLeastSegmentsAssigned(servers, routingTable)).add(segmentName);
         }
       }
     }
 
-    List<ServerToSegmentSetMap> resultRoutingTableList = new ArrayList<ServerToSegmentSetMap>();
-    for (int i = 0; i < _numberOfRoutingTables; ++i) {
-      resultRoutingTableList.add(new ServerToSegmentSetMap(routingTables.get(i)));
-    }
-    setRoutingTables(resultRoutingTableList);
-    setIsEmpty(externalView.getPartitionSet().isEmpty());
+    setRoutingTables(routingTables);
   }
 }

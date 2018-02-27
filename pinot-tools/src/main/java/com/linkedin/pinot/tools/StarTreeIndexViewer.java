@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.tools;
 
-import com.google.common.collect.HashBiMap;
 import com.google.common.collect.MinMaxPriorityQueue;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.Block;
@@ -27,9 +26,9 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
-import com.linkedin.pinot.core.startree.StarTreeIndexNodeInterf;
-import com.linkedin.pinot.core.startree.StarTreeInterf;
-import com.linkedin.pinot.core.startree.StarTreeSerDe;
+import com.linkedin.pinot.core.startree.OffHeapStarTree;
+import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.startree.StarTreeNode;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
@@ -56,14 +55,39 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class StarTreeIndexViewer {
+  private static class StarTreeJsonNode {
+    String _name;
+    List<StarTreeJsonNode> _children;
+
+    StarTreeJsonNode(String name) {
+      _name = name;
+    }
+
+    public void addChild(StarTreeJsonNode child) {
+      if (_children == null) {
+        _children = new ArrayList<>();
+      }
+      _children.add(child);
+    }
+
+    public String getName() {
+      return _name;
+    }
+
+    public List<StarTreeJsonNode> getChildren() {
+      return _children;
+    }
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeIndexViewer.class);
 
   /*
    * MAX num children to show in the UI
    */
   static int MAX_CHILDREN = 100;
-  private HashBiMap<String, Integer> dimensionNameToIndexMap;
+  private List<String> _dimensionNames;
   private Map<String, Dictionary> dictionaries;
   private Map<String, BlockSingleValIterator> valueIterators;
 
@@ -76,7 +100,6 @@ public class StarTreeIndexViewer {
 
     for (String columnName : metadata.getAllColumns()) {
       DataSource dataSource = indexSegment.getDataSource(columnName);
-      dataSource.open();
       Block block = dataSource.nextBlock();
       BlockValSet blockValSet = block.getBlockValueSet();
       BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
@@ -84,25 +107,24 @@ public class StarTreeIndexViewer {
       dictionaries.put(columnName, dataSource.getDictionary());
     }
     File starTreeFile = SegmentDirectoryPaths.findStarTreeFile(segmentDir);
-    StarTreeInterf tree = StarTreeSerDe.fromFile(starTreeFile, ReadMode.mmap);
-    dimensionNameToIndexMap = tree.getDimensionNameToIndexMap();
+    StarTree tree = new OffHeapStarTree(starTreeFile, ReadMode.mmap);
+    _dimensionNames = tree.getDimensionNames();
     StarTreeJsonNode jsonRoot = new StarTreeJsonNode("ROOT");
     build(tree.getRoot(), jsonRoot);
     ObjectMapper objectMapper = new ObjectMapper();
-    objectMapper.getSerializationConfig().setSerializationInclusion(Inclusion.NON_NULL);
-    String writeValueAsString =
-        objectMapper.defaultPrettyPrintingWriter().writeValueAsString(jsonRoot);
+    objectMapper.getSerializationConfig().withSerializationInclusion(Inclusion.NON_NULL);
+    String writeValueAsString = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(jsonRoot);
     LOGGER.info(writeValueAsString);
     startServer(segmentDir, writeValueAsString);
   }
 
-  private int build(StarTreeIndexNodeInterf indexNode, StarTreeJsonNode json) {
-    Iterator<? extends StarTreeIndexNodeInterf> childrenIterator = indexNode.getChildrenIterator();
+  private int build(StarTreeNode indexNode, StarTreeJsonNode json) {
+    Iterator<? extends StarTreeNode> childrenIterator = indexNode.getChildrenIterator();
     if (!childrenIterator.hasNext()) {
       return 0;
     }
-    int childDimensionId = indexNode.getChildDimensionName();
-    String childDimensionName = dimensionNameToIndexMap.inverse().get(childDimensionId);
+    int childDimensionId = indexNode.getChildDimensionId();
+    String childDimensionName = _dimensionNames.get(childDimensionId);
     Dictionary dictionary = dictionaries.get(childDimensionName);
     int totalChildNodes = indexNode.getNumChildren();
 
@@ -118,15 +140,15 @@ public class StarTreeIndexViewer {
     StarTreeJsonNode allNode = null;
 
     while (childrenIterator.hasNext()) {
-      StarTreeIndexNodeInterf childIndexNode = childrenIterator.next();
+      StarTreeNode childIndexNode = childrenIterator.next();
       int childDimensionValueId = childIndexNode.getDimensionValue();
       String childDimensionValue = "ALL";
-      if (childDimensionValueId != StarTreeIndexNodeInterf.ALL) {
+      if (childDimensionValueId != StarTreeNode.ALL) {
         childDimensionValue = dictionary.get(childDimensionValueId).toString();
       }
       StarTreeJsonNode childJson = new StarTreeJsonNode(childDimensionValue);
       totalChildNodes += build(childIndexNode, childJson);
-      if (childDimensionValueId != StarTreeIndexNodeInterf.ALL) {
+      if (childDimensionValueId != StarTreeNode.ALL) {
         json.addChild(childJson);
         queue.add(ImmutablePair.of(childDimensionValue, totalChildNodes));
       } else {
@@ -180,7 +202,7 @@ public class StarTreeIndexViewer {
     URI baseUri = URI.create("http://0.0.0.0:" + Integer.toString(httpPort) + "/");
     HttpServer httpServer = GrizzlyHttpServerFactory.createHttpServer(baseUri, new StarTreeResource(json));
 
-    LOGGER.info("Go to http://{}:{}/  to view the star tree", "localhost", httpPort );
+    LOGGER.info("Go to http://{}:{}/  to view the star tree", "localhost", httpPort);
   }
 
   @Path("/")
@@ -200,55 +222,5 @@ public class StarTreeIndexViewer {
     public InputStream getStarTreeHtml() {
       return getClass().getClassLoader().getResourceAsStream("star-tree.html");
     }
-  }
-}
-
-class StarTreeJsonNode {
-
-  public StarTreeJsonNode(String name) {
-    this.name = name;
-  }
-
-  String name;
-  String parent;
-  int size = 0;
-  List<StarTreeJsonNode> children;
-
-  public void addChild(StarTreeJsonNode childJsonNode) {
-    if (children == null) {
-      children = new ArrayList<>();
-    }
-    children.add(childJsonNode);
-  }
-
-  public String getParent() {
-    return parent;
-  }
-
-  public void setParent(String parent) {
-    this.parent = parent;
-  }
-
-  public void addChild(String name) {
-    if (children == null) {
-      children = new ArrayList<>();
-    }
-    children.add(new StarTreeJsonNode(name));
-  }
-
-  public String getName() {
-    return name;
-  }
-
-  public void setName(String name) {
-    this.name = name;
-  }
-
-  public List<StarTreeJsonNode> getChildren() {
-    return children;
-  }
-
-  public void setChildren(List<StarTreeJsonNode> children) {
-    this.children = children;
   }
 }

@@ -16,20 +16,15 @@
 
 package com.linkedin.pinot.broker.routing.builder;
 
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.SegmentName;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
-import java.util.Random;
-import java.util.Set;
 import java.util.SortedSet;
-import java.util.TreeSet;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
@@ -37,23 +32,14 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.broker.routing.ServerToSegmentSetMap;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
-
 
 /**
  * Routing table builder for the Kafka low level consumer.
  */
 public class KafkaLowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTableBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaLowLevelConsumerRoutingTableBuilder.class);
-  private final Random _random = new Random();
-  private int TARGET_SERVER_COUNT_PER_QUERY = 8;
+
+  private int _targetNumServersPerQuery = 8;
 
   @Override
   public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
@@ -61,15 +47,15 @@ public class KafkaLowLevelConsumerRoutingTableBuilder extends GeneratorBasedRout
     if (configuration.containsKey("realtimeTargetServerCountPerQuery")) {
       final String targetServerCountPerQuery = configuration.getString("realtimeTargetServerCountPerQuery");
       try {
-        TARGET_SERVER_COUNT_PER_QUERY = Integer.parseInt(targetServerCountPerQuery);
-        LOGGER.info("Using realtime target server count of {}", TARGET_SERVER_COUNT_PER_QUERY);
+        _targetNumServersPerQuery = Integer.parseInt(targetServerCountPerQuery);
+        LOGGER.info("Using realtime target server count of {}", _targetNumServersPerQuery);
       } catch (Exception e) {
         LOGGER.warn(
             "Could not get the realtime target server count per query from configuration value {}, keeping default value {}",
-            targetServerCountPerQuery, TARGET_SERVER_COUNT_PER_QUERY, e);
+            targetServerCountPerQuery, _targetNumServersPerQuery, e);
       }
     } else {
-      LOGGER.info("Using default value for realtime target server count of {}", TARGET_SERVER_COUNT_PER_QUERY);
+      LOGGER.info("Using default value for realtime target server count of {}", _targetNumServersPerQuery);
     }
   }
 
@@ -88,54 +74,13 @@ public class KafkaLowLevelConsumerRoutingTableBuilder extends GeneratorBasedRout
     // which point the overlapping data is discarded during the reconciliation process with the controller), we need to
     // ensure that the query that is sent has only one partition in CONSUMING state in order to avoid duplicate records.
     //
-    // Because we also want to want to spread the load as equally as possible between servers, we use a weighted random
-    // replica selection that favors picking replicas with fewer segments assigned to them, thus having an approximately
-    // equal distribution of load between servers.
-    //
-    // For example, given three replicas with 1, 2 and 3 segments assigned to each, the replica with one segment should
-    // have a weight of 2, which is the maximum segment count minus the segment count for that replica. Thus, each
-    // replica other than the replica(s) with the maximum segment count should have a chance of getting a segment
-    // assigned to it. This corresponds to alternative three below:
-    //
-    // Alternative 1 (weight is sum of segment counts - segment count in that replica):
-    // (6 - 1) = 5 -> P(0.4166)
-    // (6 - 2) = 4 -> P(0.3333)
-    // (6 - 3) = 3 -> P(0.2500)
-    //
-    // Alternative 2 (weight is max of segment counts - segment count in that replica + 1):
-    // (3 - 1) + 1 = 3 -> P(0.5000)
-    // (3 - 2) + 1 = 2 -> P(0.3333)
-    // (3 - 3) + 1 = 1 -> P(0.1666)
-    //
-    // Alternative 3 (weight is max of segment counts - segment count in that replica):
-    // (3 - 1) = 2 -> P(0.6666)
-    // (3 - 2) = 1 -> P(0.3333)
-    // (3 - 3) = 0 -> P(0.0000)
-    //
-    // Of those three weighting alternatives, the third one has the smallest standard deviation of the number of
-    // segments assigned per replica, so it corresponds to the weighting strategy used for segment assignment. Empirical
-    // testing shows that for 20 segments and three replicas, the standard deviation of each alternative is respectively
-    // 2.112, 1.496 and 0.853.
-    //
-    // This algorithm works as follows:
-    // 1. Gather all segments and group them by Kafka partition, sorted by sequence number
-    // 2. Ensure that for each partition, we have at most one partition in consuming state
-    // 3. Sort all the segments to be used during assignment in ascending order of replicas
-    // 4. For each segment to be used during assignment, pick a random replica, weighted by the number of segments
-    //    assigned to each replica.
-    //
     // The upstream code in BaseRoutingTableGenerator will generate routing tables based on taking a subset of servers
     // if the cluster is large enough as well as ensure that the best routing tables are used for routing.
 
-    private Set<String> segmentSet = new HashSet<>();
-    private Set<String> instanceSet = new HashSet<>();
-    private Map<String, Set<String>> segmentToInstanceMap = new HashMap<>();
-    private Map<String, String[]> segmentToInstanceArrayMap = new HashMap<>();
-    private Map<String, Set<String>> instanceToSegmentMap = new HashMap<>();
-    private String[] instanceArray;
+    private Map<String, List<String>> _segmentToServersMap = new HashMap<>();
 
-    protected KafkaLowLevelConsumerRoutingTableGenerator() {
-      super(TARGET_SERVER_COUNT_PER_QUERY, _random);
+    public KafkaLowLevelConsumerRoutingTableGenerator() {
+      super(_targetNumServersPerQuery);
     }
 
     @Override
@@ -162,7 +107,7 @@ public class KafkaLowLevelConsumerRoutingTableBuilder extends GeneratorBasedRout
         SegmentName validConsumingSegment = allowedSegmentInConsumingStateByKafkaPartition.get(kafkaPartition);
 
         for (SegmentName segmentName : segmentNames) {
-          Set<String> validReplicas = new HashSet<String>();
+          List<String> validServers = new ArrayList<>();
           String segmentNameStr = segmentName.getSegmentName();
           Map<String, String> externalViewState = externalView.getStateMap(segmentNameStr);
 
@@ -176,34 +121,22 @@ public class KafkaLowLevelConsumerRoutingTableBuilder extends GeneratorBasedRout
             }
 
             // Replicas in ONLINE state are always allowed
-            if (state.equalsIgnoreCase(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
-              validReplicas.add(instance);
+            if (state.equalsIgnoreCase(
+                CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
+              validServers.add(instance);
               continue;
             }
 
             // Replicas in CONSUMING state are only allowed on the last segment
-            if (state.equalsIgnoreCase(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING)
+            if (state.equalsIgnoreCase(
+                CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING)
                 && segmentName.equals(validConsumingSegment)) {
-              validReplicas.add(instance);
+              validServers.add(instance);
             }
           }
 
-          if (!validReplicas.isEmpty()) {
-            segmentSet.add(segmentNameStr);
-            instanceSet.addAll(validReplicas);
-            segmentToInstanceMap.put(segmentNameStr, validReplicas);
-            segmentToInstanceArrayMap.put(segmentNameStr, validReplicas.toArray(new String[validReplicas.size()]));
-
-            for (String validReplica : validReplicas) {
-              Set<String> segmentsForReplica = instanceToSegmentMap.get(validReplica);
-
-              if (segmentsForReplica == null) {
-                segmentsForReplica = new HashSet<>();
-                instanceToSegmentMap.put(validReplica, segmentsForReplica);
-              }
-
-              segmentsForReplica.add(segmentNameStr);
-            }
+          if (!validServers.isEmpty()) {
+            _segmentToServersMap.put(segmentNameStr, validServers);
           }
 
           // If this segment is the segment allowed in CONSUMING state, don't process segments after it in that Kafka
@@ -213,39 +146,11 @@ public class KafkaLowLevelConsumerRoutingTableBuilder extends GeneratorBasedRout
           }
         }
       }
-
-      instanceArray = instanceSet.toArray(new String[instanceSet.size()]);
     }
 
     @Override
-    protected Set<String> getSegmentSet() {
-      return segmentSet;
-    }
-
-    @Override
-    protected String[] getInstanceArray() {
-      return instanceArray;
-    }
-
-    @Override
-    protected Set<String> getInstanceSet() {
-      return instanceSet;
-    }
-
-    @Override
-    protected Map<String, Set<String>> getInstanceToSegmentMap() {
-      return instanceToSegmentMap;
-    }
-
-    @Override
-    protected Map<String, String[]> getSegmentToInstanceArrayMap() {
-      return segmentToInstanceArrayMap;
-    }
-
-    @Override
-    protected Map<String, Set<String>> getSegmentToInstanceMap() {
-      return segmentToInstanceMap;
+    protected Map<String, List<String>> getSegmentToServersMap() {
+      return _segmentToServersMap;
     }
   }
-
 }

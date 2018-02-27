@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.segment.creator;
 
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.extractors.FieldExtractor;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import com.linkedin.pinot.core.data.readers.RecordReader;
@@ -31,27 +30,21 @@ import org.slf4j.LoggerFactory;
  * {@link com.linkedin.pinot.core.segment.creator.SegmentCreationDataSource} that uses a
  * {@link com.linkedin.pinot.core.data.readers.RecordReader} as the underlying data source.
  */
+// TODO: make it Closeable so that resource in record reader can be released
 public class RecordReaderSegmentCreationDataSource implements SegmentCreationDataSource {
   private static final Logger LOGGER = LoggerFactory.getLogger(RecordReaderSegmentCreationDataSource.class);
 
+  private final RecordReader _recordReader;
+
   public RecordReaderSegmentCreationDataSource(RecordReader recordReader) {
     _recordReader = recordReader;
-
-    try {
-      recordReader.init();
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while initializing record reader", e);
-      Utils.rethrowException(e);
-    }
-
   }
-
-  private RecordReader _recordReader;
 
   @Override
   public SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig) {
     try {
-      PlainFieldExtractor fieldExtractor = FieldExtractorFactory.getPlainFieldExtractor(statsCollectorConfig.getSchema());
+      PlainFieldExtractor fieldExtractor =
+          FieldExtractorFactory.getPlainFieldExtractor(statsCollectorConfig.getSchema());
 
       SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
       collector.init();
@@ -60,7 +53,7 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
       GenericRow readRow = new GenericRow();
       GenericRow transformedRow = new GenericRow();
       while (_recordReader.hasNext()) {
-        transformedRow = readNextRowSanitized(readRow, transformedRow, fieldExtractor);
+        transformedRow = fieldExtractor.transform(_recordReader.next(readRow), transformedRow);
         collector.collectRow(transformedRow);
       }
 
@@ -71,13 +64,6 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
       Utils.rethrowException(e);
       return null;
     }
-  }
-
-  private GenericRow readNextRowSanitized(GenericRow readRow, GenericRow transformedRow, FieldExtractor extractor) {
-    readRow = GenericRow.createOrReuseRow(readRow);
-    readRow = _recordReader.next(readRow);
-    transformedRow = GenericRow.createOrReuseRow(transformedRow);
-    return extractor.transform(readRow, transformedRow);
   }
 
   @Override

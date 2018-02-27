@@ -1,4 +1,21 @@
-import Ember from 'ember';
+/**
+ * Select Filter component. A wrapper around power select
+ * to display large numbers of items
+ * @module components/filter-select
+ * @property {Number}  maxNumFilters   - Maximum items to show per filter group
+ * @property {Number}  maxTotalFilters - Maximum items to show in aggregate
+ * @property {Object}  options         - Object containing all filters
+ * @property {Boolean} disabled        - Indicates if the input field should be
+ *                                       disabled
+ * @property {Object}  onChangeHandler - Closure action to bubble up to parent
+ *                                       when a filter was (de)selected
+ * @exports filter-select
+ * @author yyuen
+ */
+
+import { computed } from '@ember/object';
+
+import Component from '@ember/component';
 import { task, timeout } from 'ember-concurrency';
 
 /**
@@ -99,12 +116,12 @@ const getSearchResults = (filterOptions, filterToMatch, maxNum) => {
 };
 
 
-export default Ember.Component.extend({
+export default Component.extend({
   // Maximum filters by filter group
   maxNumFilters: 25,
 
   // Maximum total filter to display
-  maxTotalFilters: 100,
+  maxTotalFilters: 500,
 
   triggerId: '',
   noMatchesMessage: '',
@@ -123,14 +140,14 @@ export default Ember.Component.extend({
    * Takes the filters and massage them for the power-select grouping api
    * Currently not showing the whole list because of performance issues
    */
-  filterOptions: Ember.computed('options', function() {
+  filterOptions: computed('options', function() {
     const filters = this.get('options') || {};
 
     return buildFilterOptions(filters);
   }),
 
   // Selected Filters Serializer
-  selectedFilters: Ember.computed('selected', {
+  selectedFilters: computed('selected', {
     get() {
       const filters = JSON.parse(this.get('selected'));
 
@@ -145,7 +162,7 @@ export default Ember.Component.extend({
   }),
 
   // Initial filter View (subset of FilterOptions)
-  viewFilterOptions: Ember.computed(
+  viewFilterOptions: computed(
     'filterOptions.@each',
     'maxNumFilters',
     function() {

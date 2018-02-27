@@ -35,6 +35,7 @@ import com.linkedin.pinot.core.realtime.StreamProvider;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 import com.linkedin.pinot.core.realtime.StreamProviderFactory;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
+import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
@@ -67,8 +68,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final StreamProvider kafkaStreamProvider;
   private final File resourceDir;
   private final File resourceTmpDir;
-  private final Object lock = new Object();
-  private RealtimeSegmentImpl realtimeSegment;
+  private final RealtimeSegmentImpl realtimeSegment;
   private final String tableStreamName;
 
   private final long start = System.currentTimeMillis();
@@ -88,25 +88,21 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final List<String> noDictionaryColumns;
   private Logger segmentLogger = LOGGER;
   private final SegmentVersion _segmentVersion;
-  private final RealtimeTableDataManager _realtimeTableDataManager;
 
   // An instance of this class exists only for the duration of the realtime segment that is currently being consumed.
   // Once the segment is committed, the segment is handled by OfflineSegmentDataManager
-  public HLRealtimeSegmentDataManager(final RealtimeSegmentZKMetadata segmentMetadata, final TableConfig tableConfig,
-      InstanceZKMetadata instanceMetadata, final RealtimeTableDataManager realtimeTableDataManager,
-      final String resourceDataDir, final IndexLoadingConfig indexLoadingConfig, final Schema schema,
-      final ServerMetrics serverMetrics)
+  public HLRealtimeSegmentDataManager(final RealtimeSegmentZKMetadata realtimeSegmentZKMetadata,
+      final TableConfig tableConfig, InstanceZKMetadata instanceMetadata,
+      final RealtimeTableDataManager realtimeTableDataManager, final String resourceDataDir,
+      final IndexLoadingConfig indexLoadingConfig, final Schema schema, final ServerMetrics serverMetrics)
       throws Exception {
     super();
-    initStatsHistory(realtimeTableDataManager);
-    _realtimeTableDataManager = realtimeTableDataManager;
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     this.schema = schema;
     this.extractor = FieldExtractorFactory.getPlainFieldExtractor(schema);
     this.serverMetrics =serverMetrics;
-    this.segmentName = segmentMetadata.getSegmentName();
+    this.segmentName = realtimeSegmentZKMetadata.getSegmentName();
     this.tableName = tableConfig.getTableName();
-    initMemoryManager(realtimeTableDataManager, indexLoadingConfig.isRealtimeOffheapAllocation(), segmentName);
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     if (sortedColumns.isEmpty()) {
@@ -137,7 +133,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     this.invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
 
-    this.segmentMetatdaZk = segmentMetadata;
+    this.segmentMetatdaZk = realtimeSegmentZKMetadata;
 
     // No DictionaryColumns
     noDictionaryColumns = new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns());
@@ -170,10 +166,22 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // lets create a new realtime segment
     segmentLogger.info("Started kafka stream provider");
     final int capacity = kafkaStreamProviderConfig.getSizeThresholdToFlushSegment();
-    realtimeSegment =
-        new RealtimeSegmentImpl(serverMetrics, this, indexLoadingConfig, capacity,
-            kafkaStreamProviderConfig.getStreamName());
-    realtimeSegment.setSegmentMetadata(segmentMetadata, this.schema);
+    RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder().setSegmentName(segmentName)
+        .setStreamName(kafkaStreamProviderConfig.getStreamName())
+        .setSchema(schema)
+        .setCapacity(capacity)
+        .setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
+        .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
+        .setInvertedIndexColumns(invertedIndexColumns)
+        .setRealtimeSegmentZKMetadata(realtimeSegmentZKMetadata)
+        .setOffHeap(indexLoadingConfig.isRealtimeOffheapAllocation())
+        .setMemoryManager(getMemoryManager(realtimeTableDataManager.getConsumerDir(), segmentName,
+            indexLoadingConfig.isRealtimeOffheapAllocation(), indexLoadingConfig.isDirectRealtimeOffheapAllocation(),
+            serverMetrics))
+        .setStatsHistory(realtimeTableDataManager.getStatsHistory())
+        .build();
+    realtimeSegment = new RealtimeSegmentImpl(realtimeSegmentConfig);
+
     notifier = realtimeTableDataManager;
 
     LOGGER.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
@@ -258,24 +266,23 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           // kill the timer first
           segmentStatusTask.cancel();
           updateCurrentDocumentCountMetrics();
-          segmentLogger.info("Indexed {} raw events, current number of docs = {}",
-              realtimeSegment.getRawDocumentCount(), realtimeSegment.getSegmentMetadata().getTotalDocs());
+          segmentLogger.info("Indexed {} raw events", realtimeSegment.getNumDocsIndexed());
           File tempSegmentFolder = new File(resourceTmpDir, "tmp-" + String.valueOf(System.currentTimeMillis()));
 
           // lets convert the segment now
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
-                  segmentMetadata.getTableName(), segmentMetadata.getSegmentName(), sortedColumn,
+                  realtimeSegmentZKMetadata.getTableName(), realtimeSegmentZKMetadata.getSegmentName(), sortedColumn,
                   HLRealtimeSegmentDataManager.this.invertedIndexColumns,
                   noDictionaryColumns, null/*StarTreeIndexSpec*/); // Star tree not supported for HLC.
 
           segmentLogger.info("Trying to build segment");
           final long buildStartTime = System.nanoTime();
-          converter.build(_segmentVersion);
+          converter.build(_segmentVersion, serverMetrics);
           final long buildEndTime = System.nanoTime();
           segmentLogger.info("Built segment in {} ms",
               TimeUnit.MILLISECONDS.convert((buildEndTime - buildStartTime), TimeUnit.NANOSECONDS));
-          File destDir = new File(resourceDataDir, segmentMetadata.getSegmentName());
+          File destDir = new File(resourceDataDir, realtimeSegmentZKMetadata.getSegmentName());
           FileUtils.deleteQuietly(destDir);
           FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], destDir);
 
@@ -353,14 +360,14 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           try {
             segmentLogger.info("Marking current segment as completed in Helix");
             RealtimeSegmentZKMetadata metadataToOverwrite = new RealtimeSegmentZKMetadata();
-            metadataToOverwrite.setTableName(segmentMetadata.getTableName());
-            metadataToOverwrite.setSegmentName(segmentMetadata.getSegmentName());
+            metadataToOverwrite.setTableName(realtimeSegmentZKMetadata.getTableName());
+            metadataToOverwrite.setSegmentName(realtimeSegmentZKMetadata.getSegmentName());
             metadataToOverwrite.setSegmentType(SegmentType.OFFLINE);
             metadataToOverwrite.setStatus(Status.DONE);
             metadataToOverwrite.setStartTime(segStartTime);
             metadataToOverwrite.setEndTime(segEndTime);
-            metadataToOverwrite.setTotalRawDocs(realtimeSegment.getSegmentMetadata().getTotalDocs());
             metadataToOverwrite.setTimeUnit(timeUnit);
+            metadataToOverwrite.setTotalRawDocs(realtimeSegment.getNumDocsIndexed());
             notifier.notifySegmentCommitted(metadataToOverwrite, segment);
             segmentLogger.info("Completed write of segment completion to Helix, waiting for controller to assign a new segment");
           } catch (Exception e) {
@@ -396,22 +403,18 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private void computeKeepIndexing() {
     if (keepIndexing) {
-      segmentLogger.debug(
-          "Current indexed " + realtimeSegment.getRawDocumentCount() + " raw events, success = " + realtimeSegment
-              .getSuccessIndexedCount() + " docs, total = " + realtimeSegment.getSegmentMetadata().getTotalDocs()
-              + " docs in realtime segment");
+      segmentLogger.debug("Current indexed {} raw events", realtimeSegment.getNumDocsIndexed());
       if ((System.currentTimeMillis() >= segmentEndTimeThreshold)
-          || realtimeSegment.getRawDocumentCount() >= kafkaStreamProviderConfig.getSizeThresholdToFlushSegment()) {
-        if (realtimeSegment.getRawDocumentCount() == 0) {
+          || realtimeSegment.getNumDocsIndexed() >= kafkaStreamProviderConfig.getSizeThresholdToFlushSegment()) {
+        if (realtimeSegment.getNumDocsIndexed() == 0) {
           segmentLogger.info("no new events coming in, extending the end time by another hour");
           segmentEndTimeThreshold =
               System.currentTimeMillis() + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
           return;
         }
         segmentLogger.info(
-            "Stopped indexing due to reaching segment limit: {} raw documents indexed, segment is aged {} minutes"
-                , realtimeSegment.getRawDocumentCount() , ((System.currentTimeMillis() - start)
-                / (ONE_MINUTE_IN_MILLSEC)));
+            "Stopped indexing due to reaching segment limit: {} raw documents indexed, segment is aged {} minutes",
+            realtimeSegment.getNumDocsIndexed(), ((System.currentTimeMillis() - start) / (ONE_MINUTE_IN_MILLSEC)));
         keepIndexing = false;
       }
     }
@@ -419,7 +422,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   private void updateCurrentDocumentCountMetrics() {
-    int currentRawDocs = realtimeSegment.getRawDocumentCount();
+    int currentRawDocs = realtimeSegment.getNumDocsIndexed();
     serverMetrics.addValueToTableGauge(tableName, ServerGauge.DOCUMENT_COUNT, (currentRawDocs - lastUpdatedRawDocuments.get()));
     lastUpdatedRawDocuments.set(currentRawDocs);
   }
@@ -436,30 +439,5 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     keepIndexing = false;
     segmentStatusTask.cancel();
     realtimeSegment.destroy();
-  }
-
-  @Override
-  public String getTableName() {
-    return tableName;
-  }
-
-  @Override
-  public Schema getSchema() {
-    return schema;
-  }
-
-  @Override
-  public List<String> getNoDictionaryColumns() {
-    return noDictionaryColumns;
-  }
-
-  @Override
-  public List<String> getInvertedIndexColumns() {
-    return invertedIndexColumns;
-  }
-
-  @Override
-  public File getTableDataDir() {
-    return resourceDir;
   }
 }

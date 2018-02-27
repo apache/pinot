@@ -18,11 +18,9 @@ package com.linkedin.pinot.core.operator.blocks;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataBlockCache;
-import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import java.util.Map;
 
@@ -42,16 +40,6 @@ public class ProjectionBlock implements Block {
     _docIdSetBlock = docIdSetBlock;
     _dataBlockCache = dataBlockCache;
     _dataBlockCache.initNewBlock(docIdSetBlock.getDocIdSet(), 0, docIdSetBlock.getSearchableLength());
-  }
-
-  @Override
-  public boolean applyPredicate(Predicate predicate) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockId getId() {
-    throw new UnsupportedOperationException();
   }
 
   @Override

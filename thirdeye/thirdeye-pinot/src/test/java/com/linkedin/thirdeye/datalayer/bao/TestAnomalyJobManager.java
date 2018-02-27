@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.List;
 
 import org.testng.Assert;
@@ -11,29 +13,32 @@ import com.google.common.collect.Sets;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 
-public class TestAnomalyJobManager extends AbstractManagerTestBase {
+public class TestAnomalyJobManager {
 
   private Long anomalyJobId1;
   private Long anomalyJobId2;
   private Long anomalyJobId3;
 
+  private DAOTestBase testDAOProvider;
+  private JobManager jobDAO;
   @BeforeClass
   void beforeClass() {
-    super.init();
+    testDAOProvider = DAOTestBase.getInstance();
+    jobDAO = DAORegistry.getInstance().getJobDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    super.cleanup();
+    testDAOProvider.cleanup();
   }
 
   @Test
   public void testCreate() {
-    anomalyJobId1 = jobDAO.save(getTestJobSpec());
+    anomalyJobId1 = jobDAO.save(DaoTestUtils.getTestJobSpec());
     Assert.assertNotNull(anomalyJobId1);
-    anomalyJobId2 = jobDAO.save(getTestJobSpec());
+    anomalyJobId2 = jobDAO.save(DaoTestUtils.getTestJobSpec());
     Assert.assertNotNull(anomalyJobId2);
-    anomalyJobId3 = jobDAO.save(getTestJobSpec());
+    anomalyJobId3 = jobDAO.save(DaoTestUtils.getTestJobSpec());
     Assert.assertNotNull(anomalyJobId3);
     printAll("After insert");
   }

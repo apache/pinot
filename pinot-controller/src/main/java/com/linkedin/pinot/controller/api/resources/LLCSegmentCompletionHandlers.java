@@ -85,13 +85,13 @@ public class LLCSegmentCompletionHandlers {
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset).withExtraTimeSec(
         extraTimeSec);
-    LOGGER.info(requestParams.toString());
+    LOGGER.info("Processing extendBuildTime:{}", requestParams.toString());
 
     SegmentCompletionProtocol.Response response =
         SegmentCompletionManager.getInstance().extendBuildTime(requestParams);
 
     final String responseStr = response.toJsonString();
-    LOGGER.info(responseStr);
+    LOGGER.info("Response to extendBuildTime:{}", responseStr);
     return responseStr;
   }
 
@@ -111,12 +111,12 @@ public class LLCSegmentCompletionHandlers {
     }
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset).withReason(stopReason);
-    LOGGER.info(requestParams.toString());
+    LOGGER.info("Processing segmentConsumed:{}", requestParams.toString());
 
     SegmentCompletionProtocol.Response response =
         SegmentCompletionManager.getInstance().segmentConsumed(requestParams);
     final String responseStr = response.toJsonString();
-    LOGGER.info(responseStr);
+    LOGGER.info("Response to segmentConsumed:{}", responseStr);
     return responseStr;
   }
 
@@ -136,12 +136,12 @@ public class LLCSegmentCompletionHandlers {
     }
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset).withReason(stopReason);
-    LOGGER.info(requestParams.toString());
+    LOGGER.info("Processing segmentStoppedConsuming:{}", requestParams.toString());
 
     SegmentCompletionProtocol.Response response =
         SegmentCompletionManager.getInstance().segmentStoppedConsuming(requestParams);
     final String responseStr = response.toJsonString();
-    LOGGER.info(responseStr);
+    LOGGER.info("Response to segmentStoppedConsuming:{}", responseStr);
     return responseStr;
   }
 
@@ -160,12 +160,12 @@ public class LLCSegmentCompletionHandlers {
 
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset);
-    LOGGER.info(requestParams.toString());
+    LOGGER.info("Processing segmentCommitStart:{}", requestParams.toString());
 
     SegmentCompletionProtocol.Response response =
           SegmentCompletionManager.getInstance().segmentCommitStart(requestParams);
     final String responseStr = response.toJsonString();
-    LOGGER.info(responseStr);
+    LOGGER.info("Response to segmentCommitStart:{}", responseStr);
     return responseStr;
   }
 
@@ -176,17 +176,20 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_LOCATION) String segmentLocation,
-      @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset
+      @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
+      @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes
   ) {
     if (instanceId == null || segmentName == null || offset == -1 || segmentLocation == null) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}, segmentLocation={}",
           offset, segmentName, instanceId, segmentLocation);
+      // TODO: memoryUsedInBytes = 0 if not present in params. Add validation when we start using it
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
 
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
-    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset).withSegmentLocation(segmentLocation);
-    LOGGER.info(requestParams.toString());
+    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset)
+        .withSegmentLocation(segmentLocation).withMemoryUsedBytes(memoryUsedBytes);
+    LOGGER.info("Processing segmentCommitEnd:{}", requestParams.toString());
 
     final boolean isSuccess = true;
     final boolean isSplitCommit = true;
@@ -194,7 +197,7 @@ public class LLCSegmentCompletionHandlers {
     SegmentCompletionProtocol.Response response =
         SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams, isSuccess, isSplitCommit);
     final String responseStr = response.toJsonString();
-    LOGGER.info(responseStr);
+    LOGGER.info("Response to segmentCommitEnd:{}", responseStr);
     return responseStr;
   }
 
@@ -206,11 +209,12 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
+      @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
       FormDataMultiPart multiPart
   ) {
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
-    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset);
-    LOGGER.info(requestParams.toString());
+    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset).withMemoryUsedBytes(memoryUsedBytes);
+    LOGGER.info("Processing segmentCommit:{}", requestParams.toString());
 
     final SegmentCompletionManager segmentCompletionManager = SegmentCompletionManager.getInstance();
     SegmentCompletionProtocol.Response response = segmentCompletionManager.segmentCommitStart(requestParams);
@@ -221,7 +225,7 @@ public class LLCSegmentCompletionHandlers {
       response = segmentCompletionManager.segmentCommitEnd(requestParams, success, false);
     }
 
-    LOGGER.info("Response: instance={}  segment={} status={} offset={}", requestParams.getInstanceId(), requestParams.getSegmentName(),
+    LOGGER.info("Response to segmentCommit: instance={}  segment={} status={} offset={}", requestParams.getInstanceId(), requestParams.getSegmentName(),
         response.getStatus(), response.getOffset());
 
     return response.toJsonString();
@@ -241,7 +245,7 @@ public class LLCSegmentCompletionHandlers {
   ) {
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset);
-    LOGGER.info(requestParams.toString());
+    LOGGER.info("Processing segmentUpload:{}", requestParams.toString());
 
     final String segmentLocation = uploadSegment(multiPart, instanceId, segmentName, true);
     if (segmentLocation == null) {
@@ -252,7 +256,11 @@ public class LLCSegmentCompletionHandlers {
         .withSegmentLocation(segmentLocation)
         .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS);
 
-    return new SegmentCompletionProtocol.Response(responseParams).toJsonString();
+    String response = new SegmentCompletionProtocol.Response(responseParams).toJsonString();
+
+    LOGGER.info("Response to segmentUpload:{}", response);
+
+    return response;
   }
 
   private @Nullable String uploadSegment(FormDataMultiPart multiPart, final String instanceId, final String segmentName,

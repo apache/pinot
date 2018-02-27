@@ -1,20 +1,26 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.linkedin.thirdeye.alert.commons.AnomalyFeedConfig;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.eclipse.jetty.util.StringUtil;
+
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class AlertConfigBean extends AbstractBean {
   String name;
   String application;
   String cronExpression;
+  String holidayCronExpression;
   boolean active;
+  AnomalyFeedConfig anomalyFeedConfig;
   EmailConfig emailConfig;
   ReportConfigCollection reportConfigCollection;
   AlertGroupConfig alertGroupConfig;
+  EmailFormatterConfig emailFormatterConfig;
   String recipients;
   String fromAddress;
 
@@ -48,6 +54,22 @@ public class AlertConfigBean extends AbstractBean {
 
   public void setCronExpression(String cronExpression) {
     this.cronExpression = cronExpression;
+  }
+
+  public AnomalyFeedConfig getAnomalyFeedConfig() {
+    return anomalyFeedConfig;
+  }
+
+  public void setAnomalyFeedConfig(AnomalyFeedConfig anomalyFeedConfig) {
+    this.anomalyFeedConfig = anomalyFeedConfig;
+  }
+
+  public String getHolidayCronExpression() {
+    return holidayCronExpression;
+  }
+
+  public void setHolidayCronExpression(String holidayCronExpression) {
+    this.holidayCronExpression = holidayCronExpression;
   }
 
   public EmailConfig getEmailConfig() {
@@ -90,6 +112,14 @@ public class AlertConfigBean extends AbstractBean {
     this.alertGroupConfig = alertGroupConfig;
   }
 
+  public EmailFormatterConfig getEmailFormatterConfig() {
+    return emailFormatterConfig;
+  }
+
+  public void setEmailFormatterConfig(EmailFormatterConfig emailFormatterConfig) {
+    this.emailFormatterConfig = emailFormatterConfig;
+  }
+
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class EmailConfig {
     long anomalyWatermark = 0l;
@@ -117,6 +147,34 @@ public class AlertConfigBean extends AbstractBean {
           "functionIds=" + functionIds +
           ", anomalyWatermark=" + anomalyWatermark +
           '}';
+    }
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class EmailFormatterConfig {
+    String type;
+    String properties;
+
+    public String getType() {
+      if (StringUtil.isBlank(type)) {
+        return "";
+      }
+      return type;
+    }
+
+    public void setType(String type) {
+      this.type = type;
+    }
+
+    public String getProperties() {
+      if (StringUtil.isBlank(properties)) {
+        return "";
+      }
+      return properties;
+    }
+
+    public void setProperties(String properties) {
+      this.properties = properties;
     }
   }
 
@@ -179,6 +237,7 @@ public class AlertConfigBean extends AbstractBean {
     public boolean isEnabled() {
       return enabled;
     }
+
     public void setEnabled(boolean enabled) {
       this.enabled = enabled;
     }

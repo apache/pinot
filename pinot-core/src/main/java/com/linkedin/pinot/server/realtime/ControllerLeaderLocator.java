@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.server.realtime;
 
+import com.linkedin.pinot.core.query.utils.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixManager;
@@ -37,7 +38,7 @@ public class ControllerLeaderLocator {
   private final String _clusterName;
 
   // Co-ordinates of the last known controller leader.
-  private volatile String _controllerLeaderHostPort = null;
+  private Pair<String, Integer> _controllerLeaderHostPort = null;
 
   // Should we refresh the controller leader co-ordinates?
   private volatile boolean _refresh = true;
@@ -73,7 +74,7 @@ public class ControllerLeaderLocator {
    *
    * @return The host:port string of the current controller leader.
    */
-  public synchronized String getControllerLeader() {
+  public synchronized Pair<String, Integer> getControllerLeader() {
     if (!_refresh) {
       return _controllerLeaderHostPort;
     }
@@ -84,12 +85,13 @@ public class ControllerLeaderLocator {
       ZNRecord znRecord = dataAccessor.get("/" + _clusterName + "/CONTROLLER/LEADER", stat, AccessOption.THROW_EXCEPTION_IFNOTEXIST);
       String leader = znRecord.getId();
       int index = leader.lastIndexOf('_');
-      _controllerLeaderHostPort = leader.substring(0, index) + ":" + leader.substring(index + 1);
+      String leaderHost = leader.substring(0, index);
+      int leadePort = Integer.valueOf(leader.substring(index + 1));
+      _controllerLeaderHostPort = new Pair<>(leaderHost, leadePort);
       _refresh = false;
       return _controllerLeaderHostPort;
     } catch (Exception e) {
       LOGGER.warn("Could not locate controller leader, exception", e);
-      _controllerLeaderHostPort = null;
       _refresh = true;
       return null;
     }

@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,7 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   private double score; // confidence level
   private double weight; // change percentage, whose absolute value is severity
   private double impactToGlobal; // the impact of this anomaly to the global metric
+  private AnomalyResultSource anomalyResultSource = AnomalyResultSource.DEFAULT_ANOMALY_DETECTION;
   // Additional anomaly detection properties (e.g., patter=UP, etc.)
   // Being used as identifying if two merged anomalies have same anomaly detection properties, thus can be mergeable
   private Map<String, String> properties = new HashMap<>();
@@ -170,9 +172,17 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
     this.impactToGlobal = impactToGlobal;
   }
 
+  public AnomalyResultSource getAnomalyResultSource() {
+    return anomalyResultSource;
+  }
+
+  public void setAnomalyResultSource(AnomalyResultSource anomalyResultSource) {
+    this.anomalyResultSource = anomalyResultSource;
+  }
+
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score, impactToGlobal, avgBaselineVal, avgCurrentVal);
+    return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score, impactToGlobal, avgBaselineVal, avgCurrentVal, anomalyResultSource);
   }
 
   @Override
@@ -185,7 +195,8 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
         .equals(endTime, m.getEndTime()) && Objects.equals(collection, m.getCollection()) && Objects
         .equals(metric, m.getMetric()) && Objects.equals(dimensions, m.getDimensions()) && Objects
         .equals(score, m.getScore()) && Objects.equals(avgBaselineVal, m.getAvgBaselineVal()) && Objects
-        .equals(avgCurrentVal, m.getAvgCurrentVal()) && Objects.equals(impactToGlobal, m.getImpactToGlobal());
+        .equals(avgCurrentVal, m.getAvgCurrentVal()) && Objects.equals(impactToGlobal, m.getImpactToGlobal()) &&
+        Objects.equals(anomalyResultSource, m.getAnomalyResultSource());
   }
 
   @Override

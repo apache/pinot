@@ -19,17 +19,13 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.data.readers.TestRecordReader;
+import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
-import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
@@ -37,7 +33,7 @@ import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
-import com.linkedin.pinot.operator.ArrayBasedFilterBlock;
+import com.linkedin.pinot.operator.filter.FilterOperatorTestUtils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -160,9 +156,7 @@ public class RawIndexBenchmark {
 
     System.out.println("Generating segment...");
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    RecordReader recordReader = new TestRecordReader(rows, schema);
-
-    driver.init(config, recordReader);
+    driver.init(config, new GenericRowRecordReader(rows, schema));
     driver.build();
 
     return new File(SEGMENT_DIR_NAME, SEGMENT_NAME);
@@ -175,13 +169,14 @@ public class RawIndexBenchmark {
    */
   private void compareIndexSizes(IndexSegment segment, File segmentDir, String fwdIndexColumn, String rawIndexColumn) {
     String filePrefix = segmentDir.getAbsolutePath() + File.separator;
-    File rawIndexFile = new File(filePrefix + rawIndexColumn + V1Constants.Indexes.RAW_SV_FWD_IDX_FILE_EXTENTION);
+    File rawIndexFile = new File(filePrefix + rawIndexColumn + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
 
     String extension = (segment.getDataSource(_fwdIndexColumn).getDataSourceMetadata().isSorted())
-        ? V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION : V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION;
+        ? V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION
+        : V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
 
     File fwdIndexFile = new File(filePrefix + _fwdIndexColumn + extension);
-    File fwdIndexDictFile = new File(filePrefix + _fwdIndexColumn + V1Constants.Dict.FILE_EXTENTION);
+    File fwdIndexDictFile = new File(filePrefix + _fwdIndexColumn + V1Constants.Dict.FILE_EXTENSION);
 
     long rawIndexSize = rawIndexFile.length();
     long fwdIndexSize = fwdIndexFile.length() + fwdIndexDictFile.length();
@@ -216,7 +211,7 @@ public class RawIndexBenchmark {
    * @return Time take in millis for the lookups
    */
   private long profileLookups(IndexSegment segment, String column, int[] docIds) {
-    BaseFilterOperator filterOperator = new TestFilterOperator(docIds);
+    BaseFilterOperator filterOperator = FilterOperatorTestUtils.makeFilterOperator(docIds);
     BReusableFilteredDocIdSetOperator docIdSetOperator =
         new BReusableFilteredDocIdSetOperator(filterOperator, docIds.length, DocIdSetPlanNode.MAX_DOC_PER_CALL);
 
@@ -224,7 +219,7 @@ public class RawIndexBenchmark {
     MProjectionOperator projectionOperator = new MProjectionOperator(buildDataSourceMap(segment), docIdSetOperator);
 
     long start = System.currentTimeMillis();
-    while ((projectionBlock = (ProjectionBlock) projectionOperator.nextBlock()) != null) {
+    while ((projectionBlock = projectionOperator.nextBlock()) != null) {
       ProjectionBlockValSet blockValueSet = (ProjectionBlockValSet) projectionBlock.getBlockValueSet(column);
       blockValueSet.getDoubleValuesSV();
     }
@@ -285,43 +280,6 @@ public class RawIndexBenchmark {
       docIdSet[j] = docId++;
     }
     return docIdSet;
-  }
-
-  /**
-   * Helper class to generate doc id's for lookup
-   */
-  class TestFilterOperator extends BaseFilterOperator {
-    private static final String OPERATOR_NAME = "TestFilterOperator";
-    private int[] _filteredDocIds;
-
-    public TestFilterOperator(int[] filteredDocIds) {
-      _filteredDocIds = filteredDocIds;
-    }
-
-    @Override
-    public BaseFilterBlock nextFilterBlock(BlockId blockId) {
-      return new ArrayBasedFilterBlock(_filteredDocIds);
-    }
-
-    @Override
-    public boolean isResultEmpty() {
-      return false;
-    }
-
-    @Override
-    public boolean open() {
-      return true;
-    }
-
-    @Override
-    public boolean close() {
-      return true;
-    }
-
-    @Override
-    public String getOperatorName() {
-      return OPERATOR_NAME;
-    }
   }
 
   /**

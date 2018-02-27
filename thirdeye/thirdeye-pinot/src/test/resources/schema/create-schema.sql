@@ -103,6 +103,7 @@ create index raw_anomaly_result_job_idx on raw_anomaly_result_index(job_id);
 create index raw_anomaly_result_merged_idx on raw_anomaly_result_index(merged);
 create index raw_anomaly_result_data_missing_idx on raw_anomaly_result_index(data_missing);
 create index raw_anomaly_result_start_time_idx on raw_anomaly_result_index(start_time);
+create index raw_anomaly_result_base_id_idx on raw_anomaly_result_index(base_id);
 
 create table if not exists merged_anomaly_result_index (
     function_id bigint(20),
@@ -123,6 +124,7 @@ create index merged_anomaly_result_function_idx on merged_anomaly_result_index(f
 create index merged_anomaly_result_feedback_idx on merged_anomaly_result_index(anomaly_feedback_id);
 create index merged_anomaly_result_metric_idx on merged_anomaly_result_index(metric_id);
 create index merged_anomaly_result_start_time_idx on merged_anomaly_result_index(start_time);
+create index merged_anomaly_result_base_id_idx on merged_anomaly_result_index(base_id);
 
 create table if not exists dataset_config_index (
     dataset varchar(200) not null,
@@ -157,20 +159,6 @@ create index metric_config_dataset_idx on metric_config_index(dataset);
 create index metric_config_alias_idx on metric_config_index(alias);
 create index metric_config_active_idx on metric_config_index(active);
 
-create table if not exists dashboard_config_index (
-    name varchar(200) not null,
-    dataset varchar(200) not null,
-    active boolean,
-    base_id bigint(20) not null,
-    create_time timestamp,
-    update_time timestamp default current_timestamp,
-    version int(10),
-    CONSTRAINT uc_dashboard_name unique(name)
-) ENGINE=InnoDB;
-create index dashboard_config_name_idx on dashboard_config_index(name);
-create index dashboard_config_dataset_idx on dashboard_config_index(dataset);
-create index dashboard_config_active_idx on dashboard_config_index(active);
-
 create table if not exists override_config_index (
     start_time bigint(20) NOT NULL,
     end_time bigint(20) NOT NULL,
@@ -191,9 +179,10 @@ create table if not exists alert_config_index (
     base_id bigint(20) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
-    version int(10)
+    version int(10),
+    CONSTRAINT uc_alert_name UNIQUE (name)
 ) ENGINE=InnoDB;
-
+create index alert_confix_name_idx on alert_config_index(name);
 
 create table if not exists data_completeness_config_index (
     dataset varchar(200) not null,
@@ -332,3 +321,33 @@ create table application_index (
   recipients VARCHAR(1000) NOT NULL,
   base_id bigint(20) not null
 );
+
+create table if not exists alert_snapshot_index (
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+
+create table if not exists rootcause_session_index (
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    name varchar(256),
+    owner varchar(32),
+    previousId bigint(20),
+    anomalyId bigint(20),
+    anomaly_range_start bigint(8),
+    anomaly_range_end bigint(8),
+    created bigint(8),
+    updated bigint(8),
+    version int(10)
+) ENGINE=InnoDB;
+create index rootcause_session_name_idx on rootcause_session_index(name);
+create index rootcause_session_owner_idx on rootcause_session_index(owner);
+create index rootcause_session_previousId_idx on rootcause_session_index(previousId);
+create index rootcause_session_anomalyId_idx on rootcause_session_index(anomalyId);
+create index rootcause_session_anomaly_range_start_idx on rootcause_session_index(anomaly_range_start);
+create index rootcause_session_anomaly_range_end_idx on rootcause_session_index(anomaly_range_end);
+create index rootcause_session_created_idx on rootcause_session_index(created);
+create index rootcause_session_updated_idx on rootcause_session_index(updated);

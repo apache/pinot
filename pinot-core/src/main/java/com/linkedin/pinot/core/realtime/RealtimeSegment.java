@@ -15,54 +15,33 @@
  */
 package com.linkedin.pinot.core.realtime;
 
-import java.util.List;
-
-import org.joda.time.Interval;
-
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.RecordReader;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
-public interface RealtimeSegment extends MutableIndexSegment {
-
-  /**
-   * Schema has the list of all dimentions, metrics and time columns.
-   * it also should contain data type for each of them
-   * for Time column it expects that there is a
-   * Time column Type (int, long etc) and an associated TimeUnit (days, hours etc)
-   * @param dataSchema
-   */
-  public void init(Schema dataSchema);
+public interface RealtimeSegment extends IndexSegment {
 
   /**
-   * returns a RecordReader implementation
-   * which can be used to create an offline segment.
+   * Indexes a record into the segment.
    *
-   * @return
+   * @param row Record represented as a {@link GenericRow}
+   * @return Whether the segment is full (i.e. cannot index more record into it)
    */
-  public RecordReader getRecordReader();
+  boolean index(GenericRow row);
 
   /**
+   * Returns the number of records already indexed into the segment.
    *
-   * @param docId
-   * @return
+   * @return The number of records indexed
    */
-  public GenericRow getRawValueRowAt(int docId, GenericRow row);
+  int getNumDocsIndexed();
 
   /**
-   * this will return the total number of documents that have been indexed to far,
-   * this is so that the indexing Coordination (if it chooses to) can decided
-   * when to convert this segment to immutable.
-   * @return
+   * Returns the record for the given document Id.
+   *
+   * @param docId Document
+   * @param reuse Reusable buffer for the record
+   * @return The record for the given document Id
    */
-  @Override
-  public int getAggregateDocumentCount();
-
-  /**
-   * returns the time interval of that datathat has currently been indexed
-   * @return
-   */
-  public Interval getTimeInterval();
-
+  GenericRow getRecord(int docId, GenericRow reuse);
 }

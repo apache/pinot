@@ -350,7 +350,7 @@ public abstract class Grouping {
     /**
      * Evaluates the {@code aggregationExpressions} and returns the result as a DataFrame with
      * the index corresponding to the grouping key column. Each expression takes the format
-     * {@code seriesName:operation[:outputName]}, where {@code seriesName} is a valid column name in the
+     * {@code seriesName[:operation[:outputName]]}, where {@code seriesName} is a valid column name in the
      * underlying DataFrame and {@code operation} is one of {@code SUM, PRODUCT, MIN, MAX,
      * FIRST, LAST, MEAN, MEDIAN, STD} and {@code outputName} is the name of the result series.
      *
@@ -373,11 +373,13 @@ public abstract class Grouping {
       for(String expression : aggregationExpressions) {
         // parse expression
         String[] parts = expression.split(":", 3);
-        if(parts.length < 2 || parts.length > 3)
+        if(parts.length > 3)
           throw new IllegalArgumentException(String.format("Could not parse expression '%s'", expression));
 
         String name = parts[0];
-        String operation = parts[1];
+        String operation = OP_FIRST;
+        if (parts.length >= 2)
+          operation = parts[1];
         String outName = name;
         if (parts.length >= 3)
           outName = parts[2];
@@ -425,8 +427,8 @@ public abstract class Grouping {
      * @return group sizes
      */
     public GroupingDataFrame count() {
-      // TODO data frames without index
-      return this.grouping.count(this.source.getIndex());
+      Series anySeries = this.source.series.values().iterator().next();
+      return this.grouping.count(anySeries);
     }
 
     public GroupingDataFrame sum(String seriesName) {

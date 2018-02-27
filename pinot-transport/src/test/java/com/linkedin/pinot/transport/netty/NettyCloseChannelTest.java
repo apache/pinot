@@ -18,7 +18,6 @@ package com.linkedin.pinot.transport.netty;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
@@ -69,7 +68,7 @@ public class NettyCloseChannelTest {
     NettyTestUtils.closeClientConnection(_nettyTCPClientConnection);
 
     _countDownLatch.countDown();
-    ByteBuf serverResponse = responseFuture.getOne();
+    byte[] serverResponse = responseFuture.getOne();
     Assert.assertNull(serverResponse);
     Assert.assertFalse(responseFuture.isCancelled());
     Assert.assertNotNull(responseFuture.getError());
@@ -89,7 +88,7 @@ public class NettyCloseChannelTest {
     NettyTestUtils.closeServerConnection(_nettyTCPServer);
 
     _countDownLatch.countDown();
-    ByteBuf serverResponse = responseFuture.getOne();
+    byte[] serverResponse = responseFuture.getOne();
     Assert.assertNull(serverResponse);
     Assert.assertFalse(responseFuture.isCancelled());
     Assert.assertNotNull(responseFuture.getError());

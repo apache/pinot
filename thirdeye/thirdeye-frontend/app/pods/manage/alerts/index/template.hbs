@@ -1,20 +1,18 @@
 <aside class="manage-alert-filters col-md-3">
   <div class="manage-alert-filters__wrapper">
     <h1 class="manage-alert-filters__row manage-alert-filters__row--title">Manage Alerts</h1>
-    {{#accordion-list allowManyActiveItems=true as |accordion|}}
-      {{#accordion.item as |accordionItem|}}
-        {{#accordionItem.toggle}}
-          <div class="manage-alert-filters__row te-hide">Alerts </div>
-        {{/accordionItem.toggle}}
-        {{#accordionItem.panel}}
-          <div class="manage-alert-filters__options te-hide">Options go here</div>
-        {{/accordionItem.panel}}
-      {{/accordion.item}}
-    {{/accordion-list}}
+    {{!--  TODO: enable this filter component when ready
+      {{entity-filter
+        title="Refine results by"
+        maxStrLen=25
+        filterBlocks=filterBlocks
+        onSelectFilter=(action "userDidSelectFilter")
+      }}
+    --}}
   </div>
 </aside>
 
-<main class="manage-alert-container paper-container paper-container--padded col-md-9">
+<main class="manage-alert-container card-container card-container--padded col-md-9">
   <div class="manage-alert-container__title">Search for an existing alert</div>
   <div class="manage-alert-search">
     <div class="manage-alert-search__filter">
@@ -71,8 +69,8 @@
       {{else if (eq selectedSearchMode 'Subscriber Groups')}}
         {{#power-select
           onchange=(perform searchByDatasetName)
-          selected=selectedsuscriberGroupNames
-          options=suscriberGroupNames
+          selected=selectedsubscriberGroupNames
+          options=subscriberGroupNames
           searchPlaceholder="Search for a dataset"
           placeholder="Search by Subscriber Group Name"
           allowClear=true
@@ -82,16 +80,31 @@
         {{/power-select}}
       {{/if}}
     </div>
+
+    {{#if (eq selectedSearchMode "All Alerts")}}
+      <div class="manage-alert-search__sort">
+        <div class="manage-alert-search__label">Sort By:</div>
+        {{#power-select
+          selected=selectedSortMode
+          options=sortModes
+          searchEnabled=false
+          onchange=(action "onSortModeChange")
+          as |name|
+        }}
+          {{name}}
+        {{/power-select}}
+      </div>
+    {{/if}}
   </div>
 
   <div class="manage-alert-results">
     {{#if paginatedSelectedAlerts}}
-      <section class="te-search-header"> 
+      <section class="te-search-header">
         <span class="te-search-title">
-          Alerts Found({{selectedAlerts.length}}) 
+          Alerts Found({{selectedAlerts.length}})
         </span>
         <span class="pull-right">
-          Showing {{paginatedSelectedAlerts.length}} of 
+          Showing {{paginatedSelectedAlerts.length}} of
           {{selectedAlerts.length}} {{if (gt selectedAlerts.length 1) 'alerts' 'alert'}}
         </span>
       </section>
@@ -106,47 +119,80 @@
           <div class="te-search-results__header">
             <div class="te-search-results__title-group">
               <div class="te-search-results__title">
-                <span class="te-search-results__tag {{if alert.isActive "te-search-results__tag--active"}}">
+                <span class="te-search-results__tag te-search-results__tag--list {{if alert.isActive "te-search-results__tag--active"}}">
                   {{if alert.isActive "Active" "Inactive"}}
                 </span>
+                <a href="#" {{action "navigateToAlertPage" alert.id}}>
+                  <div class="te-search-results__title-name" title={{alert.functionName}}>{{alert.functionName}}</div>
+                </a>
               </div>
-              <span title={{alert.functionName}}>
-                {{alert.functionName}}
-              </span>
             </div>
-            {{!-- TODO: add edit button once MVP is finalized --}}
-            {{!-- <div class="te-search-results__edit-button">
-              {{#link-to "manage.alerts.edit" alert.id}}<span class="glyphicon glyphicon-pencil"></span>{{/link-to}}
-            </div> --}}
+              <div class="te-search-results__edit-button">
+                {{#if testMode}}
+                  <a href="#" {{action "removeThirdEyeFunction" alert.id}}><span class="glyphicon glyphicon-trash"></span></a>
+                {{/if}}
+              </div>
           </div>
           <ul class="te-search-results__list te-search-results__list--details-block row">
-            <div class="col-xs-12 col-sm-6">
+            <div class="col-xs-12 col-sm-5">
               <li class="te-search-results__row">
-                {{!-- Todo: Dry this out --}}
-                <div class="te-search-results__option">Metric</div>
+                {{!-- TODO: Dry this out --}}
+                <div class="te-search-results__option te-search-results__option--list">Metric</div>
                 <div class="te-search-results__value" title={{alert.metric}}>{{alert.metric}}</div>
               </li>
               <li class="te-search-results__row">
-                <div class="te-search-results__option">Dataset</div>
-                <div class="te-search-results__value" title={{alert.collection}}>{{alert.collection}}</div>
+                <div class="te-search-results__option te-search-results__option--list">Dataset</div>
+                <div class="te-search-results__value" title={{alert.collection}}>
+                  <span class="{{unless alert.collection 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+                    {{if alert.collection alert.collection 'N/A'}}
+                  </span>
+                </div>
               </li>
               <li class="te-search-results__row">
-                <div class="te-search-results__option">Application</div>
-                <div class="te-search-results__value" title={{alert.application}}>{{alert.application}}</div>
+                <div class="te-search-results__option te-search-results__option--list">Application</div>
+                <div class="te-search-results__value" title={{alert.application}}>
+                  <span class="{{unless alert.application 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+                    {{if alert.application alert.application 'N/A'}}
+                  </span>
+                </div>
               </li>
-            </div> 
-            <div class="col-xs-12 col-sm-6">
               <li class="te-search-results__row">
-                <div class="te-search-results__option">Type</div>
+                <div class="te-search-results__option te-search-results__option--list">Watchers</div>
+                <div class="te-search-results__value" title={{alert.group}}>
+                  <span class="{{unless alert.group 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+                    {{if alert.group alert.group 'N/A'}}
+                  </span>
+                </div>
+              </li>
+            </div>
+            <div class="col-xs-12 col-sm-7">
+              <li class="te-search-results__row">
+                <div class="te-search-results__option te-search-results__option--list">Owner</div>
+                <div class="te-search-results__value" title={{alert.createdBy}}>
+                  <span class="{{unless alert.createdBy 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+                    {{if alert.createdBy alert.createdBy 'N/A'}}
+                  </span>
+                </div>
+              </li>
+              <li class="te-search-results__row">
+                <div class="te-search-results__option te-search-results__option--list">Type</div>
                 <div class="te-search-results__value" title={{alert.type}}>{{alert.type}}</div>
               </li>
               <li class="te-search-results__row">
-                <div class="te-search-results__option">Data Filter</div>
-                <div class="te-search-results__value" title={{alert.filters}}>{{alert.filters}}</div>
+                <div class="te-search-results__option te-search-results__option--list">Data Filter</div>
+                <div class="te-search-results__value" title={{alert.filters}}>
+                  <span class="{{unless alert.filters 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+                    {{if alert.filters alert.filters 'N/A'}}
+                  </span>
+                </div>
               </li>
               <li class="te-search-results__row">
-                <div class="te-search-results__option">Dimensions</div>
-                <div class="te-search-results__value" title={{alert.exploreDimensions}}>{{alert.exploreDimensions}}</div>
+                <div class="te-search-results__option te-search-results__option--list">Dimensions</div>
+                <div class="te-search-results__value" title={{alert.exploreDimensions}}>
+                  <span class="{{unless alert.exploreDimensions 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+                    {{if alert.exploreDimensions alert.exploreDimensions 'N/A'}}
+                  </span>
+                </div>
               </li>
             </div>
           </ul>

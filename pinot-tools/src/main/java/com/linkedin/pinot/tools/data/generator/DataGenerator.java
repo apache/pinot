@@ -15,28 +15,26 @@
  */
 package com.linkedin.pinot.tools.data.generator;
 
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.core.data.readers.FileFormat;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.math.IntRange;
+import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.json.JSONException;
-
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldRole;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.core.data.readers.FileFormat;
 
 /**
  * Sep 12, 2014
@@ -92,12 +90,11 @@ public class DataGenerator {
   public void generate(long totalDocs, int numFiles) throws IOException, JSONException {
     final int numPerFiles = (int) (totalDocs / numFiles);
     for (int i = 0; i < numFiles; i++) {
-      final AvroWriter writer = new AvroWriter(outDir, i, generators, fetchSchema());
-
-      for (int j = 0; j < numPerFiles; j++) {
-        writer.writeNext();
+      try (AvroWriter writer = new AvroWriter(outDir, i, generators, fetchSchema())) {
+        for (int j = 0; j < numPerFiles; j++) {
+          writer.writeNext();
+        }
       }
-      writer.seal();
     }
   }
 

@@ -1,43 +1,39 @@
 package com.linkedin.thirdeye.datalayer.util;
 
-import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
-import com.linkedin.thirdeye.datalayer.entity.ApplicationIndex;
-import com.linkedin.thirdeye.datalayer.entity.ClassificationConfigIndex;
-import com.linkedin.thirdeye.datalayer.entity.ConfigIndex;
-import com.linkedin.thirdeye.datalayer.entity.EventIndex;
-import com.linkedin.thirdeye.datalayer.entity.AutotuneConfigIndex;
-import com.linkedin.thirdeye.datalayer.entity.GroupedAnomalyResultsIndex;
-import com.linkedin.thirdeye.datalayer.entity.OverrideConfigIndex;
-
-import io.dropwizard.configuration.ConfigurationFactory;
-import io.dropwizard.jackson.Jackson;
-
-import java.io.File;
-import java.sql.Connection;
-
-import javax.validation.Validation;
-
-import org.apache.tomcat.jdbc.pool.DataSource;
-
 import com.google.common.base.CaseFormat;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AbstractManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
+import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.AlertSnapshotIndex;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFeedbackIndex;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionIndex;
-import com.linkedin.thirdeye.datalayer.entity.DashboardConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.ApplicationIndex;
+import com.linkedin.thirdeye.datalayer.entity.AutotuneConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.ClassificationConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.ConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DataCompletenessConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DatasetConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DetectionStatusIndex;
 import com.linkedin.thirdeye.datalayer.entity.EntityToEntityMappingIndex;
+import com.linkedin.thirdeye.datalayer.entity.EventIndex;
 import com.linkedin.thirdeye.datalayer.entity.GenericJsonEntity;
+import com.linkedin.thirdeye.datalayer.entity.GroupedAnomalyResultsIndex;
 import com.linkedin.thirdeye.datalayer.entity.JobIndex;
 import com.linkedin.thirdeye.datalayer.entity.MergedAnomalyResultIndex;
 import com.linkedin.thirdeye.datalayer.entity.MetricConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.OnboardDatasetMetricIndex;
+import com.linkedin.thirdeye.datalayer.entity.OverrideConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.RawAnomalyResultIndex;
+import com.linkedin.thirdeye.datalayer.entity.RootcauseSessionIndex;
 import com.linkedin.thirdeye.datalayer.entity.TaskIndex;
+import io.dropwizard.configuration.ConfigurationFactory;
+import io.dropwizard.jackson.Jackson;
+import java.io.File;
+import java.sql.Connection;
+import javax.validation.Validation;
+import org.apache.tomcat.jdbc.pool.DataSource;
 
 public abstract class DaoProviderUtil {
 
@@ -120,8 +116,6 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(DatasetConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, MetricConfigIndex.class,
             convertCamelCaseToUnderscore(MetricConfigIndex.class.getSimpleName()));
-        entityMappingHolder.register(conn, DashboardConfigIndex.class,
-            convertCamelCaseToUnderscore(DashboardConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, OverrideConfigIndex.class,
             convertCamelCaseToUnderscore(OverrideConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, AlertConfigIndex.class,
@@ -146,6 +140,10 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(ConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, ApplicationIndex.class,
             convertCamelCaseToUnderscore(ApplicationIndex.class.getSimpleName()));
+        entityMappingHolder.register(conn, AlertSnapshotIndex.class,
+            convertCamelCaseToUnderscore(AlertSnapshotIndex.class.getSimpleName()));
+        entityMappingHolder.register(conn, RootcauseSessionIndex.class,
+            convertCamelCaseToUnderscore(RootcauseSessionIndex.class.getSimpleName()));
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

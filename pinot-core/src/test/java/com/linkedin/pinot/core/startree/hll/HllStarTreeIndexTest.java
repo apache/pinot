@@ -23,8 +23,9 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.startree.BaseStarTreeIndexTest;
 import com.linkedin.pinot.core.startree.StarTreeIndexTestSegmentHelper;
+import com.linkedin.pinot.startree.hll.HllConfig;
+import com.linkedin.pinot.startree.hll.HllConstants;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -34,10 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeSuite;
-import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 /**
@@ -57,21 +55,21 @@ public class HllStarTreeIndexTest extends BaseStarTreeIndexTest {
       HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX);
 
   private static final String[] HARD_CODED_QUERIES = new String[]{
-      "SELECT FASTHLL(d3) FROM T",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 = 'd1-v1'",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 <> 'd1-v1'",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 BETWEEN 'd1-v1' AND 'd1-v3'",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 IN ('d1-v1', 'd1-v2')",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1')",
-      "SELECT FASTHLL(d3) FROM T GROUP BY d1",
-      "SELECT FASTHLL(d3) FROM T GROUP BY d1, d2",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 = 'd1-v2' GROUP BY d1",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 BETWEEN 'd1-v1' AND 'd1-v3' GROUP BY d2",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 = 'd1-v2' GROUP BY d2, d3",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 <> 'd1-v1' GROUP BY d2",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') GROUP BY d2",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1') GROUP BY d3",
-      "SELECT FASTHLL(d3) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1') GROUP BY d3, d4"
+      "SELECT FASTHLL(d3_hll) FROM T",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 = 'd1-v1'",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 <> 'd1-v1' AND d1 >= 'd1-v2'",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 BETWEEN 'd1-v1' AND 'd1-v3' AND d1 <> 'd1-v2'",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 IN ('d1-v1', 'd1-v2')",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1')",
+      "SELECT FASTHLL(d3_hll) FROM T GROUP BY d1",
+      "SELECT FASTHLL(d3_hll) FROM T GROUP BY d1, d2",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 = 'd1-v2' GROUP BY d1",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 BETWEEN 'd1-v1' AND 'd1-v3' GROUP BY d2",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 = 'd1-v2' GROUP BY d2, d3",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 <> 'd1-v1' GROUP BY d2",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') GROUP BY d2",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1') GROUP BY d3",
+      "SELECT FASTHLL(d3_hll) FROM T WHERE d1 NOT IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1') AND d2 > 'd2-v2' GROUP BY d3, d4"
   };
 
   @Override
@@ -86,7 +84,6 @@ public class HllStarTreeIndexTest extends BaseStarTreeIndexTest {
 
   @Override
   protected Map<List<Integer>, List<Double>> compute(Operator filterOperator) throws Exception {
-    filterOperator.open();
     BlockDocIdIterator docIdIterator = filterOperator.nextBlock().getBlockDocIdSet().iterator();
 
     Map<List<Integer>, List<HyperLogLog>> intermediateResults = new HashMap<>();
@@ -115,7 +112,6 @@ public class HllStarTreeIndexTest extends BaseStarTreeIndexTest {
         hyperLogLogs.set(i, hyperLogLog);
       }
     }
-    filterOperator.close();
 
     // Compute the final result
     Map<List<Integer>, List<Double>> finalResults = new HashMap<>();
@@ -134,12 +130,13 @@ public class HllStarTreeIndexTest extends BaseStarTreeIndexTest {
   @BeforeClass
   void setUp() throws Exception {
     StarTreeIndexTestSegmentHelper.buildSegmentWithHll(DATA_DIR, SEGMENT_NAME, HLL_CONFIG);
-    _segment = ColumnarSegmentLoader.load(new File(DATA_DIR, SEGMENT_NAME), ReadMode.mmap);
   }
 
   @Test
   public void testQueries() throws Exception {
+    _segment = ColumnarSegmentLoader.load(new File(DATA_DIR, SEGMENT_NAME), ReadMode.mmap);
     testHardCodedQueries();
+    _segment.destroy();
   }
 
   @AfterClass

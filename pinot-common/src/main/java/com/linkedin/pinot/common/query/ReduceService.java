@@ -39,18 +39,6 @@ public interface ReduceService<T extends BrokerResponse> {
    *
    * @param brokerRequest broker request.
    * @param instanceResponseMap map from server instance to data table.
-   * @return broker response.
-   */
-  @Nonnull
-  T reduceOnDataTable(@Nonnull BrokerRequest brokerRequest,
-      @Nonnull Map<ServerInstance, DataTable> instanceResponseMap);
-
-  /**
-   * Reduce data tables gathered from server instances to one brokerResponse.
-   * <p>Server instance information here is useful for debugging purpose.
-   *
-   * @param brokerRequest broker request.
-   * @param instanceResponseMap map from server instance to data table.
    * @param brokerMetrics broker metrics to track execution statistics.
    * @return broker response.
    */

@@ -16,287 +16,102 @@
 package com.linkedin.pinot.core.operator.filter.predicate;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 /**
- * Factory for NotEquals predicate evaluators.
+ * Factory for NEQ predicate evaluators.
  */
 public class NotEqualsPredicateEvaluatorFactory {
-
-  // Private constructor
   private NotEqualsPredicateEvaluatorFactory() {
-
   }
 
   /**
-   * Returns a new instance of dictionary based NEQ evaluator.
+   * Create a new instance of dictionary based NEQ predicate evaluator.
    *
-   * @param predicate NEQ predicate
-   * @param dictionary Dictionary
+   * @param nEqPredicate NEQ predicate to evaluate
+   * @param dictionary Dictionary for the column
    * @return Dictionary based NEQ predicate evaluator
    */
-  public static PredicateEvaluator newDictionaryBasedEvaluator(NEqPredicate predicate,
+  public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(NEqPredicate nEqPredicate,
       Dictionary dictionary) {
-    return new DictionaryBasedNotEqualsPredicateEvaluator(predicate, dictionary);
+    return new DictionaryBasedNeqPredicateEvaluator(nEqPredicate, dictionary);
   }
 
   /**
-   * Returns a new instance of no-dictionary based NEQ evaluator.
+   * Create a new instance of raw value based NEQ predicate evaluator.
    *
-   * @param predicate NEQ predicate
-   * @param dataType Data type of input value
-   * @return No-Dictionary based NEQ predicate evaluator
+   * @param nEqPredicate NEQ predicate to evaluate
+   * @param dataType Data type for the column
+   * @return Raw value based NEQ predicate evaluator
    */
-  public static PredicateEvaluator newNoDictionaryBasedEvaluator(NEqPredicate predicate,
+  public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(NEqPredicate nEqPredicate,
       FieldSpec.DataType dataType) {
     switch (dataType) {
       case INT:
-        return new IntNoDictionaryNeqEvaluator(predicate);
-
+        return new IntRawValueBasedNeqPredicateEvaluator(nEqPredicate);
       case LONG:
-        return new LongNoDictionaryNeqEvaluator(predicate);
-
+        return new LongRawValueBasedNeqPredicateEvaluator(nEqPredicate);
       case FLOAT:
-        return new FloatNoDictionaryNeqEvaluator(predicate);
-
+        return new FloatRawValueBasedNeqPredicateEvaluator(nEqPredicate);
       case DOUBLE:
-        return new DoubleNoDictionaryNeqEvaluator(predicate);
-
+        return new DoubleRawValueBasedNeqPredicateEvaluator(nEqPredicate);
       case STRING:
-        return new StringNoDictionaryNeqEvaluator(predicate);
-
+        return new StringRawValueBasedNeqPredicateEvaluator(nEqPredicate);
       default:
-        throw new UnsupportedOperationException("Data type not supported for index without dictionary: " + dataType);
+        throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }
   }
 
-  /**
-   *
-   * No dictionary NEQ evaluator for int data type.
-   */
-  private static final class IntNoDictionaryNeqEvaluator extends BasePredicateEvaluator {
-    private int _neqValue;
+  private static final class DictionaryBasedNeqPredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+    final int _nonMatchingDictId;
+    final int[] _nonMatchingDictIds;
+    final Dictionary _dictionary;
+    int[] _matchingDictIds;
 
-    private IntNoDictionaryNeqEvaluator(NEqPredicate predicate) {
-      _neqValue = Integer.parseInt(predicate.getNotEqualsValue());
-    }
-
-    @Override
-    public boolean apply(int inputValue) {
-      return (_neqValue != inputValue);
-    }
-
-    @Override
-    public boolean apply(int[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(int[] inputValues, int length) {
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        int inputValue = inputValues[i];
-        if (_neqValue == inputValue) {
-          return false;
-        }
-      }
-      return true;
-    }
-  }
-
-  /**
-   *
-   * No dictionary NEQ evaluator for long data type.
-   */
-  private static final class LongNoDictionaryNeqEvaluator extends BasePredicateEvaluator {
-    private long _neqValue;
-
-    private LongNoDictionaryNeqEvaluator(NEqPredicate predicate) {
-      _neqValue = Long.parseLong(predicate.getNotEqualsValue());
-    }
-
-    @Override
-    public boolean apply(long inputValue) {
-      return (_neqValue != inputValue);
-    }
-
-    @Override
-    public boolean apply(long[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(long[] inputValues, int length) {
-      // We cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        long inputValue = inputValues[i];
-        if (_neqValue == inputValue) {
-          return false;
-        }
-      }
-      return true;
-    }
-  }
-
-  /**
-   *
-   * No dictionary NEQ evaluator for float data type.
-   */
-  private static final class FloatNoDictionaryNeqEvaluator extends BasePredicateEvaluator {
-    private float _neqValue;
-
-    private FloatNoDictionaryNeqEvaluator(NEqPredicate predicate) {
-      _neqValue = Float.parseFloat(predicate.getNotEqualsValue());
-    }
-
-    @Override
-    public boolean apply(float inputValue) {
-      return (_neqValue != inputValue);
-    }
-
-    @Override
-    public boolean apply(float[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(float[] inputValues, int length) {
-      // We cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        float inputValue = inputValues[i];
-        if (_neqValue == inputValue) {
-          return false;
-        }
-      }
-      return true;
-    }
-  }
-
-  /**
-   *
-   * No dictionary NEQ evaluator for double data type.
-   */
-  private static final class DoubleNoDictionaryNeqEvaluator extends BasePredicateEvaluator {
-    private double _neqValue;
-
-    private DoubleNoDictionaryNeqEvaluator(NEqPredicate predicate) {
-      _neqValue = Double.parseDouble(predicate.getNotEqualsValue());
-    }
-
-    @Override
-    public boolean apply(double inputValue) {
-      return (_neqValue != inputValue);
-    }
-
-    @Override
-    public boolean apply(double[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(double[] inputValues, int length) {
-      // We cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        double inputValue = inputValues[i];
-        if (_neqValue == inputValue) {
-          return false;
-        }
-      }
-      return true;
-    }
-  }
-
-  /**
-   *
-   * No dictionary NEQ evaluator for string data type.
-   */
-  private static final class StringNoDictionaryNeqEvaluator extends BasePredicateEvaluator {
-    private String _neqValue;
-
-    private StringNoDictionaryNeqEvaluator(NEqPredicate predicate) {
-      _neqValue = predicate.getNotEqualsValue();
-    }
-
-    @Override
-    public boolean apply(String inputValue) {
-      return (!inputValue.equals(_neqValue));
-    }
-
-    @Override
-    public boolean apply(String[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(String[] inputValues, int length) {
-      // We cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        String inputValue = inputValues[i];
-        if (_neqValue.equals(inputValue)) {
-          return false;
-        }
-      }
-      return true;
-    }
-  }
-
-  /**
-   * Dictionary based implementation for {@link NotEqualsPredicateEvaluatorFactory}
-   */
-  private static final class DictionaryBasedNotEqualsPredicateEvaluator extends BasePredicateEvaluator {
-    private int _neqDictValue;
-    private int[] _matchingDictIds;
-    private Dictionary _dictionary;
-    private int[] _nonMatchingDictIds;
-
-    private DictionaryBasedNotEqualsPredicateEvaluator(NEqPredicate predicate, Dictionary dictionary) {
-      _dictionary = dictionary;
-      _neqDictValue = dictionary.indexOf(predicate.getNotEqualsValue());
-      if (_neqDictValue > -1) {
-        _nonMatchingDictIds = new int[]{_neqDictValue};
+    DictionaryBasedNeqPredicateEvaluator(NEqPredicate nEqPredicate, Dictionary dictionary) {
+      _nonMatchingDictId = dictionary.indexOf(nEqPredicate.getNotEqualsValue());
+      if (_nonMatchingDictId >= 0) {
+        _nonMatchingDictIds = new int[]{_nonMatchingDictId};
       } else {
         _nonMatchingDictIds = new int[0];
       }
+      _dictionary = dictionary;
     }
 
     @Override
-    public boolean apply(int dictionaryId) {
-      return _neqDictValue != dictionaryId;
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.NEQ;
     }
 
     @Override
-    public boolean apply(int[] dictionaryIds) {
-      if (_neqDictValue < 0) {
-        return true;
-      }
-      //we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int dictId : dictionaryIds) {
-        if (dictId == _neqDictValue) {
-          return false;
-        }
-      }
-
-      return true;
+    public boolean isAlwaysFalse() {
+      return _nonMatchingDictIds.length == _dictionary.length();
     }
 
     @Override
-    public int[] getMatchingDictionaryIds() {
-      // This is expensive for NOT EQ predicate, some operators need this for now. Eventually we should remove the need for exposing matching dict ids
+    public boolean applySV(int dictId) {
+      return _nonMatchingDictId != dictId;
+    }
+
+    @Override
+    public int[] getMatchingDictIds() {
       if (_matchingDictIds == null) {
-        int size;
-        if (_neqDictValue >= 0) {
-          size = _dictionary.length() - 1;
+        int dictionarySize = _dictionary.length();
+        if (_nonMatchingDictId >= 0) {
+          _matchingDictIds = new int[dictionarySize - 1];
+          int index = 0;
+          for (int dictId = 0; dictId < dictionarySize; dictId++) {
+            if (dictId != _nonMatchingDictId) {
+              _matchingDictIds[index++] = dictId;
+            }
+          }
         } else {
-          size = _dictionary.length();
-        }
-        _matchingDictIds = new int[size];
-        int count = 0;
-        for (int i = 0; i < _dictionary.length(); i++) {
-          if (i != _neqDictValue) {
-            _matchingDictIds[count] = i;
-            count = count + 1;
+          _matchingDictIds = new int[dictionarySize];
+          for (int dictId = 0; dictId < dictionarySize; dictId++) {
+            _matchingDictIds[dictId] = dictId;
           }
         }
       }
@@ -304,27 +119,98 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public int[] getNonMatchingDictionaryIds() {
+    public int[] getNonMatchingDictIds() {
       return _nonMatchingDictIds;
     }
+  }
 
-    @Override
-    public boolean apply(int[] dictionaryIds, int length) {
-      if (_neqDictValue < 0) {
-        return true;
-      }
-      for (int i = 0; i < length; i++) {
-        int dictId = dictionaryIds[i];
-        if (dictId == _neqDictValue) {
-          return false;
-        }
-      }
-      return true;
+  private static final class IntRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final int _nonMatchingValue;
+
+    IntRawValueBasedNeqPredicateEvaluator(NEqPredicate nEqPredicate) {
+      _nonMatchingValue = Integer.parseInt(nEqPredicate.getNotEqualsValue());
     }
 
     @Override
-    public boolean alwaysFalse() {
-      return _nonMatchingDictIds.length == _dictionary.length();
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.NEQ;
+    }
+
+    @Override
+    public boolean applySV(int value) {
+      return _nonMatchingValue != value;
+    }
+  }
+
+  private static final class LongRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final long _nonMatchingValue;
+
+    LongRawValueBasedNeqPredicateEvaluator(NEqPredicate nEqPredicate) {
+      _nonMatchingValue = Long.parseLong(nEqPredicate.getNotEqualsValue());
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.NEQ;
+    }
+
+    @Override
+    public boolean applySV(long value) {
+      return _nonMatchingValue != value;
+    }
+  }
+
+  private static final class FloatRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final float _nonMatchingValue;
+
+    FloatRawValueBasedNeqPredicateEvaluator(NEqPredicate nEqPredicate) {
+      _nonMatchingValue = Float.parseFloat(nEqPredicate.getNotEqualsValue());
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.NEQ;
+    }
+
+    @Override
+    public boolean applySV(float value) {
+      return _nonMatchingValue != value;
+    }
+  }
+
+  private static final class DoubleRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final double _nonMatchingValue;
+
+    DoubleRawValueBasedNeqPredicateEvaluator(NEqPredicate nEqPredicate) {
+      _nonMatchingValue = Double.parseDouble(nEqPredicate.getNotEqualsValue());
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.NEQ;
+    }
+
+    @Override
+    public boolean applySV(double value) {
+      return _nonMatchingValue != value;
+    }
+  }
+
+  private static final class StringRawValueBasedNeqPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final String _nonMatchingValue;
+
+    StringRawValueBasedNeqPredicateEvaluator(NEqPredicate nEqPredicate) {
+      _nonMatchingValue = nEqPredicate.getNotEqualsValue();
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.NEQ;
+    }
+
+    @Override
+    public boolean applySV(String value) {
+      return !_nonMatchingValue.equals(value);
     }
   }
 }

@@ -1,5 +1,4 @@
 import { ActionTypes } from '../actions/events';
-import moment from 'moment';
 
 /**
  * Define the schema

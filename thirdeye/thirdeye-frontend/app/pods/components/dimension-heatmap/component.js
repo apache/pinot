@@ -1,16 +1,19 @@
-import Ember from 'ember';
+import $ from 'jquery';
+import { computed } from '@ember/object';
+import { alias } from '@ember/object/computed';
+import Component from '@ember/component';
 import d3 from 'd3';
 
-export default Ember.Component.extend({
+export default Component.extend({
   heatMapData: {},
-  dimensions: Ember.computed.alias('heatMapData.dimensions'),
-  metricName: Ember.computed.alias('heatMapData.metrics.firstObject'),
-  inverseMetric:Ember.computed.alias('heatMapData.inverseMetric'),
+  dimensions: alias('heatMapData.dimensions'),
+  metricName: alias('heatMapData.metrics.firstObject'),
+  inverseMetric:alias('heatMapData.inverseMetric'),
   classNames: ['dimension-heatmap'],
   heatmapMode: 'Change in Contribution',
 
   // Copy pasted code from all Thirdeye UI
-  treeMapData: Ember.computed(
+  treeMapData: computed(
     'dimensions',
     'dimensions.@each',
     'heatMapData',
@@ -116,21 +119,21 @@ export default Ember.Component.extend({
       var data = treeMapData[i];
       var dimension = dimensions[i];
       var dimensionPlaceHolderId = '#' + dimension + '-heatmap-placeholder';
-      var height = Ember.$(dimensionPlaceHolderId).height();
-      var width = Ember.$(dimensionPlaceHolderId).width();
+      var height = $(dimensionPlaceHolderId).height();
+      var width = $(dimensionPlaceHolderId).width();
       var treeMap = d3.layout.treemap().size([ width, height ]).sort(function(a, b) {
         return a.value - b.value;
       });
 
       var div = d3.select(dimensionPlaceHolderId).attr("class", "heatmap")
-          .append("svg:svg").attr("width", width).attr("height", height).append("svg:g").attr("transform", "translate(.5,.5)");
+        .append("svg:svg").attr("width", width).attr("height", height).append("svg:g").attr("transform", "translate(.5,.5)");
 
       var nodes = treeMap.nodes(data).filter(function(d) {
         return !d.children;
       });
       var cell = div.selectAll("g").data(nodes).enter().append("svg:g").attr("class", "cell").attr("transform", function(d) {
         return "translate(" + d.x + "," + d.y + ")";
-      }).on("click", function(d) {
+      // }).on("click", function(d) {
         // return zoom(node == d.parent ? root : d.parent);
       }).on("mousemove", function(d) {
 
@@ -191,9 +194,6 @@ export default Ember.Component.extend({
         var factor = getChangeFactor(d);
         return getTextColor(factor);
       });
-
     }
-    // anchor page to dimension tree map if exists
-    Ember.$('.contribution-table').get(0).scrollIntoView();
   }
 });

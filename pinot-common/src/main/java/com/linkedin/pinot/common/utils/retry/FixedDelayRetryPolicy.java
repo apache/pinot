@@ -15,41 +15,19 @@
  */
 package com.linkedin.pinot.common.utils.retry;
 
-import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.Utils;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
-
-
 /**
- * Fixed delay retry policy, see {@link RetryPolicies#fixedDelayRetryPolicy(int, long)}.
+ * Delay policy with fixed delay between attempts.
  */
-public class FixedDelayRetryPolicy implements RetryPolicy {
-  public FixedDelayRetryPolicy(int attemptCount, long sleepTimeMillis) {
-    _attemptCount = attemptCount;
-    _sleepTimeMillis = sleepTimeMillis;
+public class FixedDelayRetryPolicy extends BaseRetryPolicy {
+  private final long _delayMs;
+
+  public FixedDelayRetryPolicy(int maxNumAttempts, long delayMs) {
+    super(maxNumAttempts);
+    _delayMs = delayMs;
   }
 
-  private int _attemptCount;
-  private long _sleepTimeMillis;
-
   @Override
-  public boolean attempt(Callable<Boolean> operation) {
-    try {
-      int remainingAttempts = _attemptCount - 1;
-      boolean result = operation.call();
-
-      while (!result && 0 < remainingAttempts) {
-        Uninterruptibles.sleepUninterruptibly(_sleepTimeMillis, TimeUnit.MILLISECONDS);
-
-        result = operation.call();
-        remainingAttempts--;
-      }
-
-      return result;
-    } catch (Exception e) {
-      Utils.rethrowException(e);
-      return false;
-    }
+  protected long getNextDelayMs() {
+    return _delayMs;
   }
 }

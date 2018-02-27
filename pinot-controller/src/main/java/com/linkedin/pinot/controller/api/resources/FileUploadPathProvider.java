@@ -55,7 +55,7 @@ public class FileUploadPathProvider {
       }
       _vip = _controllerConf.generateVipUrl();
     } catch (Exception e) {
-      throw new InvalidControllerConfigException("Bad controller configuration");
+      throw new InvalidControllerConfigException("Bad controller configuration", e);
     }
   }
 

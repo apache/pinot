@@ -3,10 +3,10 @@
  * @module manage/route
  * @exports manage route
  */
-import Ember from 'ember';
+import Route from '@ember/routing/route';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
-export default Ember.Route.extend(AuthenticatedRouteMixin, {
+export default Route.extend(AuthenticatedRouteMixin, {
   /**
    * Default to 'alerts' for this model's root path request
    */

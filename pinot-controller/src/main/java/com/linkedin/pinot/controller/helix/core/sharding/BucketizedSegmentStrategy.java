@@ -37,37 +37,30 @@ import com.linkedin.pinot.common.utils.helix.HelixHelper;
  *
  */
 public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BucketizedSegmentStrategy.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(BucketizedSegmentStrategy.class);
 
-  @Override
-  public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
-      int numReplicas, String tenantName) {
-    String serverTenantName = null;
-    if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
-      serverTenantName = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName);
-    } else {
-      serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
-    }
+    @Override
+    public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager,
+                                             ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
+                                             int numReplicas, String tenantName) {
+        String serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
 
-    List<String> allInstances =
-        HelixHelper.getEnabledInstancesWithTag(helixResourceManager.getHelixAdmin(), helixClusterName,
-            serverTenantName);
-    List<String> selectedInstanceList = new ArrayList<String>();
-    if (segmentMetadata.getShardingKey() != null) {
-      for (String instance : allInstances) {
-        if (HelixHelper.getInstanceConfigsMapFor(instance, helixClusterName, helixResourceManager.getHelixAdmin())
-            .get("shardingKey")
-            .equalsIgnoreCase(segmentMetadata.getShardingKey())) {
-          selectedInstanceList.add(instance);
+        List<String> allInstances = HelixHelper.getEnabledInstancesWithTag(helixResourceManager.getHelixAdmin(), helixClusterName, serverTenantName);
+        List<String> selectedInstanceList = new ArrayList<>();
+        if (segmentMetadata.getShardingKey() != null) {
+            for (String instance : allInstances) {
+                if (HelixHelper.getInstanceConfigsMapFor(instance, helixClusterName, helixResourceManager.getHelixAdmin())
+                        .get("shardingKey")
+                        .equalsIgnoreCase(segmentMetadata.getShardingKey())) {
+                    selectedInstanceList.add(instance);
+                }
+            }
+            LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
+                    + segmentMetadata.getTableName() + ", selected instances: " + Arrays.toString(
+                    selectedInstanceList.toArray()));
+            return selectedInstanceList;
+        } else {
+            throw new RuntimeException("Segment missing sharding key!");
         }
-      }
-      LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
-          + segmentMetadata.getTableName() + ", selected instances: "
-          + Arrays.toString(selectedInstanceList.toArray()));
-      return selectedInstanceList;
-    } else {
-      throw new RuntimeException("Segment missing sharding key!");
     }
-  }
 }

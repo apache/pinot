@@ -1,4 +1,4 @@
-<section class="paper-container__body">
+<section class="card-container__body">
   {{#containers/events-table-container as |events|}}
   <div class="row rca-header rca-header--flush">
     <div class="col-xs-9">
@@ -8,14 +8,15 @@
     </div>
   </div>
     {{#containers/primary-metric-container as |summary actions|}}
-      {{#if summary.loaded }}
-
-        {{#if events.loading}}
-          <div class="spinner-wrapper">
+      <div class="rca-body">
+        {{#if (or events.loading (not summary.loaded))}}
+          <div class="spinner-wrapper spinner-wrapper__border">
             {{ember-spinner}}
           </div>
-        {{/if}}
-        {{#if events.loaded}}
+          <div class="spinner-wrapper spinner-wrapper__border spinner-wrapper__margin-top">
+            {{ember-spinner}}
+          </div>
+        {{else if events.loaded}}
           {{anomaly-graph
             componentId='correlated-events'
             primaryMetric=summary.primaryMetric
@@ -40,7 +41,7 @@
             onSelection=(action actions.onEventSelection)
           }}
         {{/if}}
-      {{/if}}
+      </div>
     {{/containers/primary-metric-container}}
   {{/containers/events-table-container}}
 </section>

@@ -1,9 +1,11 @@
-import Ember from 'ember';
+import { later } from '@ember/runloop';
+import Route from '@ember/routing/route';
 
 import { Actions } from 'thirdeye-frontend/actions/dimensions';
+import { inject as service } from '@ember/service';
 
-export default Ember.Route.extend({
-  redux: Ember.inject.service(),
+export default Route.extend({
+  redux: service(),
 
   // queryParam unique to the dimension route
   queryParams: {
@@ -19,7 +21,7 @@ export default Ember.Route.extend({
     const {
       analysisStart: initStart,
       analysisEnd: initEnd
-     } = this.modelFor('rca.details');
+    } = this.modelFor('rca.details');
 
     const {
       dimension = 'All',
@@ -40,7 +42,7 @@ export default Ember.Route.extend({
       Number(end)
     ));
 
-    Ember.run.later(() => {
+    later(() => {
       redux.dispatch(Actions.updateDimension(dimension)).then(() => {
         redux.dispatch(Actions.fetchDimensions(metricId));
       });
@@ -72,6 +74,7 @@ export default Ember.Route.extend({
     // Dispatches a redux action on query param change
     queryParamsDidChange(changedParams, oldParams) {
       const redux = this.get('redux');
+      let shouldReload = false;
       const controller = this.controller;
       let {
         analysisStart: start,
@@ -87,7 +90,7 @@ export default Ember.Route.extend({
           start = start || oldParams.analysisStart;
           end = end || oldParams.analysisEnd;
 
-          Ember.run.later(() => {
+          later(() => {
             redux.dispatch(Actions.updateDates(
               Number(start),
               Number(end)
@@ -101,6 +104,7 @@ export default Ember.Route.extend({
             displayStart: Number(displayStart),
             dimensionsStart: Number(displayStart)
           });
+          shouldReload = true;
         }
 
         if (controller && displayEnd) {
@@ -109,11 +113,14 @@ export default Ember.Route.extend({
             displayEnd: Number(displayEnd),
             dimensionsEnd: Number(displayEnd)
           });
+          shouldReload = true;
         }
-
-        Ember.run.later(() => {
-          redux.dispatch(Actions.loaded());
-        });
+        if (shouldReload) {
+          later(() => {
+            redux.dispatch(Actions.loaded());
+          });
+          shouldReload = false;
+        }
       }
 
       this._super(...arguments);

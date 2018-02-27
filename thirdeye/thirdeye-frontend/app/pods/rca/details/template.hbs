@@ -1,15 +1,15 @@
 <div class="container">
   <div class="row">
     <h2 class="te-title">Summary</h2>
-    <div class="paper-container">
-      <div class="paper-container__body">
+    <div class="card-container">
+      <div class="card-container__body">
         <section class="rca-summary">
           <div class="row">
             <div class="col-xs-4">
               <label class="te-label" for="select-view-region">Display Period:
                 <span>
                   <i class="glyphicon glyphicon-question-sign"></i>
-                  {{#tooltip-on-element}}
+                  {{#tooltip-on-element class="te-tooltip"}}
                     This is the whole period that you'd like to view. This sets the boundaries for your subchart.
                   {{/tooltip-on-element}}
                 </span>
@@ -60,7 +60,7 @@
               <label class="te-label" for="select-anomaly-region">Investigation Period:
                 <span>
                   <i class="glyphicon glyphicon-question-sign"></i>
-                  {{#tooltip-on-element}}
+                  {{#tooltip-on-element class="te-tooltip"}}
                     Typically, this is your anomaly region. It's highlighted in orange in the graph below.
                   {{/tooltip-on-element}}
                 </span>
@@ -90,14 +90,12 @@
             </div>
           </div>
 
-          <main class="paper-container">
+          <main class="card-container">
             {{#containers/primary-metric-container as |summary actions|}}
-              {{#if summary.loading}}
-                <section class="paper-container">
-                  <div class="spinner-wrapper">
-                    {{ember-spinner}}
-                  </div>
-                </section>
+              {{#if (or summary.loading (not summary.loaded))}}
+                <div class="spinner-wrapper">
+                  {{ember-spinner}}
+                </div>
               {{/if}}
 
               {{#if summary.loaded}}
@@ -131,7 +129,7 @@
     </div>
 
     <h2 class="te-title">Root Cause Analysis</h2>
-    <div id="root-cause-analysis" class="paper-container">
+    <div id="root-cause-analysis" class="card-container">
       <div class="contribution-table__header">
         <div class="contribution-table__subnav">
           {{#link-to "rca.details.events" class="thirdeye-link thirdeye-link--nav" activeClass="thirdeye-link--active"}}

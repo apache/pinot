@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import java.util.HashMap;
 import java.util.Map;
@@ -45,7 +45,7 @@ public class MutableDictionaryTest {
   private static final Random RANDOM = new Random(RANDOM_SEED);
 
   private final ExecutorService _executorService = Executors.newFixedThreadPool(NUM_READERS + 1);
-  private final RealtimeIndexOffHeapMemoryManager _memoryManager =
+  private final PinotDataBufferMemoryManager _memoryManager =
       new DirectMemoryManager(MutableDictionaryTest.class.getName());
 
   @Test
@@ -156,6 +156,17 @@ public class MutableDictionaryTest {
     int numEntries = 0;
     for (int i = 0; i < NUM_ENTRIES; i++) {
       Object value = makeRandomObjectOfType(dataType);
+      if (valueToDictId.containsKey(value)) {
+        Assert.assertEquals(dictionary.indexOf(value), (int) valueToDictId.get(value));
+      } else {
+        dictionary.index(value);
+        int dictId = dictionary.indexOf(value);
+        Assert.assertEquals(dictId, numEntries++);
+        valueToDictId.put(value, dictId);
+      }
+    }
+    if (dataType == FieldSpec.DataType.INT) {
+      Object value = new Integer(Integer.MIN_VALUE);
       if (valueToDictId.containsKey(value)) {
         Assert.assertEquals(dictionary.indexOf(value), (int) valueToDictId.get(value));
       } else {

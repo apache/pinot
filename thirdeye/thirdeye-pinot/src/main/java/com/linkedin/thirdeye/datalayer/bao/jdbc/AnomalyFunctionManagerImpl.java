@@ -17,6 +17,7 @@ import com.linkedin.thirdeye.datalayer.util.Predicate;
 public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunctionDTO>
     implements AnomalyFunctionManager {
   private static final String FIND_BY_NAME_LIKE = " WHERE functionName like :functionName";
+  private static final String FIND_BY_NAME_EQUALS = " WHERE functionName = :functionName";
 
   public AnomalyFunctionManagerImpl() {
     super(AnomalyFunctionDTO.class, AnomalyFunctionBean.class);
@@ -62,5 +63,18 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
       result.add(MODEL_MAPPER.map(bean, AnomalyFunctionDTO.class));
     }
     return result;
+  }
+
+  @Override
+  public AnomalyFunctionDTO findWhereNameEquals(String name) {
+    Map<String, Object> parameterMap = new HashMap<>();
+    parameterMap.put("functionName", name);
+    List<AnomalyFunctionBean> list =
+        genericPojoDao.executeParameterizedSQL(FIND_BY_NAME_EQUALS, parameterMap, AnomalyFunctionBean.class);
+    List<AnomalyFunctionDTO> result = new ArrayList<>();
+    for (AnomalyFunctionBean bean : list) {
+      result.add(MODEL_MAPPER.map(bean, AnomalyFunctionDTO.class));
+    }
+    return result.isEmpty()? null : result.get(0);
   }
 }

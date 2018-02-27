@@ -1,10 +1,12 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
-import com.linkedin.thirdeye.auth.AuthRequest;
-import com.linkedin.thirdeye.auth.IAuthManager;
-import com.linkedin.thirdeye.auth.PrincipalAuthContext;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import java.util.concurrent.TimeUnit;
+import com.google.common.base.Optional;
+import com.linkedin.thirdeye.auth.AuthCookie;
+import com.linkedin.thirdeye.auth.AuthCookieSerializer;
+import com.linkedin.thirdeye.auth.Credentials;
+import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
+import com.linkedin.thirdeye.auth.ThirdEyePrincipal;
+import io.dropwizard.auth.Authenticator;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -21,23 +23,38 @@ import org.slf4j.LoggerFactory;
 public class AuthResource {
   public static final String AUTH_TOKEN_NAME = "te_auth";
   private static final Logger LOG = LoggerFactory.getLogger(AuthResource.class);
-  private final IAuthManager authManager;
 
-  public AuthResource() {
-    authManager = DAORegistry.getInstance().getAuthManager();
+  private final Authenticator<Credentials, ThirdEyePrincipal> authenticator;
+  private final AuthCookieSerializer serializer;
+  private final long cookieTTL;
+
+  public AuthResource(Authenticator<Credentials, ThirdEyePrincipal> authenticator, AuthCookieSerializer serializer, long cookieTTL) {
+    this.authenticator = authenticator;
+    this.serializer = serializer;
+    this.cookieTTL = cookieTTL;
   }
 
   @Path("/authenticate")
   @POST
-  public Response authenticate(AuthRequest authRequest) {
+  public Response authenticate(Credentials credentials) {
     try {
-      PrincipalAuthContext authContext =
-          authManager.authenticate(authRequest.getPrincipal(), authRequest.getPassword());
+      final Optional<ThirdEyePrincipal> optPrincipal = this.authenticator.authenticate(credentials);
+      if (!optPrincipal.isPresent()) {
+        return Response.status(Response.Status.UNAUTHORIZED).build();
+      }
 
-      //Parameters : (String name, String value, String path, String domain, String comment, int maxAge, boolean secure)
-      NewCookie cookie = new NewCookie(AUTH_TOKEN_NAME, authManager.buildAuthToken(authContext), "/", null, null,
-          (int) TimeUnit.DAYS.toSeconds(7), false);
-      return Response.ok(authContext).cookie(cookie).build();
+      final ThirdEyePrincipal principal = optPrincipal.get();
+
+      AuthCookie authCookie = new AuthCookie();
+      authCookie.setPrincipal(credentials.getPrincipal());
+      authCookie.setPassword(credentials.getPassword()); // TODO replace with token in DB
+      authCookie.setTimeCreated(System.currentTimeMillis());
+
+      final String cookieValue = this.serializer.serializeCookie(authCookie);
+
+      NewCookie cookie = new NewCookie(AUTH_TOKEN_NAME, cookieValue, "/", null, null, (int) (this.cookieTTL / 1000), false);
+
+      return Response.ok(principal).cookie(cookie).build();
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
@@ -47,7 +64,6 @@ public class AuthResource {
   @Path("/logout")
   @GET
   public Response logout() {
-    //Parameters : (String name, String value, String path, String domain, String comment, int maxAge, boolean secure)
     NewCookie cookie = new NewCookie(AUTH_TOKEN_NAME, "", "/", null, null, -1, false);
     return Response.ok().cookie(cookie).build();
   }
@@ -58,11 +74,12 @@ public class AuthResource {
    */
   @GET
   public Response getPrincipalContext() {
-    PrincipalAuthContext authContext = authManager.getCurrentPrincipal();
-    if (authContext == null) {
+    // TODO refactor this, use injection
+    ThirdEyePrincipal principal = ThirdEyeAuthFilter.getCurrentPrincipal();
+    if (principal == null) {
       LOG.error("Could not find a valid the user");
       return Response.status(Response.Status.UNAUTHORIZED).build();
     }
-    return Response.ok(authContext).build();
+    return Response.ok(principal).build();
   }
 }

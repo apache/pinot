@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.hadoop.job;
 
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import java.util.Properties;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileStatus;
@@ -25,7 +25,6 @@ import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.utils.FileUploadUtils;
 
 public class SegmentUriPushJob extends Configured {
 
@@ -33,7 +32,7 @@ public class SegmentUriPushJob extends Configured {
   private String _pushUriSuffix;
   private String _segmentPath;
   private String[] _hosts;
-  private String _port;
+  private int _port;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentUriPushJob.class);
 
@@ -43,8 +42,7 @@ public class SegmentUriPushJob extends Configured {
     _pushUriSuffix = properties.getProperty("uri.suffix", "");
     _segmentPath = properties.getProperty("path.to.output") + "/";
     _hosts = properties.getProperty("push.to.hosts").split(",");
-    _port = properties.getProperty("push.to.port");
-
+    _port = Integer.parseInt(properties.getProperty("push.to.port"));
   }
 
   public void run() throws Exception {
@@ -59,7 +57,6 @@ public class SegmentUriPushJob extends Configured {
         pushOneTarFile(fs, fileStatus.getPath());
       }
     }
-
   }
 
   public void pushDir(FileSystem fs, Path path) throws Exception {
@@ -79,18 +76,22 @@ public class SegmentUriPushJob extends Configured {
     if (!fileName.endsWith(".tar.gz")) {
       return;
     }
-    for (String host : _hosts) {
-      String uri = String.format("%s%s%s", _pushUriPrefix, path.toUri().getRawPath(), _pushUriSuffix);
-      LOGGER.info("******** Upoading file: {} to Host: {} and Port: {} with download uri: {} *******", fileName, host, _port, uri);
-      try {
-        int responseCode = FileUploadUtils.sendSegmentUri(host, _port, uri);
-        LOGGER.info("Response code: {}", responseCode);
-      } catch (Exception e) {
-        LOGGER.error("******** Error Upoading file: {} to Host: {} and Port: {}  *******", fileName, host, _port);
-        LOGGER.error("Caught exception during upload", e);
-        throw new RuntimeException("Got Error during send tar files to push hosts!");
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      for (String host : _hosts) {
+        String uri = String.format("%s%s%s", _pushUriPrefix, path.toUri().getRawPath(), _pushUriSuffix);
+        LOGGER.info("******** Uploading file: {} to Host: {} and Port: {} with download uri: {} *******", fileName,
+            host, _port, uri);
+        try {
+          int responseCode =
+              fileUploadDownloadClient.sendSegmentUri(FileUploadDownloadClient.getUploadSegmentHttpURI(host, _port),
+                  uri);
+          LOGGER.info("Response code: {}", responseCode);
+        } catch (Exception e) {
+          LOGGER.error("******** Error Uploading file: {} to Host: {} and Port: {}  *******", fileName, host, _port);
+          LOGGER.error("Caught exception during upload", e);
+          throw e;
+        }
       }
     }
   }
-
 }

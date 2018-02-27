@@ -16,6 +16,16 @@
 
 package com.linkedin.pinot.core.segment.index.creator;
 
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,17 +41,6 @@ import org.joda.time.format.DateTimeFormatter;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.data.readers.TestRecordReader;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 
 
 public class SegmentGenerationWithTimeColumnTest {
@@ -106,8 +105,8 @@ public class SegmentGenerationWithTimeColumnTest {
       config.setSimpleDateFormat(TIME_COL_FORMAT);
     }
 
-    final List<GenericRow> rows = new ArrayList<>();
-    for (int row = 0; row < NUM_ROWS; row++) {
+    List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
+    for (int i = 0; i < NUM_ROWS; i++) {
       HashMap<String, Object> map = new HashMap<>();
 
       for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -123,8 +122,7 @@ public class SegmentGenerationWithTimeColumnTest {
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    RecordReader reader = new TestRecordReader(rows, schema);
-    driver.init(config, reader);
+    driver.init(config, new GenericRowRecordReader(rows, schema));
     driver.build();
     driver.getOutputDirectory().deleteOnExit();
     return driver.getOutputDirectory();

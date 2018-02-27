@@ -42,7 +42,7 @@ public class SegmentCountMetric implements ServerLoadMetric {
       return numOfSegments;
     } else {
       return 0;
-    }*/
+    }
 
     Map<String,Double> serverLoadMap = helixResourceManager.getServerLoadMap();
     if(serverLoadMap.containsKey(instance))
@@ -53,16 +53,19 @@ public class SegmentCountMetric implements ServerLoadMetric {
     {
       return 0;
     }
+    */
+    return  0;
+
   }
 
   @Override
   public void updateServerLoadMetric(PinotHelixResourceManager helixResourceManager, String instance, Double currentLoadMetric, String tableName, SegmentMetadata segmentMetadata) {
-    helixResourceManager.updateServerLoadMap(instance,currentLoadMetric+1);
+    //helixResourceManager.updateServerLoadMap(instance,currentLoadMetric+1);
   }
 
-    @Override
-    public void resetServerLoadMetric(PinotHelixResourceManager helixResourceManager, String instance) {
-        helixResourceManager.updateServerLoadMap(instance, 0D);
-    }
+   @Override
+   public void resetServerLoadMetric(PinotHelixResourceManager helixResourceManager, String instance) {
+    //helixResourceManager.updateServerLoadMap(instance, 0D);
+   }
 
 }

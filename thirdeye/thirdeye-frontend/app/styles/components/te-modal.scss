@@ -1,0 +1,46 @@
+// Styling for the te-modal component
+
+.te-modal-overlay {
+  background-color: rgba(0,0,0,0.7);
+}
+
+.te-modal {
+  padding: 0;
+  border-radius: 2px;
+  background-color: #FFFFFF;
+  box-shadow: 0 12px 18px 0 rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.05);
+  color: rgba(0,0,0,0.85);
+
+  &__body {
+    overflow-y: scroll;
+  }
+
+  &__header {
+    padding: 8px 24px;
+    border-bottom: 1px solid rgba(0,0,0,0.15);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  &__title {
+    color: app-shade(black,0.9);
+    font-size: 21px;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    &--small {
+      font-weight: 600;
+      font-size: 16px;
+      line-height: 24px;
+    }
+  }
+
+  &__footer {
+    border-top: 1px solid rgba(0,0,0,0.15);
+    padding: 16px 24px;
+    text-align: right;
+  }
+}

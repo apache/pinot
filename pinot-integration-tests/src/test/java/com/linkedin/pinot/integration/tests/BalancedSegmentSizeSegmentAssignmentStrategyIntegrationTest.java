@@ -18,7 +18,6 @@ package com.linkedin.pinot.integration.tests;
 import com.google.common.base.Function;
 import com.linkedin.pinot.common.restlet.resources.ServerSegmentInfo;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.controller.util.ServerPerfMetricsReader;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
@@ -105,8 +104,8 @@ public class BalancedSegmentSizeSegmentAssignmentStrategyIntegrationTest extends
           prevCount = 0;
         }
         File segmentFile = new File(segmentDir, segmentName);
-        FileUploadUtils.sendSegmentFile(LOCAL_HOST, Integer.toString(_controllerPort), segmentName, segmentFile,
-            segmentFile.length());
+        //FileUploadUtils.sendSegmentFile(LOCAL_HOST, Integer.toString(_controllerPort), segmentName, segmentFile,
+          //  segmentFile.length());
         // Wait for new segment loaded
         waitForAllDocsLoaded(prevCount, 600_000L);
       } catch (Exception e) {

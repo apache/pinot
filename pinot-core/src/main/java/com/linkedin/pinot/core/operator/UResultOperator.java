@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.operator;
 
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.InstanceResponseBlock;
 
@@ -27,7 +25,7 @@ import com.linkedin.pinot.core.operator.blocks.InstanceResponseBlock;
  *
  *
  */
-public class UResultOperator extends BaseOperator {
+public class UResultOperator extends BaseOperator<InstanceResponseBlock> {
   private static final String OPERATOR_NAME = "UResultOperator";
   private final Operator _operator;
 
@@ -36,29 +34,12 @@ public class UResultOperator extends BaseOperator {
   }
 
   @Override
-  public boolean open() {
-    _operator.open();
-    return true;
-  }
-
-  @Override
-  public Block getNextBlock() {
+  protected InstanceResponseBlock getNextBlock() {
     return new InstanceResponseBlock(_operator.nextBlock());
-  }
-
-  @Override
-  public Block getNextBlock(BlockId blockId) {
-    throw new UnsupportedOperationException();
   }
 
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
-  }
-
-  @Override
-  public boolean close() {
-    _operator.close();
-    return true;
   }
 }

@@ -1,0 +1,74 @@
+.entity-filter {
+
+  background-color: white;
+  border: 1px solid $te-grey--border;
+
+  &__head {
+    padding-bottom: 5px;
+    padding: 5px $te-default-element-spacing;
+  }
+
+  &__title {
+    font-size: 18px;
+    font-weight: 500;
+  }
+
+  &__group {
+    padding: 5px $te-default-element-spacing;
+    border-top: 1px solid $te-grey--border;
+  }
+
+  &__group-title {
+    font-size: 16px;
+    color: app-shade(black, 4);
+  }
+
+  &__group-toggle {
+    float: right;
+    color: app-shade(black, 3);
+    font-weight: 300;
+  }
+
+  &__group-filter {
+    list-style: none;
+  }
+
+  &__group-list {
+    padding-left: 0;
+    margin-top: 15px;
+
+    &--hidden {
+      display: none;
+    }
+  }
+
+  &__group-label {
+    font-size: 15px;
+    font-weight: 400;
+    margin-left: 5px;
+    word-break: break-all;
+    vertical-align: middle;
+    overflow: hidden;
+    max-height: 21px;
+    max-width: 170px;
+    vertical-align: middle;
+    line-height: 21px;
+
+    &--truncated {
+      &:before {
+        content: '...';
+        position: absolute;
+        right: 41px;
+      }
+    }
+  }
+
+  .btn span.glyphicon {
+  opacity: 0;
+  }
+  .btn.active span.glyphicon {
+    opacity: 1;
+  }
+}
+
+

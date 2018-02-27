@@ -16,6 +16,7 @@ import java.util.Set;
  * by a key-value pair. Note, that dimension names may require standardization across different
  * metrics. The URN namespace is defined as 'thirdeye:dimension:{name}:{value}:{type}'.
  */
+@Deprecated
 public class DimensionEntity extends Entity {
   public static final EntityType TYPE = new EntityType("thirdeye:dimension:");
 
@@ -51,7 +52,7 @@ public class DimensionEntity extends Entity {
   }
 
   public static DimensionEntity fromDimension(double score, Collection<? extends Entity> related, String name, String value, String type) {
-    return new DimensionEntity(TYPE.formatURN(name, value, type), score, new ArrayList<>(related), name, value, type);
+    return new DimensionEntity(TYPE.formatURN(EntityUtils.encodeURNComponent(name), EntityUtils.encodeURNComponent(value), type), score, new ArrayList<>(related), name, value, type);
   }
 
   public static DimensionEntity fromDimension(double score, String name, String value, String type) {
@@ -69,7 +70,7 @@ public class DimensionEntity extends Entity {
     String[] parts = urn.split(":", 5);
     if(parts.length != 5)
       throw new IllegalArgumentException(String.format("Dimension URN must have 5 parts but has '%d'", parts.length));
-    return fromDimension(score, parts[2], parts[3], parts[4]);
+    return fromDimension(score, EntityUtils.decodeURNComponent(parts[2]), EntityUtils.decodeURNComponent(parts[3]), parts[4]);
   }
 
   public static  Set<DimensionEntity> getContextDimensions(PipelineContext context, String type) {

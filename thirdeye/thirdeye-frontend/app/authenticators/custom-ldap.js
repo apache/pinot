@@ -1,8 +1,11 @@
+import { inject as service } from '@ember/service';
 import Base from 'ember-simple-auth/authenticators/base';
 import fetch from 'fetch';
-import { checkStatus } from 'thirdeye-frontend/helpers/utils';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import RSVP from 'rsvp';
 
 export default Base.extend({
+  session: service(),
   /**
    * Implements Base authenticator's authenticate method.
    * @param {Object}  credentials containing username and password
@@ -16,11 +19,18 @@ export default Base.extend({
       headers: { 'content-type': 'Application/Json' }
     };
 
-    return fetch(url, postProps).then(checkStatus);
+    return fetch(url, postProps).then(checkStatus).then((res) => {
+      // set expiration to 7 days
+      let expiration = 60 * 60 * 24 * 7;
+
+      this.set('session.store.cookieExpirationTime', expiration);
+
+      return res;
+    });
   },
 
-  restore() {
-    return Promise.resolve();
+  restore(data) {
+    return RSVP.resolve(data);
   },
 
   /**

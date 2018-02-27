@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.operator.filter.predicate;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
@@ -32,318 +33,211 @@ import java.util.Set;
 
 
 /**
- * Factory for Not-in predicate evaluators.
+ * Factory for NOT_IN predicate evaluators.
  */
 public class NotInPredicateEvaluatorFactory {
-
-  // Private constructor
   private NotInPredicateEvaluatorFactory() {
-
   }
 
   /**
-   * Returns a new instance of dictionary based equality predicate evaluator.
-   * @param predicate Predicate to evaluate
+   * Create a new instance of dictionary based NOT_IN predicate evaluator.
+   *
+   * @param notInPredicate NOT_IN predicate to evaluate
    * @param dictionary Dictionary for the column
-   * @return Dictionary based equality predicate evaluator
+   * @return Dictionary based NOT_IN predicate evaluator
    */
-  public static PredicateEvaluator newDictionaryBasedEvaluator(NotInPredicate predicate, Dictionary dictionary) {
-    return new DictionaryBasedNotInPredicateEvaluator(predicate, dictionary);
+  public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(NotInPredicate notInPredicate,
+      Dictionary dictionary) {
+    return new DictionaryBasedNotInPredicateEvaluator(notInPredicate, dictionary);
   }
 
   /**
-   * Returns a new instance of no-dictionary based equality predicate evaluator.
-   * @param predicate Predicate to evaluate
+   * Create a new instance of raw value based NOT_IN predicate evaluator.
+   *
+   * @param notInPredicate NOT_IN predicate to evaluate
    * @param dataType Data type for the column
-   * @return No Dictionary based equality predicate evaluator
+   * @return Raw value based NOT_IN predicate evaluator
    */
-  public static PredicateEvaluator newNoDictionaryBasedEvaluator(NotInPredicate predicate, FieldSpec.DataType dataType) {
+  public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(NotInPredicate notInPredicate,
+      FieldSpec.DataType dataType) {
     switch (dataType) {
       case INT:
-        return new IntNoDictionaryBasedNotInEvaluator(predicate);
-
+        return new IntRawValueBasedNotInPredicateEvaluator(notInPredicate);
       case LONG:
-        return new LongNoDictionaryBasedNotInEvaluator(predicate);
-
+        return new LongRawValueBasedNotInPredicateEvaluator(notInPredicate);
       case FLOAT:
-        return new FloatNoDictionaryBasedNotInEvaluator(predicate);
-
+        return new FloatRawValueBasedNotInPredicateEvaluator(notInPredicate);
       case DOUBLE:
-        return new DoubleNoDictionaryBasedNotInEvaluator(predicate);
-
+        return new DoubleRawValueBasedNotInPredicateEvaluator(notInPredicate);
       case STRING:
-        return new StringNoDictionaryBasedNotInEvaluator(predicate);
-
+        return new StringRawValueBasedNotInPredicateEvaluator(notInPredicate);
       default:
-        throw new UnsupportedOperationException(
-            "No dictionary based Equals predicate evaluator not supported for datatype:" + dataType);
+        throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }
   }
 
-  /**
-   * Dictionary based implementation of not-in predicate evaluator.
-   */
-  public static class DictionaryBasedNotInPredicateEvaluator extends BasePredicateEvaluator {
+  public static final class DictionaryBasedNotInPredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+    final IntSet _nonMatchingDictIdSet;
+    final Dictionary _dictionary;
+    int[] _matchingDictIds;
+    int[] _nonMatchingDictIds;
 
-    private int[] _matchingIds;
-    private int[] _nonMatchingIds;
-    private Dictionary _dictionary;
-    private IntSet _nonMatchingDictIdSet;
-
-    public DictionaryBasedNotInPredicateEvaluator(NotInPredicate predicate, Dictionary dictionary) {
-      _dictionary = dictionary;
-      final String[] notInValues = predicate.getNotInRange();
-
-      _nonMatchingDictIdSet = new IntOpenHashSet(notInValues.length);
-      for (final String notInValue : notInValues) {
-        int dictId = dictionary.indexOf(notInValue);
+    DictionaryBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Dictionary dictionary) {
+      String[] values = notInPredicate.getValues();
+      _nonMatchingDictIdSet = new IntOpenHashSet(values.length);
+      for (String value : values) {
+        int dictId = dictionary.indexOf(value);
         if (dictId >= 0) {
           _nonMatchingDictIdSet.add(dictId);
         }
       }
-
-      _nonMatchingIds = new int[_nonMatchingDictIdSet.size()];
-      int index = 0;
-      for (int dictId : _nonMatchingDictIdSet) {
-        _nonMatchingIds[index] = dictId;
-        index = index + 1;
-      }
+      _dictionary = dictionary;
     }
 
     @Override
-    public boolean apply(int dictionaryId) {
-      return (!_nonMatchingDictIdSet.contains(dictionaryId));
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.NOT_IN;
     }
 
     @Override
-    public boolean apply(int[] dictionaryIds) {
-      for (int dictId : dictionaryIds) {
-        if (_nonMatchingDictIdSet.contains(dictId)) {
-          return false;
-        }
-      }
-      return true;
+    public boolean isAlwaysFalse() {
+      return _nonMatchingDictIdSet.size() == _dictionary.length();
     }
 
     @Override
-    public int[] getMatchingDictionaryIds() {
-      //This is expensive for NOT IN predicate, some operators need this for now. Eventually we should remove the need for exposing matching dict ids
-      if (_matchingIds == null) {
-        int count = 0;
-        _matchingIds = new int[_dictionary.length() - _nonMatchingDictIdSet.size()];
-        for (int i = 0; i < _dictionary.length(); i++) {
-          if (!_nonMatchingDictIdSet.contains(i)) {
-            _matchingIds[count] = i;
-            count = count + 1;
+    public boolean applySV(int dictId) {
+      return !_nonMatchingDictIdSet.contains(dictId);
+    }
+
+    @Override
+    public int[] getMatchingDictIds() {
+      if (_matchingDictIds == null) {
+        int dictionarySize = _dictionary.length();
+        _matchingDictIds = new int[dictionarySize - _nonMatchingDictIdSet.size()];
+        int index = 0;
+        for (int dictId = 0; dictId < dictionarySize; dictId++) {
+          if (!_nonMatchingDictIdSet.contains(dictId)) {
+            _matchingDictIds[index++] = dictId;
           }
         }
       }
-      return _matchingIds;
+      return _matchingDictIds;
     }
 
     @Override
-    public int[] getNonMatchingDictionaryIds() {
-      return _nonMatchingIds;
-    }
-
-    @Override
-    public boolean apply(int[] dictionaryIds, int length) {
-      for (int i = 0; i < length; i++) {
-        int dictId = dictionaryIds[i];
-        if (_nonMatchingDictIdSet.contains(dictId)) {
-          return false;
-        }
+    public int[] getNonMatchingDictIds() {
+      if (_nonMatchingDictIds == null) {
+        _nonMatchingDictIds = _nonMatchingDictIdSet.toIntArray();
       }
-      return true;
-    }
-
-    @Override
-    public boolean alwaysFalse() {
-      return _nonMatchingIds.length == _dictionary.length();
+      return _nonMatchingDictIds;
     }
   }
 
-  /**
-   * No dictionary implementation of not-in predicate evaluator for INT data type.
-   */
-  private static class IntNoDictionaryBasedNotInEvaluator extends BasePredicateEvaluator {
-    IntSet _nonMatchingValues;
+  private static final class IntRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final IntSet _nonMatchingValues;
 
-    public IntNoDictionaryBasedNotInEvaluator(NotInPredicate predicate) {
-      _nonMatchingValues = new IntOpenHashSet();
-      for (String valueString : predicate.getNotInRange()) {
-        _nonMatchingValues.add(Integer.parseInt(valueString));
+    IntRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate) {
+      String[] values = notInPredicate.getValues();
+      _nonMatchingValues = new IntOpenHashSet(values.length);
+      for (String value : values) {
+        _nonMatchingValues.add(Integer.parseInt(value));
       }
     }
 
     @Override
-    public boolean apply(int inputValue) {
-      return (!_nonMatchingValues.contains(inputValue));
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.NOT_IN;
     }
 
     @Override
-    public boolean apply(int[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(int[] inputValues, int length) {
-
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        int inputValue = inputValues[i];
-        if (_nonMatchingValues.contains(inputValue)) {
-          return false;
-        }
-      }
-      return true;
+    public boolean applySV(int value) {
+      return !_nonMatchingValues.contains(value);
     }
   }
 
-  /**
-   * No dictionary implementation of not-in predicate evaluator for LONG data type.
-   */
-  private static class LongNoDictionaryBasedNotInEvaluator extends BasePredicateEvaluator {
-    LongSet _nonMatchingValues;
+  private static final class LongRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final LongSet _nonMatchingValues;
 
-    public LongNoDictionaryBasedNotInEvaluator(NotInPredicate predicate) {
-      _nonMatchingValues = new LongOpenHashSet();
-      for (String valueString : predicate.getNotInRange()) {
-        _nonMatchingValues.add(Long.parseLong(valueString));
+    LongRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate) {
+      String[] values = notInPredicate.getValues();
+      _nonMatchingValues = new LongOpenHashSet(values.length);
+      for (String value : values) {
+        _nonMatchingValues.add(Long.parseLong(value));
       }
     }
 
     @Override
-    public boolean apply(long inputValue) {
-      return (!_nonMatchingValues.contains(inputValue));
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.NOT_IN;
     }
 
     @Override
-    public boolean apply(long[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(long[] inputValues, int length) {
-
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        long inputValue = inputValues[i];
-        if (_nonMatchingValues.contains(inputValue)) {
-          return false;
-        }
-      }
-      return true;
+    public boolean applySV(long value) {
+      return !_nonMatchingValues.contains(value);
     }
   }
 
-  /**
-   * No dictionary implementation of not-in predicate evaluator for FLOAT data type.
-   */
-  private static class FloatNoDictionaryBasedNotInEvaluator extends BasePredicateEvaluator {
-    FloatSet _nonMatchingValues;
+  private static final class FloatRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final FloatSet _nonMatchingValues;
 
-    public FloatNoDictionaryBasedNotInEvaluator(NotInPredicate predicate) {
-      _nonMatchingValues = new FloatOpenHashSet();
-      for (String valueString : predicate.getNotInRange()) {
-        _nonMatchingValues.add(Float.parseFloat(valueString));
+    FloatRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate) {
+      String[] values = notInPredicate.getValues();
+      _nonMatchingValues = new FloatOpenHashSet(values.length);
+      for (String value : values) {
+        _nonMatchingValues.add(Float.parseFloat(value));
       }
     }
 
     @Override
-    public boolean apply(float inputValue) {
-      return (!_nonMatchingValues.contains(inputValue));
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.NOT_IN;
     }
 
     @Override
-    public boolean apply(float[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(float[] inputValues, int length) {
-
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        float inputValue = inputValues[i];
-        if (_nonMatchingValues.contains(inputValue)) {
-          return false;
-        }
-      }
-      return true;
+    public boolean applySV(float value) {
+      return !_nonMatchingValues.contains(value);
     }
   }
 
+  private static final class DoubleRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final DoubleSet _nonMatchingValues;
 
-  /**
-   * No dictionary implementation of not-in predicate evaluator for DOUBLE data type.
-   */
-  private static class DoubleNoDictionaryBasedNotInEvaluator extends BasePredicateEvaluator {
-    DoubleSet _nonMatchingValues;
-
-    public DoubleNoDictionaryBasedNotInEvaluator(NotInPredicate predicate) {
-      _nonMatchingValues = new DoubleOpenHashSet();
-      for (String valueString : predicate.getNotInRange()) {
-        _nonMatchingValues.add(Double.parseDouble(valueString));
+    DoubleRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate) {
+      String[] values = notInPredicate.getValues();
+      _nonMatchingValues = new DoubleOpenHashSet(values.length);
+      for (String value : values) {
+        _nonMatchingValues.add(Double.parseDouble(value));
       }
     }
 
     @Override
-    public boolean apply(double inputValue) {
-      return (!_nonMatchingValues.contains(inputValue));
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.NOT_IN;
     }
 
     @Override
-    public boolean apply(double[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(double[] inputValues, int length) {
-
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        double inputValue = inputValues[i];
-        if (_nonMatchingValues.contains(inputValue)) {
-          return false;
-        }
-      }
-      return true;
+    public boolean applySV(double value) {
+      return !_nonMatchingValues.contains(value);
     }
   }
 
-  /**
-   * No dictionary implementation of not-in predicate evaluator for STRING data type.
-   */
-  private static class StringNoDictionaryBasedNotInEvaluator extends BasePredicateEvaluator {
-    Set<String> _nonMatchingValues;
+  private static final class StringRawValueBasedNotInPredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final Set<String> _nonMatchingValues;
 
-    public StringNoDictionaryBasedNotInEvaluator(NotInPredicate predicate) {
-      _nonMatchingValues = new HashSet<>();
-      Collections.addAll(_nonMatchingValues, predicate.getNotInRange());
+    StringRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate) {
+      String[] values = notInPredicate.getValues();
+      _nonMatchingValues = new HashSet<>(values.length);
+      Collections.addAll(_nonMatchingValues, values);
     }
 
     @Override
-    public boolean apply(String inputValue) {
-      return (!_nonMatchingValues.contains(inputValue));
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.NOT_IN;
     }
 
     @Override
-    public boolean apply(String[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(String[] inputValues, int length) {
-
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        String inputValue = inputValues[i];
-        if (_nonMatchingValues.contains(inputValue)) {
-          return false;
-        }
-      }
-      return true;
+    public boolean applySV(String value) {
+      return !_nonMatchingValues.contains(value);
     }
   }
 }

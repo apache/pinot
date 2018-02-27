@@ -1,9 +1,6 @@
 package com.linkedin.thirdeye.datasource;
 
-import com.google.common.cache.Weigher;
-
-import com.linkedin.pinot.client.ResultSet;
-import java.util.List;
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -14,132 +11,102 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
-import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
-import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.cache.DatasetMaxDataTimeCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.DatasetListCache;
-import com.linkedin.thirdeye.datasource.cache.DashboardConfigCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.DatasetConfigCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.DimensionFiltersCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.MetricConfigCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.MetricDataset;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.datasource.cache.ResultSetGroupCacheLoader;
-import com.linkedin.thirdeye.datasource.pinot.PinotQuery;
-import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSourceConfig;
 
 public class ThirdEyeCacheRegistry {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeCacheRegistry.class);
+  private static final ThirdEyeCacheRegistry INSTANCE = new ThirdEyeCacheRegistry();
 
+  public static final long CACHE_EXPIRATION_HOURS = 1;
+
+  // DAO to ThirdEye's data and meta-data storage.
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static DatasetConfigManager datasetConfigDAO;
+  private static MetricConfigManager metricConfigDAO;
+  private static AnomalyFunctionManager anomalyFunctionDAO;
+
+  // TODO: Rename QueryCache to a name like DataSrouceCache.
+  private QueryCache queryCache;
+
+  // Meta-data caches
   private LoadingCache<String, DatasetConfigDTO> datasetConfigCache;
   private LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache;
-  private LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache;
-  private LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache;
   private LoadingCache<String, Long> datasetMaxDataTimeCache;
   private LoadingCache<String, String> dimensionFiltersCache;
   private DatasetListCache datasetsCache;
-  private QueryCache queryCache;
-
-  private static DatasetConfigManager datasetConfigDAO;
-  private static MetricConfigManager metricConfigDAO;
-  private static DashboardConfigManager dashboardConfigDAO;
-  private static AnomalyFunctionManager anomalyFunctionDAO;
-
-  private static Map<String, ThirdEyeDataSource> thirdEyeDataSourcesMap;
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeCacheRegistry.class);
-
-  private static ThirdEyeConfiguration thirdeyeConfig = null;
-  private static DataSources dataSources = null;
-
-  // TODO: make default cache size configurable
-  private static final int DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE = 50;
-  private static final int DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 100;
-  private static final int DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 8192;
-  private static final long CACHE_EXPIRATION_HOURS = 1;
-
-  private static class Holder {
-    static final ThirdEyeCacheRegistry INSTANCE = new ThirdEyeCacheRegistry();
-  }
 
   public static ThirdEyeCacheRegistry getInstance() {
-    return Holder.INSTANCE;
+    return INSTANCE;
   }
 
-
   /**
-   * Initializes webapp caches
-   * @param config
+   * Initializes data sources and caches.
+   *
+   * @param thirdeyeConfig ThirdEye's configurations.
    */
-  public static void initializeCaches(ThirdEyeConfiguration config) throws Exception {
-
-    thirdeyeConfig = config;
-    init();
-    initCaches();
+  public static void initializeCaches(ThirdEyeConfiguration thirdeyeConfig) throws Exception {
+    initDataSources(thirdeyeConfig);
+    initMetaDataCaches(thirdeyeConfig);
     initPeriodicCacheRefresh();
   }
 
-  private static void init() {
+  /**
+   * Initializes data sources and caches without starting auto-refreshing procedure. This method is useful for running
+   * a lightweight ThirdEye that doesn't cache tons of data beforehand.
+   *
+   * @param thirdeyeConfig ThirdEye's configurations.
+   */
+  public static void initializeCachesWithoutRefreshing(ThirdEyeConfiguration thirdeyeConfig) throws Exception {
+    initDataSources(thirdeyeConfig);
+    initMetaDataCaches(thirdeyeConfig);
+  }
+
+  /**
+   * Initializes the adaptor to data sources such as Pinot, MySQL, etc.
+   */
+  private static void initDataSources(ThirdEyeConfiguration thirdeyeConfig) {
     try {
+      // Initialize adaptors to time series databases.
       String dataSourcesPath = thirdeyeConfig.getDataSourcesPath();
-      dataSources = DataSourcesLoader.fromDataSourcesPath(dataSourcesPath);
+      DataSources dataSources = DataSourcesLoader.fromDataSourcesPath(dataSourcesPath);
       if (dataSources == null) {
         throw new IllegalStateException("Could not create data sources from path " + dataSourcesPath);
       }
-      thirdEyeDataSourcesMap = DataSourcesLoader.getDataSourceMap(dataSources);
+      // Query Cache
+      Map<String, ThirdEyeDataSource> thirdEyeDataSourcesMap = DataSourcesLoader.getDataSourceMap(dataSources);
+      QueryCache queryCache = new QueryCache(thirdEyeDataSourcesMap, Executors.newFixedThreadPool(10));
+      ThirdEyeCacheRegistry.getInstance().registerQueryCache(queryCache);
+
+      // Initialize connection to ThirdEye's anomaly and meta-data storage.
       datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
       metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
-      dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
       anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
-
     } catch (Exception e) {
      LOGGER.info("Caught exception while initializing caches", e);
     }
   }
 
-  private static void initCaches() throws Exception {
+  /**
+   * Initialize the cache for meta data. This method has to be invoked after data sources are connected.
+   */
+  private static void initMetaDataCaches(ThirdEyeConfiguration thirdeyeConfig) {
     ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
-
-    RemovalListener<PinotQuery, ResultSetGroup> listener = new RemovalListener<PinotQuery, ResultSetGroup>() {
-      @Override
-      public void onRemoval(RemovalNotification<PinotQuery, ResultSetGroup> notification) {
-        LOGGER.info("Expired {}", notification.getKey().getPql());
-      }
-    };
-
-    // ResultSetGroup Cache. The size of this cache is limited by the total number of buckets in all ResultSetGroup.
-    // We estimate that 1 bucket (including overhead) consumes 1KB and this cache is allowed to use up to 50% of max
-    // heap space.
-    PinotThirdEyeDataSourceConfig pinotThirdeyeDataSourceConfig = PinotThirdEyeDataSourceConfig.createPinotThirdeyeDataSourceConfig(dataSources);
-    long maxBucketNumber = getApproximateMaxBucketNumber(DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE);
-    LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache = CacheBuilder.newBuilder()
-        .removalListener(listener)
-        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS)
-        .maximumWeight(maxBucketNumber)
-        .weigher(new Weigher<PinotQuery, ResultSetGroup>() {
-          @Override public int weigh(PinotQuery pinotQuery, ResultSetGroup resultSetGroup) {
-            int resultSetCount = resultSetGroup.getResultSetCount();
-            int weight = 0;
-            for (int idx = 0; idx < resultSetCount; ++idx) {
-              ResultSet resultSet = resultSetGroup.getResultSet(idx);
-              weight += (resultSet.getColumnCount() * resultSet.getRowCount());
-            }
-            return weight;
-          }
-        })
-        .build(new ResultSetGroupCacheLoader(pinotThirdeyeDataSourceConfig));
-    cacheRegistry.registerResultSetGroupCache(resultSetGroupCache);
-    LOGGER.info("Max bucket number for ResultSetGroup cache is set to {}", maxBucketNumber);
+    QueryCache queryCache = cacheRegistry.getQueryCache();
+    Preconditions.checkNotNull(queryCache,
+        "Data sources are not initialzed. Please invoke initDataSources() before this method.");
 
     // DatasetConfig cache
     LoadingCache<String, DatasetConfigDTO> datasetConfigCache = CacheBuilder.newBuilder()
@@ -151,15 +118,6 @@ public class ThirdEyeCacheRegistry {
         .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS).build(new MetricConfigCacheLoader(metricConfigDAO));
     cacheRegistry.registerMetricConfigCache(metricConfigCache);
 
-    // DashboardConfigs cache
-    LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS).build(new DashboardConfigCacheLoader(dashboardConfigDAO));
-    cacheRegistry.registerDashboardConfigsCache(dashboardConfigsCache);
-
-    // Query Cache
-    QueryCache queryCache = new QueryCache(thirdEyeDataSourcesMap, Executors.newFixedThreadPool(10));
-    cacheRegistry.registerQueryCache(queryCache);
-
     // DatasetMaxDataTime Cache
     LoadingCache<String, Long> datasetMaxDataTimeCache = CacheBuilder.newBuilder()
         .refreshAfterWrite(5, TimeUnit.MINUTES)
@@ -167,14 +125,14 @@ public class ThirdEyeCacheRegistry {
     cacheRegistry.registerDatasetMaxDataTimeCache(datasetMaxDataTimeCache);
 
     // Dimension Filter cache
-    LoadingCache<String, String> dimensionFiltersCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS).build(new DimensionFiltersCacheLoader(queryCache, datasetConfigDAO));
+    LoadingCache<String, String> dimensionFiltersCache =
+        CacheBuilder.newBuilder().expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS)
+            .build(new DimensionFiltersCacheLoader(queryCache, datasetConfigDAO));
     cacheRegistry.registerDimensionFiltersCache(dimensionFiltersCache);
 
-    // Collections cache
+    // Datasets list cache
     DatasetListCache datasetsCache = new DatasetListCache(anomalyFunctionDAO, datasetConfigDAO, thirdeyeConfig);
     cacheRegistry.registerDatasetsCache(datasetsCache);
-
   }
 
   private static void initPeriodicCacheRefresh() {
@@ -191,8 +149,6 @@ public class ThirdEyeCacheRegistry {
         cacheResource.refreshDatasets();
         LOGGER.info("Refreshing dataset configs cache");
         cacheResource.refreshDatasetConfigCache();
-        LOGGER.info("Refreshing dashboard configs cache");
-        cacheResource.refreshDashoardConfigsCache();
         LOGGER.info("Refreshing metrics config cache");
         cacheResource.refreshMetricConfigCache();
         LOGGER.info("Refreshing max data dime cache");
@@ -242,14 +198,6 @@ public class ThirdEyeCacheRegistry {
     }, 7, 7, TimeUnit.DAYS);
   }
 
-  public LoadingCache<PinotQuery, ResultSetGroup> getResultSetGroupCache() {
-    return resultSetGroupCache;
-  }
-
-  public void registerResultSetGroupCache(LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache) {
-    this.resultSetGroupCache = resultSetGroupCache;
-  }
-
   public LoadingCache<String, Long> getDatasetMaxDataTimeCache() {
     return datasetMaxDataTimeCache;
   }
@@ -296,40 +244,6 @@ public class ThirdEyeCacheRegistry {
 
   public void registerMetricConfigCache(LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache) {
     this.metricConfigCache = metricConfigCache;
-  }
-
-  public LoadingCache<String, List<DashboardConfigDTO>> getDashboardConfigsCache() {
-    return dashboardConfigsCache;
-  }
-
-  public void registerDashboardConfigsCache(LoadingCache<String, List<DashboardConfigDTO>> dashboardConfigsCache) {
-    this.dashboardConfigsCache = dashboardConfigsCache;
-  }
-
-  /**
-   * Returns the suggested max weight for LoadingCache according to the given percentage of max heap space.
-   *
-   * The approximate weight is calculated by following rules:
-   * 1. We estimate that a bucket, including its overhead, occupies 1 KB.
-   * 2. Cache size (in bytes) = System's maxMemory * percentage
-   * 3. We also bound the cache size between DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB and
-   *    DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB if max heap size is unavailable.
-   * 4. Weight (number of buckets) = cache size / 1KB.
-   *
-   * @param percentage the percentage of JVM max heap space
-   * @return the suggested max weight for LoadingCache
-   */
-  private static long getApproximateMaxBucketNumber(int percentage) {
-    long jvmMaxMemoryInBytes = Runtime.getRuntime().maxMemory();
-    if (jvmMaxMemoryInBytes == Long.MAX_VALUE) { // Check upper bound
-      jvmMaxMemoryInBytes = DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB * 1048576L; // MB to Bytes
-    } else { // Check lower bound
-      long lowerBoundInBytes = DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB * 1048576L; // MB to Bytes
-      if (jvmMaxMemoryInBytes < lowerBoundInBytes) {
-        jvmMaxMemoryInBytes = lowerBoundInBytes;
-      }
-    }
-    return (jvmMaxMemoryInBytes / 102400) * percentage;
   }
 
 }

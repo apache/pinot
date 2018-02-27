@@ -1,6 +1,5 @@
 .manage-alert-filters {
-  padding: 0;
-  margin-top: $te-content-container-margin;
+  margin: $te-default-element-spacing 10px 0 -30px;
 
   &__wrapper {
     background-color: white;
@@ -33,7 +32,6 @@
 .manage-alert-container {
   min-height: 200px;
   letter-spacing: 0.5px;
-  margin-top: $te-content-container-margin;
 
   &__title {
     @include app-sub-title-mixin;
@@ -54,9 +52,15 @@
     margin-right: $te-default-element-spacing;
   }
 
+  &__sort {
+    float: right;
+    min-width: 100px;
+    margin-left: $te-default-element-spacing;
+  }
+
   &__input {
     float: left;
-    width: 60%;
+    width: 59%;
     min-width: 300px;
   }
 

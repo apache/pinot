@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.operator;
 
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.util.trace.TraceContext;
 import org.slf4j.Logger;
@@ -26,32 +25,26 @@ import org.slf4j.LoggerFactory;
 /**
  * Any other Pinot Operators should extend BaseOperator
  */
-public abstract class BaseOperator implements Operator {
+public abstract class BaseOperator<T extends Block> implements Operator<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseOperator.class);
 
   @Override
-  public final Block nextBlock() {
-    long start = System.currentTimeMillis();
-    Block ret = getNextBlock();
-    long end = System.currentTimeMillis();
-    LOGGER.trace("Time spent in {}: {}", getOperatorName(), (end - start));
-    TraceContext.logLatency(getOperatorName(), (end - start));
-    return ret;
+  public final T nextBlock() {
+    if (TraceContext.traceEnabled()) {
+      long start = System.currentTimeMillis();
+      T nextBlock = getNextBlock();
+      long end = System.currentTimeMillis();
+      String operatorName = getOperatorName();
+      LOGGER.trace("Time spent in {}: {}", operatorName, (end - start));
+      TraceContext.logTime(operatorName, (end - start));
+      return nextBlock;
+    } else {
+      return getNextBlock();
+    }
   }
 
-  @Override
-  public final Block nextBlock(BlockId blockId) {
-    long start = System.currentTimeMillis();
-    Block ret = getNextBlock(blockId);
-    long end = System.currentTimeMillis();
-    LOGGER.trace("Time spent in {}: {}", getOperatorName(), (end - start));
-    TraceContext.logLatency(getOperatorName(), (end - start));
-    return ret;
-  }
-
-  public abstract Block getNextBlock();
-
-  public abstract Block getNextBlock(BlockId blockId);
+  // Make it protected because we should always call nextBlock()
+  protected abstract T getNextBlock();
 
   // Enforcing sub-class to implement the getOperatorName(), as they can just return a static final,
   // as opposed to this super class calling getClass().getSimpleName().

@@ -17,6 +17,7 @@
 package com.linkedin.pinot.controller.helix.core.util;
 
 import com.google.common.io.Files;
+import com.linkedin.pinot.controller.helix.core.SegmentDeletionManager;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import junit.framework.Assert;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
@@ -34,13 +36,11 @@ import org.joda.time.DateTime;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.controller.helix.core.SegmentDeletionManager;
-import junit.framework.Assert;
+
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyList;
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 public class SegmentDeletionManagerTest {

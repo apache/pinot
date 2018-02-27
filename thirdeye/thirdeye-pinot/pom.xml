@@ -50,12 +50,8 @@
           <artifactId>log4j-over-slf4j</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>com.fasterxml.jackson</groupId>
-          <artifactId>jackson-core</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.fasterxml.jackson</groupId>
-          <artifactId>jackson-databind</artifactId>
+          <groupId>org.glassfish.hk2.external</groupId>
+          <artifactId>aopalliance-repackaged</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -95,11 +91,29 @@
           <groupId>javax.mail</groupId>
           <artifactId>mail</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-log4j12</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-common</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>commons-beanutils</groupId>
+          <artifactId>commons-beanutils</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>commons-beanutils</groupId>
+          <artifactId>commons-beanutils-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-log4j12</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
@@ -108,6 +122,10 @@
     <dependency>
       <groupId>joda-time</groupId>
       <artifactId>joda-time</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-proxy</artifactId>
     </dependency>
 
     <!-- dataframe specific -->
@@ -124,11 +142,18 @@
     <dependency>
       <groupId>com.google.inject.extensions</groupId>
       <artifactId>guice-persist</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>javax.inject</groupId>
+          <artifactId>javax.inject</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>mysql</groupId>
       <artifactId>mysql-connector-java</artifactId>
     </dependency>
+
     <!-- TODO: restructure this -->
     <dependency>
       <groupId>org.modelmapper</groupId>
@@ -172,6 +197,16 @@
     <dependency>
       <groupId>com.scireum</groupId>
       <artifactId>parsii</artifactId>
+    </dependency>
+
+    <!-- force bump up for LI usage -->
+    <dependency>
+      <groupId>org.glassfish.hk2</groupId>
+      <artifactId>hk2-utils</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
     </dependency>
 
     <!-- test dependencies -->
@@ -245,7 +280,7 @@
 
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>1.7</version>
+        <version>3.1.0</version>
         <configuration>
           <createDependencyReducedPom>true</createDependencyReducedPom>
           <transformers>

@@ -37,6 +37,7 @@ public class QueryException {
   public static final int PQL_PARSING_ERROR_CODE = 150;
   public static final int SEGMENT_PLAN_EXECUTION_ERROR_CODE = 160;
   public static final int COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR_CODE = 170;
+  public static final int ACCESS_DENIED_ERROR_CODE = 180;
   public static final int QUERY_EXECUTION_ERROR_CODE = 200;
   // TODO: Handle these errors in broker
   public static final int SERVER_SHUTTING_DOWN_ERROR_CODE = 210;
@@ -58,6 +59,7 @@ public class QueryException {
   public static final ProcessingException JSON_PARSING_ERROR = new ProcessingException(JSON_PARSING_ERROR_CODE);
   public static final ProcessingException JSON_COMPILATION_ERROR = new ProcessingException(JSON_COMPILATION_ERROR_CODE);
   public static final ProcessingException PQL_PARSING_ERROR = new ProcessingException(PQL_PARSING_ERROR_CODE);
+  public static final ProcessingException ACCESS_DENIED_ERROR = new ProcessingException(ACCESS_DENIED_ERROR_CODE);
   public static final ProcessingException SEGMENT_PLAN_EXECUTION_ERROR =
       new ProcessingException(SEGMENT_PLAN_EXECUTION_ERROR_CODE);
   public static final ProcessingException COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR =

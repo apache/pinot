@@ -12,10 +12,11 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 public class SummaryResponseRow extends BaseResponseRow {
   public List<String> names;
   public String otherDimensionValues;
+  public double cost;
 
   public static SummaryResponseRow buildNotAvailableRow() {
     SummaryResponseRow row = new SummaryResponseRow();
-    row.names = new ArrayList<String>();
+    row.names = new ArrayList<>();
     row.names.add(SummaryResponse.NOT_AVAILABLE);
     row.percentageChange = SummaryResponse.NOT_AVAILABLE;
     row.contributionChange = SummaryResponse.NOT_AVAILABLE;

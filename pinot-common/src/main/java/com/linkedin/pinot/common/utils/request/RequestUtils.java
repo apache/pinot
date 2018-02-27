@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.utils.request;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -24,8 +25,10 @@ import com.linkedin.pinot.common.request.FilterQueryMap;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.request.HavingFilterQuery;
 import com.linkedin.pinot.common.request.HavingFilterQueryMap;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -33,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang.mutable.MutableInt;
+import org.apache.commons.lang3.StringUtils;
 
 
 public class RequestUtils {
@@ -40,6 +44,7 @@ public class RequestUtils {
   }
 
   private static final String USE_STAR_TREE_KEY = "useStarTree";
+  private static final Pql2Compiler PQL2_COMPILER = new Pql2Compiler();
 
   /**
    * Generates thrift compliant filterQuery and populate it in the broker request
@@ -154,132 +159,117 @@ public class RequestUtils {
     return q2;
   }
 
-  public static final Set<String> ALLOWED_AGGREGATION_FUNCTIONS = ImmutableSet.of("sum", "fasthll");
-
   /**
-   * Returns true for the following, false otherwise:
-   * - BrokerRequest debug options have not explicitly disabled use of star tree
-   * - Query is not aggregation/group-by
-   * - Segment does not contain star tree
-   * - The only aggregation function in the query should be in {@link #ALLOWED_AGGREGATION_FUNCTIONS}
-   * - All group by columns and predicate columns are materialized
-   * - Predicates do not contain any metric columns
-   * - Query consists only of simple predicates, conjoined by AND.
-   *   <p>
-   *   e.g. WHERE d1 = d1v1 AND d2 = d2v2 AND d3 = d3v3 AND d4 between t1,t2
-   *   </p>
-   *
+   * Helper method to extract all column names from group-by columns and expressions.
+   * <p>We have this method because group-by columns might be passed from columns (old behavior) or expressions (UDF).
+   * TODO: revisit and check if we can unify them.
    */
-  public static boolean isFitForStarTreeIndex(SegmentMetadata segmentMetadata, FilterQueryTree filterTree,
-      BrokerRequest brokerRequest) {
+  public static Set<String> getAllGroupByColumns(GroupBy groupBy) {
+    Set<String> allGroupByColumns = new HashSet<>();
 
-    // If broker request disables use of star tree, return false.
-    if (!isStarTreeEnabledInBrokerRequest(brokerRequest)) {
-      return false;
-    }
-    // Apply the checks in order of their runtime.
-    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
-
-    // There should have some aggregation
-    if (aggregationsInfo == null || aggregationsInfo.isEmpty()) {
-      return false;
-    }
-
-    // Segment metadata should contain star tree metadata.
-    StarTreeMetadata starTreeMetadata = segmentMetadata.getStarTreeMetadata();
-    if (starTreeMetadata == null) {
-      return false;
-    }
-
-    Set<String> metricColumnSet = new HashSet<>(segmentMetadata.getSchema().getMetricNames());
-    List<String> skipMaterializationList = starTreeMetadata.getSkipMaterializationForDimensions();
-    Set<String> skipMaterializationSet = null;
-    if (skipMaterializationList != null && !skipMaterializationList.isEmpty()) {
-      skipMaterializationSet = new HashSet<>(skipMaterializationList);
-    }
-
-    // Ensure that none of the group-by columns are metric or skipped for materialization.
-    GroupBy groupBy = brokerRequest.getGroupBy();
     if (groupBy != null) {
       List<String> groupByColumns = groupBy.getColumns();
-      for (String groupByColumn : groupByColumns) {
-        if (metricColumnSet.contains(groupByColumn)) {
-          return false;
-        }
-        if (skipMaterializationSet != null && skipMaterializationSet.contains(groupByColumn)) {
-          return false;
+      if (groupByColumns != null) {
+        allGroupByColumns.addAll(groupByColumns);
+      }
+
+      List<String> groupByExpressions = groupBy.getExpressions();
+      if (groupByExpressions != null) {
+        for (String expression : groupByExpressions) {
+          TransformExpressionTree expressionTree = PQL2_COMPILER.compileToExpressionTree(expression);
+          List<String> columns = new ArrayList<>();
+          expressionTree.getColumns(columns);
+          allGroupByColumns.addAll(columns);
         }
       }
     }
+    return allGroupByColumns;
+  }
 
-    // We currently support only limited aggregations
+  public static final Set<String> STAR_TREE_AGGREGATION_FUNCTIONS = ImmutableSet.of("sum", "fasthll");
+
+  /**
+   * Return whether the query is fit for star tree index.
+   * <p>The query is fit for star tree index if the following conditions are met:
+   * <ul>
+   *   <li>Segment contains star tree</li>
+   *   <li>BrokerRequest debug options have not explicitly disabled use of star tree</li>
+   *   <li>Query is aggregation/group-by with all aggregation functions in {@link #STAR_TREE_AGGREGATION_FUNCTIONS}</li>
+   *   <li>The aggregations must apply on metric column</li>
+   *   <li>All predicate columns and group-by columns are materialized dimensions</li>
+   *   <li>All predicates are conjoined by AND</li>
+   * </ul>
+   */
+  public static boolean isFitForStarTreeIndex(SegmentMetadata segmentMetadata, BrokerRequest brokerRequest,
+      FilterQueryTree rootFilterNode) {
+    // Check whether segment contains star tree
+    if (!segmentMetadata.hasStarTree()) {
+      return false;
+    }
+
+    // Check whether star tree is disabled explicitly in BrokerRequest
+    Map<String, String> debugOptions = brokerRequest.getDebugOptions();
+    if (debugOptions != null && StringUtils.compareIgnoreCase(debugOptions.get(USE_STAR_TREE_KEY), "false") == 0) {
+      return false;
+    }
+
+    // Get all metrics
+    // NOTE: we treat all non-metric columns as dimensions in star tree
+    Set<String> metrics = new HashSet<>(segmentMetadata.getSchema().getMetricNames());
+
+    // Check whether all aggregation functions are supported and apply on metric column
+    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
+    if (aggregationsInfo == null) {
+      return false;
+    }
     for (AggregationInfo aggregationInfo : aggregationsInfo) {
-      String aggregationFunctionName = aggregationInfo.getAggregationType().toLowerCase();
-      if (!ALLOWED_AGGREGATION_FUNCTIONS.contains(aggregationFunctionName)) {
+      if (!STAR_TREE_AGGREGATION_FUNCTIONS.contains(aggregationInfo.getAggregationType().toLowerCase())) {
+        return false;
+      }
+      if (!metrics.contains(aggregationInfo.getAggregationParams().get("column").trim())) {
         return false;
       }
     }
 
-    //if the filter tree has children, ensure that root is AND and all its children are leaves, and
-    //no metric columns appear in the predicates.
-    if (filterTree != null && filterTree.getChildren() != null && !filterTree.getChildren().isEmpty()) {
-      //ensure that its AND
-      if (filterTree.getOperator() != FilterOperator.AND) {
-        return false;
-      }
-      //ensure that children are not nested further and only one predicate per column
-      Set<String> predicateColumns = new HashSet<>();
-      for (FilterQueryTree child : filterTree.getChildren()) {
-        if (child.getChildren() != null && !child.getChildren().isEmpty()) {
-          //star tree index cannot support nested filter predicates
-          return false;
-        }
-        //only one predicate per column is supported
-        String column = child.getColumn();
-        if (predicateColumns.contains(column)) {
-          return false;
-        }
+    // Get all un-materialized dimensions
+    StarTreeMetadata starTreeMetadata = segmentMetadata.getStarTreeMetadata();
+    Preconditions.checkNotNull(starTreeMetadata);
+    Set<String> unMaterializedDimensions = new HashSet<>(starTreeMetadata.getSkipMaterializationForDimensions());
 
-        // predicate columns should be materialized.
-        if ((skipMaterializationSet != null) && skipMaterializationSet.contains(column)) {
+    // Check whether all group-by columns are materialized dimensions
+    GroupBy groupBy = brokerRequest.getGroupBy();
+    if (groupBy != null) {
+      Set<String> groupByColumns = getAllGroupByColumns(groupBy);
+      for (String groupByColumn : groupByColumns) {
+        if (metrics.contains(groupByColumn) || unMaterializedDimensions.contains(groupByColumn)) {
           return false;
         }
-
-        // predicate should not contain metric columns.
-        if (metricColumnSet.contains(column)) {
-          return false;
-        }
-        predicateColumns.add(column);
-      }
-    } else if (filterTree != null) {
-      // Predicate column of root node should be materialized.
-      String rootColumn = filterTree.getColumn();
-      if (skipMaterializationSet != null && skipMaterializationSet.contains(rootColumn)) {
-        return false;
-      }
-
-      // predicate should not contain metric columns.
-      if (metricColumnSet.contains(rootColumn)) {
-        return false;
       }
     }
 
-    return true;
+    // Check whether all predicate columns are materialized dimensions, and all predicates are conjoined by AND
+    return rootFilterNode == null || checkPredicatesForStarTree(rootFilterNode, metrics, unMaterializedDimensions);
   }
 
   /**
-   * This method returns the value of {@link #USE_STAR_TREE_KEY} boolean flag specified in the debug options
-   * in broker request. If the flag is not specified in the debug options, it returns true.
-   *
-   * @param brokerRequest Broker Request
-   * @return Value of {@link #USE_STAR_TREE_KEY} debug option, or true if not option not specified.
+   * Helper method to check whether all columns in predicates are materialized dimensions, and all predicates are
+   * conjoined by AND. This is a pre-requisite in order to use star tree.
    */
-  public static boolean isStarTreeEnabledInBrokerRequest(BrokerRequest brokerRequest) {
-    Map<String, String> debugOptions = brokerRequest.getDebugOptions();
-    if (debugOptions == null) {
+  private static boolean checkPredicatesForStarTree(FilterQueryTree filterNode, Set<String> metrics,
+      Set<String> unMaterializedDimensions) {
+    FilterOperator operator = filterNode.getOperator();
+    if (operator == FilterOperator.OR) {
+      return false;
+    }
+    if (operator == FilterOperator.AND) {
+      for (FilterQueryTree child : filterNode.getChildren()) {
+        if (!checkPredicatesForStarTree(child, metrics, unMaterializedDimensions)) {
+          return false;
+        }
+      }
       return true;
     }
-    String useStarTreeString = debugOptions.get(USE_STAR_TREE_KEY);
-    return (useStarTreeString != null) ? Boolean.valueOf(useStarTreeString) : true;
+    String column = filterNode.getColumn();
+    return !metrics.contains(column) && !unMaterializedDimensions.contains(column);
   }
 }

@@ -16,19 +16,16 @@
 package com.linkedin.thirdeye.hadoop.derivedcolumn.transformation;
 
 import com.linkedin.thirdeye.hadoop.config.DimensionSpec;
+import com.linkedin.thirdeye.hadoop.config.DimensionType;
 import com.linkedin.thirdeye.hadoop.config.MetricSpec;
 import com.linkedin.thirdeye.hadoop.config.MetricType;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.config.TopkWhitelistSpec;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
 
 /**
  * This class contains the config needed by TopKColumnTransformation
@@ -36,12 +33,13 @@ import java.util.Set;
  */
 public class DerivedColumnTransformationPhaseConfig {
   private List<String> dimensionNames;
+  private List<DimensionType> dimensionTypes;
   private List<String> metricNames;
   private List<MetricType> metricTypes;
   private String timeColumnName;
-  private Map<String, Set<String>> whitelist;
+  private Map<String, List<String>> whitelist;
+  private Map<String, String> nonWhitelistValue;
 
-  private static final String FIELD_SEPARATOR = ",";
 
   public DerivedColumnTransformationPhaseConfig() {
 
@@ -49,23 +47,31 @@ public class DerivedColumnTransformationPhaseConfig {
 
   /**
    * @param dimensionNames
+   * @param dimensionTypes
    * @param metricNames
    * @param metricTypes
    * @param timeColumnName
    * @param whitelist
    */
-  public DerivedColumnTransformationPhaseConfig(List<String> dimensionNames, List<String> metricNames,
-      List<MetricType> metricTypes, String timeColumnName, Map<String, Set<String>> whitelist) {
+  public DerivedColumnTransformationPhaseConfig(List<String> dimensionNames, List<DimensionType> dimensionTypes,
+      List<String> metricNames, List<MetricType> metricTypes, String timeColumnName,
+      Map<String, List<String>> whitelist, Map<String, String> nonWhitelistValue) {
     super();
     this.dimensionNames = dimensionNames;
+    this.dimensionTypes = dimensionTypes;
     this.metricNames = metricNames;
     this.metricTypes = metricTypes;
     this.timeColumnName = timeColumnName;
     this.whitelist = whitelist;
+    this.nonWhitelistValue = nonWhitelistValue;
   }
 
   public List<String> getDimensionNames() {
     return dimensionNames;
+  }
+
+  public List<DimensionType> getDimensionTypes() {
+    return dimensionTypes;
   }
 
   public List<String> getMetricNames() {
@@ -80,42 +86,50 @@ public class DerivedColumnTransformationPhaseConfig {
     return timeColumnName;
   }
 
-  public Map<String, Set<String>> getWhitelist() {
+  public Map<String, List<String>> getWhitelist() {
     return whitelist;
+  }
+
+  public Map<String, String> getNonWhitelistValue() {
+    return nonWhitelistValue;
   }
 
   public static DerivedColumnTransformationPhaseConfig fromThirdEyeConfig(ThirdEyeConfig config) {
 
     // metrics
-    List<String> metricNames = new ArrayList<String>(config.getMetrics().size());
-    List<MetricType> metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
+    List<String> metricNames = new ArrayList<>(config.getMetrics().size());
+    List<MetricType> metricTypes = new ArrayList<>(config.getMetrics().size());
     for (MetricSpec spec : config.getMetrics()) {
       metricNames.add(spec.getName());
       metricTypes.add(spec.getType());
     }
 
     // dimensions
-    List<String> dimensionNames = new ArrayList<String>(config.getDimensions().size());
-    for (DimensionSpec dimensionSpec : config.getDimensions()) {
-      dimensionNames.add(dimensionSpec.getName());
+    List<String> dimensionNames = new ArrayList<>(config.getDimensions().size());
+    List<DimensionType> dimensionTypes = new ArrayList<>(config.getDimensions().size());
+    for (DimensionSpec spec : config.getDimensions()) {
+      dimensionNames.add(spec.getName());
+      dimensionTypes.add(spec.getDimensionType());
     }
 
     // time
     String timeColumnName = config.getTime().getColumnName();
 
     TopkWhitelistSpec topKWhitelist = config.getTopKWhitelist();
-    Map<String, Set<String>> whitelist = new HashMap<>();
+    Map<String, List<String>> whitelist = new HashMap<>();
 
     // topkwhitelist
     if (topKWhitelist != null && topKWhitelist.getWhitelist() != null) {
-      for (Entry<String, String> entry : topKWhitelist.getWhitelist().entrySet()) {
-        String[] whitelistValues = entry.getValue().split(FIELD_SEPARATOR);
-        whitelist.put(entry.getKey(), new HashSet<String>(Arrays.asList(whitelistValues)));
-      }
+      whitelist.putAll(topKWhitelist.getWhitelist());
     }
 
-    return new DerivedColumnTransformationPhaseConfig(dimensionNames, metricNames, metricTypes,
-        timeColumnName, whitelist);
+    Map<String, String> nonWhitelistValueMap = new HashMap<>();
+    if (topKWhitelist != null && topKWhitelist.getNonWhitelistValue() != null) {
+      nonWhitelistValueMap.putAll(topKWhitelist.getNonWhitelistValue());
+    }
+
+    return new DerivedColumnTransformationPhaseConfig(dimensionNames, dimensionTypes, metricNames, metricTypes,
+        timeColumnName, whitelist, nonWhitelistValueMap);
   }
 
 }

@@ -102,7 +102,7 @@ public class SegmentUploaderCommand extends AbstractBaseAdminCommand implements 
         uploader.setControllerPort(_controllerPort)
                 .setControllerHost(_controllerHost)
                 .setSegmentDir(_segDir);
-        uploader.execute(_uploadPeriod);
+        uploader.execute();
     }
 
     @Override

@@ -7,12 +7,26 @@ body {
   margin: 0;
 }
 
+.smaller {
+  font-size: 19px;
+  padding-left: 5px;
+  margin-top: 24px;
+}
+
+.stronger {
+  font-weight: bold;
+}
+
 .te-title {
   @include app-title-mixin;
 
   &--flush {
     @include padding-reset;
     @include margin-reset;
+  }
+  &--rootcause {
+    color: app-shade(black, 0.85);
+    margin-top: 0;
   }
 }
 
@@ -21,6 +35,15 @@ body {
   &--flush {
     @include padding-reset;
     @include margin-reset;
+  }
+}
+
+.te-icon {
+  &__inline-link {
+    color: $te-link-blue;
+    font-size: 16px;
+    vertical-align: middle;
+    padding-bottom: 2px;
   }
 }
 
@@ -57,8 +80,90 @@ body {
       width: 49%;
     }
   }
+
+  &__list {
+    list-style: none;
+
+    &--suffix {
+      margin-left: -10px;
+    }
+  }
+
+  &__indent-block {
+    margin-left: 20px;
+
+    &--custom {
+      display: block;
+      margin: -12px 0 0 36px;
+    }
+  }
+
+  &__vertical-block {
+    margin-top: 4px;
+  }
+
+  &__list-label {
+    display: inline-block;
+    padding-left: 10px;
+    font-weight: normal;
+    font-size: 15px;
+  }
+
+  &__radio {
+    padding-left: 10px;
+  }
+
+  &__field-inline {
+    display: inline-block;
+  }
+
+  &__tune-field {
+    width: 180px;
+    display: inline-block;
+    vertical-align: middle;
+    margin: 5px 0 5px 5px;
+
+    &--amount {
+      width: 70px;
+    }
+  }
+
+  &__cta-row {
+    float: right;
+    margin-top: 20px;
+    margin-right: 30px;
+  }
+
+  &__cta-button {
+    text-align: right;
+
+    &--right {
+      margin: -25px 50px 0 0;
+      float: right;
+    }
+  }
+
+  &__select {
+    float: none;
+
+    &--wider {
+      width: 600px;
+      float: left;
+      margin-left: -15px;
+      display: inline-block;
+      color: app-shade(black, 7);
+    }
+  }
 }
 
+.te-content-block {
+  font-family: "Source Sans Pro", sans-serif;
+  border-radius: 5px;
+  border: 2px solid app-shade(black, 1);
+  margin: 10px 0 20px 0;
+  background: white;
+  padding: 24px;
+}
 
 .te-hide {
   @include app-hide;
@@ -66,11 +171,19 @@ body {
 
 .te-label {
   font-weight: normal;
-  color:  app-shade(black, 8);
+  color: app-shade(black, 9);
   margin-bottom: 12px;
 
   &--flush {
     margin-bottom: 0;
+  }
+
+  &--small {
+    margin-bottom: 2px;
+  }
+
+  &--taller {
+    margin-top: 14px;
   }
 }
 
@@ -96,65 +209,639 @@ body {
       font-weight: normal;
     }
   }
-  
+
   &--read-only:disabled {
-    color: app-shade(black, 0.55);    
+    color: app-shade(black, 0.55);
+    background-color: rgba(0, 0, 0, 0.03);
   }
 
   &:hover:not(:disabled){
     border-color: app-shade(black, 0.55);
   }
 
+  &--number {
+    width: 50px;
+  }
 }
 
-.te-page-right {
-  float: right;
-  margin-top: -24px;
+.te-page {
+  &__right {
+    float: right;
+    margin-top: -24px;
 
-  &--inside {
-    margin-top: 0;
+    &--inside {
+      margin-top: 0;
+    }
   }
+
+  &__top {
+    background: white;
+    width: 100%;
+    border-top: 1px app-shade(black, 1) solid;
+  }
+}
+
+.te-self-serve {
+  &__block-title {
+    margin-top: 0;
+    color: app-shade(black, 8);
+  }
+
+  &__block-subtext {
+    margin: -5px 0 25px 0;
+
+    &--narrow {
+      margin-bottom: 0px;
+    }
+
+    &--normal {
+      margin: 0;
+    }
+  }
+}
+
+.te-alert-page-hzlist {
+    display: inline-block;
+    margin-left: 10px;
+    font-size: 15px;
+    padding: 0;
+
+  &__item {
+    display: inline-block;
+    margin-right: 7px;
+    list-style: none;
+    font-weight: 600;
+    color: app-shade(black, 5);
+    padding: 4px 12px;
+    border: 1px solid app-shade(black, 5);
+    border-radius: 15px;
+
+    &:hover {
+      cursor: pointer;
+    }
+
+    &--active {
+      background-color: $te-alerts-background;
+      border-color: $te-alerts-background;
+    }
+  }
+}
+
+.te-pill-selectors {
+  clear: left;
+  margin-top: 12px;
+
+  &__range-picker {
+    display: inline-block;
+    color: app-shade(black, 7);
+    min-width: 250px;
+    margin: 0;
+
+    .daterangepicker-input {
+      background: none;
+      border: none;
+      box-shadow: none;
+      padding: 3px 5px;
+      height: auto;
+
+      &:hover {
+        cursor: pointer;
+      }
+    }
+  }
+
+  &__label {
+    margin: 15px 0 5px 0;
+    font-weight: 600;
+    color: app-shade(black, 7);
+    display: inline-block;
+  }
+
+  &__side-link {
+    font-size: 15px;
+    color: $te-link-blue;
+    font-weight: 600;
+    letter-spacing: .03em;
+    float: right;
+    margin: -15px 10px 0 0;
+    cursor: pointer;
+
+    &--high {
+      margin-top: -30px;
+    }
+
+    &--low {
+      margin-top: -5px;
+    }
+
+    &--active {
+      border-bottom: 1px dashed;
+    }
+
+    &--inactive {
+      color: app-shade(black, 3);
+    }
+
+    &:hover {
+      color: $te-link-blue;
+      text-decoration: none;
+    }
+  }
+}
+
+.te-horizontal-cards {
+  &--hidden {
+    visibility: hidden;
+  }
+
+  &__container {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 15px;
+    clear: both;
+  }
+
+  &__card {
+    list-style: none;
+    background-color: white;
+    margin-right: 12px;
+    border-radius: 5px;
+    border: 2px solid app-shade(black, 1);
+    padding: 13px 15px 6px 17px;
+    flex-basis: 25%;
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+    justify-content: space-between;
+
+    &:last-child {
+      margin-right: 0;
+    }
+  }
+
+  &__card-title {
+    font-weight: 600;
+    font-size: 16px;
+    float: left;
+    padding-right: 8px;
+  }
+
+  &__card-text {
+    color: app-shade(black, 5);
+    clear: both;
+    font-size: 13px;
+  }
+
+  &__card-value {
+    font-size: 42px;
+    font-weight: 300;
+    display: flex;
+    margin-top: 10px;
+
+    &--tight {
+      margin-top: 0;
+    }
+  }
+
+  &__val-glyph {
+
+    &--middle {
+      padding: 26px 10px 0 9px;
+      font-size: 19px;
+      font-weight: normal;
+      color: app-shade(black, 2);
+    }
+
+    &--right {
+      font-size: 13px;
+      vertical-align: text-top;
+      color: app-shade(black, 5);
+      padding-top: 9px;
+    }
+  }
+
+  &__card-tooltip {
+    font-size: 15px;
+    float: left;
+  }
+
+  &__card-subt {
+    font-size: 14px;
+    color: app-shade(black, 7);
+    font-weight: normal;
+
+    &--hide {
+      visibility: hidden;
+    }
+
+    &--stronger {
+      font-weight: bold;
+    }
+  }
+
+  &__card-number {
+    font-size: 28px;
+    font-weight: normal;
+  }
+
+  &__card-units {
+    font-size: 18px;
+    margin-left: -3px;
+
+    &--small {
+      font-size: 14px;
+    }
+  }
+}
+
+.te-graph-container {
+  margin: 10px 0 20px -15px;
+}
+
+.te-block-container {
+  position: relative;
+}
+
+.te-anomaly-table-stats {
+  display: table;
+  margin: 0;
+  width: 100%;
+
+  &__category {
+    list-style: none;
+    border-right: 1px app-shade(black, 1) solid;
+    display: table-cell;
+    min-width: 150px;
+    padding: 20px;
+
+    &:last-child {
+      border: none;
+    }
+
+    &:hover {
+      border-bottom: 4px solid app-shade(black, 2);
+      cursor: pointer;
+    }
+
+    &--active {
+      border-bottom: 4px solid #0084bf;
+
+      &:hover {
+        border-bottom: 4px solid #0084bf;
+      }
+    }
+  }
+
+  &__content {
+    display: block;
+
+    &--number {
+      font-size: 18px;
+      color: $te-blue;
+    }
+    &--text {
+
+    }
+  }
+}
+
+.te-anomaly-table {
+  width: 100%;
+  margin-top: 12px;
+  border: 1px solid app-shade(black, 1);
+
+  &__wrapper {
+    height: 500px;
+    overflow-y: scroll;
+  }
+
+  &__text {
+    margin-right: 30px;
+  }
+
+  &__head {
+    line-height: 40px;
+  }
+
+  &__cell {
+    padding: 5px 20px;
+    font-size: 15px;
+    font-weight: 500;
+    color: app-shade(black, 8);
+    position: relative;
+
+    &:last-child {
+      max-width: 90px;
+      text-align: center;
+      padding: 4px 0 0 0;
+      vertical-align: baseline;
+    }
+  }
+
+  &__cell-head {
+    font-size: 15px;
+    font-weight: bold;
+    color: app-shade(black, 6);
+    padding-left: 20px;
+    line-height: 45px;
+
+    &--fixed {
+      width: 215px;
+    }
+  }
+
+  &__cell-link {
+    color: app-shade(black, 6);
+    white-space: nowrap;
+    font-weight: 700;
+
+    &:hover {
+      text-decoration: none;
+      cursor: pointer;
+      color: black;
+    }
+  }
+
+  &__row {
+    border-bottom: 1px solid app-shade(black, 1);
+  }
+
+  &__list {
+    list-style: none;
+    margin-left: -39px;
+    margin-bottom: 0;
+    max-width: 250px;
+  }
+
+  &__list-item {
+    &--smaller {
+      font-size: 12px;
+      margin-left: -2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    &--lighter {
+      font-size: 12px;
+      color: app-shade(black, 6);
+    }
+
+    &--warning {
+      color: $te-red;
+      font-size: 13px;
+    }
+
+    &--shadow {
+      position: absolute;
+      color: app-shade(black, 2);
+      margin-left: -18px;
+    }
+  }
+
+  &__value-label {
+    font-size: 13px;
+
+    &--up {
+      color: $te-green;
+    }
+
+    &--down {
+      color: $te-red;
+    }
+  }
+
+  &__select {
+    display: inline-block;
+    margin-right: 30px;
+    width: 180px;
+  }
+
+  &__link-wrapper {
+    display: inline-block;
+    vertical-align: top;
+    margin-right: 20px;
+    padding-top: 7px;
+  }
+
+  &__link {
+    vertical-align: top;
+    color: $te-link-blue;
+    font-weight: 600;
+    letter-spacing: .03em;
+    font-size: 15px;
+  }
+
+  &__icon {
+    font-size: 14px;
+    margin-left: 5px;
+
+    &--status {
+      -webkit-animation: fadeinout 4s linear forwards;
+      animation: fadeinout 4s linear forwards;
+      position: absolute;
+      font-size: 20px;
+      margin: 14px 0 0 -26px;
+    }
+
+    &--small {
+      font-size: 11px;
+      margin-left: 0px;
+    }
+  }
+
+  &--performance {
+    margin-top: 30px;
+  }
+
+}
+
+.te-alert-page-pending {
+  text-align: center;
+  margin-top: 50px;
+  color: app-shade(black, 9);
+
+  &__image {
+    width: 300px;
+
+    &--error {
+      width: 100px;
+    }
+  }
+
+  &__title {
+    font-size: 40px;
+    font-weight: 100;
+    letter-spacing: .02em;
+  }
+
+  &__text {
+    font-size: 15px;
+    color: app-shade(black, 6);
+  }
+
+  &__loader {
+    height: 4px;
+    width: 40%;
+    margin: 20px auto;
+    position: relative;
+    overflow: hidden;
+    background-color: #ddd;
+
+    &:before {
+      display: block;
+      position: absolute;
+      content: "";
+      left: -200px;
+      width: 200px;
+      height: 4px;
+      background-color: $te-blue;
+      animation: loading 2s linear infinite;
+    }
+  }
+}
+
+.glyphicon-spin {
+    -webkit-animation: spin 1000ms infinite linear;
+    animation: spin 1000ms infinite linear;
 }
 
 .te-search-results {
   border-bottom: 1px app-shade(black, 1) solid;
+  color: app-shade(black, 0.7);
   padding: 24px 0;
+
+  &--slim {
+    padding: 24px 0 0 0;
+  }
 
   &__list {
     list-style: none;
-    // margin-bottom: 24px;
+    font-weight: normal;
+    margin-bottom: 0;
+
+    &--summary-block {
+      padding: 0;
+    }
 
     &--details-block {
       padding: 0;
     }
   }
 
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $te-spacing;
+  }
+
+  &__row {
+    display: flex;
+    font-size: 15px;
+  }
+
+  &__option {
+    font-weight: 600;
+
+    &--list {
+      display: inline-block;
+      width: 100px;
+      min-width: 100px;
+      font-size: 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: right;
+      margin-right: 10px;
+      color: app-shade(black, 4);
+    }
+
+    &--solo {
+      color: app-shade(black, 9);
+      width: 117px;
+    }
+  }
+
+  &__value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: black;
+    max-height: 19px;
+  }
+
+  &__value-solo {
+    color: app-shade(black, 5);
+    word-wrap: break-word;
+    max-width: 340px;
+    max-height: 65px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__title-group {
+    color: app-shade(black, 0.85);
+    font-size: 21px;
+    display: flex;
+    align-items: center;
+    flex-shrink: 1;
+    overflow: hidden;
+  }
+
+  &__title {
+    min-width: 95px;
+  }
+
+  &__title-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 660px;
+    margin: -30px 0 0 74px;
+  }
+
+  &__edit-button {
+    margin-left: $te-spacing;
+  }
+
   &__summary-item {
     line-height: 22px;
 
-    &--tag {
-      // margin-top: 4px;
-
-    }
-
     &--title {
       margin: 0;
+      color: $te-blue-4;
+      font-size: 18px;
+      font-weight: 400;
     }
   }
 
   &__icon {
     float: right;
+    padding: 15px 15px 0 0;
+    color: app-shade(black, 2);
+  }
+
+  &__prop {
+    &--missing {
+      color: app-shade(black, 5);
+    }
   }
 
   &__tag {
     background-color: app-shade(black, 3);
-    border-radius: 5px;
+    font-size: 15px;
+    line-height: 20px;
+    letter-spacing: .05em;
+    border-radius: 3px;
     padding: 4px 8px;
-    margin-right: $te-spacing-lg;
-    color: app-shade(white, 8);
-    width: 150px;
+    margin: 0 20px;
+    display: inline-block;
+    color: white;
+    width: auto;
+
+    &--list {
+      margin: 0 10px 0 0;
+    }
+
     &--active {
-      background-color: app-shade(black, 7);
+      background-color: $te-blue;
     }
   }
 
@@ -164,7 +851,7 @@ body {
 }
 
 .te-search-header {
-  padding-bottom: $te-spacing--sm;
+  padding-bottom: $te-spacing;
   border-bottom: 1px app-shade(black, 1) solid;
 }
 
@@ -182,32 +869,17 @@ body {
   display: none;
 }
 
-.te-button {
-  border-radius: 2px; 
-  border: 1px solid #339BC7;
-  margin: 0 1px;
-  font-size: 17px;
+.te-topcard-subnav {
+  display: flex;
+  border-top: 1px solid app-shade(black, 1);
+  padding-top: 12px;
+  margin: 25px 0 13px 0;
 
-  &--cancel {
-    background-color: white;
-    color: #339BC7;
-    a {
-      color: #339BC7;
-    }
-    &:hover,
-    a:hover {
-      color: #339BC7;      
-      text-decoration: none;
-    }
-  }
+  &__item {
+    margin: 0 14px;
 
-  &--submit {
-    background-color: #1A84BC;
-    color: white;
-    &:hover,
-    a:hover {
-      color: white;
-      text-decoration: none;
+    &:first-child {
+      margin-left: 0;
     }
   }
 }

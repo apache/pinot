@@ -23,14 +23,13 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.PartitionToReplicaGroupMappingZKMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
-import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
+import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.util.ArrayList;
@@ -47,8 +46,6 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
@@ -58,13 +55,11 @@ import static org.mockito.Mockito.*;
 
 
 public class SegmentAssignmentStrategyTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentAssignmentStrategyTest.class);
-
   private final static String ZK_SERVER = ZkStarter.DEFAULT_ZK_STR;
   private final static String HELIX_CLUSTER_NAME = "TestSegmentAssignmentStrategyHelix";
   private final static String TABLE_NAME_BALANCED = "testResourceBalanced";
   private final static String TABLE_NAME_RANDOM = "testResourceRandom";
-  private final static String TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP= "testTableLevelReplicaGroup";
+  private final static String TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP = "testTableLevelReplicaGroup";
   private final static String TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP = "testPartitionLevelReplicaGroup";
 
   private static final Random random = new Random();
@@ -88,7 +83,8 @@ public class SegmentAssignmentStrategyTest {
     }
     final String instanceId = "localhost_helixController";
     _pinotHelixResourceManager =
-        new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true, /*isUpdateStateModel=*/false);
+        new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true, /*isUpdateStateModel=*/
+            false);
     _pinotHelixResourceManager.start();
 
     final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_SERVER);
@@ -132,7 +128,8 @@ public class SegmentAssignmentStrategyTest {
     }
 
     for (int i = 0; i < 10; ++i) {
-      addOneSegment(TABLE_NAME_RANDOM);
+      _pinotHelixResourceManager.addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME_RANDOM),
+          "downloadUrl");
 
       // Wait for all segments appear in the external view
       while (!allSegmentsPushedToIdealState(TABLE_NAME_RANDOM, i + 1)) {
@@ -167,7 +164,8 @@ public class SegmentAssignmentStrategyTest {
 
     int numSegments = 20;
     for (int i = 0; i < numSegments; ++i) {
-      addOneSegment(TABLE_NAME_BALANCED);
+      _pinotHelixResourceManager.addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME_BALANCED),
+          "downloadUrl");
     }
 
     // Wait for all segments appear in the external view
@@ -212,8 +210,8 @@ public class SegmentAssignmentStrategyTest {
     replicaGroupStrategyConfig.setMirrorAssignmentAcrossReplicaGroups(true);
 
     // Create table config
-    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE)
-        .setTableName(TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP)
+    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(
+        TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP)
         .setNumReplicas(NUM_REPLICA)
         .setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy")
         .build();
@@ -292,8 +290,8 @@ public class SegmentAssignmentStrategyTest {
     indexingConfig.setSegmentPartitionConfig(new SegmentPartitionConfig(partitionConfigMap));
 
     // Create table config
-    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE)
-        .setTableName(TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP)
+    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(
+        TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP)
         .setNumReplicas(NUM_REPLICA)
         .setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy")
         .build();
@@ -372,8 +370,8 @@ public class SegmentAssignmentStrategyTest {
     IdealState idealState =
         _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
 
-    List<String> servers = _pinotHelixResourceManager.getServerInstancesForTable(tableName,
-        CommonConstants.Helix.TableType.OFFLINE);
+    List<String> servers =
+        _pinotHelixResourceManager.getServerInstancesForTable(tableName, CommonConstants.Helix.TableType.OFFLINE);
     Map<String, Set<String>> serverToSegments = new HashMap<>();
 
     for (String server : servers) {
@@ -386,12 +384,6 @@ public class SegmentAssignmentStrategyTest {
       }
     }
     return serverToSegments;
-  }
-
-  private void addOneSegment(String tableName) {
-    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(tableName);
-    LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
-    _pinotHelixResourceManager.addSegment(segmentMetadata, "downloadUrl");
   }
 
   private void addOneSegmentWithPartitionInfo(String tableName, String segmentName, String columnName,
@@ -408,6 +400,6 @@ public class SegmentAssignmentStrategyTest {
     when(meta.getTableName()).thenReturn(tableName);
     when(meta.getName()).thenReturn(segmentName);
     when(meta.getCrc()).thenReturn("0");
-    _pinotHelixResourceManager.addSegment(meta, "downloadUrl");
+    _pinotHelixResourceManager.addNewSegment(meta, "downloadUrl");
   }
 }

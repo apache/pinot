@@ -24,12 +24,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.util.JsonResponseUtil;
@@ -44,11 +41,9 @@ public class MetricConfigResource {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private MetricConfigManager metricConfigDao;
-  private DashboardConfigManager dashboardConfigDAO;
 
   public MetricConfigResource() {
     this.metricConfigDao = DAO_REGISTRY.getMetricConfigDAO();
-    this.dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
   }
 
   @GET
@@ -144,14 +139,6 @@ public class MetricConfigResource {
   @Path("/delete")
   public String deleteMetricConfig(@NotNull @QueryParam("dataset") String dataset, @NotNull @QueryParam("id") Long metricConfigId) {
     metricConfigDao.deleteById(metricConfigId);
-    DashboardConfigDTO dashboardConfigDTO =
-        dashboardConfigDAO.findByName(ThirdEyeUtils.getDefaultDashboardName(dataset));
-    if (dashboardConfigDTO != null) {
-      List<Long> metricIds = dashboardConfigDTO.getMetricIds();
-      metricIds.removeAll(Lists.newArrayList(metricConfigId));
-      dashboardConfigDTO.setMetricIds(metricIds);
-      dashboardConfigDAO.update(dashboardConfigDTO);
-    }
     return JsonResponseUtil.buildSuccessResponseJSON("Successully deleted " + metricConfigId).toString();
   }
 

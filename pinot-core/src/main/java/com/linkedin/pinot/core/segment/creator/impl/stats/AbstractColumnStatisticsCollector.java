@@ -190,4 +190,9 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
       }
     }
   }
+
+  @Override
+  public int getPartitionRangeWidth() {
+    return partitionRangeEnd - partitionRangeStart + 1;
+  }
 }

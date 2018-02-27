@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -72,12 +73,11 @@ public class TimeBasedAnomalyMerger {
    * Step 5: persist merged anomalies
    *
    * @param functionSpec the spec of the function that detects anomalies
-   * @param isBackfill set to true to disable the alert of the merged anomalies
    *
    * @return the number of merged anomalies after merging
    */
   public ListMultimap<DimensionMap, MergedAnomalyResultDTO> mergeAnomalies(AnomalyFunctionDTO functionSpec,
-      ListMultimap<DimensionMap, RawAnomalyResultDTO> unmergedAnomalies, boolean isBackfill) {
+      ListMultimap<DimensionMap, RawAnomalyResultDTO> unmergedAnomalies) {
 
     int rawAnomaliesCount = 0;
     for (DimensionMap dimensionMap : unmergedAnomalies.keySet()) {
@@ -109,9 +109,6 @@ public class TimeBasedAnomalyMerger {
 
       // Update information of merged anomalies
       for (MergedAnomalyResultDTO mergedAnomalyResultDTO : mergedAnomalies.values()) {
-        if (isBackfill) {
-          mergedAnomalyResultDTO.setNotified(isBackfill);
-        } // else notified flag is left as is
         updateMergedAnomalyInfo(mergedAnomalyResultDTO, mergeConfig);
       }
 

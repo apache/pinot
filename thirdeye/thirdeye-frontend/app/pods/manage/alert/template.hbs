@@ -1,0 +1,139 @@
+<section class="te-page__top te-search-results {{if isEditModeActive "te-search-results--slim"}}">
+  <div class="container">
+    <div class="te-search-results__header">
+      <div class="te-search-results__title-group">
+        <div class="te-search-results__title">
+          <span title={{alertData.functionName}}>
+            {{alertData.functionName}}
+          </span>
+          <div class="te-search-results__tag {{if alertData.isActive "te-search-results__tag--active"}}">
+            {{if alertData.isActive "Active" "Inactive"}}
+          </div>
+        </div>
+      </div>
+      {{#if (not isReplayPending)}}
+        <div class="te-search-results__cta">
+          {{#if isOverViewModeActive}}
+            <button class="te-button te-button--outline" {{action "onClickEdit"}}>Edit</button>
+          {{else}}
+            <button {{action "onClickNavToOverview"}} class="te-button te-button--outline">Back to overview</button>
+          {{/if}}
+        </div>
+      {{/if}}
+    </div>
+    {{#if (not isLoadError)}}
+      <ul class="te-search-results__list te-search-results__list--details-block row">
+        <div class="col-xs-12 col-sm-5">
+          <li class="te-search-results__row">
+            {{!-- Todo: Dry this out --}}
+            <div class="te-search-results__option te-search-results__option--solo">Metric</div>
+            <div class="te-search-results__value-solo" title={{alertData.metric}}>{{alertData.metric}}</div>
+          </li>
+          <li class="te-search-results__row">
+            <div class="te-search-results__option te-search-results__option--solo">Dataset</div>
+            <div class="te-search-results__value-solo" title={{alertData.collection}}>
+              <span class="{{unless alertData.collection 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+                {{if alertData.collection alertData.collection 'N/A'}}
+              </span>
+            </div>
+          </li>
+          <li class="te-search-results__row">
+            <div class="te-search-results__option te-search-results__option--solo">Filtered by</div>
+            <div class="te-search-results__value-solo" title={{alertData.filters}}>
+              <span class="{{unless alertData.filters 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+                {{if alertData.filters alertData.filters 'N/A'}}
+              </span>
+            </div>
+          </li>
+          <li class="te-search-results__row">
+            <div class="te-search-results__option te-search-results__option--solo">Breakdown by</div>
+            <div class="te-search-results__value-solo" title={{alertData.exploreDimensions}}>
+              <span class="{{unless alertData.exploreDimensions 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+                {{if alertData.exploreDimensions alertData.exploreDimensions 'N/A'}}
+              </span>
+            </div>
+          </li>
+        </div>
+        <div class="col-xs-12 col-sm-7">
+          <li class="te-search-results__row">
+            <div class="te-search-results__option te-search-results__option--solo">Owner</div>
+            <div class="te-search-results__value-solo" title={{alertData.createdBy}}>
+              <span class="{{unless alertData.createdBy 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+                {{if alertData.createdBy alertData.createdBy 'N/A'}}
+              </span>
+            </div>
+          </li>
+          <li class="te-search-results__row">
+            <div class="te-search-results__option te-search-results__option--solo">Application</div>
+            <div class="te-search-results__value-solo" title={{alertData.application}}>
+              <span class="{{unless alertData.application 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+                {{if alertData.application alertData.application 'N/A'}}
+              </span>
+            </div>
+          </li>
+          <li class="te-search-results__row">
+            <div class="te-search-results__option te-search-results__option--solo">Anomaly Pattern</div>
+            <div class="te-search-results__value-solo" title={{alertData.pattern}}>
+              {{if alertData.pattern alertData.pattern 'N/A'}}
+            </div>
+          </li>
+          <li class="te-search-results__row">
+            <div class="te-search-results__option te-search-results__option--solo">Mailing List</div>
+            <div class="te-search-results__value-solo" title={{alertData.group}}>
+              <span class="{{unless alertData.group 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+                {{if alertData.group alertData.group 'N/A'}}
+              </span>
+            </div>
+          </li>
+        </div>
+        <div class="col-xs-12 col-sm-7">
+          <li class="te-search-results__row">
+            <div class="te-search-results__option te-search-results__option--solo">Granularity</div>
+            <div class="te-search-results__value-solo" title={{alertData.granularity}}>
+              <span class="{{unless alertData.granularity 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+                {{if alertData.granularity alertData.granularity 'N/A'}}
+              </span>
+            </div>
+          </li>
+        </div>
+      </ul>
+    {{/if}}
+
+    {{#if isEditModeActive}}
+      <div class="te-topcard-subnav">
+        <div class="te-topcard-subnav__item">
+          <span {{action "setEditModeActive"}}>
+            {{#link-to "manage.alert.edit" alertData.id class="thirdeye-link thirdeye-link--smaller thirdeye-link--nav" activeClass="thirdeye-link--active"}}
+              Edit alert settings
+            {{/link-to}}
+          </span>
+        </div>
+        <div class="te-topcard-subnav__item">
+          <span {{action "setEditModeActive"}}>
+            {{#link-to "manage.alert.tune" alertData.id class="thirdeye-link thirdeye-link--smaller thirdeye-link--nav" activeClass="thirdeye-link--active"}}
+              Tune alert sensitivity
+            {{/link-to}}
+          </span>
+        </div>
+      </div>
+    {{/if}}
+
+  </div>
+</section>
+
+<section class="te-page__bottom">
+  <div class="container">
+    {{#if isLoadError}}
+      <div class="te-alert-page-pending">
+        <img src="{{rootURL}}assets/images/te-alert-error.png" class="te-alert-page-pending__image te-alert-page-pending__image--error" alt="error">
+        <h2 class="te-alert-page-pending__title">Oops, something went wrong</h2>
+        <p class="te-alert-page-pending__text">{{errorText}}</p>
+      </div>
+    {{else}}
+      {{#if (not isTransitionDone)}}
+        <div class="spinner-wrapper-self-serve spinner-wrapper-self-serve__content-block">{{ember-spinner}}</div>
+      {{/if}}
+      {{outlet}}
+    {{/if}}
+  </div>
+</section>

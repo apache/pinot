@@ -15,31 +15,27 @@
  */
 package com.linkedin.pinot.core.realtime.impl;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.extractors.FieldExtractor;
-import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
+import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.realtime.StreamProvider;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
+import java.io.File;
+import java.io.IOException;
 
 
 public class FileBasedStreamProviderImpl implements StreamProvider {
-
-  private FileBasedStreamProviderConfig config;
-  private RecordReader reader;
-  private int count;
+  private RecordReader _recordReader;
+  private int _currentOffset;
 
   @Override
   public void init(StreamProviderConfig streamProviderConfig, String tableName, ServerMetrics serverMetrics)
       throws Exception {
-    config = (FileBasedStreamProviderConfig) streamProviderConfig;
-
-    FieldExtractor extractor = FieldExtractorFactory.getPlainFieldExtractor(config.getSchema());
-    reader = RecordReaderFactory.get(this.config.getFormat(), this.config.getPath(), extractor);
-    reader.init();
-    count = 0;
+    FileBasedStreamProviderConfig config = (FileBasedStreamProviderConfig) streamProviderConfig;
+    _recordReader = new AvroRecordReader(new File(config.getPath()), config.getSchema());
+    _currentOffset = 0;
   }
 
   @Override
@@ -54,9 +50,13 @@ public class FileBasedStreamProviderImpl implements StreamProvider {
 
   @Override
   public GenericRow next(GenericRow destination) {
-    if (reader.hasNext()) {
-      count++;
-      return reader.next();
+    if (_recordReader.hasNext()) {
+      _currentOffset++;
+      try {
+        return _recordReader.next(destination);
+      } catch (IOException e) {
+        Utils.rethrowException(e);
+      }
     }
 
     return null;
@@ -69,7 +69,7 @@ public class FileBasedStreamProviderImpl implements StreamProvider {
 
   @Override
   public long currentOffset() {
-    return count;
+    return _currentOffset;
   }
 
   @Override
@@ -84,7 +84,6 @@ public class FileBasedStreamProviderImpl implements StreamProvider {
 
   @Override
   public void shutdown() throws Exception {
-    reader.close();
+    _recordReader.close();
   }
-
 }

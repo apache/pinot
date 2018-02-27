@@ -24,21 +24,6 @@ package com.linkedin.pinot.core.common;
 public interface Block {
 
   /**
-   * returns the blockid, a segment will
-   *
-   * @return
-   */
-  BlockId getId();
-
-  /**
-   * Allows one to push down the predicates
-   *
-   * @param predicate
-   * @return
-   */
-  boolean applyPredicate(Predicate predicate);
-
-  /**
    * Returns valset that allows one to iterate over the docId. If no predicate
    * is provided, this will consists of all docIds within the block
    *
@@ -68,6 +53,4 @@ public interface Block {
    * @return
    */
   BlockMetadata getMetadata();
-
-
 }

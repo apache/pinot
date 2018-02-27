@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.HashMap;
@@ -38,10 +39,10 @@ public class RoutingConfig {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private String _routingTableBuilderName;
-  
+
   private Map<String,String> _routingTableBuilderOptions = new HashMap<>();
-  
-  
+
+
   public String getRoutingTableBuilderName() {
     return _routingTableBuilderName;
   }
@@ -69,5 +70,27 @@ public class RoutingConfig {
     }
     return "";
   }
-  
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    RoutingConfig that = (RoutingConfig) o;
+
+    return EqualityUtils.isEqual(_routingTableBuilderName, that._routingTableBuilderName) && EqualityUtils.isEqual(
+        _routingTableBuilderOptions, that._routingTableBuilderOptions);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_routingTableBuilderName);
+    result = EqualityUtils.hashCodeOf(result, _routingTableBuilderOptions);
+    return result;
+  }
 }

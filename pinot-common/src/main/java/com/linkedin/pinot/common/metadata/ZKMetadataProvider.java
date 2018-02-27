@@ -31,9 +31,11 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.I0Itec.zkclient.exception.ZkBadVersionException;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -142,18 +144,43 @@ public class ZKMetadataProvider {
         partitionMappingZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
   }
 
-  public static void setOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
+  public static boolean setOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      OfflineSegmentZKMetadata offlineSegmentZKMetadata, int expectedVersion) {
+    // NOTE: Helix will throw ZkBadVersionException if version does not match
+    try {
+      return propertyStore.set(constructPropertyStorePathForSegment(
+          TableNameBuilder.OFFLINE.tableNameWithType(offlineSegmentZKMetadata.getTableName()),
+          offlineSegmentZKMetadata.getSegmentName()), offlineSegmentZKMetadata.toZNRecord(), expectedVersion,
+          AccessOption.PERSISTENT);
+    } catch (ZkBadVersionException e) {
+      return false;
+    }
+  }
+
+  public static boolean setOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
       OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
-    propertyStore.set(constructPropertyStorePathForSegment(
+    return propertyStore.set(constructPropertyStorePathForSegment(
         TableNameBuilder.OFFLINE.tableNameWithType(offlineSegmentZKMetadata.getTableName()),
         offlineSegmentZKMetadata.getSegmentName()), offlineSegmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
   }
 
-  public static void setRealtimeSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
+  public static boolean setRealtimeSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
       RealtimeSegmentZKMetadata realtimeSegmentZKMetadata) {
-    propertyStore.set(constructPropertyStorePathForSegment(
+    return propertyStore.set(constructPropertyStorePathForSegment(
         TableNameBuilder.REALTIME.tableNameWithType(realtimeSegmentZKMetadata.getTableName()),
         realtimeSegmentZKMetadata.getSegmentName()), realtimeSegmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
+  }
+
+  @Nullable
+  public static ZNRecord getZnRecord(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull String path) {
+    Stat stat = new Stat();
+    ZNRecord znRecord = propertyStore.get(path, stat, AccessOption.PERSISTENT);
+    if (znRecord != null) {
+      znRecord.setCreationTime(stat.getCtime());
+      znRecord.setModifiedTime(stat.getMtime());
+      znRecord.setVersion(stat.getVersion());
+    }
+    return znRecord;
   }
 
   @Nullable

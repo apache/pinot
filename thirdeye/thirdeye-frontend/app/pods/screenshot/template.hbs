@@ -1,5 +1,5 @@
 {{#if anomaly}}
-  <div class="paper-container paper-container--padding">
+  <div class="card-container card-container--padding">
     {{anomaly-graph
       primaryMetric=primaryMetric
       isLoading=false
@@ -13,6 +13,7 @@
       chartDates=dates
       primaryMetricColumn=columns
       point=point
+      padding=screenshotPadding
     }}
   </div>
 {{/if}}

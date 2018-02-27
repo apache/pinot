@@ -35,7 +35,7 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
   Object _maxValue;
 
   public RealtimeNoDictionaryColStatistics(ColumnDataSource dataSource) {
-    Block block = dataSource.getNextBlock();
+    Block block = dataSource.nextBlock();
     _numDocIds = block.getMetadata().getEndDocId() + 1;
     _blockValSet = block.getBlockValueSet();
   }
@@ -205,5 +205,10 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
   @Override
   public List<IntRange> getPartitionRanges() {
     return null;
+  }
+
+  @Override
+  public int getPartitionRangeWidth() {
+    return 0;
   }
 }

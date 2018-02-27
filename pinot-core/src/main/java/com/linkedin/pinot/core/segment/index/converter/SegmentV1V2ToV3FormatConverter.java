@@ -78,7 +78,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     setDirectoryPermissions(v3TempDirectory);
 
     createMetadataFile(v2SegmentDirectory, v3TempDirectory);
-    copyCreationMetadata(v2SegmentDirectory, v3TempDirectory);
+    copyCreationMetadataIfExists(v2SegmentDirectory, v3TempDirectory);
     copyIndexData(v2SegmentDirectory, v2Metadata, v3TempDirectory);
 
     File newLocation = SegmentDirectoryPaths.segmentDirectoryFor(v2SegmentDirectory, SegmentVersion.v3);
@@ -210,11 +210,12 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     properties.save(v3MetadataFile);
   }
 
-  private void copyCreationMetadata(File currentDir, File v3Dir)
-      throws IOException {
-    File v2CreationFile = new File (currentDir, V1Constants.SEGMENT_CREATION_META);
-    File v3CreationFile = new File (v3Dir, V1Constants.SEGMENT_CREATION_META);
-    Files.copy(v2CreationFile.toPath(), v3CreationFile.toPath());
+  private void copyCreationMetadataIfExists(File currentDir, File v3Dir) throws IOException {
+    File v2CreationFile = new File(currentDir, V1Constants.SEGMENT_CREATION_META);
+    if (v2CreationFile.exists()) {
+      File v3CreationFile = new File(v3Dir, V1Constants.SEGMENT_CREATION_META);
+      Files.copy(v2CreationFile.toPath(), v3CreationFile.toPath());
+    }
   }
 
   private void deleteStaleConversionDirectories(File segmentDirectory) {

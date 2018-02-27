@@ -39,7 +39,7 @@ public class GroupByAstNode extends BaseAstNode {
         FunctionCallAstNode functionCallAstNode = (FunctionCallAstNode) astNode;
 
         // Remove all white-space until we start compiling expressions on broker side.
-        groupBy.addToExpressions(functionCallAstNode.getExpression().replaceAll("\\s", ""));
+        groupBy.addToExpressions(functionCallAstNode.getExpression());
       }
     }
     brokerRequest.setGroupBy(groupBy);

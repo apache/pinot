@@ -1,4 +1,8 @@
 
+// endpoint cutoff for long periods
+const ROOTCAUSE_ANALYSIS_DURATION_MAX = 1209600000; // 14 days (in millis)
+const ROOTCAUSE_ANOMALY_DURATION_MAX = 604800000; // 7 days (in millis)
+
 // compare mode to week offset mapping
 const COMPARE_MODE_MAPPING = {
   WoW: 1,
@@ -48,5 +52,7 @@ export {
   colors,
   eventColorMapping,
   eventWeightMapping,
-  baselineEventColorMapping
+  baselineEventColorMapping,
+  ROOTCAUSE_ANALYSIS_DURATION_MAX,
+  ROOTCAUSE_ANOMALY_DURATION_MAX
 };

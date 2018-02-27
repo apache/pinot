@@ -1,0 +1,16 @@
+.rootcause-chart {
+  flex-grow: 1;
+  min-height: 400px;
+
+  &__title {
+    padding-left: 16px;
+  }
+}
+
+.c3-line {
+  stroke-width: 2px;
+}
+
+g[class^='c3-circles-frontend-metric'], g[class*=' c3-circles-frontend-metric']{
+    display: none;
+}

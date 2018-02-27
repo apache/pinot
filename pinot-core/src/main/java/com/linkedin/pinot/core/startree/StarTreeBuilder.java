@@ -15,56 +15,44 @@
  */
 package com.linkedin.pinot.core.startree;
 
+import com.google.common.collect.BiMap;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
+import java.io.Closeable;
+import java.io.File;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import com.google.common.collect.HashBiMap;
-import com.linkedin.pinot.core.data.GenericRow;
 import java.util.Set;
 
 
-public interface StarTreeBuilder {
-  /**
-   * Initializes the builder, called before append.
-   *
-   * @param splitOrder
-   *  The dimensions that should be used in successive splits down the tree.
-   * @param maxLeafRecords
-   *  The maximum number of records that can exist at a leaf, if there are still split dimensions available.
-   * @param table
-   *  The temporary table to store dimensional data.
-   * @throws Exception
-   */
-  void init(StarTreeBuilderConfig config) throws Exception;
+public interface StarTreeBuilder extends Closeable {
 
   /**
-   * Adds a possibly non-unique dimension combination to the StarTree table.
-   * @throws Exception
+   * Initialize the builder, called before append().
    */
-  void append(GenericRow row) throws Exception;
+  void init(StarTreeBuilderConfig config) throws IOException;
 
   /**
-   * Builds the StarTree, called after all calls to append (after build);
-   * @throws Exception
+   * Append a document to the star tree.
    */
-  void build() throws Exception;
+  void append(GenericRow row) throws IOException;
 
   /**
-   * Clean up any temporary files/directories, called at the end.
+   * Build the StarTree, called after all documents get appended.
    */
-  void cleanup();
+  void build() throws IOException;
 
   /**
-   * Returns the root node of the tree (after build).
+   * Iterator to iterate over the records from startDocId to endDocId (exclusive).
    */
-  StarTree getTree();
+  Iterator<GenericRow> iterator(int startDocId, int endDocId) throws IOException;
 
   /**
-   *
-   * @return
-   * @throws Exception
+   * Serialize the star tree into a file.
    */
-  Iterator<GenericRow> iterator(int startDocId, int endDocId) throws Exception;
+  void serializeTree(File starTreeFile, Map<String, ColumnIndexCreationInfo> indexCreationInfoMap) throws IOException;
 
   /**
    * Returns the total number of non-aggregate dimension combinations.
@@ -77,18 +65,13 @@ public interface StarTreeBuilder {
   int getTotalAggregateDocumentCount();
 
   /**
-   * Returns the maximum number of leaf records from init.
-   */
-  int getMaxLeafRecords();
-
-  /**
    * Returns the split order
    */
   List<String> getDimensionsSplitOrder();
 
-  Map<String, HashBiMap<Object, Integer>> getDictionaryMap();
+  Set<String> getSkipMaterializationDimensions();
 
-  HashBiMap<String, Integer> getDimensionNameToIndexMap();
+  List<String> getDimensionNames();
 
-  Set<String> getSkipMaterializationForDimensions();
+  List<BiMap<Object, Integer>> getDimensionDictionaries();
 }

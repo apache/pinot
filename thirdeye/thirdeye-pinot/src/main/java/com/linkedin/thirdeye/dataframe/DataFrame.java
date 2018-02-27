@@ -216,8 +216,8 @@ public class DataFrame {
     }
   }
 
-  String indexName = null;
-  Map<String, Series> series = new LinkedHashMap<>();
+  final List<String> indexNames = new ArrayList<>();
+  final Map<String, Series> series = new LinkedHashMap<>();
 
   /**
    * Returns a DoubleSeries wrapping the values array
@@ -356,7 +356,7 @@ public class DataFrame {
       indexValues[i] = i;
     }
     this.addSeries(COLUMN_INDEX_DEFAULT, LongSeries.buildFrom(indexValues));
-    this.indexName = COLUMN_INDEX_DEFAULT;
+    this.indexNames.add(COLUMN_INDEX_DEFAULT);
   }
 
   /**
@@ -367,7 +367,7 @@ public class DataFrame {
    */
   public DataFrame(long... indexValues) {
     this.addSeries(COLUMN_INDEX_DEFAULT, LongSeries.buildFrom(indexValues));
-    this.indexName = COLUMN_INDEX_DEFAULT;
+    this.indexNames.add(COLUMN_INDEX_DEFAULT);
   }
 
   /**
@@ -378,7 +378,18 @@ public class DataFrame {
    */
   public DataFrame(Series index) {
     this.addSeries(COLUMN_INDEX_DEFAULT, index);
-    this.indexName = COLUMN_INDEX_DEFAULT;
+    this.indexNames.add(COLUMN_INDEX_DEFAULT);
+  }
+
+  /**
+   * Creates a new DataFrame with a column {@code indexName} referencing the Series {@code index}.
+   *
+   * @param indexName index series column name
+   * @param index index series
+   */
+  public DataFrame(String indexName, Series index) {
+    this.addSeries(indexName, index);
+    this.indexNames.add(indexName);
   }
 
   /**
@@ -389,8 +400,8 @@ public class DataFrame {
    * @param df DataFrame to copy properties from
    */
   public DataFrame(DataFrame df) {
-    this.indexName = df.indexName;
-    this.series = new HashMap<>(df.series);
+    this.indexNames.addAll(df.indexNames);
+    this.series.putAll(df.series);
   }
 
   /**
@@ -404,13 +415,25 @@ public class DataFrame {
   /**
    * Sets the index name to the specified series name in-place.
    *
-   * @param seriesName index series name
+   * @param seriesNames index series names
    * @throws IllegalArgumentException if the series does not exist
    * @return reference to the modified DataFrame (this)
    */
-  public DataFrame setIndex(String seriesName) {
-    assertSeriesExists(seriesName);
-    this.indexName = seriesName;
+  public DataFrame setIndex(String... seriesNames) {
+    return this.setIndex(Arrays.asList(seriesNames));
+  }
+
+  /**
+   * Sets the index name to the specified series name in-place.
+   *
+   * @param seriesNames index series names
+   * @throws IllegalArgumentException if the series does not exist
+   * @return reference to the modified DataFrame (this)
+   */
+  public DataFrame setIndex(List<String> seriesNames) {
+    assertSeriesExist(seriesNames);
+    this.indexNames.clear();
+    this.indexNames.addAll(seriesNames);
     return this;
   }
 
@@ -420,18 +443,33 @@ public class DataFrame {
    * @return reference to the modified DataFrame (this)
    */
   public DataFrame resetIndex() {
-    this.indexName = null;
+    this.indexNames.clear();
     return this;
   }
 
   /**
-   * Returns the series referenced by indexName.
+   * Returns the series referenced by indexName, if there is exactly one index column.
    *
    * @throws IllegalArgumentException if the series does not exist
    * @return index series
    */
-  public Series getIndex() {
-    return assertSeriesExists(this.indexName);
+  public Series getIndexSingleton() {
+    if (this.indexNames.size() != 1)
+      throw new IllegalArgumentException("Must have exactly one index column");
+    return assertSeriesExists(this.indexNames.get(0));
+  }
+
+  /**
+   * Returns the series referenced by indexNames.
+   *
+   * @throws IllegalArgumentException if the series does not exist
+   * @return index series
+   */
+  public List<Series> getIndexSeries() {
+    List<Series> series = new ArrayList<>();
+    for (String name : this.indexNames)
+      series.add(this.get(name));
+    return series;
   }
 
   /**
@@ -440,7 +478,7 @@ public class DataFrame {
    * @return {@code true} if a valid index name is set, {@code false} otherwise
    */
   public boolean hasIndex() {
-    return this.indexName != null;
+    return !this.indexNames.isEmpty();
   }
 
   /**
@@ -448,8 +486,8 @@ public class DataFrame {
    *
    * @return index series name
    */
-  public String getIndexName() {
-    return this.indexName;
+  public List<String> getIndexNames() {
+    return new ArrayList<>(this.indexNames);
   }
 
   /**
@@ -522,12 +560,14 @@ public class DataFrame {
    */
   public DataFrame slice(Iterable<String> seriesNames) {
     DataFrame df = new DataFrame();
+    List<String> index = new ArrayList<>();
     df.series.clear();
     for(String name : seriesNames) {
       df.addSeries(name, this.get(name).copy());
-      if(name.equals(this.getIndexName()))
-        df.setIndex(name);
+      if(this.indexNames.contains(name))
+        index.add(name);
     }
+    df.setIndex(index);
     return df;
   }
 
@@ -709,15 +749,23 @@ public class DataFrame {
       return this;
 
     // fast - if indexes match
-    if(this.getIndex().equals(source.getIndex())) {
+    if(this.getIndexSeries().equals(source.getIndexSeries())) {
       for(String name : seriesNames)
         addSeries(name, source.get(name));
       return this;
     }
 
     // left join - on minimal structure
-    DataFrame dfLeft = new DataFrame(this.getIndex());
-    DataFrame dfRight = new DataFrame(source.getIndex());
+    DataFrame dfLeft = new DataFrame();
+    for (String name : this.indexNames)
+      dfLeft.addSeries(name, this.get(name));
+    dfLeft.setIndex(this.indexNames);
+
+    DataFrame dfRight = new DataFrame();
+    for (String name : source.indexNames)
+      dfRight.addSeries(name, source.get(name));
+    dfRight.setIndex(source.indexNames);
+
     for(String name : seriesNames)
       dfRight.addSeries(name, source.get(name));
 
@@ -743,22 +791,35 @@ public class DataFrame {
    */
   public DataFrame addSeries(DataFrame source) {
     Collection<String> seriesNames = new HashSet<>(source.getSeriesNames());
-    seriesNames.remove(source.getIndexName());
-    return this.addSeries(source, seriesNames.toArray(new String[seriesNames.size()]));
+    for (String name : source.indexNames)
+      seriesNames.remove(name);
+    return this.addSeries(source, seriesNames);
   }
 
   /**
    * Removes a series from the DataFrame in-place.
    *
-   * @param seriesName
+   * @param seriesNames
    * @throws IllegalArgumentException if the series does not exist
    * @return reference to the modified DataFrame (this)
    */
-  public DataFrame dropSeries(String seriesName) {
-    assertSeriesExists(seriesName);
-    this.series.remove(seriesName);
-    if(seriesName.equals(this.indexName))
-      this.indexName = null;
+  public DataFrame dropSeries(String... seriesNames) {
+    return this.dropSeries(Arrays.asList(seriesNames));
+  }
+
+  /**
+   * Removes a series from the DataFrame in-place.
+   *
+   * @param seriesNames
+   * @throws IllegalArgumentException if the series does not exist
+   * @return reference to the modified DataFrame (this)
+   */
+  public DataFrame dropSeries(List<String> seriesNames) {
+    assertSeriesExist(seriesNames);
+    for (String name : seriesNames) {
+      this.series.remove(name);
+      this.indexNames.remove(name);
+    }
     return this;
   }
 
@@ -773,12 +834,17 @@ public class DataFrame {
    */
   public DataFrame renameSeries(String oldName, String newName) {
     Series s = assertSeriesExists(oldName);
-    String indexName = this.indexName;
+    List<String> indexNames = new ArrayList<>(this.indexNames);
 
     this.dropSeries(oldName).addSeries(newName, s);
 
-    if(oldName.equals(indexName))
-      this.indexName = newName;
+    for (int i=0; i<indexNames.size(); i++)
+      if (indexNames.get(i).equals(oldName))
+        indexNames.set(i, newName);
+
+    this.indexNames.clear();
+    this.indexNames.addAll(indexNames);
+
     return this;
   }
 
@@ -1214,6 +1280,16 @@ public class DataFrame {
   }
 
   /**
+   * Returns a copy of the DataFrame sorted by series values referenced by its index.
+   *
+   * @throws IllegalArgumentException if the series does not exist
+   * @return sorted DataFrame copy
+   */
+  public DataFrame sortedByIndex() {
+    return this.sortedBy(this.indexNames);
+  }
+
+  /**
    * Returns a copy of the DataFrame sorted by series values referenced by {@code seriesNames}.
    * The resulting sorted order is the equivalent of applying a stable sort to the nth series
    * first, and then sorting iteratively by series until the 1st series.
@@ -1382,6 +1458,20 @@ public class DataFrame {
    * @return DataFrameGrouping
    */
   public Grouping.DataFrameGrouping groupByValue(String... seriesNames) {
+    return this.groupByValue(Arrays.asList(seriesNames));
+  }
+
+  /**
+   * Returns a DataFrameGrouping based on the labels provided by the series referenced by
+   * {@code seriesNames} row by row.  The method can group across multiple columns.  It returns
+   * the key column as object series of {@code Tuples} constructed from the input columns.
+   *
+   * @see Grouping.GroupingByValue
+   *
+   * @param seriesNames series containing grouping labels
+   * @return DataFrameGrouping
+   */
+  public Grouping.DataFrameGrouping groupByValue(List<String> seriesNames) {
     return new Grouping.DataFrameGrouping(Grouping.GROUP_KEY, this, Grouping.GroupingByValue.from(names2series(seriesNames)));
   }
 
@@ -1583,7 +1673,7 @@ public class DataFrame {
    */
   public DataFrame joinInner(DataFrame other) {
     assertIndex(this, other);
-    return this.joinInner(other, new String[] { this.getIndexName() }, new String[] { other.getIndexName() });
+    return this.joinInner(other, this.indexNames, other.indexNames);
   }
 
   /**
@@ -1594,6 +1684,17 @@ public class DataFrame {
    * @return joined DataFrame
    */
   public DataFrame joinInner(DataFrame other, String... onSeries) {
+    return this.joinInner(other, onSeries, onSeries);
+  }
+
+  /**
+   * Performs an inner join on the {@code onSeries} columns of two DataFrames.
+   * @see DataFrame#join(DataFrame, DataFrame, List, List, Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
+  public DataFrame joinInner(DataFrame other, List<String> onSeries) {
     return this.joinInner(other, onSeries, onSeries);
   }
 
@@ -1610,6 +1711,18 @@ public class DataFrame {
   }
 
   /**
+   * Performs an inner join on the {@code onSeriesLeft} columns of this DataFrame and
+   * the {@code onSeriesLeft} columns of the {@code other} DataFrame.
+   * @see DataFrame#join(DataFrame, DataFrame, List, List, Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
+  public DataFrame joinInner(DataFrame other, List<String> onSeriesLeft, List<String> onSeriesRight) {
+    return DataFrame.join(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.INNER);
+  }
+
+  /**
    * Performs a left outer join on the index column of two DataFrames.
    * @see DataFrame#join(DataFrame, DataFrame, String[], String[], Series.JoinType)
    *
@@ -1618,7 +1731,7 @@ public class DataFrame {
    */
   public DataFrame joinLeft(DataFrame other) {
     assertIndex(this, other);
-    return this.joinLeft(other, new String[] { this.getIndexName() }, new String[] { other.getIndexName() });
+    return this.joinLeft(other, this.indexNames, other.indexNames);
   }
 
   /**
@@ -1629,6 +1742,17 @@ public class DataFrame {
    * @return joined DataFrame
    */
   public DataFrame joinLeft(DataFrame other, String... onSeries) {
+    return this.joinLeft(other, onSeries, onSeries);
+  }
+
+  /**
+   * Performs a left outer join on the {@code onSeries} columns of two DataFrames.
+   * @see DataFrame#join(DataFrame, DataFrame, List, List, Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
+  public DataFrame joinLeft(DataFrame other, List<String> onSeries) {
     return this.joinLeft(other, onSeries, onSeries);
   }
 
@@ -1645,6 +1769,18 @@ public class DataFrame {
   }
 
   /**
+   * Performs a left outer join on the {@code onSeriesLeft} columns of this DataFrame and
+   * the {@code onSeriesLeft} columns of the {@code other} DataFrame.
+   * @see DataFrame#join(DataFrame, DataFrame, List, List, Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
+  public DataFrame joinLeft(DataFrame other, List<String> onSeriesLeft, List<String> onSeriesRight) {
+    return DataFrame.join(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.LEFT);
+  }
+
+  /**
    * Performs a right outer join on the index column of two DataFrames.
    * @see DataFrame#join(DataFrame, DataFrame, String[], String[], Series.JoinType)
    *
@@ -1653,7 +1789,18 @@ public class DataFrame {
    */
   public DataFrame joinRight(DataFrame other) {
     assertIndex(this, other);
-    return this.joinRight(other, new String[] { this.getIndexName() }, new String[] { other.getIndexName() });
+    return this.joinRight(other, this.indexNames, other.indexNames);
+  }
+
+  /**
+   * Performs a right outer join on the {@code onSeries} columns of two DataFrames.
+   * @see DataFrame#join(DataFrame, DataFrame, List, List, Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
+  public DataFrame joinRight(DataFrame other, List<String> onSeries) {
+    return this.joinRight(other, onSeries, onSeries);
   }
 
   /**
@@ -1680,6 +1827,18 @@ public class DataFrame {
   }
 
   /**
+   * Performs a right outer join on the {@code onSeriesLeft} columns of this DataFrame and
+   * the {@code onSeriesLeft} columns of the {@code other} DataFrame.
+   * @see DataFrame#join(DataFrame, DataFrame, List, List, Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
+  public DataFrame joinRight(DataFrame other, List<String> onSeriesLeft, List<String> onSeriesRight) {
+    return DataFrame.join(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.RIGHT);
+  }
+
+  /**
    * Performs an outer join on the index column of two DataFrames.
    * @see DataFrame#join(DataFrame, DataFrame, String[], String[], Series.JoinType)
    *
@@ -1688,17 +1847,28 @@ public class DataFrame {
    */
   public DataFrame joinOuter(DataFrame other) {
     assertIndex(this, other);
-    return this.joinOuter(other, new String[] { this.getIndexName() }, new String[] { other.getIndexName() });
+    return this.joinOuter(other, this.indexNames, other.indexNames);
   }
 
   /**
    * Performs an outer join on the {@code onSeries} columns of two DataFrames.
-   * @see DataFrame#join(DataFrame, DataFrame, String[], String[], Series.JoinType)
+   * @see DataFrame#join(DataFrame, DataFrame, List, List, Series.JoinType)
    *
    * @param other right DataFrame
    * @return joined DataFrame
    */
   public DataFrame joinOuter(DataFrame other, String... onSeries) {
+    return this.joinOuter(other, onSeries, onSeries);
+  }
+
+  /**
+   * Performs an outer join on the {@code onSeries} columns of two DataFrames.
+   * @see DataFrame#join(DataFrame, DataFrame, List, List, Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
+  public DataFrame joinOuter(DataFrame other, List<String> onSeries) {
     return this.joinOuter(other, onSeries, onSeries);
   }
 
@@ -1711,6 +1881,18 @@ public class DataFrame {
    * @return joined DataFrame
    */
   public DataFrame joinOuter(DataFrame other, String[] onSeriesLeft, String[] onSeriesRight) {
+    return DataFrame.join(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.OUTER);
+  }
+
+  /**
+   * Performs an outer join on the {@code onSeriesLeft} columns of this DataFrame and
+   * the {@code onSeriesLeft} columns of the {@code other} DataFrame.
+   * @see DataFrame#join(DataFrame, DataFrame, List, List, Series.JoinType)
+   *
+   * @param other right DataFrame
+   * @return joined DataFrame
+   */
+  public DataFrame joinOuter(DataFrame other, List<String> onSeriesLeft, List<String> onSeriesRight) {
     return DataFrame.join(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.OUTER);
   }
 
@@ -1730,19 +1912,38 @@ public class DataFrame {
    * @return joined DataFrame
    */
   public static DataFrame join(DataFrame left, DataFrame right, String[] onSeriesLeft, String[] onSeriesRight, Series.JoinType joinType) {
-    if(onSeriesLeft.length != onSeriesRight.length)
+    return join(left, right, Arrays.asList(onSeriesLeft), Arrays.asList(onSeriesRight), joinType);
+  }
+
+  /**
+   * Performs a join between two DataFrames and returns the result as a new DataFrame. The join
+   * can be performed across multiple series. If (non-joined) series with the same name exist
+   * in both DataFrames, their names are appended with {@code COLUMN_JOIN_LEFT} and
+   * {@code COLUMN_JOIN_RIGHT} in the returned DataFrame.
+   *
+   * <b>NOTE:</b> the series names of the left join series survive.
+   *
+   * @param left left DataFrame
+   * @param right right DataFrame
+   * @param onSeriesLeft left series names to join on
+   * @param onSeriesRight right series names to join on
+   * @param joinType type of join to perform
+   * @return joined DataFrame
+   */
+  public static DataFrame join(DataFrame left, DataFrame right, List<String> onSeriesLeft, List<String> onSeriesRight, Series.JoinType joinType) {
+    if(onSeriesLeft.size() != onSeriesRight.size())
       throw new IllegalArgumentException("Number of series on the left side of the join must equal the number of series on the right side");
 
-    final int numSeries = onSeriesLeft.length;
+    final int numSeries = onSeriesLeft.size();
 
     // extract source series
     Series[] leftSeries = new Series[numSeries];
     for(int i=0; i<numSeries; i++)
-      leftSeries[i] = left.get(onSeriesLeft[i]);
+      leftSeries[i] = left.get(onSeriesLeft.get(i));
 
     Series[] rightSeries = new Series[numSeries];
     for(int i=0; i<numSeries; i++)
-      rightSeries[i] = right.get(onSeriesRight[i]);
+      rightSeries[i] = right.get(onSeriesRight.get(i));
 
     // perform join, generate row pairs
     Series.JoinPairs pairs = filterJoinPairs(Series.hashJoinOuter(leftSeries, rightSeries), joinType);
@@ -1769,25 +1970,29 @@ public class DataFrame {
     // merge values of join columns
     Series[] joinKeys = new Series[numSeries];
     for(int i=0; i<numSeries; i++)
-      joinKeys[i] = leftData.get(onSeriesLeft[i]).set(BooleanSeries.buildFrom(maskValues), rightData.get(onSeriesRight[i]));
+      joinKeys[i] = leftData.get(onSeriesLeft.get(i)).set(BooleanSeries.buildFrom(maskValues), rightData.get(onSeriesRight.get(i)));
 
     // select series names
     Set<String> seriesLeft = new HashSet<>(left.getSeriesNames());
     Set<String> seriesRight = new HashSet<>(right.getSeriesNames());
 
-    seriesLeft.removeAll(Arrays.asList(onSeriesLeft));
-    seriesRight.removeAll(Arrays.asList(onSeriesRight));
+    seriesLeft.removeAll(onSeriesLeft);
+    seriesRight.removeAll(onSeriesRight);
 
-    String[] joinKeyNames = onSeriesLeft;
+    final List<String> joinKeyNames = onSeriesLeft;
 
     // construct result
     DataFrame joined = new DataFrame();
 
     for(int i=0; i<numSeries; i++)
-      joined.addSeries(joinKeyNames[i], joinKeys[i]);
+      joined.addSeries(joinKeyNames.get(i), joinKeys[i]);
 
-    if(joined.contains(left.getIndexName()))
-      joined.setIndex(left.getIndexName());
+    List<String> newIndex = new ArrayList<>();
+    for (String name : joinKeyNames) {
+      if (left.indexNames.contains(name))
+        newIndex.add(name);
+    }
+    joined.setIndex(newIndex);
 
     for(String name : seriesRight) {
       Series s = rightData.get(name);
@@ -1845,6 +2050,19 @@ public class DataFrame {
    * @return copy of the DataFrame with appended data
    */
   public DataFrame append(DataFrame... others) {
+    return this.append(Arrays.asList(others));
+  }
+
+  /**
+   * Returns a copy of the DataFrame with data from {@code others} appended at the end. Matches
+   * series by names and uses the native type of the original (this) DataFrame. If {@code others}
+   * do not contain series with matching names, a sequence of {@code nulls} is appended. Any series
+   * in {@code other} that are not matched by name are discarded.
+   *
+   * @param others DataFrames to append in sequence
+   * @return copy of the DataFrame with appended data
+   */
+  public DataFrame append(List<DataFrame> others) {
     DataFrame df = new DataFrame(this);
     df.series.clear();
 
@@ -1868,15 +2086,13 @@ public class DataFrame {
 
   @Override
   public String toString() {
-    StringBuilder builder = new StringBuilder();
-
     List<String> names = new ArrayList<>(this.getSeriesNames());
-    if(this.hasIndex()) {
-      names.remove(this.getIndexName());
-      names.add(0, this.getIndexName());
+    for (int i=0; i<this.indexNames.size(); i++) {
+      names.remove(this.indexNames.get(i));
+      names.add(i, this.indexNames.get(i));
     }
 
-    return this.toString(DEFAULT_MAX_COLUMN_WIDTH, names.toArray(new String[names.size()]));
+    return this.toString(DEFAULT_MAX_COLUMN_WIDTH, names);
   }
 
   public String toString(String... seriesNames) {
@@ -1971,9 +2187,13 @@ public class DataFrame {
   }
 
   Series[] names2series(String... names) {
-    Series[] inputSeries = new Series[names.length];
-    for(int i=0; i<names.length; i++) {
-      inputSeries[i] = assertSeriesExists(names[i]);
+    return names2series(Arrays.asList(names));
+  }
+
+  Series[] names2series(List<String> names) {
+    Series[] inputSeries = new Series[names.size()];
+    for(int i=0; i<names.size(); i++) {
+      inputSeries[i] = assertSeriesExists(names.get(i));
     }
     return inputSeries;
   }
@@ -1982,6 +2202,13 @@ public class DataFrame {
     if(!series.containsKey(name))
       throw new IllegalArgumentException(String.format("Unknown series '%s'", name));
     return series.get(name);
+  }
+
+  List<Series> assertSeriesExist(List<String> names) {
+    List<Series> series = new ArrayList<>();
+    for (String n : names)
+      series.add(assertSeriesExists(n));
+    return series;
   }
 
   void assertSameLength(Series s) {
@@ -2086,8 +2313,6 @@ public class DataFrame {
   /**
    * Reads in a Pinot ResultSetGroup and returns it as a DataFrame.
    *
-   * <br/><b>NOTE:</b> cannot parse a query result with multiple group aggregations
-   *
    * @param resultSetGroup pinot query result
    * @return Pinot query result as DataFrame
    * @throws IllegalArgumentException if the result cannot be parsed
@@ -2096,7 +2321,6 @@ public class DataFrame {
     if (resultSetGroup.getResultSetCount() <= 0)
       throw new IllegalArgumentException("Query did not return any results");
 
-    // TODO conditions not necessarily safe
     if (resultSetGroup.getResultSetCount() == 1) {
       ResultSet resultSet = resultSetGroup.getResultSet(0);
 
@@ -2110,7 +2334,7 @@ public class DataFrame {
         DataFrame df = new DataFrame();
         String function = resultSet.getColumnName(0);
         String value = resultSet.getString(0, 0);
-        df.addSeries(function, DataFrame.toSeries(new String[]{value}));
+        df.addSeries(function, DataFrame.toSeries(value));
         return df;
 
       } else if (resultSet.getColumnCount() >= 1 && resultSet.getGroupKeyLength() == 0) {
@@ -2126,64 +2350,34 @@ public class DataFrame {
     }
 
     // group by result
-    // TODO use join on multiple columns when available
-    DataFrame df = new DataFrame();
-    df.addSeries(COLUMN_JOIN_KEY, ObjectSeries.empty());
-    df.setIndex(COLUMN_JOIN_KEY);
-
     ResultSet firstResultSet = resultSetGroup.getResultSet(0);
     String[] groupKeyNames = new String[firstResultSet.getGroupKeyLength()];
     for(int i=0; i<firstResultSet.getGroupKeyLength(); i++) {
       groupKeyNames[i] = firstResultSet.getGroupKeyColumnName(i);
     }
 
-    System.out.println("groupKeyNames: " + Arrays.toString(groupKeyNames));
+    DataFrame df = new DataFrame();
+    for (String groupKeyName : groupKeyNames) {
+      df.addSeries(groupKeyName, StringSeries.empty());
+    }
+    df.setIndex(groupKeyNames);
 
     for(int i=0; i<resultSetGroup.getResultSetCount(); i++) {
       ResultSet resultSet = resultSetGroup.getResultSet(i);
       String function = resultSet.getColumnName(0);
 
-      // pack group by keys into key tuple
+      // group keys
       DataFrame dfColumn = new DataFrame();
       for(int j=0; j<resultSet.getGroupKeyLength(); j++) {
         dfColumn.addSeries(groupKeyNames[j], makeGroupByGroupSeries(resultSet, j));
       }
+      dfColumn.setIndex(groupKeyNames);
 
-      ObjectSeries jointKey = dfColumn.map(new Series.ObjectFunction() {
-        @Override
-        public Object apply(Object... values) {
-          return Tuple.copyFrom(values);
-        }
-      }, groupKeyNames);
+      // values
+      dfColumn.addSeries(function, makeGroupByValueSeries(resultSet));
 
-      // join on key tuple
-      DataFrame dfJoin = new DataFrame();
-      dfJoin.addSeries(COLUMN_JOIN_KEY, jointKey);
-      dfJoin.addSeries(function, makeGroupByValueSeries(resultSet));
-      dfJoin.setIndex(COLUMN_JOIN_KEY);
-
-      System.out.println("dfJoin " + i + ":");
-      System.out.println(dfJoin);
-
-      df = df.joinOuter(dfJoin);
+      df = df.joinOuter(dfColumn);
     }
-
-    // unpack key tuple
-    for(int i=0; i<groupKeyNames.length; i++) {
-      final int fi = i;
-      df.addSeries(groupKeyNames[i], df.map(new Series.ObjectFunction() {
-        @Override
-        public Object apply(Object... values) {
-          return ((Tuple) values[0]).values[fi];
-        }
-      }, COLUMN_JOIN_KEY));
-    }
-
-    System.out.println("output (including key tuple):");
-    System.out.println(df);
-
-    // remove key tuple series
-    df.dropSeries(COLUMN_JOIN_KEY);
 
     return df;
   }
@@ -2192,8 +2386,6 @@ public class DataFrame {
     int rowCount = resultSet.getRowCount();
     if(rowCount <= 0)
       return StringSeries.empty();
-
-    //DataFrame.SeriesType type = inferType(resultSet.getString(0, colIndex));
 
     String[] values = new String[rowCount];
     for(int i=0; i<rowCount; i++) {

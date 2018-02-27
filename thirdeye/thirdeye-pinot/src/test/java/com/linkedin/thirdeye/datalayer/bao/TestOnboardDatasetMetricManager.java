@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.List;
 
 import org.testng.Assert;
@@ -9,7 +11,7 @@ import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.datalayer.dto.OnboardDatasetMetricDTO;
 
-public class TestOnboardDatasetMetricManager extends AbstractManagerTestBase {
+public class TestOnboardDatasetMetricManager {
 
   private Long id1 = null;
   private Long id2 = null;
@@ -22,30 +24,34 @@ public class TestOnboardDatasetMetricManager extends AbstractManagerTestBase {
   private static String metric2 = "m2";
   private static String metric3 = "m3";
 
+  private DAOTestBase testDAOProvider;
+  private OnboardDatasetMetricManager onboardDatasetMetricDAO;
   @BeforeClass
   void beforeClass() {
-    super.init();
+    testDAOProvider = DAOTestBase.getInstance();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+    onboardDatasetMetricDAO = daoRegistry.getOnboardDatasetMetricDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    super.cleanup();
+    testDAOProvider.cleanup();
   }
 
   @Test
   public void testCreateOnboardConfig() {
     // create just a dataset
-    OnboardDatasetMetricDTO dto = getTestOnboardConfig(dataset1, null, dataSource1);
+    OnboardDatasetMetricDTO dto = DaoTestUtils.getTestOnboardConfig(dataset1, null, dataSource1);
     id1 = onboardDatasetMetricDAO.save(dto);
     Assert.assertNotNull(id1);
 
     // create metric + dataset
-    dto = getTestOnboardConfig(dataset2, metric2, dataSource2);
+    dto = DaoTestUtils.getTestOnboardConfig(dataset2, metric2, dataSource2);
     id2 = onboardDatasetMetricDAO.save(dto);
     Assert.assertNotNull(id2);
 
     // add metric to existing dataset
-    dto = getTestOnboardConfig(dataset2, metric3, dataSource2);
+    dto = DaoTestUtils.getTestOnboardConfig(dataset2, metric3, dataSource2);
     id3 = onboardDatasetMetricDAO.save(dto);
     Assert.assertNotNull(id3);
 

@@ -3,9 +3,11 @@
  * @module components/anomaly-id
  * @exports anomaly-id
  */
-import Ember from 'ember';
+import { computed } from '@ember/object';
 
-export default Ember.Component.extend({
+import Component from '@ember/component';
+
+export default Component.extend({
   /**
    * Component's tag name
    */
@@ -22,7 +24,7 @@ export default Ember.Component.extend({
    * @method anomalyChangeRate
    * @return {Number} - total % change from baseline
    */
-  anomalyChangeRate: Ember.computed('anomaly.current', 'anomaly.baseline', function() {
+  anomalyChangeRate: computed('anomaly.current', 'anomaly.baseline', function() {
     const currentValue = this.get('anomaly.current') || 0;
     const baselineValue = this.get('anomaly.baseline') || 0;
 

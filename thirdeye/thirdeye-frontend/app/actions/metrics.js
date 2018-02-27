@@ -1,10 +1,15 @@
+import { hash } from 'rsvp';
 import { type } from './utils';
 import fetch from 'fetch';
-import Ember from 'ember';
 import moment from 'moment';
 import _ from 'lodash';
+import {
+  COMPARE_MODE_MAPPING,
+  colors,
+  ROOTCAUSE_ANALYSIS_DURATION_MAX,
+  ROOTCAUSE_ANOMALY_DURATION_MAX
+} from './constants';
 
-import { COMPARE_MODE_MAPPING, colors } from './constants';
 /**
  * Define the metric action types
  */
@@ -122,16 +127,24 @@ function fetchRelatedMetricIds() {
 
     let {
       primaryMetricId: metricId,
-      currentStart: analysisStart,
-      currentEnd: analysisEnd,
-      regionStart: anomalyStart,
-      regionEnd: anomalyEnd
+      currentStart: analysisStartRaw,
+      currentEnd: analysisEndRaw,
+      regionStart: anomalyStartRaw,
+      regionEnd: anomalyEndRaw
     } = metrics;
 
     const {
       compareMode,
-      filters: filterJson,
+      filters: filterJson
     } = primaryMetric;
+
+    const analysisDurationSafe = Math.min(analysisEndRaw - analysisStartRaw, ROOTCAUSE_ANALYSIS_DURATION_MAX);
+    const analysisStart = Math.max(analysisStartRaw, analysisEndRaw - analysisDurationSafe);
+    const analysisEnd = analysisEndRaw;
+
+    const anomalyDurationSafe = Math.min(anomalyEndRaw - anomalyStartRaw, ROOTCAUSE_ANOMALY_DURATION_MAX);
+    const anomalyStart = anomalyStartRaw;
+    const anomalyEnd = anomalyStartRaw + anomalyDurationSafe;
 
     const offset = COMPARE_MODE_MAPPING[compareMode] || 1;
     const baselineStart = moment(anomalyStart).subtract(offset, 'week').valueOf();
@@ -143,10 +156,13 @@ function fetchRelatedMetricIds() {
 
     const filters = JSON.parse(filterJson);
     const filterUrns = Object.keys(filters).map(key => 'thirdeye:dimension:' + key + ':' + filters[key] + ':provided');
-    const urns = [`thirdeye:metric:${metricId}`].concat(filterUrns).join(',');
+    const primaryUrn = `thirdeye:metric:${metricId}`;
+
+    const urns = [primaryUrn].concat(filterUrns).join(',');
 
     return fetch(`/rootcause/query?framework=relatedMetrics&anomalyStart=${anomalyStart}&anomalyEnd=${anomalyEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&analysisStart=${analysisStart}&analysisEnd=${analysisEnd}&urns=${urns}`)
       .then(res => res.json())
+      .then(res => res.filter(metric => metric.urn != primaryUrn))
       .then(res => dispatch(loadRelatedMetricIds(res)));
   };
 }
@@ -213,7 +229,7 @@ function fetchRelatedMetricData() {
       return hash;
     }, {});
 
-    return Ember.RSVP.hash(promiseHash)
+    return hash(promiseHash)
       .then((metrics) => {
         const filteredMetrics = _.pickBy(metrics, filterMetric);
 
@@ -268,9 +284,7 @@ function updateMetricDate(startDate, endDate) {
  * @param {Number} end The end time in unix ms
  */
 function updateDates(start, end) {
-  return (dispatch, getState) => {
-    // const { primaryMetric } = getState();
-    //check if dates are stame
+  return (dispatch) => {
 
     return dispatch(setDate([start, end]));
   };

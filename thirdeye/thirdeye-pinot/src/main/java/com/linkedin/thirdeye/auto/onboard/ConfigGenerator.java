@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.auto.onboard;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -10,10 +11,8 @@ import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -22,7 +21,8 @@ public class ConfigGenerator {
 
   private static final String PDT_TIMEZONE = "US/Pacific";
 
-  public static DatasetConfigDTO generateDatasetConfig(String dataset, Schema schema) {
+  public static DatasetConfigDTO generateDatasetConfig(String dataset, Schema schema,
+      Map<String, String> customConfigs) {
     List<String> dimensions = schema.getDimensionNames();
     TimeGranularitySpec timeSpec = schema.getTimeFieldSpec().getOutgoingGranularitySpec();
 
@@ -39,6 +39,7 @@ public class ConfigGenerator {
       datasetConfigDTO.setTimezone(PDT_TIMEZONE);
     }
     datasetConfigDTO.setDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
+    datasetConfigDTO.setProperties(customConfigs);
     return datasetConfigDTO;
   }
 
@@ -72,15 +73,6 @@ public class ConfigGenerator {
   }
 
 
-  public static DashboardConfigDTO generateDefaultDashboardConfig(String dataset, List<Long> metricIds) {
-    DashboardConfigDTO dashboardConfigDTO = new DashboardConfigDTO();
-    String dashboardName = DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset;
-    dashboardConfigDTO.setName(dashboardName);
-    dashboardConfigDTO.setDataset(dataset);
-    dashboardConfigDTO.setMetricIds(metricIds);
-    return dashboardConfigDTO;
-  }
-
   public static List<Long> getMetricIdsFromMetricConfigs(List<MetricConfigDTO> metricConfigs) {
     List<Long> metricIds = new ArrayList<>();
     for (MetricConfigDTO metricConfig : metricConfigs) {
@@ -88,7 +80,5 @@ public class ConfigGenerator {
     }
     return metricIds;
   }
-
-
 
 }

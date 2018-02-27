@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.fwd;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.io.compression.ChunkCompressor;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.io.writer.impl.v1.FixedByteChunkSingleValueWriter;
@@ -37,22 +35,22 @@ public class SingleValueFixedByteRawIndexCreator extends BaseSingleValueRawIndex
   private static final int NUM_DOCS_PER_CHUNK = 1000; // TODO: Auto-derive this based on metadata.
 
   final FixedByteChunkSingleValueWriter _indexWriter;
-  private final ChunkCompressor compressor = ChunkCompressorFactory.getCompressor("snappy");
 
   /**
    * Constructor for the class
    *
    * @param baseIndexDir Index directory
+   * @param compressionType Type of compression to use
    * @param column Name of column to index
    * @param totalDocs Total number of documents to index
    * @param sizeOfEntry Size of entry (in bytes)
    * @throws IOException
    */
-  public SingleValueFixedByteRawIndexCreator(File baseIndexDir, String column, int totalDocs,
-      int sizeOfEntry)
-      throws IOException {
-    File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FWD_IDX_FILE_EXTENTION);
-    _indexWriter = new FixedByteChunkSingleValueWriter(file, compressor, totalDocs, NUM_DOCS_PER_CHUNK, sizeOfEntry);
+  public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
+      String column, int totalDocs, int sizeOfEntry) throws IOException {
+    File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+    _indexWriter =
+        new FixedByteChunkSingleValueWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, sizeOfEntry);
   }
 
   @Override
@@ -95,30 +93,5 @@ public class SingleValueFixedByteRawIndexCreator extends BaseSingleValueRawIndex
   public void close()
       throws IOException {
     _indexWriter.close();
-  }
-
-  public static int[] getColumnSize(FieldSpec.DataType dataType) {
-    int[] columnSizes;
-    switch (dataType) {
-      case INT:
-        columnSizes = new int[] {V1Constants.Numbers.INTEGER_SIZE};
-        break;
-
-      case LONG:
-        columnSizes = new int[] {V1Constants.Numbers.LONG_SIZE};
-        break;
-
-      case FLOAT:
-        columnSizes = new int[] {V1Constants.Numbers.FLOAT_SIZE};
-        break;
-
-      case DOUBLE:
-        columnSizes = new int[] {V1Constants.Numbers.DOUBLE_SIZE};
-        break;
-
-      default:
-        throw new IllegalArgumentException("Illegal data type for raw index creator: " + dataType);
-    }
-    return columnSizes;
   }
 }

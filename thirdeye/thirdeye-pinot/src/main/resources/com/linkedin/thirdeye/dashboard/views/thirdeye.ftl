@@ -187,7 +187,10 @@
 
               <ul class="nav navbar-nav thirdeye-nav__tabs">
                 <li class="te-nav__link"><a href="app/#/rca">Root Cause Analysis</a></li>
-                <li class="te-nav__link"><a href="app/#/manage/alerts">Manage</a></li>
+                <li class="te-nav__link">
+                  <a href="app/#/rootcause">Root Cause Analysis (beta)</a>
+                </li>
+                <li class="te-nav__link"><a href="app/#/manage/alerts">Manage Alerts</a></li>
               </ul>
 
               <div class="te-nav__user" role="menu">
@@ -202,7 +205,7 @@
                     <a class="te-nav__dropdown-item" href="https://iwww.corp.linkedin.com/wiki/cf/display/PRT/ThirdEye+Help+Page" target="_blank">Help page</a>
                     <a class="te-nav__dropdown-item" href="app/#/logout">Logout</a>
                   </div>
-                </div> 
+                </div>
               </div>
 
               <!--- <div class="thirdeye-nav__oldui">

@@ -1,9 +1,10 @@
-import Ember from 'ember';
+import { later } from '@ember/runloop';
+import Controller, { inject as controller } from '@ember/controller';
 import { task, timeout } from 'ember-concurrency';
 import moment from 'moment';
 
-export default Ember.Controller.extend({
-  detailsController: Ember.inject.controller('rca/details'),
+export default Controller.extend({
+  detailsController: controller('rca/details'),
   splitView: false,
   selectedTab: 'change',
 
@@ -27,7 +28,7 @@ export default Ember.Controller.extend({
     let startDate = moment(start).valueOf();
     let endDate = moment(end).valueOf();
 
-    Ember.run.later(() => {
+    later(() => {
       this.setProperties({
         analysisStart: startDate,
         analysisEnd: endDate
@@ -62,7 +63,7 @@ export default Ember.Controller.extend({
       if (currentTab !== tab) {
         this.set('loading', true);
 
-        Ember.run.later(() => {
+        later(() => {
           this.setProperties({
             selectedTab: tab
           });

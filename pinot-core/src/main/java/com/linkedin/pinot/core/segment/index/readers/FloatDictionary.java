@@ -27,6 +27,12 @@ public class FloatDictionary extends ImmutableDictionaryReader {
 
   @Override
   public int indexOf(Object rawValue) {
+    int index = insertionIndexOf(rawValue);
+    return (index >= 0) ? index : -1;
+  }
+
+  @Override
+  public int insertionIndexOf(Object rawValue) {
     float value;
     if (rawValue instanceof String) {
       value = Float.parseFloat((String) rawValue);

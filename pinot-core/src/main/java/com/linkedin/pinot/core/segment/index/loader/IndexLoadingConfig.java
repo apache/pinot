@@ -15,13 +15,13 @@
  */
 package com.linkedin.pinot.core.segment.index.loader;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
-import com.linkedin.pinot.core.startree.StarTreeFormatVersion;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -42,24 +42,21 @@ public class IndexLoadingConfig {
   private Set<String> _noDictionaryColumns = new HashSet<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
   private SegmentVersion _segmentVersion;
-  private StarTreeFormatVersion _starTreeVersion = StarTreeFormatVersion.DEFAULT_VERSION;
   // This value will remain true only when the empty constructor is invoked.
   private boolean _enableDefaultColumns = true;
   private ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
   private int _realtimeAvgMultiValueCount = DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT;
   private boolean _enableSplitCommit;
   private boolean _isRealtimeOffheapAllocation;
+  private boolean _isDirectRealtimeOffheapAllocation;
 
   public IndexLoadingConfig(@Nonnull InstanceDataManagerConfig instanceDataManagerConfig,
-      @Nullable TableConfig tableConfig) {
+      @Nonnull TableConfig tableConfig) {
     extractFromInstanceConfig(instanceDataManagerConfig);
-
-    if (tableConfig != null) {
-      extractFromTableConfig(tableConfig);
-    }
+    extractFromTableConfig(tableConfig);
   }
 
-  private void extractFromTableConfig(@Nullable TableConfig tableConfig) {
+  private void extractFromTableConfig(@Nonnull TableConfig tableConfig) {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     String tableReadMode = indexingConfig.getLoadMode();
     if (tableReadMode != null) {
@@ -91,11 +88,6 @@ public class IndexLoadingConfig {
       _segmentVersion = SegmentVersion.valueOf(tableSegmentVersion.toLowerCase());
     }
 
-    String starTreeFormat = indexingConfig.getStarTreeFormat();
-    if (starTreeFormat != null) {
-      _starTreeVersion = StarTreeFormatVersion.valueOf(starTreeFormat.toUpperCase());
-    }
-
     String columnMinMaxValueGeneratorMode = indexingConfig.getColumnMinMaxValueGeneratorMode();
     if (columnMinMaxValueGeneratorMode != null) {
       _columnMinMaxValueGeneratorMode =
@@ -119,6 +111,7 @@ public class IndexLoadingConfig {
     _enableSplitCommit = instanceDataManagerConfig.isEnableSplitCommit();
 
     _isRealtimeOffheapAllocation = instanceDataManagerConfig.isRealtimeOffHeapAllocation();
+    _isDirectRealtimeOffheapAllocation = instanceDataManagerConfig.isDirectRealtimeOffheapAllocation();
 
     String avgMultiValueCount = instanceDataManagerConfig.getAvgMultiValueCount();
     if (avgMultiValueCount != null) {
@@ -157,8 +150,14 @@ public class IndexLoadingConfig {
   /**
    * For tests only.
    */
+  @VisibleForTesting
   public void setInvertedIndexColumns(@Nonnull Set<String> invertedIndexColumns) {
     _invertedIndexColumns = invertedIndexColumns;
+  }
+
+  @VisibleForTesting
+  public void setOnHeapDictionaryColumns(@Nonnull Set<String> onHeapDictionaryColumns) {
+    _onHeapDictionaryColumns = onHeapDictionaryColumns;
   }
 
   @Nonnull
@@ -183,18 +182,6 @@ public class IndexLoadingConfig {
     _segmentVersion = segmentVersion;
   }
 
-  @Nonnull
-  public StarTreeFormatVersion getStarTreeVersion() {
-    return _starTreeVersion;
-  }
-
-  /**
-   * For tests only.
-   */
-  public void setStarTreeVersion(@Nonnull StarTreeFormatVersion starTreeVersion) {
-    _starTreeVersion = starTreeVersion;
-  }
-
   public boolean isEnableDefaultColumns() {
     return _enableDefaultColumns;
   }
@@ -205,6 +192,10 @@ public class IndexLoadingConfig {
 
   public boolean isRealtimeOffheapAllocation() {
     return _isRealtimeOffheapAllocation;
+  }
+
+  public boolean isDirectRealtimeOffheapAllocation() {
+    return _isDirectRealtimeOffheapAllocation;
   }
 
   @Nonnull

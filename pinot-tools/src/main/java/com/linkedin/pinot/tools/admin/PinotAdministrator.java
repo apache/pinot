@@ -15,7 +15,10 @@
  */
 package com.linkedin.pinot.tools.admin;
 
+import com.linkedin.pinot.tools.admin.command.MoveReplicaGroup;
+
 import java.lang.reflect.Field;
+
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
@@ -26,6 +29,30 @@ import org.kohsuke.args4j.spi.SubCommands;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.tools.Command;
+import com.linkedin.pinot.tools.admin.command.AddSchemaCommand;
+import com.linkedin.pinot.tools.admin.command.AddTableCommand;
+import com.linkedin.pinot.tools.admin.command.AddTenantCommand;
+import com.linkedin.pinot.tools.admin.command.AvroSchemaToPinotSchema;
+import com.linkedin.pinot.tools.admin.command.BackfillDateTimeColumnCommand;
+import com.linkedin.pinot.tools.admin.command.ChangeNumReplicasCommand;
+import com.linkedin.pinot.tools.admin.command.ChangeTableState;
+import com.linkedin.pinot.tools.admin.command.CreateSegmentCommand;
+import com.linkedin.pinot.tools.admin.command.DeleteClusterCommand;
+import com.linkedin.pinot.tools.admin.command.GenerateDataCommand;
+import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
+import com.linkedin.pinot.tools.admin.command.RebalanceTableCommand;
+import com.linkedin.pinot.tools.admin.command.ShowClusterInfoCommand;
+import com.linkedin.pinot.tools.admin.command.StartBrokerCommand;
+import com.linkedin.pinot.tools.admin.command.StartControllerCommand;
+import com.linkedin.pinot.tools.admin.command.StartKafkaCommand;
+import com.linkedin.pinot.tools.admin.command.StartServerCommand;
+import com.linkedin.pinot.tools.admin.command.StartZookeeperCommand;
+import com.linkedin.pinot.tools.admin.command.StopProcessCommand;
+import com.linkedin.pinot.tools.admin.command.StreamAvroIntoKafkaCommand;
+import com.linkedin.pinot.tools.admin.command.UploadSegmentCommand;
+import com.linkedin.pinot.tools.admin.command.ValidateConfigCommand;
+import com.linkedin.pinot.tools.admin.command.VerifyClusterStateCommand;
+import com.linkedin.pinot.tools.admin.command.VerifySegmentState;
 import com.linkedin.pinot.tools.segment.converter.PinotSegmentConvertCommand;
 import com.linkedin.pinot.tools.admin.command.*;
 
@@ -67,7 +94,9 @@ public class PinotAdministrator {
       @SubCommand(name = "UploadSegmentPeriodically", impl = SegmentUploaderCommand.class),
       @SubCommand(name = "PinotBenchmarkGenerateEventTableData", impl = PinotBenchmarkEventTableCreationCommand.class),
       @SubCommand(name = "PinotBenchmarkGenerateEventTableSegment", impl = PinotBenchmarkSegmentCreationCommand.class),
-      @SubCommand(name = "PinotBenchmarkGenerateQueries", impl= PinotBenchmarkQueryGeneratorCommand.class)
+      @SubCommand(name = "PinotBenchmarkGenerateQueries", impl= PinotBenchmarkQueryGeneratorCommand.class),
+      @SubCommand(name = "BackfillSegmentColumn", impl = BackfillDateTimeColumnCommand.class),
+      @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class)
   })
   Command _subCommand;
   // @formatter:on

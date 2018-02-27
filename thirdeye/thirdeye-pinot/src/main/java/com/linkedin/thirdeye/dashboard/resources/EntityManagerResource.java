@@ -7,7 +7,6 @@ import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ApplicationManager;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -17,7 +16,6 @@ import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -50,7 +48,6 @@ import org.slf4j.LoggerFactory;
 @Consumes(MediaType.APPLICATION_JSON)
 public class EntityManagerResource {
   private final AnomalyFunctionManager anomalyFunctionManager;
-  private final DashboardConfigManager dashboardConfigManager;
   private final MetricConfigManager metricConfigManager;
   private final DatasetConfigManager datasetConfigManager;
   private final OverrideConfigManager overrideConfigManager;
@@ -67,7 +64,6 @@ public class EntityManagerResource {
 
   public EntityManagerResource(ThirdEyeConfiguration configuration) {
     this.anomalyFunctionManager = DAO_REGISTRY.getAnomalyFunctionDAO();
-    this.dashboardConfigManager = DAO_REGISTRY.getDashboardConfigDAO();
     this.metricConfigManager = DAO_REGISTRY.getMetricConfigDAO();
     this.datasetConfigManager = DAO_REGISTRY.getDatasetConfigDAO();
     this.overrideConfigManager = DAO_REGISTRY.getOverrideConfigDAO();
@@ -79,7 +75,7 @@ public class EntityManagerResource {
   }
 
   private enum EntityType {
-    ANOMALY_FUNCTION, DASHBOARD_CONFIG, DATASET_CONFIG, METRIC_CONFIG,
+    ANOMALY_FUNCTION, DATASET_CONFIG, METRIC_CONFIG,
     OVERRIDE_CONFIG, ALERT_CONFIG, CLASSIFICATION_CONFIG, APPLICATION, ENTITY_MAPPING
   }
 
@@ -95,10 +91,7 @@ public class EntityManagerResource {
     List<AbstractDTO> results = new ArrayList<>();
     switch (entityType) {
     case ANOMALY_FUNCTION:
-      results.addAll(anomalyFunctionManager.findAllActiveFunctions());
-      break;
-    case DASHBOARD_CONFIG:
-      results.addAll(dashboardConfigManager.findAll());
+      results.addAll(anomalyFunctionManager.findAll());
       break;
     case DATASET_CONFIG:
       List<DatasetConfigDTO> allDatasets = datasetConfigManager.findAll();
@@ -153,10 +146,6 @@ public class EntityManagerResource {
       switch (entityType) {
 
       // Update Only end point for these
-      case DASHBOARD_CONFIG:
-        DashboardConfigDTO dashboardConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, DashboardConfigDTO.class);
-        dashboardConfigManager.update(dashboardConfigDTO);
-        break;
       case DATASET_CONFIG:
         DatasetConfigDTO datasetConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, DatasetConfigDTO.class);
         datasetConfigManager.update(datasetConfigDTO);

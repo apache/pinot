@@ -15,47 +15,54 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
+import java.io.File;
 import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
+// TODO: maybe better to merge APIs for adding segment to OFFLINE/REALTIME table
 public interface DataManager {
-  void init(Configuration dataManagerConfig);
+  void init(Configuration config, ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics);
 
   void start();
 
-  /**
-   * Adds a segment from local disk into the OFFLINE table.
-   */
-  void addSegment(@Nonnull SegmentMetadata segmentMetadata, @Nullable TableConfig tableConfig, @Nullable Schema schema)
-      throws Exception;
-
-  void removeSegment(String segmentName);
-
-  void reloadSegment(@Nonnull String tableNameWithType, @Nonnull SegmentMetadata segmentMetadata,
-      @Nullable TableConfig tableConfig, @Nullable Schema schema)
-      throws Exception;
-
   void shutDown();
 
-  String getSegmentDataDirectory();
+  /**
+   * Add a segment from local disk into the OFFLINE table.
+   */
+  void addOfflineSegment(@Nonnull String offlineTableName, @Nonnull String segmentName, @Nonnull File indexDir)
+      throws Exception;
 
-  String getSegmentFileDirectory();
+  /**
+   * Add a segment into the REALTIME table.
+   * <p>The segment could be committed or under consuming.
+   */
+  void addRealtimeSegment(@Nonnull String realtimeTableName, @Nonnull String segmentName) throws Exception;
 
-  SegmentMetadataLoader getSegmentMetadataLoader();
+  void removeSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName) throws Exception;
 
-  @Nonnull
-  List<SegmentMetadata> getAllSegmentsMetadata(@Nonnull String tableNameWithType);
+  void reloadSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName) throws Exception;
+
+  void reloadAllSegments(@Nonnull String tableNameWithType) throws Exception;
 
   @Nullable
   SegmentMetadata getSegmentMetadata(@Nonnull String tableNameWithType, @Nonnull String segmentName);
 
-  boolean isStarted();
+  @Nonnull
+  List<SegmentMetadata> getAllSegmentsMetadata(@Nonnull String tableNameWithType);
+
+  @Nonnull
+  String getSegmentDataDirectory();
+
+  @Nonnull
+  String getSegmentFileDirectory();
 
   int getMaxParallelRefreshThreads();
 }

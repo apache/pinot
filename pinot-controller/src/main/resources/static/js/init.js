@@ -43,17 +43,84 @@ $(document).ready(function() {
     });
   }, qH);
 
+  var table;
+
   $("#execute-query").click(function() {
     // execute query and draw the results
     var query = EDITOR.getValue().trim();
     var traceEnabled = document.getElementById('trace-enabled').checked;
     HELPERS.executeQuery(query, traceEnabled, function(data) {
       RESULTS.setValue(js_beautify(data, JS_BEAUTIFY_SETTINGS));
+
+      var queryResponse = null;
+      try {
+        queryResponse = HELPERS.getAsObject(data);
+      } catch (err) {
+        if (table) {
+          table.destroy();
+          table = null;
+        }
+
+        HELPERS.resetResultsTable();
+        return;
+      }
+
+      var dataArray = [];
+      var columnList = [];
+
+      if (queryResponse) {
+        if (queryResponse["selectionResults"]) {
+          // Selection query
+          columnList = _.map(queryResponse.selectionResults.columns, function (columnName) {
+            return {"title": columnName};
+          });
+          dataArray = queryResponse.selectionResults.results;
+        } else if (queryResponse["aggregationResults"] && queryResponse.aggregationResults.length > 0
+            && !queryResponse.aggregationResults[0]["groupByResult"]) {
+          // Simple aggregation query
+          columnList = _.map(queryResponse.aggregationResults, function (aggregationResult) {
+            return {"title": aggregationResult.function};
+          });
+
+          dataArray.push(_.map(queryResponse.aggregationResults, function (aggregationResult) {
+            return aggregationResult.value;
+          }));
+        } else if (queryResponse["aggregationResults"] && queryResponse.aggregationResults.length > 0
+            && queryResponse.aggregationResults[0]["groupByResult"]) {
+          // Aggregation group by query
+          var columns = queryResponse.aggregationResults[0].groupByColumns;
+          columns.push(queryResponse.aggregationResults[0].function);
+          columnList = _.map(columns, function (columnName) {
+            return {"title": columnName};
+          });
+
+          dataArray = _.map(queryResponse.aggregationResults[0].groupByResult, function (aggregationGroup) {
+            var row = aggregationGroup.group;
+            row.push(aggregationGroup.value);
+            return row;
+          });
+        }
+      }
+
+      HELPERS.resetResultsTable();
+
+      table = $('#query-results-table').DataTable({
+        destroy: true,
+        data: dataArray,
+        columns: columnList,
+        scrollX: true
+      });
     })
   });
 });
 
 var HELPERS = {
+  resetResultsTable: function() {
+    $('#query-results-table-wrapper')
+        .empty()
+        .append("<table id=\"query-results-table\" class=\"display\" width=\"100%\"/></table>");
+  },
+
   printTables : function(callback, qh) {
     $.get("/tables", function(data) {
       var source   = $("#table-names-template").html();
@@ -105,10 +172,15 @@ var HELPERS = {
   },
 
   executeQuery: function(query, traceEnabled, callback) {
-    var url = "/pql?pql=" + encodeURIComponent(query) +"&trace=" + traceEnabled;
+    var url = "/pql";
+    var params = JSON.stringify({
+      "pql": query,
+      "trace": traceEnabled
+    });
     $.ajax({
-      type: 'GET',
+      type: 'POST',
       url: url,
+      data: params,
       contentType: 'application/json; charset=utf-8',
       success: function (text) {
         callback(text);

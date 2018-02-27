@@ -26,25 +26,29 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka;
 import com.linkedin.pinot.common.utils.CommonConstants.Minion;
 import com.linkedin.pinot.common.utils.CommonConstants.Server;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.realtime.impl.kafka.AvroRecordToPinotRowGenerator;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
+import com.linkedin.pinot.core.util.AvroUtils;
 import com.linkedin.pinot.minion.MinionStarter;
 import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
 import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 import java.io.File;
-import java.io.FileInputStream;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileStream;
@@ -56,6 +60,7 @@ import org.apache.avro.io.DecoderFactory;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.http.HttpStatus;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,7 +109,6 @@ public abstract class ClusterTest extends ControllerTest {
     Configuration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
     configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
     configuration.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
-    configuration.setProperty(Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT, "10000");
     configuration.addProperty(Server.CONFIG_OF_ENABLE_DEFAULT_COLUMNS, true);
     configuration.setProperty(Server.CONFIG_OF_ENABLE_SHUTDOWN_DELAY, false);
     return configuration;
@@ -137,7 +141,7 @@ public abstract class ClusterTest extends ControllerTest {
             Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
-        overrideOfflineServerConf(configuration);
+        overrideServerConf(configuration);
         _serverStarters.add(new HelixServerStarter(_clusterName, zkStr, configuration));
       }
     } catch (Exception e) {
@@ -174,7 +178,7 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void overrideOfflineServerConf(Configuration configuration) {
+  protected void overrideServerConf(Configuration configuration) {
     // Do nothing, to be overridden by tests if they need something specific
   }
 
@@ -203,13 +207,10 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void addSchema(File schemaFile, String schemaName) throws Exception {
-    FileUploadUtils.sendFile(LOCAL_HOST, Integer.toString(_controllerPort), "schemas", schemaName,
-        new FileInputStream(schemaFile), schemaFile.length(), FileUploadUtils.SendFileMethod.POST);
-  }
-
-  protected void updateSchema(File schemaFile, String schemaName) throws Exception {
-    FileUploadUtils.sendFile(LOCAL_HOST, Integer.toString(_controllerPort), "schemas/" + schemaName, schemaName,
-        new FileInputStream(schemaFile), schemaFile.length(), FileUploadUtils.SendFileMethod.PUT);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      fileUploadDownloadClient.addSchema(FileUploadDownloadClient.getUploadSchemaHttpURI(LOCAL_HOST, _controllerPort),
+          schemaName, schemaFile);
+    }
   }
 
   /**
@@ -217,13 +218,29 @@ public abstract class ClusterTest extends ControllerTest {
    *
    * @param segmentDir Segment directory
    */
-  protected void uploadSegments(@Nonnull File segmentDir) {
+  protected void uploadSegments(@Nonnull File segmentDir) throws Exception {
     String[] segmentNames = segmentDir.list();
     Assert.assertNotNull(segmentNames);
-    for (String segmentName : segmentNames) {
-      File segmentFile = new File(segmentDir, segmentName);
-      FileUploadUtils.sendSegmentFile(LOCAL_HOST, Integer.toString(_controllerPort), segmentName, segmentFile,
-          segmentFile.length());
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      final URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort);
+
+      // Upload all segments in parallel
+      int numSegments = segmentNames.length;
+      ExecutorService executor = Executors.newFixedThreadPool(numSegments);
+      List<Future<Integer>> tasks = new ArrayList<>(numSegments);
+      for (final String segmentName : segmentNames) {
+        final File segmentFile = new File(segmentDir, segmentName);
+        tasks.add(executor.submit(new Callable<Integer>() {
+          @Override
+          public Integer call() throws Exception {
+            return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentName, segmentFile);
+          }
+        }));
+      }
+      for (Future<Integer> task : tasks) {
+        Assert.assertEquals((int) task.get(), HttpStatus.SC_OK);
+      }
+      executor.shutdown();
     }
   }
 
@@ -328,14 +345,15 @@ public abstract class ClusterTest extends ControllerTest {
   protected void addRealtimeTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
       String kafkaTopic, int realtimeSegmentFlushSize, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
-      List<String> invertedIndexColumns, List<String> noDictionaryColumns, TableTaskConfig taskConfig)
-      throws Exception {
+      List<String> invertedIndexColumns, List<String> noDictionaryColumns, TableTaskConfig taskConfig,
+      String kafkaConsumerFactoryName) throws Exception {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
     if (useLlc) {
       // LLC
       streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.simple.toString());
       streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_BROKER_LIST, kafkaBrokerList);
+      streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_FACTORY, kafkaConsumerFactoryName);
     } else {
       // HLC
       streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
@@ -381,7 +399,7 @@ public abstract class ClusterTest extends ControllerTest {
         invertedIndexColumns, taskConfig);
     addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushSize, avroFile,
         timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn, invertedIndexColumns,
-        noDictionaryColumns, taskConfig);
+        noDictionaryColumns, taskConfig, null);
   }
 
   protected void createBrokerTenant(String tenantName, int brokerCount) throws Exception {

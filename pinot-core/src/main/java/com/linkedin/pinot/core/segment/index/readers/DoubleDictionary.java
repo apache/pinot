@@ -27,6 +27,12 @@ public class DoubleDictionary extends ImmutableDictionaryReader {
 
   @Override
   public int indexOf(Object rawValue) {
+    int index = insertionIndexOf(rawValue);
+    return (index >= 0) ? index : -1;
+  }
+
+  @Override
+  public int insertionIndexOf(Object rawValue) {
     double value;
     if (rawValue instanceof String) {
       value = Double.parseDouble((String) rawValue);

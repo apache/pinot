@@ -31,7 +31,6 @@ import com.linkedin.pinot.transport.pool.AsyncPoolResourceManagerAdapter;
 import com.linkedin.pinot.transport.pool.KeyedPool;
 import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
 import com.yammer.metrics.core.MetricsRegistry;
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
@@ -89,9 +88,7 @@ public class NettySingleConnectionIntegrationTest {
       _requestHandler.setResponse(response);
       ResponseFuture responseFuture =
           _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
-      ByteBuf byteBuf = responseFuture.getOne();
-      byte[] bytes = new byte[byteBuf.readableBytes()];
-      byteBuf.readBytes(bytes);
+      byte[] bytes = responseFuture.getOne();
       Assert.assertEquals(new String(bytes), response);
       Assert.assertEquals(_requestHandler.getRequest(), request);
     }
@@ -111,9 +108,7 @@ public class NettySingleConnectionIntegrationTest {
       _requestHandler.setResponse(response);
       ResponseFuture responseFuture =
           _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
-      ByteBuf byteBuf = responseFuture.getOne();
-      byte[] bytes = new byte[byteBuf.readableBytes()];
-      byteBuf.readBytes(bytes);
+      byte[] bytes = responseFuture.getOne();
       Assert.assertEquals(new String(bytes), response);
       Assert.assertEquals(_requestHandler.getRequest(), request);
     }
@@ -146,9 +141,7 @@ public class NettySingleConnectionIntegrationTest {
     } catch (IllegalStateException e) {
       // Pass
     }
-    ByteBuf response = responseFuture.getOne();
-    byte[] bytes = new byte[response.readableBytes()];
-    response.readBytes(bytes);
+    byte[] bytes = responseFuture.getOne();
     Assert.assertEquals(new String(bytes), NettyTestUtils.DUMMY_RESPONSE);
     Assert.assertEquals(_requestHandler.getRequest(), NettyTestUtils.DUMMY_REQUEST);
   }
@@ -239,7 +232,7 @@ public class NettySingleConnectionIntegrationTest {
       // The act of calling checkoutObject() creates a new AsyncPool and places a request for a new connection
       // NOTE: since no connections are available in the beginning, and the min connections are still being filled, we
       // always end up creating one more connection than the min connections
-      Assert.assertNotNull(keyedPool.checkoutObject(_clientServer).getOne());
+      Assert.assertNotNull(keyedPool.checkoutObject(_clientServer, "none").getOne());
 
       // Use reflection to get the pool and the waiters queue
       Field keyedPoolField = KeyedPoolImpl.class.getDeclaredField("_keyedPool");
@@ -261,8 +254,8 @@ public class NettySingleConnectionIntegrationTest {
       Assert.assertEquals(waitersQueue.size(), 0);
 
       // Get two more connections to the server and leak them
-      Assert.assertNotNull(keyedPool.checkoutObject(_clientServer).getOne());
-      Assert.assertNotNull(keyedPool.checkoutObject(_clientServer).getOne());
+      Assert.assertNotNull(keyedPool.checkoutObject(_clientServer, "none").getOne());
+      Assert.assertNotNull(keyedPool.checkoutObject(_clientServer, "none").getOne());
       stats = pool.getStats();
       Assert.assertEquals(stats.getPoolSize(), 3);
       Assert.assertEquals(stats.getIdleCount(), 0);
@@ -272,7 +265,7 @@ public class NettySingleConnectionIntegrationTest {
       // Try to get one more connection
       // We should get an exception because we don't have a free connection to the server
       ServerResponseFuture<PooledNettyClientResourceManager.PooledClientConnection> serverResponseFuture =
-          keyedPool.checkoutObject(_clientServer);
+          keyedPool.checkoutObject(_clientServer, "none");
       try {
         serverResponseFuture.getOne(1, TimeUnit.SECONDS);
         Assert.fail("Get connection even no connections available");
@@ -296,7 +289,7 @@ public class NettySingleConnectionIntegrationTest {
 
       // Try to get 3 new connections
       for (int i = 0; i < 3; i++) {
-        Assert.assertNotNull(keyedPool.checkoutObject(_clientServer).getOne());
+        Assert.assertNotNull(keyedPool.checkoutObject(_clientServer, "none").getOne());
       }
     } finally {
       keyedPool.shutdown();

@@ -15,12 +15,11 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.operator.UResultOperator;
 import com.linkedin.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -28,52 +27,29 @@ import com.linkedin.pinot.core.operator.blocks.InstanceResponseBlock;
  *
  *
  */
-public class GlobalPlanImplV0 extends Plan {
+public class GlobalPlanImplV0 implements Plan {
   private static final Logger LOGGER = LoggerFactory.getLogger(GlobalPlanImplV0.class);
 
-  private InstanceResponsePlanNode _rootNode;
-  private DataTable _instanceResponseDataTable;
+  private final InstanceResponsePlanNode _instanceResponsePlanNode;
 
-  public GlobalPlanImplV0(InstanceResponsePlanNode rootNode) {
-    _rootNode = rootNode;
+  public GlobalPlanImplV0(InstanceResponsePlanNode instanceResponsePlanNode) {
+    _instanceResponsePlanNode = instanceResponsePlanNode;
+  }
+
+  @Override
+  public DataTable execute() {
+    long startTime = System.currentTimeMillis();
+    UResultOperator uResultOperator = _instanceResponsePlanNode.run();
+    long endTime1 = System.currentTimeMillis();
+    LOGGER.debug("InstanceResponsePlanNode.run() took: {}ms", endTime1 - startTime);
+    InstanceResponseBlock instanceResponseBlock = uResultOperator.nextBlock();
+    long endTime2 = System.currentTimeMillis();
+    LOGGER.debug("UResultOperator.nextBlock() took: {}ms", endTime2 - endTime1);
+    return instanceResponseBlock.getInstanceResponseDataTable();
   }
 
   @Override
   public void print() {
-    _rootNode.showTree("");
+    _instanceResponsePlanNode.showTree("");
   }
-
-  @Override
-  public PlanNode getRoot() {
-    return _rootNode;
-  }
-
-  @Override
-  public void execute() {
-    long tid = Thread.currentThread().getId();
-
-    long startTime = System.currentTimeMillis();
-    PlanNode root = getRoot();
-    UResultOperator operator = (UResultOperator) root.run();
-    try {
-      long endTime1 = System.currentTimeMillis();
-      LOGGER.debug("InstanceResponsePlanNode.run took:{}", (endTime1 - startTime));
-      InstanceResponseBlock instanceResponseBlock = (InstanceResponseBlock) operator.nextBlock();
-      long endTime2 = System.currentTimeMillis();
-      LOGGER.debug("UResultOperator took :{}", (endTime2 - endTime1));
-      _instanceResponseDataTable = instanceResponseBlock.getInstanceResponseDataTable();
-      long endTime3 = System.currentTimeMillis();
-      LOGGER.debug("Converting to InstanceResponseBlock to DataTable took :{}", (endTime3 - endTime2));
-      long endTime = System.currentTimeMillis();
-      _instanceResponseDataTable.getMetadata().put(DataTable.TIME_USED_MS_METADATA_KEY, "" + (endTime - startTime));
-    } finally {
-      operator.close();
-    }
-  }
-
-  @Override
-  public DataTable getInstanceResponse() {
-    return _instanceResponseDataTable;
-  }
-
 }

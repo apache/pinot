@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.executor;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMeter;
@@ -25,6 +26,7 @@ import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableBuilder;
 import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
@@ -58,21 +60,17 @@ import scala.util.parsing.combinator.token.StdTokens;
 
 public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
+  private static final boolean PRINT_QUERY_PLAN = false;
 
   private InstanceDataManager _instanceDataManager = null;
   private SegmentPrunerService _segmentPrunerService = null;
   private PlanMaker _planMaker = null;
   private volatile boolean _isStarted = false;
-  private long _defaultTimeOutMs = 15000;
-  private boolean _printQueryPlan = false;
+  private long _defaultTimeOutMs = CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS;
   private final Map<String, Long> _resourceTimeOutMsMap = new ConcurrentHashMap<>();
   private ServerMetrics _serverMetrics;
 
   public ServerQueryExecutorV1Impl() {
-  }
-
-  public ServerQueryExecutorV1Impl(boolean printQueryPlan) {
-    _printQueryPlan = printQueryPlan;
   }
 
   @Override
@@ -93,7 +91,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   @Override
-  public DataTable processQuery(final ServerQueryRequest queryRequest, ExecutorService executorService) {
+  public DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService) {
     TimerContext timerContext = queryRequest.getTimerContext();
     TimerContext.Timer schedulerWaitTimer = timerContext.getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     if (schedulerWaitTimer != null) {
@@ -112,21 +110,23 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     TimerContext.Timer queryProcessingTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PROCESSING);
 
-    DataTable dataTable;
-    List<SegmentDataManager> queryableSegmentDataManagerList = null;
     InstanceRequest instanceRequest = queryRequest.getInstanceRequest();
-    final long requestId = instanceRequest.getRequestId();
+    long requestId = instanceRequest.getRequestId();
+    BrokerRequest brokerRequest = instanceRequest.getQuery();
+    LOGGER.debug("Incoming request Id: {}, query: {}", requestId, brokerRequest);
+    String tableName = brokerRequest.getQuerySource().getTableName();
+    TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableName);
+    Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: {}", tableName);
+    List<SegmentDataManager> queryableSegmentDataManagerList =
+        acquireQueryableSegments(tableDataManager, instanceRequest);
+    boolean enableTrace = instanceRequest.isEnableTrace();
+    if (enableTrace) {
+      TraceContext.register(requestId);
+    }
 
+    DataTable dataTable = null;
     try {
-      TraceContext.register(instanceRequest);
-      final BrokerRequest brokerRequest = instanceRequest.getQuery();
-      LOGGER.debug("Incoming query is : {}", brokerRequest);
-
       TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
-
-      final String tableName = instanceRequest.getQuery().getQuerySource().getTableName();
-      TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableName);
-      queryableSegmentDataManagerList = acquireQueryableSegments(tableDataManager, instanceRequest);
       long totalRawDocs = pruneSegments(tableDataManager, queryableSegmentDataManagerList, queryRequest);
       segmentPruneTimer.stopAndRecord();
 
@@ -142,71 +142,65 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       queryRequest.setSegmentCountAfterPruning(numSegmentsMatched);
       LOGGER.debug("Matched {} segments", numSegmentsMatched);
       if (numSegmentsMatched == 0) {
-        DataTable emptyDataTable = DataTableBuilder.buildEmptyDataTable(brokerRequest);
-        emptyDataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(totalRawDocs));
+        dataTable = DataTableBuilder.buildEmptyDataTable(brokerRequest);
+        Map<String, String> metadata = dataTable.getMetadata();
+        metadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(totalRawDocs));
+        metadata.put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, "0");
+        metadata.put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, "0");
+        metadata.put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, "0");
+        dataTable.getMetadata().put(DataTable.EXECUTOR_CPU_TIME,"0");
 
-        // Stop and record the query processing timer for early bailout.
-        queryProcessingTimer.stopAndRecord();
-        return emptyDataTable;
-      }
+      } else {
+        TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
+        Plan globalQueryPlan =
+            _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, executorService,
+                getResourceTimeOut(brokerRequest));
+        planBuildTimer.stopAndRecord();
 
-      TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
-      final Plan globalQueryPlan =
-          _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, executorService,
-              getResourceTimeOut(instanceRequest.getQuery()));
-      planBuildTimer.stopAndRecord();
+        if (PRINT_QUERY_PLAN) {
+          LOGGER.debug("***************************** Query Plan for Request {} ***********************************",
+              instanceRequest.getRequestId());
+          globalQueryPlan.print();
+          LOGGER.debug("*********************************** End Query Plan ***********************************");
+        }
 
-      if (_printQueryPlan) {
-        LOGGER.debug("***************************** Query Plan for Request {} ***********************************",
-            instanceRequest.getRequestId());
-        globalQueryPlan.print();
-        LOGGER.debug("*********************************** End Query Plan ***********************************");
-      }
+        TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
+        dataTable = globalQueryPlan.execute();
+        planExecTimer.stopAndRecord();
 
-      TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
-      globalQueryPlan.execute();
-      planExecTimer.stopAndRecord();
+        // Update the total docs in the metadata based on un-pruned segments.
+        dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, Long.toString(totalRawDocs));
 
-      dataTable = globalQueryPlan.getInstanceResponse();
-      Map<String, String> dataTableMetadata = dataTable.getMetadata();
-      queryProcessingTimer.stopAndRecord();
-
-      LOGGER.debug("Searching Instance for Request Id - {}, browse took: {}", instanceRequest.getRequestId(),
-          queryProcessingTimer.getDurationNs());
-      LOGGER.debug("InstanceResponse for Request Id - {} : {}", instanceRequest.getRequestId(), dataTable.toString());
-      dataTableMetadata.put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTimer.getDurationMs()));
-      dataTableMetadata.put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(instanceRequest.getRequestId()));
-      dataTableMetadata.put(DataTable.TRACE_INFO_METADATA_KEY,
-          TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
-
-      // Update the total docs in the metadata based on un-pruned segments.
-      dataTableMetadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(totalRawDocs));
-
-
-      long cpuTime = 0;
-      if(bean.isCurrentThreadCpuTimeSupported())
-      {
-        long endCpuTime = bean.getCurrentThreadCpuTime();
-        if(endCpuTime >= startCpuTime)
+        long cpuTime = 0;
+        if(bean.isCurrentThreadCpuTimeSupported())
         {
-          cpuTime = endCpuTime-startCpuTime;
+          long endCpuTime = bean.getCurrentThreadCpuTime();
+          if(endCpuTime >= startCpuTime)
+          {
+            cpuTime = endCpuTime-startCpuTime;
+          }
+          else
+          {
+            cpuTime = Long.MIN_VALUE - startCpuTime;
+            cpuTime += endCpuTime;
+          }
+
         }
         else
         {
-          cpuTime = Long.MIN_VALUE - startCpuTime;
-          cpuTime += endCpuTime;
+          cpuTime = -1;
         }
+        dataTable.getMetadata().put(DataTable.EXECUTOR_CPU_TIME,Long.toString(cpuTime));
 
+        dataTable.getMetadata().put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTimer.getDurationMs()));
+        dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(instanceRequest.getRequestId()));
+        //dataTable.getMetadata().put(DataTable.TRACE_INFO_METADATA_KEY,
+        //        TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()))
       }
-      else
-      {
-       cpuTime = -1;
-      }
-      dataTableMetadata.put(DataTable.EXECUTOR_CPU_TIME,Long.toString(cpuTime));
-
       return dataTable;
-    } catch (Exception e) {
-      _serverMetrics.addMeteredQueryValue(instanceRequest.getQuery(), ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
+
+  } catch (Exception e) {
+      _serverMetrics.addMeteredQueryValue(brokerRequest, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
 
       // Do not log error for BadQueryRequestException because it's caused by bad query
       if (e instanceof BadQueryRequestException) {
@@ -216,27 +210,25 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       }
 
       dataTable = new DataTableImplV2();
-      Map<String, String> dataTableMetadata = dataTable.getMetadata();
       dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
-      TraceContext.logException("ServerQueryExecutorV1Impl", "Exception occurs in processQuery");
-      queryProcessingTimer.stopAndRecord();
-
-      LOGGER.info("Searching Instance for Request Id - {}, browse took: {}, instanceResponse: {}", requestId,
-          queryProcessingTimer.getDurationMs(), dataTable.toString());
-      dataTableMetadata.put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTimer.getDurationNs()));
-      dataTableMetadata.put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(instanceRequest.getRequestId()));
-      dataTableMetadata.put(DataTable.TRACE_INFO_METADATA_KEY,
-          TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
-      return dataTable;
     } finally {
-      TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(queryRequest.getTableName());
-      if (tableDataManager != null && queryableSegmentDataManagerList != null) {
-        for (SegmentDataManager segmentDataManager : queryableSegmentDataManagerList) {
-          tableDataManager.releaseSegment(segmentDataManager);
-        }
+      for (SegmentDataManager segmentDataManager : queryableSegmentDataManagerList) {
+        tableDataManager.releaseSegment(segmentDataManager);
       }
-      TraceContext.unregister(instanceRequest);
+      if (enableTrace) {
+        if (dataTable != null) {
+          dataTable.getMetadata().put(DataTable.TRACE_INFO_METADATA_KEY, TraceContext.getTraceInfo());
+        }
+        TraceContext.unregister();
+      }
     }
+
+    queryProcessingTimer.stopAndRecord();
+    long queryProcessingTime = queryProcessingTimer.getDurationMs();
+    dataTable.getMetadata().put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTime));
+    LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
+    LOGGER.debug("InstanceResponse for request Id - {}: {}", requestId, dataTable);
+    return dataTable;
   }
 
   /**

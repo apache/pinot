@@ -15,11 +15,8 @@
  */
 package com.linkedin.pinot.core.common.docidsets;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.operator.blocks.BlockMetadataImpl;
 import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -65,8 +62,7 @@ public class BitmapDocIdSetTest {
     }
     ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[list.size()];
     list.toArray(bitmaps);
-    BlockMetadata blockMetadata = new BlockMetadataImpl(numDocs, true, 0, DataType.INT, null);
-    BitmapDocIdSet bitmapDocIdSet = new BitmapDocIdSet("testColumn", blockMetadata, 0, numDocs - 1, bitmaps);
+    BitmapDocIdSet bitmapDocIdSet = new BitmapDocIdSet(bitmaps, 0, numDocs - 1, false);
     BlockDocIdIterator iterator = bitmapDocIdSet.iterator();
     int docId;
     TreeSet<Integer> result = new TreeSet<>();

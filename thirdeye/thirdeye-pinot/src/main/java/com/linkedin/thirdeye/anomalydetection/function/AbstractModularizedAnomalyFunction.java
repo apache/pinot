@@ -4,9 +4,15 @@ import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
+import com.linkedin.thirdeye.anomalydetection.model.data.DataModel;
+import com.linkedin.thirdeye.anomalydetection.model.data.NoopDataModel;
+import com.linkedin.thirdeye.anomalydetection.model.detection.DetectionModel;
+import com.linkedin.thirdeye.anomalydetection.model.detection.NoopDetectionModel;
 import com.linkedin.thirdeye.anomalydetection.model.merge.MergeModel;
 import com.linkedin.thirdeye.anomalydetection.model.merge.NoPredictionMergeModel;
+import com.linkedin.thirdeye.anomalydetection.model.merge.NoopMergeModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.ExpectedTimeSeriesPredictionModel;
+import com.linkedin.thirdeye.anomalydetection.model.prediction.NoopPredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
 import com.linkedin.thirdeye.api.DimensionMap;
@@ -26,6 +32,7 @@ import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * This class provides the default control logic to perform actions on an anomaly detection context
  * with the given anomaly detection module; the actions can be anomaly detection, information update
@@ -39,12 +46,20 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
     implements AnomalyDetectionFunction, ModularizedAnomalyFunctionModelProvider {
   protected final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
 
+  protected DataModel dataModel = new NoopDataModel();
+  protected List<TransformationFunction> currentTimeSeriesTransformationChain = new ArrayList<>();
+  protected List<TransformationFunction> baselineTimeSeriesTransformationChain = new ArrayList<>();
+  protected PredictionModel predictionModel = new NoopPredictionModel();
+  protected DetectionModel detectionModel = new NoopDetectionModel();
+  protected MergeModel mergeModel = new NoopMergeModel();
+
   protected AnomalyFunctionDTO spec;
   protected Properties properties;
 
   @Override
   public void init(AnomalyFunctionDTO spec) throws Exception {
     this.spec = spec;
+    super.init(spec);
     this.properties = spec.toProperties();
   }
 
@@ -269,5 +284,69 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
 
     return this.getTimeSeriesView(anomalyDetectionContext, bucketMillis, metric, viewWindowStartTime, viewWindowEndTime,
         knownAnomalies);
+  }
+
+  /**
+   * Get the data model that defines the time ranges of the input time series
+   * @return a data model of the anomaly function
+   */
+  @Override
+  public DataModel getDataModel() {
+    return this.dataModel;
+  }
+
+  /**
+   * Get the transformation models to transform the current/monitoring time series
+   * @return a list of transformation models
+   */
+  @Override
+  public List<TransformationFunction> getCurrentTimeSeriesTransformationChain() {
+    return this.currentTimeSeriesTransformationChain;
+  }
+
+  /**
+   * Get the transformation models to transform the baseline time series
+   * @return a list of transformation models
+   */
+  @Override
+  public List<TransformationFunction> getBaselineTimeSeriesTransformationChain() {
+    return this.baselineTimeSeriesTransformationChain;
+  }
+
+  /**
+   * Get the prediction model of the anomaly function
+   * @return the prediction model of the anomaly function
+   */
+  @Override
+  public PredictionModel getPredictionModel() {
+    return this.predictionModel;
+  }
+
+  /**
+   * Get the detection model of the anomaly function
+   * @return the detection model of the anomaly function
+   */
+  @Override
+  public DetectionModel getDetectionModel() {
+    return this.detectionModel;
+  }
+
+  /**
+   * Get the merge model of the anomaly function
+   * @return the merge model of the anomaly function
+   */
+  @Override
+  public MergeModel getMergeModel() {
+    return this.mergeModel;
+  }
+
+  /**
+   * Determine if the history anomalies are used in the anomaly function
+   * TODO: Remove this flag after the migration to modularized functions is done. The pipeline itself has the ability to determine if the history anomalies should be used.
+   * @return true if the history anomalies should be included in the context
+   */
+  @Override
+  public boolean useHistoryAnomaly() {
+    return true;
   }
 }

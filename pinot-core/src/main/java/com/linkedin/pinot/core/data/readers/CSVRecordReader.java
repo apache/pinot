@@ -18,54 +18,76 @@ package com.linkedin.pinot.core.data.readers;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
-import java.io.FileReader;
-import java.io.Reader;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.io.File;
+import java.io.IOException;
 import java.util.Iterator;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
-public class CSVRecordReader extends BaseRecordReader {
-  private static final Logger _logger = LoggerFactory.getLogger(CSVRecordReader.class);
+/**
+ * Record reader for CSV file.
+ */
+public class CSVRecordReader implements RecordReader {
+  private final File _dataFile;
+  private final Schema _schema;
+  private final CSVFormat _format;
+  private final char _multiValueDelimiter;
 
-  private String _delimiterString = ",";
-  private String _fileName;
-  private Schema _schema = null;
+  private CSVParser _parser;
+  private Iterator<CSVRecord> _iterator;
 
-  private CSVParser _parser = null;
-  private Iterator<CSVRecord> _iterator = null;
-  CSVRecordReaderConfig _config = null;
-
-  public CSVRecordReader(String dataFile, RecordReaderConfig recordReaderConfig, Schema schema) {
-    super();
-    super.initNullCounters(schema);
-    _fileName = dataFile;
+  public CSVRecordReader(File dataFile, Schema schema, CSVRecordReaderConfig config) throws IOException {
+    _dataFile = dataFile;
     _schema = schema;
 
-    _config = (CSVRecordReaderConfig) recordReaderConfig;
-    _delimiterString = (_config != null) ? _config.getCsvDelimiter() : ",";
-  }
+    if (config == null) {
+      _format = CSVFormat.DEFAULT.withDelimiter(CSVRecordReaderConfig.DEFAULT_DELIMITER).withHeader();
+      _multiValueDelimiter = CSVRecordReaderConfig.DEFAULT_MULTI_VALUE_DELIMITER;
+    } else {
+      CSVFormat format;
+      String formatString = config.getFileFormat();
+      if (formatString == null) {
+        format = CSVFormat.DEFAULT;
+      } else {
+        switch (formatString.toUpperCase()) {
+          case "EXCEL":
+            format = CSVFormat.EXCEL;
+            break;
+          case "MYSQL":
+            format = CSVFormat.MYSQL;
+            break;
+          case "RFC4180":
+            format = CSVFormat.RFC4180;
+            break;
+          case "TDF":
+            format = CSVFormat.TDF;
+            break;
+          default:
+            format = CSVFormat.DEFAULT;
+            break;
+        }
+      }
+      char delimiter = config.getDelimiter();
+      format = format.withDelimiter(delimiter);
+      String csvHeader = config.getHeader();
+      if (csvHeader == null) {
+        format = format.withHeader();
+      } else {
+        format = format.withHeader(StringUtils.split(csvHeader, delimiter));
+      }
+      _format = format;
+      _multiValueDelimiter = config.getMultiValueDelimiter();
+    }
 
-  @Override
-  public void init() throws Exception {
-    final Reader reader = new FileReader(_fileName);
-    _parser = new CSVParser(reader, getFormat());
-
-    _iterator = _parser.iterator();
-  }
-
-  @Override
-  public void rewind() throws Exception {
-    _parser.close();
     init();
+  }
+
+  private void init() throws IOException {
+    _parser = _format.parse(RecordReaderUtils.getFileReader(_dataFile));
+    _iterator = _parser.iterator();
   }
 
   @Override
@@ -74,125 +96,45 @@ public class CSVRecordReader extends BaseRecordReader {
   }
 
   @Override
-  public Schema getSchema() {
-    return _schema;
-  }
-
-  @Override
   public GenericRow next() {
     return next(new GenericRow());
   }
 
   @Override
-  public GenericRow next(GenericRow row) {
+  public GenericRow next(GenericRow reuse) {
     CSVRecord record = _iterator.next();
 
-    for (final FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
-      String token = getValueForColumn(record, column);
+      String token = record.isSet(column) ? record.get(column) : null;
 
-      Object value = null;
-      if (token == null || token.isEmpty()) {
-        incrementNullCountFor(fieldSpec.getName());
-      }
+      Object value;
       if (fieldSpec.isSingleValueField()) {
         value = RecordReaderUtils.convertToDataType(token, fieldSpec);
       } else {
-        String[] tokens = (token != null) ? StringUtils.split(token, _delimiterString) : null;
+        String[] tokens = token != null ? StringUtils.split(token, _multiValueDelimiter) : null;
         value = RecordReaderUtils.convertToDataTypeArray(tokens, fieldSpec);
       }
 
-      row.putField(column, value);
+      reuse.putField(column, value);
     }
 
-    return row;
+    return reuse;
   }
 
   @Override
-  public void close() throws Exception {
+  public void rewind() throws IOException {
     _parser.close();
+    init();
   }
 
-  private String getValueForColumn(CSVRecord record, String column) {
-    if ((_config != null) && (_config.columnIsDate(column))) {
-      return dateToDaysSinceEpochMilli(record.get(column)).toString();
-    } else {
-      return record.get(column);
-    }
+  @Override
+  public Schema getSchema() {
+    return _schema;
   }
 
-  private Long dateToDaysSinceEpochMilli(String token) {
-    if ((token == null) || (_config == null)) {
-      return 0L;
-    }
-
-    SimpleDateFormat dateFormat = new SimpleDateFormat(_config.getCsvDateFormat());
-
-    // Propagting this exception up causes a whole bunch of other readers to now throw exceptions.
-    // Catch here, and return 0.
-    try {
-      Date date = dateFormat.parse(token);
-      return date.getTime(); // This is in milli-seconds.
-    } catch (ParseException e) {
-      _logger.warn("Illegal date: Expected format: " + _config.getCsvDateFormat());
-      return 0L;
-    }
-  }
-
-  private CSVFormat getFormatFromConfig() {
-    String format = (_config != null) ? _config.getCsvFileFormat() : null;
-
-    if (format == null) {
-      return CSVFormat.DEFAULT;
-    }
-
-    format = format.toUpperCase();
-    if ((format.equals("DEFAULT"))) {
-      return CSVFormat.DEFAULT;
-
-    } else if (format.equals("EXCEL")) {
-      return CSVFormat.EXCEL;
-
-    } else if (format.equals("MYSQL")) {
-      return CSVFormat.MYSQL;
-
-    } else if (format.equals("RFC4180")) {
-      return CSVFormat.RFC4180;
-
-    } else if (format.equals("TDF")) {
-      return CSVFormat.TDF;
-    } else {
-      return CSVFormat.DEFAULT;
-    }
-  }
-
-  private String[] getHeaderFromConfig() {
-    String token;
-    if ((_config == null) || ((token = _config.getCsvHeader())) == null) {
-      return null;
-    }
-    return StringUtils.split(token, _delimiterString);
-  }
-
-  private char getDelimiterFromConfig() {
-    String delimiter;
-    if ((_config == null) || ((delimiter = _config.getCsvDelimiter()) == null)) {
-      return ',';
-    } else {
-      return StringEscapeUtils.unescapeJava(delimiter).charAt(0);
-    }
-  }
-
-  private CSVFormat getFormat() {
-    CSVFormat format = getFormatFromConfig().withDelimiter(getDelimiterFromConfig());
-    String[] header = getHeaderFromConfig();
-
-    if (header != null) {
-      format = format.withHeader(header);
-    } else {
-      format = format.withHeader();
-    }
-
-    return format;
+  @Override
+  public void close() throws IOException {
+    _parser.close();
   }
 }

@@ -13,6 +13,7 @@ import java.util.Map;
 public class AlertConfigManagerImpl extends AbstractManagerImpl<AlertConfigDTO>
     implements AlertConfigManager {
   private static final String FIND_BY_NAME_LIKE = " WHERE name like :name";
+  private static final String FIND_BY_NAME_EQUALS = " WHERE name = :name";
   private static final String FIND_BY_APPLICATION_LIKE = " WHERE application like :application";
 
   public AlertConfigManagerImpl() {
@@ -37,6 +38,19 @@ public class AlertConfigManagerImpl extends AbstractManagerImpl<AlertConfigDTO>
       result.add(MODEL_MAPPER.map(bean, AlertConfigDTO.class));
     }
     return result;
+  }
+
+  @Override
+  public AlertConfigDTO findWhereNameEquals(String name) {
+    Map<String, Object> parameterMap = new HashMap<>();
+    parameterMap.put("name", name);
+    List<AlertConfigBean> list =
+        genericPojoDao.executeParameterizedSQL(FIND_BY_NAME_EQUALS, parameterMap, AlertConfigBean.class);
+    List<AlertConfigDTO> result = new ArrayList<>();
+    for (AlertConfigBean bean : list) {
+      result.add(MODEL_MAPPER.map(bean, AlertConfigDTO.class));
+    }
+    return result.isEmpty()? null : result.get(0);
   }
 
   @Override

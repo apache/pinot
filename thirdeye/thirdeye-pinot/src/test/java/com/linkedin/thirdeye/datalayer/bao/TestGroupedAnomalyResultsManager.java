@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.datalayer.bao;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.List;
 import org.testng.Assert;
@@ -11,16 +12,22 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-public class TestGroupedAnomalyResultsManager extends AbstractManagerTestBase {
+public class TestGroupedAnomalyResultsManager {
 
+  private DAOTestBase testDAOProvider;
+  private GroupedAnomalyResultsManager groupedAnomalyResultsDAO;
+  private MergedAnomalyResultManager mergedAnomalyResultDAO;
   @BeforeClass
   void beforeClass() {
-    super.init();
+    testDAOProvider = DAOTestBase.getInstance();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+    groupedAnomalyResultsDAO = daoRegistry.getGroupedAnomalyResultsDAO();
+    mergedAnomalyResultDAO = daoRegistry.getMergedAnomalyResultDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    super.cleanup();
+    testDAOProvider.cleanup();
   }
 
   @Test(dataProvider="groupedAnomalies")

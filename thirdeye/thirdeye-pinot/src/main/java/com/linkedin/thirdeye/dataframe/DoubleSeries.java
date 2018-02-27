@@ -191,6 +191,28 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     }
   }
 
+  public static final class DoubleQuantile implements DoubleFunction {
+    final double q;
+
+    public DoubleQuantile(double q) {
+      if (q < 0 || q > 1.0)
+        throw new IllegalArgumentException(String.format("q must be between 0.0 and 1.0, but was %f", q));
+      this.q = q;
+    }
+
+    @Override
+    public double apply(double... values) {
+      if (values.length <= 0)
+        return NULL;
+      Arrays.sort(values);
+      double index = (values.length - 1) * this.q;
+      int lo = (int) Math.floor(index);
+      int hi = (int) Math.ceil(index);
+      double diff = values[hi] - values[lo];
+      return values[lo] + diff * (index - lo);
+    }
+  }
+
   public static class Builder extends Series.Builder {
     final List<double[]> arrays = new ArrayList<>();
 
@@ -428,32 +450,52 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return String.valueOf(this.values[index]);
   }
 
+  @Override
   public DoubleSeries sum() {
     return this.aggregate(SUM);
   }
 
+  @Override
   public DoubleSeries product() {
     return this.aggregate(PRODUCT);
   }
 
+  @Override
   public DoubleSeries min() {
     return this.aggregate(MIN);
   }
 
+  @Override
   public DoubleSeries max() {
     return this.aggregate(MAX);
   }
 
+  @Override
   public DoubleSeries mean() {
     return this.aggregate(MEAN);
   }
 
+  @Override
   public DoubleSeries median() {
     return this.aggregate(MEDIAN);
   }
 
+  @Override
   public DoubleSeries std() {
     return this.aggregate(STD);
+  }
+
+  /**
+   * Returns the quantile from the series as indicated by {@code q}. Applies linear interpolation
+   * between two values if the exact quantile does not align with the index of series values.
+   *
+   * @param q quantile rank between {@code [0.0, 1.0]} (bounds inclusive)
+   *
+   * @return series with quantile value or {@code NULL} if invalid
+   * @throws IllegalArgumentException if the quantile rank {@code q} is not between {@code [0.0, 1.0]}.
+   */
+  public DoubleSeries quantile(double q) {
+    return this.aggregate(new DoubleQuantile(q));
   }
 
   public double corr(Series other) {

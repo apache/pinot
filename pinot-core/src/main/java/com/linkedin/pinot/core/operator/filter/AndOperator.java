@@ -15,22 +15,16 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.AndBlock;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import java.util.ArrayList;
+import java.util.List;
 
 
 public class AndOperator extends BaseFilterOperator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AndOperator.class);
   private static final String OPERATOR_NAME = "AndOperator";
 
   private List<BaseFilterOperator> operators;
@@ -41,15 +35,7 @@ public class AndOperator extends BaseFilterOperator {
   }
 
   @Override
-  public boolean open() {
-    for (Operator operator : operators) {
-      operator.open();
-    }
-    return true;
-  }
-
-  @Override
-  public BaseFilterBlock nextFilterBlock(BlockId BlockId) {
+  protected BaseFilterBlock getNextBlock() {
     List<FilterBlockDocIdSet> blockDocIdSets = new ArrayList<FilterBlockDocIdSet>();
     for (Operator operator : operators) {
       Block block = operator.nextBlock();
@@ -68,14 +54,6 @@ public class AndOperator extends BaseFilterOperator {
       }
     }
     return false;
-  }
-
-  @Override
-  public boolean close() {
-    for (Operator operator : operators) {
-      operator.close();
-    }
-    return true;
   }
 
   @Override

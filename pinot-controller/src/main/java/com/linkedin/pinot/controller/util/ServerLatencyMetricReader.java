@@ -70,7 +70,7 @@ public class ServerLatencyMetricReader {
         ServerLoadMetrics serverLatencyInfo = new ServerLoadMetrics();
 
         String serverLatencyUrl;
-         serverLatencyUrl = "http://" + serverNameOrEndpoint + CommonConstants.Helix.ServerMetricUris.SERVER_METRICS_INFO_URI;
+         serverLatencyUrl = "http://" + serverNameOrEndpoint + CommonConstants.ServerMetricUris.SERVER_METRICS_INFO_URI;
         serverLatencyUrl = serverLatencyUrl+tableName+"/LatencyInfo";
 
         List<String> serverUrl = new ArrayList<>(1);

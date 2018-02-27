@@ -98,10 +98,7 @@ public class ScheduledRequestHandlerTest {
     // The handler method is expected to return immediately
     Assert.assertTrue(response.isDone());
     byte[] responseBytes = response.get();
-    Assert.assertTrue(responseBytes.length > 0);
-    DataTable expectedDT = new DataTableImplV2();
-    expectedDT.addException(QueryException.INTERNAL_ERROR);
-    Assert.assertEquals(responseBytes, expectedDT.toBytes());
+    Assert.assertNull(responseBytes);
   }
 
   private InstanceRequest getInstanceRequest() {

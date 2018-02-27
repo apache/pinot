@@ -1,6 +1,10 @@
-import Ember from 'ember';
+import $ from 'jquery';
+import { set, computed } from '@ember/object';
+import { later } from '@ember/runloop';
+import Component from '@ember/component';
 import moment from 'moment';
 import d3 from 'd3';
+import { eventWeightMapping } from 'thirdeye-frontend/actions/constants';
 
 const COLOR_MAPPING = {
   blue: '#33AADA',
@@ -19,7 +23,7 @@ const COLOR_MAPPING = {
   light_pink: '#FF91CF'
 };
 
-export default Ember.Component.extend({
+export default Component.extend({
   init() {
     this._super(...arguments);
 
@@ -208,7 +212,7 @@ export default Ember.Component.extend({
   didRender(){
     this._super(...arguments);
 
-    Ember.run.later(() => {
+    later(() => {
       this.buildSliderButton();
       // hiding this feature until fully fleshed out
       // this.buildAnomalyRegionSlider();
@@ -241,6 +245,11 @@ export default Ember.Component.extend({
     const selectedMetrics = this.get('selectedMetrics') || [];
     const selectedDimensions = this.get('selectedDimensions') || [];
     const events = this.get('holidayEvents') || [];
+
+    // This check is necessary so that it is only set once
+    if (primaryMetric.isSelected === undefined) {
+      set(primaryMetric, 'isSelected', true);
+    }
 
     const data = [
       primaryMetric,
@@ -306,23 +315,26 @@ export default Ember.Component.extend({
 
   enableZoom: false,
 
+  // padding for the anomaly graph (optional)
+  padding: null,
+
   // dd for primary metric
-  primaryMetricId: Ember.computed('componentId', function() {
+  primaryMetricId: computed('componentId', function() {
     return this.get('componentId') + '-primary-metric-';
   }),
 
   // id for related metrics
-  relatedMetricId: Ember.computed('componentId', function() {
+  relatedMetricId: computed('componentId', function() {
     return this.get('componentId') + '-related-metric-';
   }),
 
   // id for dimension
-  dimensionId:  Ember.computed('componentId', function() {
+  dimensionId:  computed('componentId', function() {
     return this.get('componentId') + '-dimension-';
   }),
 
   // filtered events for graph
-  holidayEvents: Ember.computed('events', function() {
+  holidayEvents: computed('events', function() {
     return this.get('events');
     // const events = this.get('events');
     // const hiddenEvents = [];
@@ -331,7 +343,7 @@ export default Ember.Component.extend({
     // });
   }),
 
-  holidayEventsColumn: Ember.computed(
+  holidayEventsColumn: computed(
     'holidayEvents',
     function() {
       const events = this.get('holidayEvents');
@@ -352,7 +364,7 @@ export default Ember.Component.extend({
     }
   ),
 
-  holidayEventsDatesColumn: Ember.computed(
+  holidayEventsDatesColumn: computed(
     'holidayEvents',
     function() {
       const holidays = this.get('holidayEvents');
@@ -373,7 +385,7 @@ export default Ember.Component.extend({
   /**
    * Graph Legend config
    */
-  legend: Ember.computed('showGraphLegend', function() {
+  legend: computed('showGraphLegend', function() {
     const showGraphLegend = this.get('showGraphLegend');
     return {
       position: 'inset',
@@ -384,7 +396,7 @@ export default Ember.Component.extend({
   /**
    * Graph Zoom config
    */
-  zoom: Ember.computed(
+  zoom: computed(
     'onSubchartChange',
     'enableZoom',
     function() {
@@ -400,7 +412,7 @@ export default Ember.Component.extend({
   /**
    * Graph Point Config
    */
-  point: Ember.computed(
+  point: computed(
     'showGraphLegend',
     function() {
       return {
@@ -420,7 +432,7 @@ export default Ember.Component.extend({
   /**
    * Graph axis config
    */
-  axis: Ember.computed(
+  axis: computed(
     'chartDates',
     'primaryMetric',
     'subchartStart',
@@ -446,12 +458,9 @@ export default Ember.Component.extend({
       return {
         y: {
           show: true,
-          min: 0,
-          padding: {
-            bottom: 0
-          },
+          // min: 0,
           tick: {
-            format: d3.format('2s')
+            format: d3.format('.2s')
           }
         },
         y2: {
@@ -485,7 +494,7 @@ export default Ember.Component.extend({
   /**
    * Graph Subchart Config
    */
-  subchart: Ember.computed(
+  subchart: computed(
     'showLegend',
     'showSubchart',
     'showGraphLegend',
@@ -504,7 +513,7 @@ export default Ember.Component.extend({
   onbrush: function(dates) {
     const [ start, end ] = dates;
     const onSubchartBrush = this.get('onSubchartChange');
-    const [ _, ...graphDates ] = this.get('chartDates');
+    const [ , ...graphDates ] = this.get('chartDates');
     const min = graphDates.get('firstObject');
     const max = graphDates.get('lastObject');
 
@@ -529,7 +538,7 @@ export default Ember.Component.extend({
   /**
    * Graph Height Config
    */
-  size: Ember.computed(
+  size: computed(
     'showLegend',
     'height',
     function() {
@@ -544,15 +553,23 @@ export default Ember.Component.extend({
   /**
    * Data massages primary Metric into a Column
    */
-  primaryMetricColumn: Ember.computed(
+  primaryMetricColumn: computed(
     'primaryMetric',
+    'primaryMetric.isSelected',
     function() {
       const primaryMetric = this.get('primaryMetric');
 
-      const { baselineValues, currentValues } = primaryMetric.subDimensionContributionMap['All'];
+      // Return data only when it's selected
+      if (primaryMetric.isSelected) {
+        const { baselineValues, currentValues } = primaryMetric.subDimensionContributionMap['All'];
+        return [
+          [`${primaryMetric.metricName}-current`, ...currentValues],
+          [`${primaryMetric.metricName}-expected`, ...baselineValues]
+        ];
+      }
       return [
-        [`${primaryMetric.metricName}-current`, ...currentValues],
-        [`${primaryMetric.metricName}-expected`, ...baselineValues]
+        [`${primaryMetric.metricName}-current`],
+        [`${primaryMetric.metricName}-expected`]
       ];
     }
   ),
@@ -560,7 +577,7 @@ export default Ember.Component.extend({
   /**
    * Data massages relatedMetrics into Columns
    */
-  selectedMetricsColumn: Ember.computed(
+  selectedMetricsColumn: computed(
     'selectedMetrics',
     'selectedMetrics.@each',
     function() {
@@ -581,7 +598,7 @@ export default Ember.Component.extend({
   /**
    * Data massages dimensions into Columns
    */
-  selectedDimensionsColumn: Ember.computed(
+  selectedDimensionsColumn: computed(
     'selectedDimensions',
     function() {
       const columns = [];
@@ -598,7 +615,7 @@ export default Ember.Component.extend({
   /**
    * Derives x axis from the primary metric
    */
-  chartDates: Ember.computed(
+  chartDates: computed(
     'primaryMetric.timeBucketsCurrent',
     function() {
       return ['date', ...this.get('primaryMetric.timeBucketsCurrent')];
@@ -608,7 +625,7 @@ export default Ember.Component.extend({
   /**
    * Aggregates data for chart
    */
-  data: Ember.computed(
+  data: computed(
     'primaryMetricColumn',
     'selectedMetricsColumn',
     'selectedDimensionsColumn',
@@ -682,10 +699,10 @@ export default Ember.Component.extend({
    * Data massages Primary Metric's region
    * and assigns color class
    */
-  primaryRegions: Ember.computed('primaryMetric', function() {
+  primaryRegions: computed('primaryMetric', function() {
     const primaryMetric = this.get('primaryMetric') || {};
-    const { 
-      regions, 
+    const {
+      regions,
       color = 'orange'
     } = primaryMetric;
 
@@ -708,7 +725,7 @@ export default Ember.Component.extend({
   /**
    * Data massages the main anomaly region
    */
-  anomalyRegion: Ember.computed(
+  anomalyRegion: computed(
     'analysisStart',
     'analysisEnd',
     function() {
@@ -735,7 +752,7 @@ export default Ember.Component.extend({
    * Data massages Primary Metric's region
    * and assigns color class
    */
-  relatedRegions: Ember.computed(
+  relatedRegions: computed(
     'selectedMetrics',
     'selectedMetrics.@each',
     function() {
@@ -771,8 +788,24 @@ export default Ember.Component.extend({
       title: function(d) {
         return moment(d).format('MM/DD hh:mm a');
       },
-      value: function(val) {
-        return d3.format('2s')(val);
+      value: function(val, ratio, id) {
+        const isMetric = ['current', 'expected'].some((category) => {
+          return id.includes(category);
+        });
+
+        if (isMetric) {
+          return d3.format('.3s')(val);
+        } else {
+          // do not return values if data point is an event
+
+          const eventType = Object.keys(eventWeightMapping).find((key) => {
+            if (val == eventWeightMapping[key]) {
+              return key;
+            }
+          });
+
+          return eventType || '';
+        }
       }
     }
   },
@@ -781,7 +814,7 @@ export default Ember.Component.extend({
   /**
    * Aggregates chart regions
    */
-  regions: Ember.computed(
+  regions: computed(
     'primaryRegions',
     'relatedRegions',
     'anomalyRegion',
@@ -796,11 +829,26 @@ export default Ember.Component.extend({
 
   actions: {
     /**
+     * Shows/Hides the primary metric
+     */
+    onPrimaryMetricToggle() {
+      if (!this.attrs.onPrimaryClick) {
+        this.toggleProperty('primaryMetric.isSelected');
+      } else {
+        this.attrs.onPrimaryClick(...arguments);
+      }
+    },
+
+    /**
      * Handles graph item selection
      */
     onSelection() {
       this.attrs.onSelection(...arguments);
     },
+
+    /**
+     * Shows/Hides the graph legend
+     */
     onToggle() {
       this.toggleProperty('showGraphLegend');
     },
@@ -809,8 +857,8 @@ export default Ember.Component.extend({
      * Scrolls to the appropriate tab on click
      */
     scrollToSection() {
-      Ember.run.later(() => {
-        Ember.$('#root-cause-analysis').get(0).scrollIntoView();
+      later(() => {
+        $('#root-cause-analysis').get(0).scrollIntoView();
       });
     }
   }

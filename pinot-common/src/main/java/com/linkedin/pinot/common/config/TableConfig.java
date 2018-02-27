@@ -16,7 +16,10 @@
 package com.linkedin.pinot.common.config;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.startree.hll.HllConfig;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -286,10 +289,48 @@ public class TableConfig {
     }
   }
 
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    TableConfig that = (TableConfig) o;
+
+    return EqualityUtils.isEqual(_tableName, that._tableName) &&
+        EqualityUtils.isEqual(_tableType, that._tableType) &&
+        EqualityUtils.isEqual(_validationConfig, that._validationConfig) &&
+        EqualityUtils.isEqual(_tenantConfig, that._tenantConfig) &&
+        EqualityUtils.isEqual(_indexingConfig, that._indexingConfig) &&
+        EqualityUtils.isEqual( _customConfig, that._customConfig) &&
+        EqualityUtils.isEqual(_quotaConfig, that._quotaConfig) &&
+        EqualityUtils.isEqual(_taskConfig, that._taskConfig) &&
+        EqualityUtils.isEqual(_routingConfig, that._routingConfig);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_tableName);
+    result = EqualityUtils.hashCodeOf(result, _tableType);
+    result = EqualityUtils.hashCodeOf(result, _validationConfig);
+    result = EqualityUtils.hashCodeOf(result, _tenantConfig);
+    result = EqualityUtils.hashCodeOf(result, _indexingConfig);
+    result = EqualityUtils.hashCodeOf(result, _customConfig);
+    result = EqualityUtils.hashCodeOf(result, _quotaConfig);
+    result = EqualityUtils.hashCodeOf(result, _taskConfig);
+    result = EqualityUtils.hashCodeOf(result, _routingConfig);
+    return result;
+  }
+
   public static class Builder {
     private static final String DEFAULT_SEGMENT_PUSH_TYPE = "APPEND";
     private static final String REFRESH_SEGMENT_PUSH_TYPE = "REFRESH";
     private static final String DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceNumSegmentAssignmentStrategy";
+    private static final String DEFAULT_STREAM_PARTITION_ASSIGNMENT_STRATEGY = "UniformStreamPartitionAssignment";
     private static final String DEFAULT_NUM_REPLICAS = "1";
     private static final String DEFAULT_LOAD_MODE = "HEAP";
     private static final String MMAP_LOAD_MODE = "MMAP";
@@ -321,11 +362,14 @@ public class TableConfig {
     private List<String> _noDictionaryColumns;
     private List<String> _onHeapDictionaryColumns;
     private Map<String, String> _streamConfigs;
+    private String _streamPartitionAssignmentStrategy = DEFAULT_STREAM_PARTITION_ASSIGNMENT_STRATEGY;
 
     private TableCustomConfig _customConfig;
     private QuotaConfig _quotaConfig;
     private TableTaskConfig _taskConfig;
     private RoutingConfig _routingConfig;
+    private HllConfig _hllConfig;
+    private StarTreeIndexSpec _starTreeIndexSpec;
 
     public Builder(TableType tableType) {
       _tableType = tableType;
@@ -440,6 +484,11 @@ public class TableConfig {
       return this;
     }
 
+    public Builder setStreamPartitionAssignmentStrategy(String streamPartitionAssignmentStrategy) {
+      _streamPartitionAssignmentStrategy = streamPartitionAssignmentStrategy;
+      return this;
+    }
+
     public Builder setStreamConfigs(Map<String, String> streamConfigs) {
       Preconditions.checkState(_tableType == TableType.REALTIME);
       _streamConfigs = streamConfigs;
@@ -499,6 +548,9 @@ public class TableConfig {
       indexingConfig.setNoDictionaryColumns(_noDictionaryColumns);
       indexingConfig.setOnHeapDictionaryColumns(_onHeapDictionaryColumns);
       indexingConfig.setStreamConfigs(_streamConfigs);
+      StreamConsumptionConfig streamConsumptionConfig = new StreamConsumptionConfig();
+      streamConsumptionConfig.setStreamPartitionAssignmentStrategy(_streamPartitionAssignmentStrategy);
+      indexingConfig.setStreamConsumptionConfig(streamConsumptionConfig);
       // TODO: set SegmentPartitionConfig here
 
       if (_customConfig == null) {

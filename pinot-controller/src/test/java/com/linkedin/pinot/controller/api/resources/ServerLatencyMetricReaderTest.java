@@ -113,7 +113,7 @@ public class ServerLatencyMetricReaderTest {
 
     private HttpServer startServer(int port,String table, HttpHandler handler) throws IOException {
         final HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
-        server.createContext(CommonConstants.Helix.ServerMetricUris.SERVER_METRICS_INFO_URI+table+"/LatencyInfo", handler);
+        server.createContext(CommonConstants.ServerMetricUris.SERVER_METRICS_INFO_URI+table+"/LatencyInfo", handler);
         new Thread(new Runnable() {
             @Override
             public void run() {

@@ -29,7 +29,6 @@ import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -88,7 +87,7 @@ public class SelectionOperatorUtils {
   public static List<String> getSelectionColumns(@Nonnull List<String> selectionColumns,
       @Nonnull IndexSegment indexSegment) {
     if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
-      List<String> allColumns = Arrays.asList(indexSegment.getColumnNames());
+      List<String> allColumns = new ArrayList<>(indexSegment.getColumnNames());
       Collections.sort(allColumns);
       return allColumns;
     } else {

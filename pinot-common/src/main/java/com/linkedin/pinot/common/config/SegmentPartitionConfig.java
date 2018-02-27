@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.config;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -113,5 +114,26 @@ public class SegmentPartitionConfig {
   public int getNumPartitions(String column) {
     ColumnPartitionConfig config = _columnPartitionMap.get(column);
     return (config != null) ? config.getNumPartitions() : INVALID_NUM_PARTITIONS;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    SegmentPartitionConfig that = (SegmentPartitionConfig) o;
+
+    return EqualityUtils.isEqual(_columnPartitionMap, that._columnPartitionMap);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_columnPartitionMap);
+    return result;
   }
 }

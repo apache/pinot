@@ -1,92 +1,152 @@
-import Ember from 'ember';
-import fetch from 'fetch';
+import Route from '@ember/routing/route';
 import moment from 'moment';
-import { checkStatus } from 'thirdeye-frontend/helpers/utils';
+import fetch from 'fetch';
+import RSVP from 'rsvp';
+import _ from 'lodash';
+import {
+  checkStatus,
+  buildDateEod,
+  parseProps
+} from 'thirdeye-frontend/utils/utils';
 
-/**
- * Parses stringified object from payload
- * @param {String} filters
- * @returns {Object}
- */
-const parseProps = (filters) => {
-  filters = filters || '';
-
-  return filters.split(';')
-    .filter(prop => prop)
-    .map(prop => prop.split('='))
-    .reduce(function (aggr, prop) {
-      const [ propName, value ] = prop;
-      aggr[propName] = value;
-
-      return aggr;
-    }, {});
-};
-
-
-
-export default Ember.Route.extend({
+export default Route.extend({
   model(params) {
     const { alertId: id } = params;
     if (!id) { return; }
+    const alertUrl = `/onboard/function/${id}`;
 
-    const url = `/onboard/function/${id}`;
-    return fetch(url).then(checkStatus);
+    return RSVP.hash({
+      function: fetch(alertUrl).then(checkStatus)
+    });
   },
 
   afterModel(model) {
     const {
+      id,
       metric: metricName,
       collection: dataset,
+      exploreDimensions,
       filters,
-      bucketUnit: granularity,
-      id
-     } = model;
+      bucketSize,
+      bucketUnit,
+      properties: alertProps
+    } = model.function;
 
     let metricId = '';
+    let metricDataUrl = '';
+    let metricDimensionURl = '';
+    let selectedAppName = '';
+
+    // Add a parsed properties array to the model
+    const propsArray = alertProps.split(';').map((prop) => {
+      const [ name, value ] = prop.split('=');
+      return { name, value: decodeURIComponent(value) };
+    });
+    Object.assign(model, { propsArray });
 
     return fetch(`/data/autocomplete/metric?name=${dataset}::${metricName}`).then(checkStatus)
-      .then((metrics) => {
-        const metric = metrics.pop();
+      .then((metricsByName) => {
+        const metric = metricsByName.pop();
         metricId = metric.id;
         return fetch(`/data/maxDataTime/metricId/${metricId}`).then(checkStatus);
       })
       .then((maxTime) => {
+        const dimension = exploreDimensions || 'All';
         const currentEnd = moment(maxTime).isValid()
           ? moment(maxTime).valueOf()
-          : moment().subtract(1, 'day').endOf('day').valueOf();
+          : buildDateEod(1, 'day').valueOf();
         const formattedFilters = JSON.stringify(parseProps(filters));
-        const dimension = 'All';
-        const currentStart = moment(currentEnd).subtract(1, 'months').valueOf();
+        // Load less data if granularity is 'minutes'
+        const isMinutely = bucketUnit.toLowerCase().includes('minute');
+        const duration = isMinutely ? { unit: 2, size: 'week' } : { unit: 1, size: 'month' };
+        const currentStart = moment(currentEnd).subtract(duration.unit, duration.size).valueOf();
         const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
         const baselineEnd = moment(currentEnd).subtract(1, 'week');
-        const url =  `/timeseries/compare/${metricId}/${currentStart}/${currentEnd}/` +
-          `${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=${granularity}` +
-          `&filters=${encodeURIComponent(formattedFilters)}`;
-        return fetch(url).then(checkStatus);
+
+        // Prepare call for metric graph data
+        metricDataUrl =  `/timeseries/compare/${metricId}/${currentStart}/${currentEnd}/` +
+          `${baselineStart}/${baselineEnd}?dimension=${dimension}&granularity=` +
+          `${bucketSize + '_' + bucketUnit}&filters=${encodeURIComponent(formattedFilters)}`;
+
+        // Prepare call for dimension graph data
+        metricDimensionURl = `/rootcause/query?framework=relatedDimensions&anomalyStart=${currentStart}` +
+          `&anomalyEnd=${currentEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}` +
+          `&analysisStart=${currentStart}&analysisEnd=${currentEnd}&urns=thirdeye:metric:${metricId}` +
+          `&filters=${encodeURIComponent(filters)}`;
+
+        // Fetch graph metric data
+        return fetch(metricDataUrl).then(checkStatus);
       })
       .then((metricData) => {
-        Object.assign(metricData, { color: 'blue' })
+        Object.assign(metricData, { color: 'blue' });
         Object.assign(model, { metricData });
-
-        return fetch(`/thirdeye/email/functions`).then(checkStatus);
+        return fetch(`/thirdeye/entity/ALERT_CONFIG`).then(checkStatus);
       })
-      .then((groupConfigs) => {
-        // Temporary fix to match alert functions to subscribtion group
-        const subscriptionGroups = groupConfigs[id] || [];
-
-        // Back end supports 1-many relationships, however, we currently
-        // enforces 1-1 in the front end
-        const subscriptionGroup = subscriptionGroups.pop();
-
-        Object.assign(model, { subscriptionGroup });
+      .then((allConfigGroups) => {
+        // TODO: confirm dedupe
+        const uniqueGroups = _.uniq(allConfigGroups, name);
+        Object.assign(model, { allConfigGroups: uniqueGroups });
+        return fetch(`/thirdeye/email/function/${id}`).then(checkStatus);
+      })
+      .then((groupByAlertId) => {
+        const originalConfigGroup = groupByAlertId.length ? groupByAlertId.pop() : null;
+        selectedAppName = originalConfigGroup ? originalConfigGroup.application : null;
+        Object.assign(model, { originalConfigGroup, selectedAppName });
+        return fetch('/thirdeye/entity/APPLICATION').then(checkStatus);
+      })
+      .then((allApps) => {
+        const selectedApplication = _.find(allApps, function(appsObj) { return appsObj.application === selectedAppName; });
+        Object.assign(model, { allApps, selectedApplication });
+        if (exploreDimensions) {
+          return fetch(metricDimensionURl).then(checkStatus).then((metricDimensions) => {
+            Object.assign(model, { metricDimensions });
+          });
+        }
+      })
+      .catch((errors) => {
+        Object.assign(model, { loadError: true, loadErrorMsg: errors });
       });
+  },
+
+  resetController(controller, isExiting) {
+    this._super(...arguments);
+
+    if (isExiting) {
+      controller.clearAll();
+    }
+  },
+
+  setupController(controller, model) {
+    this._super(controller, model);
+
+    controller.setProperties({
+      model,
+      metricData: model.metricData,
+      alertDimension: model.function.exploreDimensions,
+      metricDimensions: model.metricDimensions,
+      metricName: model.function.metric,
+      granularity: `${model.function.bucketSize}_${model.function.bucketUnit}`,
+      alertFilters: model.function.filters,
+      alertProps: model.propsArray,
+      alertConfigGroups: model.allConfigGroups,
+      alertFunctionName: model.function.functionName,
+      alertId: model.function.id,
+      isActive: model.function.isActive,
+      allApplications: model.allApps,
+      selectedConfigGroup: model.originalConfigGroup,
+      selectedApplication: model.selectedApplication,
+      selectedAppName: model.selectedAppName,
+      isLoadError: model.loadError,
+      loadErrorMessage: model.loadErrorMsg,
+      isGraphVisible: true
+    });
   },
 
   actions: {
     /**
      * Action called on submission to reload the route's model
      */
-    refreshModel: function() {
+    refreshModel() {
       this.refresh();
     }
   }

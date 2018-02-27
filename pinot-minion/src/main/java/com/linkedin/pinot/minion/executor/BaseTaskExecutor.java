@@ -16,17 +16,12 @@
 package com.linkedin.pinot.minion.executor;
 
 import com.linkedin.pinot.minion.MinionContext;
-import javax.annotation.Nonnull;
 
 
 public abstract class BaseTaskExecutor implements PinotTaskExecutor {
-  protected MinionContext _minionContext;
-  protected boolean _cancelled = false;
+  protected static final MinionContext MINION_CONTEXT = MinionContext.getInstance();
 
-  @Override
-  public void setMinionContext(@Nonnull MinionContext minionContext) {
-    _minionContext = minionContext;
-  }
+  protected boolean _cancelled = false;
 
   @Override
   public void cancel() {

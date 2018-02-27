@@ -16,22 +16,23 @@
 
 package com.linkedin.pinot.broker.routing.builder;
 
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.SegmentName;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
-
+import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.SegmentId;
 
 /**
  * Partition aware routing table builder for the Kafka low level consumer.
@@ -41,23 +42,26 @@ import com.linkedin.pinot.transport.common.SegmentId;
  * from the external view.
  *
  */
-public class PartitionAwareRealtimeRoutingTableBuilder extends AbstractPartitionAwareRoutingTableBuilder {
+public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwareRoutingTableBuilder {
 
   @Override
-  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
-      List<InstanceConfig> instanceConfigList) {
-
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    super.init(configuration, tableConfig, propertyStore);
     _numReplicas = Integer.valueOf(_tableConfig.getValidationConfig().getReplicasPerPartition());
+  }
 
+  @Override
+  public synchronized void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
+      List<InstanceConfig> instanceConfigs) {
     // Update the cache for the segment ZK metadata
-    for (String segment : externalView.getPartitionSet()) {
-      SegmentId segmentId = new SegmentId(segment);
-      SegmentZKMetadata segmentZKMetadata = _segmentToZkMetadataMapping.get(segmentId);
-      if (segmentZKMetadata == null || segmentZKMetadata.getPartitionMetadata() == null ||
-          segmentZKMetadata.getPartitionMetadata().getColumnPartitionMap().size() == 0) {
-        segmentZKMetadata = ZKMetadataProvider.getRealtimeSegmentZKMetadata(_propertyStore, tableName, segment);
+    Set<String> segmentSet = externalView.getPartitionSet();
+    for (String segmentName : segmentSet) {
+      SegmentZKMetadata segmentZKMetadata = _segmentToZkMetadataMapping.get(segmentName);
+      if (segmentZKMetadata == null || segmentZKMetadata.getPartitionMetadata() == null
+          || segmentZKMetadata.getPartitionMetadata().getColumnPartitionMap().size() == 0) {
+        segmentZKMetadata = ZKMetadataProvider.getRealtimeSegmentZKMetadata(_propertyStore, tableName, segmentName);
         if (segmentZKMetadata != null) {
-          _segmentToZkMetadataMapping.put(segmentId, segmentZKMetadata);
+          _segmentToZkMetadataMapping.put(segmentName, segmentZKMetadata);
         }
       }
     }
@@ -71,58 +75,52 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends AbstractPartition
         KafkaLowLevelRoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView,
             sortedSegmentsByKafkaPartition);
 
-    RoutingTableInstancePruner pruner = new RoutingTableInstancePruner(instanceConfigList);
+    RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);
 
-    // Compute segment id to replica id to server instance
-    Map<SegmentId, Map<Integer, ServerInstance>> segmentIdToServersMapping = new HashMap<>();
-    for (String segmentName : externalView.getPartitionSet()) {
-      SegmentId segmentId = new SegmentId(segmentName);
+    // Compute map from segment to map from replica to server
+    Map<String, Map<Integer, String>> segmentToReplicaToServerMap = new HashMap<>();
+    for (String segmentName : segmentSet) {
       int partitionId = getPartitionId(segmentName);
-      Map<String, String> instanceToStateMap = new HashMap<>(externalView.getStateMap(segmentName));
-      Map<Integer, ServerInstance> serverInstanceMap = new HashMap<>();
+      SegmentName validConsumingSegment =
+          allowedSegmentInConsumingStateByKafkaPartition.get(Integer.toString(partitionId));
 
-      String partitionStr = Integer.toString(partitionId);
-      SegmentName validConsumingSegment = allowedSegmentInConsumingStateByKafkaPartition.get(partitionStr);
-
+      Map<Integer, String> replicaToServerMap = new HashMap<>();
       int replicaId = 0;
-      for (String instanceName : instanceToStateMap.keySet()) {
+      for (Map.Entry<String, String> entry : externalView.getStateMap(segmentName).entrySet()) {
+        String serverName = entry.getKey();
+        String state = entry.getValue();
+
         // Do not add the server if it is inactive
-        if (pruner.isInactive(instanceName)) {
+        if (instancePruner.isInactive(serverName)) {
           continue;
         }
 
-        String state = instanceToStateMap.get(instanceName);
-        ServerInstance serverInstance = ServerInstance.forInstanceName(instanceName);
-
         // If the server is in ONLINE status, it's always to safe to add
-        if (state.equalsIgnoreCase(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
-          serverInstanceMap.put(replicaId, serverInstance);
+        if (state.equals(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
+          replicaToServerMap.put(replicaId++, serverName);
         }
 
         // If the server is in CONSUMING status, the segment has to be match with the valid consuming segment
-        if (state.equalsIgnoreCase(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
-          if (validConsumingSegment != null && segmentName.equals(validConsumingSegment.getSegmentName())) {
-            serverInstanceMap.put(replicaId, serverInstance);
-          }
+        if (state.equals(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING)
+            && validConsumingSegment != null && segmentName.equals(validConsumingSegment.getSegmentName())) {
+          replicaToServerMap.put(replicaId++, serverName);
         }
-        replicaId++;
       }
 
       // Update the final routing look up table.
-      if (!serverInstanceMap.isEmpty()) {
-        segmentIdToServersMapping.put(segmentId, serverInstanceMap);
+      if (!replicaToServerMap.isEmpty()) {
+        segmentToReplicaToServerMap.put(segmentName, replicaToServerMap);
       }
     }
 
     // Delete segment metadata from the cache if the segment no longer exists in the external view.
-    Set<String> segmentsFromExternalView = externalView.getPartitionSet();
-    for (SegmentId segmentId : _segmentToZkMetadataMapping.keySet()) {
-      if (!segmentsFromExternalView.contains(segmentId.getSegmentId())) {
-        _segmentToZkMetadataMapping.remove(segmentId);
+    for (String segmentName : _segmentToZkMetadataMapping.keySet()) {
+      if (!segmentSet.contains(segmentName)) {
+        _segmentToZkMetadataMapping.remove(segmentName);
       }
     }
 
-    _mappingReference.set(segmentIdToServersMapping);
+    setSegmentToReplicaToServerMap(segmentToReplicaToServerMap);
   }
 
   /**

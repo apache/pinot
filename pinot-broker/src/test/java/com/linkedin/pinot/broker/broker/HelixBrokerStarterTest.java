@@ -19,35 +19,25 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.broker.broker.helix.DefaultHelixBrokerConfig;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
-import com.linkedin.pinot.broker.routing.ServerToSegmentSetMap;
 import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
-import com.linkedin.pinot.controller.helix.starter.HelixConfig;
-import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
-
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
 import java.lang.reflect.Field;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
@@ -55,16 +45,14 @@ import org.testng.annotations.Test;
 
 
 public class HelixBrokerStarterTest {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(HelixBrokerStarterTest.class);
   private static final int SEGMENT_COUNT = 6;
   private PinotHelixResourceManager _pinotResourceManager;
-  private final static String HELIX_CLUSTER_NAME = "TestHelixBrokerStarter";
-  private final static String DINING_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType("dining");
-  private final static String COFFEE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType("coffee");
+  private static final String HELIX_CLUSTER_NAME = "TestHelixBrokerStarter";
+  private static final String RAW_DINING_TABLE_NAME = "dining";
+  private static final String DINING_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_DINING_TABLE_NAME);
+  private static final String COFFEE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType("coffee");
 
   private ZkClient _zkClient;
-  private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
   private HelixBrokerStarter _helixBrokerStarter;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
@@ -77,10 +65,7 @@ public class HelixBrokerStarterTest {
     _pinotResourceManager =
         new PinotHelixResourceManager(ZkStarter.DEFAULT_ZK_STR, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true, /*isUpdateStateModel=*/false);
     _pinotResourceManager.start();
-
-    final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZkStarter.DEFAULT_ZK_STR);
-    _helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, instanceId, /*isUpdateStateModel=*/false);
-    _helixAdmin = _helixZkManager.getClusterManagmentTool();
+    _helixAdmin = _pinotResourceManager.getHelixAdmin();
 
     final Configuration pinotHelixBrokerProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf();
     pinotHelixBrokerProperties.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, 8943);
@@ -97,20 +82,18 @@ public class HelixBrokerStarterTest {
       Thread.sleep(100);
     }
 
-    final String tableName = "dining";
     TableConfig tableConfig =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName).build();
+        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(RAW_DINING_TABLE_NAME).build();
     _pinotResourceManager.addTable(tableConfig);
 
-    for (int i = 1; i <= 5; i++) {
-      addOneSegment(tableName);
+    for (int i = 0; i < 5; i++) {
+      _pinotResourceManager.addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(RAW_DINING_TABLE_NAME),
+          "downloadUrl");
     }
 
     Thread.sleep(1000);
 
-    final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
-        TableNameBuilder.OFFLINE.tableNameWithType(tableName));
-
+    ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, DINING_TABLE_NAME);
     Assert.assertEquals(externalView.getPartitionSet().size(), 5);
   }
 
@@ -188,12 +171,12 @@ public class HelixBrokerStarterTest {
     Arrays.sort(tableArray);
     Assert.assertEquals(Arrays.toString(tableArray), "[coffee_OFFLINE, dining_OFFLINE]");
 
-    Set<String> serverSet = brokerRoutingTableBuilderMap.get(DINING_TABLE_NAME).getRoutingTables().get(0).getServerSet();
-    Assert.assertEquals(brokerRoutingTableBuilderMap.get(DINING_TABLE_NAME).getRoutingTables().get(0)
-        .getSegmentSet(serverSet.iterator().next()).size(), 5);
+    Assert.assertEquals(
+        brokerRoutingTableBuilderMap.get(DINING_TABLE_NAME).getRoutingTables().get(0).values().iterator().next().size(),
+        5);
 
-    final String dataResource = DINING_TABLE_NAME;
-    addOneSegment(dataResource);
+    _pinotResourceManager.addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(RAW_DINING_TABLE_NAME),
+        "downloadUrl");
 
     // Wait up to 30s for external view to reach the expected size
     waitForPredicate(new Callable<Boolean>() {
@@ -214,16 +197,14 @@ public class HelixBrokerStarterTest {
     waitForPredicate(new Callable<Boolean>() {
       @Override
       public Boolean call() throws Exception {
-        ServerToSegmentSetMap routingTable = brokerRoutingTableBuilderMap.get(DINING_TABLE_NAME).getRoutingTables().get(0);
-        String firstServer = routingTable.getServerSet().iterator().next();
-        return routingTable.getSegmentSet(firstServer).size() == SEGMENT_COUNT;
+        Map<String, List<String>> routingTable =
+            brokerRoutingTableBuilderMap.get(DINING_TABLE_NAME).getRoutingTables().get(0);
+        return routingTable.values().iterator().next().size() == SEGMENT_COUNT;
       }
     }, 30000L);
 
-    serverSet = brokerRoutingTableBuilderMap.get(DINING_TABLE_NAME).getRoutingTables().get(0).getServerSet();
     Assert.assertEquals(brokerRoutingTableBuilderMap.get(DINING_TABLE_NAME).getRoutingTables().get(0)
-        .getSegmentSet(serverSet.iterator().next()).size(), SEGMENT_COUNT);
-
+        .values().iterator().next().size(), SEGMENT_COUNT);
   }
 
   private void waitForPredicate(Callable<Boolean> predicate, long timeout) {
@@ -240,22 +221,4 @@ public class HelixBrokerStarterTest {
       Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
     }
   }
-
-  public void testWithCmdLines() throws Exception {
-
-    final BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-    while (true) {
-      final String command = br.readLine();
-      if ((command != null) && command.equals("exit")) {
-        tearDown();
-      }
-    }
-  }
-
-  private void addOneSegment(String tableName) {
-    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(tableName);
-    LOGGER.info("Trying to add IndexSegment : " + segmentMetadata.getName());
-    _pinotResourceManager.addSegment(segmentMetadata, "http://localhost:something");
-  }
-
 }

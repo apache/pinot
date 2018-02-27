@@ -28,7 +28,7 @@ public class TopKDimensionValues {
   private Map<String, Set<String>> topKDimensions;
 
   public TopKDimensionValues() {
-    topKDimensions = new HashMap<String, Set<String>>();
+    topKDimensions = new HashMap<>();
   }
 
   public Map<String, Set<String>> getTopKDimensions() {

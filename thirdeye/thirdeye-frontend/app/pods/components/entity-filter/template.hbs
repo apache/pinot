@@ -1,0 +1,28 @@
+<div class="entity-filter">
+
+  <header class="entity-filter__head">
+    <h3 class="entity-filter__title">{{title}}</h3>
+  </header>
+
+ {{#each filterBlocks as |block|}}
+    <section class="entity-filter__group">
+      <h5 class="entity-filter__group-title">{{block.name}}
+        <a class="entity-filter__group-toggle" {{action "toggleDisplay" block}}>
+          <i class="glyphicon {{if block.isHidden "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+        </a>
+      </h5>
+      <ul class="entity-filter__group-list {{if block.isHidden "entity-filter__group-list--hidden"}}">
+        {{#each block.filtersArray as |filter|}}
+          <li class="entity-filter__group-filter">
+            {{input
+              type="checkbox"
+              isActive=filter.isActive
+              change=(action "onFilterSelection" block.name filter)
+              id=filter.id }}
+            <label class="entity-filter__group-label {{if (gt filter.name.length maxStrLen) 'entity-filter__group-label--truncated'}}" for="{{filter.id}}" title={{filter.id}}> {{filter.name}} </label>
+          </li>
+        {{/each}}
+      </ul>
+    </section>
+  {{/each}}
+</div>

@@ -1,17 +1,16 @@
 <h1 class="te-title">Create An Alert</h1>
-<main class="alert-create paper-container paper-container--padded te-form">
-
+<main class="alert-create card-container card-container--padded te-form">
   <fieldset class="te-form__section te-form__section--first row">
     <div class="col-xs-12">
-      <legend class="te-form__section-title">Metric Details</legend>
+      <legend class="te-form__section-title">Pick a metric to alert</legend>
     </div>
-    <div class="form-group col-xs-12 col-sm-8">
-      <div class="te-page-right te-page-right--inside">
+    <div class="col-xs-12 col-sm-8">
+      <div class="te-page__right te-page__right--inside">
         {{#link-to "self-serve.import-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
           Import a Metric From InGraphs
         {{/link-to}}
       </div>
-      <label for="select-metric" class="control-label te-label required">Search for a Metric</label>
+      <label for="select-metric" class="control-label te-label te-label--taller required">Search for a Metric</label>
       {{#power-select
         search=(perform searchMetricsList)
         selected=selectedMetricOption
@@ -34,8 +33,8 @@
       {{/bs-alert}}
     {{/if}}
 
-    <div class="form-group col-xs-6 col-sm-4">
-      <label for="select-granularity" class="control-label te-label">Desired Granularity</label>
+    <div class="col-xs-6 col-sm-4">
+      <label for="select-granularity" class="control-label te-label te-label--taller">Monitor at this data granularity</label>
       {{#power-select
         options=metricGranularityOptions
         selected=selectedGranularity
@@ -51,24 +50,21 @@
       {{/power-select}}
     </div>
 
-    <div class="form-group col-xs-6">
-      <label for="select-filters" class="control-label te-label required">Filters (optional)</label>
-      {{filter-select
-        options=filters
-        selected=selectedFilters
-        triggerId="select-filters"
-        onChange=(action "onSelectFilter")
-        disabled=isFilterSelectDisabled
-      }}
-    </div>
-
-    <div class="form-group col-xs-6">
-      <label for="select-dimension" class="control-label te-label">Dimension (optional)</label>
+    <div class="col-xs-6">
+      <label for="select-dimension" class="control-label te-label te-label--taller">
+        Create alert for each dimension values in: (optional)
+        <span>
+          <i class="glyphicon glyphicon-question-sign"></i>
+          {{#tooltip-on-element class="te-tooltip"}}
+            For example, selecting Continent means anomalies on each continent will be monitored.
+          {{/tooltip-on-element}}
+        </span>
+      </label>
       {{#power-select
         classNames="te-input"
         options=dimensions
         selected=selectedDimension
-        onchange=(action (mut selectedDimension))
+        onchange=(action "onSelectDimension")
         loadingMessage="Waiting for the server...."
         placeholder="Break Dimensions By..."
         searchPlaceholder="Type to filter..."
@@ -81,25 +77,49 @@
       {{/power-select}}
     </div>
 
+    <div class="col-xs-6">
+      <label for="select-filters" class="control-label te-label te-label--taller required">
+        Filter metric by: (Optional)
+        <span>
+          <i class="glyphicon glyphicon-question-sign"></i>
+          {{#tooltip-on-element class="te-tooltip"}}
+            For example, filter on countryCode::US implies only anomalies in US will be detected.
+          {{/tooltip-on-element}}
+        </span>
+      </label>
+      {{filter-select
+        options=filters
+        selected=selectedFilters
+        triggerId="select-filters"
+        onChange=(action "onSelectFilter")
+        disabled=isFilterSelectDisabled
+      }}
+    </div>
+
     <div class="col-xs-12">
       <div class="te-graph-alert {{if (not isMetricSelected) 'te-graph-alert--pending'}}">
-        {{#if isMetricDataLoading}}
-          <section>
-            <div class="spinner-wrapper--self-serve">
-              {{ember-spinner}}
-            </div>
-          </section>
+        {{#if (or isFetchingDimensions isDimensionFetchDone)}}
+          {{#if isDimensionError}}
+            <div class="te-form__super-label">... error loading subDimensions for <span class="stronger">{{selectedDimension}}</span></div>
+          {{else}}
+            <div class="te-form__super-label">...{{if isDimensionFetchDone 'Displaying' 'Loading'}} top {{availableDimensions}} contributing subDimensions for <span class="stronger">{{selectedDimension}}</span></div>
+          {{/if}}
         {{/if}}
+        {{#if isMetricDataLoading}}{{ember-spinner}}{{/if}}
         {{#if isMetricSelected}}
           {{anomaly-graph
             primaryMetric=selectedMetric
+            selectedDimensions=selectedDimensions
+            dimensions=topDimensions
+            showDimensions=true
             isLoading=loading
             showSubchart=true
-            showLegend=false
-            legendText=legendText
+            showLegend=true
             enableZoom=true
             componentId='create-alert'
             showGraphLegend=false
+            onSelection=(action "onSelection")
+            onPrimaryMetricToggle=(action "onPrimaryMetricToggle")
             height=400
           }}
           <div class="te-form__note">
@@ -113,26 +133,27 @@
         {{/if}}
       </div>
     </div>
-    
+
   </fieldset>
 
-  <fieldset class="te-form__se  ction row">
+  <fieldset class="te-form__section row">
     <div class="col-xs-12">
-      <legend class="te-form__section-title">Detection Configuration</legend>
+      <legend class="te-form__section-title">Define anomaly pattern</legend>
     </div>
+
     {{!-- Field: Pattern --}}
-    <div class="form-group col-xs-6">
-      <label for="select-pattern" class="control-label te-label required">Pattern of Interest *</label>
+    <div class="col-xs-3">
+      <label for="select-pattern" class="control-label te-label te-label--taller required">Anomaly Pattern of Interest</label>
       {{#power-select
         loadingMessage="Waiting for the server...."
         triggerId="select-pattern"
         triggerClass="te-form__select"
-        placeholder="Select a Pattern"
+        placeholder="Pick an anomaly pattern"
         loadingMessage="Please select a metric first"
         options=patternsOfInterest
         searchEnabled=false
         selected=selectedPattern
-        onchange=(action (mut selectedPattern))
+        onchange=(action "onSelectPattern")
         disabled=(not isMetricSelected)
         required=true
         as |name|
@@ -141,52 +162,82 @@
       {{/power-select}}
     </div>
 
-    {{!-- Field: Sensitivity --}}
-    <div class="form-group col-xs-6">
-      <label for="select-sensitivity" class="control-label te-label required">
-        Sensitivity (optional)
-        <span>
-          <i class="glyphicon glyphicon-question-sign"></i>
-          {{#tooltip-on-element}}
-            How sensitive do you want your alert to be?
-          {{/tooltip-on-element}}
-        </span>
-      </label>
-      {{#power-select
-        loadingMessage="Waiting for the server...."
-        triggerId="select-sensitivity"
-        triggerClass="te-form__select"
-        placeholder="Select a sensitivity"
-        loadingMessage="Please select a metric first"
-        options=sensitivityOptions
-        allowClear=true
-        searchEnabled=false
-        selected=selectedSensitivity
-        onchange=(action (mut selectedSensitivity))
-        disabled=(not isMetricSelected)
-        required=true
-        as |sensitivity|
-      }}
-  
-        {{sensitivity}}
-      {{/power-select}}
+    {{!-- Field: Sensitivity with mode option --}}
+    <div class="te-form__vertical-block col-xs-12">
+      <label for="select-sensitivity" class="control-label te-label te-label--taller required">ThirdEye will determine anomaly by (optional)</label>
+      <div class="te-form__indent-block">
+        <ul class="te-form__list col-xs-12 col-sm-8">
+          <li class="te-form__list-item">
+            {{#radio-button value="current" groupValue=selectedTuneType}}
+              <div class="te-form__list-label">Automatically tune alert settings</div>
+            {{/radio-button}}
+          </li>
+          <li class="te-form__list-item">
+            {{#radio-button value="custom" groupValue=selectedTuneType}}
+              <div class="te-form__list-label">Customize alert settings</div>
+            {{/radio-button}}
+           </li>
+        </ul>
+      </div>
+      <div class="te-form__indent-block te-form__indent-block--custom col-xs-12">
+        <label for="alert-tune-severity" class="te-form__list-label">When</label>
+        <div class="te-form__tune-field">
+          {{#power-select
+            triggerId="alert-tune-severity"
+            triggerClass="te-form__tune-field"
+            verticalPosition="below"
+            placeholder="Select detection option"
+            options=tuneSeverityOptions
+            searchEnabled=false
+            selected=selectedSeverityOption
+            onchange=(action (mut selectedSeverityOption))
+            disabled=isCustomFieldsDisabled
+            as |severity|
+          }}
+            {{severity}}
+          {{/power-select}}
+        </div>
+        <label for="custom-tune-percent" class="te-form__list-label">is >=</label>
+        <div class="te-form__tune-field te-form__tune-field--amount">
+          {{input
+            type="text"
+            id="custom-tune-percent"
+            class="form-control te-input te-input"
+            value=customPercentChange
+            disabled=isCustomFieldsDisabled
+          }}
+        </div>
+        <span class="te-form__list-label--suffix">{{sensitivityUnits}}, </span>
+        <label for="custom-tune-mttd" class="te-form__list-label">MTTD should be no more than</label>
+        <div class="te-form__tune-field te-form__tune-field--amount">
+          {{input
+            type="text"
+            id="custom-tune-mttd"
+            class="form-control te-input"
+            value=customMttdChange
+            disabled=isCustomFieldsDisabled
+          }}
+        </div>
+        <span class="te-form__list-label">hours</span>
+      </div>
     </div>
 
     {{!-- Field: Weekly Effect --}}
     {{#if (eq selectedGranularity 'DAYS')}}
-      <div class="form-group col-xs-6">
-        <label for="select-effect" class="control-label te-label required">
+      <div class="col-xs-6">
+        <label for="select-effect" class="control-label te-label te-label--taller required">
           Weekly Seasonality *
           <span>
             <i class="glyphicon glyphicon-question-sign"></i>
-            {{#tooltip-on-element}}
+            {{#tooltip-on-element class="te-tooltip"}}
               Does your metric behave differently depending on the day of the week?
             {{/tooltip-on-element}}
           </span>
         </label>
-        {{#x-toggle 
-          value=selectedWeeklyEffect 
+        {{#x-toggle
+          value=selectedWeeklyEffect
           classNames="te-toggle te-toggle--form te-toggle--left"
+          id="select-effect"
           theme='ios'
           showLabels=true
           name="splitViewToggle"
@@ -194,10 +245,10 @@
           onToggle=(action (mut selectedWeeklyEffect))
           as |toggle|}}
             {{#toggle.label value=selectedWeeklyEffect}}
-              <span class="te-label te-label--flush">{{if selectedWeeklyEffect 'True' 'False'}}</span>
+              <span class="te-label te-label--taller te-label te-label--taller--flush">{{if selectedWeeklyEffect 'True' 'False'}}</span>
             {{/toggle.label}}
             {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
-        {{/x-toggle}} 
+        {{/x-toggle}}
       </div>
     {{/if}}
 
@@ -205,14 +256,14 @@
 
   <fieldset class="te-form__section row">
     <div class="col-xs-12">
-      <legend class="te-form__section-title">Alert Details</legend>
+      <legend class="te-form__section-title">Notifications Settings</legend>
     </div>
 
     {{!-- Field: Alert Name --}}
-    <div class="form-group col-xs-12">
-      <label for="anomaly-form-function-name" class="control-label te-label required">
-        Alert Name *
-        <div class="te-form__sub-label">Please follow this naming convention: <span class="te-form__sub-label--strong">productName_metricName_dimensionName_other</span></div>
+    <div class="col-xs-12">
+      <label for="anomaly-form-function-name" class="control-label te-label te-label--taller required">
+        Name this alert
+        <div class="te-form__sub-label">Please follow this naming convention: <span class="te-form__sub-label--strong">applicationName_metricName_dimensionName_other</span></div>
       </label>
       {{#if isAlertNameDuplicate}}
         <div class="te-form__alert--warning alert-warning">Warning: <strong>{{alertFunctionName}}</strong> already exists. Please try another name.</div>
@@ -223,22 +274,21 @@
         class="form-control te-input"
         placeholder="Add a descriptive alert name"
         value=alertFunctionName
-        focus-out="validateAlertName"
-        key-up="validateAlertName"
+        key-up=(action "validateAlertName" alertFunctionName true)
         disabled=(not isMetricSelected)
       }}
     </div>
 
-
     {{!-- Field: App Name --}}
-    <div class="form-group col-xs-12">
-      <label for="anomaly-form-app-name" class="control-label te-label required">Related Product or Team *</label>
+    <div class="col-xs-12">
+      <label for="anomaly-form-app-name" class="control-label te-label te-label--taller required">Alert belongs to</label>
        {{#power-select
           options=allApplicationNames
           selected=selectedAppName
+          searchField="application"
           onchange=(action "onSelectAppName")
           loadingMessage="Waiting for the server...."
-          placeholder="Select an existing product/team name"
+          placeholder="Pick a related application, product or team"
           searchPlaceholder="Type to filter..."
           triggerId="anomaly-form-app-name"
           triggerClass="te-form__select"
@@ -247,18 +297,23 @@
         }}
           {{app.application}}
         {{/power-select}}
+
+        {{!-- Loader for submit button --}}
+        {{#if isProcessingForm}}
+          <div class="spinner-wrapper--self-serve">{{ember-spinner}}</div>
+        {{/if}}
     </div>
 
-
-
     {{!-- Field: Select Existing Subscription Group --}}
-    <div class="form-group col-sm-6">
-      <label for="config-group" class="control-label te-label">Add This Alert To An Existing Subscription Group</label>
+    <div class="col-sm-6">
+      <label for="config-group" class="control-label te-label te-label--taller">Add This Alert To An Existing Subscription Group</label>
       {{#power-select
         options=filteredConfigGroups
         selected=selectedConfigGroup
+        searchField="name"
         onchange=(action "onSelectConfigGroup")
         disabled=(not isMetricSelected)
+        searchField="name"
         loadingMessage="Waiting for the server...."
         placeholder="Select an existing alert subscription group"
         searchPlaceholder="Type to filter..."
@@ -270,8 +325,8 @@
       {{/power-select}}
     </div>
     {{!--  Fields for new alert group creation --}}
-    <div class="form-group col-sm-6">
-      <label for="config-group-new-name" class="control-label te-label"><strong>Or</strong> Provide A New Subscription Group Name</label>
+    <div class="col-sm-6">
+      <label for="config-group-new-name" class="control-label te-label te-label--taller"><strong>Or</strong> create new subscription group</label>
       {{#if isGroupNameDuplicate}}
         <div class="te-form__alert--warning alert-warning">Warning: <strong>{{newConfigGroupName}}</strong> already exists. Please try another name.</div>
       {{/if}}
@@ -288,7 +343,7 @@
     </div>
     {{!-- Alert Group Metadata --}}
     {{#if selectedConfigGroup}}
-      <div class="form-group col-xs-12">
+      <div class="col-xs-12">
         {{#if selectedGroupFunctions.length}}
           {{#bs-accordion as |acc|}}
             {{#acc.item class="te-form__custom-label" title=selectedConfigGroupSubtitle}}
@@ -307,13 +362,19 @@
       </div>
     {{/if}}
     {{!-- Field: new alert group recipient emails --}}
-    <div class="form-group col-xs-12">
-      <label for="config-group" class="control-label te-label">
-        Add Alert Notification Recipients *
-        <div class="te-form__sub-label">Current recipients: <span class="te-form__sub-label--strong">{{if selectedGroupRecipients selectedGroupRecipients "None"}}</span></div>
+    <div class="col-xs-12">
+      <label for="config-group" class="control-label te-label te-label--taller">
+        Recipients in subscription group <span class="stronger">{{selectedConfigGroup.name}}</span>:
+        <div class="te-form__sub-label"><span class="te-form__sub-label--strong">{{if selectedGroupRecipients selectedGroupRecipients "No recipients yet"}}</span></div>
       </label>
       {{#if isDuplicateEmail}}
         <div class="te-form__alert--warning alert-warning">Warning: <strong>{{duplicateEmails}}</strong> is already included in this group.</div>
+      {{/if}}
+      {{#if isEmptyEmail}}
+        <div class="te-form__alert--warning alert-warning">Warning: Please provide a notification email for this group!</div>
+      {{/if}}
+      {{#if isEmailError}}
+        <div class="te-form__alert--warning alert-warning">Warning: Please check formatting of these LinkedIn email addresses</div>
       {{/if}}
       {{input
         type="email"
@@ -321,7 +382,7 @@
         class="form-control te-input"
         focus-out="validateAlertEmail"
         key-up="validateAlertEmail"
-        placeholder="Add additional recipients (comma-separated email addresses)"
+        placeholder="Add recipients. Type email addresses, separated by commas"
         autocomplete=false
         value=alertGroupNewRecipient
         disabled=(not isMetricSelected)
@@ -329,41 +390,6 @@
       }}
     </div>
   </fieldset>
-
-  {{#if isCreateAlertSuccess}}
-    {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
-      <strong>Create Alert Success!</strong> You have created anomaly alert Id <strong>{{finalFunctionId}}</strong>
-      {{#if selectedConfigGroup}}
-        ... and assigned it to existing notification group <strong>{{selectedConfigGroup.name}}</strong>.
-      {{/if}}
-    {{/bs-alert}}
-  {{/if}}
-
-  {{#if isCreateAlertError}}
-    {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
-      <strong>Create Alert Error!</strong> Alert creation has failed. Please try again.
-    {{/bs-alert}}
-  {{/if}}
-
-  {{#if isCreateGroupSuccess}}
-    {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
-      <strong>New Group Success!</strong> You have created anomaly notification group <strong>{{newConfigGroupName}}</strong>.
-    {{/bs-alert}}
-  {{/if}}
-
-  {{#if isReplayStarted}}
-    {{#bs-alert type=bsAlertBannerType class="te-form__banner" classNameBindings="replayStatusClass"}}
-      {{#if isReplayStatusPending}}
-        ...triggering replay. Please wait.
-      {{/if}}
-      {{#if isReplayStatusSuccess}}
-        <strong>Replay Success!</strong> The replay of anomaly alert <strong>{{alertFunctionName}}</strong> has started processing.
-      {{/if}}
-      {{#if isReplayStatusError}}
-        <strong>Replay Warning:</strong> {{failureMessage}}
-      {{/if}}
-    {{/bs-alert}}
-  {{/if}}
 
   <fieldset class="te-form__section-submit">
     {{bs-button
@@ -391,8 +417,6 @@
         class="te-button te-button--submit"
       }}
     {{/if}}
-
   </fieldset>
-
   {{outlet}}
 </main>

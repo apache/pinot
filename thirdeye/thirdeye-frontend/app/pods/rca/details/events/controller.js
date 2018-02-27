@@ -1,7 +1,8 @@
-import Ember from 'ember';
+import { debounce } from '@ember/runloop';
+import Controller from '@ember/controller';
 import moment from 'moment';
 
-export default Ember.Controller.extend({
+export default Controller.extend({
   eventStart: 0,
   eventEnd: 0,
   displayStart: 0,
@@ -25,7 +26,7 @@ export default Ember.Controller.extend({
      * Handles subchart date change (debounced)
      */
     setDateParams([start, end]) {
-      Ember.run.debounce(this, this.get('actions.setNewDate'), { start, end }, 500);
+      debounce(this, this.get('actions.setNewDate'), { start, end }, 500);
     }
   }
 });

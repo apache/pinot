@@ -117,7 +117,7 @@ public class IndexingConfigTest {
     List<String> expectedDimensionSplitOrder = Arrays.asList("col1", "col2", "col3");
     expectedStarTreeSpec.setDimensionsSplitOrder(expectedDimensionSplitOrder);
 
-    Integer expectedMaxLeafRecords = random.nextInt();
+    int expectedMaxLeafRecords = random.nextInt();
     expectedStarTreeSpec.setMaxLeafRecords(expectedMaxLeafRecords);
 
     int expectedSkipMaterializationThreshold = random.nextInt();
@@ -141,9 +141,9 @@ public class IndexingConfigTest {
     Assert.assertEquals(actualStarTreeSpec.getDimensionsSplitOrder(), expectedDimensionSplitOrder);
     Assert.assertEquals(actualStarTreeSpec.getMaxLeafRecords(), expectedMaxLeafRecords);
 
-    Assert.assertEquals(actualStarTreeSpec.getskipMaterializationCardinalityThreshold(),
+    Assert.assertEquals(actualStarTreeSpec.getSkipMaterializationCardinalityThreshold(),
         expectedSkipMaterializationThreshold);
-    Assert.assertEquals(actualStarTreeSpec.getskipMaterializationForDimensions(),
+    Assert.assertEquals(actualStarTreeSpec.getSkipMaterializationForDimensions(),
         expectedSkipMaterializationDimensions);
     Assert.assertEquals(actualStarTreeSpec.getSkipStarNodeCreationForDimensions(),
         expectedSkipStarNodeCreationForDimension);

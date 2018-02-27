@@ -27,6 +27,10 @@ public class AuthConfiguration {
 
   Set<String> allowedPaths = new HashSet<>();
 
+  long cacheTTL; // in seconds
+
+  long cookieTTL; // in seconds
+
   public Set<String> getAllowedPaths() {
     return allowedPaths;
   }
@@ -73,5 +77,21 @@ public class AuthConfiguration {
 
   public void setAdminUsers(List<String> adminUsers) {
     this.adminUsers = adminUsers;
+  }
+
+  public long getCacheTTL() {
+    return cacheTTL;
+  }
+
+  public void setCacheTTL(long cacheTTL) {
+    this.cacheTTL = cacheTTL;
+  }
+
+  public long getCookieTTL() {
+    return cookieTTL;
+  }
+
+  public void setCookieTTL(long cookieTTL) {
+    this.cookieTTL = cookieTTL;
   }
 }

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.config;
 
 import com.linkedin.pinot.common.utils.DataSize;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationRuntimeException;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
@@ -72,5 +73,26 @@ public class QuotaConfig {
       LOGGER.error("Failed to convert storage quota config: {} to bytes", _storage);
       throw new ConfigurationRuntimeException("Failed to convert storage quota config: " + _storage + " to bytes");
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    QuotaConfig that = (QuotaConfig) o;
+
+    return EqualityUtils.isEqual(_storage, that._storage);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_storage);
+    return result;
   }
 }

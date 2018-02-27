@@ -21,6 +21,13 @@ import java.io.Closeable;
 public interface Dictionary extends Closeable {
   int NULL_VALUE_INDEX = -1;
 
+  /**
+   * Returns index of the object in the dictionary.
+   * Returns -1, if the object does not exist in the dictionary.
+   *
+   * @param rawValue Object for which to find the index.
+   * @return Index of object, or -1 if not found.
+   */
   int indexOf(Object rawValue);
 
   Object get(int dictId);
@@ -37,6 +44,8 @@ public interface Dictionary extends Closeable {
 
   int length();
 
+  boolean isSorted();
+
   // Batch read APIs
 
   void readIntValues(int[] dictIds, int inStartPos, int length, int[] outValues, int outStartPos);
@@ -48,4 +57,5 @@ public interface Dictionary extends Closeable {
   void readDoubleValues(int[] dictIds, int inStartPos, int length, double[] outValues, int outStartPos);
 
   void readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos);
+
 }

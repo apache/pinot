@@ -15,49 +15,35 @@
  */
 package com.linkedin.pinot.core.util.trace;
 
-import com.linkedin.pinot.common.request.InstanceRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.concurrent.Callable;
 
+
 /**
- * Wrap a {@link Callable} so that the thread executes this job
- * will be automatically registered/unregistered to/from a request.
- *
+ * Wrapper class for {@link Callable} to automatically register/un-register itself to/from a request.
  */
 public abstract class TraceCallable<V> implements Callable<V> {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(TraceCallable.class);
-
-  private final InstanceRequest request;
-  private final Trace parent;
-
-  public TraceCallable(InstanceRequest request, Trace parent) {
-    if (request == null) {
-      LOGGER.warn("Passing null request to TraceRunnable, maybe forget to register the request in current thread.");
-    }
-    this.request = request;
-    this.parent = parent;
-  }
+  private final TraceContext.TraceEntry _parentTraceEntry;
 
   /**
-   * Only works when the calling thread has registered the requestId
+   * If trace is not enabled, parent trace entry will be null.
    */
   public TraceCallable() {
-    this(TraceContext.getRequestForCurrentThread(), TraceContext.getLocalTraceForCurrentThread());
+    _parentTraceEntry = TraceContext.getTraceEntry();
   }
 
   @Override
   public V call() throws Exception {
-    if (request != null) TraceContext.registerThreadToRequest(request, parent);
+    if (_parentTraceEntry != null) {
+      TraceContext.registerThreadToRequest(_parentTraceEntry);
+    }
     try {
       return callJob();
     } finally {
-      if (request != null) TraceContext.unregisterThreadFromRequest();
+      if (_parentTraceEntry != null) {
+        TraceContext.unregisterThreadFromRequest();
+      }
     }
   }
 
   public abstract V callJob() throws Exception;
-
 }

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import java.io.IOException;
 import java.net.URLEncoder;
 import org.apache.avro.reflect.Nullable;
 import org.apache.commons.lang.StringUtils;
@@ -179,6 +180,11 @@ public class ControllerRequestURLBuilder {
     System.out.println(ControllerRequestURLBuilder.baseUrl("localhost:8089").forInstanceCreate());
   }
 
+  public String forSegmentDownload(String tableName, String segmentName) throws IOException {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName,
+        URLEncoder.encode(segmentName, "UTF-8"));
+  }
+
   public String forSegmentDelete(String resourceName, String segmentName) {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "datafiles", resourceName, segmentName);
   }
@@ -213,5 +219,8 @@ public class ControllerRequestURLBuilder {
 
   public String forSegmentListAPIWithTableType(String tableName, String tableType) {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName + "?type=" + tableType);
+  }
+  public String forSegmentListAPI(String tableName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName);
   }
 }

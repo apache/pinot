@@ -5,9 +5,9 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
@@ -15,15 +15,15 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 
-import com.linkedin.thirdeye.tools.FetchMetricDataAndExistingAnomaliesTool.TimeGranularity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class FetchMetricDataInRangeAndOutputCSV {
   private static final Logger LOG = LoggerFactory.getLogger(FetchAnomaliesInRangeAndOutputCSV.class);
-  private static final String DEFAULT_HOST = "http://localhost";
+  private static final String DEFAULT_HOST = "localhost";
   private static final String DEFAULT_PORT = "1426";
+  private static final String AUTHENTICATION_TOKEN = "";
 
   /**
    * Fetch metric historical data from server and parse the json object
@@ -39,7 +39,7 @@ public class FetchMetricDataInRangeAndOutputCSV {
    *             8: filter in json format, ex: {"channel":["guest-email","guest-sms"]}
    *             9: Output path
    */
-  public static void main(String[] args){
+  public static void main(String[] args) {
     if(args.length < 10){
       LOG.error("Error: Insufficient number of arguments", new IllegalArgumentException());
       return;
@@ -58,7 +58,7 @@ public class FetchMetricDataInRangeAndOutputCSV {
     DateTime monitoringWindowStartTime = ISODateTimeFormat.dateTimeParser()
         .parseDateTime(monitoringStartTime).withZone(dateTimeZone);
     String aggTimeGranularity = args[6];
-    TimeGranularity timeGranularity = TimeGranularity.fromString(aggTimeGranularity);
+    TimeUnit timeUnit = TimeUnit.valueOf(aggTimeGranularity);
     File output_folder = new File(args[9]);
 
     if(!output_folder.exists() || !output_folder.canWrite()){
@@ -66,14 +66,14 @@ public class FetchMetricDataInRangeAndOutputCSV {
       return;
     }
 
-    if(timeGranularity == null){
+    if(timeUnit == null){
       LOG.error("Illegal time granularity");
       return;
     }
 
     // Training data range
     Period period = null;
-    switch (timeGranularity) {
+    switch (timeUnit) {
       case DAYS:
         period = new Period(0, 0, 0, Integer.valueOf(monitoringLength), 0, 0, 0, 0);
         break;
@@ -97,9 +97,9 @@ public class FetchMetricDataInRangeAndOutputCSV {
     try {
       FetchMetricDataAndExistingAnomaliesTool thirdEyeDAO =
           new FetchMetricDataAndExistingAnomaliesTool(new File(path2PersistenceFile));
-      metricContent = thirdEyeDAO.fetchMetric(DEFAULT_HOST, Integer.valueOf(DEFAULT_PORT), dataset,
+      metricContent = thirdEyeDAO.fetchMetric(DEFAULT_HOST, Integer.valueOf(DEFAULT_PORT), AUTHENTICATION_TOKEN, dataset,
           metric, dataRangeStart, dataRangeEnd,
-          FetchMetricDataAndExistingAnomaliesTool.TimeGranularity.fromString(aggTimeGranularity), dimensions,
+          timeUnit, dimensions,
           filters, dateTimeZone.getID());
 
       BufferedWriter bw = new BufferedWriter(new FileWriter(fname));

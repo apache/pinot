@@ -36,4 +36,9 @@ public class HolidayEventEntity extends EventEntity {
     String urn = TYPE.formatURN(dto.getId());
     return new HolidayEventEntity(urn, score, new ArrayList<Entity>(), dto.getId(), dto);
   }
+
+  public static HolidayEventEntity fromDTO(double score, List<? extends Entity> related, EventDTO dto) {
+    String urn = TYPE.formatURN(dto.getId());
+    return new HolidayEventEntity(urn, score, related, dto.getId(), dto);
+  }
 }

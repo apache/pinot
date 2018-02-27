@@ -1,0 +1,128 @@
+{{#if isDataLoading}}
+  <div class="te-alert-page-pending">
+    <img src="{{rootURL}}assets/images/te-alert-{{if isDataLoadingError "error" "pending"}}.png" class="te-alert-page-pending__image {{if isDataLoadingError "te-alert-page-pending__image--error"}}" alt="alertData.Setup is Processing">
+    <h2 class="te-alert-page-pending__title">{{if isDataLoadingError "Oops, something went wrong." "Aggregating anomaly performance data..."}}</h2>
+    {{#if (not isDataLoadingError)}}<div class="te-alert-page-pending__loader"></div>{{/if}}
+    <p class="te-alert-page-pending__text">
+      {{#if isDataLoadingError}}
+        The performance data cannot be retrieved.
+      {{else}}
+        Fetching all app-related anomaly data for all alerts may take up to a minute. <br/>Hang in there!
+      {{/if}}
+    </p>
+  </div>
+{{else}}
+  <div class="manage-alert-tune">
+    <div class="te-content-block">
+      <h4 class="te-alert-page__subtitle">Alert Performance by Application Group</h4>
+      <a class="te-pill-selectors__side-link te-pill-selectors__side-link--{{viewTotalsState}}" {{action (toggle "viewTotals" this)}}>View total values</a>
+      <a class="te-pill-selectors__side-link te-pill-selectors__side-link--{{viewAvgState}}" {{action (toggle "viewTotals" this)}}>View average values</a>
+      {{!-- Alert anomaly table --}}
+      <table class="te-anomaly-table te-anomaly-table--performance">
+        <thead>
+          <tr class="te-anomaly-table__row te-anomaly-table__head">
+           <th class="te-anomaly-table__cell-head">
+              <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "name"}}>
+                Appp
+                <i class="te-anomaly-table__icon te-anomaly-table__icon--small glyphicon glyphicon-menu-{{sortMenuGlyph.name}}"></i>
+              </a>
+             </th>
+             <th class="te-anomaly-table__cell-head">
+              <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "alert"}}>
+                Alerts
+                <i class="te-anomaly-table__icon te-anomaly-table__icon--small glyphicon glyphicon-menu-{{sortMenuGlyph.alert}}"></i>
+              </a>
+             </th>
+             <th class="te-anomaly-table__cell-head">
+              <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "anomaly"}}>
+                Anomalies
+                <i class="te-anomaly-table__icon te-anomaly-table__icon--small glyphicon glyphicon-menu-{{sortMenuGlyph.anomaly}}"></i>
+              </a>
+             </th>
+             <th class="te-anomaly-table__cell-head">
+              <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "user"}}>
+                User-rep
+                <i class="te-anomaly-table__icon te-anomaly-table__icon--small glyphicon glyphicon-menu-{{sortMenuGlyph.user}}"></i>
+              </a>
+            </th>
+             <th class="te-anomaly-table__cell-head">
+              <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "responses"}}>
+                Responses
+                <i class="te-anomaly-table__icon te-anomaly-table__icon--small glyphicon glyphicon-menu-{{sortMenuGlyph.responses}}"></i>
+              </a>
+             </th>
+             <th class="te-anomaly-table__cell-head">
+              <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "resrate"}}>
+                Response rate
+                <i class="te-anomaly-table__icon te-anomaly-table__icon--small glyphicon glyphicon-menu-{{sortMenuGlyph.resrate}}"></i>
+              </a>
+            </th>
+             <th class="te-anomaly-table__cell-head">
+              <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "precision"}}>
+                Precision
+                <i class="te-anomaly-table__icon te-anomaly-table__icon--small glyphicon glyphicon-menu-{{sortMenuGlyph.precision}}"></i>
+              </a>
+            </th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {{#each applications as |app|}}
+            <tr class="te-anomaly-table__row">
+              <td class="te-anomaly-table__cell te-anomaly-table__list-item te-anomaly-table__list-item--stronger">{{app.name}}</td>
+              <td class="te-anomaly-table__cell">{{app.alerts}}</td>
+              <td class="te-anomaly-table__cell">
+                {{performance-tooltip
+                  data=app.data.totalAlerts
+                  category="Anomalies"
+                  viewTotals=viewTotals
+                }}
+              </td>
+              <td class="te-anomaly-table__cell">
+                {{performance-tooltip
+                  data=app.data.userReportAnomaly
+                  category="User reported anomalies"
+                  viewTotals=viewTotals
+                }}
+              </td>
+              <td class="te-anomaly-table__cell">
+                <div class="te-performance-metric">
+                  {{performance-tooltip
+                   data=app.data.totalResponses
+                   category="Total Responses"
+                   viewTotals=viewTotals
+                  }}
+                </div>
+                <div class="te-performance-metric__subset">
+                  ( T: {{performance-tooltip
+                         data=app.data.trueAnomalies
+                         category="True anomalies"
+                         viewTotals=viewTotals
+                       }} |
+                  F: {{performance-tooltip
+                       data=app.data.falseAlarm
+                       category="False anomalies"
+                       viewTotals=viewTotals
+                     }} |
+                  N: {{performance-tooltip
+                       data=app.data.newTrend
+                       category="New trend anomalies"
+                       viewTotals=viewTotals
+                     }} )
+              </div>
+              </td>
+              <td class="te-anomaly-table__cell">
+                {{app.data.responseRate}}
+                <span class="te-anomaly-table__list-item te-anomaly-table__list-item--smaller">%</span>
+              </td>
+              <td class="te-anomaly-table__cell">
+                {{app.data.precision}}
+                <span class="te-anomaly-table__list-item te-anomaly-table__list-item--smaller">%</span>
+              </td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{{/if}}

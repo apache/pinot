@@ -81,12 +81,12 @@ public class TablesResource {
     if (serverInstance == null) {
       throw new WebApplicationException("Server initialization error. Missing server instance");
     }
-    InstanceDataManager dataManager = (InstanceDataManager) serverInstance.getInstanceDataManager();
-    if (dataManager == null) {
+    InstanceDataManager instanceDataManager = serverInstance.getInstanceDataManager();
+    if (instanceDataManager == null) {
       throw new WebApplicationException("Server initialization error. Missing data manager",
           Response.Status.INTERNAL_SERVER_ERROR);
     }
-    return dataManager;
+    return instanceDataManager;
   }
 
   private TableDataManager checkGetTableDataManager(String tableName) {

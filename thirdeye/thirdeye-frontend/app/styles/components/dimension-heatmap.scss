@@ -12,8 +12,23 @@
 }
 
 .analysis-tooltip {
-  font-size: 12px;
-  font-weight: lighter;
+  font-size: 14px;
+}
+
+.analysis-tooltip__header {
+  font-weight: bold;
+}
+
+.analysis-tooltip__column {
+  text-align: right;
+}
+
+.analysis-tooltip__column-header {
+  text-align: left;
+}
+
+.analysis-tooltip__container {
+  width: 400px;
 }
 
 .analysis-tooltip__list {
@@ -27,9 +42,10 @@
   justify-content: space-between;
 }
 
-#tooltip {
+#tooltip,
+#heatmap-tooltip {
   position: absolute;
-  width: 220px;
+  min-width: 300px;
   height: auto;
   padding: 10px;
   background-color: white;
@@ -40,13 +56,14 @@
   -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
   box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
   pointer-events: none;
+
+  &.hidden {
+    display: none;
+  }
+
+  & p {
+    margin: 0;
+    font-size: 13px;
+  }
 }
 
-#tooltip.hidden {
-  display: none;
-}
-
-#tooltip p {
-  margin: 0;
-  font-size: 13px;
-}

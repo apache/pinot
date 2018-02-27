@@ -33,7 +33,7 @@ import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByResul
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.startree.hll.HllConfig;
+import com.linkedin.pinot.startree.hll.HllConfig;
 import java.io.File;
 import java.net.URL;
 import java.util.Arrays;
@@ -108,10 +108,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     AggregationOperator aggregationOperator = getOperatorForQuery(BASE_QUERY);
     IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) aggregationOperator.nextBlock();
     ExecutionStatistics executionStatistics = aggregationOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 1L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 2L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 1L, 0L, 2L, 30000L);
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 21L);
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1762L);
@@ -119,10 +116,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     aggregationOperator = getOperatorForQueryWithFilter(BASE_QUERY);
     resultsBlock = (IntermediateResultsBlock) aggregationOperator.nextBlock();
     executionStatistics = aggregationOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 6129L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 85248L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 12258L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 6129L, 112472L, 12258L, 30000L);
     aggregationResult = resultsBlock.getAggregationResult();
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 17L);
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1197L);
@@ -130,10 +124,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     AggregationGroupByOperator aggregationGroupByOperator = getOperatorForQuery(BASE_QUERY + GROUP_BY);
     resultsBlock = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
     executionStatistics = aggregationGroupByOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 4613L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 13839L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 4613L, 0L, 13839L, 30000L);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     GroupKeyGenerator.GroupKey firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
     Assert.assertEquals(firstGroupKey._stringKey, "");
@@ -145,7 +136,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 4L, 0L, 8L, 120000L, new String[]{"21", "1762"});
     // Test inter segments query with filter
     brokerResponse = getBrokerResponseForQueryWithFilter(BASE_QUERY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 340992L, 49032L, 120000L,
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 449888L, 49032L, 120000L,
         new String[]{"17", "1197"});
     // Test inter segments query with group-by
     brokerResponse = getBrokerResponseForQuery(BASE_QUERY + GROUP_BY);
@@ -164,10 +155,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     AggregationOperator aggregationOperator = getOperatorForQuery(BASE_QUERY);
     IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) aggregationOperator.nextBlock();
     ExecutionStatistics executionStatistics = aggregationOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 60000L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 30000L, 0L, 60000L, 30000L);
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 21L);
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1762L);
@@ -175,10 +163,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     aggregationOperator = getOperatorForQueryWithFilter(BASE_QUERY);
     resultsBlock = (IntermediateResultsBlock) aggregationOperator.nextBlock();
     executionStatistics = aggregationOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 6129L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 84134L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 12258L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 6129L, 84134L, 12258L, 30000L);
     aggregationResult = resultsBlock.getAggregationResult();
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(0)).cardinality(), 17L);
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1197L);
@@ -186,10 +171,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     AggregationGroupByOperator aggregationGroupByOperator = getOperatorForQuery(BASE_QUERY + GROUP_BY);
     resultsBlock = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
     executionStatistics = aggregationGroupByOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 90000L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 30000L, 0L, 90000L, 30000L);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     GroupKeyGenerator.GroupKey firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
     Assert.assertEquals(firstGroupKey._stringKey, "");
@@ -253,7 +235,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     if (hasPreGeneratedHllColumns) {
       segmentGeneratorConfig.setHllConfig(new HllConfig(HLL_LOG2M));
     } else {
-      segmentGeneratorConfig.setEnableStarTreeIndex(true);
+      segmentGeneratorConfig.enableStarTreeIndex(null);
       // Intentionally use the non-default suffix
       segmentGeneratorConfig.setHllConfig(
           new HllConfig(HLL_LOG2M, new HashSet<>(Arrays.asList("column17", "column18")), "_HLL"));

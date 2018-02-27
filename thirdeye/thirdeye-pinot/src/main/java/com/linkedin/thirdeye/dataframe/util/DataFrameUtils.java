@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dataframe.util;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
@@ -20,11 +21,14 @@ import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponseRow;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
+import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
+import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 
 /**
@@ -123,26 +127,37 @@ public class DataFrameUtils {
       values[i] = MetricExpression.evaluateExpression(me, context);
     }
 
-    df.addSeries(COL_VALUE, values);
+    // drop intermediate columns
+    for(MetricFunction f : functions) {
+      df.dropSeries(f.toString());
+    }
 
-    return df;
+    return df.addSeries(COL_VALUE, values);
   }
 
   /**
-   * Returns the DataFrame with timestamps offset with by a start offset and an interval.
+   * Returns the DataFrame with timestamps aligned to a start offset and an interval. Also, missing
+   * rows (between {@code start} and {@code end} in {@code interval} steps) are fill in with NULL
+   * values.
    *
    * @param df thirdeye response dataframe
    * @param start start offset
+   * @param end end offset
    * @param interval timestep multiple
    * @return dataframe with modified timestamps
    */
-  public static DataFrame offsetTimestamps(DataFrame df, final long start, final long interval) {
-    return df.mapInPlace(new Series.LongFunction() {
+  public static DataFrame alignTimestamps(DataFrame df, final long start, final long end, final long interval) {
+    int count = (int)((end - start) / interval);
+    LongSeries timestamps = LongSeries.sequence(start, count, interval);
+    DataFrame dfTime = new DataFrame(COL_TIME, timestamps);
+    DataFrame dfOffset = new DataFrame(df).mapInPlace(new Series.LongFunction() {
       @Override
       public long apply(long... values) {
         return (values[0] * interval) + start;
       }
     }, COL_TIME);
+
+    return dfTime.joinLeft(dfOffset);
   }
 
   /**
@@ -173,8 +188,9 @@ public class DataFrameUtils {
    * @return response as dataframe
    */
   public static DataFrame evaluateResponse(ThirdEyeResponse response, TimeSeriesRequestContainer rc) throws Exception {
-    long start = (long) Math.ceil(rc.start / (double) rc.interval) * rc.interval;
-    return offsetTimestamps(evaluateExpressions(parseResponse(response), rc.getExpressions()), start, rc.getInterval());
+    long start = ((rc.start + rc.interval - 1) / rc.interval) * rc.interval;
+    long end = ((rc.end + rc.interval - 1) / rc.interval) * rc.interval;
+    return alignTimestamps(evaluateExpressions(parseResponse(response), rc.getExpressions()), start, end, rc.getInterval());
   }
 
   /**
@@ -246,6 +262,49 @@ public class DataFrameUtils {
 
   /**
    * Constructs and wraps a request for a metric with derived expressions. Resolves all
+   * required dependencies from the Thirdeye database. Also aligns start and end timestamps by
+   * rounding them down (start) and up (end) to align with metric time granularity boundaries.
+   * <br/><b>NOTE:</b> the aligned end timestamp is still exclusive.
+   *
+   * @param slice metric data slice
+   * @param reference unique identifier for request
+   * @param metricDAO metric config DAO
+   * @param datasetDAO dataset config DAO
+   * @return TimeSeriesRequestContainer
+   * @throws Exception
+   */
+  public static TimeSeriesRequestContainer makeTimeSeriesRequestAligned(MetricSlice slice, String reference, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) throws Exception {
+    MetricConfigDTO metric = metricDAO.findById(slice.metricId);
+    if(metric == null)
+      throw new IllegalArgumentException(String.format("Could not resolve metric id %d", slice.metricId));
+
+    DatasetConfigDTO dataset = datasetDAO.findByDataset(metric.getDataset());
+    if(dataset == null)
+      throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for metric id '%d'", metric.getDataset(), metric.getId()));
+
+    List<MetricExpression> expressions = Utils.convertToMetricExpressions(metric.getName(),
+        metric.getDefaultAggFunction(), metric.getDataset());
+
+    TimeGranularity granularity = dataset.bucketTimeGranularity();
+    if (!MetricSlice.NATIVE_GRANULARITY.equals(slice.granularity)) {
+      granularity = slice.granularity;
+    }
+
+    long timeGranularity = granularity.toMillis();
+    long start = (slice.start / timeGranularity) * timeGranularity;
+    long end = ((slice.end + timeGranularity - 1) / timeGranularity) * timeGranularity;
+
+    MetricSlice alignedSlice = MetricSlice.from(slice.metricId, start, end, slice.filters, slice.granularity);
+
+    ThirdEyeRequest request = makeThirdEyeRequestBuilder(alignedSlice, metric, dataset, expressions)
+        .setGroupByTimeGranularity(granularity)
+        .build(reference);
+
+    return new TimeSeriesRequestContainer(request, expressions, start, end, timeGranularity);
+  }
+
+  /**
+   * Constructs and wraps a request for a metric with derived expressions. Resolves all
    * required dependencies from the Thirdeye database.
    *
    * @param slice metric data slice
@@ -264,32 +323,19 @@ public class DataFrameUtils {
     if(dataset == null)
       throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for metric id '%d'", metric.getDataset(), metric.getId()));
 
-    List<MetricFunction> functions = new ArrayList<>();
     List<MetricExpression> expressions = Utils.convertToMetricExpressions(metric.getName(),
         metric.getDefaultAggFunction(), metric.getDataset());
-    for(MetricExpression exp : expressions) {
-      functions.addAll(exp.computeMetricFunctions());
+
+    TimeGranularity granularity = dataset.bucketTimeGranularity();
+    if (!MetricSlice.NATIVE_GRANULARITY.equals(slice.granularity)) {
+      granularity = slice.granularity;
     }
 
-    Multimap<String, String> effectiveFilters = ArrayListMultimap.create();
-    for (String dimName : slice.filters.keySet()) {
-      if (dataset.getDimensions().contains(dimName)) {
-        effectiveFilters.putAll(dimName, slice.filters.get(dimName));
-      }
-    }
-
-    ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
-        .setStartTimeInclusive(slice.start)
-        .setEndTimeExclusive(slice.end)
-        .setFilterSet(effectiveFilters)
-        .setMetricFunctions(functions)
-        .setGroupByTimeGranularity(dataset.bucketTimeGranularity())
-        .setDataSource(dataset.getDataSource())
+    ThirdEyeRequest request = makeThirdEyeRequestBuilder(slice, metric, dataset, expressions)
+        .setGroupByTimeGranularity(granularity)
         .build(reference);
 
-    final long timeGranularity = dataset.bucketTimeGranularity().toMillis();
-
-    return new TimeSeriesRequestContainer(request, expressions, slice.start, slice.end, timeGranularity);
+    return new TimeSeriesRequestContainer(request, expressions, slice.start, slice.end, granularity.toMillis());
   }
 
   /**
@@ -313,9 +359,28 @@ public class DataFrameUtils {
     if(dataset == null)
       throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for metric id '%d'", metric.getDataset(), metric.getId()));
 
-    List<MetricFunction> functions = new ArrayList<>();
     List<MetricExpression> expressions = Utils.convertToMetricExpressions(metric.getName(),
         metric.getDefaultAggFunction(), metric.getDataset());
+
+    ThirdEyeRequest request = makeThirdEyeRequestBuilder(slice, metric, dataset, expressions)
+        .setGroupBy(dimensions)
+        .build(reference);
+
+    return new RequestContainer(request, expressions);
+  }
+
+  /**
+   * Helper: Returns a pre-populated ThirdeyeRequestBuilder instance.
+   *
+   * @param slice metric data slice
+   * @param metric metric dto
+   * @param dataset dataset dto
+   * @param expressions metric expressions
+   * @return ThirdeyeRequestBuilder
+   * @throws ExecutionException
+   */
+  private static ThirdEyeRequest.ThirdEyeRequestBuilder makeThirdEyeRequestBuilder(MetricSlice slice, MetricConfigDTO metric, DatasetConfigDTO dataset, List<MetricExpression> expressions) throws ExecutionException {
+    List<MetricFunction> functions = new ArrayList<>();
     for(MetricExpression exp : expressions) {
       functions.addAll(exp.computeMetricFunctions());
     }
@@ -327,15 +392,124 @@ public class DataFrameUtils {
       }
     }
 
-    ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
+    return ThirdEyeRequest.newBuilder()
         .setStartTimeInclusive(slice.start)
         .setEndTimeExclusive(slice.end)
         .setFilterSet(effectiveFilters)
         .setMetricFunctions(functions)
-        .setDataSource(dataset.getDataSource())
-        .setGroupBy(dimensions)
-        .build(reference);
+        .setDataSource(dataset.getDataSource());
 
-    return new RequestContainer(request, expressions);
+  }
+
+  /**
+   * Reads in a ThirdEyeResultSetGroup and returns it as a DataFrame.
+   * <br/><b>NOTE:</b> This code duplicates DataFrame.fromPinotResult() due to lack of interfaces in pinot
+   *
+   * @param resultSetGroup pinot query result
+   * @return Pinot query result as DataFrame
+   * @throws IllegalArgumentException if the result cannot be parsed
+   */
+  public static DataFrame fromThirdEyeResult(ThirdEyeResultSetGroup resultSetGroup) {
+    if (resultSetGroup.size() <= 0)
+      throw new IllegalArgumentException("Query did not return any results");
+
+    if (resultSetGroup.size() == 1) {
+      ThirdEyeResultSet resultSet = resultSetGroup.getResultSets().get(0);
+
+      if (resultSet.getColumnCount() == 1 && resultSet.getRowCount() == 0) {
+        // empty result
+        return new DataFrame();
+
+      } else if (resultSet.getColumnCount() == 1 && resultSet.getRowCount() == 1 && resultSet.getGroupKeyLength() == 0) {
+        // aggregation result
+
+        DataFrame df = new DataFrame();
+        String function = resultSet.getColumnName(0);
+        String value = resultSet.getString(0, 0);
+        df.addSeries(function, DataFrame.toSeries(value));
+        return df;
+
+      } else if (resultSet.getColumnCount() >= 1 && resultSet.getGroupKeyLength() == 0) {
+        // selection result
+
+        DataFrame df = new DataFrame();
+        for (int i = 0; i < resultSet.getColumnCount(); i++) {
+          df.addSeries(resultSet.getColumnName(i), makeSelectionSeries(resultSet, i));
+        }
+        return df;
+
+      }
+    }
+
+    // group by result
+    ThirdEyeResultSet firstResultSet = resultSetGroup.getResultSets().get(0);
+    String[] groupKeyNames = new String[firstResultSet.getGroupKeyLength()];
+    for(int i=0; i<firstResultSet.getGroupKeyLength(); i++) {
+      groupKeyNames[i] = firstResultSet.getGroupKeyColumnName(i);
+    }
+
+    DataFrame df = new DataFrame();
+    for (String groupKeyName : groupKeyNames) {
+      df.addSeries(groupKeyName, StringSeries.empty());
+    }
+    df.setIndex(groupKeyNames);
+
+    for(int i=0; i<resultSetGroup.size(); i++) {
+      ThirdEyeResultSet resultSet = resultSetGroup.getResultSets().get(i);
+      String function = resultSet.getColumnName(0);
+
+      // group keys
+      DataFrame dfColumn = new DataFrame();
+      for(int j=0; j<resultSet.getGroupKeyLength(); j++) {
+        dfColumn.addSeries(groupKeyNames[j], makeGroupByGroupSeries(resultSet, j));
+      }
+      dfColumn.setIndex(groupKeyNames);
+
+      // values
+      dfColumn.addSeries(function, makeGroupByValueSeries(resultSet));
+
+      df = df.joinOuter(dfColumn);
+    }
+
+    return df;
+  }
+
+  private static Series makeSelectionSeries(ThirdEyeResultSet resultSet, int colIndex) {
+    int rowCount = resultSet.getRowCount();
+    if(rowCount <= 0)
+      return StringSeries.empty();
+
+    String[] values = new String[rowCount];
+    for(int i=0; i<rowCount; i++) {
+      values[i] = resultSet.getString(i, colIndex);
+    }
+
+    return DataFrame.toSeries(values);
+  }
+
+  private static Series makeGroupByValueSeries(ThirdEyeResultSet resultSet) {
+    int rowCount = resultSet.getRowCount();
+    if(rowCount <= 0)
+      return StringSeries.empty();
+
+    String[] values = new String[rowCount];
+    for(int i=0; i<rowCount; i++) {
+      values[i] = resultSet.getString(i, 0);
+    }
+
+    return DataFrame.toSeries(values);
+  }
+
+  private static Series makeGroupByGroupSeries(ThirdEyeResultSet resultSet, int keyIndex) {
+    int rowCount = resultSet.getRowCount();
+    if(rowCount <= 0)
+      return StringSeries.empty();
+
+    String[] values = new String[rowCount];
+    for(int i=0; i<rowCount; i++) {
+      values[i] = resultSet.getGroupKeyColumnValue(i, keyIndex);
+    }
+
+    return DataFrame.toSeries(values);
   }
 }

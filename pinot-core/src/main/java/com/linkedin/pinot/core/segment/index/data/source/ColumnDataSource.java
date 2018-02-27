@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.segment.index.data.source;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
@@ -138,7 +137,7 @@ public final class ColumnDataSource extends DataSource {
 
   @SuppressWarnings("unchecked")
   @Override
-  public Block getNextBlock() {
+  protected Block getNextBlock() {
     if (_isSingleValue) {
       return new SingleValueBlock((SingleColumnSingleValueReader<? super ReaderContext>) _forwardIndex, _numDocs,
           _dataType, _dictionary);
@@ -149,22 +148,7 @@ public final class ColumnDataSource extends DataSource {
   }
 
   @Override
-  public Block getNextBlock(BlockId blockId) {
-    return getNextBlock();
-  }
-
-  @Override
   public String getOperatorName() {
     return _operatorName;
-  }
-
-  @Override
-  public boolean open() {
-    return true;
-  }
-
-  @Override
-  public boolean close() {
-    return true;
   }
 }

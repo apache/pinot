@@ -1,0 +1,181 @@
+<main class="alert-create card-container card-container--padded te-form">
+  <fieldset class="te-form__section row">
+    <div class="col-xs-12">
+      <legend class="te-form__section-title">Alert Details</legend>
+    </div>
+
+    {{!-- Field: Alert Name --}}
+    <div class="form-group col-xs-12">
+      <label for="anomaly-form-function-name" class="control-label te-label required">
+        Alert Name *
+        <div class="te-form__sub-label">Please follow this naming convention: <span class="te-form__sub-label--strong">productName_metricName_dimensionName_other</span></div>
+      </label>
+      {{#if isAlertNameDuplicate}}
+        <div class="te-form__alert--warning alert-warning">Warning: <strong>{{alertFunctionName}}</strong> already exists. Please try another name.</div>
+      {{/if}}
+      {{input
+        type="text"
+        id="anomaly-form-function-name"
+        class="form-control te-input te-input--read-only"
+        placeholder="Add a descriptive alert name"
+        value=alertFunctionName
+        focus-out="validateAlertName"
+        key-up="validateAlertName"
+      }}
+    </div>
+
+    {{!-- Field: App Name --}}
+    <div class="form-group col-xs-10">
+      <label for="anomaly-form-app-name" class="control-label te-label required">Related Application, Product or Team</label>
+      {{#power-select
+        options=allApplications
+        selected=selectedApplication
+        searchField="application"
+        onchange=(action "onSelectAppName")
+        loadingMessage="Waiting for the server...."
+        placeholder="Select an existing product/team name"
+        searchPlaceholder="Type to filter..."
+        triggerId="anomaly-form-app-name"
+        triggerClass="te-form__select"
+        searchEnabled=false
+        as |app|
+      }}
+        {{app.application}}
+      {{/power-select}}
+    </div>
+
+    <div class="form-group col-xs-2">
+      <label for="select-status" class="control-label te-label required">
+        Status
+      </label>
+      {{#x-toggle
+        value=isActive
+        classNames="te-toggle te-toggle--form te-toggle--left"
+        theme='ios'
+        showLabels=true
+        name="activeToggle"
+        onToggle=(action (mut isActive))
+        as |toggle|}}
+          {{#toggle.label value=isActive}}
+            <span class="te-label te-label--flush">{{if isActive 'Active' 'Inactive'}}</span>
+          {{/toggle.label}}
+          {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
+      {{/x-toggle}}
+    </div>
+
+    {{!-- Field: Select Existing Subscription Group --}}
+    <div class="form-group col-sm-6">
+      <label for="config-group" class="control-label te-label">Add This Alert To An Existing Subscription Group</label>
+      {{#power-select
+        options=allAlertsConfigGroups
+        selected=selectedConfigGroup
+        searchField="name"
+        onchange=(action "onSelectConfigGroup")
+        loadingMessage="Waiting for the server...."
+        placeholder="Select an existing alert subscription group"
+        searchPlaceholder="Type to filter..."
+        triggerId="config-group"
+        triggerClass="te-form__select"
+        as |group|
+      }}
+        {{group.name}}
+      {{/power-select}}
+    </div>
+    {{!--  Fields for new alert group creation --}}
+    <div class="form-group col-sm-6">
+      <label for="config-group-new-name" class="control-label te-label"><strong>Or</strong> Provide A New Subscription Group Name</label>
+      {{#if isGroupNameDuplicate}}
+        <div class="te-form__alert--warning alert-warning">Warning: <strong>{{newConfigGroupName}}</strong> already exists. Please try another name.</div>
+      {{/if}}
+      {{input
+        type="text"
+        id="config-group-new-name"
+        class="form-control te-input"
+        placeholder="New Group Name"
+        value=newConfigGroupName
+        key-up="validateNewGroupName"
+        focus-out="validateNewGroupName"
+      }}
+    </div>
+    {{!-- Alert Group Metadata --}}
+    {{#if selectedConfigGroup}}
+      <div class="form-group col-xs-12">
+        {{#if selectedGroupFunctions.length}}
+          {{#bs-accordion as |acc|}}
+            {{#acc.item class="te-form__custom-label" title=selectedConfigGroupSubtitle}}
+              {{models-table
+                data=selectedGroupFunctions
+                columns=alertsTableColumns
+                showGlobalFilter=false
+                showColumnsDropdown=false
+                filteringIgnoreCase=true
+              }}
+            {{/acc.item}}
+          {{/bs-accordion}}
+        {{else}}
+          <span class="alert-group-functions__item--id">No alerts are monitored by this group yet.</span>
+        {{/if}}
+      </div>
+    {{/if}}
+    {{!-- Field: new alert group recipient emails --}}
+    <div class="form-group col-xs-12">
+      <label for="config-group" class="control-label te-label">
+        Add Alert Notification Recipients *
+        <div class="te-form__sub-label">Current recipients: <span class="te-form__sub-label--strong">{{if selectedConfigGroupRecipients selectedConfigGroupRecipients "None"}}</span></div>
+      </label>
+      {{#if isDuplicateEmail}}
+        <div class="te-form__alert--warning alert-warning">Warning: <strong>{{duplicateEmails}}</strong> is already included in this group.</div>
+      {{/if}}
+      {{#if isEmptyEmail}}
+        <div class="te-form__alert--warning alert-warning">Warning: Please provide a notification email for this alert or group!</div>
+      {{/if}}
+      {{#if isEmailError}}
+        <div class="te-form__alert--warning alert-warning">Warning: Please check formatting of these LinkedIn email addresses</div>
+      {{/if}}
+      {{input
+        type="email"
+        id="config-group-add-recipients"
+        class="form-control te-input"
+        focus-out="validateAlertEmail"
+        key-up="validateAlertEmail"
+        placeholder="Add additional recipients (comma-separated email addresses)"
+        autocomplete=false
+        value=alertGroupNewRecipient
+        required=true
+      }}
+    </div>
+  </fieldset>
+
+  {{#if isEditAlertError}}
+    {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
+      <strong>Edit Alert Error!</strong> Alert edit has failed. Please try again.
+    {{/bs-alert}}
+  {{/if}}
+
+  {{#if (and isEditAlertSuccess (not isEditAlertError))}}
+    {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
+      <strong>Edit Alert Success!</strong> You have successfully edited alert {{alertId}}.
+    {{/bs-alert}}
+  {{/if}}
+
+  <fieldset class="te-form__section-submit">
+
+    {{#bs-button
+      type="outline-primary"
+      buttonType="Cancel"
+      defaultText="Cancel"
+      onClick=(action "onCancel")
+      class="te-button te-button--cancel"
+    }}
+
+    {{/bs-button}}
+    {{bs-button
+      defaultText="Save"
+      type="primary"
+      onClick=(action "onSubmit")
+      buttonType="submit"
+      disabled=isSubmitDisabled
+      class="te-button te-button--submit"
+    }}
+  </fieldset>
+</main>

@@ -237,18 +237,21 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     if (numEntriesToScan == 0) {
       return DEFAULT_EST_CARDINALITY;
     }
-    int estCardinality = 0;
+    int totalCardinality = 0;
     int numValidValues = 0;
     for (int i = 0; i < numEntriesToScan; i++) {
       SegmentStats segmentStats = getSegmentStatsAt(i);
       ColumnStats columnStats = segmentStats.getColumnStats(columnName);
       if (columnStats != null) {
-        estCardinality += columnStats.getCardinality();
+        totalCardinality += columnStats.getCardinality();
         numValidValues++;
       }
     }
     if (numValidValues > 0) {
-      return estCardinality / numValidValues;
+      int avgEstimatedCardinality = totalCardinality /numValidValues;
+      if (avgEstimatedCardinality > 0) {
+        return avgEstimatedCardinality;
+      }
     }
     return DEFAULT_EST_CARDINALITY;
   }
@@ -263,21 +266,23 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   public synchronized int getEstimatedAvgColSize(@Nonnull String columnName) {
     int numEntriesToScan = getNumntriesToScan();
     if (numEntriesToScan == 0) {
-
       return DEFAULT_EST_AVG_COL_SIZE;
     }
-    int estAvgColSize = 0;
+    int totalColSize = 0;
     int numValidValues = 0;
     for (int i = 0; i < numEntriesToScan; i++) {
       SegmentStats segmentStats = getSegmentStatsAt(i);
       ColumnStats columnStats = segmentStats.getColumnStats(columnName);
       if (columnStats != null) {
-        estAvgColSize += columnStats.getAvgColumnSize();
+        totalColSize += columnStats.getAvgColumnSize();
         numValidValues++;
       }
     }
     if (numValidValues > 0) {
-      return estAvgColSize / numValidValues;
+      int avgColSize = totalColSize / numValidValues;
+      if (avgColSize > 0) {
+        return avgColSize;
+      }
     }
     return DEFAULT_EST_AVG_COL_SIZE;
   }

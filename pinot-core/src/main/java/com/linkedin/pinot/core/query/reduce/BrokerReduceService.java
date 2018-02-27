@@ -65,13 +65,6 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
   @Nonnull
   @Override
   public BrokerResponseNative reduceOnDataTable(@Nonnull BrokerRequest brokerRequest,
-      @Nonnull Map<ServerInstance, DataTable> instanceResponseMap) {
-    return reduceOnDataTable(brokerRequest, instanceResponseMap, null);
-  }
-
-  @Nonnull
-  @Override
-  public BrokerResponseNative reduceOnDataTable(@Nonnull BrokerRequest brokerRequest,
       @Nonnull Map<ServerInstance, DataTable> dataTableMap, @Nullable BrokerMetrics brokerMetrics) {
     if (dataTableMap.size() == 0) {
       // Empty response.

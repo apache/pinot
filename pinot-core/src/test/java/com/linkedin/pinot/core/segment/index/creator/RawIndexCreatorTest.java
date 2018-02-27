@@ -15,6 +15,22 @@
  */
 package com.linkedin.pinot.core.segment.index.creator;
 
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
+import com.linkedin.pinot.core.data.readers.RecordReader;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.core.segment.store.ColumnIndexType;
+import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -27,34 +43,14 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.data.readers.TestRecordReader;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
-import com.linkedin.pinot.core.io.compression.ChunkDecompressor;
-import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.core.segment.store.ColumnIndexType;
-import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 
 
 /**
  * Class for testing Raw index creators.
  */
 public class RawIndexCreatorTest {
-
   private static final int NUM_ROWS = 10009;
   private static final int MAX_STRING_LENGTH = 101;
-  private static final int MAX_STRING_LENGTH_IN_BYTES = MAX_STRING_LENGTH / 4; // margin for UTF-8 chars.
 
   private static final String SEGMENT_DIR_NAME = System.getProperty("java.io.tmpdir") + File.separator + "fwdIndexTest";
   private static final String SEGMENT_NAME = "testSegment";
@@ -151,9 +147,7 @@ public class RawIndexCreatorTest {
   public void testStringRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_COLUMN);
-
-    ChunkDecompressor uncompressor = ChunkCompressorFactory.getDecompressor("snappy");
-    VarByteChunkSingleValueReader rawIndexReader = new VarByteChunkSingleValueReader(indexBuffer, uncompressor);
+    VarByteChunkSingleValueReader rawIndexReader = new VarByteChunkSingleValueReader(indexBuffer);
 
     _recordReader.rewind();
     ChunkReaderContext context = rawIndexReader.createContext();
@@ -176,8 +170,7 @@ public class RawIndexCreatorTest {
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(column);
 
-    FixedByteChunkSingleValueReader rawIndexReader = new FixedByteChunkSingleValueReader(indexBuffer,
-        ChunkCompressorFactory.getDecompressor("snappy"));
+    FixedByteChunkSingleValueReader rawIndexReader = new FixedByteChunkSingleValueReader(indexBuffer);
 
     _recordReader.rewind();
     for (int row = 0; row < NUM_ROWS; row++) {
@@ -215,8 +208,8 @@ public class RawIndexCreatorTest {
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);
 
-    final List<GenericRow> rows = new ArrayList<>();
-    for (int row = 0; row < NUM_ROWS; row++) {
+    List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
+    for (int i = 0; i < NUM_ROWS; i++) {
       HashMap<String, Object> map = new HashMap<>();
 
       for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -231,49 +224,37 @@ public class RawIndexCreatorTest {
       rows.add(genericRow);
     }
 
+    RecordReader recordReader = new GenericRowRecordReader(rows, schema);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    RecordReader reader = new TestRecordReader(rows, schema);
-    driver.init(config, reader);
+    driver.init(config, recordReader);
     driver.build();
     _segmentDirectory = SegmentDirectory.createFromLocalFS(driver.getOutputDirectory(), ReadMode.mmap);
     _segmentReader = _segmentDirectory.createReader();
-    reader.rewind();
-    return reader;
+    recordReader.rewind();
+    return recordReader;
   }
 
   /**
-   * Helper method that generates a random value for a given data type
+   * Helper method that generates a random value for a given data type.
    *
    * @param dataType Data type for which to generate the random value
-   * @return Random value for the data type.
+   * @return Random value for the data type
    */
   public static Object getRandomValue(Random random, FieldSpec.DataType dataType) {
-    Object value;
     switch (dataType) {
       case INT:
-        value = random.nextInt();
-        break;
-
+        return random.nextInt();
       case LONG:
-        value = random.nextLong();
-        break;
-
+        return random.nextLong();
       case FLOAT:
-        value = random.nextFloat();
-        break;
-
+        return random.nextFloat();
       case DOUBLE:
-        value = random.nextDouble();
-        break;
-
+        return random.nextDouble();
       case STRING:
-        value = StringUtil.trimTrailingNulls(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH_IN_BYTES)));
-        break;
-
+        return StringUtil.removeNullCharacters(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)));
       default:
-        throw new IllegalArgumentException("Illegal data type for random value generator: " + dataType);
+        throw new UnsupportedOperationException("Unsupported data type for random value generator: " + dataType);
     }
-    return value;
   }
 
   /**

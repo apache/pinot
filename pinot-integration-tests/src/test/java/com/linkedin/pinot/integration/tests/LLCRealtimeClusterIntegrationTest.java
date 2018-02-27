@@ -17,11 +17,15 @@ package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import java.io.File;
 import java.util.List;
+import java.util.Random;
 import org.apache.avro.reflect.Nullable;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
@@ -29,6 +33,26 @@ import org.testng.annotations.Test;
  * Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer.
  */
 public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
+  public static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
+  public static final long RANDOM_SEED = System.currentTimeMillis();
+  public static final Random RANDOM = new Random(RANDOM_SEED);
+
+  public final boolean _isDirectAlloc = RANDOM.nextBoolean();
+  public final boolean _isConsumerDirConfigured = RANDOM.nextBoolean();
+
+  @BeforeClass
+  @Override
+  public void setUp() throws Exception {
+    // TODO Avoid printing to stdout. Instead, we need to add the seed to every assert in this (and super-classes)
+    System.out.println("========== Using random seed value " + RANDOM_SEED);
+    // Remove the consumer directory
+    File consumerDirectory = new File(CONSUMER_DIRECTORY);
+    if (consumerDirectory.exists()) {
+      FileUtils.deleteDirectory(consumerDirectory);
+    }
+
+    super.setUp();
+  }
 
   @Override
   protected boolean useLlc() {
@@ -42,9 +66,19 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   }
 
   @Override
-  protected void overrideOfflineServerConf(Configuration configuration) {
-    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION,
-        "true");
+  protected void overrideServerConf(Configuration configuration) {
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, true);
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION, _isDirectAlloc);
+    if (_isConsumerDirConfigured) {
+      configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
+    }
+  }
+
+  @Test
+  public void testConsumerDirectoryExists() {
+    File consumerDirectory = new File(CONSUMER_DIRECTORY, "mytable_REALTIME");
+    Assert.assertEquals(consumerDirectory.exists(), _isConsumerDirConfigured,
+        "The off heap consumer directory does not exist");
   }
 
   @Test

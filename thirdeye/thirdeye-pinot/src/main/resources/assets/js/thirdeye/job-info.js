@@ -3,7 +3,7 @@ function listJobs() {
   $.ajax({
     type : "GET",
     url : "/data/datasets",
-    data : "{}",
+    data : encodeURIComponent("{}"),
     contentType : "application/json; charset=utf-8",
     dataType : "json",
     success : function(data) {

@@ -171,6 +171,19 @@ public class MetricTimeSeriesTest {
   }
 
   @Test(dataProvider = "defaultMetricTimeSeries")
+  public void testGetMetricAvgs(List<String> metricNames, MetricTimeSeries metricTimeSeries, long[] timestamps) {
+    // Fill Double.NaN for value of divided by zero
+    Double[] actualAvgs = metricTimeSeries.getMetricAvgs(Double.NaN);
+    Double[] expectedAvgs = new Double[] {2.75d, Double.NaN, 3d};
+    Assert.assertEquals(actualAvgs, expectedAvgs);
+
+    // Fill null for value of divided by zero
+    actualAvgs = metricTimeSeries.getMetricAvgs();
+    expectedAvgs = new Double[] {2.75d, null, 3d};
+    Assert.assertEquals(actualAvgs, expectedAvgs);
+  }
+
+  @Test(dataProvider = "defaultMetricTimeSeries")
   public void testGetHasValueSums(List<String> metricNames, MetricTimeSeries metricTimeSeries, long[] timestamps) {
     Integer[] actualSums = metricTimeSeries.getHasValueSums();
     Integer[] expectedSums = new Integer[] {4, 0, 3};

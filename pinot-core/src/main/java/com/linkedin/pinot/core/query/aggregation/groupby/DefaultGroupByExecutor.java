@@ -37,8 +37,6 @@ import javax.annotation.Nonnull;
  * - Single/Multi valued columns.
  */
 public class DefaultGroupByExecutor implements GroupByExecutor {
-  public static final int MAX_INITIAL_RESULT_HOLDER_CAPACITY = 10_000;
-
   // Thread local (reusable) array for dict id to group key mapping.
   private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_ID_TO_GROUP_KEY = new ThreadLocal<int[]>() {
     @Override
@@ -57,6 +55,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
   private static final double GROUP_BY_TRIM_FACTOR = 0.9;
   private final int _numAggrFunc;
+  private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
   private final AggregationFunctionContext[] _aggrFunctionContexts;
   private final AggregationFunction[] _aggregationFunctions;
@@ -78,10 +77,11 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    * Constructor for the class.
    * @param aggrFunctionContexts Array of aggregation functions
    * @param groupBy Group by from broker request
+   * @param maxInitialResultHolderCapacity Maximum initial capacity for the result holder
    * @param numGroupsLimit Limit on number of aggregation groups returned in the result
    */
   public DefaultGroupByExecutor(@Nonnull AggregationFunctionContext[] aggrFunctionContexts, GroupBy groupBy,
-      int numGroupsLimit) {
+      int maxInitialResultHolderCapacity, int numGroupsLimit) {
     Preconditions.checkNotNull(aggrFunctionContexts.length > 0);
     Preconditions.checkNotNull(groupBy);
 
@@ -96,6 +96,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     }
 
     _numAggrFunc = aggrFunctionContexts.length;
+    _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
 
     // TODO: revisit the trim factor. Usually the factor should be 5-10, and based on the 'TOP' limit.
     // When results are trimmed, drop bottom 10% of groups.
@@ -237,7 +238,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    */
   private void initResultHolderArray(int trimSize, int maxNumResults) {
     _resultHolderArray = new GroupByResultHolder[_numAggrFunc];
-    int initialCapacity = Math.min(maxNumResults, MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+    int initialCapacity = Math.min(maxNumResults, _maxInitialResultHolderCapacity);
     for (int i = 0; i < _numAggrFunc; i++) {
       _resultHolderArray[i] = _aggrFunctionContexts[i].getAggregationFunction()
           .createGroupByResultHolder(initialCapacity, maxNumResults, trimSize);
@@ -295,7 +296,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
         _groupKeyGenerator = new NoDictionaryMultiColumnGroupKeyGenerator(transformBlock, _groupByColumns);
       }
     } else {
-      _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(transformBlock, _groupByColumns);
+      _groupKeyGenerator =
+          new DictionaryBasedGroupKeyGenerator(transformBlock, _groupByColumns, _maxInitialResultHolderCapacity);
     }
 
     int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();

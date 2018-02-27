@@ -2,7 +2,10 @@
   <div class="anomaly-feedback padding-all">
     <div class="container">
       <div class="row">
-        <h3 class="anomaly-feedback-title">Is this an anomaly?</h3>
+        <h3 class="anomaly-feedback-title">
+          <span>Is this an anomaly?</span>
+          <a class="anomaly-feedback-title__help thirdeye-link" href="https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/Anomaly+Labeling+on+ThirdEye#AnomalyLabelingonThirdEye-WhataretheLabels?" target="_blank">Learn more about each option</a>
+        </h3>
       </div>
       <form class="anomaly-feedback-radio" id="anomaly-feedback-radio">
           <label class="radio-inline" for="feedback-radio-yes">
@@ -114,13 +117,12 @@
     <ul class="investigate-wow">
       <li class="wow-card">
         <div class="wow-card-header">
-          <label class="label-medium-semibold">Current Total</label>
+          <label class="label-medium-semibold">Current Average</label>
         </div>
         <div class="wow-card-body">
           {{formatNumber (formatDouble currentValue)}}
         </div>
-        <div class="wow-card-footer">
-        </div>
+        <div class="wow-card-footer"></div>
       </li>
 
       {{#each wowResults as |wow|}}
@@ -133,7 +135,9 @@
             <span class="anomaly-change-delta {{colorDelta wow.change}}">({{formatPercent wow.change}})</span>
           </div>
           <div class="wow-card-footer">
-            <a href="{{wow.newUrl}}" target="_blank" class="thirdeye-link">Root Cause Analysis</a>
+             {{#if wow.isLast}} 
+               <a href="{{wow.betaUrl}}" target="_blank" class="thirdeye-link">Root Cause Analysis</a>
+             {{/if}}
           </div>
         </li>
       {{/each}}

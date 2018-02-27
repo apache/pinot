@@ -1,5 +1,13 @@
 package com.linkedin.thirdeye.anomaly.alert.v2;
 
+import com.linkedin.thirdeye.alert.commons.AnomalyFeedConfig;
+import com.linkedin.thirdeye.alert.commons.AnomalyFeedFactory;
+import com.linkedin.thirdeye.alert.commons.EmailContentFormatterFactory;
+import com.linkedin.thirdeye.alert.commons.EmailEntity;
+import com.linkedin.thirdeye.alert.content.EmailContentFormatter;
+import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
+import com.linkedin.thirdeye.alert.content.EmailContentFormatterContext;
+import com.linkedin.thirdeye.alert.feed.AnomalyFeed;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
 import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouper;
@@ -13,7 +21,6 @@ import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.Aler
 import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AlertGroupRecipientProviderFactory;
 import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
-import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
 import com.linkedin.thirdeye.anomaly.alert.util.DataReportHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
@@ -21,17 +28,25 @@ import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.AlertSnapshotManager;
 import com.linkedin.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.AlertSnapshotDTO;
 import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailFormatterConfig;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.AlertGroupConfig;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.ReportConfigCollection;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.ReportMetricConfig;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 
@@ -44,9 +59,12 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.TimeZone;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -63,13 +81,16 @@ import org.slf4j.LoggerFactory;
 public class AlertTaskRunnerV2 implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(AlertTaskRunnerV2.class);
+
   public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone("America/Los_Angeles");
+  public static final String DEFAULT_EMAIL_FORMATTER_TYPE = "MultipleAnomaliesEmailContentFormatter";
   public static final String CHARSET = "UTF-8";
 
   private final MergedAnomalyResultManager anomalyMergedResultDAO;
   private final AlertConfigManager alertConfigDAO;
   private final MetricConfigManager metricConfigManager;
   private final GroupedAnomalyResultsManager groupedAnomalyResultsDAO;
+  private final AlertSnapshotManager alertSnapshotDAO;
 
   private AlertConfigDTO alertConfig;
   private ThirdEyeAnomalyConfiguration thirdeyeConfig;
@@ -81,6 +102,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
   public AlertTaskRunnerV2() {
     anomalyMergedResultDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
     alertConfigDAO = DAORegistry.getInstance().getAlertConfigDAO();
+    alertSnapshotDAO = DAORegistry.getInstance().getAlertSnapshotDAO();
     metricConfigManager = DAORegistry.getInstance().getMetricConfigDAO();
     groupedAnomalyResultsDAO = DAORegistry.getInstance().getGroupedAnomalyResultsDAO();
   }
@@ -119,10 +141,29 @@ public class AlertTaskRunnerV2 implements TaskRunner {
   }
 
   private void sendAnomalyReport() throws Exception {
-    AlertConfigBean.EmailConfig emailConfig = alertConfig.getEmailConfig();
-    if (emailConfig != null && emailConfig.getFunctionIds() != null) {
+    EmailConfig emailConfig = alertConfig.getEmailConfig();
+    List<MergedAnomalyResultDTO> results = new ArrayList<>();
+    List<MergedAnomalyResultDTO> mergedAnomaliesAllResults = new ArrayList<>();
+    AnomalyFeed anomalyFeed = null;
+    if (alertConfig.getAnomalyFeedConfig() != null &&
+        StringUtils.isNotBlank(alertConfig.getAnomalyFeedConfig().getAnomalyFeedType())) {
+      LOG.info("Use Anomaly Feed for alert {}", alertConfig.getId());
+      AnomalyFeedConfig anomalyFeedConfig = alertConfig.getAnomalyFeedConfig();
+      AlertSnapshotDTO alertSnapshot = alertSnapshotDAO.findById(anomalyFeedConfig.getAlertSnapshotId());
+      if (alertSnapshot == null) { // if alert snapshot doesn't exist, create a new one
+        alertSnapshot = new AlertSnapshotDTO();
+        alertSnapshot.setLastNotifyTime(0);
+        long snapshotId = alertSnapshotDAO.save(alertSnapshot);
+        anomalyFeedConfig.setAlertSnapshotId(snapshotId);
+        alertConfigDAO.update(alertConfig);
+      }
+      anomalyFeed = AnomalyFeedFactory.fromClassName(anomalyFeedConfig.getAnomalyFeedType());
+      anomalyFeed.init(alertFilterFactory, anomalyFeedConfig);
+      Collection<MergedAnomalyResultDTO> anaomalyAlertCandidates = anomalyFeed.getAnomalyFeed();
+      mergedAnomaliesAllResults.addAll(anaomalyAlertCandidates);
+    } else if (emailConfig != null && emailConfig.getFunctionIds() != null) {
+      LOG.info("Use Email Config for alert {}", alertConfig.getId());
       List<Long> functionIds = alertConfig.getEmailConfig().getFunctionIds();
-      List<MergedAnomalyResultDTO> mergedAnomaliesAllResults = new ArrayList<>();
       long lastNotifiedAnomaly = emailConfig.getAnomalyWatermark();
       for (Long functionId : functionIds) {
         List<MergedAnomalyResultDTO> resultsForFunction =
@@ -133,114 +174,150 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         // fetch anomalies having id lesser than the watermark for the same function with notified = false & endTime > last one day
         // these anomalies are the ones that did not qualify filtration rule and got modified.
         // We should add these again so that these could be included in email if qualified through filtration rule
-        List<MergedAnomalyResultDTO> filteredAnomalies = anomalyMergedResultDAO
-            .findUnNotifiedByFunctionIdAndIdLesserThanAndEndTimeGreaterThanLastOneDay(functionId,
+        List<MergedAnomalyResultDTO> filteredAnomalies = anomalyMergedResultDAO.findUnNotifiedByFunctionIdAndIdLesserThanAndEndTimeGreaterThanLastOneDay(functionId,
                 lastNotifiedAnomaly, false);
         if (CollectionUtils.isNotEmpty(filteredAnomalies)) {
           mergedAnomaliesAllResults.addAll(filteredAnomalies);
         }
       }
+    }
+    // apply filtration rule
+    results = AlertFilterHelper.applyFiltrationRule(mergedAnomaliesAllResults, alertFilterFactory);
 
-      // apply filtration rule
-      List<MergedAnomalyResultDTO> results =
-          AlertFilterHelper.applyFiltrationRule(mergedAnomaliesAllResults, alertFilterFactory);
+    // only anomalies detected by default scheduler are sent; the anomalies detected during replay or given by users will not be sent
+    Iterator<MergedAnomalyResultDTO> mergedAnomalyIterator = results.iterator();
+    while (mergedAnomalyIterator.hasNext()) {
+      MergedAnomalyResultDTO anomaly = mergedAnomalyIterator.next();
+      if (anomaly.getAnomalyResultSource() == null) {
+        continue;
+      }
+      if (!AnomalyResultSource.DEFAULT_ANOMALY_DETECTION.equals(anomaly.getAnomalyResultSource())) {
+        mergedAnomalyIterator.remove();
+      }
+    }
 
-      if (results.isEmpty()) {
-        LOG.info("Zero anomalies found, skipping sending email");
+    if (results.isEmpty()) {
+      LOG.info("Zero anomalies found, skipping sending email");
+    } else {
+      // TODO: Add dimensional alert grouping before the stage of task runner?
+      // There are two approaches to solve the problem of alert grouping:
+      // 1. Anomaly results from detection --> Grouped anomalies from grouper --> Alerter sends emails on grouped anomalies
+      // 2. Anomaly results from detection --> Alerter performs simple grouping and sends alerts in one go
+
+      // Current implementation uses the second approach for experimental purpose. We might need to move to
+      //     approach 1 in order to consider multi-metric grouping.
+      // Input: a list of anomalies.
+      // Output: lists of anomalies; each list contains the anomalies of the same group.
+      AlertGroupConfig alertGroupConfig = alertConfig.getAlertGroupConfig();
+      if (alertGroupConfig == null) {
+        alertGroupConfig = new AlertGroupConfig();
+      }
+      AlertGrouper alertGrouper = AlertGrouperFactory.fromSpec(alertGroupConfig.getGroupByConfig());
+      Map<DimensionMap, GroupedAnomalyResultsDTO> groupedAnomalyResultsMap = alertGrouper.group(results);
+
+      Map<DimensionMap, GroupedAnomalyResultsDTO> filteredGroupedAnomalyResultsMap;
+      // DummyAlertGroupFilter does not generate any GroupedAnomaly. Thus, we don't apply any additional processes.
+      if (alertGrouper instanceof DummyAlertGrouper) {
+        filteredGroupedAnomalyResultsMap = groupedAnomalyResultsMap;
       } else {
-        // TODO: Add dimensional alert grouping before the stage of task runner?
-        // There are two approaches to solve the problem of alert grouping:
-        // 1. Anomaly results from detection --> Grouped anomalies from grouper --> Alerter sends emails on grouped anomalies
-        // 2. Anomaly results from detection --> Alerter performs simple grouping and sends alerts in one go
+        filteredGroupedAnomalyResultsMap = timeBasedMergeAndFilterGroupedAnomalies(groupedAnomalyResultsMap, alertGroupConfig);
+      }
 
-        // Current implementation uses the second approach for experimental purpose. We might need to move to
-        //     approach 1 in order to consider multi-metric grouping.
-        // Input: a list of anomalies.
-        // Output: lists of anomalies; each list contains the anomalies of the same group.
-        AlertConfigBean.AlertGroupConfig alertGroupConfig = alertConfig.getAlertGroupConfig();
-        if (alertGroupConfig == null) {
-          alertGroupConfig = new AlertConfigBean.AlertGroupConfig();
+      for (Map.Entry<DimensionMap, GroupedAnomalyResultsDTO> entry : filteredGroupedAnomalyResultsMap.entrySet()) {
+        // Anomaly results for this group
+        DimensionMap dimensions = entry.getKey();
+        GroupedAnomalyResultsDTO groupedAnomalyDTO = entry.getValue();
+        List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>();
+        for (MergedAnomalyResultDTO anomaly : groupedAnomalyDTO.getAnomalyResults()) {
+          anomalyResultListOfGroup.add(anomaly);
         }
-        AlertGrouper alertGrouper = AlertGrouperFactory.fromSpec(alertGroupConfig.getGroupByConfig());
-        Map<DimensionMap, GroupedAnomalyResultsDTO> groupedAnomalyResultsMap = alertGrouper.group(results);
-
-        Map<DimensionMap, GroupedAnomalyResultsDTO> filteredGroupedAnomalyResultsMap;
-        // DummyAlertGroupFilter does not generate any GroupedAnomaly. Thus, we don't apply any additional processes.
-        if (alertGrouper instanceof DummyAlertGrouper) {
-          filteredGroupedAnomalyResultsMap = groupedAnomalyResultsMap;
+        // Append auxiliary recipients for this group
+        String recipientsForThisGroup = alertConfig.getRecipients();
+        //   Get auxiliary email recipient from provider
+        AlertGroupAuxiliaryInfoProvider auxiliaryInfoProvider =
+            alertGroupAuxiliaryInfoProviderFactory.fromSpec(alertGroupConfig.getGroupAuxiliaryEmailProvider());
+        AuxiliaryAlertGroupInfo auxiliaryInfo =
+            auxiliaryInfoProvider.getAlertGroupAuxiliaryInfo(dimensions, groupedAnomalyDTO.getAnomalyResults());
+        // Check if this group should be skipped
+        if (auxiliaryInfo.isSkipGroupAlert()) {
+          continue;
+        }
+        // Construct email subject
+        StringBuilder emailSubjectBuilder = new StringBuilder("Thirdeye Alert : ");
+        emailSubjectBuilder.append(alertConfig.getName());
+        // Append group tag to email subject
+        if (StringUtils.isNotBlank(auxiliaryInfo.getGroupTag())) {
+          emailSubjectBuilder.append(" (").append(auxiliaryInfo.getGroupTag()).append(") ");
+        }
+        // Append auxiliary recipients
+        if (StringUtils.isNotBlank(auxiliaryInfo.getAuxiliaryRecipients())) {
+          recipientsForThisGroup =
+              recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryInfo.getAuxiliaryRecipients();
+        }
+        // Construct group name if dimensions of this group is not empty
+        String groupName = null;
+        if (dimensions.size() != 0) {
+          StringBuilder sb = new StringBuilder();
+          String separator = "";
+          for (Map.Entry<String, String> dimension : dimensions.entrySet()) {
+            sb.append(separator).append(dimension.getKey()).append(":").append(dimension.getValue());
+            separator = ", ";
+          }
+          groupName = sb.toString();
+        }
+        // Generate and send out an anomaly report for this group
+        EmailContentFormatter emailContentFormatter;
+        EmailFormatterConfig emailFormatterConfig = alertConfig.getEmailFormatterConfig();
+        try {
+          emailContentFormatter = EmailContentFormatterFactory.fromClassName(emailFormatterConfig.getType());
+        } catch (Exception e) {
+          LOG.error("User-assigned Email Formatter Config {} is not available. Use default instead.", alertConfig.getEmailFormatterConfig());
+          emailContentFormatter = EmailContentFormatterFactory.fromClassName(DEFAULT_EMAIL_FORMATTER_TYPE);
+        }
+        EmailContentFormatterConfiguration emailContemtFormatterConfig = EmailContentFormatterConfiguration
+            .fromThirdEyeAnomalyConfiguration(thirdeyeConfig);
+        if (emailFormatterConfig != null && StringUtils.isNotBlank(emailFormatterConfig.getProperties())) {
+          emailContentFormatter.init(com.linkedin.thirdeye.datalayer.util.
+              StringUtils.decodeCompactedProperties(emailFormatterConfig.getProperties()), emailContemtFormatterConfig
+              );
         } else {
-          filteredGroupedAnomalyResultsMap = timeBasedMergeAndFilterGroupedAnomalies(groupedAnomalyResultsMap, alertGroupConfig);
+          emailContentFormatter.init(new Properties(), emailContemtFormatterConfig);
         }
 
-        for (Map.Entry<DimensionMap, GroupedAnomalyResultsDTO> entry : filteredGroupedAnomalyResultsMap.entrySet()) {
-          // Anomaly results for this group
-          DimensionMap dimensions = entry.getKey();
-          GroupedAnomalyResultsDTO groupedAnomalyDTO = entry.getValue();
-          List<MergedAnomalyResultDTO> anomalyResultListOfGroup = groupedAnomalyDTO.getAnomalyResults();
-          // Append auxiliary recipients for this group
-          String recipientsForThisGroup = alertConfig.getRecipients();
-          //   Get auxiliary email recipient from provider
-          AlertGroupAuxiliaryInfoProvider auxiliaryInfoProvider =
-              alertGroupAuxiliaryInfoProviderFactory.fromSpec(alertGroupConfig.getGroupAuxiliaryEmailProvider());
-          AuxiliaryAlertGroupInfo auxiliaryInfo =
-              auxiliaryInfoProvider.getAlertGroupAuxiliaryInfo(dimensions, anomalyResultListOfGroup);
-          // Check if this group should be skipped
-          if (auxiliaryInfo.isSkipGroupAlert()) {
-            continue;
-          }
-          // Append group tag to subject
-          String emailSubjectName = alertConfig.getName();
-          if (StringUtils.isNotBlank(auxiliaryInfo.getGroupTag())) {
-            emailSubjectName = emailSubjectName + " (" + auxiliaryInfo.getGroupTag() + ") ";
-          }
-          // Append auxiliary recipients
-          if (StringUtils.isNotBlank(auxiliaryInfo.getAuxiliaryRecipients())) {
-            recipientsForThisGroup =
-                recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryInfo.getAuxiliaryRecipients();
-          }
-          // Construct group name if dimensions of this group is not empty
-          String groupName = null;
-          if (dimensions.size() != 0) {
-            StringBuilder sb = new StringBuilder();
-            String separator = "";
-            for (Map.Entry<String, String> dimension : dimensions.entrySet()) {
-              sb.append(separator).append(dimension.getKey()).append(":").append(dimension.getValue());
-              separator = ", ";
-            }
-            groupName = sb.toString();
-          }
-          // Generate and send out an anomaly report for this group
-          AnomalyReportGenerator.getInstance()
-              .buildReport(groupedAnomalyDTO.getId(), groupName, anomalyResultListOfGroup, thirdeyeConfig, recipientsForThisGroup,
-                  alertConfig.getFromAddress(), emailSubjectName);
-          // Update notified flag
-          if (alertGrouper instanceof DummyAlertGrouper) {
-            // DummyAlertGroupFilter does not generate real GroupedAnomaly, so the flag has to be set on merged anomalies.
-            updateNotifiedStatus(anomalyResultListOfGroup);
-          } else {
-            // For other alert groupers, the notified flag is set on the grouped anomalies.
-            groupedAnomalyDTO.setNotified(true);
-            groupedAnomalyResultsDAO.update(groupedAnomalyDTO);
-          }
+        EmailEntity emailEntity = emailContentFormatter
+            .getEmailEntity(alertConfig, recipientsForThisGroup, emailSubjectBuilder.toString(),
+                groupedAnomalyDTO.getId(), groupName, anomalyResultListOfGroup, new EmailContentFormatterContext());
+        EmailHelper.sendEmailWithEmailEntity(emailEntity, thirdeyeConfig.getSmtpConfiguration());
+        // Update notified flag
+        if (alertGrouper instanceof DummyAlertGrouper) {
+          // DummyAlertGroupFilter does not generate real GroupedAnomaly, so the flag has to be set on merged anomalies.
+          updateNotifiedStatus(groupedAnomalyDTO.getAnomalyResults());
+        } else {
+          // For other alert groupers, the notified flag is set on the grouped anomalies.
+          groupedAnomalyDTO.setNotified(true);
+          groupedAnomalyResultsDAO.update(groupedAnomalyDTO);
         }
+      }
 
-        // update anomaly watermark in alertConfig
-        long lastNotifiedAlertId = emailConfig.getAnomalyWatermark();
-        for (MergedAnomalyResultDTO anomalyResult : results) {
-          if (anomalyResult.getId() > lastNotifiedAlertId) {
-            lastNotifiedAlertId = anomalyResult.getId();
-          }
+      // update anomaly watermark in alertConfig
+      long lastNotifiedAlertId = emailConfig.getAnomalyWatermark();
+      for (MergedAnomalyResultDTO anomalyResult : results) {
+        if (anomalyResult.getId() > lastNotifiedAlertId) {
+          lastNotifiedAlertId = anomalyResult.getId();
         }
-        if (lastNotifiedAlertId != emailConfig.getAnomalyWatermark()) {
-          alertConfig.getEmailConfig().setAnomalyWatermark(lastNotifiedAlertId);
-          alertConfigDAO.update(alertConfig);
-        }
+      }
+      if (lastNotifiedAlertId != emailConfig.getAnomalyWatermark()) {
+        alertConfig.getEmailConfig().setAnomalyWatermark(lastNotifiedAlertId);
+        alertConfigDAO.update(alertConfig);
+      }
+      if (anomalyFeed != null && results.size() > 0) {
+        anomalyFeed.updateSnapshot(results);
       }
     }
   }
 
   private void sendScheduledDataReport() throws Exception {
-    AlertConfigBean.ReportConfigCollection reportConfigCollection =
+    ReportConfigCollection reportConfigCollection =
         alertConfig.getReportConfigCollection();
 
     if (reportConfigCollection != null && reportConfigCollection.isEnabled()) {
@@ -254,7 +331,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
 
         List<ContributorViewResponse> reports = new ArrayList<>();
         for (int i = 0; i < reportConfigCollection.getReportMetricConfigs().size(); i++) {
-          AlertConfigBean.ReportMetricConfig reportMetricConfig =
+          ReportMetricConfig reportMetricConfig =
               reportConfigCollection.getReportMetricConfigs().get(i);
           MetricConfigDTO metricConfig =
               metricConfigManager.findById(reportMetricConfig.getMetricId());
@@ -287,7 +364,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           report.setDataset(metricMap.get(report.getMetricName()).getDataset());
           long metricId = metricMap.get(report.getMetricName()).getId();
           report.setMetricId(metricId);
-          for (AlertConfigBean.ReportMetricConfig reportMetricConfig : reportConfigCollection
+          for (ReportMetricConfig reportMetricConfig : reportConfigCollection
               .getReportMetricConfigs()) {
             if (reportMetricConfig.getMetricId() == metricId) {
               metricDimensionValueReports.get(i)
@@ -366,7 +443,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
    */
   private Map<DimensionMap, GroupedAnomalyResultsDTO> timeBasedMergeAndFilterGroupedAnomalies(
       Map<DimensionMap, GroupedAnomalyResultsDTO> groupedAnomalyResultsMap,
-      AlertConfigBean.AlertGroupConfig alertGroupConfig) {
+      AlertGroupConfig alertGroupConfig) {
     // Populate basic fields of the new grouped anomaly
     for (Map.Entry<DimensionMap, GroupedAnomalyResultsDTO> entry : groupedAnomalyResultsMap.entrySet()) {
       GroupedAnomalyResultsDTO groupedAnomaly = entry.getValue();

@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.rootcause;
 
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -37,14 +38,21 @@ class PipelineCallable implements Callable<PipelineResult> {
     }
 
     long tStart = System.nanoTime();
+    LOG.info("Executing pipeline '{}'", this.pipeline.getOutputName());
+    PipelineContext context = new PipelineContext(inputs);
+
     try {
-      LOG.info("Executing pipeline '{}'", this.pipeline.getOutputName());
-      PipelineContext context = new PipelineContext(inputs);
       PipelineResult result = this.pipeline.run(context);
 
       long runtime = (System.nanoTime() - tStart) / 1000000;
       LOG.info("Completed pipeline '{}' in {}ms. Got {} results", this.pipeline.getOutputName(), runtime, result.getEntities().size());
       return result;
+
+    } catch(Exception e) {
+      long runtime = (System.nanoTime() - tStart) / 1000000;
+      LOG.error("Error while executing pipeline '{}' after {}ms. Returning empty result.", this.pipeline.getOutputName(), runtime, e);
+      return new PipelineResult(context, Collections.<Entity>emptySet());
+
     } finally {
       ThirdeyeMetricsUtil.rcaPipelineCallCounter.inc();
       ThirdeyeMetricsUtil.rcaPipelineDurationCounter.inc(System.nanoTime() - tStart);

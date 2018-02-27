@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 
@@ -139,5 +140,27 @@ public class MaxScoreSet<T extends Entity> implements Set<T> {
   @Override
   public void clear() {
     this.delegate.clear();
+  }
+
+  @Override
+  public String toString() {
+    return this.delegate.values().toString();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof MaxScoreSet)) {
+      return false;
+    }
+    MaxScoreSet<?> that = (MaxScoreSet<?>) o;
+    return Objects.equals(delegate, that.delegate);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(delegate);
   }
 }

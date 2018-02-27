@@ -1,0 +1,42 @@
+{{#if isShowingModal}}
+  {{#modal-dialog
+    containerClassNames=containerClassNames
+    overlayClassNames=overlayClassNames
+    targetAttachment=targetAttachment
+    animatable=true}}
+
+    <div class="container">
+      {{!-- modal header --}}
+      {{#if hasHeader}}
+        <div class="row te-modal__header">
+          <h4 class="te-modal__title">{{headerText}}</h4>
+          {{#if isCancellable}}
+            <div class="te-modal__close-icon">
+              <button {{action "onCancel"}} class="thirdeye-link thirdeye-link--tertiary thirdeye-link--muted" title="cancel">
+                <span class="thirdeye-link__icon">
+                  <i class="glyphicon glyphicon-remove"></i>
+                </span>
+              </button>
+            </div>
+          {{/if}}
+        </div>
+      {{/if}}
+      {{!-- modal body --}}
+      <div class="row te-modal__body">
+        {{yield}}
+      </div>
+      {{!-- modal footer --}}
+      {{#if hasFooter}}
+        <div class="row te-modal__footer">
+          <button {{action "onCancel"}} type="Cancel" class="te-button te-button--small te-button--muted btn">
+            {{cancelButtonText}}
+          </button>
+          <button {{action "onSubmit"}} type="submit" class="te-button te-button--small te-button--submit btn">
+            {{submitButtonText}}
+          </button>
+        </div>
+      {{/if}}
+    </div>
+
+  {{/modal-dialog}}
+{{/if}}

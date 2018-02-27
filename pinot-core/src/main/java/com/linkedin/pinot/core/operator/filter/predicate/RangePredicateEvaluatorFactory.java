@@ -15,541 +15,382 @@
  */
 package com.linkedin.pinot.core.operator.filter.predicate;
 
-import java.util.ArrayList;
-import java.util.List;
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionary;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 
 
 /**
- * Factory for Range _predicate evaluators with offline dictionary.
+ * Factory for RANGE predicate evaluators.
  */
 public class RangePredicateEvaluatorFactory {
-
-  // Private constructor
   private RangePredicateEvaluatorFactory() {
-
   }
 
   /**
-   * Returns a new instance of dictionary based equality _predicate evaluator.
-   * @param predicate Predicate to evaluate
+   * Create a new instance of dictionary based RANGE predicate evaluator.
+   *
+   * @param rangePredicate RANGE predicate to evaluate
    * @param dictionary Dictionary for the column
-   * @return Dictionary based equality _predicate evaluator
+   * @return Dictionary based RANGE predicate evaluator
    */
-  public static PredicateEvaluator newOfflineDictionaryBasedEvaluator(RangePredicate predicate,
-      ImmutableDictionaryReader dictionary) {
-    return new OfflineDictionaryBasedPredicateEvaluator(predicate, dictionary);
+  public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(RangePredicate rangePredicate,
+      Dictionary dictionary) {
+    if (dictionary instanceof ImmutableDictionaryReader) {
+      return new OfflineDictionaryBasedRangePredicateEvaluator(rangePredicate, (ImmutableDictionaryReader) dictionary);
+    } else {
+      return new RealtimeDictionaryBasedRangePredicateEvaluator(rangePredicate, (MutableDictionary) dictionary);
+    }
   }
 
   /**
-   * Returns a new instance of dictionary based equality _predicate evaluator.
-   * @param predicate Predicate to evaluate
-   * @param dictionary Dictionary for the column
-   * @return Dictionary based equality _predicate evaluator
-   */
-  public static PredicateEvaluator newRealtimeDictionaryBasedEvaluator(RangePredicate predicate,
-      MutableDictionary dictionary) {
-    return new RealtimeDictionaryBasedPredicateEvaluator(predicate, dictionary);
-  }
-
-  /**
-   * Returns a new instance of no-dictionary based equality _predicate evaluator.
-   * @param predicate Predicate to evaluate
+   * Create a new instance of raw value based RANGE predicate evaluator.
+   *
+   * @param rangePredicate RANGE predicate to evaluate
    * @param dataType Data type for the column
-   * @return No Dictionary based equality _predicate evaluator
+   * @return Raw value based RANGE predicate evaluator
    */
-  public static PredicateEvaluator newNoDictionaryBasedEvaluator(RangePredicate predicate,
+  public static BaseRawValueBasedPredicateEvaluator newRawValueBasedEvaluator(RangePredicate rangePredicate,
       FieldSpec.DataType dataType) {
     switch (dataType) {
       case INT:
-        return new IntNoDictionaryBasedRangeEvaluator(predicate);
-
+        return new IntRawValueBasedRangePredicateEvaluator(rangePredicate);
       case LONG:
-        return new LongNoDictionaryBasedRangeEvaluator(predicate);
-
+        return new LongRawValueBasedRangePredicateEvaluator(rangePredicate);
       case FLOAT:
-        return new FloatNoDictionaryBasedRangeEvaluator(predicate);
-
+        return new FloatRawValueBasedRangePredicateEvaluator(rangePredicate);
       case DOUBLE:
-        return new DoubleNoDictionaryBasedRangeEvaluator(predicate);
-
+        return new DoubleRawValueBasedRangePredicateEvaluator(rangePredicate);
       case STRING:
-        return new StringNoDictionaryBasedRangeEvaluator(predicate);
-
+        return new StringRawValueBasedRangePredicateEvaluator(rangePredicate);
       default:
-        throw new UnsupportedOperationException(
-            "No dictionary based Equals predicate evaluator not supported for datatype:" + dataType);
+        throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }
   }
 
-  private static final class OfflineDictionaryBasedPredicateEvaluator extends BasePredicateEvaluator {
-    private int[] _matchingIds;
-    private RangePredicate _predicate;
-    private int _rangeStartIndex = 0;
-    private int _rangeEndIndex = 0;
-    int _matchingSize;
+  private static final class OfflineDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+    final int _startDictId;
+    // Exclusive
+    final int _endDictId;
+    int[] _matchingDictIds;
 
-    public OfflineDictionaryBasedPredicateEvaluator(RangePredicate predicate, ImmutableDictionaryReader dictionary) {
-      this._predicate = predicate;
+    OfflineDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, ImmutableDictionaryReader dictionary) {
+      String lowerBoundary = rangePredicate.getLowerBoundary();
+      String upperBoundary = rangePredicate.getUpperBoundary();
+      boolean includeLowerBoundary = rangePredicate.includeLowerBoundary();
+      boolean includeUpperBoundary = rangePredicate.includeUpperBoundary();
 
-      final boolean incLower = predicate.includeLowerBoundary();
-      final boolean incUpper = predicate.includeUpperBoundary();
-      final String lower = predicate.getLowerBoundary();
-      final String upper = predicate.getUpperBoundary();
-
-      if (lower.equals("*")) {
-        _rangeStartIndex = 0;
+      if (lowerBoundary.equals("*")) {
+        _startDictId = 0;
       } else {
-        _rangeStartIndex = dictionary.indexOf(lower);
+        int insertionIndex = dictionary.insertionIndexOf(lowerBoundary);
+        if (insertionIndex < 0) {
+          _startDictId = -(insertionIndex + 1);
+        } else {
+          if (includeLowerBoundary) {
+            _startDictId = insertionIndex;
+          } else {
+            _startDictId = insertionIndex + 1;
+          }
+        }
       }
-      if (upper.equals("*")) {
-        _rangeEndIndex = dictionary.length() - 1;
+      if (upperBoundary.equals("*")) {
+        _endDictId = dictionary.length();
       } else {
-        _rangeEndIndex = dictionary.indexOf(upper);
-      }
-
-      if (_rangeStartIndex < 0) {
-        _rangeStartIndex = -(_rangeStartIndex + 1);
-      } else if (!incLower && !lower.equals("*")) {
-        _rangeStartIndex += 1;
-      }
-
-      if (_rangeEndIndex < 0) {
-        _rangeEndIndex = -(_rangeEndIndex + 1) - 1;
-      } else if (!incUpper && !upper.equals("*")) {
-        _rangeEndIndex -= 1;
-      }
-
-      _matchingSize = (_rangeEndIndex - _rangeStartIndex) + 1;
-      if (_matchingSize < 0) {
-        _matchingSize = 0;
-      }
-    }
-
-    @Override
-    public boolean apply(int dictionaryId) {
-      return dictionaryId >= _rangeStartIndex && dictionaryId <= _rangeEndIndex;
-    }
-
-    @Override
-    public boolean apply(int[] dictionaryIds) {
-      for (int dictId : dictionaryIds) {
-        if (dictId >= _rangeStartIndex && dictId <= _rangeEndIndex) {
-          return true;
+        int insertionIndex = dictionary.insertionIndexOf(upperBoundary);
+        if (insertionIndex < 0) {
+          _endDictId = -(insertionIndex + 1);
+        } else {
+          if (includeUpperBoundary) {
+            _endDictId = insertionIndex + 1;
+          } else {
+            _endDictId = insertionIndex;
+          }
         }
       }
-      return false;
     }
 
     @Override
-    public int[] getMatchingDictionaryIds() {
-      if (_matchingIds == null) {
-        _matchingIds = new int[_matchingSize];
-        int counter = 0;
-        for (int i = _rangeStartIndex; i <= _rangeEndIndex; i++) {
-          _matchingIds[counter++] = i;
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.RANGE;
+    }
+
+    @Override
+    public boolean isAlwaysFalse() {
+      return _startDictId >= _endDictId;
+    }
+
+    @Override
+    public boolean applySV(int dictId) {
+      return _startDictId <= dictId && _endDictId > dictId;
+    }
+
+    @Override
+    public int[] getMatchingDictIds() {
+      if (_matchingDictIds == null) {
+        int numMatchingDictIds = _endDictId - _startDictId;
+        if (numMatchingDictIds <= 0) {
+          _matchingDictIds = new int[0];
+        } else {
+          _matchingDictIds = new int[numMatchingDictIds];
+          for (int i = 0; i < numMatchingDictIds; i++) {
+            _matchingDictIds[i] = _startDictId + i;
+          }
         }
       }
-      return _matchingIds;
-    }
-
-    @Override
-    public int[] getNonMatchingDictionaryIds() {
-      throw new UnsupportedOperationException(
-          "Returning non matching values is expensive for predicateType:" + _predicate.getType());
-    }
-
-    @Override
-    public boolean apply(int[] dictionaryIds, int length) {
-      for (int i = 0; i < length; i++) {
-        int dictId = dictionaryIds[i];
-        if (dictId >= _rangeStartIndex && dictId <= _rangeEndIndex) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    @Override
-    public boolean alwaysFalse() {
-      return ((_rangeEndIndex - _rangeStartIndex) + 1) <= 0;
+      return _matchingDictIds;
     }
   }
 
-  private static final class RealtimeDictionaryBasedPredicateEvaluator extends BasePredicateEvaluator {
+  private static final class RealtimeDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+    final IntSet _matchingDictIdSet;
+    int[] _matchingDictIds;
 
-    private int[] _matchingIds;
-    private IntSet _dictIdSet;
-    private RangePredicate _predicate;
+    RealtimeDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, MutableDictionary dictionary) {
+      _matchingDictIdSet = new IntOpenHashSet();
 
-    public RealtimeDictionaryBasedPredicateEvaluator(RangePredicate predicate, MutableDictionary dictionary) {
-      this._predicate = predicate;
-      List<Integer> ids = new ArrayList<>();
-      String rangeStart;
-      String rangeEnd;
-
-      if (dictionary.isEmpty()) {
-        _matchingIds = new int[0];
+      int dictionarySize = dictionary.length();
+      if (dictionarySize == 0) {
         return;
       }
 
-      final boolean incLower = predicate.includeLowerBoundary();
-      final boolean incUpper = predicate.includeUpperBoundary();
-      final String lower = predicate.getLowerBoundary();
-      final String upper = predicate.getUpperBoundary();
+      String lowerBoundary = rangePredicate.getLowerBoundary();
+      String upperBoundary = rangePredicate.getUpperBoundary();
+      boolean includeLowerBoundary = rangePredicate.includeLowerBoundary();
+      boolean includeUpperBoundary = rangePredicate.includeUpperBoundary();
 
-      if (lower.equals("*")) {
-        rangeStart = dictionary.getMinVal().toString();
-      } else {
-        rangeStart = lower;
+      if (lowerBoundary.equals("*")) {
+        lowerBoundary = dictionary.getMinVal().toString();
+      }
+      if (upperBoundary.equals("*")) {
+        upperBoundary = dictionary.getMaxVal().toString();
       }
 
-      if (upper.equals("*")) {
-        rangeEnd = dictionary.getMaxVal().toString();
-      } else {
-        rangeEnd = upper;
-      }
-
-      for (int dicId = 0; dicId < dictionary.length(); dicId++) {
-        if (dictionary.inRange(rangeStart, rangeEnd, dicId, incLower, incUpper)) {
-          ids.add(dicId);
+      for (int dictId = 0; dictId < dictionarySize; dictId++) {
+        if (dictionary.inRange(lowerBoundary, upperBoundary, dictId, includeLowerBoundary, includeUpperBoundary)) {
+          _matchingDictIdSet.add(dictId);
         }
       }
-      _matchingIds = new int[ids.size()];
-      _dictIdSet = new IntOpenHashSet(ids.size());
-      for (int i = 0; i < _matchingIds.length; i++) {
-        _matchingIds[i] = ids.get(i);
-        _dictIdSet.add(ids.get(i));
+    }
+
+    @Override
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.RANGE;
+    }
+
+    @Override
+    public boolean applySV(int dictId) {
+      return _matchingDictIdSet.contains(dictId);
+    }
+
+    @Override
+    public int[] getMatchingDictIds() {
+      if (_matchingDictIds == null) {
+        _matchingDictIds = _matchingDictIdSet.toIntArray();
       }
+      return _matchingDictIds;
     }
 
     @Override
-    public boolean apply(int dictionaryId) {
-      return _dictIdSet.contains(dictionaryId);
+    public int[] getNonMatchingDictIds() {
+      throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean apply(int[] dictionaryIds) {
-      for (int dictId : dictionaryIds) {
-        if (_dictIdSet.contains(dictId)) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    @Override
-    public int[] getMatchingDictionaryIds() {
-      return _matchingIds;
-    }
-
-    @Override
-    public int[] getNonMatchingDictionaryIds() {
-      throw new UnsupportedOperationException(
-          "Returning non matching values is expensive for predicateType:" + _predicate.getType());
-    }
-
-    @Override
-    public boolean apply(int[] dictionaryIds, int length) {
-      for (int i = 0; i < length; i++) {
-        int dictId = dictionaryIds[i];
-        if (_dictIdSet.contains(dictId)) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    @Override
-    public boolean alwaysFalse() {
-      return _matchingIds.length == 0;
+    public boolean isAlwaysFalse() {
+      return _matchingDictIdSet.isEmpty();
     }
   }
 
-  /**
-   * No dictionary implementation of range _predicate evaluator for INT data type.
-   */
-  private static final class IntNoDictionaryBasedRangeEvaluator extends BasePredicateEvaluator {
-    private final int _rangeStart;
-    private final int _rangeEnd;
-    private final boolean _incLower;
-    private final boolean _incUpper;
+  private static final class IntRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final int _lowerBoundary;
+    final int _upperBoundary;
+    final boolean _includeLowerBoundary;
+    final boolean _includeUpperBoundary;
 
-    public IntNoDictionaryBasedRangeEvaluator(RangePredicate predicate) {
-      _incLower = predicate.includeLowerBoundary();
-      _incUpper = predicate.includeUpperBoundary();
-      final String lower = predicate.getLowerBoundary();
-      final String upper = predicate.getUpperBoundary();
-
-      _rangeStart = lower.equals("*") ? Integer.MIN_VALUE : Integer.parseInt(lower);
-      _rangeEnd = upper.equals("*") ? Integer.MAX_VALUE : Integer.parseInt(upper);
+    IntRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
+      _includeLowerBoundary = rangePredicate.includeLowerBoundary();
+      _includeUpperBoundary = rangePredicate.includeUpperBoundary();
+      String lowerBoundary = rangePredicate.getLowerBoundary();
+      String upperBoundary = rangePredicate.getUpperBoundary();
+      _lowerBoundary = lowerBoundary.equals("*") ? Integer.MIN_VALUE : Integer.parseInt(lowerBoundary);
+      _upperBoundary = upperBoundary.equals("*") ? Integer.MAX_VALUE : Integer.parseInt(upperBoundary);
     }
 
     @Override
-    @SuppressWarnings("Duplicates")
-    public boolean apply(int inputValue) {
-      if (_incLower) {
-        if (_incUpper) {
-          return (inputValue >= _rangeStart && inputValue <= _rangeEnd);
-        } else {
-          return (inputValue >= _rangeStart && inputValue < _rangeEnd);
-        }
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.RANGE;
+    }
+
+    @Override
+    public boolean applySV(int value) {
+      boolean result;
+      if (_includeLowerBoundary) {
+        result = _lowerBoundary <= value;
       } else {
-        if (_incUpper) {
-          return (inputValue > _rangeStart && inputValue <= _rangeEnd);
-        } else {
-          return (inputValue > _rangeStart && inputValue < _rangeEnd);
-        }
+        result = _lowerBoundary < value;
       }
-    }
-
-    @Override
-    public boolean apply(int[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(int[] inputValues, int length) {
-
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        int inputValue = inputValues[i];
-        if (apply(inputValue)) {
-          return true;
-        }
+      if (_includeUpperBoundary) {
+        result &= _upperBoundary >= value;
+      } else {
+        result &= _upperBoundary > value;
       }
-      return false;
+      return result;
     }
   }
 
-  /**
-   * No dictionary implementation of range _predicate evaluator for LONG data type.
-   */
-  private static final class LongNoDictionaryBasedRangeEvaluator extends BasePredicateEvaluator {
-    private final long _rangeStart;
-    private final long _rangeEnd;
-    private final boolean _incLower;
-    private final boolean _incUpper;
+  private static final class LongRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final long _lowerBoundary;
+    final long _upperBoundary;
+    final boolean _includeLowerBoundary;
+    final boolean _includeUpperBoundary;
 
-    public LongNoDictionaryBasedRangeEvaluator(RangePredicate predicate) {
-      _incLower = predicate.includeLowerBoundary();
-      _incUpper = predicate.includeUpperBoundary();
-      final String lower = predicate.getLowerBoundary();
-      final String upper = predicate.getUpperBoundary();
-
-      _rangeStart = lower.equals("*") ? Long.MIN_VALUE : Long.parseLong(lower);
-      _rangeEnd = upper.equals("*") ? Long.MAX_VALUE : Long.parseLong(upper);
+    LongRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
+      _includeLowerBoundary = rangePredicate.includeLowerBoundary();
+      _includeUpperBoundary = rangePredicate.includeUpperBoundary();
+      String lowerBoundary = rangePredicate.getLowerBoundary();
+      String upperBoundary = rangePredicate.getUpperBoundary();
+      _lowerBoundary = lowerBoundary.equals("*") ? Integer.MIN_VALUE : Long.parseLong(lowerBoundary);
+      _upperBoundary = upperBoundary.equals("*") ? Integer.MAX_VALUE : Long.parseLong(upperBoundary);
     }
 
     @Override
-    @SuppressWarnings("Duplicates")
-    public boolean apply(long inputValue) {
-      if (_incLower) {
-        if (_incUpper) {
-          return (inputValue >= _rangeStart && inputValue <= _rangeEnd);
-        } else {
-          return (inputValue >= _rangeStart && inputValue < _rangeEnd);
-        }
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.RANGE;
+    }
+
+    @Override
+    public boolean applySV(long value) {
+      boolean result;
+      if (_includeLowerBoundary) {
+        result = _lowerBoundary <= value;
       } else {
-        if (_incUpper) {
-          return (inputValue > _rangeStart && inputValue <= _rangeEnd);
-        } else {
-          return (inputValue > _rangeStart && inputValue < _rangeEnd);
-        }
+        result = _lowerBoundary < value;
       }
-    }
-
-    @Override
-    public boolean apply(long[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(int[] inputValues, int length) {
-
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        long inputValue = inputValues[i];
-        if (apply(inputValue)) {
-          return true;
-        }
+      if (_includeUpperBoundary) {
+        result &= _upperBoundary >= value;
+      } else {
+        result &= _upperBoundary > value;
       }
-      return false;
+      return result;
     }
   }
 
-  /**
-   * No dictionary implementation of range _predicate evaluator for FLOAT data type.
-   */
-  private static final class FloatNoDictionaryBasedRangeEvaluator extends BasePredicateEvaluator {
-    private final float _rangeStart;
-    private final float _rangeEnd;
-    private final boolean _incLower;
-    private final boolean _incUpper;
+  private static final class FloatRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final float _lowerBoundary;
+    final float _upperBoundary;
+    final boolean _includeLowerBoundary;
+    final boolean _includeUpperBoundary;
 
-    public FloatNoDictionaryBasedRangeEvaluator(RangePredicate predicate) {
-      _incLower = predicate.includeLowerBoundary();
-      _incUpper = predicate.includeUpperBoundary();
-      final String lower = predicate.getLowerBoundary();
-      final String upper = predicate.getUpperBoundary();
-
-      _rangeStart = lower.equals("*") ? Float.NEGATIVE_INFINITY : Float.parseFloat(lower);
-      _rangeEnd = upper.equals("*") ? Float.POSITIVE_INFINITY : Float.parseFloat(upper);
+    FloatRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
+      _includeLowerBoundary = rangePredicate.includeLowerBoundary();
+      _includeUpperBoundary = rangePredicate.includeUpperBoundary();
+      String lowerBoundary = rangePredicate.getLowerBoundary();
+      String upperBoundary = rangePredicate.getUpperBoundary();
+      _lowerBoundary = lowerBoundary.equals("*") ? Integer.MIN_VALUE : Float.parseFloat(lowerBoundary);
+      _upperBoundary = upperBoundary.equals("*") ? Integer.MAX_VALUE : Float.parseFloat(upperBoundary);
     }
 
     @Override
-    @SuppressWarnings("Duplicates")
-    public boolean apply(float inputValue) {
-      if (_incLower) {
-        if (_incUpper) {
-          return (inputValue >= _rangeStart && inputValue <= _rangeEnd);
-        } else {
-          return (inputValue >= _rangeStart && inputValue < _rangeEnd);
-        }
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.RANGE;
+    }
+
+    @Override
+    public boolean applySV(float value) {
+      boolean result;
+      if (_includeLowerBoundary) {
+        result = _lowerBoundary <= value;
       } else {
-        if (_incUpper) {
-          return (inputValue > _rangeStart && inputValue <= _rangeEnd);
-        } else {
-          return (inputValue > _rangeStart && inputValue < _rangeEnd);
-        }
+        result = _lowerBoundary < value;
       }
-    }
-
-    @Override
-    public boolean apply(float[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(int[] inputValues, int length) {
-
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        float inputValue = inputValues[i];
-        if (apply(inputValue)) {
-          return true;
-        }
+      if (_includeUpperBoundary) {
+        result &= _upperBoundary >= value;
+      } else {
+        result &= _upperBoundary > value;
       }
-      return false;
+      return result;
     }
   }
 
-  /**
-   * No dictionary implementation of range _predicate evaluator for DOUBLE data type.
-   */
-  private static final class DoubleNoDictionaryBasedRangeEvaluator extends BasePredicateEvaluator {
-    private final double _rangeStart;
-    private final double _rangeEnd;
-    private final boolean _incLower;
-    private final boolean _incUpper;
+  private static final class DoubleRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final double _lowerBoundary;
+    final double _upperBoundary;
+    final boolean _includeLowerBoundary;
+    final boolean _includeUpperBoundary;
 
-    public DoubleNoDictionaryBasedRangeEvaluator(RangePredicate predicate) {
-      _incLower = predicate.includeLowerBoundary();
-      _incUpper = predicate.includeUpperBoundary();
-      final String lower = predicate.getLowerBoundary();
-      final String upper = predicate.getUpperBoundary();
-
-      _rangeStart = lower.equals("*") ? Double.NEGATIVE_INFINITY : Double.parseDouble(lower);
-      _rangeEnd = upper.equals("*") ? Double.POSITIVE_INFINITY : Double.parseDouble(upper);
+    DoubleRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
+      _includeLowerBoundary = rangePredicate.includeLowerBoundary();
+      _includeUpperBoundary = rangePredicate.includeUpperBoundary();
+      String lowerBoundary = rangePredicate.getLowerBoundary();
+      String upperBoundary = rangePredicate.getUpperBoundary();
+      _lowerBoundary = lowerBoundary.equals("*") ? Integer.MIN_VALUE : Double.parseDouble(lowerBoundary);
+      _upperBoundary = upperBoundary.equals("*") ? Integer.MAX_VALUE : Double.parseDouble(upperBoundary);
     }
 
     @Override
-    @SuppressWarnings("Duplicates")
-    public boolean apply(double inputValue) {
-      if (_incLower) {
-        if (_incUpper) {
-          return (inputValue >= _rangeStart && inputValue <= _rangeEnd);
-        } else {
-          return (inputValue >= _rangeStart && inputValue < _rangeEnd);
-        }
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.RANGE;
+    }
+
+    @Override
+    public boolean applySV(double value) {
+      boolean result;
+      if (_includeLowerBoundary) {
+        result = _lowerBoundary <= value;
       } else {
-        if (_incUpper) {
-          return (inputValue > _rangeStart && inputValue <= _rangeEnd);
-        } else {
-          return (inputValue > _rangeStart && inputValue < _rangeEnd);
-        }
+        result = _lowerBoundary < value;
       }
-    }
-
-    @Override
-    public boolean apply(double[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(double[] inputValues, int length) {
-
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        double inputValue = inputValues[i];
-        if (apply(inputValue)) {
-          return true;
-        }
+      if (_includeUpperBoundary) {
+        result &= _upperBoundary >= value;
+      } else {
+        result &= _upperBoundary > value;
       }
-      return false;
+      return result;
     }
   }
 
-  /**
-   * No dictionary implementation of range _predicate evaluator for STRING data type.
-   */
-  private static final class StringNoDictionaryBasedRangeEvaluator extends BasePredicateEvaluator {
-    private final String _rangeStart;
-    private final String _rangeEnd;
-    private final boolean _incLower;
-    private final boolean _incUpper;
+  private static final class StringRawValueBasedRangePredicateEvaluator extends BaseRawValueBasedPredicateEvaluator {
+    final String _lowerBoundary;
+    final String _upperBoundary;
+    final boolean _includeLowerBoundary;
+    final boolean _includeUpperBoundary;
 
-    public StringNoDictionaryBasedRangeEvaluator(RangePredicate predicate) {
-      _incLower = predicate.includeLowerBoundary();
-      _incUpper = predicate.includeUpperBoundary();
-
-      String lower = predicate.getLowerBoundary();
-      String upper = predicate.getUpperBoundary();
-      _rangeStart = lower.equals("*") ? null : lower;
-      _rangeEnd = upper.equals("*") ? null : upper;
+    StringRawValueBasedRangePredicateEvaluator(RangePredicate rangePredicate) {
+      _lowerBoundary = rangePredicate.getLowerBoundary();
+      _upperBoundary = rangePredicate.getUpperBoundary();
+      _includeLowerBoundary = rangePredicate.includeLowerBoundary();
+      _includeUpperBoundary = rangePredicate.includeUpperBoundary();
     }
 
     @Override
-    public boolean apply(String inputValue) {
-      int compareLower = (_rangeStart != null) ? inputValue.compareTo(_rangeStart) : 1;
-      int compareUpper = (_rangeEnd != null) ? inputValue.compareTo(_rangeEnd) : -1;
+    public Predicate.Type getPredicateType() {
+      return Predicate.Type.RANGE;
+    }
 
-      if (_incLower) {
-        if (_incUpper) {
-          return compareLower >= 0 && compareUpper <= 0;
+    @Override
+    public boolean applySV(String value) {
+      boolean result = true;
+      if (!_lowerBoundary.equals("*")) {
+        if (_includeLowerBoundary) {
+          result = _lowerBoundary.compareTo(value) <= 0;
         } else {
-          return compareLower >= 0 && compareUpper < 0;
-        }
-      } else {
-        if (_incUpper) {
-          return compareLower > 0 && compareUpper <= 0;
-        } else {
-          return compareLower > 0 && compareUpper < 0;
+          result = _lowerBoundary.compareTo(value) < 0;
         }
       }
-    }
-
-    @Override
-    public boolean apply(String[] inputValues) {
-      return apply(inputValues, inputValues.length);
-    }
-
-    @Override
-    public boolean apply(String[] inputValues, int length) {
-
-      // we cannot do binary search since the multi-value columns are not sorted in the raw segment
-      for (int i = 0; i < length; i++) {
-        String inputValue = inputValues[i];
-        if (apply(inputValue)) {
-          return true;
+      if (!_upperBoundary.equals("*")) {
+        if (_includeUpperBoundary) {
+          result &= _upperBoundary.compareTo(value) >= 0;
+        } else {
+          result &= _upperBoundary.compareTo(value) > 0;
         }
       }
-      return false;
+      return result;
     }
   }
 }

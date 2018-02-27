@@ -15,18 +15,16 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
@@ -41,37 +39,80 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerManager;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.LoggerFactory;
+
 
 public class RealtimeTableDataManager extends AbstractTableDataManager {
-
-  private final ExecutorService _segmentAsyncExecutorService = Executors
-      .newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
-  private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
+  private final ExecutorService _segmentAsyncExecutorService =
+      Executors.newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
   private SegmentBuildTimeLeaseExtender _leaseExtender;
   private RealtimeSegmentStatsHistory _statsHistory;
+  private Semaphore _segmentBuildSemaphore;
 
-  private static final String CONSUMERS_DIR = "consumers";
   private static final String STATS_FILE_NAME = "stats.ser";
+  private static final String CONSUMERS_DIR = "consumers";
 
-  public RealtimeTableDataManager() {
-    super();
+  @Override
+  protected void doInit() {
+    _leaseExtender = SegmentBuildTimeLeaseExtender.create(_instanceId);
+    int maxParallelBuilds = _tableDataManagerConfig.getMaxParallelSegmentBuilds();
+    if (maxParallelBuilds > 0) {
+      _segmentBuildSemaphore = new Semaphore(maxParallelBuilds, true);
+    }
+
+    File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
+    try {
+      _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
+    } catch (IOException | ClassNotFoundException e) {
+      _logger.error("Error reading history object for table {} from {}", _tableName, statsFile.getAbsolutePath(), e);
+      File savedFile = new File(_tableDataDir, STATS_FILE_NAME + "." + UUID.randomUUID());
+      try {
+        FileUtils.moveFile(statsFile, savedFile);
+      } catch (IOException e1) {
+        _logger.error("Could not move {} to {}", statsFile.getAbsolutePath(), savedFile.getAbsolutePath(), e1);
+        throw new RuntimeException(e);
+      }
+      _logger.warn("Saved unreadable {} into {}. Creating a fresh instance", statsFile.getAbsolutePath(),
+          savedFile.getAbsolutePath());
+      try {
+        _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
+      } catch (Exception e2) {
+        Utils.rethrowException(e2);
+      }
+    }
+
+    String consumerDirPath = getConsumerDir();
+    File consumerDir = new File(consumerDirPath);
+
+    if (consumerDir.exists()) {
+      File[] segmentFiles = consumerDir.listFiles(new FilenameFilter() {
+        @Override
+        public boolean accept(File dir, String name) {
+          return !name.equals(STATS_FILE_NAME);
+        }
+      });
+      for (File file : segmentFiles) {
+        if (file.delete()) {
+          _logger.info("Deleted old file {}", file.getAbsolutePath());
+        } else {
+          _logger.error("Cannot delete file {}", file.getAbsolutePath());
+        }
+      }
+    }
   }
 
   @Override
   protected void doShutdown() {
     _segmentAsyncExecutorService.shutdown();
-    for (SegmentDataManager segmentDataManager :_segmentsMap.values() ) {
+    for (SegmentDataManager segmentDataManager : _segmentsMap.values()) {
       segmentDataManager.destroy();
     }
     KafkaConsumerManager.closeAllConsumers();
@@ -80,43 +121,37 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
     }
   }
 
-  protected void doInit() {
-    _leaseExtender = SegmentBuildTimeLeaseExtender.create(getServerInstance());
-    LOGGER = LoggerFactory.getLogger(_tableName + "-RealtimeTableDataManager");
-    File consumersDir = new File(_tableDataDir, CONSUMERS_DIR);
-    consumersDir.mkdirs();
-    File statsFile = new File(consumersDir, STATS_FILE_NAME);
-    try {
-      _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
-    } catch (IOException |ClassNotFoundException e) {
-      LOGGER.error("Error reading history object for table {} from {}", _tableName, statsFile.getAbsolutePath(), e);
-      File savedFile = new File(consumersDir, STATS_FILE_NAME + "." + UUID.randomUUID());
-      try {
-        FileUtils.moveFile(statsFile, savedFile);
-      } catch (IOException e1) {
-        LOGGER.error("Could not move {} to {}", statsFile.getAbsolutePath(), savedFile.getAbsolutePath(), e1);
-        throw new RuntimeException(e);
-      }
-      LOGGER.warn("Saved unreadable {} into {}. Creating a fresh instance", statsFile.getAbsolutePath(), savedFile.getAbsolutePath());
-      try {
-        _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
-      } catch (Exception e2) {
-        Utils.rethrowException(e2);
-      }
-    }
-  }
-
   public RealtimeSegmentStatsHistory getStatsHistory() {
     return _statsHistory;
   }
 
+  public Semaphore getSegmentBuildSemaphore() {
+    return _segmentBuildSemaphore;
+  }
+
   public String getConsumerDir() {
-    return _tableDataDir + File.separator + CONSUMERS_DIR;
+    String consumerDirPath = _tableDataManagerConfig.getConsumerDir();
+    File consumerDir;
+    // If a consumer directory has been configured, use it to create a per-table path under the consumer dir.
+    // Otherwise, create a sub-dir under the table-specific data director and use it for consumer mmaps
+    if (consumerDirPath != null) {
+       consumerDir = new File(consumerDirPath, _tableName);
+    } else {
+      consumerDirPath = _tableDataDir + File.separator + CONSUMERS_DIR;
+      consumerDir = new File(consumerDirPath);
+    }
+
+    if (!consumerDir.exists()) {
+      if (!consumerDir.mkdirs()) {
+        _logger.error("Failed to create consumer directory {}", consumerDir.getAbsolutePath());
+      }
+    }
+
+    return consumerDir.getAbsolutePath();
   }
 
   public void notifySegmentCommitted(RealtimeSegmentZKMetadata metadata, IndexSegment segment) {
-    ZKMetadataProvider.setRealtimeSegmentZKMetadata(_helixPropertyStore, metadata);
-    markSegmentAsLoaded(metadata.getSegmentName());
+    ZKMetadataProvider.setRealtimeSegmentZKMetadata(_propertyStore, metadata);
     addSegment(segment);
   }
 
@@ -136,23 +171,11 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
    *   to start consuming or download the segment.
    */
   @Override
-  public void addSegment(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull TableConfig tableConfig,
-      @Nullable InstanceZKMetadata instanceZKMetadata, @Nonnull SegmentZKMetadata segmentZKMetadata,
-      @Nonnull IndexLoadingConfig indexLoadingConfig)
-      throws Exception {
-    // TODO FIXME
-    // Hack. We get the _helixPropertyStore here and save it, knowing that we will get this addSegment call
-    // before the notifyCommitted call (that uses _helixPropertyStore)
-    _helixPropertyStore = propertyStore;
-
-    String segmentName = segmentZKMetadata.getSegmentName();
-    String tableName = segmentZKMetadata.getTableName();
-    if (!(segmentZKMetadata instanceof RealtimeSegmentZKMetadata)) {
-      throw new IllegalArgumentException(
-          "Trying to add a segment into REALTIME table with non-REALTIME segment ZK metadata");
-    }
-    RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = (RealtimeSegmentZKMetadata) segmentZKMetadata;
-    LOGGER.info("Attempting to add realtime segment {} for table {}", segmentName, tableName);
+  public void addSegment(@Nonnull String segmentName, @Nonnull TableConfig tableConfig,
+      @Nonnull IndexLoadingConfig indexLoadingConfig) throws Exception {
+    RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
+        ZKMetadataProvider.getRealtimeSegmentZKMetadata(_propertyStore, _tableName, segmentName);
+    Preconditions.checkNotNull(realtimeSegmentZKMetadata);
 
     File indexDir = new File(_indexDir, segmentName);
     // Restart during segment reload might leave segment in inconsistent state (index directory might not exist but
@@ -162,29 +185,30 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
     if (indexDir.exists() && (realtimeSegmentZKMetadata.getStatus() == Status.DONE)) {
       // segment already exists on file, and we have committed the realtime segment in ZK. Treat it like an offline segment
       if (_segmentsMap.containsKey(segmentName)) {
-        LOGGER.warn("Got reload for segment already on disk {} table {}, have {}", segmentName, tableName,
+        _logger.warn("Got reload for segment already on disk {} table {}, have {}", segmentName, _tableName,
             _segmentsMap.get(segmentName).getClass().getSimpleName());
         return;
       }
 
       IndexSegment segment = ColumnarSegmentLoader.load(indexDir, indexLoadingConfig);
       addSegment(segment);
-      markSegmentAsLoaded(segmentName);
     } else {
       // Either we don't have the segment on disk or we have not committed in ZK. We should be starting the consumer
       // for realtime segment here. If we wrote it on disk but could not get to commit to zk yet, we should replace the
       // on-disk segment next time
       if (_segmentsMap.containsKey(segmentName)) {
-        LOGGER.warn("Got reload for segment not on disk {} table {}, have {}", segmentName, tableName,
+        _logger.warn("Got reload for segment not on disk {} table {}, have {}", segmentName, _tableName,
             _segmentsMap.get(segmentName).getClass().getSimpleName());
         return;
       }
-      Schema schema =
-          ZKMetadataProvider.getTableSchema(propertyStore, TableNameBuilder.REALTIME.tableNameWithType(tableName));
+      Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableName);
+      Preconditions.checkNotNull(schema);
       if (!isValid(schema, tableConfig.getIndexingConfig())) {
-        LOGGER.error("Not adding segment {}", segmentName);
+        _logger.error("Not adding segment {}", segmentName);
         throw new RuntimeException("Mismatching schema/table config for " + _tableName);
       }
+
+      InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, _instanceId);
       SegmentDataManager manager;
       if (SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
         manager = new HLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, instanceZKMetadata, this,
@@ -199,14 +223,13 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
         manager = new LLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, instanceZKMetadata, this,
             _indexDir.getAbsolutePath(), indexLoadingConfig, schema, _serverMetrics);
       }
-      LOGGER.info("Initialize RealtimeSegmentDataManager - " + segmentName);
+      _logger.info("Initialize RealtimeSegmentDataManager - " + segmentName);
       try {
         _rwLock.writeLock().lock();
         _segmentsMap.put(segmentName, manager);
       } finally {
         _rwLock.writeLock().unlock();
       }
-      _loadingSegments.add(segmentName);
     }
   }
 
@@ -217,12 +240,12 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
         new File(_indexDir, "tmp-" + segmentName + "." + String.valueOf(System.currentTimeMillis()));
     File tempFile = new File(_indexDir, segmentName + ".tar.gz");
     try {
-      SegmentFetcherFactory.getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempFile);
-      LOGGER.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, tempFile, tempFile.length());
+      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempFile);
+      _logger.info("Downloaded file from {} to {}; Length of downloaded file: {}", uri, tempFile, tempFile.length());
       TarGzCompressionUtils.unTar(tempFile, tempSegmentFolder);
-      LOGGER.info("Uncompressed file {} into tmp dir {}", tempFile, tempSegmentFolder);
+      _logger.info("Uncompressed file {} into tmp dir {}", tempFile, tempSegmentFolder);
       FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], new File(_indexDir, segmentName));
-      LOGGER.info("Replacing LLC Segment {}", segmentName);
+      _logger.info("Replacing LLC Segment {}", segmentName);
       replaceLLSegment(segmentName, indexLoadingConfig);
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -243,7 +266,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
   }
 
   public String getServerInstance() {
-    return _serverInstance;
+    return _instanceId;
   }
 
   /**
@@ -273,35 +296,19 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
     if (!sortedColumns.isEmpty()) {
       final String sortedColumn = sortedColumns.get(0);
       if (sortedColumns.size() > 1) {
-        LOGGER.warn("More than one sorted column configured. Using {}", sortedColumn);
+        _logger.warn("More than one sorted column configured. Using {}", sortedColumn);
       }
       FieldSpec fieldSpec = schema.getFieldSpecFor(sortedColumn);
       if (!fieldSpec.isSingleValueField()) {
-        LOGGER.error("Cannot configure multi-valued column {} as sorted column", sortedColumn);
+        _logger.error("Cannot configure multi-valued column {} as sorted column", sortedColumn);
         isValid = false;
       }
     }
     // 2. We want to get the schema errors, if any, even if isValid is false;
-    if (!schema.validate(LOGGER)) {
+    if (!schema.validate(_logger)) {
       isValid = false;
     }
 
     return isValid;
-  }
-
-  @Override
-  public void addSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull IndexLoadingConfig indexLoadingConfig,
-      @Nullable Schema schema)
-      throws Exception {
-    throw new UnsupportedOperationException(
-        "Unsupported adding segment: " + segmentMetadata.getName() + " to OFFLINE table: "
-            + segmentMetadata.getTableName() + " using RealtimeTableDataManager");
-  }
-
-  private void markSegmentAsLoaded(String segmentId) {
-    _loadingSegments.remove(segmentId);
-    if (!_activeSegments.contains(segmentId)) {
-      _activeSegments.add(segmentId);
-    }
   }
 }

@@ -1,5 +1,11 @@
-<h1 class="te-title">Edit An Alert</h1>
-<main class="alert-create paper-container paper-container--padded te-form">
+<h1 class="te-title">Edit Alert: <span class="te-title__entity-name">{{alertFunctionName}}</span></h1>
+<main class="alert-create card-container card-container--padded te-form">
+
+{{#if isLoadError}}
+  {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
+    <strong>Data Error!</strong> We were unable to fetch data for this alert.
+  {{/bs-alert}}
+{{/if}}
 
   <fieldset class="te-form__section te-form__section--first row">
     <div class="col-xs-12">
@@ -33,11 +39,10 @@
         type="text"
         id="select-filters"
         class="form-control te-input te-input--read-only"
-        value=filters
+        value=alertFilters
         disabled=true
       }}
     </div>
-
 
     <div class="form-group col-xs-6">
       <label for="select-dimension" class="control-label te-label">Dimension</label>
@@ -45,23 +50,32 @@
         type="text"
         id="select-dimension"
         class="form-control te-input te-input--read-only"
-        value=dimensions
+        value=alertDimension
         disabled=true
       }}
     </div>
 
     <div class="col-xs-12">
       <div class="te-graph-alert">
-        {{anomaly-graph
-          primaryMetric=metricData
-          showSubchart=true
-          showLegend=false
-          legendText=legendText
-          enableZoom=true
-          componentId='create-alert'
-          showGraphLegend=false
-          height=400
-        }}
+        {{#if isGraphVisible}}
+          {{#if alertDimension}}
+            <div class="te-form__super-label">...Displaying top 5 contributing subDimensions for <strong>{{alertDimension}}</strong></div>
+          {{/if}}
+          {{anomaly-graph
+            primaryMetric=metricData
+            selectedDimensions=topDimensions
+            dimensions=topDimensions
+            showDimensions=true
+            isLoading=loading
+            showSubchart=true
+            showLegend=false
+            legendText=legendText
+            enableZoom=true
+            componentId='create-alert'
+            showGraphLegend=showGraphLegend
+            height=400
+          }}
+        {{/if}}
       </div>
     </div>
   </fieldset>
@@ -101,13 +115,13 @@
           Weekly Seasonality
           <span>
             <i class="glyphicon glyphicon-question-sign"></i>
-            {{#tooltip-on-element}}
+            {{#tooltip-on-element class="te-tooltip"}}
               Does your metric behave differently depending on the day of the week?
             {{/tooltip-on-element}}
           </span>
         </label>
-        {{#x-toggle 
-          value=weeklyEffect 
+        {{#x-toggle
+          value=weeklyEffect
           classNames="te-toggle te-toggle--form te-toggle--left"
           theme='ios'
           showLabels=true
@@ -118,7 +132,7 @@
               <span class="te-label te-label--flush">{{if weeklyEffect 'True' 'False'}}</span>
             {{/toggle.label}}
             {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
-        {{/x-toggle}} 
+        {{/x-toggle}}
       </div>
     {{/if}}
   </fieldset>
@@ -150,22 +164,30 @@
 
     {{!-- Field: App Name --}}
     <div class="form-group col-xs-10">
-      <label for="anomaly-form-app-name" class="control-label te-label required">Related Product or Team</label>
-      {{input
-        type="text"
-        id="anomaly-form-app-name"
-        class="form-control te-input te-input--read-only"
-        value=(get subscriptionGroup "application")
-        disabled=true
+      <label for="anomaly-form-app-name" class="control-label te-label required">Related Application, Product or Team</label>
+      {{#power-select
+        options=allApplications
+        selected=selectedApplication
+        searchField="application"
+        onchange=(action "onSelectAppName")
+        loadingMessage="Waiting for the server...."
+        placeholder="Select an existing product/team name"
+        searchPlaceholder="Type to filter..."
+        triggerId="anomaly-form-app-name"
+        triggerClass="te-form__select"
+        searchEnabled=false
+        as |app|
       }}
+        {{app.application}}
+      {{/power-select}}
     </div>
 
     <div class="form-group col-xs-2">
       <label for="select-status" class="control-label te-label required">
         Status
       </label>
-      {{#x-toggle 
-        value=isActive 
+      {{#x-toggle
+        value=isActive
         classNames="te-toggle te-toggle--form te-toggle--left"
         theme='ios'
         showLabels=true
@@ -176,52 +198,114 @@
             <span class="te-label te-label--flush">{{if isActive 'Active' 'Inactive'}}</span>
           {{/toggle.label}}
           {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
-      {{/x-toggle}} 
+      {{/x-toggle}}
     </div>
 
     {{!-- Field: Select Existing Subscription Group --}}
-    <div class="form-group col-sm-12">
-      <label for="config-group" class="control-label te-label">Subscription Group</label>
+    <div class="form-group col-sm-6">
+      <label for="config-group" class="control-label te-label">Add This Alert To An Existing Subscription Group</label>
+      {{#power-select
+        options=allAlertsConfigGroups
+        selected=selectedConfigGroup
+        searchField="name"
+        onchange=(action "onSelectConfigGroup")
+        loadingMessage="Waiting for the server...."
+        placeholder="Select an existing alert subscription group"
+        searchPlaceholder="Type to filter..."
+        triggerId="config-group"
+        triggerClass="te-form__select"
+        as |group|
+      }}
+        {{group.name}}
+      {{/power-select}}
+    </div>
+    {{!--  Fields for new alert group creation --}}
+    <div class="form-group col-sm-6">
+      <label for="config-group-new-name" class="control-label te-label"><strong>Or</strong> Provide A New Subscription Group Name</label>
+      {{#if isGroupNameDuplicate}}
+        <div class="te-form__alert--warning alert-warning">Warning: <strong>{{newConfigGroupName}}</strong> already exists. Please try another name.</div>
+      {{/if}}
       {{input
         type="text"
-        id="config-group"
-        class="form-control te-input te-input--read-only"
-        placeholder="Add a descriptive alert name"
-        value=(get subscriptionGroup "name")
-        disabled=true
+        id="config-group-new-name"
+        class="form-control te-input"
+        placeholder="New Group Name"
+        value=newConfigGroupName
+        key-up="validateNewGroupName"
+        focus-out="validateNewGroupName"
       }}
     </div>
-
+    {{!-- Alert Group Metadata --}}
+    {{#if selectedConfigGroup}}
+      <div class="form-group col-xs-12">
+        {{#if selectedGroupFunctions.length}}
+          {{#bs-accordion as |acc|}}
+            {{#acc.item class="te-form__custom-label" title=selectedConfigGroupSubtitle}}
+              {{models-table
+                data=selectedGroupFunctions
+                columns=alertsTableColumns
+                showGlobalFilter=false
+                showColumnsDropdown=false
+                filteringIgnoreCase=true
+              }}
+            {{/acc.item}}
+          {{/bs-accordion}}
+        {{else}}
+          <span class="alert-group-functions__item--id">No alerts are monitored by this group yet.</span>
+        {{/if}}
+      </div>
+    {{/if}}
     {{!-- Field: new alert group recipient emails --}}
     <div class="form-group col-xs-12">
-      <label for="config-group-add-recipients" class="control-label te-label">
-        Notification Recipients
-        {{!-- <div class="te-form__sub-label">Current recipients: <span class="te-form__sub-label--strong">{{get subscriptionGroup "recipients"}}</span></div> --}}
+      <label for="config-group" class="control-label te-label">
+        Add Alert Notification Recipients *
+        <div class="te-form__sub-label">Current recipients: <span class="te-form__sub-label--strong">{{if selectedConfigGroupRecipients selectedConfigGroupRecipients "None"}}</span></div>
       </label>
       {{#if isDuplicateEmail}}
         <div class="te-form__alert--warning alert-warning">Warning: <strong>{{duplicateEmails}}</strong> is already included in this group.</div>
       {{/if}}
+      {{#if isEmptyEmail}}
+        <div class="te-form__alert--warning alert-warning">Warning: Please provide a notification email for this alert or group!</div>
+      {{/if}}
+      {{#if isEmailError}}
+        <div class="te-form__alert--warning alert-warning">Warning: Please check formatting of these LinkedIn email addresses</div>
+      {{/if}}
       {{input
         type="email"
         id="config-group-add-recipients"
-        class="form-control te-input te-input--read-only"
+        class="form-control te-input"
+        focus-out="validateAlertEmail"
+        key-up="validateAlertEmail"
         placeholder="Add additional recipients (comma-separated email addresses)"
         autocomplete=false
-        value=(get subscriptionGroup "recipients")
+        value=alertGroupNewRecipient
         required=true
-        disabled=true
       }}
     </div>
   </fieldset>
+
+  {{#if isEditAlertError}}
+    {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
+      <strong>Edit Alert Error!</strong> Alert edit has failed. Please try again.
+    {{/bs-alert}}
+  {{/if}}
+
+  {{#if (and isEditAlertSuccess (not isEditAlertError))}}
+    {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
+      <strong>Edit Alert Success!</strong> You have successfully edited alert {{alertId}}.
+    {{/bs-alert}}
+  {{/if}}
 
   <fieldset class="te-form__section-submit">
 
     {{#bs-button
       type="outline-primary"
-      buttonType="cancel"
+      buttonType="Cancel"
+      defaultText="Cancel"
+      onClick=(action "onCancel")
       class="te-button te-button--cancel"
     }}
-      {{#link-to "manage.alerts"}} Cancel {{/link-to}}
+
     {{/bs-button}}
     {{bs-button
       defaultText="Save"

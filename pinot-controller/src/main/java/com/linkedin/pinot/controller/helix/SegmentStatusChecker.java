@@ -20,16 +20,18 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ControllerGauge;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.util.TableSizeReader;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.helix.ControllerChangeListener;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.NotificationContext;
@@ -56,35 +58,40 @@ public class SegmentStatusChecker {
   private static final String CONTROLLER_LEADER_CHANGE = "CONTROLLER LEADER CHANGE";
   public static final String ONLINE = "ONLINE";
   public static final String ERROR = "ERROR";
+  public static final String CONSUMING = "CONSUMING";
   private ScheduledExecutorService _executorService;
-  ControllerMetrics _metricsRegistry;
-  private ControllerConf _config;
+  private final ControllerMetrics _metricsRegistry;
+  private final ControllerConf _config;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final HelixAdmin _helixAdmin;
   private final long _segmentStatusIntervalSeconds;
   private final int _waitForPushTimeSeconds;
+  private final TableSizeReader _tableSizeReader;
 
   /**
    * Constructs the segment status checker.
    * @param pinotHelixResourceManager The resource checker used to interact with Helix
    * @param config The controller configuration object
    */
-  public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
+  public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config, ControllerMetrics metricsRegistry) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _helixAdmin = pinotHelixResourceManager.getHelixAdmin();
+    _config = config;
     _segmentStatusIntervalSeconds = config.getStatusCheckerFrequencyInSeconds();
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
+    _metricsRegistry = metricsRegistry;
+    HttpConnectionManager httpConnectionManager = new MultiThreadedHttpConnectionManager();
+    _tableSizeReader = new TableSizeReader(Executors.newCachedThreadPool(), httpConnectionManager, _pinotHelixResourceManager);
   }
 
   /**
    * Starts the segment status checker.
    */
-  public void start(ControllerMetrics metricsRegistry) {
+  public void start() {
     if (_segmentStatusIntervalSeconds == -1) {
       return;
     }
 
-    _metricsRegistry = metricsRegistry;
     setStatusToDefault();
     // Subscribe to leadership changes
     _pinotHelixResourceManager.getHelixZkManager().addControllerListener(new ControllerChangeListener() {
@@ -167,7 +174,7 @@ public class SegmentStatusChecker {
     ZkHelixPropertyStore<ZNRecord> propertyStore= _pinotHelixResourceManager.getPropertyStore();
 
     for (String tableName : allTableNames) {
-      if (TableNameBuilder.getTableTypeFromTableName(tableName).equals(CommonConstants.Helix.TableType.OFFLINE)) {
+      if (TableNameBuilder.getTableTypeFromTableName(tableName) == TableType.OFFLINE) {
         offlineTableCount++;
       } else {
         realTimeTableCount++;
@@ -193,7 +200,7 @@ public class SegmentStatusChecker {
       int nReplicasIdealMax = 0; // Keeps track of maximum number of replicas in ideal state
       int nReplicasExternal = -1; // Keeps track of minimum number of replicas in external view
       int nErrors = 0; // Keeps track of number of segments in error state
-      int nOffline = 0; // Keeeps track of number segments with no online replicas
+      int nOffline = 0; // Keeps track of number segments with no online replicas
       int nSegments = 0; // Counts number of segments
       for (String partitionName : idealState.getPartitionSet()) {
         int nReplicas = 0;
@@ -204,7 +211,7 @@ public class SegmentStatusChecker {
           if (serverAndState == null) {
             break;
           }
-          if (serverAndState.getValue().equals(ONLINE)){
+          if (serverAndState.getValue().equals(ONLINE)) {
             nIdeal++;
             break;
           }
@@ -234,8 +241,11 @@ public class SegmentStatusChecker {
           continue;
         }
         for (Map.Entry<String, String> serverAndState : externalView.getStateMap(partitionName).entrySet()) {
-          // Count number of online replicas
-          if (serverAndState.getValue().equals(ONLINE)) {
+          // Count number of online replicas. Ignore if state is CONSUMING.
+          // It is possible for a segment to be ONLINE in idealstate, and CONSUMING in EV for a short period of time.
+          // So, ignore this combination. If a segment exists in this combination for a long time, we will get
+          // kafka-partition-not-consuming alert anyway.
+          if (serverAndState.getValue().equals(ONLINE) || serverAndState.getValue().equals(CONSUMING)) {
             nReplicas++;
           }
           if (serverAndState.getValue().equals(ERROR)) {
@@ -250,7 +260,7 @@ public class SegmentStatusChecker {
         }
         nReplicasExternal = ((nReplicasExternal > nReplicas) || (nReplicasExternal == -1)) ? nReplicas : nReplicasExternal;
       }
-      if (nReplicasExternal == -1){
+      if (nReplicasExternal == -1) {
         nReplicasExternal = (nReplicasIdealMax == 0) ? 1 : 0;
       }
       // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
@@ -293,11 +303,7 @@ public class SegmentStatusChecker {
     }
   }
 
-  public void setMetricsRegistry(ControllerMetrics metricsRegistry) {
-    _metricsRegistry = metricsRegistry;
-  }
-
-  void setStatusToDefault() {
+  private void setStatusToDefault() {
     // Fetch the list of tables
     List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
     // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge

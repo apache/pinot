@@ -1,7 +1,8 @@
 package com.linkedin.thirdeye.config;
 
 import com.linkedin.thirdeye.dashboard.resources.v2.ConfigResource;
-import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
+import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -13,8 +14,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class ConfigNamespaceIntegrationTest extends AbstractManagerTestBase {
+public class ConfigNamespaceIntegrationTest {
   private final static Map<String, String> MAP_EXPECTED = new HashMap<>();
+  private DAOTestBase testDAOProvider;
   static {
     MAP_EXPECTED.put("a", "A");
     MAP_EXPECTED.put("b", "B");
@@ -54,16 +56,16 @@ public class ConfigNamespaceIntegrationTest extends AbstractManagerTestBase {
 
   @BeforeMethod
   public void beforeMethod() {
-    super.init();
+    testDAOProvider = DAOTestBase.getInstance();
   }
 
   @AfterMethod(alwaysRun = true)
   public void afterMethod() {
-    super.cleanup();
+    testDAOProvider.cleanup();
   }
 
   public void setupViaResource() throws IOException {
-    ConfigResource res = new ConfigResource(super.configDAO);
+    ConfigResource res = new ConfigResource(DAORegistry.getInstance().getConfigDAO());
     res.put("ns1", "string", "mystring");
     res.put("ns1", "list", "[1, 2, 3]");
     res.put("ns1", "listString", "[\"1\", \"2\", \"3\"]");
@@ -76,7 +78,7 @@ public class ConfigNamespaceIntegrationTest extends AbstractManagerTestBase {
   public void testReadConfig() throws Exception {
     setupViaResource();
 
-    ConfigNamespace ns = new ConfigNamespace("ns1", super.configDAO);
+    ConfigNamespace ns = new ConfigNamespace("ns1", DAORegistry.getInstance().getConfigDAO());
     String string = ns.get("string");
     Assert.assertEquals(string, "mystring");
 

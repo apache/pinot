@@ -17,6 +17,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang.StringUtils;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
 import org.quartz.JobBuilder;
@@ -125,8 +126,12 @@ public class AlertJobSchedulerV2 implements JobScheduler, Runnable {
     if (isActive) {
       if (isScheduled) {
         String cronInDatabase = alertConfig.getCronExpression();
-        List<Trigger> triggers =
-            (List<Trigger>) quartzScheduler.getTriggersOfJob(JobKey.jobKey(jobKey));
+        if (!StringUtils.isBlank(alertConfig.getHolidayCronExpression())) {
+          LOG.info("Using holiday mode for alert config id '{}' with expression '{}'", id, alertConfig.getHolidayCronExpression());
+          cronInDatabase = alertConfig.getHolidayCronExpression();
+        }
+
+        List<Trigger> triggers = (List<Trigger>) quartzScheduler.getTriggersOfJob(JobKey.jobKey(jobKey));
         CronTrigger cronTrigger = (CronTrigger) triggers.get(0);
         String cronInSchedule = cronTrigger.getCronExpression();
         // cron expression has been updated, restart this job
@@ -197,8 +202,14 @@ public class AlertJobSchedulerV2 implements JobScheduler, Runnable {
   private void scheduleJob(JobContext jobContext, AlertConfigDTO alertConfig) throws SchedulerException {
     LOG.info("Starting {}", jobContext.getJobName());
     String triggerKey = String.format("alert_scheduler_trigger_%d", alertConfig.getId());
+
+    String cronSchedule = alertConfig.getCronExpression();
+    if (!StringUtils.isBlank(alertConfig.getHolidayCronExpression())) {
+      cronSchedule = alertConfig.getHolidayCronExpression();
+    }
+
     CronTrigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey)
-        .withSchedule(CronScheduleBuilder.cronSchedule(alertConfig.getCronExpression())).build();
+        .withSchedule(CronScheduleBuilder.cronSchedule(cronSchedule)).build();
     String jobKey = jobContext.getJobName();
     JobDetail job = JobBuilder.newJob(AlertJobRunnerV2.class).withIdentity(jobKey).build();
     job.getJobDataMap().put(AlertJobRunnerV2.ALERT_JOB_CONTEXT_V2, jobContext);

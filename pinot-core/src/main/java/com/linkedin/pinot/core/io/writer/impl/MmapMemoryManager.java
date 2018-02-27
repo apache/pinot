@@ -50,6 +50,8 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
   private static final long DEFAULT_FILE_LENGTH = 512 * 1024 * 1024L; // 0.5G per segment
 
   private final String _dirPathName;
+  private final String _segmentName;
+
   // It is possible that one thread stops consumption, and another thread takes over consumption, in LLC.
   // So we should make numFiles as a volatile, in case buffer expansion happens in a different thread.
   private volatile int _numFiles = 0;
@@ -72,12 +74,13 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
    * @param dirPathName directory under which all mmap files are created.
    * @param segmentName Name of the segment for which this memory manager allocates memory
    *
-   * @param serverMetrics
+   * @param serverMetrics Server metrics
    * @see RealtimeIndexOffHeapMemoryManager
    */
   public MmapMemoryManager(String dirPathName, String segmentName, ServerMetrics serverMetrics) {
     super(serverMetrics, segmentName);
     _dirPathName = dirPathName;
+    _segmentName = segmentName;
     File dirFile = new File(_dirPathName);
     if (dirFile.exists()) {
       File[] segmentFiles = dirFile.listFiles(new FilenameFilter() {
@@ -102,7 +105,7 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
   }
 
   private String getFilePrefix() {
-    return getSegmentName() + ".";
+    return _segmentName + ".";
   }
 
   private void addFileIfNecessary(long len) {
@@ -128,7 +131,7 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
       raf.setLength(fileLen);
       raf.close();
       _currentBuffer = PinotDataBuffer.fromFile(file, ReadMode.mmap, FileChannel.MapMode.READ_WRITE, thisContext);
-      LOGGER.info("Mapped file {} for segment {} into buffer {}", file.getAbsolutePath(), getSegmentName(), _currentBuffer);
+      LOGGER.info("Mapped file {} for segment {} into buffer {}", file.getAbsolutePath(), _segmentName, _currentBuffer);
       _memMappedBuffers.add(_currentBuffer);
     }  catch (IOException e) {
       throw new RuntimeException(e);
@@ -148,7 +151,7 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
   @Override
   protected PinotDataBuffer allocateInternal(long size, String columnName) {
     addFileIfNecessary(size);
-    PinotDataBuffer buffer = _currentBuffer.view(_availableOffset, _availableOffset+size);
+    PinotDataBuffer buffer = _currentBuffer.view(_availableOffset, _availableOffset + size);
     _availableOffset += size;
     return buffer;
   }
@@ -162,8 +165,11 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
     for (String path: _paths) {
       try {
         File file = new File(path);
-        file.delete();
-        LOGGER.info("Deleted file {}", path);
+        if (file.delete()) {
+          LOGGER.info("Deleted file {}", path);
+        } else {
+          throw new RuntimeException("Unable to delete file: " + file);
+        }
       } catch (Exception e) {
         LOGGER.warn("Exception trying to delete file {}", path, e);
       }

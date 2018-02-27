@@ -116,14 +116,14 @@ public class ColumnarToStarTreeConverter {
     config.setDataDir(_inputDirName);
     config.setInputFilePath(columnarSegment.getAbsolutePath());
     config.setFormat(FileFormat.PINOT);
-    config.setEnableStarTreeIndex(true);
     config.setOutDir(_outputDirName);
-    config.setStarTreeIndexSpecFile(_starTreeConfigFileName);
     config.setOverwrite(_overwrite);
 
-    // Load the StarTreeSpec object from the config file.
-    StarTreeIndexSpec starTreeIndexSpec = objectMapper.readValue(new File(_starTreeConfigFileName), StarTreeIndexSpec.class);
-    config.setStarTreeIndexSpec(starTreeIndexSpec);
+    StarTreeIndexSpec starTreeIndexSpec = null;
+    if (_starTreeConfigFileName != null) {
+       starTreeIndexSpec = StarTreeIndexSpec.fromFile(new File(_starTreeConfigFileName));
+    }
+    config.enableStarTreeIndex(starTreeIndexSpec);
 
     // Read the segment and table name from the segment's metadata.
     SegmentMetadata metadata = new SegmentMetadataImpl(columnarSegment);

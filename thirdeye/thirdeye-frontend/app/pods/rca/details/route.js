@@ -1,4 +1,5 @@
-import Ember from 'ember';
+import { inject as service } from '@ember/service';
+import Route from '@ember/routing/route';
 import RSVP from 'rsvp';
 import moment from 'moment';
 import fetch from 'fetch';
@@ -18,7 +19,7 @@ const replaceConfig = {
   replace: true
 };
 
-export default Ember.Route.extend({
+export default Route.extend({
   // queryParams for rca
   queryParams: {
     startDate: queryParamsConfig,
@@ -32,7 +33,7 @@ export default Ember.Route.extend({
     displayEnd: replaceConfig
   },
 
-  redux: Ember.inject.service(),
+  redux: service(),
 
   // resets all redux stores' state
   beforeModel(transition) {
@@ -78,8 +79,8 @@ export default Ember.Route.extend({
     } = transition.queryParams;
 
     const newEndDate = maxTime.isValid() && maxTime.isBefore(moment(+endDate))
-        ? maxTime
-        : moment(+endDate);
+      ? maxTime
+      : moment(+endDate);
 
     if (granularity === 'DAYS') {
       start = newEndDate.clone().subtract(29, 'days').startOf('day');
@@ -132,7 +133,7 @@ export default Ember.Route.extend({
     return {};
   },
 
-  resetController(controller, isExiting, transition) {
+  resetController(controller, isExiting) {
     this._super(...arguments);
 
     if (isExiting) {

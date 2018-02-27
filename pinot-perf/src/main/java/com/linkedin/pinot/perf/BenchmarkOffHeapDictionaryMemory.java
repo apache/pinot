@@ -16,26 +16,25 @@
 
 package com.linkedin.pinot.perf;
 
-import org.openjdk.jmh.annotations.Setup;
-import org.openjdk.jmh.annotations.TearDown;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.LongOffHeapMutableDictionary;
+import org.openjdk.jmh.annotations.Setup;
+import org.openjdk.jmh.annotations.TearDown;
 
 
 // Test to get memory statistics for off-heap dictionary
 public class BenchmarkOffHeapDictionaryMemory {
-  private Long[] colValues;
-  private long[] uniqueColValues;
-  private final int nRuns = 10;
-  private final int nDivs = 10;
-  final int cardinality = 1_000_000;
-  final int nRows = 2_500_000;
-  private final long[] totalMem = new long[nDivs+1];
-  private final int[] nBufs = new int[nDivs+1];
-  private final int [] overflowSize = new int[nDivs+1];
-  private RealtimeIndexOffHeapMemoryManager _memoryManager;
+  private Long[] _colValues;
+  private final int _nRuns = 10;
+  private final int _nDivs = 10;
+  final int _cardinality = 1_000_000;
+  final int _nRows = 2_500_000;
+  private final long[] _totalMem = new long[_nDivs + 1];
+  private final int[] _nBufs = new int[_nDivs + 1];
+  private final int[] _overflowSize = new int[_nDivs + 1];
+  private PinotDataBufferMemoryManager _memoryManager;
 
   @Setup
   public void setUp() {
@@ -43,37 +42,38 @@ public class BenchmarkOffHeapDictionaryMemory {
   }
 
   @TearDown
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     _memoryManager.close();
   }
 
   private void setupValues(final int cardinality, final int nRows) {
     // Create a list of values to insert into the hash map
-    uniqueColValues = new long[cardinality];
+    long[] uniqueColValues = new long[cardinality];
     for (int i = 0; i < uniqueColValues.length; i++) {
-      uniqueColValues[i] = (long)(Math.random() * Long.MAX_VALUE);
+      uniqueColValues[i] = (long) (Math.random() * Long.MAX_VALUE);
     }
-    colValues = new Long[nRows];
-    for (int i = 0; i < colValues.length; i++) {
-      colValues[i] = uniqueColValues[(int)(Math.random() * cardinality)];
+    _colValues = new Long[nRows];
+    for (int i = 0; i < _colValues.length; i++) {
+      _colValues[i] = uniqueColValues[(int) (Math.random() * cardinality)];
     }
   }
 
-  private BaseOffHeapMutableDictionary testMem(final int actualCardinality, final int initialCardinality, final int maxOverflowSize) throws Exception {
-    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(initialCardinality, maxOverflowSize,
-        _memoryManager, "longColumn");
+  private BaseOffHeapMutableDictionary testMem(final int initialCardinality, final int maxOverflowSize)
+      throws Exception {
+    LongOffHeapMutableDictionary dictionary =
+        new LongOffHeapMutableDictionary(initialCardinality, maxOverflowSize, _memoryManager, "longColumn");
 
-    for (int i = 0; i < colValues.length; i++) {
-      dictionary.index(colValues[i]);
+    for (Long colValue : _colValues) {
+      dictionary.index(colValue);
     }
     return dictionary;
   }
 
-  private void addStats(BaseOffHeapMutableDictionary dictionary, int actualCardinality, int initialCardinality,
-      int maxOverflowSize, int div) {
-    totalMem[div] += dictionary.getTotalOffHeapMemUsed();
-    overflowSize[div] += dictionary.getNumberOfOveflowValues();
-    nBufs[div] += dictionary.getNumberOfHeapBuffersUsed();
+  private void addStats(BaseOffHeapMutableDictionary dictionary, int div) {
+    _totalMem[div] += dictionary.getTotalOffHeapMemUsed();
+    _overflowSize[div] += dictionary.getNumberOfOveflowValues();
+    _nBufs[div] += dictionary.getNumberOfHeapBuffersUsed();
 
     /*
     System.out.println("Cardinality:" + actualCardinality + ",initialCardinality:" + initialCardinality +
@@ -87,31 +87,34 @@ public class BenchmarkOffHeapDictionaryMemory {
   }
 
   private void printStats() {
-    for (int div = 1; div < nDivs; div++) {
-      totalMem[div] /= nRuns;
-      nBufs[div] /= nRuns;
-      overflowSize[div] /= nRuns;
-      System.out.println("Div=" + div + ",TotalMem:" + totalMem[div]/1024/1024 + "MB,nBufs=" + nBufs[div] + ",numOverflows=" + overflowSize[div]);
+    for (int div = 1; div < _nDivs; div++) {
+      _totalMem[div] /= _nRuns;
+      _nBufs[div] /= _nRuns;
+      _overflowSize[div] /= _nRuns;
+      System.out.println(
+          "Div=" + div + ",TotalMem:" + _totalMem[div] / 1024 / 1024 + "MB,_nBufs=" + _nBufs[div] + ",numOverflows="
+              + _overflowSize[div]);
     }
   }
 
   private void clearStats() {
-    for (int div = 1; div < nDivs; div++) {
-      totalMem[div] = 0;
-      nBufs[div] = 0;
-      overflowSize[div] = 0;
+    for (int div = 1; div < _nDivs; div++) {
+      _totalMem[div] = 0;
+      _nBufs[div] = 0;
+      _overflowSize[div] = 0;
     }
   }
 
-  private void testMem(final int maxOverflowSize) throws Exception {
+  private void testMem(final int maxOverflowSize)
+      throws Exception {
     clearStats();
 
-    for (int div = 1; div <= nDivs; div++) {
-      setupValues(cardinality, nRows);
-      for (int i = 0; i < nRuns; i++) {
-        int initialCardinality = cardinality/div;
-        BaseOffHeapMutableDictionary dictionary = testMem(cardinality, initialCardinality, maxOverflowSize);
-        addStats(dictionary, cardinality, initialCardinality, maxOverflowSize, div);
+    for (int div = 1; div <= _nDivs; div++) {
+      setupValues(_cardinality, _nRows);
+      for (int i = 0; i < _nRuns; i++) {
+        int initialCardinality = _cardinality / div;
+        BaseOffHeapMutableDictionary dictionary = testMem(initialCardinality, maxOverflowSize);
+        addStats(dictionary, div);
         dictionary.close();
       }
     }
@@ -119,7 +122,8 @@ public class BenchmarkOffHeapDictionaryMemory {
     printStats();
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     BenchmarkOffHeapDictionaryMemory benchmark = new BenchmarkOffHeapDictionaryMemory();
     System.out.println("Results with overflow:");
     benchmark.testMem(1000);

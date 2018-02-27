@@ -25,6 +25,7 @@ import com.linkedin.pinot.core.common.DataBlockCache;
 import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.BaseOperator;
@@ -35,11 +36,12 @@ import com.linkedin.pinot.core.query.aggregation.groupby.DictionaryBasedGroupKey
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
-import com.linkedin.pinot.util.TestDataRecordReader;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -63,16 +65,18 @@ public class DictionaryBasedGroupKeyGeneratorTest {
   private final long _randomSeed = System.currentTimeMillis();
   private final Random _random = new Random(_randomSeed);
   private final String _errorMessage = "Random seed is: " + _randomSeed;
-  TransformBlock _transformBlock;
 
   private static final int TEST_LENGTH = 20;
   private final int[] _testDocIdSet = new int[TEST_LENGTH];
   private final int[] _singleValueGroupKeyBuffer = new int[TEST_LENGTH];
   private final int[][] _multiValueGroupKeyBuffer = new int[TEST_LENGTH][];
 
+  private static final int ARRAY_BASED_THRESHOLD = 10_000;
+  private TransformBlock _transformBlock;
+
   @BeforeClass
   private void setup() throws Exception {
-    GenericRow[] segmentData = new GenericRow[NUM_ROWS];
+    List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     int value = _random.nextInt(MAX_STEP_LENGTH);
 
     // Generate random values for the segment.
@@ -91,12 +95,12 @@ public class DictionaryBasedGroupKeyGeneratorTest {
         }
         map.put(multiValueColumn, values);
       }
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(map);
-      segmentData[i] = genericRow;
+      GenericRow row = new GenericRow();
+      row.init(map);
+      rows.add(row);
     }
-    for (int i = UNIQUE_ROWS; i < NUM_ROWS; i += UNIQUE_ROWS) {
-      System.arraycopy(segmentData, 0, segmentData, i, UNIQUE_ROWS);
+    for (int i = UNIQUE_ROWS; i < NUM_ROWS; i++) {
+      rows.add(rows.get(i % UNIQUE_ROWS));
     }
 
     // Create an index segment with the random values.
@@ -116,7 +120,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     config.setSegmentName(SEGMENT_NAME);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new TestDataRecordReader(schema, segmentData));
+    driver.init(config, new GenericRowRecordReader(rows, schema));
     driver.build();
 
     IndexSegment indexSegment = Loaders.IndexSegment.load(new File(INDEX_DIR_PATH, SEGMENT_NAME), ReadMode.heap);
@@ -128,7 +132,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     for (String column : indexSegment.getColumnNames()) {
       DataSource dataSource = indexSegment.getDataSource(column);
       dataSourceMap.put(column, dataSource);
-      blockMap.put(column, dataSource.getNextBlock());
+      blockMap.put(column, dataSource.nextBlock());
     }
 
     // Generate a random test doc id set.
@@ -151,8 +155,8 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     String[] groupByColumns = {"s1"};
 
     // Test initial status.
-    DictionaryBasedGroupKeyGenerator
-        dictionaryBasedGroupKeyGenerator = new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns);
+    DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
+        new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns, ARRAY_BASED_THRESHOLD);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
 
@@ -170,8 +174,8 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
     // Test initial status.
     long expected = (long) Math.pow(UNIQUE_ROWS, groupByColumns.length);
-    DictionaryBasedGroupKeyGenerator
-        dictionaryBasedGroupKeyGenerator = new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns);
+    DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
+        new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns, ARRAY_BASED_THRESHOLD);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), expected, _errorMessage);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
@@ -188,9 +192,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     String[] groupByColumns = {"s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"};
 
     // Test initial status.
-    DictionaryBasedGroupKeyGenerator
-        dictionaryBasedGroupKeyGenerator = new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns);
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), Integer.MAX_VALUE, _errorMessage);
+    DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
+        new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns, ARRAY_BASED_THRESHOLD);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), Integer.MAX_VALUE,
+        _errorMessage);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
     // Test group key generation.
@@ -220,15 +225,17 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     String[] groupByColumns = {"m1"};
 
     // Test initial status.
-    DictionaryBasedGroupKeyGenerator
-        dictionaryBasedGroupKeyGenerator = new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns);
+    DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
+        new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns, ARRAY_BASED_THRESHOLD);
     int groupKeyUpperBound = dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound();
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound, _errorMessage);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound,
+        _errorMessage);
 
     // Test group key generation.
     dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, _multiValueGroupKeyBuffer);
     int numUniqueKeys = _multiValueGroupKeyBuffer[0].length + _multiValueGroupKeyBuffer[1].length;
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound, _errorMessage);
+    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound,
+        _errorMessage);
     compareMultiValueBuffer();
     testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), numUniqueKeys);
   }
@@ -239,8 +246,8 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     String[] groupByColumns = {"m1", "m2", "s1", "s2"};
 
     // Test initial status.
-    DictionaryBasedGroupKeyGenerator
-        dictionaryBasedGroupKeyGenerator = new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns);
+    DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
+        new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns, ARRAY_BASED_THRESHOLD);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
     // Test group key generation.
@@ -257,8 +264,8 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     String[] groupByColumns = {"m1", "m2", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"};
 
     // Test initial status.
-    DictionaryBasedGroupKeyGenerator
-        dictionaryBasedGroupKeyGenerator = new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns);
+    DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
+        new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns, ARRAY_BASED_THRESHOLD);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
     // Test group key generation.

@@ -1,7 +1,7 @@
-import Ember from 'ember';
+import EmberRouter from '@ember/routing/router';
 import config from './config/environment';
 
-const Router = Ember.Router.extend({
+const Router = EmberRouter.extend({
   location: config.locationType,
   rootURL: config.rootURL
 });
@@ -11,14 +11,20 @@ Router.map(function() {
   this.route('login');
   this.route('logout');
 
-  this.route('manage', function() {
+  this.route('manage', { path: '/manage' }, function() {
+    this.route('alert', { path: 'alert/:alertId' }, function() {
+      this.route('explore');
+      this.route('tune');
+      this.route('edit');
+    });
     this.route('alerts', function() {
       this.route('edit', { path: '/:alertId' });
+      this.route('performance');
     });
   });
 
   this.route('rca', { path: '/rca' }, function() {
-    this.route('details', { path: '/:metricId' }, function() {
+    this.route('details', { path: '/:metricId' }, function () {
       this.route('metrics');
       this.route('events');
       this.route('dimensions', function() {
@@ -31,6 +37,8 @@ Router.map(function() {
     this.route('import-metric');
   });
   this.route('screenshot', { path: 'screenshot/:anomalyId' });
+  this.route('rootcause');
+  this.route('home');
 });
 
 export default Router;

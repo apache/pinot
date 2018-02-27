@@ -15,279 +15,105 @@
  */
 package com.linkedin.pinot.core.util.trace;
 
-import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.utils.NamedThreadFactory;
-import com.linkedin.pinot.core.util.trace.Trace;
-import com.linkedin.pinot.core.util.trace.TraceContext;
-import com.linkedin.pinot.core.util.trace.TraceRunnable;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Queue;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import org.json.JSONObject;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
 
-import java.util.*;
-import java.util.concurrent.*;
-
-/**
- * Mimic the behavior of server-side multi-threading, and test whether the log maintains multi-threading invariants.
- *
- */
 public class TraceContextTest {
+  private static final int NUM_CHILDREN_PER_REQUEST = 10;
+  private static final int NUM_REQUESTS = 10;
+  private static final Random RANDOM = new Random();
 
-  private static final String SEP = "_";
-  private static final Logger LOGGER = LoggerFactory.getLogger(TraceContextTest.class);
-
-  static final int JOBS_PER_REQUEST = 100;
-  static final int NUMBER_OF_REQUESTS = 50;
-  static final int NUMBER_OF_THREADS = 50;
-
-  /**
-   * CountInfo is a mutable structure.
-   */
-  private static class CountInfo {
-    public final Set<Long> numberOfRequests = new HashSet<Long>();
-    public final Map<Long, Integer> numberOfJobsMap = new HashMap<Long, Integer>();
-
-    private final int requestsNum;
-    private final int jobsNumPerRequest;
-
-    public CountInfo(int requestsNum, int jobsNumPerRequest) {
-      this.requestsNum = requestsNum;
-      this.jobsNumPerRequest = jobsNumPerRequest;
-    }
-
-    public void verify() {
-      assertEquals(numberOfRequests.size(), requestsNum);
-      assertEquals(numberOfJobsMap.keySet().size(), requestsNum);
-      for (int num: numberOfJobsMap.values()) {
-        assertEquals(num, jobsNumPerRequest);
-      }
-    }
+  @Test
+  public void testSingleRequest() throws Exception {
+    ExecutorService executorService = Executors.newCachedThreadPool();
+    testSingleRequest(executorService, 0);
+    executorService.shutdown();
+    Assert.assertTrue(TraceContext.REQUEST_TO_TRACES_MAP.isEmpty());
   }
 
-  // ------ helper functions ------
-
-  private void mixedInvariants(ConcurrentLinkedDeque<TraceContext.Info> queue, CountInfo countInfo) {
-    while (queue.size() > 0) {
-      if (queue.peekFirst().message == TraceContext.CONSTANT.REGISTER_REQUEST) {
-        requestHandlerInvariants(queue, countInfo);
-      } else if (queue.peekFirst().message == TraceContext.CONSTANT.REGISTER_THREAD_TO_REQUEST) {
-        jobHandlerInvariants(queue, countInfo);
-      } else {
-        throw new RuntimeException("Remaining Queue malformed: " + queue);
-      }
-    }
-  }
-
-  private void requestHandlerInvariants(ConcurrentLinkedDeque<TraceContext.Info> queue, CountInfo countInfo) {
-    TraceContext.Info info1 = queue.pollFirst();
-    TraceContext.Info info2 = queue.pollFirst();
-    TraceContext.Info info3 = queue.pollFirst();
-    TraceContext.Info info4 = queue.pollFirst();
-    assertEquals(info1.requestId, info2.requestId);
-    assertEquals(info2.requestId, info3.requestId);
-    assertEquals(info3.requestId, info4.requestId);
-    assertEquals(info1.message, TraceContext.CONSTANT.REGISTER_REQUEST);
-    assertEquals(info2.message, TraceContext.CONSTANT.REGISTER_THREAD_TO_REQUEST);
-    assertEquals(info3.message, TraceContext.CONSTANT.UNREGISTER_THREAD_FROM_REQUEST);
-    assertEquals(info4.message, TraceContext.CONSTANT.UNREGISTER_REQUEST);
-
-    countInfo.numberOfRequests.add(info1.requestId);
-  }
-
-  private void putIfAbsent(Map<Long, Integer> map, Long key, Integer value) {
-    Integer v = map.get(key);
-    if (v == null) {
-      map.put(key, value);
-    }
-  }
-
-  private void jobHandlerInvariants(ConcurrentLinkedDeque<TraceContext.Info> queue, CountInfo countInfo) {
-    TraceContext.Info info1 = queue.pollFirst();
-    TraceContext.Info info2 = queue.pollFirst();
-    TraceContext.Info info3 = queue.pollFirst();
-    assertEquals(info1.requestId, info2.requestId);
-    assertEquals(info2.requestId, info3.requestId);
-    assertEquals(info1.message, TraceContext.CONSTANT.REGISTER_THREAD_TO_REQUEST);
-    assertEquals(info2.message, TraceContext.CONSTANT.START_NEW_TRACE);
-    assertEquals(info3.message, TraceContext.CONSTANT.UNREGISTER_THREAD_FROM_REQUEST);
-
-    putIfAbsent(countInfo.numberOfJobsMap, info1.requestId, 0);
-    countInfo.numberOfJobsMap.put(info1.requestId, countInfo.numberOfJobsMap.get(info1.requestId) + 1);
-  }
-
-  private void singleRequestCall(ExecutorService jobService, final InstanceRequest request, int jobsPerRequest) throws Exception {
-    TraceContext.register(request);
-    Future[] tasks = new Future[jobsPerRequest];
-
-    // fan out multiple threads for this request
-    for (int i = 0; i < jobsPerRequest; i++) {
-      final int taskId = i;
-      tasks[i] = jobService.submit(new TraceRunnable() {
-        @Override
-        public void runJob() {
-          String tid = Thread.currentThread().getId() + "";
-          TraceContext.logException(tid, request.getRequestId() + SEP + taskId);
-        }
-      });
-    }
-
-    // wait for all threads to finish the job
-    for (int i = 0; i < jobsPerRequest; i++) {
-      // block waiting
-      tasks[i].get();
-    }
-    TraceContext.unregister(request);
-  }
-
-  /**
-   * The {@link ExecutorService} for handling requests can be
-   * 1. the same service that handling internal multi-threading jobs of each request
-   * 2. or a different service
-   *
-   * @param requestService
-   * @throws Exception
-   */
-  private void multipleRequestsCall(ExecutorService requestService, final ExecutorService jobService,
-                                    int numberOfRequests, final int jobsPerRequest) throws Exception {
-    // init requests
-    List<InstanceRequest> requests = new ArrayList<InstanceRequest>();
-    for (int j = 0; j < numberOfRequests; j++) {
-      InstanceRequest request = new InstanceRequest(j, null);
-      request.setEnableTrace(true);
-      requests.add(request);
-    }
-
-    // init tasks
-    Future[] tasks = new Future[requests.size()];
-    int i = 0;
-    for (final InstanceRequest request: requests) {
-      tasks[i++] = requestService.submit(new Runnable() {
+  @Test
+  public void testMultipleRequests() throws Exception {
+    final ExecutorService executorService = Executors.newCachedThreadPool();
+    Future[] futures = new Future[NUM_REQUESTS];
+    for (int i = 0; i < NUM_REQUESTS; i++) {
+      final int requestId = i;
+      futures[i] = executorService.submit(new Runnable() {
         @Override
         public void run() {
           try {
-            singleRequestCall(jobService, request, jobsPerRequest);
+            testSingleRequest(executorService, requestId);
           } catch (Exception e) {
-            e.printStackTrace();
+            Assert.fail();
           }
         }
       });
     }
-
-    // wait for all tasks to finish
-    for (Future task: tasks) {
-      // block waiting
-      task.get();
+    for (Future future : futures) {
+      future.get();
     }
+    executorService.shutdown();
+    Assert.assertTrue(TraceContext.REQUEST_TO_TRACES_MAP.isEmpty());
   }
 
-  private void runVariousConditionTests(ExecutorService requestService, ExecutorService jobService) throws Exception {
-    int reqStep = NUMBER_OF_REQUESTS/5;
-    int jobStep = JOBS_PER_REQUEST/5;
-    boolean shared = false;
+  private void testSingleRequest(ExecutorService executorService, final long requestId) throws Exception {
+    Set<String> expectedTraces = new HashSet<>(NUM_CHILDREN_PER_REQUEST + 1);
+    TraceContext.register(requestId);
+    String key = Integer.toString(RANDOM.nextInt());
+    int value = RANDOM.nextInt();
+    expectedTraces.add(getTraceString(key, value));
 
-    if (requestService == jobService) {
-      shared = true;
+    // Add (requestId + 1) logs
+    for (int i = 0; i <= requestId; i++) {
+      TraceContext.logInfo(key, value);
     }
 
-    for (int numberOfRequests = reqStep; numberOfRequests <= NUMBER_OF_REQUESTS; numberOfRequests += reqStep) {
-      for (int jobsPerRequest = jobStep; jobsPerRequest < JOBS_PER_REQUEST; jobsPerRequest += jobStep) {
-        if (shared) {
-          LOGGER.info("Shared exec service for #request: " + numberOfRequests + " #jobsPerRequest: " + jobsPerRequest);
-        } else {
-          LOGGER.info("Non-shared exec service for #request: " + numberOfRequests + " #jobsPerRequest: " + jobsPerRequest);
-        }
+    Future[] futures = new Future[NUM_CHILDREN_PER_REQUEST];
+    for (int i = 0; i < NUM_CHILDREN_PER_REQUEST; i++) {
+      final String chileKey = Integer.toString(RANDOM.nextInt());
+      final int childValue = RANDOM.nextInt();
+      expectedTraces.add(getTraceString(chileKey, childValue));
 
-        if (shared && (numberOfRequests>=NUMBER_OF_THREADS)) {
-          LOGGER.info("Ignore tests for #request: " + numberOfRequests + ", since it will deadlock.");
-        } else {
-          TraceContext.reset();
-          multipleRequestsCall(requestService, jobService, numberOfRequests, jobsPerRequest);
-          runVerification(numberOfRequests, jobsPerRequest);
+      futures[i] = executorService.submit(new TraceRunnable() {
+        @Override
+        public void runJob() {
+          // Add (requestId + 1) logs
+          for (int j = 0; j <= requestId; j++) {
+            TraceContext.logInfo(chileKey, childValue);
+          }
         }
+      });
+    }
+    for (Future future : futures) {
+      future.get();
+    }
+
+    Queue<TraceContext.Trace> traces = TraceContext.REQUEST_TO_TRACES_MAP.get(requestId);
+    Assert.assertNotNull(traces);
+    Assert.assertEquals(traces.size(), NUM_CHILDREN_PER_REQUEST + 1);
+    for (TraceContext.Trace trace : traces) {
+      // Trace Id is not deterministic because it relies on the order of runJob() getting called
+      List<TraceContext.Trace.LogEntry> logs = trace._logs;
+      Assert.assertEquals(logs.size(), requestId + 1);
+      for (TraceContext.Trace.LogEntry log : logs) {
+        Assert.assertTrue(expectedTraces.contains(log.toJson().toString()));
       }
     }
+
+    TraceContext.unregister();
   }
 
-  private void runVerification(int numberOfRequests, int jobsPerRequest) {
-    // verify control info
-    CountInfo countInfo = new CountInfo(numberOfRequests, jobsPerRequest);
-    ConcurrentHashMap<Long, ConcurrentLinkedDeque<TraceContext.Info>> testInfoMap = TraceContext.getTestInfoMap();
-
-    // LOGGER.info("Thread {}: {}", key, testInfoMap.get(key).toString().replace(",", "\n"));
-    for (ConcurrentLinkedDeque<TraceContext.Info> queue : testInfoMap.values()) {
-      mixedInvariants(queue, countInfo);
-    }
-
-    countInfo.verify();
-
-    // verify trace info
-    for (long rqId = 0; rqId < numberOfRequests; rqId++) {
-      ConcurrentLinkedDeque<Trace> traceQueue = TraceContext.getAllTraceInfoMap().get(rqId);
-      assertEquals(traceQueue.size(), jobsPerRequest + 1);
-      Set<Integer> jobIdSet = new HashSet<Integer>();
-      for (Trace trace: traceQueue) {
-        // one trace is used for request handler, it has no info recorded
-        if (trace.getValue().size() > 0) {
-          Object obj = trace.getValue().get(0); // we have recorded one entry per job in tests
-          String[] tmp = ((String) obj).split(SEP);
-          long reqId = Long.parseLong(tmp[0].trim());
-          assertEquals(rqId, reqId);
-          int jobId = Integer.parseInt(tmp[1].trim());
-          jobIdSet.add(jobId);
-        }
-      }
-      assertEquals(jobIdSet.size(), jobsPerRequest);
-      // show trace
-      LOGGER.debug("Trace Tree: {}", TraceContext.getTraceInfoOfRequestId(rqId));
-    }
+  private static String getTraceString(String key, Object value) {
+    return new JSONObject(Collections.singletonMap(key, value)).toString();
   }
-
-  // ------ test functions ------
-
-  @BeforeClass
-  public static void before() throws Exception {
-    TraceContext.TEST_ENABLED = true;
-  }
-
-  @AfterClass
-  public static void after() throws Exception {
-    TraceContext.TEST_ENABLED = false;
-  }
-
-  @Test
-  public void testSingleRequest() throws Exception {
-    TraceContext.reset();
-    ExecutorService jobService = Executors.newFixedThreadPool(NUMBER_OF_THREADS, new NamedThreadFactory("jobService"));
-    InstanceRequest request = new InstanceRequest(0L, null);
-    request.setEnableTrace(true);
-    singleRequestCall(jobService, request, JOBS_PER_REQUEST);
-    runVerification(1, JOBS_PER_REQUEST);
-  }
-
-  /**
-   * If using the shared {@link ExecutorService} created by {@link Executors#newFixedThreadPool(int)}
-   * for handling requests and jobs, avoiding potential deadlock by making sure NUMBER_OF_REQUESTS &lt; nThreads.
-   * (Using non-shared {@link ExecutorService} is no issue.)
-   *
-   * @throws Exception
-   */
-  @Test
-  public void testMultipleRequests() throws Exception {
-    TraceContext.reset();
-
-    // shared Service
-    ExecutorService sharedService = Executors.newFixedThreadPool(NUMBER_OF_THREADS, new NamedThreadFactory("sharedService"));
-    runVariousConditionTests(sharedService, sharedService);
-
-    // non-shared Service
-    ExecutorService requestService = Executors.newFixedThreadPool(NUMBER_OF_THREADS, new NamedThreadFactory("requestService"));
-    ExecutorService jobService = Executors.newFixedThreadPool(NUMBER_OF_THREADS, new NamedThreadFactory("jobService"));
-    runVariousConditionTests(requestService, jobService);
-  }
-
 }

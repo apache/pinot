@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.rootcause;
 
+import com.linkedin.thirdeye.rootcause.impl.EntityUtils;
 import java.util.Map;
 import java.util.Set;
 
@@ -38,10 +39,7 @@ public class PipelineContext {
   public <T extends Entity> Set<T> filter(Class<? extends T> clazz) {
     Set<T> filtered = new MaxScoreSet<>();
     for(Set<Entity> entities : this.inputs.values()) {
-      for (Entity e : entities) {
-        if (clazz.isInstance(e))
-          filtered.add((T) e);
-      }
+      filtered.addAll(EntityUtils.filter(entities, clazz));
     }
     return filtered;
   }

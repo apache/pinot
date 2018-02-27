@@ -29,7 +29,7 @@ public class EntityMappingHolder {
   public void register(Connection connection, Class<? extends AbstractEntity> entityClass,
       String tableName) throws Exception {
     tableName = tableName.toLowerCase();
-    LOG.info("GENERATING MAPPING FOR TABLE:" + tableName);
+    LOG.info("GENERATING MAPPING FOR TABLE: {}", tableName);
     DatabaseMetaData databaseMetaData = connection.getMetaData();
     String catalog = null;
     String schemaPattern = null;
@@ -53,7 +53,7 @@ public class EntityMappingHolder {
       }
     }
     if (!foundTable) {
-      throw new RuntimeException("Unable to find table:" + tableName);
+      throw new RuntimeException("Unable to find table: " + tableName);
     }
     List<Field> fields = new ArrayList<>();
     getAllFields(fields, entityClass);
@@ -73,7 +73,7 @@ public class EntityMappingHolder {
         if (success) {
           columnInfoMap.get(dbColumn).columnNameInEntity = entityColumn;
           columnInfoMap.get(dbColumn).field = field;
-          LOG.info("Mapped " + dbColumn + " to " + entityColumn);
+          LOG.debug("Mapped {} to {}", dbColumn, entityColumn);
           columnMappingPerTable.get(tableName).put(dbColumn, entityColumn);
           break;
         }

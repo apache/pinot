@@ -7,7 +7,9 @@ import com.linkedin.thirdeye.completeness.checker.Wo4WAvgDataCompletenessAlgorit
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -36,15 +38,6 @@ public class DatasetConfigBean extends AbstractBean {
 
   /** Introduce this as a dataset property because count* queries will have no metric information **/
   private String dataSource = PinotThirdEyeDataSource.DATA_SOURCE_NAME;
-
-  private boolean metricAsDimension = false;
-
-  private String metricNamesColumn;
-
-  private String metricValuesColumn;
-
-  /** Autodiscover metrics in case of metricAsDimension */
-  private boolean autoDiscoverMetrics = false;
 
   private boolean active = true;
 
@@ -81,6 +74,8 @@ public class DatasetConfigBean extends AbstractBean {
   private String dataCompletenessAlgorithm = DEFAULT_COMPLETENESS_ALGORITHM;
   // expected percentage completeness for dataset to be marked complete
   private double expectedCompleteness = Wo4WAvgDataCompletenessAlgorithm.DEFAULT_EXPECTED_COMPLETENESS;
+
+  private Map<String, String> properties = new HashMap<>();
 
 
   public String getDataset() {
@@ -161,39 +156,6 @@ public class DatasetConfigBean extends AbstractBean {
 
   public void setDataSource(String dataSource) {
     this.dataSource = dataSource;
-  }
-
-  public boolean isMetricAsDimension() {
-    return metricAsDimension;
-  }
-
-  public void setMetricAsDimension(boolean metricAsDimension) {
-    this.metricAsDimension = metricAsDimension;
-  }
-
-  public String getMetricNamesColumn() {
-    return metricNamesColumn;
-  }
-
-  public void setMetricNamesColumn(String metricNamesColumn) {
-    this.metricNamesColumn = metricNamesColumn;
-  }
-
-  public String getMetricValuesColumn() {
-    return metricValuesColumn;
-  }
-
-  public void setMetricValuesColumn(String metricValuesColumn) {
-    this.metricValuesColumn = metricValuesColumn;
-  }
-
-
-  public boolean isAutoDiscoverMetrics() {
-    return autoDiscoverMetrics;
-  }
-
-  public void setAutoDiscoverMetrics(boolean autoDiscoverMetrics) {
-    this.autoDiscoverMetrics = autoDiscoverMetrics;
   }
 
   public boolean isActive() {
@@ -288,6 +250,14 @@ public class DatasetConfigBean extends AbstractBean {
     this.dataCompletenessAlgorithm = dataCompletenessAlgorithm;
   }
 
+  public Map<String, String> getProperties() {
+    return properties;
+  }
+
+  public void setProperties(Map<String, String> properties) {
+    this.properties = properties;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof DatasetConfigBean)) {
@@ -303,10 +273,6 @@ public class DatasetConfigBean extends AbstractBean {
         && Objects.equals(timeFormat, dc.getTimeFormat())
         && Objects.equals(timezone, dc.getTimezone())
         && Objects.equals(dataSource, dc.getDataSource())
-        && Objects.equals(metricAsDimension, dc.isMetricAsDimension())
-        && Objects.equals(metricNamesColumn, dc.getMetricNamesColumn())
-        && Objects.equals(metricValuesColumn, dc.getMetricValuesColumn())
-        && Objects.equals(autoDiscoverMetrics, dc.isAutoDiscoverMetrics())
         && Objects.equals(active, dc.isActive())
         && Objects.equals(additive, dc.isAdditive())
         && Objects.equals(dimensionsHaveNoPreAggregation, dc.getDimensionsHaveNoPreAggregation())
@@ -323,10 +289,10 @@ public class DatasetConfigBean extends AbstractBean {
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), dataset, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone, dataSource,
-        metricAsDimension, metricNamesColumn, metricValuesColumn, autoDiscoverMetrics, active, additive,
-        dimensionsHaveNoPreAggregation, preAggregatedKeyword, nonAdditiveBucketSize, nonAdditiveBucketUnit, realtime,
-        requiresCompletenessCheck, expectedDelay, dataCompletenessAlgorithm, expectedCompleteness, dataSource);
+    return Objects.hash(getId(), dataset, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone,
+        dataSource, active, additive, dimensionsHaveNoPreAggregation, preAggregatedKeyword, nonAdditiveBucketSize,
+        nonAdditiveBucketUnit, realtime, requiresCompletenessCheck, expectedDelay, dataCompletenessAlgorithm,
+        expectedCompleteness, dataSource);
   }
 
 }

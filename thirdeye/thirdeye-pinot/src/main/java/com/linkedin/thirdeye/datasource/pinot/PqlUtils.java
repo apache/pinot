@@ -15,12 +15,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean.DimensionAsMetricProperties;
 import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -31,7 +34,9 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 public class PqlUtils {
   private static final Joiner AND = Joiner.on(" AND ");
   private static final Joiner COMMA = Joiner.on(",");
-  private static final Joiner EQUALS = Joiner.on(" = ");
+
+  private static final String PREFIX_EXCLUDE = "!";
+
   private static final Logger LOGGER = LoggerFactory.getLogger(PqlUtils.class);
   private static final int DEFAULT_TOP = 100000;
 
@@ -102,33 +107,54 @@ public class PqlUtils {
    * @return
    * @throws Exception
    */
-  public static String getMetricAsDimensionPql(ThirdEyeRequest request, MetricFunction metricFunction,
+  public static String getDimensionAsMetricPql(ThirdEyeRequest request, MetricFunction metricFunction,
       Multimap<String, String> filterSet, TimeSpec dataTimeSpec, DatasetConfigDTO datasetConfig) throws Exception {
 
     // select sum(metric_values_column) from collection
-    // where time_clause and metric_names_column=function.getMetricName
-    String metricValuesColumn = datasetConfig.getMetricValuesColumn();
-    String metricNamesColumn = datasetConfig.getMetricNamesColumn();
+    // where time_clause and metric_names_column=metric_name
+    MetricConfigDTO metricConfig = metricFunction.getMetricConfig();
+    Map<String, String> metricProperties = metricConfig.getMetricProperties();
+    if (metricProperties == null || metricProperties.isEmpty()) {
+      throw new RuntimeException("Metric properties must have properties " + DimensionAsMetricProperties.values());
+    }
+    String metricNames =
+        metricProperties.get(DimensionAsMetricProperties.METRIC_NAMES.toString());
+    String metricNamesColumns =
+        metricProperties.get(DimensionAsMetricProperties.METRIC_NAMES_COLUMNS.toString());
+    String metricValuesColumn =
+        metricProperties.get(DimensionAsMetricProperties.METRIC_VALUES_COLUMN.toString());
+    if (StringUtils.isBlank(metricNames) || StringUtils.isBlank(metricNamesColumns) || StringUtils.isBlank(metricValuesColumn)) {
+      throw new RuntimeException("Metric properties must have properties " + DimensionAsMetricProperties.values());
+    }
+    List<String> metricNamesList =
+        Lists.newArrayList(metricNames.split(MetricConfigBean.METRIC_PROPERTIES_SEPARATOR));
+    List<String> metricNamesColumnsList =
+        Lists.newArrayList(metricNamesColumns.split(MetricConfigBean.METRIC_PROPERTIES_SEPARATOR));
+    if (metricNamesList.size() != metricNamesColumnsList.size()) {
+      throw new RuntimeException("Must provide same number of metricNames in " + metricNames
+          + " as metricNamesColumns in " + metricNamesColumns);
+    }
 
-    String metricAsDimensionPql = getMetricAsDimensionPql(metricFunction,
+    String dimensionAsMetricPql = getDimensionAsMetricPql(metricFunction,
         request.getStartTimeInclusive(), request.getEndTimeExclusive(), filterSet,
         request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec,
-        metricValuesColumn, metricNamesColumn);
+        metricNamesList, metricNamesColumnsList, metricValuesColumn);
 
-    return metricAsDimensionPql;
+    return dimensionAsMetricPql;
   }
 
 
-  private static String getMetricAsDimensionPql(MetricFunction metricFunction, DateTime startTime,
+  private static String getDimensionAsMetricPql(MetricFunction metricFunction, DateTime startTime,
       DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
-      TimeGranularity timeGranularity, TimeSpec dataTimeSpec, String metricValuesColumn,
-      String metricNamesColumn) throws ExecutionException {
+      TimeGranularity timeGranularity, TimeSpec dataTimeSpec,
+      List<String> metricNames, List<String> metricNamesColumns, String metricValuesColumn)
+          throws ExecutionException {
 
-    MetricConfigDTO metricConfig = ThirdEyeUtils.getMetricConfigFromId(metricFunction.getMetricId());
+    MetricConfigDTO metricConfig = metricFunction.getMetricConfig();
     String dataset = metricFunction.getDataset();
 
     StringBuilder sb = new StringBuilder();
-    String selectionClause = getMetricAsDimensionSelectionClause(metricFunction, metricValuesColumn);
+    String selectionClause = getDimensionAsMetricSelectionClause(metricFunction, metricValuesColumn);
 
     String tableName = ThirdEyeUtils.computeTableName(dataset);
 
@@ -136,7 +162,7 @@ public class PqlUtils {
     String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, dataset);
     sb.append(" WHERE ").append(betweenClause);
 
-    String metricWhereClause = getMetricWhereClause(metricConfig, metricFunction, metricNamesColumn);
+    String metricWhereClause = getMetricWhereClause(metricConfig, metricFunction, metricNames, metricNamesColumns);
     sb.append(metricWhereClause);
 
     String dimensionWhereClause = getDimensionWhereClause(filterSet);
@@ -154,17 +180,22 @@ public class PqlUtils {
   }
 
 
-  private static String getMetricWhereClause(MetricConfigDTO metricConfig, MetricFunction metricFunction, String metricNameColumn) {
+  private static String getMetricWhereClause(MetricConfigDTO metricConfig, MetricFunction metricFunction,
+      List<String> metricNames, List<String> metricNamesColumns) {
     StringBuilder builder = new StringBuilder();
     if (!metricFunction.getMetricName().equals("*")) {
-      builder.append(" AND ");
-      builder.append(String.format("%s='%s'", metricNameColumn, metricConfig.getName()));
+      for (int i = 0; i < metricNamesColumns.size(); i++) {
+        String metricName = metricNames.get(i);
+        String metricNamesColumn = metricNamesColumns.get(i);
+        builder.append(" AND ");
+        builder.append(String.format("%s='%s'", metricNamesColumn, metricName));
+      }
     }
     return builder.toString();
   }
 
 
-  private static String getMetricAsDimensionSelectionClause(MetricFunction metricFunction, String metricValueColumn) {
+  private static String getDimensionAsMetricSelectionClause(MetricFunction metricFunction, String metricValueColumn) {
     StringBuilder builder = new StringBuilder();
     String metricName = metricValueColumn;
     if (metricFunction.getMetricName().equals("*")) {
@@ -227,19 +258,28 @@ public class PqlUtils {
     for (Map.Entry<String, Collection<String>> entry : dimensionValues.asMap().entrySet()) {
       String key = entry.getKey();
       Collection<String> values = entry.getValue();
-      String component;
       if (values.isEmpty()) {
         continue;
-      } else if (values.size() == 1) {
-        component = EQUALS.join(key, String.format("'%s'", values.iterator().next().trim()));
-      } else {
-        List<String> quotedValues = new ArrayList<>(values.size());
-        for (String value : values) {
-          quotedValues.add(String.format("'%s'", value.trim()));
-        }
-        component = String.format("%s IN (%s)", key, COMMA.join(quotedValues));
       }
-      components.add(component);
+
+      List<String> include = new ArrayList<>();
+      List<String> exclude = new ArrayList<>();
+
+      for (String value : values) {
+        if (value.startsWith(PREFIX_EXCLUDE)) {
+          exclude.add(quote(value.substring(PREFIX_EXCLUDE.length())));
+        } else {
+          include.add(quote(value));
+        }
+      }
+
+      if (!include.isEmpty()) {
+        components.add(String.format("%s IN (%s)", key, COMMA.join(include)));
+      }
+
+      if (!exclude.isEmpty()) {
+        components.add(String.format("%s NOT IN (%s)", key, COMMA.join(exclude)));
+      }
     }
     if (components.isEmpty()) {
       return null;
@@ -268,4 +308,21 @@ public class PqlUtils {
         dataset);
   }
 
+  /**
+   * Surrounds a value with quote characters that are not contained in the value itself.
+   *
+   * @param value value to be quoted
+   * @return quoted value
+   * @throws IllegalArgumentException if no unused quote char can be found
+   */
+  private static String quote(String value) {
+    String quoteChar = "\"";
+    if (value.contains(quoteChar)) {
+      quoteChar = "\'";
+    }
+    if (value.contains(quoteChar)) {
+      throw new IllegalArgumentException(String.format("Could not find quote char for expression: %s", value));
+    }
+    return String.format("%s%s%s", quoteChar, value, quoteChar);
+  }
 }

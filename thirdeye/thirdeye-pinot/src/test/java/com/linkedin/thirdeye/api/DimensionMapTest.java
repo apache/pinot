@@ -20,6 +20,27 @@ public class DimensionMapTest {
     Assert.assertEquals(dimensionClone2, dimensionOrg);
   }
 
+  @Test(expectedExceptions = NullPointerException.class)
+  public void testNullCreation() {
+    new DimensionMap(null);
+  }
+
+  @Test
+  public void testEmptyCreation() {
+    DimensionMap expectedDimensionMap = new DimensionMap();
+
+    DimensionMap dimensionMap1 = new DimensionMap("");
+    Assert.assertEquals(dimensionMap1, expectedDimensionMap);
+
+    DimensionMap dimensionMap2 = new DimensionMap("{}");
+    Assert.assertEquals(dimensionMap2, expectedDimensionMap);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testFailureCreation() {
+    new DimensionMap("abc");
+  }
+
   @Test
   public void testComparison() {
     DimensionMap d1;

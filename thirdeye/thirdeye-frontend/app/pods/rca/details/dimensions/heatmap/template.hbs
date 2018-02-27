@@ -1,5 +1,5 @@
 {{#containers/dimensions-container as |dimensions|}}
-    <span>(Investigation Period: {{moment-format dimensions.regionStart dateFormat}} -
+  <span>(Investigation Period: {{moment-format dimensions.regionStart dateFormat}} -
       {{moment-format dimensions.regionEnd dateFormat}})</span>
   {{#with dimensions.heatmapData.summary.simpleFields as |summary|}}
     {{dimension-summary

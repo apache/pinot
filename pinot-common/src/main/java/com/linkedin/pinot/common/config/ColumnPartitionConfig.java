@@ -129,20 +129,23 @@ public class ColumnPartitionConfig {
 
   @Override
   public boolean equals(Object o) {
-
-    if (this == o) {
+    if (EqualityUtils.isSameReference(this, o)) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
       return false;
     }
 
     ColumnPartitionConfig that = (ColumnPartitionConfig) o;
-    return (_numPartitions == that._numPartitions) &&  _functionName.equals(that._functionName);
+    return EqualityUtils.isEqual(this._numPartitions, that._numPartitions) &&
+        EqualityUtils.isEqual(this._functionName, that._functionName);
   }
 
   @Override
   public int hashCode() {
-    return EqualityUtils.hashCodeOf(_functionName.hashCode(), _numPartitions);
+    int hashCode = EqualityUtils.hashCodeOf(_functionName);
+    hashCode = EqualityUtils.hashCodeOf(hashCode, _numPartitions);
+    return hashCode;
   }
 }

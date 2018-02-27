@@ -47,8 +47,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 // TODO Write more tests for other parts of the class
@@ -252,6 +251,25 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertTrue(segmentDataManager._commitSegmentCalled);
     Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.COMMITTED);
   }
+
+  @Test
+  public void testSegmentBuildException() throws Exception {
+    FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
+    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+    final long endOffset = _startOffset + 500;
+    // We should consume initially...
+    segmentDataManager._consumeOffsets.add(endOffset);
+    final SegmentCompletionProtocol.Response commitResponse = new SegmentCompletionProtocol.Response(
+        new SegmentCompletionProtocol.Response.Params().withOffset(endOffset).withStatus(
+            SegmentCompletionProtocol.ControllerResponseStatus.COMMIT));
+    segmentDataManager._responses.add(commitResponse);
+    segmentDataManager._failSegmentBuild = true;
+
+    consumer.run();
+    Assert.assertTrue(segmentDataManager._buildSegmentCalled);
+    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.ERROR);
+  }
+
 
   // Test hold, catchup. hold, commit
   @Test
@@ -549,7 +567,7 @@ public class LLRealtimeSegmentDataManagerTest {
   // Replace the realtime segment with a mock that returns numDocs for raw doc count.
   private void replaceRealtimeSegment(FakeLLRealtimeSegmentDataManager segmentDataManager, int numDocs) throws Exception {
     RealtimeSegmentImpl mockSegmentImpl = mock(RealtimeSegmentImpl.class);
-    when(mockSegmentImpl.getRawDocumentCount()).thenReturn(numDocs);
+    when(mockSegmentImpl.getNumDocsIndexed()).thenReturn(numDocs);
     Field segmentImpl = LLRealtimeSegmentDataManager.class.getDeclaredField("_realtimeSegment");
     segmentImpl.setAccessible(true);
     segmentImpl.set(segmentDataManager, mockSegmentImpl);
@@ -628,6 +646,7 @@ public class LLRealtimeSegmentDataManagerTest {
     public LinkedList<SegmentCompletionProtocol.Response> _responses = new LinkedList<>();
     public boolean _commitSegmentCalled = false;
     public boolean _buildSegmentCalled = false;
+    public boolean _failSegmentBuild = false;
     public boolean _buildAndReplaceCalled = false;
     public int _stopWaitTimeMs = 100;
     private boolean _downloadAndReplaceCalled = false;
@@ -761,6 +780,9 @@ public class LLRealtimeSegmentDataManagerTest {
     @Override
     protected String buildSegmentInternal(boolean forCommit) {
       _buildSegmentCalled = true;
+      if (_failSegmentBuild) {
+        return null;
+      }
       if (!forCommit) {
         return _segmentDir;
       }

@@ -17,11 +17,40 @@ package com.linkedin.pinot.core.data.readers;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.zip.GZIPInputStream;
 
 
 public class RecordReaderUtils {
   private RecordReaderUtils() {
+  }
+
+  public static Reader getFileReader(File dataFile) throws IOException {
+    return new BufferedReader(new InputStreamReader(getFileStreamReader(dataFile), "UTF-8"));
+  }
+
+  public static InputStream getFileStreamReader(File dataFile) throws IOException {
+    InputStream inputStream;
+    if (dataFile.getName().endsWith(".gz")) {
+      inputStream = new GZIPInputStream(new FileInputStream(dataFile));
+    } else {
+      inputStream = new FileInputStream(dataFile);
+    }
+    return inputStream;
+  }
+
+  public static BufferedInputStream getFileBufferStream(File dataFile) throws IOException {
+    return new BufferedInputStream(getFileStreamReader(dataFile));
   }
 
   public static Object convertToDataType(String token, FieldSpec fieldSpec) {
@@ -77,6 +106,28 @@ public class RecordReaderUtils {
         } else {
           value[i] = convertToDataType(token.toString(), fieldSpec);
         }
+      }
+    }
+
+    return value;
+  }
+
+  public static Object convertToDataTypeSet(HashSet tokens, FieldSpec fieldSpec) {
+    Object[] value;
+
+    if ((tokens == null) || tokens.isEmpty()) {
+      value = new Object[]{fieldSpec.getDefaultNullValue()};
+    } else {
+      int length = tokens.size();
+      value = new Object[length];
+      int index = 0;
+      for (Object token: tokens) {
+        if (token == null) {
+          value[index] = fieldSpec.getDefaultNullValue();
+        } else {
+          value[index] = convertToDataType(token.toString(), fieldSpec);
+        }
+        index++;
       }
     }
 

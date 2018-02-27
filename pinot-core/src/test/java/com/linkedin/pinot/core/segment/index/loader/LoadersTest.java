@@ -15,13 +15,19 @@
  */
 package com.linkedin.pinot.core.segment.index.loader;
 
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -31,6 +37,7 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.segment.store.ColumnIndexType;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
+import com.linkedin.pinot.core.util.AvroUtils;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
@@ -182,8 +189,76 @@ public class LoadersTest {
     Assert.assertEquals(dict.getStringValue(1), "lynda 2.0");
     Assert.assertEquals(dict.get(0), "lynda");
     Assert.assertEquals(dict.get(1), "lynda 2.0");
-    Assert.assertEquals(dict.indexOf("lynda\0"), -2);
-    Assert.assertEquals(dict.indexOf("lynda\0\0"), -2);
+    Assert.assertEquals(dict.insertionIndexOf("lynda\0"), -2);
+    Assert.assertEquals(dict.insertionIndexOf("lynda\0\0"), -2);
+  }
+
+  /**
+   * Test for the case where a new column is added to the schema and the segment is reloaded.
+   * If the column is of datatype STRING and default null value="", we should be able to handle it gracefully
+   * @throws Exception
+   */
+  @Test
+  public void testLoadSegmentWithNewStringColumnDefaultEmptyValue() throws Exception {
+
+    // create a segment
+    Schema schema = AvroUtils.extractSchemaFromAvro(_avroFile);
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
+    segmentGeneratorConfig.setTableName("testTable");
+    segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
+    segmentGeneratorConfig.setSegmentName("testSegment");
+    segmentGeneratorConfig.setFormat(FileFormat.AVRO);
+    segmentGeneratorConfig.setInputFilePath(_avroFile.getAbsolutePath());
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(segmentGeneratorConfig);
+    driver.build();
+
+    File segmentDir = new File(INDEX_DIR, "testSegment");
+
+    // load the segment
+    boolean exception = false;
+    try {
+      loadSegment(segmentDir, schema);
+    } catch (Exception e) {
+      exception = true;
+    }
+    Assert.assertFalse(exception);
+
+    // add a new column to the schema -> string, default null value ""
+    schema.addField(new DimensionFieldSpec("d2", FieldSpec.DataType.STRING, true, ""));
+
+    // load segment
+    try {
+      IndexSegment indexSegment = loadSegment(segmentDir, schema);
+      String d2Value = (String) indexSegment.getDataSource("d2").getDictionary().get(0);
+      Assert.assertEquals(d2Value, "");
+    } catch (Exception e) {
+      exception = true;
+    }
+    Assert.assertFalse(exception);
+
+    // add a new column to the schema -> string, default null value "", multivalue
+    schema.addField(new DimensionFieldSpec("d3", FieldSpec.DataType.STRING, false, ""));
+
+    // load segment
+    try {
+      IndexSegment indexSegment = loadSegment(segmentDir, schema);
+      String d3Value = (String) indexSegment.getDataSource("d3").getDictionary().get(0);
+      Assert.assertEquals(d3Value, "");
+    } catch (Exception e) {
+      exception = true;
+    }
+    Assert.assertFalse(exception);
+  }
+
+
+  private IndexSegment loadSegment(File segmentDir, Schema schema) throws Exception {
+    IndexLoadingConfig config = new IndexLoadingConfig();
+    config.setSegmentVersion(SegmentVersion.v3);
+    config.setReadMode(ReadMode.mmap);
+    IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentDir, config, schema);
+    return indexSegment;
   }
 
   @AfterClass

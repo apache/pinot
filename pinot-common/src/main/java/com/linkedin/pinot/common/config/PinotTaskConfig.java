@@ -22,8 +22,8 @@ import org.apache.helix.task.TaskConfig;
 
 
 public class PinotTaskConfig {
-  private static final String TASK_COMMAND_KEY = "TASK_COMMAND";
-  private static final String TASK_ID_KEY = "TASK_ID";
+  public static final String TASK_COMMAND_KEY = "TASK_COMMAND";
+  public static final String TASK_ID_KEY = "TASK_ID";
 
   private final String _taskType;
   private final Map<String, String> _configs;
@@ -58,17 +58,25 @@ public class PinotTaskConfig {
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof PinotTaskConfig) {
-      PinotTaskConfig pinotTaskConfig = (PinotTaskConfig) obj;
-      return _taskType.equals(pinotTaskConfig._taskType) && _configs.equals(pinotTaskConfig._configs);
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
     }
-    return false;
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    PinotTaskConfig that = (PinotTaskConfig) o;
+
+    return EqualityUtils.isEqual(_taskType, that._taskType) && EqualityUtils.isEqual(_configs, that._configs);
   }
 
   @Override
   public int hashCode() {
-    return EqualityUtils.hashCodeOf(_taskType.hashCode(), _configs.hashCode());
+    int result = EqualityUtils.hashCodeOf(_taskType);
+    result = EqualityUtils.hashCodeOf(result, _configs);
+    return result;
   }
 
   @Override

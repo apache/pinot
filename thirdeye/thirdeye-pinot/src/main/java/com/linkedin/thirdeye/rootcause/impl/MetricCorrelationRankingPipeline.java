@@ -37,7 +37,11 @@ import org.slf4j.LoggerFactory;
  * target metrics. It takes two sets of MetricEntities as inputs - candidate and target
  * metrics - and ranks the candidate metrics based on the absolute strength of their
  * correlation with the target metrics over the given time range.
+ *
+ * @see MetricAnalysisPipeline as a replacement that relies on MetricEntities with filters
+ * in the tail of the URN
  */
+@Deprecated
 public class MetricCorrelationRankingPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(MetricCorrelationRankingPipeline.class);
 

@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.index.readerwriter;
 
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
@@ -22,13 +25,10 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
-import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
-import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 
 
 public class FixedByteSingleColumnSingleValueReaderWriterTest {
-  private RealtimeIndexOffHeapMemoryManager _memoryManager;
+  private PinotDataBufferMemoryManager _memoryManager;
 
   @BeforeClass
   public void setUp() {
@@ -36,17 +36,19 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     _memoryManager.close();
   }
 
   @Test
-  public void testInt() throws IOException {
+  public void testInt()
+      throws IOException {
     Random r = new Random();
     final long seed = r.nextLong();
     r = new Random(seed);
     int rows = 10;
-    for (int div = 1; div <= rows/2; div++) {
+    for (int div = 1; div <= rows / 2; div++) {
       try {
         testInt(r, rows, div);
       } catch (Throwable t) {
@@ -56,17 +58,26 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
     }
   }
 
-  private void testInt(final Random r, final int rows, final int div) throws IOException {
+  private void testInt(final Random random, final int rows, final int div)
+      throws IOException {
     FixedByteSingleColumnSingleValueReaderWriter readerWriter;
     final int columnSizesInBytes = Integer.SIZE / 8;
-    readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows/div, columnSizesInBytes, _memoryManager, "Int");
+    readerWriter =
+        new FixedByteSingleColumnSingleValueReaderWriter(rows / div, columnSizesInBytes, _memoryManager, "Int");
     int[] data = new int[rows];
     for (int i = 0; i < rows; i++) {
-      data[i] = r.nextInt();
+      data[i] = random.nextInt();
       readerWriter.setInt(i, data[i]);
     }
+
     for (int i = 0; i < rows; i++) {
       Assert.assertEquals(readerWriter.getInt(i), data[i]);
+    }
+
+    // Test mutability by over-writing all rows.
+    for (int i = 0; i < rows; i++) {
+      data[i] = random.nextInt();
+      readerWriter.setInt(i, data[i]);
     }
 
     int[] rowIds = new int[rows];
@@ -81,36 +92,85 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
     int numValues = 4;
     readerWriter.readValues(rowIds, dStart, numValues, values, vStart);
     for (int i = 0; i < numValues; i++) {
-      Assert.assertEquals(values[i+vStart], data[i+dStart]);
+      Assert.assertEquals(values[i + vStart], data[i + dStart]);
     }
 
     readerWriter.readValues(rowIds, 0, 0, values, 0);
     Assert.assertEquals(values[0], 0);
+
+    // Write to a large enough row index to ensure multiple chunks are correctly allocated.
+    int start = rows * 4;
+    for (int i = 0; i < rows; i++) {
+      data[i] = random.nextInt();
+      readerWriter.setInt(start + i, data[i]);
+    }
+
+    for (int i = 0; i < rows; i++) {
+      Assert.assertEquals(readerWriter.getInt(start + i), data[i]);
+    }
+
+    // Ensure that rows not written default to zero.
+    start = rows * 2;
+    for (int i = 0; i < 2 * rows; i++) {
+      Assert.assertEquals(readerWriter.getInt(start+i), 0);
+    }
     readerWriter.close();
   }
 
   @Test
-  public void testLong() throws IOException {
+  public void testLong()
+      throws IOException {
     int rows = 10;
     Random r = new Random();
     final long seed = r.nextLong();
     r = new Random(seed);
-    for (int div = 1; div <= rows/2; div++) {
+    for (int div = 1; div <= rows / 2; div++) {
       testLong(r, rows, div);
     }
   }
 
-  private void testLong(final Random r, final int rows, final int div) throws IOException {
+  private void testLong(final Random random, final int rows, final int div)
+      throws IOException {
     FixedByteSingleColumnSingleValueReaderWriter readerWriter;
     final int columnSizesInBytes = Long.SIZE / 8;
-    readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows/div, columnSizesInBytes, _memoryManager, "Long");
+    readerWriter =
+        new FixedByteSingleColumnSingleValueReaderWriter(rows / div, columnSizesInBytes, _memoryManager, "Long");
     long[] data = new long[rows];
+
     for (int i = 0; i < rows; i++) {
-      data[i] = r.nextLong();
+      data[i] = random.nextLong();
       readerWriter.setLong(i, data[i]);
     }
     for (int i = 0; i < rows; i++) {
       Assert.assertEquals(readerWriter.getLong(i), data[i]);
+    }
+
+    // Test mutability by overwriting randomly selected rows.
+    for (int i = 0; i < rows; i++) {
+      if (random.nextFloat() >= 0.5) {
+        data[i] = random.nextLong();
+        readerWriter.setLong(i, data[i]);
+      }
+    }
+    for (int i = 0; i < rows; i++) {
+      Assert.assertEquals(readerWriter.getLong(i), data[i]);
+    }
+
+    // Write to a large enough row index to ensure multiple chunks are correctly allocated.
+    int start = rows * 4;
+    for (int i = 0; i < rows; i++) {
+      data[i] = random.nextLong();
+      readerWriter.setLong(start + i, data[i]);
+    }
+
+    for (int i = 0; i < rows; i++) {
+      Assert.assertEquals(readerWriter.getLong(start + i), data[i]);
+    }
+
+    // Ensure that rows not written default to zero.
+    start = rows * 2;
+    for (int i = 0; i < 2 * rows; i++) {
+      Assert.assertEquals(readerWriter.getLong(start+i), 0);
     }
     readerWriter.close();
   }

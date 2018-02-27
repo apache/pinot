@@ -1153,7 +1153,7 @@ public class DataFrameTest {
 
     Assert.assertEquals(out.getSeriesNames().size(), 10);
     Assert.assertEquals(out.size(), 2);
-    assertEquals(out.getIndex().getLongs(), 0, 1);
+    assertEquals(out.getIndexSingleton().getLongs(), 0, 1);
     assertEquals(out.getLongs("sum"), 6, 9);
     assertEquals(out.getLongs("product"), 6, 20);
     assertEquals(out.getLongs("min"), 1, 4);
@@ -1163,6 +1163,22 @@ public class DataFrameTest {
     assertEquals(out.getDoubles("mean"), 2, 4.5);
     assertEquals(out.getDoubles("median"), 2, 4.5);
     assertEquals(out.getDoubles("std"), 1, 0.70710);
+  }
+
+  @Test
+  public void testGroupingExpressionDefaultOperation() {
+    DataFrame out = new DataFrame()
+        .addSeries("a", 1, 1, 2, 2, 2)
+        .addSeries("b", "1", "1", "2", "2", "2")
+        .groupByValue("a", "b")
+        .aggregate("a", "a:first:first", "b");
+
+    Assert.assertEquals(out.getSeriesNames().size(), 4);
+    Assert.assertEquals(out.size(), 2);
+    Assert.assertEquals(out.getIndexSingleton().type(), Series.SeriesType.OBJECT);
+    assertEquals(out.getLongs("a"), 1, 2);
+    assertEquals(out.getLongs("first"), 1, 2);
+    assertEquals(out.getStrings("b"), "1", "2");
   }
 
   @Test
@@ -1946,7 +1962,7 @@ public class DataFrameTest {
     DataFrame dfRight = new DataFrame(5)
         .addSeries("two", 11, 12, 13, 14, 15);
 
-    Assert.assertEquals(dfLeft.getIndex(), dfRight.getIndex());
+    Assert.assertEquals(dfLeft.getIndexSingleton(), dfRight.getIndexSingleton());
 
     dfLeft.addSeries(dfRight);
 
@@ -1983,6 +1999,72 @@ public class DataFrameTest {
         .addSeries("two", 10, 11, 12);
 
     dfLeft.addSeries(dfRight);
+  }
+
+  @Test
+  public void testJoinMultiIndex() {
+    DataFrame dfLeft = new DataFrame()
+        .addSeries("A", 1, 1, 1, 2, 2)
+        .addSeries("B", "a", "b", "c", "d", "e")
+        .addSeries("V", 0, 1, 2, 3, 4)
+        .setIndex("A", "B");
+
+    DataFrame dfRight = new DataFrame()
+        .addSeries("A", 1, 1, 2, 2, 2)
+        .addSeries("B", "a", "b", "c", "d", "e")
+        .addSeries("W", "a", "aa", "aaa", "aaaa", "aaaaa")
+        .setIndex("A", "B");
+
+    DataFrame joined = dfLeft.joinOuter(dfRight).sortedByIndex();
+
+    Assert.assertEquals(joined.size(), 6);
+    Assert.assertEquals(joined.getSeriesNames().size(), 4);
+    Assert.assertEquals(joined.getIndexNames().size(), 2);
+    assertEquals(joined.getLongs("A"), 1, 1, 1, 2, 2, 2);
+    assertEquals(joined.getStrings("B"), "a", "b", "c", "c", "d", "e");
+    assertEquals(joined.getLongs("V"), 0, 1, 2, LNULL, 3, 4);
+    assertEquals(joined.getStrings("W"), "a", "aa", SNULL, "aaa", "aaaa", "aaaaa");
+  }
+
+  @Test
+  public void testAddSeriesMultiIndex() {
+    DataFrame dfLeft = new DataFrame()
+        .addSeries("A", 1, 1, 1, 2, 2)
+        .addSeries("B", "a", "b", "c", "d", "e")
+        .addSeries("V", 0, 1, 2, 3, 4)
+        .setIndex("A", "B");
+
+    DataFrame dfRight = new DataFrame()
+        .addSeries("A", 1, 1, 2, 2, 2)
+        .addSeries("B", "a", "b", "c", "d", "e")
+        .addSeries("W", "a", "aa", "aaa", "aaaa", "aaaaa")
+        .setIndex("A", "B");
+
+    dfLeft.addSeries(dfRight, "W");
+
+    Assert.assertEquals(dfLeft.size(), 5);
+    Assert.assertEquals(dfLeft.getSeriesNames().size(), 4);
+    Assert.assertEquals(dfLeft.getIndexNames().size(), 2);
+    assertEquals(dfLeft.getStrings("W"), "a", "aa", SNULL, "aaaa", "aaaaa");
+  }
+
+  @Test
+  public void testJoinIndexRetention() {
+    DataFrame dfLeft = new DataFrame()
+        .addSeries("a", 0)
+        .addSeries("b", 0)
+        .setIndex("a");
+
+    DataFrame dfRight = new DataFrame()
+        .addSeries("a", 0)
+        .addSeries("b", 0)
+        .setIndex("a", "b");
+
+    DataFrame joined = dfLeft.joinOuter(dfRight, Arrays.asList("a", "b"));
+
+    Assert.assertEquals(joined.getSeriesNames().size(), 2);
+    Assert.assertEquals(joined.getIndexNames().size(), 1);
+    Assert.assertEquals(joined.getIndexNames().get(0), "a");
   }
 
   @Test
@@ -2259,7 +2341,9 @@ public class DataFrameTest {
   public void testIndexNone() {
     DataFrame df = new DataFrame();
     Assert.assertFalse(df.hasIndex());
-    df.getIndex();
+    Assert.assertEquals(df.getIndexNames().size(), 0);
+    Assert.assertEquals(df.getIndexSeries().size(), 0);
+    df.getIndexSingleton();
   }
 
   @Test
@@ -2274,7 +2358,10 @@ public class DataFrameTest {
     DataFrame df = new DataFrame(5)
         .addSeries("test", DataFrame.toSeries(VALUES_BOOLEAN))
         .setIndex("test");
-    Assert.assertEquals(df.copy().getIndexName(), "test");
+    Assert.assertTrue(df.copy().hasIndex());
+    Assert.assertEquals(df.copy().getIndexSeries().size(), 1);
+    Assert.assertEquals(df.copy().getIndexNames().size(), 1);
+    Assert.assertEquals(df.copy().getIndexNames().get(0), "test");
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -2286,11 +2373,11 @@ public class DataFrameTest {
   @Test
   public void testIndexRename() {
     DataFrame df = new DataFrame(0);
-    Series index = df.getIndex();
-    df.renameSeries(df.getIndexName(), "test");
+    Series index = df.getIndexSeries().get(0);
+    df.renameSeries(df.getIndexNames().get(0), "test");
     df.addSeries(DataFrame.COLUMN_INDEX_DEFAULT, DataFrame.toSeries(new double[0]));
-    Assert.assertEquals(df.getIndexName(), "test");
-    Assert.assertEquals(df.getIndex(), index);
+    Assert.assertEquals(df.getIndexNames().get(0), "test");
+    Assert.assertEquals(df.getIndexSeries().get(0), index);
   }
 
   @Test
@@ -2537,6 +2624,45 @@ public class DataFrameTest {
     assertEquals(base.mean(), 0.87575);
     assertEquals(base.median(), 1);
     assertEquals(base.std(), 0.62776236215094);
+  }
+
+  @Test
+  public void testDoubleQuantile() {
+    DoubleSeries base = DataFrame.toSeries(DNULL, 1, 2, 3, 4, 5);
+    assertEquals(base.quantile(0.00), 1d);
+    assertEquals(base.quantile(0.25), 2d);
+    assertEquals(base.quantile(0.50), 3d);
+    assertEquals(base.quantile(0.75), 4d);
+    assertEquals(base.quantile(1.00), 5d);
+  }
+
+  @Test
+  public void testDoubleQuantileInterpolation() {
+    DoubleSeries base = DataFrame.toSeries(DNULL, 1, 2, 3, 4, 5);
+    assertEquals(base.quantile(0.0000), 1.00);
+    assertEquals(base.quantile(0.0625), 1.25);
+    assertEquals(base.quantile(0.1250), 1.50);
+    assertEquals(base.quantile(0.1875), 1.75);
+    assertEquals(base.quantile(0.2500), 2.00);
+  }
+
+  @Test
+  public void testDoubleQuantileNull() {
+    DoubleSeries base = DataFrame.toSeries(DNULL);
+    assertEquals(base.quantile(0.00), DNULL);
+    assertEquals(base.quantile(1.00), DNULL);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testDoubleQuantileFailLowQ() {
+    DoubleSeries base = DataFrame.toSeries(DNULL);
+    assertEquals(base.quantile(-0.01), DNULL);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testDoubleQuantileFailHighQ() {
+    DoubleSeries base = DataFrame.toSeries(DNULL);
+    assertEquals(base.quantile(1.01), DNULL);
   }
 
   @Test
@@ -3566,7 +3692,7 @@ public class DataFrameTest {
 
     Assert.assertEquals(out.size(), 4);
     Assert.assertEquals(out.getSeriesNames().size(), 2);
-    Assert.assertEquals(out.getIndexName(), "one");
+    Assert.assertEquals(out.getIndexNames().get(0), "one");
     assertEquals(out.getStrings("three"), "1", "2", "3", "4");
     assertEquals(out.getLongs("one"), 1, 2, 3, 4);
   }
@@ -3582,7 +3708,7 @@ public class DataFrameTest {
 
     Assert.assertEquals(out.size(), 4);
     Assert.assertEquals(out.getSeriesNames().size(), 1);
-    Assert.assertEquals(out.getIndexName(), null);
+    Assert.assertFalse(out.hasIndex());
     assertEquals(out.getLongs("one"), 1, 2, 3, 4);
   }
 

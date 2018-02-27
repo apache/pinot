@@ -50,20 +50,16 @@ public class DefaultHelixStarterServerConfig {
         CommonConstants.Server.DEFAULT_READ_MODE);
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS,
         CommonConstants.Server.DEFAULT_DATA_MANAGER_CLASS);
-    serverConf.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_METADATA_LOADER_CLASS,
-        CommonConstants.Server.DEFAULT_SEGMENT_METADATA_LOADER_CLASS);
 
     // query executor parameters
+    serverConf.addProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_CLASS,
+        CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_CLASS);
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_PRUNER_CLASS,
         "DataSchemaSegmentPruner,ColumnValueSegmentPruner,ValidSegmentPruner,PartitionSegmentPruner");
     serverConf.addProperty("pinot.server.query.executor.pruner.DataSchemaSegmentPruner.id", "0");
     serverConf.addProperty("pinot.server.query.executor.pruner.ColumnValueSegmentPruner.id", "1");
     serverConf.addProperty("pinot.server.query.executor.pruner.ValidSegmentPruner.id", "2");
     serverConf.addProperty("pinot.server.query.executor.pruner.PartitionSegmentPruner.id", "3");
-    serverConf.addProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT,
-        CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT);
-    serverConf.addProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_CLASS,
-        CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_CLASS);
 
     serverConf.addProperty(CommonConstants.Helix.CONFIG_OF_HELIX_FLAPPING_TIMEWINDOW_MS,
         CommonConstants.Helix.DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS);

@@ -16,17 +16,18 @@
 package com.linkedin.pinot.core.operator.query;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.DoubleAggregationResultHolder;
+import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +36,9 @@ import java.util.Map;
 /**
  * Aggregation operator that utilizes metadata for serving aggregation queries.
  */
-public class MetadataBasedAggregationOperator implements Operator {
+public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateResultsBlock> {
+  private static final String OPERATOR_NAME = "MetadataBasedAggregationOperator";
+
   private final AggregationFunctionContext[] _aggregationFunctionContexts;
   private final Map<String, BaseOperator> _dataSourceMap;
   private final SegmentMetadata _segmentMetadata;
@@ -59,15 +62,7 @@ public class MetadataBasedAggregationOperator implements Operator {
   }
 
   @Override
-  public boolean open() {
-    for (BaseOperator operator : _dataSourceMap.values()) {
-      operator.open();
-    }
-    return true;
-  }
-
-  @Override
-  public Block nextBlock() {
+  protected IntermediateResultsBlock getNextBlock() {
     int numAggregationFunctions = _aggregationFunctionContexts.length;
     List<Object> aggregationResults = new ArrayList<>(numAggregationFunctions);
     int totalRawDocs = _segmentMetadata.getTotalRawDocs();
@@ -76,12 +71,27 @@ public class MetadataBasedAggregationOperator implements Operator {
       AggregationFunction function = aggregationFunctionContext.getAggregationFunction();
       AggregationFunctionFactory.AggregationFunctionType functionType =
           AggregationFunctionFactory.AggregationFunctionType.valueOf(function.getName().toUpperCase());
+      String column = aggregationFunctionContext.getAggregationColumns()[0];
 
-      // TODO: Add support for more aggregation functions that can be served with metadata.
+      SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) _segmentMetadata;
       AggregationResultHolder resultHolder;
       switch (functionType) {
         case COUNT:
           resultHolder = new DoubleAggregationResultHolder(totalRawDocs);
+          break;
+        case MIN:
+          String minValue = segmentMetadata.getColumnMetadataFor(column).getMinValue().toString();
+          resultHolder = new DoubleAggregationResultHolder(Double.valueOf(minValue));
+          break;
+        case MAX:
+          String maxValue = segmentMetadata.getColumnMetadataFor(column).getMaxValue().toString();
+          resultHolder = new DoubleAggregationResultHolder(Double.valueOf(maxValue));
+          break;
+        case MINMAXRANGE:
+          String minValueRange = segmentMetadata.getColumnMetadataFor(column).getMinValue().toString();
+          String maxValueRange = segmentMetadata.getColumnMetadataFor(column).getMaxValue().toString();
+          resultHolder = new ObjectAggregationResultHolder();
+          resultHolder.setValue(new MinMaxRangePair(Double.valueOf(minValueRange), Double.valueOf(maxValueRange)));
           break;
 
         default:
@@ -101,16 +111,8 @@ public class MetadataBasedAggregationOperator implements Operator {
   }
 
   @Override
-  public Block nextBlock(BlockId blockId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public boolean close() {
-    for (BaseOperator operator : _dataSourceMap.values()) {
-      operator.close();
-    }
-    return true;
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   @Override

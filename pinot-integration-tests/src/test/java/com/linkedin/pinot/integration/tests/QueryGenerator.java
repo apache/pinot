@@ -508,9 +508,10 @@ public class QueryGenerator {
             _predicate.generatePql(), _top.generatePql());
       } else {
         String groupByColumns = StringUtils.join(_groupColumns, ", ");
+
+        // TODO: After fixing having clause, we need to add back the having predicate.
         return joinWithSpaces("SELECT", StringUtils.join(_aggregateColumnsAndFunctions, ", "), "FROM", _pinotTableName,
-            _predicate.generatePql(), "GROUP BY", StringUtils.join(_groupColumns, ", "), _havingPredicate.generatePql(),
-            _top.generatePql());
+            _predicate.generatePql(), "GROUP BY", StringUtils.join(_groupColumns, ", "), _top.generatePql());
       }
     }
 
@@ -538,8 +539,10 @@ public class QueryGenerator {
 
           // Unlike PQL, SQL expects the group columns in select statements.
           String groupByColumns = StringUtils.join(_groupColumns, ", ");
+
+          // TODO: After fixing having clause, we need to add back the having predicate.
           queries.add(joinWithSpaces("SELECT", groupByColumns + ",", aggregateColumnAndFunction, "FROM", _h2TableName,
-              _predicate.generateH2Sql(), "GROUP BY", groupByColumns, _havingPredicate.generateH2Sql(), _top.generateH2Sql()));
+              _predicate.generateH2Sql(), "GROUP BY", groupByColumns, _top.generateH2Sql()));
         }
       }
 

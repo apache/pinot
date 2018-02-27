@@ -1,4 +1,4 @@
-import Ember from 'ember';
+import { helper } from '@ember/component/helper';
 
 /**
  * Template helper that computes the background color
@@ -16,4 +16,4 @@ export function computeColor([value = 0]) {
   }
 }
 
-export default Ember.Helper.helper(computeColor);
+export default helper(computeColor);

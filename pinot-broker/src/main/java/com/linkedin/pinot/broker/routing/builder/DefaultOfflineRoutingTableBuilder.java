@@ -15,11 +15,12 @@
  */
 package com.linkedin.pinot.broker.routing.builder;
 
+import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.common.config.TableConfig;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
@@ -28,24 +29,21 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.broker.routing.ServerToSegmentSetMap;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 /**
  * Create a given number of routing tables based on random selections from ExternalView.
  */
-public class DefaultOfflineRoutingTableBuilder extends AbstractRoutingTableBuilder {
+public class DefaultOfflineRoutingTableBuilder extends BaseRoutingTableBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultOfflineRoutingTableBuilder.class);
+
   private RoutingTableBuilder _largeClusterRoutingTableBuilder;
   private RoutingTableBuilder _smallClusterRoutingTableBuilder;
 
-  private static int MIN_SERVER_COUNT_FOR_LARGE_CLUSTER = 30;
-  private static int MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER = 4;
+  // Set variable as volatile so all threads can get the up-to-date routing table builder
+  private volatile RoutingTableBuilder _routingTableBuilder;
 
-  RoutingTableBuilder _routingTableBuilder;
+  private int _minServerCountForLargeCluster = 30;
+  private int _minReplicaCountForLargeCluster = 4;
 
   @Override
   public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
@@ -54,27 +52,29 @@ public class DefaultOfflineRoutingTableBuilder extends AbstractRoutingTableBuild
     if (configuration.containsKey("minServerCountForLargeCluster")) {
       final String minServerCountForLargeCluster = configuration.getString("minServerCountForLargeCluster");
       try {
-        MIN_SERVER_COUNT_FOR_LARGE_CLUSTER = Integer.parseInt(minServerCountForLargeCluster);
-        LOGGER.info("Using large cluster min server count of {}", MIN_SERVER_COUNT_FOR_LARGE_CLUSTER);
+        _minServerCountForLargeCluster = Integer.parseInt(minServerCountForLargeCluster);
+        LOGGER.info("Using large cluster min server count of {}", _minServerCountForLargeCluster);
       } catch (Exception e) {
-        LOGGER.warn("Could not get the large cluster min server count from configuration value {}, keeping default value {}", minServerCountForLargeCluster,
-            MIN_SERVER_COUNT_FOR_LARGE_CLUSTER, e);
+        LOGGER.warn(
+            "Could not get the large cluster min server count from configuration value {}, keeping default value {}",
+            minServerCountForLargeCluster, _minServerCountForLargeCluster, e);
       }
     } else {
-      LOGGER.info("Using default value for large cluster min server count of {}", MIN_SERVER_COUNT_FOR_LARGE_CLUSTER);
+      LOGGER.info("Using default value for large cluster min server count of {}", _minServerCountForLargeCluster);
     }
 
     if (configuration.containsKey("minReplicaCountForLargeCluster")) {
       final String minReplicaCountForLargeCluster = configuration.getString("minReplicaCountForLargeCluster");
       try {
-        MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER = Integer.parseInt(minReplicaCountForLargeCluster);
-        LOGGER.info("Using large cluster min replica count of {}", MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER);
+        _minReplicaCountForLargeCluster = Integer.parseInt(minReplicaCountForLargeCluster);
+        LOGGER.info("Using large cluster min replica count of {}", _minReplicaCountForLargeCluster);
       } catch (Exception e) {
-        LOGGER.warn("Could not get the large cluster min replica count from configuration value {}, keeping default value {}", minReplicaCountForLargeCluster,
-            MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER, e);
+        LOGGER.warn(
+            "Could not get the large cluster min replica count from configuration value {}, keeping default value {}",
+            minReplicaCountForLargeCluster, _minReplicaCountForLargeCluster, e);
       }
     } else {
-      LOGGER.info("Using default value for large cluster min replica count of {}", MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER);
+      LOGGER.info("Using default value for large cluster min replica count of {}", _minReplicaCountForLargeCluster);
     }
 
     _largeClusterRoutingTableBuilder.init(configuration, tableConfig, propertyStore);
@@ -82,13 +82,15 @@ public class DefaultOfflineRoutingTableBuilder extends AbstractRoutingTableBuild
   }
 
   @Override
-  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView, List<InstanceConfig> instanceConfigList) {
+  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
+      List<InstanceConfig> instanceConfigs) {
     if (isLargeCluster(externalView)) {
+      _largeClusterRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
       _routingTableBuilder = _largeClusterRoutingTableBuilder;
     } else {
+      _smallClusterRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
       _routingTableBuilder = _smallClusterRoutingTableBuilder;
     }
-    _routingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigList);
   }
 
   private boolean isLargeCluster(ExternalView externalView) {
@@ -99,11 +101,12 @@ public class DefaultOfflineRoutingTableBuilder extends AbstractRoutingTableBuild
     try {
       replicaCount = Integer.parseInt(helixReplicaCount);
     } catch (Exception e) {
-      LOGGER.warn("Failed to parse the replica count ({}) from external view of table {}", helixReplicaCount, externalView.getResourceName());
+      LOGGER.warn("Failed to parse the replica count ({}) from external view of table {}", helixReplicaCount,
+          externalView.getResourceName());
       return false;
     }
 
-    if (replicaCount < MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER) {
+    if (replicaCount < _minReplicaCountForLargeCluster) {
       return false;
     }
 
@@ -113,16 +116,16 @@ public class DefaultOfflineRoutingTableBuilder extends AbstractRoutingTableBuild
       instanceSet.addAll(externalView.getStateMap(partition).keySet());
     }
 
-    return MIN_SERVER_COUNT_FOR_LARGE_CLUSTER <= instanceSet.size();
+    return _minServerCountForLargeCluster <= instanceSet.size();
   }
 
   @Override
-  public Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request) {
-    return _routingTableBuilder.findServers(request);
+  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
+    return _routingTableBuilder.getRoutingTable(request);
   }
-  
+
   @Override
-  public List<ServerToSegmentSetMap> getRoutingTables() {
+  public List<Map<String, List<String>>> getRoutingTables() {
     return _routingTableBuilder.getRoutingTables();
   }
 }

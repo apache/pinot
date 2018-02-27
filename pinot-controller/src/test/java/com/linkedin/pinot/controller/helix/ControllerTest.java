@@ -142,15 +142,19 @@ public abstract class ControllerTest {
   }
 
   public static String sendPostRequest(String urlString, String payload) throws IOException {
-    URLConnection urlConnection = new URL(urlString).openConnection();
-    urlConnection.setDoOutput(true);
+    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    httpConnection.setRequestMethod("POST");
 
-    try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(urlConnection.getOutputStream(), "UTF-8"))) {
-      writer.write(payload, 0, payload.length());
-      writer.flush();
+    if (payload != null && !payload.isEmpty()) {
+      httpConnection.setDoOutput(true);
+      try (BufferedWriter writer = new BufferedWriter(
+          new OutputStreamWriter(httpConnection.getOutputStream(), "UTF-8"))) {
+        writer.write(payload, 0, payload.length());
+        writer.flush();
+      }
     }
 
-    return constructResponse(urlConnection.getInputStream());
+    return constructResponse(httpConnection.getInputStream());
   }
 
   public static String sendPutRequest(String urlString, String payload) throws IOException {

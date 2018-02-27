@@ -16,7 +16,6 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.google.common.util.concurrent.MoreExecutors;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
@@ -109,7 +108,7 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
 
     File segmentTarDir = new File(_tarDir, segmentName);
     TestUtils.ensureDirectoriesExistAndEmpty(segmentTarDir);
-    ExecutorService executor = MoreExecutors.sameThreadExecutor();
+    ExecutorService executor = MoreExecutors.newDirectExecutorService();
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(avroFile), segmentIndex,
         new File(_segmentDir, segmentName), segmentTarDir, this._tableName, false, null, null, executor);
     executor.shutdown();
@@ -117,73 +116,8 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
 
     uploadSegments(segmentTarDir);
 
-    avroFile.delete();
-    FileUtils.deleteQuietly(segmentTarDir);
-  }
-
-  protected void generateAndUploadRandomSegment1(final String segmentName, int rowCount) throws Exception {
-    ThreadLocalRandom random = ThreadLocalRandom.current();
-    Schema schema = new Schema.Parser().parse(
-        new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource("dummy.avsc"))));
-    GenericRecord record = new GenericData.Record(schema);
-    GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(schema);
-    DataFileWriter<GenericRecord> fileWriter = new DataFileWriter<GenericRecord>(datumWriter);
-    final File avroFile = new File(_tempDir, segmentName + ".avro");
-    fileWriter.create(schema, avroFile);
-
-    for (int i = 0; i < rowCount; i++) {
-      record.put(0, random.nextInt());
-      fileWriter.append(record);
-    }
-
-    fileWriter.close();
-
-    final int segmentIndex = Integer.parseInt(segmentName.split("_")[1]);
-    final String TAR_GZ_FILE_EXTENTION = ".tar.gz";
-    File segmentTarDir = new File(_tarDir, segmentName);
-    buildSegment(segmentTarDir, avroFile, segmentIndex, segmentName, 0);
-    String segmentFileName = segmentName;
-    for (String name : segmentTarDir.list()) {
-      if (name.endsWith(TAR_GZ_FILE_EXTENTION)) {
-        segmentFileName = name;
-      }
-    }
-    final File generatedFile = new File(segmentTarDir, segmentFileName);
-    Assert.assertTrue(generatedFile.exists());
-    final long segmentLength = generatedFile.length();
-    final File tmpGeneratedFile = new File(segmentTarDir, segmentFileName + "." + System.currentTimeMillis());
-    generatedFile.renameTo(tmpGeneratedFile);
-    LOGGER.info("Stashed segment away in {}", tmpGeneratedFile.getAbsolutePath());
-    new Thread(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          // Make the segment file available after 5s
-          Thread.sleep(5000);
-          tmpGeneratedFile.renameTo(generatedFile);
-          LOGGER.info("Segment moved to {}", generatedFile.getAbsolutePath());
-        } catch (Exception e) {
-        }
-      }
-    }).start();
-
-    LOGGER.info("Uploading {} of length {}", generatedFile.getAbsolutePath(), segmentLength);
-    FileUploadUtils.sendSegmentFile(LOCAL_HOST, Integer.toString(_controllerPort), segmentFileName, generatedFile,
-        segmentLength, 5, 5);
-
-    avroFile.delete();
-    FileUtils.deleteQuietly(segmentTarDir);
-  }
-
-  public void buildSegment(File segmentTarDir, File avroFile, int segmentIndex, String segmentName,
-      int sleepTimeSec) throws Exception {
-    Thread.sleep(sleepTimeSec * 1000);
-    TestUtils.ensureDirectoriesExistAndEmpty(segmentTarDir);
-    ExecutorService executor = MoreExecutors.sameThreadExecutor();
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(avroFile), segmentIndex,
-        new File(segmentTarDir, segmentName), segmentTarDir, this._tableName, false, null, null, executor);
-    executor.shutdown();
-    executor.awaitTermination(1L, TimeUnit.MINUTES);
+    FileUtils.forceDelete(avroFile);
+    FileUtils.forceDelete(segmentTarDir);
   }
 
   @DataProvider(name = "configProvider")
@@ -212,16 +146,6 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     generateAndUploadRandomSegment(segment9, nRows3);
     verifyNRows(nRows2, nRows2+nRows3);
   }
-
-  @Test(dataProvider = "configProvider")
-  public void testRetry(String tableName, SegmentVersion version) throws Exception {
-    final String segment6 = "segmentToBeRefreshed_6";
-    final int nRows1 = 69;
-
-    generateAndUploadRandomSegment1(segment6, nRows1);
-    verifyNRows(0, nRows1);
-  }
-
 
   // Verify that the number of rows is either the initial value or the final value but not something else.
   private void verifyNRows(int currentNrows, int finalNrows) throws Exception {

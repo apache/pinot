@@ -29,6 +29,8 @@ import com.linkedin.pinot.core.segment.index.converter.SegmentV1V2ToV3FormatConv
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
+import com.linkedin.pinot.startree.hll.HllConfig;
+import com.linkedin.pinot.startree.hll.HllConstants;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.attribute.FileTime;

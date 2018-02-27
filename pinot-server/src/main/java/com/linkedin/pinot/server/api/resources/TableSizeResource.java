@@ -61,13 +61,13 @@ public class TableSizeResource {
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Provide detailed information", required = false) @DefaultValue("true") @QueryParam("detailed") boolean detailed)
       throws WebApplicationException {
-    InstanceDataManager dataManager = (InstanceDataManager) serverInstance.getInstanceDataManager();
+    InstanceDataManager instanceDataManager = serverInstance.getInstanceDataManager();
 
-    if (dataManager == null) {
+    if (instanceDataManager == null) {
       throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
     }
 
-    TableDataManager tableDataManager = dataManager.getTableDataManager(tableName);
+    TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableName);
     if (tableDataManager == null) {
       throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
     }

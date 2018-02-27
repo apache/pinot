@@ -18,6 +18,7 @@ package com.linkedin.pinot.minion;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
@@ -84,6 +85,7 @@ public class MinionStarter {
   public void start() throws Exception {
     LOGGER.info("Starting Pinot minion: {}", _instanceId);
     Utils.logVersions();
+    MinionContext minionContext = MinionContext.getInstance();
 
     // Initialize data directory
     LOGGER.info("Initializing data directory");
@@ -92,21 +94,29 @@ public class MinionStarter {
     if (!dataDir.exists()) {
       Preconditions.checkState(dataDir.mkdirs());
     }
+    minionContext.setDataDir(dataDir);
 
     // Initialize metrics
     LOGGER.info("Initializing metrics");
     MetricsHelper.initializeMetrics(_config);
     MetricsRegistry metricsRegistry = new MetricsRegistry();
     MetricsHelper.registerMetricsRegistry(metricsRegistry);
-    MinionMetrics minionMetrics = new MinionMetrics(metricsRegistry);
+    final MinionMetrics minionMetrics = new MinionMetrics(metricsRegistry);
     minionMetrics.initializeGlobalMeters();
+    minionContext.setMinionMetrics(minionMetrics);
+
+    // TODO: set the correct minion version
+    minionContext.setMinionVersion("1.0");
+
+    LOGGER.info("initializing segment fetchers for all protocols");
+    SegmentFetcherFactory.getInstance()
+        .init(_config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
 
     // Join the Helix cluster
     LOGGER.info("Joining the Helix cluster");
-    final MinionContext minionContext = new MinionContext(dataDir, minionMetrics);
     _helixManager.getStateMachineEngine()
         .registerStateModelFactory("Task", new TaskStateModelFactory(_helixManager,
-            new TaskFactoryRegistry(_taskExecutorRegistry, minionContext).getTaskFactoryRegistry()));
+            new TaskFactoryRegistry(_taskExecutorRegistry).getTaskFactoryRegistry()));
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
     addInstanceTagIfNeeded();
@@ -117,9 +127,15 @@ public class MinionStarter {
       @Override
       public ServiceStatus.Status getServiceStatus() {
         // TODO: add health check here
-        minionContext.getMinionMetrics().addMeteredGlobalValue(MinionMeter.HEALTH_CHECK_GOOD_CALLS, 1L);
+        minionMetrics.addMeteredGlobalValue(MinionMeter.HEALTH_CHECK_GOOD_CALLS, 1L);
         return ServiceStatus.Status.GOOD;
       }
+
+      @Override
+      public String getStatusDescription() {
+        return ServiceStatus.STATUS_DESCRIPTION_NONE;
+      }
+
     });
 
     LOGGER.info("Pinot minion started");

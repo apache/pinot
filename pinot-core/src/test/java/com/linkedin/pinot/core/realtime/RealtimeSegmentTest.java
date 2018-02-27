@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.core.realtime;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
@@ -29,21 +29,22 @@ import com.linkedin.pinot.core.common.predicate.EqPredicate;
 import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderImpl;
+import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
-import com.linkedin.pinot.core.realtime.impl.kafka.RealtimeSegmentImplTest;
-import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +67,7 @@ public class RealtimeSegmentTest {
   @BeforeClass
   public static void before() throws Exception {
     filePath = RealtimeFileBasedReaderTest.class.getClassLoader().getResource(AVRO_DATA).getFile();
-    fieldTypeMap = new HashMap<String, FieldSpec.FieldType>();
+    fieldTypeMap = new HashMap<>();
     fieldTypeMap.put("column1", FieldType.DIMENSION);
     fieldTypeMap.put("column2", FieldType.DIMENSION);
     fieldTypeMap.put("column3", FieldType.DIMENSION);
@@ -84,31 +85,26 @@ public class RealtimeSegmentTest {
     schema = SegmentTestUtils.extractSchemaFromAvro(new File(filePath), fieldTypeMap, TimeUnit.MINUTES);
 
     StreamProviderConfig config = new FileBasedStreamProviderConfig(FileFormat.AVRO, filePath, schema);
-//    System.out.println(config);
     StreamProvider provider = new FileBasedStreamProviderImpl();
     final String tableName = RealtimeSegmentTest.class.getSimpleName() + ".noTable";
     provider.init(config, tableName, new ServerMetrics(new MetricsRegistry()));
 
-    List<String> invertedIdxCols = new ArrayList<>();
-    invertedIdxCols.add("count");
-    RealtimeSegmentDataManager segmentDataManager = mock(RealtimeSegmentDataManager.class);
-    when(segmentDataManager.getSegmentName()).thenReturn("noSegment");
-    when(segmentDataManager.getTableName()).thenReturn(tableName);
-    when(segmentDataManager.getInvertedIndexColumns()).thenReturn(invertedIdxCols);
-    when(segmentDataManager.getNoDictionaryColumns()).thenReturn(new ArrayList<String>());
-    when(segmentDataManager.getSchema()).thenReturn(schema);
-    when(segmentDataManager.getMemoryManager()).thenReturn(new DirectMemoryManager("noSegment"));
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
     when(statsHistory.getEstimatedAvgColSize(any(String.class))).thenReturn(32);
     when(statsHistory.getEstimatedCardinality(any(String.class))).thenReturn(200);
-    when(segmentDataManager.getStatsHistory()).thenReturn(statsHistory);
-
-    IndexLoadingConfig indexLoadingConfig = mock(IndexLoadingConfig.class);
-    when(indexLoadingConfig.getRealtimeAvgMultiValueCount()).thenReturn(2);
-    segmentWithInvIdx = new RealtimeSegmentImpl(new ServerMetrics(new MetricsRegistry()), segmentDataManager,
-        indexLoadingConfig, 100000, AVRO_DATA);
-    segmentWithoutInvIdx = RealtimeSegmentImplTest.createRealtimeSegmentImpl(schema, 100000, tableName, "noSegment",
-        AVRO_DATA, new ServerMetrics(new MetricsRegistry()));
+    RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder().setSegmentName("noSegment")
+        .setStreamName(AVRO_DATA)
+        .setSchema(schema)
+        .setCapacity(100000)
+        .setAvgNumMultiValues(2)
+        .setNoDictionaryColumns(Collections.<String>emptySet())
+        .setInvertedIndexColumns(Collections.singleton("count"))
+        .setRealtimeSegmentZKMetadata(new RealtimeSegmentZKMetadata())
+        .setMemoryManager(new DirectMemoryManager("noSegment"))
+        .setStatsHistory(statsHistory)
+        .build();
+    segmentWithInvIdx = new RealtimeSegmentImpl(realtimeSegmentConfig);
+    segmentWithoutInvIdx = RealtimeSegmentTestUtils.createRealtimeSegmentImpl(schema, 100000, "noSegment", AVRO_DATA);
     GenericRow row = provider.next(new GenericRow());
     while (row != null) {
       segmentWithInvIdx.index(row);
@@ -126,8 +122,9 @@ public class RealtimeSegmentTest {
     List<String> rhs = new ArrayList<String>();
     rhs.add("890662862");
     Predicate predicate = new EqPredicate("count", rhs);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, ds1);
     BitmapBasedFilterOperator op =
-        new BitmapBasedFilterOperator(predicate, ds1, 0, segmentWithInvIdx.getRawDocumentCount() - 1);
+        new BitmapBasedFilterOperator(predicateEvaluator, ds1, 0, segmentWithInvIdx.getNumDocsIndexed() - 1);
 
     Block b = op.nextBlock();
     BlockDocIdIterator iterator = b.getBlockDocIdSet().iterator();
@@ -153,8 +150,9 @@ public class RealtimeSegmentTest {
     List<String> rhs = new ArrayList<String>();
     rhs.add("890662862");
     Predicate predicate = new EqPredicate("count", rhs);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, ds1);
     ScanBasedFilterOperator op =
-        new ScanBasedFilterOperator(predicate, ds1, 0, segmentWithoutInvIdx.getRawDocumentCount() - 1);
+        new ScanBasedFilterOperator(predicateEvaluator, ds1, 0, segmentWithoutInvIdx.getNumDocsIndexed() - 1);
 
     Block b = op.nextBlock();
     BlockDocIdIterator iterator = b.getBlockDocIdSet().iterator();
@@ -180,8 +178,9 @@ public class RealtimeSegmentTest {
     List<String> rhs = new ArrayList<String>();
     rhs.add("890662862");
     Predicate predicate = new NEqPredicate("count", rhs);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, ds1);
     BitmapBasedFilterOperator op =
-        new BitmapBasedFilterOperator(predicate, ds1, 0, segmentWithInvIdx.getRawDocumentCount() - 1);
+        new BitmapBasedFilterOperator(predicateEvaluator, ds1, 0, segmentWithInvIdx.getNumDocsIndexed() - 1);
 
     Block b = op.nextBlock();
     BlockDocIdIterator iterator = b.getBlockDocIdSet().iterator();
@@ -204,8 +203,9 @@ public class RealtimeSegmentTest {
     List<String> rhs = new ArrayList<String>();
     rhs.add("890662862");
     Predicate predicate = new NEqPredicate("count", rhs);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, ds1);
     ScanBasedFilterOperator op =
-        new ScanBasedFilterOperator(predicate, ds1, 0, segmentWithoutInvIdx.getRawDocumentCount() - 1);
+        new ScanBasedFilterOperator(predicateEvaluator, ds1, 0, segmentWithoutInvIdx.getNumDocsIndexed() - 1);
 
     Block b = op.nextBlock();
     BlockDocIdIterator iterator = b.getBlockDocIdSet().iterator();
@@ -228,8 +228,9 @@ public class RealtimeSegmentTest {
     List<String> rhs = new ArrayList<String>();
     rhs.add("[0\t\t*)");
     Predicate predicate = new RangePredicate("count", rhs);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, ds1);
     BitmapBasedFilterOperator op =
-        new BitmapBasedFilterOperator(predicate, ds1, 0, segmentWithInvIdx.getRawDocumentCount() - 1);
+        new BitmapBasedFilterOperator(predicateEvaluator, ds1, 0, segmentWithInvIdx.getNumDocsIndexed() - 1);
 
     Block b = op.nextBlock();
     BlockDocIdIterator iterator = b.getBlockDocIdSet().iterator();
@@ -255,8 +256,9 @@ public class RealtimeSegmentTest {
     List<String> rhs = new ArrayList<String>();
     rhs.add("[0\t\t*)");
     Predicate predicate = new RangePredicate("count", rhs);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, ds1);
     ScanBasedFilterOperator op =
-        new ScanBasedFilterOperator(predicate, ds1, 0, segmentWithoutInvIdx.getRawDocumentCount() - 1);
+        new ScanBasedFilterOperator(predicateEvaluator, ds1, 0, segmentWithoutInvIdx.getNumDocsIndexed() - 1);
 
     Block b = op.nextBlock();
     BlockDocIdIterator iterator = b.getBlockDocIdSet().iterator();
@@ -282,8 +284,9 @@ public class RealtimeSegmentTest {
     List<String> rhs = new ArrayList<String>();
     rhs.add("[0\t\t100)");
     Predicate predicate = new RangePredicate("count", rhs);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, ds1);
     BitmapBasedFilterOperator op =
-        new BitmapBasedFilterOperator(predicate, ds1, 0, segmentWithInvIdx.getRawDocumentCount() - 1);
+        new BitmapBasedFilterOperator(predicateEvaluator, ds1, 0, segmentWithInvIdx.getNumDocsIndexed() - 1);
 
     Block b = op.nextBlock();
     BlockDocIdIterator iterator = b.getBlockDocIdSet().iterator();
@@ -306,8 +309,9 @@ public class RealtimeSegmentTest {
     List<String> rhs = new ArrayList<String>();
     rhs.add("[0\t\t100)");
     Predicate predicate = new RangePredicate("count", rhs);
+    PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, ds1);
     ScanBasedFilterOperator op =
-        new ScanBasedFilterOperator(predicate, ds1, 0, segmentWithoutInvIdx.getRawDocumentCount() - 1);
+        new ScanBasedFilterOperator(predicateEvaluator, ds1, 0, segmentWithoutInvIdx.getNumDocsIndexed() - 1);
 
     Block b = op.nextBlock();
     BlockDocIdIterator iterator = b.getBlockDocIdSet().iterator();
@@ -322,5 +326,4 @@ public class RealtimeSegmentTest {
     }
     Assert.assertEquals(counter, 0);
   }
-
 }

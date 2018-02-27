@@ -15,12 +15,10 @@
  */
 package com.linkedin.pinot.broker.routing;
 
-import java.util.Map;
-
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.config.PerTableRoutingConfig;
 import com.linkedin.pinot.transport.config.RoutingTableConfig;
+import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,12 +36,12 @@ public class CfgBasedRouting implements RoutingTable {
   }
 
   @Override
-  public Map<ServerInstance, SegmentIdSet> findServers(RoutingTableLookupRequest request) {
+  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
+    String tableName = request.getTableName();
+    PerTableRoutingConfig cfg = _cfg.getPerTableRoutingCfg().get(tableName);
 
-    PerTableRoutingConfig cfg = _cfg.getPerTableRoutingCfg().get(request.getTableName());
-
-    if (null == cfg) {
-      LOGGER.warn("Unable to find routing setting for table :" + request.getTableName());
+    if (cfg == null) {
+      LOGGER.warn("Unable to find routing setting for table: {}", tableName);
       return null;
     }
 
@@ -52,18 +50,7 @@ public class CfgBasedRouting implements RoutingTable {
 
   @Override
   public boolean routingTableExists(String tableName) {
-    Map<ServerInstance, SegmentIdSet> routingTableEntry = findServers(new RoutingTableLookupRequest(tableName, null, null));
-    return routingTableEntry != null && !routingTableEntry.isEmpty();
-  }
-
-  @Override
-  public void start() {
-    // Nothing to be done here
-  }
-
-  @Override
-  public void shutdown() {
-    // Nothing to be done here
+    return _cfg.getPerTableRoutingCfg().containsKey(tableName);
   }
 
   @Override

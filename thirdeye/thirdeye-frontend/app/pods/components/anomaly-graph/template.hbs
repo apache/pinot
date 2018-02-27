@@ -4,8 +4,12 @@
       <h5 class="legend-title">Primary Metric</h5>
       <ul class="anomaly-graph__filter-group">
         <li class="anomaly-graph__filter-item">
-          {{input type="checkbox" id=(concat primaryMetricId metric.id) checked=true disabled=true}}
-          <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{primaryMetric.color}}" for="{{concat primaryMetricId metric.id}}" title={{primaryMetric.metricName}}> {{primaryMetric.metricName}} </label>
+          {{input
+            type="checkbox"
+            id=(concat primaryMetricId primaryMetric.metricId)
+            change=(action "onPrimaryMetricToggle")
+            checked=primaryMetric.isSelected}}
+          <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{primaryMetric.color}}" for="{{concat primaryMetricId primaryMetric.metricId}}" title={{primaryMetric.metricName}}> {{primaryMetric.metricName}} </label>
         </li>
       </ul>
 
@@ -43,14 +47,14 @@
           </a>
         </h5>
         <ul class="anomaly-graph__filter-group {{if isDimensionsHidden "anomaly-graph__filter-group--hidden"}}">
-          {{#each dimensions as |subdimension|}}
+          {{#each dimensions as |subdimension index|}}
             <li class="anomaly-graph__filter-item">
               {{input
                 type="checkbox"
-                id=(concat dimensionId subdimension.id)
+                id=(concat dimensionId index)
                 change=(action "onSelection" subdimension)
                 checked=subdimension.isSelected}}
-              <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{subdimension.color}}" for="{{concat dimensionId subdimension.id}}" title={{subdimension.name}}> {{subdimension.name}} </label>
+              <label class="anomaly-graph__filter-label anomaly-graph__filter-label--{{subdimension.color}}" for="{{concat dimensionId index}}" title={{subdimension.name}}> {{subdimension.name}} </label>
             </li>
           {{else}}
             No Dimensions.
@@ -111,5 +115,6 @@
     id=componentId
     subchart=subchart
     tooltip=tooltip
+    padding=padding
   }}
 </section>

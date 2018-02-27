@@ -57,13 +57,13 @@ public class BalancedLoadSegmentAssignmentStrategy implements SegmentAssignmentS
     String tableName;
 
 
-    if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
-      tableName = TableNameBuilder.REALTIME.tableNameWithType(segmentMetadata.getTableName());
-      serverTenantName = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName);
-    } else {
+    //if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
+    //  tableName = TableNameBuilder.REALTIME.tableNameWithType(segmentMetadata.getTableName());
+    //  serverTenantName = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName);
+    //} else {
       tableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
       serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
-    }
+    //}
 
     List<String> selectedInstances = new ArrayList<>();
     Map<String, Double> reportedLoadMetricPerInstanceMap = new HashMap<>();

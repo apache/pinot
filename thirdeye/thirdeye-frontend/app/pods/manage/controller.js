@@ -3,9 +3,9 @@
  * @module manage/controller
  * @exports manage
  */
-import Ember from 'ember';
+import Controller from '@ember/controller';
 
-export default Ember.Controller.extend({
+export default Controller.extend({
   /**
    * Array of 'manage' sub navigation items
    */

@@ -84,15 +84,14 @@ public abstract class BaseQueriesTest {
 
     // Server side.
     Plan plan = PLAN_MAKER.makeInterSegmentPlan(getSegmentDataManagers(), brokerRequest, EXECUTOR_SERVICE, 10_000);
-    plan.execute();
-    DataTable instanceResponse = plan.getInstanceResponse();
+    DataTable instanceResponse = plan.execute();
 
     // Broker side.
     BrokerReduceService brokerReduceService = new BrokerReduceService();
     Map<ServerInstance, DataTable> dataTableMap = new HashMap<>();
     dataTableMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     dataTableMap.put(new ServerInstance("localhost:1111"), instanceResponse);
-    return brokerReduceService.reduceOnDataTable(brokerRequest, dataTableMap);
+    return brokerReduceService.reduceOnDataTable(brokerRequest, dataTableMap, null);
   }
 
   /**

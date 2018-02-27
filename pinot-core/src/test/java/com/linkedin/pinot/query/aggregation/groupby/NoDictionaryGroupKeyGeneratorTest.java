@@ -22,8 +22,8 @@ import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.data.readers.TestRecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
@@ -72,14 +72,14 @@ public class NoDictionaryGroupKeyGeneratorTest {
 
   private static final int NUM_COLUMNS = DATA_TYPES.length;
   private static final int NUM_ROWS = 1;
-  private TestRecordReader _recordReader;
+  private RecordReader _recordReader;
   private Map<String, BaseOperator> _dataSourceMap;
   private IndexSegment _indexSegment;
 
   @BeforeClass
   public void setup()
       throws Exception {
-    buildSegment();
+    _recordReader = buildSegment();
 
     // Load the segment.
     File segment = new File(SEGMENT_DIR_NAME, SEGMENT_NAME);
@@ -110,9 +110,9 @@ public class NoDictionaryGroupKeyGeneratorTest {
    * @throws Exception
    */
   @Test
-  public void testMultiColumnGroupKeyGenerator()
-      throws Exception {
-    testGroupKeyGenerator(_indexSegment.getColumnNames(), DATA_TYPES);
+  public void testMultiColumnGroupKeyGenerator() throws Exception {
+    Set<String> columnNames = _indexSegment.getColumnNames();
+    testGroupKeyGenerator(columnNames.toArray(new String[columnNames.size()]), DATA_TYPES);
   }
 
   /**
@@ -208,7 +208,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
    *
    * @throws Exception
    */
-  private TestRecordReader buildSegment()
+  private RecordReader buildSegment()
       throws Exception {
     Schema schema = new Schema();
 
@@ -263,12 +263,11 @@ public class NoDictionaryGroupKeyGeneratorTest {
       rows.add(genericRow);
     }
 
+    RecordReader recordReader = new GenericRowRecordReader(rows, schema);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    _recordReader = new TestRecordReader(rows, schema);
-
-    driver.init(config, _recordReader);
+    driver.init(config, recordReader);
     driver.build();
 
-    return _recordReader;
+    return recordReader;
   }
 }

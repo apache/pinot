@@ -16,12 +16,15 @@
 package com.linkedin.pinot.core.data.manager.offline;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,78 +33,79 @@ import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-// TODO: pass a reference to Helix property store during initialization. Both OFFLINE and REALTIME use case need it.
 public abstract class AbstractTableDataManager implements TableDataManager {
-  protected final List<String> _activeSegments = new ArrayList<String>();
-  protected final List<String> _loadingSegments = new ArrayList<String>();
   // This read-write lock protects the _segmentsMap and SegmentDataManager.refCnt
   protected final ReadWriteLock _rwLock = new ReentrantReadWriteLock();
   @VisibleForTesting
-  protected final Map<String, SegmentDataManager> _segmentsMap = new HashMap<String, SegmentDataManager>();
-
-  protected Logger LOGGER = LoggerFactory.getLogger(AbstractTableDataManager.class);
-  protected volatile boolean _isStarted = false;
-  protected String _tableName;
+  protected final Map<String, SegmentDataManager> _segmentsMap = new HashMap<>();
 
   protected TableDataManagerConfig _tableDataManagerConfig;
+  protected String _instanceId;
+  protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  protected ServerMetrics _serverMetrics;
+  protected String _tableName;
   protected String _tableDataDir;
   protected File _indexDir;
-  protected ServerMetrics _serverMetrics;
-  protected String _serverInstance;
 
-  protected AbstractTableDataManager() {
-  }
+  protected Logger _logger;
+
+  private boolean _started = false;
 
   @Override
-  public void init(@Nonnull TableDataManagerConfig tableDataManagerConfig, @Nonnull ServerMetrics serverMetrics,
-      @Nullable String serverInstance) {
-    _serverInstance = serverInstance;
+  public void init(@Nonnull TableDataManagerConfig tableDataManagerConfig, @Nonnull String instanceId,
+      @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull ServerMetrics serverMetrics) {
     _tableDataManagerConfig = tableDataManagerConfig;
+    _instanceId = instanceId;
+    _propertyStore = propertyStore;
     _serverMetrics = serverMetrics;
 
-    _tableName = _tableDataManagerConfig.getTableName();
-
-    _tableDataDir = _tableDataManagerConfig.getDataDir();
+    _tableName = tableDataManagerConfig.getTableName();
+    _tableDataDir = tableDataManagerConfig.getDataDir();
     _indexDir = new File(_tableDataDir);
     if (!_indexDir.exists()) {
-      _indexDir.mkdirs();
+      Preconditions.checkState(_indexDir.mkdirs());
     }
+    _logger = LoggerFactory.getLogger(_tableName + "-" + getClass().getSimpleName());
 
     doInit();
-    LOGGER.info("Initialized table: {} with data directory: {}", _tableName, _tableDataDir);
+
+    _logger.info("Initialized table: {} with data directory: {}", _tableName, _tableDataDir);
   }
 
   protected abstract void doInit();
 
   @Override
   public void start() {
-    LOGGER.info("Trying to start table : " + _tableName);
-    if (_isStarted) {
-      LOGGER.warn("TableDataManager for table {} is already started.", _tableName);
+    _logger.info("Starting table data manager for table: {}", _tableName);
+    if (_started) {
+      _logger.info("Table data manager for table: {} is already started", _tableName);
       return;
     }
-    if (_tableDataManagerConfig == null) {
-      LOGGER.warn("TableDataManager for table {} is not initialized.", _tableName);
-      return;
-    }
-    _isStarted = true;
+
+    // Nothing to be done
+
+    _started = true;
+    _logger.info("Finish starting table data manager for table: {}", _tableName);
   }
 
   @Override
   public void shutDown() {
-    LOGGER.info("Trying to shutdown table : " + _tableName);
-    doShutdown();
-    if (_isStarted) {
-      _tableDataManagerConfig = null;
-      _isStarted = false;
-    } else {
-      LOGGER.warn("Already shutDown table : " + _tableName);
+    _logger.info("Shutting down table data manager for table: {}", _tableName);
+    if (!_started) {
+      _logger.info("Table data manager for table: {} is not running", _tableName);
+      return;
     }
+
+    doShutdown();
+
+    _started = false;
+    _logger.info("Finish shutting down table data manager for table: {}", _tableName);
   }
 
   protected abstract void doShutdown();
@@ -118,7 +122,7 @@ public abstract class AbstractTableDataManager implements TableDataManager {
    */
   public void addSegment(@Nonnull IndexSegment indexSegmentToAdd) {
     final String segmentName = indexSegmentToAdd.getSegmentName();
-    LOGGER.info("Trying to add a new segment {} of table {} with OfflineSegmentDataManager", segmentName, _tableName);
+    _logger.info("Trying to add a new segment {} of table {} with OfflineSegmentDataManager", segmentName, _tableName);
     OfflineSegmentDataManager newSegmentManager = new OfflineSegmentDataManager(indexSegmentToAdd);
     final int newNumDocs = indexSegmentToAdd.getSegmentMetadata().getTotalRawDocs();
     final long segmentSize = indexSegmentToAdd.getDiskSizeBytes();
@@ -134,9 +138,9 @@ public abstract class AbstractTableDataManager implements TableDataManager {
       _rwLock.writeLock().unlock();
     }
     if (oldSegmentManager == null) {
-      LOGGER.info("Added new segment {} for table {}", segmentName, _tableName);
+      _logger.info("Added new segment {} for table {}", segmentName, _tableName);
     } else {
-      LOGGER.info("Replaced segment {}(refCnt {}) with new segment for table {}", segmentName, refCnt, _tableName);
+      _logger.info("Replaced segment {}(refCnt {}) with new segment for table {}", segmentName, refCnt, _tableName);
     }
     if (refCnt == 0) {  // oldSegmentManager must be non-null.
       closeSegment(oldSegmentManager);
@@ -144,6 +148,17 @@ public abstract class AbstractTableDataManager implements TableDataManager {
     _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.DOCUMENT_COUNT, newNumDocs);
     _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.SEGMENT_COUNT, 1L);
     _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.SEGMENT_SIZE, segmentSize);
+  }
+
+  @Override
+  public void addSegment(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig) throws Exception {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void addSegment(@Nonnull String segmentName, @Nonnull TableConfig tableConfig,
+      @Nonnull IndexLoadingConfig indexLoadingConfig) throws Exception {
+    throw new UnsupportedOperationException();
   }
 
   /**
@@ -154,11 +169,6 @@ public abstract class AbstractTableDataManager implements TableDataManager {
    */
   @Override
   public void removeSegment(String segmentName) {
-    if (!_isStarted) {
-      LOGGER.warn("Could not remove segment {}, Tracker is stopped", segmentName);
-      return;
-    }
-
     SegmentDataManager segmentDataManager;
     int refCnt = -1;
     try {
@@ -177,18 +187,13 @@ public abstract class AbstractTableDataManager implements TableDataManager {
 
   protected void closeSegment(SegmentDataManager segmentDataManager) {
     final String segmentName = segmentDataManager.getSegmentName();
-    LOGGER.info("Closing segment {} for table {}", segmentName, _tableName);
+    _logger.info("Closing segment {} for table {}", segmentName, _tableName);
     _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.SEGMENT_COUNT, -1L);
     _serverMetrics.addMeteredTableValue(_tableName, ServerMeter.DELETED_SEGMENT_COUNT, 1L);
     _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.DOCUMENT_COUNT,
         -segmentDataManager.getSegment().getSegmentMetadata().getTotalRawDocs());
     segmentDataManager.destroy();
-    LOGGER.info("Segment {} for table {} has been closed", segmentName, _tableName);
-  }
-
-  @Override
-  public boolean isStarted() {
-    return _isStarted;
+    _logger.info("Segment {} for table {} has been closed", segmentName, _tableName);
   }
 
   @Nonnull
@@ -210,7 +215,7 @@ public abstract class AbstractTableDataManager implements TableDataManager {
 
   @Override
   public List<SegmentDataManager> acquireSegments(List<String> segmentList) {
-    List<SegmentDataManager> ret = new ArrayList<SegmentDataManager>();
+    List<SegmentDataManager> ret = new ArrayList<>();
     try {
       _rwLock.readLock().lock();
       for (String segName : segmentList) {

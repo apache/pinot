@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.List;
 
 import org.testng.Assert;
@@ -10,25 +12,29 @@ import org.testng.annotations.Test;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
-public class TestAnomalyFunctionManager extends AbstractManagerTestBase {
+public class TestAnomalyFunctionManager {
 
   private Long anomalyFunctionId;
   private static String collection = "my dataset";
   private static String metricName = "__counts";
 
+  private DAOTestBase testDAOProvider;
+  private AnomalyFunctionManager anomalyFunctionDAO;
   @BeforeClass
   void beforeClass() {
-    super.init();
+    testDAOProvider = DAOTestBase.getInstance();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+    anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
-    super.cleanup();
+    testDAOProvider.cleanup();
   }
 
   @Test
   public void testCreate() {
-    anomalyFunctionId = anomalyFunctionDAO.save(getTestFunctionSpec(metricName, collection));
+    anomalyFunctionId = anomalyFunctionDAO.save(DaoTestUtils.getTestFunctionSpec(metricName, collection));
     Assert.assertNotNull(anomalyFunctionId);
 
     // test fetch all
@@ -37,6 +43,12 @@ public class TestAnomalyFunctionManager extends AbstractManagerTestBase {
 
     functions = anomalyFunctionDAO.findAllActiveFunctions();
     Assert.assertEquals(functions.size(), 1);
+  }
+
+  @Test(dependsOnMethods = {"testCreate"})
+  public void testFindNameEquals(){
+    AnomalyFunctionDTO anomalyFunctionSpec = DaoTestUtils.getTestFunctionSpec(metricName, collection);
+    Assert.assertNotNull(anomalyFunctionDAO.findWhereNameEquals(anomalyFunctionSpec.getFunctionName()));
   }
 
   @Test(dependsOnMethods = {"testCreate"})

@@ -10,9 +10,8 @@ import java.util.Set;
 
 
 /**
- * NullPipeline serves as a dummy implementation or sink that may receive inputs, but does not
- * emit any output. Can be used to construct an validate a DAG without a full implementation
- * of component pipelines.
+ * NullPipeline serves as a dummy implementation or sink that emits as output any received inputs.
+ * Can be used to construct an validate a DAG without a full implementation of component pipelines.
  */
 public class NullPipeline extends Pipeline {
   /**
@@ -38,6 +37,6 @@ public class NullPipeline extends Pipeline {
 
   @Override
   public PipelineResult run(PipelineContext context) {
-    return new PipelineResult(context, Collections.<Entity>emptySet());
+    return new PipelineResult(context, context.filter(Entity.class));
   }
 }

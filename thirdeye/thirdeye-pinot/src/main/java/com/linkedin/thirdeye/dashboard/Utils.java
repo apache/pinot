@@ -1,10 +1,22 @@
 package com.linkedin.thirdeye.dashboard;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.cache.LoadingCache;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.datasource.MetricExpression;
+import com.linkedin.thirdeye.datasource.MetricFunction;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -12,90 +24,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-
-import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datasource.MetricExpression;
-import com.linkedin.thirdeye.datasource.MetricFunction;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class Utils {
   private static final Logger LOG = LoggerFactory.getLogger(Utils.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
-
-  public static List<ThirdEyeRequest> generateFilterRequests(String dataset, String requestReference,
-      MetricFunction metricFunction, List<String> dimensions, DateTime start, DateTime end, String dataSource) {
-
-    List<ThirdEyeRequest> requests = new ArrayList<>();
-
-    for (String dimension : dimensions) {
-      ThirdEyeRequestBuilder requestBuilder = new ThirdEyeRequestBuilder();
-      List<MetricFunction> metricFunctions = Arrays.asList(metricFunction);
-      requestBuilder.setMetricFunctions(metricFunctions);
-
-      requestBuilder.setStartTimeInclusive(start);
-      requestBuilder.setEndTimeExclusive(end);
-      requestBuilder.setGroupBy(dimension);
-      requestBuilder.setDataSource(dataSource);
-      ThirdEyeRequest request = requestBuilder.build(requestReference);
-      requests.add(request);
-    }
-
-    return requests;
-  }
-
-  public static Map<String, List<String>> getFilters(QueryCache queryCache, String dataset,
-      String requestReference, List<String> dimensions, DateTime start,
-      DateTime end) throws Exception {
-
-    DatasetConfigDTO datasetConfig = ThirdEyeUtils.getDatasetConfigFromName(dataset);
-    MetricFunction metricFunction = new MetricFunction(MetricAggFunction.COUNT, "*", null, dataset, null, datasetConfig);
-
-    List<ThirdEyeRequest> requests =
-        generateFilterRequests(dataset, requestReference, metricFunction, dimensions, start, end, datasetConfig.getDataSource());
-
-    Map<ThirdEyeRequest, Future<ThirdEyeResponse>> queryResultMap =
-        queryCache.getQueryResultsAsync(requests);
-
-    Map<String, List<String>> result = new HashMap<>();
-    for (Map.Entry<ThirdEyeRequest, Future<ThirdEyeResponse>> entry : queryResultMap.entrySet()) {
-      ThirdEyeRequest request = entry.getKey();
-      String dimension = request.getGroupBy().get(0);
-      ThirdEyeResponse thirdEyeResponse = entry.getValue().get();
-      int n = thirdEyeResponse.getNumRowsFor(metricFunction);
-
-      List<String> values = new ArrayList<>();
-      for (int i = 0; i < n; i++) {
-        Map<String, String> row = thirdEyeResponse.getRow(metricFunction, i);
-        String dimensionValue = row.get(dimension);
-        values.add(dimensionValue);
-      }
-      Collections.sort(values);
-      result.put(dimension, values);
-    }
-    return result;
-  }
 
   public static List<String> getSortedDimensionNames(String collection)
       throws Exception {
@@ -241,8 +178,16 @@ public class Utils {
   public static DateTimeZone getDataTimeZone(String collection)  {
     String timezone = TimeSpec.DEFAULT_TIMEZONE;
     try {
-      DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
-      timezone = datasetConfig.getTimezone();
+      DatasetConfigDTO datasetConfig;
+      LoadingCache<String, DatasetConfigDTO> datasetConfigCache = CACHE_REGISTRY.getDatasetConfigCache();
+      if (datasetConfigCache != null && datasetConfigCache.get(collection) != null) {
+        datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
+      } else {
+        datasetConfig = DAORegistry.getInstance().getDatasetConfigDAO().findByDataset(collection);
+      }
+      if (datasetConfig != null) {
+        timezone = datasetConfig.getTimezone();
+      }
     } catch (ExecutionException e) {
       LOG.error("Exception while getting dataset config for {}", collection);
     }

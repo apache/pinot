@@ -16,9 +16,7 @@
 package com.linkedin.pinot.core.operator;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
@@ -31,7 +29,7 @@ import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
  * Internally, cached a given size of docIds, so this Operator could be replicated
  * for many ColumnarReaderDataSource.
  */
-public class BReusableFilteredDocIdSetOperator extends BaseOperator {
+public class BReusableFilteredDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   private static final String OPERATOR_NAME = "BReusableFilteredDocIdSetOperator";
 
   private static final ThreadLocal<int[]> DOC_ID_ARRAY = new ThreadLocal<int[]>() {
@@ -61,13 +59,7 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
   }
 
   @Override
-  public boolean open() {
-    _filterOperator.open();
-    return true;
-  }
-
-  @Override
-  public DocIdSetBlock getNextBlock() {
+  protected DocIdSetBlock getNextBlock() {
     // Handle limit 0 clause safely.
     // For limit 0, _docIdArray will be zero sized
     if (_currentDocId == Constants.EOF) {
@@ -95,19 +87,8 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
   }
 
   @Override
-  public Block getNextBlock(BlockId blockId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
-  }
-
-  @Override
-  public boolean close() {
-    _filterOperator.close();
-    return true;
   }
 
   @Override

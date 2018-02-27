@@ -15,11 +15,6 @@
  */
 package com.linkedin.pinot.transport.netty;
 
-import java.net.ConnectException;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
 import com.linkedin.pinot.common.response.ServerInstance;
@@ -41,6 +36,11 @@ import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.util.Timeout;
 import io.netty.util.Timer;
 import io.netty.util.TimerTask;
+import java.net.ConnectException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 
 /**
@@ -172,7 +172,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
     _lastSendRequestLatency = MetricsHelper.startTimer();
     _lastResponseLatency = MetricsHelper.startTimer();
 
-    _outstandingFuture.set(new ResponseFuture(_server, "Response Future for request " + requestId + " to server " + _server + " connId " + getConnId()));
+    _outstandingFuture.set(new ResponseFuture(_server, "Server response future for reqId " + requestId + " to server " + _server + " connId " + getConnId()));
     _lastRequestTimeoutMS = timeoutMS;
     _lastRequestId = requestId;
     _lastError = null;
@@ -276,36 +276,44 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
 
     @Override
     public synchronized void channelRead(ChannelHandlerContext ctx, Object msg) {
+      ByteBuf responseByteBuf = (ByteBuf) msg;
+      try {
+        // Cancel outstanding timer
+        cancelLastRequestTimeout();
 
-      //Cancel outstanding timer
-      cancelLastRequestTimeout();
+        //checkTransition(State.GOT_RESPONSE);
+        _lastResponseLatency.stop();
 
-      ByteBuf result = (ByteBuf) msg;
-      //checkTransition(State.GOT_RESPONSE);
-      _lastResponseSizeInBytes = result.readableBytes();
-      _lastResponseLatency.stop();
+        int numReadableBytes = responseByteBuf.readableBytes();
+        byte[] responseBytes = new byte[numReadableBytes];
+        if (numReadableBytes > 0) {
+          responseByteBuf.readBytes(responseBytes);
+        }
+        _lastResponseSizeInBytes = numReadableBytes;
 
-      State prevState = _connState;
-      _connState = State.GOT_RESPONSE;
+        State prevState = _connState;
+        _connState = State.GOT_RESPONSE;
 
-      _outstandingFuture.get().onSuccess(result);
-      _clientMetric.addRequestResponseStats(_lastRequsetSizeInBytes, 1, _lastResponseSizeInBytes, false,
-          _lastSendRequestLatency.getLatencyMs(), _lastResponseLatency.getLatencyMs());
+        _outstandingFuture.get().onSuccess(responseBytes);
+        _clientMetric.addRequestResponseStats(_lastRequsetSizeInBytes, 1, _lastResponseSizeInBytes, false,
+            _lastSendRequestLatency.getLatencyMs(), _lastResponseLatency.getLatencyMs());
 
-      /**
-       * IMPORTANT:
-       * There could be 2 netty threads one running the sendRequest() code (the ones after flush()
-       * and another for response/error handling (this one)
-       * simultaneously. Netty does not provide guarantees around this. So in worst case, the thread that
-       * is flushing request could block for sometime and gets executed after the response is obtained.
-       * We should checkin the connection to the pool only after all outstanding callbacks are complete.
-       * We do this by trancking the connection state. If we detect that response/error arrives before sendRequest
-       * completes, we will let the sendRequest to checkin/destroy the connection.
-       */
-      if ((null != _requestCallback) && (prevState == State.REQUEST_SENT)) {
-        _requestCallback.onSuccess(null);
+        /**
+         * IMPORTANT:
+         * There could be 2 netty threads one running the sendRequest() code (the ones after flush()
+         * and another for response/error handling (this one)
+         * simultaneously. Netty does not provide guarantees around this. So in worst case, the thread that
+         * is flushing request could block for sometime and gets executed after the response is obtained.
+         * We should checkin the connection to the pool only after all outstanding callbacks are complete.
+         * We do this by trancking the connection state. If we detect that response/error arrives before sendRequest
+         * completes, we will let the sendRequest to checkin/destroy the connection.
+         */
+        if ((null != _requestCallback) && (prevState == State.REQUEST_SENT)) {
+          _requestCallback.onSuccess(null);
+        }
+      } finally {
+        responseByteBuf.release();
       }
-
     }
 
     @Override

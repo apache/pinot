@@ -15,21 +15,6 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.RandomStringUtils;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
-
 import com.google.common.io.Files;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -41,19 +26,34 @@ import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+
 
 /**
  * Tests the PinotSegmentRecordReader to check that the records being generated
  * are the same as the records used to create the segment
  */
 public class PinotSegmentRecordReaderTest {
+  private static final int NUM_ROWS = 10000;
 
   private String segmentName;
   private Schema schema;
   private String segmentOutputDir;
   private File segmentIndexDir;
   private List<GenericRow> rows;
-  private TestRecordReader recordReader;
+  private RecordReader recordReader;
 
   private static String D_SV_1 = "d_sv_1";
   private static String D_MV_1 = "d_mv_1";
@@ -61,24 +61,23 @@ public class PinotSegmentRecordReaderTest {
   private static String M2 = "m2";
   private static String TIME = "t";
 
-
   @BeforeClass
   public void setup() throws Exception {
     segmentName = "pinotSegmentRecordReaderTest";
     schema = createPinotSchema();
     segmentOutputDir = Files.createTempDir().toString();
     segmentIndexDir = new File(segmentOutputDir, segmentName);
-    rows = createTestData();
-    recordReader = new TestRecordReader(rows, schema);
+    createTestData();
+    recordReader = new GenericRowRecordReader(rows, schema);
     createSegment();
   }
 
-  private List<GenericRow> createTestData() {
-    List<GenericRow> rows = new ArrayList<>();
+  private void createTestData() {
     Random random = new Random();
+    rows = new ArrayList<>(NUM_ROWS);
 
     Map<String, Object> fields;
-    for (int i = 0; i < 10000; i++) {
+    for (int i = 0; i < NUM_ROWS; i++) {
       fields = new HashMap<>();
       fields.put(D_SV_1, D_SV_1 + "_" + RandomStringUtils.randomAlphabetic(2));
       Object[] d2Array = new Object[5];
@@ -94,7 +93,6 @@ public class PinotSegmentRecordReaderTest {
       row.init(fields);
       rows.add(row);
     }
-    return rows;
   }
 
   private Schema createPinotSchema() {
@@ -134,14 +132,14 @@ public class PinotSegmentRecordReaderTest {
   public void testPinotSegmentRecordReader() throws Exception {
     List<GenericRow> outputRows = new ArrayList<>();
 
-    PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(segmentIndexDir);
-    pinotSegmentRecordReader.init();
-    while (pinotSegmentRecordReader.hasNext()) {
-      outputRows.add(pinotSegmentRecordReader.next());
+    try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(segmentIndexDir)) {
+      while (pinotSegmentRecordReader.hasNext()) {
+        outputRows.add(pinotSegmentRecordReader.next());
+      }
     }
-    pinotSegmentRecordReader.close();
 
-    Assert.assertEquals(outputRows.size(), rows.size(), "Number of rows returned by PinotSegmentRecordReader is incorrect");
+    Assert.assertEquals(outputRows.size(), rows.size(),
+        "Number of rows returned by PinotSegmentRecordReader is incorrect");
     for (int i = 0; i < outputRows.size(); i++) {
       GenericRow outputRow = outputRows.get(i);
       GenericRow row = rows.get(i);

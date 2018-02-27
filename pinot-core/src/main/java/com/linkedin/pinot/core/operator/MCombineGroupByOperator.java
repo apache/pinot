@@ -19,8 +19,6 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
@@ -38,6 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
@@ -47,7 +46,7 @@ import org.slf4j.LoggerFactory;
 /**
  * The <code>MCombineGroupByOperator</code> class is the operator to combine aggregation group-by results.
  */
-public class MCombineGroupByOperator extends BaseOperator {
+public class MCombineGroupByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MCombineGroupByOperator.class);
   private static final String OPERATOR_NAME = "MCombineGroupByOperator";
 
@@ -91,36 +90,15 @@ public class MCombineGroupByOperator extends BaseOperator {
 
   /**
    * {@inheritDoc}
-   * Calls 'open' on all the underlying operators.
-   *
-   * @return
-   */
-  @Override
-  public boolean open() {
-    for (Operator operator : _operators) {
-      operator.open();
-    }
-    return true;
-  }
-
-  /**
-   * {@inheritDoc}
    * Builds and returns a block containing result of combine:
    * - Group-by blocks from underlying operators are merged.
    * - Merged results are sorted and trimmed (for 'TOP N').
    * - Any exceptions encountered are also set in the merged result block
    *   that is returned.
-   *
-   * @return
    */
   @Override
-  public Block getNextBlock() {
-    try {
-      return combineBlocks();
-    } catch (InterruptedException e) {
-      LOGGER.error("InterruptedException caught while executing CombineGroupBy", e);
-      return new IntermediateResultsBlock(QueryException.COMBINE_GROUP_BY_EXCEPTION_ERROR, e);
-    }
+  protected IntermediateResultsBlock getNextBlock() {
+    return combineBlocks();
   }
 
   /**
@@ -140,8 +118,7 @@ public class MCombineGroupByOperator extends BaseOperator {
    *
    * @return IntermediateResultBlock containing the final results from combine operation.
    */
-  private IntermediateResultsBlock combineBlocks()
-      throws InterruptedException {
+  private IntermediateResultsBlock combineBlocks() {
     int numOperators = _operators.size();
     final CountDownLatch operatorLatch = new CountDownLatch(numOperators);
     final Map<String, Object[]> resultsMap = new ConcurrentHashMap<>();
@@ -155,9 +132,10 @@ public class MCombineGroupByOperator extends BaseOperator {
       aggregationFunctions[i] = aggregationFunctionContexts[i].getAggregationFunction();
     }
 
+    Future[] futures = new Future[numOperators];
     for (int i = 0; i < numOperators; i++) {
       final int index = i;
-      _executorService.execute(new TraceRunnable() {
+      futures[i] = _executorService.submit(new TraceRunnable() {
         @SuppressWarnings("unchecked")
         @Override
         public void runJob() {
@@ -213,56 +191,56 @@ public class MCombineGroupByOperator extends BaseOperator {
       });
     }
 
-    boolean opCompleted = operatorLatch.await(_timeOutMs, TimeUnit.MILLISECONDS);
-    if (!opCompleted) {
-      // If this happens, the broker side should already timed out, just log the error in server side.
-      LOGGER.error("Timed out while combining group-by results, after {}ms.", _timeOutMs);
-      return new IntermediateResultsBlock(new TimeoutException("CombineGroupBy timed out."));
-    }
+    try {
+      boolean opCompleted = operatorLatch.await(_timeOutMs, TimeUnit.MILLISECONDS);
+      if (!opCompleted) {
+        // If this happens, the broker side should already timed out, just log the error and return
+        String errorMessage = "Timed out while combining group-by results after " + _timeOutMs + "ms";
+        LOGGER.error(errorMessage);
+        return new IntermediateResultsBlock(new TimeoutException(errorMessage));
+      }
 
-    // Trim the results map.
-    AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
-        new AggregationGroupByTrimmingService(aggregationFunctions, (int) _brokerRequest.getGroupBy().getTopN());
-    List<Map<String, Object>> trimmedResults = aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
-    IntermediateResultsBlock mergedBlock =
-        new IntermediateResultsBlock(aggregationFunctionContexts, trimmedResults, true);
+      // Trim the results map.
+      AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
+          new AggregationGroupByTrimmingService(aggregationFunctions, (int) _brokerRequest.getGroupBy().getTopN());
+      List<Map<String, Object>> trimmedResults =
+          aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
+      IntermediateResultsBlock mergedBlock =
+          new IntermediateResultsBlock(aggregationFunctionContexts, trimmedResults, true);
 
-    // Set the processing exceptions.
-    if (!mergedProcessingExceptions.isEmpty()) {
-      mergedBlock.setProcessingExceptions(new ArrayList<>(mergedProcessingExceptions));
-    }
+      // Set the processing exceptions.
+      if (!mergedProcessingExceptions.isEmpty()) {
+        mergedBlock.setProcessingExceptions(new ArrayList<>(mergedProcessingExceptions));
+      }
 
-    // Set the execution statistics.
-    ExecutionStatistics executionStatistics = new ExecutionStatistics();
-    for (Operator operator : _operators) {
-      ExecutionStatistics executionStatisticsToMerge = operator.getExecutionStatistics();
-      if (executionStatisticsToMerge != null) {
-        executionStatistics.merge(executionStatisticsToMerge);
+      // Set the execution statistics.
+      ExecutionStatistics executionStatistics = new ExecutionStatistics();
+      for (Operator operator : _operators) {
+        ExecutionStatistics executionStatisticsToMerge = operator.getExecutionStatistics();
+        if (executionStatisticsToMerge != null) {
+          executionStatistics.merge(executionStatisticsToMerge);
+        }
+      }
+      mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
+      mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
+      mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
+      mergedBlock.setNumTotalRawDocs(executionStatistics.getNumTotalRawDocs());
+
+      return mergedBlock;
+    } catch (Exception e) {
+      return new IntermediateResultsBlock(e);
+    } finally {
+      // Cancel all ongoing jobs
+      for (Future future : futures) {
+        if (!future.isDone()) {
+          future.cancel(true);
+        }
       }
     }
-    mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
-    mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
-    mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
-    mergedBlock.setNumTotalRawDocs(executionStatistics.getNumTotalRawDocs());
-
-    return mergedBlock;
-  }
-
-  @Override
-  public Block getNextBlock(BlockId blockId) {
-    throw new UnsupportedOperationException();
   }
 
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
-  }
-
-  @Override
-  public boolean close() {
-    for (Operator operator : _operators) {
-      operator.close();
-    }
-    return true;
   }
 }

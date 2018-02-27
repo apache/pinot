@@ -15,38 +15,36 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
-import com.linkedin.pinot.core.data.extractors.FieldExtractor;
-import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import java.io.File;
 
 
 public class RecordReaderFactory {
-  public static RecordReader get(final SegmentGeneratorConfig segmentCreationSpec) throws Exception {
-    if (segmentCreationSpec.getFormat() == null) {
-      throw new UnsupportedOperationException("No input format property!");
-    }
-
-    if (segmentCreationSpec.getFormat() == FileFormat.AVRO || segmentCreationSpec.getFormat() == FileFormat.GZIPPED_AVRO) {
-      return new AvroRecordReader(FieldExtractorFactory.getPlainFieldExtractor(segmentCreationSpec), segmentCreationSpec.getInputFilePath());
-
-    } else if (segmentCreationSpec.getFormat() == FileFormat.CSV) {
-      return new CSVRecordReader(segmentCreationSpec.getInputFilePath(), segmentCreationSpec.getReaderConfig(),
-          segmentCreationSpec.getSchema());
-
-    } else if (segmentCreationSpec.getFormat() == FileFormat.JSON) {
-      return new JSONRecordReader(segmentCreationSpec.getInputFilePath(), segmentCreationSpec.getSchema());
-    } else if (segmentCreationSpec.getFormat() == FileFormat.PINOT) {
-      return new PinotSegmentRecordReader(new File(segmentCreationSpec.getInputFilePath()));
-    }
-
-    throw new UnsupportedOperationException("Unsupported input format: " + segmentCreationSpec.getFormat());
+  private RecordReaderFactory() {
   }
 
-  public static RecordReader get(FileFormat format, String fileName, FieldExtractor extractor) throws Exception {
-    if (format == FileFormat.AVRO || format == FileFormat.GZIPPED_AVRO) {
-      return new AvroRecordReader(extractor, fileName);
+  public static RecordReader getRecordReader(SegmentGeneratorConfig segmentGeneratorConfig) throws Exception {
+    File dataFile = new File(segmentGeneratorConfig.getInputFilePath());
+    Preconditions.checkState(dataFile.exists(), "Input file: " + dataFile.getAbsolutePath() + " does not exist");
+
+    Schema schema = segmentGeneratorConfig.getSchema();
+    FileFormat fileFormat = segmentGeneratorConfig.getFormat();
+    switch (fileFormat) {
+      case AVRO:
+      case GZIPPED_AVRO:
+        return new AvroRecordReader(dataFile, schema);
+      case CSV:
+        return new CSVRecordReader(dataFile, schema, (CSVRecordReaderConfig) segmentGeneratorConfig.getReaderConfig());
+      case JSON:
+        return new JSONRecordReader(dataFile, schema);
+      case PINOT:
+        return new PinotSegmentRecordReader(dataFile, schema);
+      case THRIFT:
+        return new ThriftRecordReader(dataFile, schema,(ThriftRecordReaderConfig)segmentGeneratorConfig.getReaderConfig());
+      default:
+        throw new UnsupportedOperationException("Unsupported input file format: " + fileFormat);
     }
-    return null;
   }
 }

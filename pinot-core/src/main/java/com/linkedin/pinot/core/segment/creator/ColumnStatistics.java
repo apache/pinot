@@ -78,4 +78,9 @@ public interface ColumnStatistics {
     int getNumPartitions();
 
     List<IntRange> getPartitionRanges();
+
+    /**
+     * Returns the width of the partition range for this column, used when doing per-column partitioning.
+     */
+    int getPartitionRangeWidth();
 }

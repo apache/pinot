@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.io.readerwriter.impl;
 
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnSingleValueReaderWriter;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
@@ -29,191 +29,110 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-// TODO Check if MMAP allows us to pack more partitions on a single machine.
+/**
+ * This class implements reader as well as writer interfaces for fixed-byte single column and single value data.
+ * <ul>
+ *   <li> Auto expands memory allocation on-demand. </li>
+ *   <li> Supports random reads and writes. </li>
+ *   <li> Callers should ensure they are only reading row that were written, as allocated but not written rows
+ *   are not guaranteed to have a deterministic value. </li>
+ * </ul>
+ */
 public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColumnSingleValueReaderWriter {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteSingleColumnSingleValueReaderWriter.class);
 
-  public static Logger LOGGER = LoggerFactory.getLogger(FixedByteSingleColumnSingleValueReaderWriter.class);
-  WriterWithOffset currentWriter;
-  private List<WriterWithOffset> writers = new ArrayList<>();
-  private List<ReaderWithOffset> readers = new ArrayList<>();
-  private List<PinotDataBuffer> buffers = new ArrayList<>();
-  private final long chunkSizeInBytes;
-  private final int numRowsPerChunk;
-  private final int columnSizesInBytes;
-  private final RealtimeIndexOffHeapMemoryManager memoryManager;
-  private final String columnName;
-  private long numBytesInCurrentWriter = 0;
+  private List<WriterWithOffset> _writers = new ArrayList<>();
+  private List<ReaderWithOffset> _readers = new ArrayList<>();
+  private List<PinotDataBuffer> _dataBuffers = new ArrayList<>();
 
-  private static class WriterWithOffset implements Closeable {
-    final FixedByteSingleValueMultiColWriter writer;
-    final int startRowId;
+  private final long _chunkSizeInBytes;
+  private final int _numRowsPerChunk;
+  private final int _columnSizesInBytes;
 
-    private WriterWithOffset(FixedByteSingleValueMultiColWriter writer, int startRowId) {
-      this.writer = writer;
-      this.startRowId = startRowId;
-    }
-
-    @Override
-    public void close() {
-      writer.close();
-    }
-
-    public void setInt(int row, int value) {
-      writer.setInt(row - startRowId, 0, value);
-    }
-
-    public void setLong(int row, long value) {
-      writer.setLong(row - startRowId, 0, value);
-    }
-
-    public void setFloat(int row, float value) {
-      writer.setFloat(row - startRowId, 0, value);
-    }
-
-    public void setDouble(int row, double value) {
-      writer.setDouble(row - startRowId, 0, value);
-    }
-  }
-
-  private static class ReaderWithOffset implements Closeable {
-    final FixedByteSingleValueMultiColReader reader;
-    final int startRowId;
-
-    private ReaderWithOffset(FixedByteSingleValueMultiColReader reader, int startRowId) {
-      this.reader = reader;
-      this.startRowId = startRowId;
-    }
-
-    @Override
-    public void close() {
-      reader.close();
-    }
-
-    public int getInt(int row) {
-      return reader.getInt(row - startRowId, 0);
-    }
-
-    public long getLong(int row) {
-      return reader.getLong(row - startRowId, 0);
-    }
-
-    public float getFloat(int row) {
-      return reader.getFloat(row - startRowId, 0);
-    }
-
-    public double getDouble(int row) {
-      return reader.getDouble(row - startRowId, 0);
-    }
-
-    public FixedByteSingleValueMultiColReader getReader() {
-      return reader;
-    }
-  }
+  private final PinotDataBufferMemoryManager _memoryManager;
+  private final String _allocationContext;
+  private int _capacityInRows = 0;
 
   /**
    * @param numRowsPerChunk Number of rows to pack in one chunk before a new chunk is created.
-   * @param columnSizesInBytes
-   * @param memoryManager
-   * @param columnName
+   * @param columnSizesInBytes Size of column value in bytes.
+   * @param memoryManager Memory manager to be used for allocating memory.
+   * @param allocationContext Allocation allocationContext.
    */
   public FixedByteSingleColumnSingleValueReaderWriter(int numRowsPerChunk, int columnSizesInBytes,
-      RealtimeIndexOffHeapMemoryManager memoryManager, String columnName) {
-    chunkSizeInBytes = numRowsPerChunk * columnSizesInBytes;
-    this.numRowsPerChunk = numRowsPerChunk;
-    this.columnSizesInBytes = columnSizesInBytes;
-    this.memoryManager = memoryManager;
-    this.columnName = columnName;
+      PinotDataBufferMemoryManager memoryManager, String allocationContext) {
+    _chunkSizeInBytes = numRowsPerChunk * columnSizesInBytes;
+    _numRowsPerChunk = numRowsPerChunk;
+    _columnSizesInBytes = columnSizesInBytes;
+    _memoryManager = memoryManager;
+    _allocationContext = allocationContext;
     addBuffer();
   }
 
-  private void addBuffer() {
-    LOGGER.info("Allocating {} bytes for column {} for segment {}", chunkSizeInBytes, columnName, memoryManager.getSegmentName());
-    PinotDataBuffer buffer = memoryManager.allocate(chunkSizeInBytes, columnName);
-    buffer.order(ByteOrder.nativeOrder());
-    buffers.add(buffer);
-    FixedByteSingleValueMultiColReader reader = new FixedByteSingleValueMultiColReader(buffer, numRowsPerChunk, new int[]{columnSizesInBytes});
-    FixedByteSingleValueMultiColWriter writer  = new FixedByteSingleValueMultiColWriter(buffer, numRowsPerChunk, /*cols=*/1, new int[]{columnSizesInBytes});
-    final int startRowId = numRowsPerChunk * (buffers.size()-1);
-    currentWriter = new WriterWithOffset(writer, startRowId);
-    readers.add(new ReaderWithOffset(reader, startRowId));
-    writers.add(currentWriter);
-    numBytesInCurrentWriter = 0;
-  }
-
-  private void addBufferIfNeeded(int row) {
-    if (numBytesInCurrentWriter + columnSizesInBytes > chunkSizeInBytes) {
-      addBuffer();
-    }
-    numBytesInCurrentWriter += columnSizesInBytes;
-  }
-
   @Override
-  public void close() throws IOException {
-    for (ReaderWithOffset reader : readers) {
+  public void close()
+      throws IOException {
+    for (ReaderWithOffset reader : _readers) {
       reader.close();
     }
-    for (WriterWithOffset writer : writers) {
+    for (WriterWithOffset writer : _writers) {
       writer.close();
     }
-    for (PinotDataBuffer buffer : buffers) {
+    for (PinotDataBuffer buffer : _dataBuffers) {
       buffer.close();
     }
-  }
-
-  private int getRowInChunk(int row) {
-    return row % numRowsPerChunk;
-  }
-
-  private int getBufferId(int row) {
-    return row / numRowsPerChunk;
   }
 
   @Override
   public void setInt(int row, int i) {
     addBufferIfNeeded(row);
-    currentWriter.setInt(row, i);
+    getWriterForRow(row).setInt(row, i);
   }
 
   @Override
   public void setLong(int row, long l) {
     addBufferIfNeeded(row);
-    currentWriter.setLong(row, l);
+    getWriterForRow(row).setLong(row, l);
   }
 
   @Override
   public void setFloat(int row, float f) {
     addBufferIfNeeded(row);
-    currentWriter.setFloat(row, f);
+    getWriterForRow(row).setFloat(row, f);
   }
 
   @Override
   public void setDouble(int row, double d) {
     addBufferIfNeeded(row);
-    currentWriter.setDouble(row, d);
+    getWriterForRow(row).setDouble(row, d);
+  }
+
+  private WriterWithOffset getWriterForRow(int row) {
+    return _writers.get(getBufferId(row));
   }
 
   @Override
   public int getInt(int row) {
     int bufferId = getBufferId(row);
-    return readers.get(bufferId).getInt(row);
+    return _readers.get(bufferId).getInt(row);
   }
 
   @Override
   public long getLong(int row) {
     int bufferId = getBufferId(row);
-    return readers.get(bufferId).getLong(row);
+    return _readers.get(bufferId).getLong(row);
   }
 
   @Override
   public float getFloat(int row) {
     int bufferId = getBufferId(row);
-    return readers.get(bufferId).getFloat(row);
+    return _readers.get(bufferId).getFloat(row);
   }
 
   @Override
   public double getDouble(int row) {
     int bufferId = getBufferId(row);
-    return readers.get(bufferId).getDouble(row);
+    return _readers.get(bufferId).getDouble(row);
   }
 
   @Override
@@ -224,19 +143,123 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
      * at a time, identifying the rows in sequence that belong to the same block. This logic is more complex, but may
      * perform better in the sorted case.
      *
-     * An alternative is to not have multiple buffers, but just copy the values from one buffer to next as we
+     * An alternative is to not have multiple _dataBuffers, but just copy the values from one buffer to next as we
      * increase the number of rows.
      */
-    if (readers.size() == 1) {
-      readers.get(0).getReader().readIntValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
+    if (_readers.size() == 1) {
+      _readers.get(0).getReader().readIntValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
     } else {
-      for (int rowIter = rowStartPos, valueIter = valuesStartPos;
-          rowIter < rowStartPos + rowSize;
+      for (int rowIter = rowStartPos, valueIter = valuesStartPos; rowIter < rowStartPos + rowSize;
           rowIter++, valueIter++) {
         int row = rows[rowIter];
         int bufferId = getBufferId(row);
-        values[valueIter] = readers.get(bufferId).getInt(row);
+        values[valueIter] = _readers.get(bufferId).getInt(row);
       }
+    }
+  }
+
+  private int getBufferId(int row) {
+    return row / _numRowsPerChunk;
+  }
+
+  private void addBuffer() {
+    LOGGER.info("Allocating {} bytes for: {}", _chunkSizeInBytes, _allocationContext);
+    PinotDataBuffer buffer = _memoryManager.allocate(_chunkSizeInBytes, _allocationContext);
+    _capacityInRows += _numRowsPerChunk;
+
+    buffer.order(ByteOrder.nativeOrder());
+    _dataBuffers.add(buffer);
+
+    FixedByteSingleValueMultiColReader reader =
+        new FixedByteSingleValueMultiColReader(buffer, _numRowsPerChunk, new int[]{_columnSizesInBytes});
+    FixedByteSingleValueMultiColWriter writer =
+        new FixedByteSingleValueMultiColWriter(buffer, _numRowsPerChunk, /*cols=*/1, new int[]{_columnSizesInBytes});
+
+    final int startRowId = _numRowsPerChunk * (_dataBuffers.size() - 1);
+    _writers.add(new WriterWithOffset(writer, startRowId));
+    _readers.add(new ReaderWithOffset(reader, startRowId));
+  }
+
+  /**
+   * Helper class that encapsulates writer and global startRowId.
+   */
+  private void addBufferIfNeeded(int row) {
+    if (row >= _capacityInRows) {
+
+      // Adding _chunkSizeInBytes in the numerator for rounding up. +1 because rows are 0-based index.
+      long buffersNeeded = (row + 1 - _capacityInRows + _numRowsPerChunk) / _numRowsPerChunk;
+      for (int i = 0; i < buffersNeeded; i++) {
+        addBuffer();
+      }
+    }
+  }
+
+  private static class WriterWithOffset implements Closeable {
+    final FixedByteSingleValueMultiColWriter _writer;
+    final int _startRowId;
+
+    private WriterWithOffset(FixedByteSingleValueMultiColWriter writer, int startRowId) {
+      _writer = writer;
+      _startRowId = startRowId;
+    }
+
+    @Override
+    public void close() {
+      _writer.close();
+    }
+
+    public void setInt(int row, int value) {
+      _writer.setInt(row - _startRowId, 0, value);
+    }
+
+    public void setLong(int row, long value) {
+      _writer.setLong(row - _startRowId, 0, value);
+    }
+
+    public void setFloat(int row, float value) {
+      _writer.setFloat(row - _startRowId, 0, value);
+    }
+
+    public void setDouble(int row, double value) {
+      _writer.setDouble(row - _startRowId, 0, value);
+    }
+  }
+
+  /**
+   * Helper class that encapsulates reader and global startRowId.
+   */
+  private static class ReaderWithOffset implements Closeable {
+    final FixedByteSingleValueMultiColReader _reader;
+    final int _startRowId;
+
+    private ReaderWithOffset(FixedByteSingleValueMultiColReader reader, int startRowId) {
+      _reader = reader;
+      _startRowId = startRowId;
+    }
+
+    @Override
+    public void close() {
+      _reader.close();
+    }
+
+    public int getInt(int row) {
+      return _reader.getInt(row - _startRowId, 0);
+    }
+
+    public long getLong(int row) {
+      return _reader.getLong(row - _startRowId, 0);
+    }
+
+    public float getFloat(int row) {
+      return _reader.getFloat(row - _startRowId, 0);
+    }
+
+    public double getDouble(int row) {
+      return _reader.getDouble(row - _startRowId, 0);
+    }
+
+    public FixedByteSingleValueMultiColReader getReader() {
+      return _reader;
     }
   }
 }

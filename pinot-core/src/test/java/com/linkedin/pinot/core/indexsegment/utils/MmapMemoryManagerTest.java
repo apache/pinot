@@ -17,7 +17,7 @@
 package com.linkedin.pinot.core.indexsegment.utils;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.MmapMemoryManager;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
@@ -54,7 +54,7 @@ public class MmapMemoryManagerTest {
   @Test
   public void testLargeBlocks() throws Exception {
     final String segmentName = "someSegment";
-    RealtimeIndexOffHeapMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
+    PinotDataBufferMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
     final long s1 = 2 * MmapMemoryManager.getDefaultFileLength();
     final long s2 = 1000;
     final String col1 = "col1";
@@ -104,7 +104,7 @@ public class MmapMemoryManagerTest {
   @Test
   public void testSmallBlocksForSameColumn() throws Exception {
     final String segmentName = "someSegment";
-    RealtimeIndexOffHeapMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
+    PinotDataBufferMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
     final long s1 = 500;
     final long s2 = 1000;
     final String col1 = "col1";
@@ -138,7 +138,7 @@ public class MmapMemoryManagerTest {
   @Test
   public void testCornerConditions() throws Exception {
     final String segmentName = "someSegment";
-    RealtimeIndexOffHeapMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
+    PinotDataBufferMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
     final long s1 = MmapMemoryManager.getDefaultFileLength() - 1;
     final long s2 = 1;
     final long s3 = 100*1024*1024;

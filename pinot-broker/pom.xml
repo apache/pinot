@@ -75,10 +75,6 @@
       <artifactId>jersey-container-grizzly2-http</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.glassfish.jersey.containers</groupId>
-      <artifactId>jersey-container-grizzly2-servlet</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-transport</artifactId>
     </dependency>
@@ -106,6 +102,10 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>io.swagger</groupId>
+      <artifactId>swagger-jersey2-jaxrs</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.codehaus.jackson</groupId>
       <artifactId>jackson-mapper-asl</artifactId>
     </dependency>
@@ -126,8 +126,20 @@
       <artifactId>jcabi-log</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-common</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-controller</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
       <scope>test</scope>

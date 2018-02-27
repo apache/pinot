@@ -200,6 +200,12 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     repushOfflineSegments();
   }
 
+  @Override
+  @Test
+  public void testSegmentListApi() {
+    // Tested in HybridClusterIntegrationTest
+  }
+
   @Test
   public void deleteFromGetAPI() throws Exception {
     String segmentList = sendGetRequest(_controllerRequestURLBuilder.

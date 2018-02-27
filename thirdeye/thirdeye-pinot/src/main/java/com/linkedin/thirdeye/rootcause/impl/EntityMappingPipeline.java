@@ -4,12 +4,14 @@ import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
 import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.MaxScoreSet;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -20,7 +22,7 @@ import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+// TODO handle MetricEntity tail
 /**
  * The EntityMappingPipeline is a generic implementation for emitting Entities based on
  * association with incoming Entities. For example, it may be used to generate "similar" metrics
@@ -35,7 +37,8 @@ public class EntityMappingPipeline extends Pipeline {
   public static final String PROP_DIRECTION_REVERSE = "REVERSE";
   public static final String PROP_DIRECTION_BOTH = "BOTH";
 
-  public static final String PROP_MAPPING_TYPE = "mappingType";
+  public static final String PROP_INPUT_FILTERS = "inputFilters";
+  public static final String PROP_OUTPUT_FILTERS = "outputFilters";
   public static final String PROP_IS_REWRITER = "isRewriter";
   public static final String PROP_MATCH_PREFIX = "matchPrefix";
   public static final String PROP_IS_COLLECTOR = "isCollector";
@@ -49,7 +52,8 @@ public class EntityMappingPipeline extends Pipeline {
   public static final int PROP_ITERATIONS_DEFAULT = 1;
 
   private final EntityToEntityMappingManager entityDAO;
-  private final String mappingType;
+  private final Set<String> inputFilters;
+  private final Set<String> outputFilters;
   private final boolean isRewriter;
   private final boolean matchPrefix;
   private final boolean isCollector;
@@ -62,17 +66,19 @@ public class EntityMappingPipeline extends Pipeline {
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
    * @param entityDAO entity mapping DAO
-   * @param mappingType entity mapping type
+   * @param inputFilters input type filter
+   * @param outputFilters output type filter
    * @param isRewriter enable rewriter mode (pass-through for entities without mapping)
    * @param matchPrefix match on URN prefix rather than entire URN
    * @param isCollector emit iterated entities in output (does not include input entities)
    * @param direction apply mappings given direction
    * @param iterations number of iterations of transitive hull expansion
    */
-  public EntityMappingPipeline(String outputName, Set<String> inputNames, EntityToEntityMappingManager entityDAO, String mappingType, boolean isRewriter, boolean matchPrefix, boolean isCollector, String direction, int iterations) {
+  public EntityMappingPipeline(String outputName, Set<String> inputNames, EntityToEntityMappingManager entityDAO, Set<String> inputFilters, Set<String> outputFilters, boolean isRewriter, boolean matchPrefix, boolean isCollector, String direction, int iterations) {
     super(outputName, inputNames);
     this.entityDAO = entityDAO;
-    this.mappingType = mappingType;
+    this.inputFilters = inputFilters;
+    this.outputFilters = outputFilters;
     this.isRewriter = isRewriter;
     this.matchPrefix = matchPrefix;
     this.isCollector = isCollector;
@@ -90,12 +96,7 @@ public class EntityMappingPipeline extends Pipeline {
   public EntityMappingPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) throws IOException {
     super(outputName, inputNames);
 
-    if(!properties.containsKey(PROP_MAPPING_TYPE))
-      throw new IllegalArgumentException(String.format("Property '%s' required, but not found", PROP_MAPPING_TYPE));
-    String mappingTypeProp = properties.get(PROP_MAPPING_TYPE).toString();
-
     this.entityDAO = DAORegistry.getInstance().getEntityToEntityMappingDAO();
-    this.mappingType = mappingTypeProp;
     this.isRewriter = MapUtils.getBoolean(properties, PROP_IS_REWRITER, PROP_IS_REWRITER_DEFAULT);
     this.matchPrefix = MapUtils.getBoolean(properties, PROP_MATCH_PREFIX, PROP_MATCH_PREFIX_DEFAULT);
     this.isCollector = MapUtils.getBoolean(properties, PROP_IS_COLLECTOR, PROP_IS_COLLECTOR_DEFAULT);
@@ -105,13 +106,25 @@ public class EntityMappingPipeline extends Pipeline {
     if (!Arrays.asList(PROP_DIRECTION_REGULAR, PROP_DIRECTION_REVERSE, PROP_DIRECTION_BOTH).contains(this.direction)) {
       throw new IllegalArgumentException(String.format("Unknown direction '%s'", this.direction));
     }
+
+    if (properties.containsKey(PROP_INPUT_FILTERS)) {
+      this.inputFilters = new HashSet<>((Collection<String>) properties.get(PROP_INPUT_FILTERS));
+    } else {
+      this.inputFilters = new HashSet<>();
+    }
+
+    if (properties.containsKey(PROP_OUTPUT_FILTERS)) {
+      this.outputFilters = new HashSet<>((Collection<String>) properties.get(PROP_OUTPUT_FILTERS));
+    } else {
+      this.outputFilters = new HashSet<>();
+    }
   }
 
   @Override
   public PipelineResult run(PipelineContext context) {
     Set<Entity> entities = context.filter(Entity.class);
 
-    Map<String, Set<EntityToEntityMappingDTO>> mappings = toMap(this.getMappings());
+    final Map<String, Set<EntityToEntityMappingDTO>> mappings = toMap(this.filterMappings(this.getMappings()));
 
     // perform entity urn mapping
     final int inputSize = entities.size();
@@ -132,13 +145,7 @@ public class EntityMappingPipeline extends Pipeline {
     }
 
     // consolidate entity scores, use max
-    Map<String, Entity> best = new HashMap<>();
-    for(Entity e : entities) {
-      if(!best.containsKey(e.getUrn()) || best.get(e.getUrn()).getScore() < e.getScore())
-        best.put(e.getUrn(), e);
-    }
-
-    return new PipelineResult(context, new HashSet<>(best.values()));
+    return new PipelineResult(context, new MaxScoreSet<>(entities));
   }
 
   private Set<Entity> mapEntities(Set<Entity> entities, Map<String, Set<EntityToEntityMappingDTO>> mappings) {
@@ -211,7 +218,7 @@ public class EntityMappingPipeline extends Pipeline {
   }
 
   private List<EntityToEntityMappingDTO> getMappings() {
-    List<EntityToEntityMappingDTO> mappings = this.entityDAO.findByMappingType(this.mappingType);
+    List<EntityToEntityMappingDTO> mappings = this.entityDAO.findAll();
 
     switch (this.direction) {
       case PROP_DIRECTION_REGULAR:
@@ -224,6 +231,52 @@ public class EntityMappingPipeline extends Pipeline {
       default:
         throw new IllegalArgumentException(String.format("Unknown direction '%s'", this.direction));
     }
+  }
+
+  private List<EntityToEntityMappingDTO> filterMappings(List<EntityToEntityMappingDTO> mappings) {
+    List<EntityToEntityMappingDTO> output = new ArrayList<>();
+    for (EntityToEntityMappingDTO mapping : mappings) {
+      if (passesInputFilters(mapping) && passesOutputFilters(mapping)) {
+        output.add(mapping);
+      }
+    }
+    return output;
+  }
+
+  /**
+   * Applies input filters with {@code OR} semantics. If the set of filters in empty, passes by default.
+   *
+   * @param mapping entity mapping
+   * @return {@code true} if a filter matches or the set of filters is empty, otherwise {@code false}
+   */
+  private boolean passesInputFilters(EntityToEntityMappingDTO mapping) {
+    if (this.inputFilters.isEmpty()) {
+      return true;
+    }
+    for (String filter : this.inputFilters) {
+      if (mapping.getFromURN().startsWith(filter)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Applies output filters with {@code OR} semantics. If the set of filters in empty, passes by default.
+   *
+   * @param mapping entity mapping
+   * @return {@code true} if a filter matches or the set of filters is empty, otherwise {@code false}
+   */
+  private boolean passesOutputFilters(EntityToEntityMappingDTO mapping) {
+    if (this.outputFilters.isEmpty()) {
+      return true;
+    }
+    for (String filter : this.outputFilters) {
+      if (mapping.getToURN().startsWith(filter)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static Map<String, Set<EntityToEntityMappingDTO>> toMap(Iterable<EntityToEntityMappingDTO> mappings) {

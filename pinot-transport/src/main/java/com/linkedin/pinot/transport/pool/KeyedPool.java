@@ -59,9 +59,10 @@ public interface KeyedPool<T> extends PoolStatsProvider<Histogram> {
    * <code>checkinObject</code>.
    *
    * @param key the key identifying the inner pool which manages the resources.
+   * @param context A string to be used in logs during allocation
    * @return A {@link AsyncResponseFuture} whose get() method will return the actual resource
    */
-  public ServerResponseFuture<T> checkoutObject(ServerInstance key);
+  public ServerResponseFuture<T> checkoutObject(ServerInstance key, String context);
 
   /**
    * Validates all object in the pool with key.

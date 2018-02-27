@@ -16,50 +16,22 @@
 
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.MmapMemoryManager;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
-import java.io.File;
-import java.util.List;
 
 
 public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
-  protected RealtimeSegmentStatsHistory _statsHistory;
-  protected RealtimeIndexOffHeapMemoryManager _memoryManager;
-
-  public abstract String getTableName();
-
-  public abstract Schema getSchema();
-
-  public abstract List<String> getNoDictionaryColumns();
-
-  public abstract List<String> getInvertedIndexColumns();
-
-  public abstract File getTableDataDir();
-
-  protected void initStatsHistory(RealtimeTableDataManager realtimeTableDataManager) {
-    _statsHistory = realtimeTableDataManager.getStatsHistory();
-  }
-
-  public RealtimeSegmentStatsHistory getStatsHistory() {
-    return _statsHistory;
-  }
-
-  protected void initMemoryManager(RealtimeTableDataManager realtimeTableDataManager, boolean isOffHeapAllocation, String segmentName) {
-    ServerMetrics serverMetrics = realtimeTableDataManager.getServerMetrics();
-    if (isOffHeapAllocation) {
-      _memoryManager = new MmapMemoryManager(realtimeTableDataManager.getConsumerDir(), segmentName,
-          realtimeTableDataManager.getServerMetrics());
+  protected static PinotDataBufferMemoryManager getMemoryManager(String consumerDir, String segmentName,
+      boolean offHeap, boolean directOffHeap, ServerMetrics serverMetrics) {
+    if (offHeap && !directOffHeap) {
+      return new MmapMemoryManager(consumerDir, segmentName, serverMetrics);
     } else {
-      _memoryManager = new DirectMemoryManager(segmentName, realtimeTableDataManager.getServerMetrics());
+      // For on-heap allocation, we still need a memory manager for forward index.
+      // Dictionary will be allocated on heap.
+      return new DirectMemoryManager(segmentName, serverMetrics);
     }
-  }
-
-  public RealtimeIndexOffHeapMemoryManager getMemoryManager() {
-    return _memoryManager;
   }
 }

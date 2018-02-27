@@ -246,40 +246,38 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     checkForEmptyRoutingTable(false);
 
     // Check on each server instance
-    for (String instance : instances) {
-      if (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
+    for (String instanceName : instances) {
+      if (!instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
         continue;
       }
-      // E.g. instance: Server_1.2.3.4_1234; instanceAddress: 1.2.3.4_1234
-      String instanceAddress = instance.substring(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE.length());
 
       // Ensure that the random instance is in the routing table
-      checkForInstanceInRoutingTable(true, instanceAddress);
+      checkForInstanceInRoutingTable(true, instanceName);
 
       // Mark the server instance as shutting down
-      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_clusterName, instance);
+      InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(_clusterName, instanceName);
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, true);
-      _helixAdmin.setInstanceConfig(_clusterName, instance, instanceConfig);
+      _helixAdmin.setInstanceConfig(_clusterName, instanceName, instanceConfig);
 
       // Check that it is not in the routing table
-      checkForInstanceInRoutingTable(false, instanceAddress);
+      checkForInstanceInRoutingTable(false, instanceName);
 
       // Re-enable the server instance
       instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
-      _helixAdmin.setInstanceConfig(_clusterName, instance, instanceConfig);
+      _helixAdmin.setInstanceConfig(_clusterName, instanceName, instanceConfig);
 
       // Check that it is in the routing table
-      checkForInstanceInRoutingTable(true, instanceAddress);
+      checkForInstanceInRoutingTable(true, instanceName);
     }
   }
 
-  private void checkForInstanceInRoutingTable(final boolean shouldExist, @Nonnull final String instanceAddress)
+  private void checkForInstanceInRoutingTable(final boolean shouldExist, @Nonnull final String instanceName)
       throws Exception {
     String errorMessage;
     if (shouldExist) {
-      errorMessage = "Routing table does not contain expected instance: " + instanceAddress;
+      errorMessage = "Routing table does not contain expected instance: " + instanceName;
     } else {
-      errorMessage = "Routing table contains unexpected instance: " + instanceAddress;
+      errorMessage = "Routing table contains unexpected instance: " + instanceName;
     }
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
       @Nullable
@@ -297,7 +295,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
               int numRoutingTableEntries = routingTableEntries.length();
               for (int j = 0; j < numRoutingTableEntries; j++) {
                 JSONObject routingTableEntry = routingTableEntries.getJSONObject(j);
-                if (routingTableEntry.has(instanceAddress)) {
+                if (routingTableEntry.has(instanceName)) {
                   return shouldExist;
                 }
               }

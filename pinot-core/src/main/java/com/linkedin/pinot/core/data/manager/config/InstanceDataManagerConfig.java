@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.core.data.manager.config;
 
-import org.apache.commons.configuration.Configuration;
 import com.linkedin.pinot.common.segment.ReadMode;
+import org.apache.commons.configuration.Configuration;
 
 
 public interface InstanceDataManagerConfig {
@@ -26,11 +26,11 @@ public interface InstanceDataManagerConfig {
 
   String getInstanceDataDir();
 
+  String getConsumerDir();
+
   String getInstanceSegmentTarDir();
 
   String getInstanceBootstrapSegmentDir();
-
-  String getSegmentMetadataLoaderClass();
 
   ReadMode getReadMode();
 
@@ -43,4 +43,8 @@ public interface InstanceDataManagerConfig {
   boolean isEnableSplitCommit();
 
   boolean isRealtimeOffHeapAllocation();
+
+  boolean isDirectRealtimeOffheapAllocation();
+
+  int getMaxParallelSegmentBuilds();
 }

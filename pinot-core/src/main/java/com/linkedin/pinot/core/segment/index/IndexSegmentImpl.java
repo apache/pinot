@@ -20,10 +20,8 @@ import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.IndexType;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
@@ -31,10 +29,12 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
-import com.linkedin.pinot.core.startree.StarTreeInterf;
+import com.linkedin.pinot.core.startree.StarTree;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,10 +44,10 @@ public class IndexSegmentImpl implements IndexSegment {
   private SegmentDirectory segmentDirectory;
   private final SegmentMetadataImpl segmentMetadata;
   private final Map<String, ColumnIndexContainer> indexContainerMap;
-  private final StarTreeInterf starTree;
+  private final StarTree starTree;
 
   public IndexSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
-      Map<String, ColumnIndexContainer> columnIndexContainerMap, StarTreeInterf starTree) throws Exception {
+      Map<String, ColumnIndexContainer> columnIndexContainerMap, StarTree starTree) throws Exception {
     this.segmentDirectory = segmentDirectory;
     this.segmentMetadata = segmentMetadata;
     this.indexContainerMap = columnIndexContainerMap;
@@ -68,18 +68,8 @@ public class IndexSegmentImpl implements IndexSegment {
   }
 
   @Override
-  public IndexType getIndexType() {
-    return IndexType.COLUMNAR;
-  }
-
-  @Override
   public String getSegmentName() {
     return segmentMetadata.getName();
-  }
-
-  @Override
-  public String getAssociatedDirectory() {
-    return segmentDirectory.getPath().toString();
   }
 
   @Override
@@ -92,13 +82,9 @@ public class IndexSegmentImpl implements IndexSegment {
     return new ColumnDataSource(indexContainerMap.get(columnName), segmentMetadata.getColumnMetadataFor(columnName));
   }
 
-  public DataSource getDataSource(String columnName, Predicate p) {
-    throw new UnsupportedOperationException("cannot ask for a data source with a predicate");
-  }
-
   @Override
-  public String[] getColumnNames() {
-    return segmentMetadata.getSchema().getColumnNames().toArray(new String[0]);
+  public Set<String> getColumnNames() {
+    return segmentMetadata.getSchema().getColumnNames();
   }
 
   @Override
@@ -135,10 +121,17 @@ public class IndexSegmentImpl implements IndexSegment {
       LOGGER.error("Failed to close segment directory: {}. Continuing with error.", segmentDirectory, e);
     }
     indexContainerMap.clear();
+    if (starTree != null) {
+      try {
+        starTree.close();
+      } catch (IOException e) {
+        LOGGER.error("Failed to close star-tree. Continuing with error.", e);
+      }
+    }
   }
 
   @Override
-  public StarTreeInterf getStarTree() {
+  public StarTree getStarTree() {
     return starTree;
   }
 
@@ -153,7 +146,7 @@ public class IndexSegmentImpl implements IndexSegment {
     final Map<String, BlockMultiValIterator> multiValIteratorMap = new HashMap<>();
     for (String column : getColumnNames()) {
       DataSource dataSource = getDataSource(column);
-      BlockValIterator iterator = dataSource.getNextBlock().getBlockValueSet().iterator();
+      BlockValIterator iterator = dataSource.nextBlock().getBlockValueSet().iterator();
       if (dataSource.getDataSourceMetadata().isSingleValue()) {
         singleValIteratorMap.put(column, (BlockSingleValIterator) iterator);
       } else {

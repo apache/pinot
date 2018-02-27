@@ -15,30 +15,26 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.fwd;
 
-import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
-
-import org.apache.commons.io.FileUtils;
-
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.io.writer.SingleColumnSingleValueWriter;
 import com.linkedin.pinot.core.io.writer.impl.v1.FixedBitSingleValueWriter;
 import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import java.io.File;
+import java.io.IOException;
+import org.apache.commons.io.FileUtils;
 
-public class SingleValueUnsortedForwardIndexCreator
-    implements Closeable, SingleValueForwardIndexCreator {
 
+public class SingleValueUnsortedForwardIndexCreator implements SingleValueForwardIndexCreator {
   private final File forwardIndexFile;
   private final FieldSpec spec;
   private int maxNumberOfBits = 0;
   private SingleColumnSingleValueWriter sVWriter;
 
-  public SingleValueUnsortedForwardIndexCreator(FieldSpec spec, File baseIndexDir, int cardinality,
-      int numDocs, int totalNumberOfValues, boolean hasNulls) throws Exception {
-    forwardIndexFile = new File(baseIndexDir,
-        spec.getName() + V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION);
+  public SingleValueUnsortedForwardIndexCreator(FieldSpec spec, File baseIndexDir, int cardinality, int numDocs,
+      int totalNumberOfValues, boolean hasNulls) throws Exception {
+    forwardIndexFile =
+        new File(baseIndexDir, spec.getName() + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
     this.spec = spec;
     FileUtils.touch(forwardIndexFile);
     maxNumberOfBits = getNumOfBits(cardinality);

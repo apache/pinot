@@ -15,12 +15,13 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 import com.linkedin.pinot.common.utils.DataSchema;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Type;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 
 /**
@@ -33,12 +34,13 @@ import org.json.JSONObject;
  * <p>- <code>IsSingleValueField</code>: single-value or multi-value field.
  * <p>- <code>DefaultNullValue</code>: when no value found for this field, use this value. Stored in string format.
  */
+@SuppressWarnings("unused")
 public abstract class FieldSpec {
-  private static final Integer DEFAULT_DIM_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
-  private static final Long DEFAULT_DIM_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
-  private static final Float DEFAULT_DIM_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
-  private static final Double DEFAULT_DIM_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
-  private static final String DEFAULT_DIM_NULL_VALUE_OF_STRING = "null";
+  private static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
+  private static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
+  private static final Float DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
+  private static final Double DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
+  private static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
 
   private static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
   private static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
@@ -46,11 +48,12 @@ public abstract class FieldSpec {
   private static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
   private static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
 
-  private String _name;
-  private DataType _dataType;
-  private boolean _isSingleValueField = true;
-  private String _stringDefaultNullValue;
-  private Object _cachedDefaultNullValue;
+  protected String _name;
+  protected DataType _dataType;
+  protected boolean _isSingleValueField = true;
+  protected Object _defaultNullValue;
+
+  private transient String _stringDefaultNullValue;
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public FieldSpec() {
@@ -60,6 +63,7 @@ public abstract class FieldSpec {
     _name = name;
     _dataType = dataType.getStoredType();
     _isSingleValueField = isSingleValueField;
+    _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, null);
   }
 
   public FieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField,
@@ -68,6 +72,7 @@ public abstract class FieldSpec {
     _dataType = dataType.getStoredType();
     _isSingleValueField = isSingleValueField;
     _stringDefaultNullValue = defaultNullValue.toString();
+    _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
   }
 
 
@@ -79,6 +84,7 @@ public abstract class FieldSpec {
     return _name;
   }
 
+  // Required by JSON de-serializer. DO NOT REMOVE.
   public void setName(@Nonnull String name) {
     _name = name;
   }
@@ -88,102 +94,177 @@ public abstract class FieldSpec {
     return _dataType;
   }
 
+  // Required by JSON de-serializer. DO NOT REMOVE.
   public void setDataType(@Nonnull DataType dataType) {
     _dataType = dataType.getStoredType();
-    _cachedDefaultNullValue = null;
+    _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
   }
 
   public boolean isSingleValueField() {
     return _isSingleValueField;
   }
 
+  // Required by JSON de-serializer. DO NOT REMOVE.
   public void setSingleValueField(boolean isSingleValueField) {
     _isSingleValueField = isSingleValueField;
   }
 
   @Nonnull
   public Object getDefaultNullValue() {
-    FieldType fieldType = getFieldType();
-    if (_cachedDefaultNullValue == null) {
-      if (_stringDefaultNullValue != null) {
-        switch (_dataType) {
-          case INT:
-            _cachedDefaultNullValue = Integer.valueOf(_stringDefaultNullValue);
-            break;
-          case LONG:
-            _cachedDefaultNullValue = Long.valueOf(_stringDefaultNullValue);
-            break;
-          case FLOAT:
-            _cachedDefaultNullValue = Float.valueOf(_stringDefaultNullValue);
-            break;
-          case DOUBLE:
-            _cachedDefaultNullValue = Double.valueOf(_stringDefaultNullValue);
-            break;
-          case STRING:
-            _cachedDefaultNullValue = _stringDefaultNullValue;
-            break;
-          default:
-            throw new UnsupportedOperationException("Unsupported data type: " + _dataType);
-        }
-      } else {
-        switch (fieldType) {
-          case METRIC:
-            switch (_dataType) {
-              case INT:
-                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_INT;
-                break;
-              case LONG:
-                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_LONG;
-                break;
-              case FLOAT:
-                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_FLOAT;
-                break;
-              case DOUBLE:
-                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
-                break;
-              case STRING:
-                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_STRING;
-                break;
-              default:
-                throw new UnsupportedOperationException(
-                    "Unknown default null value for metric field of data type: " + _dataType);
-            }
-            break;
-          case DIMENSION:
-          case TIME:
-          case DATE_TIME:
-            switch (_dataType) {
-              case INT:
-                _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_INT;
-                break;
-              case LONG:
-                _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_LONG;
-                break;
-              case FLOAT:
-                _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_FLOAT;
-                break;
-              case DOUBLE:
-                _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_DOUBLE;
-                break;
-              case STRING:
-                _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_STRING;
-                break;
-              default:
-                throw new UnsupportedOperationException(
-                    "Unknown default null value for dimension/time field of data type: " + _dataType);
-            }
-            break;
-          default:
-            throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
-        }
-      }
-    }
-    return _cachedDefaultNullValue;
+    return _defaultNullValue;
   }
 
+  // Required by JSON de-serializer. DO NOT REMOVE.
   public void setDefaultNullValue(@Nonnull Object defaultNullValue) {
     _stringDefaultNullValue = defaultNullValue.toString();
-    _cachedDefaultNullValue = null;
+    if (_dataType != null) {
+      _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
+    }
+  }
+
+  private static Object getDefaultNullValue(@Nonnull FieldType fieldType, @Nonnull DataType dataType,
+      String stringDefaultNullValue) {
+    if (stringDefaultNullValue != null) {
+      switch (dataType) {
+        case INT:
+          return Integer.valueOf(stringDefaultNullValue);
+        case LONG:
+          return Long.valueOf(stringDefaultNullValue);
+        case FLOAT:
+          return Float.valueOf(stringDefaultNullValue);
+        case DOUBLE:
+          return Double.valueOf(stringDefaultNullValue);
+        case STRING:
+          return stringDefaultNullValue;
+        default:
+          throw new UnsupportedOperationException("Unsupported data type: " + dataType);
+      }
+    } else {
+      switch (fieldType) {
+        case METRIC:
+          switch (dataType) {
+            case INT:
+              return DEFAULT_METRIC_NULL_VALUE_OF_INT;
+            case LONG:
+              return DEFAULT_METRIC_NULL_VALUE_OF_LONG;
+            case FLOAT:
+              return DEFAULT_METRIC_NULL_VALUE_OF_FLOAT;
+            case DOUBLE:
+              return DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
+            case STRING:
+              return DEFAULT_METRIC_NULL_VALUE_OF_STRING;
+            default:
+              throw new UnsupportedOperationException(
+                  "Unknown default null value for metric field of data type: " + dataType);
+          }
+        case DIMENSION:
+        case TIME:
+        case DATE_TIME:
+          switch (dataType) {
+            case INT:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_INT;
+            case LONG:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_LONG;
+            case FLOAT:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT;
+            case DOUBLE:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE;
+            case STRING:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
+            default:
+              throw new UnsupportedOperationException(
+                  "Unknown default null value for dimension/time field of data type: " + dataType);
+          }
+        default:
+          throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
+      }
+    }
+  }
+
+  /**
+   * Returns the {@link JsonObject} representing the field spec.
+   * <p>Only contains fields with non-default value.
+   * <p>NOTE: here we use {@link JsonObject} to preserve the insertion order.
+   */
+  @Nonnull
+  public JsonObject toJsonObject() {
+    JsonObject jsonObject = new JsonObject();
+    jsonObject.addProperty("name", _name);
+    jsonObject.addProperty("dataType", _dataType.name());
+    if (!_isSingleValueField) {
+      jsonObject.addProperty("singleValueField", false);
+    }
+    appendDefaultNullValue(jsonObject);
+    return jsonObject;
+  }
+
+  protected void appendDefaultNullValue(@Nonnull JsonObject jsonObject) {
+    if (!_defaultNullValue.equals(getDefaultNullValue(getFieldType(), _dataType, null))) {
+      if (_defaultNullValue instanceof Number) {
+        jsonObject.add("defaultNullValue", new JsonPrimitive((Number) _defaultNullValue));
+      } else {
+        jsonObject.addProperty("defaultNullValue", _defaultNullValue.toString());
+      }
+    }
+  }
+
+  @Nonnull
+  public JsonObject toAvroSchemaJsonObject() {
+    JsonObject jsonSchema = new JsonObject();
+    jsonSchema.addProperty("name", _name);
+    switch (_dataType) {
+      case INT:
+        jsonSchema.add("type", convertStringsToJsonArray("null", "int"));
+        return jsonSchema;
+      case LONG:
+        jsonSchema.add("type", convertStringsToJsonArray("null", "long"));
+        return jsonSchema;
+      case FLOAT:
+        jsonSchema.add("type", convertStringsToJsonArray("null", "float"));
+        return jsonSchema;
+      case DOUBLE:
+        jsonSchema.add("type", convertStringsToJsonArray("null", "double"));
+        return jsonSchema;
+      case STRING:
+        jsonSchema.add("type", convertStringsToJsonArray("null", "string"));
+        return jsonSchema;
+      default:
+        throw new UnsupportedOperationException();
+    }
+  }
+
+  private static JsonArray convertStringsToJsonArray(String... strings) {
+    JsonArray jsonArray = new JsonArray();
+    for (String string : strings) {
+      jsonArray.add(new JsonPrimitive(string));
+    }
+    return jsonArray;
+  }
+
+  @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    FieldSpec that = (FieldSpec) o;
+    return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
+        .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils.isEqual(_defaultNullValue,
+        that._defaultNullValue);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_name);
+    result = EqualityUtils.hashCodeOf(result, _dataType);
+    result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
+    result = EqualityUtils.hashCodeOf(result, _defaultNullValue);
+    return result;
   }
 
   /**
@@ -314,15 +395,10 @@ public abstract class FieldSpec {
       }
       // Number is not compatible with String.
       if (isSingleValue()) {
-        if (isNumber() != anotherDataType.isNumber()) {
-          return false;
-        }
+        return isNumber() == anotherDataType.isNumber();
       } else {
-        if (toSingleValue().isNumber() != anotherDataType.toSingleValue().isNumber()) {
-          return false;
-        }
+        return toSingleValue().isNumber() == anotherDataType.toSingleValue().isNumber();
       }
-      return true;
     }
 
     /**
@@ -386,47 +462,6 @@ public abstract class FieldSpec {
           return 8;
         default:
           throw new UnsupportedOperationException("Cannot get number of bytes for: " + this);
-      }
-    }
-
-    public JSONObject toJSONSchemaFor(String column)
-        throws JSONException {
-      final JSONObject ret = new JSONObject();
-      ret.put("name", column);
-      ret.put("doc", "data sample from load generator");
-      switch (this) {
-        case INT:
-          final JSONArray intType = new JSONArray();
-          intType.put("null");
-          intType.put("int");
-          ret.put("type", intType);
-          return ret;
-        case LONG:
-          final JSONArray longType = new JSONArray();
-          longType.put("null");
-          longType.put("long");
-          ret.put("type", longType);
-          return ret;
-        case FLOAT:
-          final JSONArray floatType = new JSONArray();
-          floatType.put("null");
-          floatType.put("float");
-          ret.put("type", floatType);
-          return ret;
-        case DOUBLE:
-          final JSONArray doubleType = new JSONArray();
-          doubleType.put("null");
-          doubleType.put("double");
-          ret.put("type", doubleType);
-          return ret;
-        case STRING:
-          final JSONArray stringType = new JSONArray();
-          stringType.put("null");
-          stringType.put("string");
-          ret.put("type", stringType);
-          return ret;
-        default:
-          return null;
       }
     }
   }
