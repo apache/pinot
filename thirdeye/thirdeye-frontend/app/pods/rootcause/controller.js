@@ -13,8 +13,8 @@ import {
   appendFilters,
   dateFormatFull
 } from 'thirdeye-frontend/utils/rca-utils';
-import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/mocks/eventTableColumns';
-import filterBarConfig from 'thirdeye-frontend/mocks/filterBarConfig';
+import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/shared/eventTableColumns';
+import filterBarConfig from 'thirdeye-frontend/shared/filterBarConfig';
 import fetch from 'fetch';
 import moment from 'moment';
 import config from 'thirdeye-frontend/config/environment';
