@@ -1,5 +1,6 @@
 import { isNone } from '@ember/utils';
 import moment from 'moment';
+import d3 from 'd3';
 
 /**
  * The Promise returned from fetch() won't reject on HTTP error status even if the response is an HTTP 404 or 500.
@@ -48,35 +49,7 @@ function isValidForDisplay(f) {
  */
 export function humanizeFloat(f) {
   if (!isValidForDisplay(f)) { return '-'; }
-
-  const log10 = Math.log10(Math.abs(f));
-
-  let suffix = '', shift = 0;
-  if (log10 >= 15) {
-    return '+inf';
-  } else if (log10 >= 12) { // 1,000,000,000,000
-    suffix = 'T';
-    shift = -12;
-  } else if (log10 >= 9) { // 1,000,000,000
-    suffix = 'B';
-    shift = -9;
-  } else if (log10 >= 6) { // 1,000,000
-    suffix = 'M';
-    shift = -6;
-  } else if (log10 >= 3) { // 1,000
-    suffix = 'K';
-    shift = -3;
-  } else if (log10 >= -2) { // 0.01
-    suffix = '';
-    shift = 0;
-  } else if (log10 >= -5) { // 0.000,01
-    suffix = 'm';
-    shift = 3;
-  } else {
-    return '-inf';
-  }
-
-  return `${(f * Math.pow(10, shift)).toFixed(2)}${suffix}`;
+  return d3.format('.3s')(f);
 }
 
 /**

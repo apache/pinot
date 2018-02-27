@@ -11,7 +11,6 @@ import {
 } from 'thirdeye-frontend/utils/rca-utils';
 import { humanizeChange, humanizeFloat } from 'thirdeye-frontend/utils/utils';
 import moment from 'moment';
-import d3 from 'd3';
 
 /**
  * Massages the hovered urns
@@ -77,8 +76,8 @@ const getValues = (hoverUrns, hoverTimestamp, lookup, entities) => {
     const change = current / baseline - 1;
 
     values[urn] = {
-      current: d3.format('.3s')(humanizeFloat(current)),
-      baseline: d3.format('.3s')(humanizeFloat(baseline)),
+      current: humanizeFloat(current),
+      baseline: humanizeFloat(baseline),
       delta: humanizeChange(change),
       color: toColorDirection(change, isInverse(urn, entities))
     };

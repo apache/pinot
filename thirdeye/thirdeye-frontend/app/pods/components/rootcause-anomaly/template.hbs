@@ -44,7 +44,7 @@
             <div class="rootcause-anomaly__stats">
               <span class="rootcause-anomaly__stats-label">{{offset}}</span>
               <span class="rootcause-anomaly__stats-value">
-                <span class="rootcause-anomaly__stats-number">{{format-number (get anomalyInfo (concat offset ".value")) formatter="d3" format=".3s"}}</span>
+                <span class="rootcause-anomaly__stats-number">{{get anomalyInfo (concat offset ".value")}}</span>
                   <span class="rootcause-anomaly__stats-change {{if (eq offset 'current') 'rootcause-anomaly__stats-change--hidden'}} rootcause-anomaly__stats-change--{{get anomalyInfo (concat offset ".direction")}}">
                     ({{get anomalyInfo (concat offset ".change")}})
                   </span>
