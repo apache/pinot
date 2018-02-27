@@ -108,6 +108,7 @@ public class PrecisionRecallEvaluator {
     return 1.0 * getTotalResponses() / getTotalAlerts();
   }
 
+  // Total responses is including notified labeled anomalies and user report anomalies
   public int getTotalResponses() {
     return notifiedFalseAlarm + notifiedTrueAnomaly + notifiedTrueAnomalyNewTrend + userReportTrueAnomaly
         + userReportTrueAnomalyNewTrend;
