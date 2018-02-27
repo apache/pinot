@@ -119,7 +119,7 @@ public class PinotHelixTaskResourceManager {
     }
 
     LOGGER.info("Cleaning up task queue: {} for task type: {}", helixJobQueueName, taskType);
-    _taskDriver.cleanupQueue(helixJobQueueName);
+    _taskDriver.cleanupJobQueue(helixJobQueueName);
 
     // Explicitly remove the task contexts
     Set<String> helixJobsAfterCleaningUp = _taskDriver.getWorkflowConfig(helixJobQueueName).getJobDag().getAllNodes();
