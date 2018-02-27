@@ -18,6 +18,12 @@ export default Controller.extend({
    */
   globalNavItems: [
     {
+      className: 'home',
+      link: 'home',
+      isCustomLink: false,
+      title: 'Home'
+    },
+    {
       className: 'anomalies',
       link: '/thirdeye#anomalies',
       isCustomLink: true,
