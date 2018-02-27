@@ -392,7 +392,8 @@ public class PinotTableRestletResource {
       @ApiParam(value = "true|false") @Nonnull @QueryParam("dryrun") Boolean dryRun,
       @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming) {
 
-    if (!EnumUtils.isValidEnum(CommonConstants.Helix.TableType.class, tableType.toUpperCase())) {
+    if (tableType != null
+        && !EnumUtils.isValidEnum(CommonConstants.Helix.TableType.class, tableType.toUpperCase())) {
       throw new ControllerApplicationException(LOGGER, "Illegal table type " + tableType, Response.Status.BAD_REQUEST);
     }
 
