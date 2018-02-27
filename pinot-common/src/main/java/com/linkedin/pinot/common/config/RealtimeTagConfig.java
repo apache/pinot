@@ -20,26 +20,19 @@ import org.apache.helix.HelixManager;
 
 
 /**
- * Wrapper class over TableConfig
+ * Wrapper class over TableConfig for a realtime table
  * This class will help answer questions about what are consuming/completed tags for a table
  */
-public class RealtimeTagConfig {
+public class RealtimeTagConfig extends TagConfig {
 
-  private TableConfig _tableConfig;
-
-  private String _serverTenant;
   private String _consumingRealtimeServerTag;
   private String _completedRealtimeServerTag;
 
   private boolean _moveCompletedSegments = false;
 
-  public RealtimeTagConfig(TableConfig realtimeTableConfig, HelixManager helixManager) {
+  public RealtimeTagConfig(TableConfig tableConfig, HelixManager helixManager) {
+    super(tableConfig, helixManager);
 
-    _tableConfig = realtimeTableConfig;
-
-    // TODO: we will introduce TENANTS config in property store, which should return the consuming/completed tags
-    // once we have that, below code will change to fetching TENANT from property store and returning the consuming/completed values
-    _serverTenant = realtimeTableConfig.getTenantConfig().getServer();
     _consumingRealtimeServerTag = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(_serverTenant);
     _completedRealtimeServerTag = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(_serverTenant);
     if (!_consumingRealtimeServerTag.equals(_completedRealtimeServerTag)) {
@@ -47,23 +40,15 @@ public class RealtimeTagConfig {
     }
   }
 
-  public TableConfig getTableConfig() {
-    return _tableConfig;
-  }
-
-  public String getConsumingRealtimeServerTag() {
+  public String getConsumingServerTag() {
     return _consumingRealtimeServerTag;
   }
 
-  public String getCompletedRealtimeServerTag() {
+  public String getCompletedServerTag() {
     return _completedRealtimeServerTag;
   }
 
-  public String getServerTenantName() {
-    return _serverTenant;
-  }
-
-  public boolean isMoveCompletedSegments() {
+  public boolean isRelocateCompletedSegments() {
     return _moveCompletedSegments;
   }
 }
