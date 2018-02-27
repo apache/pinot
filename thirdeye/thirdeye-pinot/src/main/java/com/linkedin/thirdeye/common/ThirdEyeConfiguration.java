@@ -38,7 +38,7 @@ public class ThirdEyeConfiguration extends Configuration {
    *   myDir/data-sources-config.yml
    * </pre>
    *
-   * @return
+   * @return the url of the data source
    */
   public URL getDataSourcesAsUrl() {
     try {
