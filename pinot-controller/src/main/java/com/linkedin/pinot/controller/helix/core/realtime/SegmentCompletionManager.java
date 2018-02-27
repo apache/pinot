@@ -154,6 +154,7 @@ public class SegmentCompletionManager {
    */
   public SegmentCompletionProtocol.Response segmentConsumed(SegmentCompletionProtocol.Request.Params reqParams) {
     if (!_helixManager.isLeader() || !_helixManager.isConnected()) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String segmentNameStr = reqParams.getSegmentName();
@@ -190,6 +191,7 @@ public class SegmentCompletionManager {
    */
   public SegmentCompletionProtocol.Response segmentCommitStart(final SegmentCompletionProtocol.Request.Params reqParams) {
     if (!_helixManager.isLeader() || !_helixManager.isConnected()) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String segmentNameStr = reqParams.getSegmentName();
@@ -213,6 +215,7 @@ public class SegmentCompletionManager {
 
   public SegmentCompletionProtocol.Response extendBuildTime(final SegmentCompletionProtocol.Request.Params reqParams) {
     if (!_helixManager.isLeader() || !_helixManager.isConnected()) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String segmentNameStr = reqParams.getSegmentName();
@@ -243,6 +246,7 @@ public class SegmentCompletionManager {
    */
   public SegmentCompletionProtocol.Response segmentStoppedConsuming(SegmentCompletionProtocol.Request.Params reqParams) {
     if (!_helixManager.isLeader() || !_helixManager.isConnected()) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String segmentNameStr = reqParams.getSegmentName();
@@ -278,6 +282,7 @@ public class SegmentCompletionManager {
   public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams, boolean success, boolean isSplitCommit) {
     String segmentLocation = reqParams.getSegmentLocation();
     if (!_helixManager.isLeader() || !_helixManager.isConnected()) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String segmentNameStr = reqParams.getSegmentName();

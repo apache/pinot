@@ -583,6 +583,7 @@ public class PinotLLCRealtimeSegmentManager {
       // We can potentially log a different value than what we saw ....
       LOGGER.warn("Lost leadership while committing segment file {}, {} for table {}: isLeader={}, isConnected={}",
           segmentName, segmentLocation, tableName, isLeader(), isConnected());
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return false;
     }
 
@@ -688,6 +689,7 @@ public class PinotLLCRealtimeSegmentManager {
       // We can potentially log a different value than what we saw ....
       LOGGER.warn("Lost leadership while committing segment metadata for {} for table {}: isLeader={}, isConnected={}",
           committingSegmentNameStr, rawTableName, isLeader(), isConnected());
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return false;
     }
     /*
