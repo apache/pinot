@@ -6,7 +6,7 @@ export default [
     end: 23456,
     dimensions: {
       country: "US",
-      pageName: "d_flagship3_messaging"
+      pageName: "some_page"
     },
     severity: 0.86,
     current: 1444,
@@ -20,7 +20,7 @@ export default [
     end: 23456,
     dimensions: {
       country: "US",
-      pageName: "d_flagship3_messaging"
+      pageName: "some_page"
     },
     severity: 0.86,
     current: 1444,
@@ -34,7 +34,7 @@ export default [
     end: 23456,
     dimensions: {
       country: "US",
-      pageName: "d_flagship3_messaging"
+      pageName: "some_page"
     },
     severity: 0.86,
     current: 1444,
@@ -48,7 +48,7 @@ export default [
     end: 23456,
     dimensions: {
       country: "US",
-      pageName: "d_flagship3_messaging"
+      pageName: "some_page"
     },
     severity: 0.86,
     current: 1444,
@@ -62,7 +62,7 @@ export default [
     end: 23456,
     dimensions: {
       country: "US",
-      pageName: "d_flagship3_messaging"
+      pageName: "some_page"
     },
     severity: 0.86,
     current: 1444,
@@ -76,7 +76,7 @@ export default [
     end: 23456,
     dimensions: {
       country: "US",
-      pageName: "d_flagship3_messaging"
+      pageName: "some_page"
     },
     severity: 0.86,
     current: 1444,

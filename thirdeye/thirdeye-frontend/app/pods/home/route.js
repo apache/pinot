@@ -6,6 +6,7 @@ export default Route.extend({
 
   /**
    * Returns a two-dimensional array, which maps anomalies by metric and functionName (aka alert)
+   * @return {Array}
    * @example
    * [
    *  "Metric 1": [
@@ -45,33 +46,43 @@ export default Route.extend({
   },
 
   /**
-   * Retrieves metric and alert lists to index anomalies
-   * @type {Array} - array of array, where the first element is the metric list and the second is the alert list
-   * @example
-   * [
-   *  ["metric 1", "metric 2"],
-   *  ["alert 1", "alert 2"]
-   * ]
+   * Retrieves metrics to index anomalies
+   * @return {Array} - array of strings, each of which is a metric
    */
-  getMetricAlertLists() {
-    let metricList = new Set();
-    let alertList = new Set();
+  getMetrics() {
+    let metricSet = new Set();
 
     applicationAnomalies.forEach(anomaly => {
-      metricList.add(anomaly.metric);
-      alertList.add(anomaly.functionName);
+      metricSet.add(anomaly.metric);
     });
 
-    return [ [...metricList], [...alertList] ];
+    return [...metricSet];
   },
 
+  /**
+   * Retrieves alerts to index anomalies
+   * @return {Array} - array of strings, each of which is a alerts
+   */
+  getAlerts() {
+    let alertSet = new Set();
+    applicationAnomalies.forEach(anomaly => {
+      alertSet.add(anomaly.functionName);
+    });
+
+    return [...alertSet];
+  },
+
+  /**
+   * Sets the table column, metricList, and alertList
+   * @return {undefined}
+   */
   setupController(controller) {
     this._super(...arguments);
 
     controller.setProperties({
       columns,
-      metricList: this.getMetricAlertLists()[0],
-      alertList: this.getMetricAlertLists()[1]
+      metricList: this.getMetrics(),
+      alertList: this.getAlerts()
     });
   }
 });
