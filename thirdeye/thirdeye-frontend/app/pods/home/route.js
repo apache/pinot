@@ -6,21 +6,21 @@ export default Route.extend({
 
   /**
    * Returns a two-dimensional array, which maps anomalies by metric and functionName (aka alert)
-   * @return {Array.<Array.<Object>>}
+   * @return {Object}
    * @example
-   * [
-   *  "Metric 1": [
+   * {
+   *  "Metric 1": {
    *    "Alert 1": [ {anomalyObject}, {anomalyObject} ],
    *    "Alert 11": [ {anomalyObject}, {anomalyObject} ]
-   *  ],
-   *  "Metric 2": [
+   *  },
+   *  "Metric 2": {
    *    "Alert 21": [ {anomalyObject}, {anomalyObject} ],
    *    "Alert 22": [ {anomalyObject}, {anomalyObject} ]
-   *   ]
-   * ]
+   *   }
+   * }
    */
   model() {
-    let anomalyMapping = [];
+    let anomalyMapping = {};
 
     applicationAnomalies.forEach(anomaly => {
       const { metric, functionName, current, baseline } = anomaly;
@@ -30,7 +30,7 @@ export default Route.extend({
       };
 
       if (!anomalyMapping[metric]) {
-        anomalyMapping[metric] = [];
+        anomalyMapping[metric] = {};
       }
 
       if (!anomalyMapping[metric][functionName]) {
