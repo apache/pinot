@@ -139,6 +139,7 @@ public class AnomalyResource {
   @GET
   @Path("/anomalies/metrics")
   public List<String> viewMetricsForDataset(@QueryParam("dataset") String dataset) {
+    LOG.warn("Call to a deprecated end point /dashboard/anomalies/view" + getClass().getName());
     if (StringUtils.isBlank(dataset)) {
       throw new IllegalArgumentException("dataset is a required query param");
     }
@@ -150,6 +151,7 @@ public class AnomalyResource {
   @Path("/anomalies/view/{anomaly_merged_result_id}")
   public MergedAnomalyResultDTO getMergedAnomalyDetail(
       @NotNull @PathParam("anomaly_merged_result_id") long mergedAnomalyId) {
+    LOG.warn("Call to a deprecated end point /dashboard/anomalies/view/{anomaly_merged_result_id}" + getClass().getName());
     return anomalyMergedResultDAO.findById(mergedAnomalyId);
   }
 
@@ -240,6 +242,7 @@ public class AnomalyResource {
   public String viewRawAnomaliesInRange(@QueryParam("functionId") String functionId,
       @QueryParam("dataset") String dataset, @QueryParam("startTimeIso") String startTimeIso,
       @QueryParam("endTimeIso") String endTimeIso, @QueryParam("metric") String metric) throws JsonProcessingException {
+    LOG.warn("Call to a deprecated end point /dashboard/raw-anomalies/view" + getClass().getName());
 
     if (StringUtils.isBlank(functionId) && StringUtils.isBlank(dataset)) {
       throw new IllegalArgumentException("must provide dataset or functionId");
@@ -1127,6 +1130,7 @@ public class AnomalyResource {
   @Path(value = "anomaly-result/feedback")
   @Produces(MediaType.APPLICATION_JSON)
   public AnomalyFeedbackType[] getAnomalyFeedbackTypes() {
+    LOG.warn("Call to a deprecated end point /dashboard/anomaly-result/feedback" + getClass().getName());
     return AnomalyFeedbackType.values();
   }
 
@@ -1202,7 +1206,7 @@ public class AnomalyResource {
       @NotNull @PathParam("anomaly_merged_result_id") long anomalyResultId,
       @NotNull @QueryParam("aggTimeGranularity") String aggTimeGranularity,
       @QueryParam("start") long viewWindowStartTime, @QueryParam("end") long viewWindowEndTime) throws Exception {
-
+    LOG.warn("Call to a deprecated end point /dashboard/anomaly-merged-result/timeseries/{anomaly_merged_result_id}" + getClass().getName());
     boolean loadRawAnomalies = false;
     MergedAnomalyResultDTO anomalyResult = anomalyMergedResultDAO.findById(anomalyResultId, loadRawAnomalies);
     Map<String, String> anomalyProps = anomalyResult.getProperties();
