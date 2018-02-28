@@ -6,7 +6,7 @@ export default Route.extend({
 
   /**
    * Returns a two-dimensional array, which maps anomalies by metric and functionName (aka alert)
-   * @return {Array}
+   * @return {Array.<Array.<Object>>}
    * @example
    * [
    *  "Metric 1": [
@@ -47,7 +47,7 @@ export default Route.extend({
 
   /**
    * Retrieves metrics to index anomalies
-   * @return {Array} - array of strings, each of which is a metric
+   * @return {String[]} - array of strings, each of which is a metric
    */
   getMetrics() {
     let metricSet = new Set();
@@ -61,7 +61,7 @@ export default Route.extend({
 
   /**
    * Retrieves alerts to index anomalies
-   * @return {Array} - array of strings, each of which is a alerts
+   * @return {String[]} - array of strings, each of which is a alerts
    */
   getAlerts() {
     let alertSet = new Set();
