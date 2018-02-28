@@ -45,6 +45,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   CONTROLLER_TABLE_TENANT_DELETE_ERROR("TableTenantDeleteError", true),
   CONTROLLER_TABLE_TENANT_GET_ERROR("TableTenantGetError", true),
   CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR("errors", true),
+  CONTROLLER_NOT_LEADER("notLeader", true),
   LLC_STATE_MACHINE_ABORTS("aborts", false),
   LLC_AUTO_CREATED_PARTITIONS("creates", false),
   LLC_ZOOKEEPER_UPDATE_FAILURES("failures", false),
