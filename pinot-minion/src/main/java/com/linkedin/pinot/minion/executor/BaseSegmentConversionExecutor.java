@@ -76,7 +76,7 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
   public void executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) throws Exception {
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
-    String tableName = configs.get(MinionConstants.TABLE_NAME_KEY);
+    final String tableName = configs.get(MinionConstants.TABLE_NAME_KEY);
     final String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
     String downloadURL = configs.get(MinionConstants.DOWNLOAD_URL_KEY);
     final String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
@@ -107,7 +107,7 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       File convertedIndexDir = convert(pinotTaskConfig, indexDir, workingDir);
 
       // Tar the converted segment
-      File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
+      final File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
       Preconditions.checkState(convertedTarredSegmentDir.mkdir());
       final File convertedTarredSegmentFile = new File(
           TarGzCompressionUtils.createTarGzOfDirectory(convertedIndexDir.getPath(),
@@ -153,8 +153,9 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
           @Override
           public Boolean call() throws Exception {
             try {
-              fileUploadDownloadClient.uploadSegment(new URI(uploadURL), segmentName, convertedTarredSegmentFile,
+              int responseCode = fileUploadDownloadClient.uploadSegment(new URI(uploadURL), segmentName, convertedTarredSegmentFile,
                   httpHeaders, parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+              LOGGER.info("Response code {} received for segment {} from table {} from uri {}", responseCode, segmentName, tableName, uploadURL);
               return true;
             } catch (HttpErrorStatusException e) {
               int statusCode = e.getStatusCode();
