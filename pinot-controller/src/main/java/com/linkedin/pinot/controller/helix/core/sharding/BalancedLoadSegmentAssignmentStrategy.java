@@ -27,6 +27,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -128,5 +130,10 @@ public class BalancedLoadSegmentAssignmentStrategy implements SegmentAssignmentS
       _serverLoadMetric.updateServerLoadMetric(helixResourceManager,selectedInstances.get(i),reportedLoadMetricPerInstanceMap.get(selectedInstances.get(i)),tableName,segmentMetadata);
     }
     return selectedInstances;
+  }
+
+  @Override
+  public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
+    return null;
   }
 }

@@ -213,7 +213,7 @@ public class PinotTableIdealStateBuilder {
 
     RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(realtimeTableConfig, helixManager);
     final List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName,
-        realtimeTagConfig.getConsumingRealtimeServerTag());
+        realtimeTagConfig.getConsumingServerTag());
     segmentManager.setupHelixEntries(realtimeTagConfig, kafkaMetadata, nPartitions, realtimeInstances, idealState, create);
   }
 

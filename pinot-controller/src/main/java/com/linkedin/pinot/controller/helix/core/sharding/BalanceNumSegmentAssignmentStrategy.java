@@ -44,9 +44,13 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
   private static final Logger LOGGER = LoggerFactory.getLogger(BalanceNumSegmentAssignmentStrategy.class);
 
   @Override
-  public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager, ZkHelixPropertyStore<ZNRecord> propertyStore,
+  public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager, ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
+    return null;
+  }
+
+  @Override
+  public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
                                            String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
-    HelixAdmin helixAdmin = helixResourceManager.getHelixAdmin();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
     String serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
 

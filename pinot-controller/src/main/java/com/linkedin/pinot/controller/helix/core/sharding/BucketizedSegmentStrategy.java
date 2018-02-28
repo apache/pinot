@@ -40,16 +40,21 @@ public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {
     private static final Logger LOGGER = LoggerFactory.getLogger(BucketizedSegmentStrategy.class);
 
     @Override
-    public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager,
+    public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager, ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
+        return null;
+    }
+
+    @Override
+    public List<String> getAssignedInstances(HelixAdmin helixAdmin,
                                              ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
                                              int numReplicas, String tenantName) {
         String serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
 
-        List<String> allInstances = HelixHelper.getEnabledInstancesWithTag(helixResourceManager.getHelixAdmin(), helixClusterName, serverTenantName);
+        List<String> allInstances = HelixHelper.getEnabledInstancesWithTag(helixAdmin, helixClusterName, serverTenantName);
         List<String> selectedInstanceList = new ArrayList<>();
         if (segmentMetadata.getShardingKey() != null) {
             for (String instance : allInstances) {
-                if (HelixHelper.getInstanceConfigsMapFor(instance, helixClusterName, helixResourceManager.getHelixAdmin())
+                if (HelixHelper.getInstanceConfigsMapFor(instance, helixClusterName, helixAdmin)
                         .get("shardingKey")
                         .equalsIgnoreCase(segmentMetadata.getShardingKey())) {
                     selectedInstanceList.add(instance);
@@ -63,4 +68,6 @@ public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {
             throw new RuntimeException("Segment missing sharding key!");
         }
     }
+
+
 }

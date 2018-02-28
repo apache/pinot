@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.helix.core.realtime.partition;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.controller.helix.PartitionAssignment;
 import java.util.List;
 import java.util.Map;
 
@@ -30,10 +31,10 @@ public interface StreamPartitionAssignmentStrategy {
    * the instances over which to generate partition assignment and the current partition assignment
    * @param allTablesInTenant
    * @param instanceNames
-   * @param tableNameToPartitionsList
+   * @param tableNameToPartitionAssignment
    */
   void init(List<TableConfig> allTablesInTenant, List<String> instanceNames,
-      Map<String, List<RealtimePartition>> tableNameToPartitionsList);
+      Map<String, PartitionAssignment> tableNameToPartitionAssignment);
 
   /**
    * Generates partition assignment for the table, and all other tables which might need a reassignment
@@ -41,5 +42,5 @@ public interface StreamPartitionAssignmentStrategy {
    * @param numPartitions
    * @return
    */
-  Map<String, List<RealtimePartition>> generatePartitionAssignment(TableConfig tableConfig, int numPartitions);
+  Map<String, PartitionAssignment> generatePartitionAssignment(TableConfig tableConfig, int numPartitions);
 }

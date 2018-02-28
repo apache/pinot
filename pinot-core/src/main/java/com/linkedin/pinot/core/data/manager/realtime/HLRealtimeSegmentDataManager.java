@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.data.manager.realtime;
 
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -162,6 +163,11 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     this.kafkaStreamProvider.init(kafkaStreamProviderConfig, tableName, serverMetrics);
     this.kafkaStreamProvider.start();
     this.tableStreamName = tableName + "_" + kafkaStreamProviderConfig.getStreamName();
+
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    if (indexingConfig != null && indexingConfig.getAggregateMetrics()) {
+      LOGGER.warn("Updating of metrics only supported for LLC consumer, ignoring.");
+    }
 
     // lets create a new realtime segment
     segmentLogger.info("Started kafka stream provider");

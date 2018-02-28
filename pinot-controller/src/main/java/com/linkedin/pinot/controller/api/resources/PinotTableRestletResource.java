@@ -27,6 +27,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
+import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -38,6 +39,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
@@ -47,7 +49,9 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.helix.ZNRecord;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.lang3.EnumUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -382,18 +386,28 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/rebalance")
   @ApiOperation(value = "Rebalances segments of a table across servers", notes = "Rebalances segments of a table across servers")
-  public ZNRecord rebalance(
-      @ApiParam(value = "Name of the table to rebalance", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "offline|realtime", required = true) @QueryParam("type") String tableType,
-      @ApiParam(value = "true|false", required = true, defaultValue = "true") @QueryParam("dryrun") Boolean dryRun
-  )
-  {
-    if (tableType.equalsIgnoreCase(CommonConstants.Helix.TableType.OFFLINE.name())) {
-      return _pinotHelixResourceManager.rebalanceTable(tableName, dryRun, CommonConstants.Helix.TableType.OFFLINE);
-    } else if (tableType.equalsIgnoreCase(CommonConstants.Helix.TableType.REALTIME.name())) {
-      return _pinotHelixResourceManager.rebalanceTable(tableName, dryRun, CommonConstants.Helix.TableType.REALTIME);
-    } else {
+  public String rebalance(
+      @ApiParam(value = "Name of the table to rebalance") @Nonnull @PathParam("tableName") String tableName,
+      @ApiParam(value = "offline|realtime") @Nonnull @QueryParam("type") String tableType,
+      @ApiParam(value = "true|false") @Nonnull @QueryParam("dryrun") Boolean dryRun,
+      @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming) {
+
+    if (tableType != null
+        && !EnumUtils.isValidEnum(CommonConstants.Helix.TableType.class, tableType.toUpperCase())) {
       throw new ControllerApplicationException(LOGGER, "Illegal table type " + tableType, Response.Status.BAD_REQUEST);
     }
+
+    Configuration rebalanceUserConfig = new PropertiesConfiguration();
+    rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DRYRUN, dryRun);
+    rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.INCLUDE_CONSUMING, includeConsuming);
+
+    try {
+      JSONObject jsonObject = _pinotHelixResourceManager.rebalanceTable(tableName,
+          CommonConstants.Helix.TableType.valueOf(tableType.toUpperCase()), rebalanceUserConfig);
+      return jsonObject.toString();
+    } catch (JSONException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
   }
+
 }

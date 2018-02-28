@@ -43,6 +43,7 @@ public class IndexingConfig {
   private List<String> _onHeapDictionaryColumns;
   private StarTreeIndexSpec _starTreeIndexSpec;
   private SegmentPartitionConfig _segmentPartitionConfig;
+  private boolean _aggregateMetrics;
 
   public List<String> getInvertedIndexColumns() {
     return _invertedIndexColumns;
@@ -136,8 +137,16 @@ public class IndexingConfig {
     _segmentPartitionConfig = config;
   }
 
+  public void setAggregateMetrics(boolean value) {
+    _aggregateMetrics = value;
+  }
+
   public SegmentPartitionConfig getSegmentPartitionConfig() {
     return _segmentPartitionConfig;
+  }
+
+  public boolean getAggregateMetrics() {
+    return _aggregateMetrics;
   }
 
   @Override

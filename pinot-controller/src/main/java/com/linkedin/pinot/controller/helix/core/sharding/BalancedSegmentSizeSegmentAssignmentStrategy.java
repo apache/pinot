@@ -18,6 +18,8 @@ package com.linkedin.pinot.controller.helix.core.sharding;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.util.List;
+
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
@@ -38,5 +40,10 @@ public class BalancedSegmentSizeSegmentAssignmentStrategy implements SegmentAssi
     BalancedLoadSegmentAssignmentStrategy BalancedLoadSegmentAssignmentStrategy = new BalancedLoadSegmentAssignmentStrategy(serverLoadMetric);
     return BalancedLoadSegmentAssignmentStrategy.getAssignedInstances(helixResourceManager, propertyStore, helixClusterName,
         segmentMetadata, numReplicas, tenantName);
+  }
+
+  @Override
+  public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
+    return null;
   }
 }

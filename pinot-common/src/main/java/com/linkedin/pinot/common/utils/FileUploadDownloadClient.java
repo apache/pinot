@@ -24,7 +24,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.StringWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
@@ -52,6 +51,7 @@ import org.apache.http.entity.mime.content.InputStreamBody;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.json.JSONObject;
 
 
 public class FileUploadDownloadClient implements Closeable {
@@ -228,7 +228,7 @@ public class FileUploadDownloadClient implements Closeable {
     }
   }
 
-  private static String getErrorMessage(HttpUriRequest request, CloseableHttpResponse response) {
+  private static String getErrorMessage(HttpUriRequest request, CloseableHttpResponse response) throws Exception {
     String controllerHost = null;
     String controllerVersion = null;
     if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
@@ -236,15 +236,9 @@ public class FileUploadDownloadClient implements Closeable {
       controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
     }
     StatusLine statusLine = response.getStatusLine();
-    String message;
-    try {
-      message = EntityUtils.toString(response.getEntity());
-    } catch (Exception e) {
-      message = "No message";
-    }
-    String errorMessage =
-        String.format("Got error status code: %d with reason: %s while sending request: %s\nMessage: %s", statusLine.getStatusCode(),
-            statusLine.getReasonPhrase(), request.getURI(), message);
+    String reason = new JSONObject(EntityUtils.toString(response.getEntity())).getString("error");
+    String errorMessage = String.format("Got error status code: %d (%s) with reason: \"%s\" while sending request: %s",
+        statusLine.getStatusCode(), statusLine.getReasonPhrase(), reason, request.getURI());
     if (controllerHost != null) {
       errorMessage =
           String.format("%s to controller: %s, version: %s", errorMessage, controllerHost, controllerVersion);
@@ -295,28 +289,25 @@ public class FileUploadDownloadClient implements Closeable {
     return sendRequest(getUploadSegmentRequest(uri, segmentName, segmentFile, headers, parameters, socketTimeoutMs));
   }
 
-  public String uploadSegment(String url, String segmentName, File segmentFile, int socketTimeoutMs) throws IOException, HttpErrorStatusException {
+  public String uploadSegment(String url, String segmentName, File segmentFile, int socketTimeoutMs) throws Exception {
     URI uri = URI.create(url);
     HttpUriRequest request = getUploadSegmentRequest(uri, segmentName, segmentFile, null, null, socketTimeoutMs);
     return sendSegmentCompletionProtocolRequest(request);
   }
 
-  public String sendSegmentCompletionProtocolRequest(String url, int socketTimeoutMs) throws IOException, HttpErrorStatusException {
+  public String sendSegmentCompletionProtocolRequest(String url, int socketTimeoutMs) throws Exception {
     HttpUriRequest request = getSegmentCompletionUriRequest(url, socketTimeoutMs);
     return sendSegmentCompletionProtocolRequest(request);
   }
 
-  private String sendSegmentCompletionProtocolRequest(HttpUriRequest request) throws IOException, HttpErrorStatusException {
+  private String sendSegmentCompletionProtocolRequest(HttpUriRequest request) throws Exception {
     try (CloseableHttpResponse response = _httpClient.execute(request)) {
       StatusLine statusLine = response.getStatusLine();
       int statusCode = statusLine.getStatusCode();
       if (statusCode >= 300) {
         throw new HttpErrorStatusException(getErrorMessage(request, response), statusCode);
       }
-      StringWriter writer = new StringWriter();
-      HttpEntity entity = response.getEntity();
-      IOUtils.copy(entity.getContent(), writer, "UTF-8");
-      return writer.toString();
+      return EntityUtils.toString(response.getEntity());
     }
   }
 

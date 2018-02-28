@@ -47,7 +47,12 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
   private static final Random RANDOM = new Random();
 
   @Override
-  public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager, ZkHelixPropertyStore<ZNRecord> propertyStore,
+  public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager, ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
+    return null;
+  }
+
+  @Override
+  public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
       String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
 

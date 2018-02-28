@@ -33,6 +33,9 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
 import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.util.FixedIntArray;
+import com.linkedin.pinot.core.util.FixedIntArrayOffHeapIdMap;
+import com.linkedin.pinot.core.util.IdMap;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -47,6 +50,10 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   // For multi-valued column, forward-index.
   // Maximum number of multi-values per row. We assert on this.
   private static final int MAX_MULTI_VALUES_PER_ROW = 1000;
+  private static final String RECORD_ID_MAP = "__recordIdMap__";
+  private static final int EXPECTED_COMPRESSION = 1000;
+  private static final int MIN_ROWS_TO_INDEX = 1000_000; // Min size of recordIdMap for updatable metrics.
+  private static final int MIN_RECORD_ID_MAP_CACHE_SIZE = 10000; // Min overflow map size for updatable metrics.
 
   private final Logger _logger;
   private final long _startTimeMillis = System.currentTimeMillis();
@@ -64,12 +71,15 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private final Map<String, DataFileReader> _indexReaderWriterMap = new HashMap<>();
   private final Map<String, Integer> _maxNumValuesMap = new HashMap<>();
   private final Map<String, RealtimeInvertedIndexReader> _invertedIndexMap = new HashMap<>();
+  private final IdMap<FixedIntArray> _recordIdMap;
+  private final boolean _aggregateMetrics;
 
   private volatile int _numDocsIndexed = 0;
 
   // to compute the rolling interval
   private volatile long _minTime = Long.MAX_VALUE;
   private volatile long _maxTime = Long.MIN_VALUE;
+  private final int _numKeyColumns;
 
   public RealtimeSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
@@ -92,9 +102,13 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     _memoryManager = config.getMemoryManager();
     _statsHistory = config.getStatsHistory();
     _segmentPartitionConfig = config.getSegmentPartitionConfig();
+    _numKeyColumns = _schema.getDimensionNames().size() + 1;
 
     _logger = LoggerFactory.getLogger(
         RealtimeSegmentImpl.class.getName() + "_" + _segmentName + "_" + config.getStreamName());
+
+    _aggregateMetrics = config.aggregateMetrics();
+    _recordIdMap = (_aggregateMetrics) ? initMetricsAggregation(config) : null;
 
     Set<String> noDictionaryColumns = config.getNoDictionaryColumns();
     Set<String> invertedIndexColumns = config.getInvertedIndexColumns();
@@ -127,7 +141,6 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
                 _statsHistory.getEstimatedCardinality(column), allocationContext);
         _dictionaryMap.put(column, dictionary);
       }
-
 
       DataFileReader indexReaderWriter;
       if (fieldSpec.isSingleValueField()) {
@@ -166,6 +179,27 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   @Override
   public boolean index(GenericRow row) {
     // Update dictionary first
+    Map<String, Object> dictIdMap = updateDictionary(row);
+
+    int numDocs = _numDocsIndexed;
+    int docId = getOrCreateDocId(dictIdMap);
+
+    if (docId == numDocs) {
+      // Add forward and inverted indices for new document.
+      addForwardIndex(row, docId, dictIdMap);
+      addInvertedIndex(docId, dictIdMap);
+      // Update number of document indexed at last to make the latest record queryable
+      return _numDocsIndexed++ < _capacity;
+    } else {
+      Preconditions.checkState(_aggregateMetrics,
+          "Invalid document-id during indexing: " + docId + " expected: " + numDocs);
+      // Update metrics for existing document.
+      return aggregateMetrics(row, docId);
+    }
+  }
+
+  private Map<String, Object> updateDictionary(GenericRow row) {
+    Map<String, Object> dictIdMap = new HashMap<>();
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
       Object value = row.getValue(column);
@@ -174,7 +208,19 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         dictionary.index(value);
       }
       // Update max number of values for multi-value column
-      if (!fieldSpec.isSingleValueField()) {
+      if (fieldSpec.isSingleValueField()) {
+        if (dictionary != null) {
+          dictIdMap.put(column, dictionary.indexOf(value));
+        }
+      } else {
+        // No-dictionary not supported for multi-valued columns.
+        int i = 0;
+        Object[] values = (Object[]) value;
+        int[] dictIds = new int[values.length];
+        for (Object object : values) {
+          dictIds[i++] = dictionary.indexOf(object);
+        }
+        dictIdMap.put(column, dictIds);
         int numValues = ((Object[]) value).length;
         if (_maxNumValuesMap.get(column) < numValues) {
           _maxNumValuesMap.put(column, numValues);
@@ -182,7 +228,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         continue;
       }
       // Update min/max value for time column
-      if (fieldSpec.getFieldType() == FieldSpec.FieldType.TIME) {
+      if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
         long timeValue;
         if (value instanceof Number) {
           timeValue = ((Number) value).longValue();
@@ -193,23 +239,21 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         _maxTime = Math.max(_maxTime, timeValue);
       }
     }
+    return dictIdMap;
+  }
 
-    // Update forward index
-    int docId = _numDocsIndexed;
+  private void addForwardIndex(GenericRow row, int docId, Map<String, Object> dictIdMap) {
     // Store dictionary Id(s) for columns with dictionary
-    Map<String, Object> dictIdMap = new HashMap<>();
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
       Object value = row.getValue(column);
       if (fieldSpec.isSingleValueField()) {
         FixedByteSingleColumnSingleValueReaderWriter indexReaderWriter =
             (FixedByteSingleColumnSingleValueReaderWriter) _indexReaderWriterMap.get(column);
-        MutableDictionary dictionary = _dictionaryMap.get(column);
-        if (dictionary != null) {
+        Integer dictId = (Integer) dictIdMap.get(column);
+        if (dictId != null) {
           // Column with dictionary
-          int dictId = dictionary.indexOf(value);
           indexReaderWriter.setInt(docId, dictId);
-          dictIdMap.put(column, dictId);
         } else {
           // No-dictionary column
           FieldSpec.DataType dataType = fieldSpec.getDataType();
@@ -232,17 +276,13 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
           }
         }
       } else {
-        Object[] values = (Object[]) value;
-        int numValues = values.length;
-        int[] dictIds = new int[numValues];
-        for (int i = 0; i < numValues; i++) {
-          dictIds[i] = _dictionaryMap.get(column).indexOf(values[i]);
-        }
+        int[] dictIds = (int[]) dictIdMap.get(column);
         ((FixedByteSingleColumnMultiValueReaderWriter) _indexReaderWriterMap.get(column)).setIntArray(docId, dictIds);
-        dictIdMap.put(column, dictIds);
       }
     }
+  }
 
+  private void addInvertedIndex(int docId, Map<String, Object> dictIdMap) {
     // Update inverted index at last
     // NOTE: inverted index have to be updated at last because once it gets updated, the latest record will become
     // queryable
@@ -260,9 +300,36 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         }
       }
     }
+  }
 
-    // Update number of document indexed at last to make the latest record queryable
-    return _numDocsIndexed++ < _capacity;
+  private boolean aggregateMetrics(GenericRow row, int docId) {
+    for (FieldSpec metricSpec : _schema.getMetricFieldSpecs()) {
+      String column = metricSpec.getName();
+      Object value = row.getValue(column);
+      Preconditions.checkState(metricSpec.isSingleValueField(), "Multivalued metrics cannot be updated.");
+      FixedByteSingleColumnSingleValueReaderWriter indexReaderWriter =
+          (FixedByteSingleColumnSingleValueReaderWriter) _indexReaderWriterMap.get(column);
+      Preconditions.checkState(_dictionaryMap.get(column) == null, "Updating metrics not supported with dictionary.");
+      FieldSpec.DataType dataType = metricSpec.getDataType();
+      switch (dataType) {
+        case INT:
+          indexReaderWriter.setInt(docId, (Integer) value + indexReaderWriter.getInt(docId));
+          break;
+        case LONG:
+          indexReaderWriter.setLong(docId, (Long) value + indexReaderWriter.getLong(docId));
+          break;
+        case FLOAT:
+          indexReaderWriter.setFloat(docId, indexReaderWriter.getFloat(docId) + indexReaderWriter.getFloat(docId));
+          break;
+        case DOUBLE:
+          indexReaderWriter.setDouble(docId, indexReaderWriter.getDouble(docId) + indexReaderWriter.getDouble(docId));
+          break;
+        default:
+          throw new UnsupportedOperationException(
+              "Unsupported data type: " + dataType + " for no-dictionary column: " + column);
+      }
+    }
+    return true;
   }
 
   @Override
@@ -368,6 +435,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
           segmentStats.setColumnStats(entry.getKey(), columnStats);
         }
         segmentStats.setNumRowsConsumed(_numDocsIndexed);
+        segmentStats.setNumRowsIndexed(_numDocsIndexed);
         segmentStats.setMemUsedBytes(totalMemBytes);
         segmentStats.setNumSeconds(numSeconds);
         _statsHistory.addSegmentStats(segmentStats);
@@ -403,6 +471,11 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       _memoryManager.close();
     } catch (IOException e) {
       _logger.error("Could not close memory manager", e);
+    }
+
+    // Clear the recordId map.
+    if (_recordIdMap != null) {
+      _recordIdMap.clear();
     }
   }
 
@@ -574,5 +647,48 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
    */
   private String buildAllocationContext(String segmentName, String columnName, String indexType) {
     return segmentName + ":" + columnName + indexType;
+  }
+
+  private int getOrCreateDocId(Map<String, Object> dictIdMap) {
+    if (!_aggregateMetrics) {
+      return _numDocsIndexed;
+    }
+
+    int i = 0;
+    int[] dictIds = new int[_numKeyColumns]; // dimensions + time column.
+
+    for (String column : _schema.getDimensionNames()) {
+      dictIds[i++] = (Integer) dictIdMap.get(column);
+    }
+
+    String timeColumnName = _schema.getTimeColumnName();
+    if (timeColumnName != null) {
+      dictIds[i] = (Integer) dictIdMap.get(timeColumnName);
+    }
+    return _recordIdMap.put(new FixedIntArray(dictIds));
+  }
+
+  /**
+   * Helper method to initialize updating of metrics.
+   *
+   * @param config Segment config
+   */
+  private IdMap<FixedIntArray> initMetricsAggregation(RealtimeSegmentConfig config) {
+    int estimatedRowsToIndex;
+    if (_statsHistory.isEmpty()) {
+      // Choose estimated rows to index as maxNumRowsPerSegment / EXPECTED_COMPRESSION (1000, to be conservative in size).
+      // These are just heuristics at the moment, and can be refined based on experimental results.
+      estimatedRowsToIndex = Math.max(config.getCapacity() / EXPECTED_COMPRESSION, MIN_ROWS_TO_INDEX);
+    } else {
+      estimatedRowsToIndex = Math.max(_statsHistory.getEstimatedRowsToIndex(), MIN_ROWS_TO_INDEX);
+    }
+
+    // Compute size of overflow map.
+    int maxOverFlowHashSize = Math.max(estimatedRowsToIndex / 1000, MIN_RECORD_ID_MAP_CACHE_SIZE);
+
+    _logger.info("Initializing metrics update: estimatedRowsToIndex:{}, cacheSize:{}", estimatedRowsToIndex,
+        maxOverFlowHashSize);
+    return new FixedIntArrayOffHeapIdMap(estimatedRowsToIndex, maxOverFlowHashSize, _numKeyColumns, _memoryManager,
+        RECORD_ID_MAP);
   }
 }
