@@ -177,7 +177,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
    *   <li>"newAddedLongDimension", DIMENSION, LONG, single-value, default (Long.MIN_VALUE)</li>
    *   <li>"newAddedFloatDimension", DIMENSION, FLOAT, single-value, default (Float.NEGATIVE_INFINITY)</li>
    *   <li>"newAddedDoubleDimension", DIMENSION, DOUBLE, single-value, default (Double.NEGATIVE_INFINITY)</li>
-   *   <li>"newAddedStringDimension", DIMENSION, STRING, multi-value, "newAdded"</li>
+   *   <li>"newAddedSVStringDimension", DIMENSION, STRING, single-value, default ("null")</li>
+   *   <li>"newAddedMVStringDimension", DIMENSION, STRING, multi-value, ""</li>
    * </ul>
    */
   @Test
@@ -187,7 +188,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadDefaultColumns(true);
     JSONObject queryResponse = postQuery(SELECT_STAR_QUERY);
     Assert.assertEquals(queryResponse.getLong("totalDocs"), numTotalDocs);
-    Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 88);
+    Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 89);
 
     testNewAddedColumns();
 
@@ -274,7 +275,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDoubleDimension < 0.0";
     sqlQuery = "SELECT COUNT(*) FROM mytable";
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
-    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedStringDimension = 'newAdded'";
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedSVStringDimension = 'null'";
+    sqlQuery = "SELECT COUNT(*) FROM mytable";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVStringDimension = ''";
     sqlQuery = "SELECT COUNT(*) FROM mytable";
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
 
@@ -295,12 +299,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Test other query forms with new added columns
     JSONObject response;
     JSONObject groupByResult;
-    pqlQuery = "SELECT SUM(NewAddedFloatMetric) FROM mytable GROUP BY NewAddedStringDimension";
+    pqlQuery = "SELECT SUM(NewAddedFloatMetric) FROM mytable GROUP BY NewAddedSVStringDimension";
     response = postQuery(pqlQuery);
     groupByResult =
         response.getJSONArray("aggregationResults").getJSONObject(0).getJSONArray("groupByResult").getJSONObject(0);
     Assert.assertEquals(groupByResult.getInt("value"), 0);
-    Assert.assertEquals(groupByResult.getJSONArray("group").getString(0), "newAdded");
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(0), "null");
     pqlQuery = "SELECT SUM(NewAddedDoubleMetric) FROM mytable GROUP BY NewAddedIntDimension";
     response = postQuery(pqlQuery);
     groupByResult =
@@ -316,7 +320,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     pqlQuery =
         "SELECT SUM(NewAddedIntMetric), SUM(NewAddedLongMetric), SUM(NewAddedFloatMetric), SUM(NewAddedDoubleMetric) "
             + "FROM mytable GROUP BY NewAddedIntDimension, NewAddedLongDimension, NewAddedFloatDimension, "
-            + "NewAddedDoubleDimension, NewAddedStringDimension";
+            + "NewAddedDoubleDimension, NewAddedSVStringDimension, NewAddedMVStringDimension";
     response = postQuery(pqlQuery);
     JSONArray groupByResultArray = response.getJSONArray("aggregationResults");
     groupByResult = groupByResultArray.getJSONObject(0).getJSONArray("groupByResult").getJSONObject(0);

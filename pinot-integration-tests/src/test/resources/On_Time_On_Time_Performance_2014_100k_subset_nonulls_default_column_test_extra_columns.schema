@@ -1,432 +1,379 @@
 {
-  "metricFieldSpecs": [
-    {
-      "dataType": "INT",
-      "name": "ActualElapsedTime"
-    },
-    {
-      "dataType": "INT",
-      "name": "AirTime"
-    },
-    {
-      "dataType": "INT",
-      "name": "ArrDel15"
-    },
-    {
-      "dataType": "FLOAT",
-      "name": "ArrDelay"
-    },
-    {
-      "dataType": "INT",
-      "name": "ArrivalDelayGroups"
-    },
-    {
-      "dataType": "DOUBLE",
-      "name": "ArrDelayMinutes"
-    },
-    {
-      "dataType": "INT",
-      "name": "Cancelled"
-    },
-    {
-      "dataType": "INT",
-      "name": "CarrierDelay"
-    },
-    {
-      "dataType": "INT",
-      "name": "DepDel15"
-    },
-    {
-      "dataType": "DOUBLE",
-      "name": "DepDelay"
-    },
-    {
-      "dataType": "FLOAT",
-      "name": "DepDelayMinutes"
-    },
-    {
-      "dataType": "INT",
-      "name": "DepartureDelayGroups"
-    },
-    {
-      "dataType": "INT",
-      "name": "LateAircraftDelay"
-    },
-    {
-      "dataType": "INT",
-      "name": "NASDelay"
-    },
-    {
-      "dataType": "INT",
-      "name": "SecurityDelay"
-    },
-    {
-      "dataType": "INT",
-      "name": "WeatherDelay"
-    },
-    {
-      "dataType": "INT",
-      "name": "NewAddedIntMetric",
-      "defaultNullValue": 1
-    },
-    {
-      "dataType": "LONG",
-      "name": "NewAddedLongMetric",
-      "defaultNullValue": 1
-    },
-    {
-      "dataType": "FLOAT",
-      "name": "NewAddedFloatMetric"
-    },
-    {
-      "dataType": "DOUBLE",
-      "name": "NewAddedDoubleMetric"
-    }
-  ],
+  "schemaName": "mytable",
   "dimensionFieldSpecs": [
     {
-      "dataType": "LONG",
       "name": "AirlineID",
-      "singleValueField": true
+      "dataType": "LONG"
     },
     {
-      "dataType": "INT",
       "name": "ArrTime",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "STRING",
       "name": "ArrTimeBlk",
-      "singleValueField": true
+      "dataType": "STRING"
     },
     {
-      "dataType": "INT",
       "name": "CRSArrTime",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "INT",
       "name": "CRSDepTime",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "INT",
       "name": "CRSElapsedTime",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "STRING",
       "name": "CancellationCode",
-      "singleValueField": true
+      "dataType": "STRING"
     },
     {
-      "dataType": "STRING",
       "name": "Carrier",
-      "singleValueField": true
+      "dataType": "STRING"
     },
     {
-      "dataType": "INT",
       "name": "DayOfWeek",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "INT",
       "name": "DayofMonth",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "INT",
       "name": "DepTime",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "STRING",
       "name": "DepTimeBlk",
-      "singleValueField": true
+      "dataType": "STRING"
     },
     {
-      "dataType": "STRING",
       "name": "Dest",
-      "singleValueField": true
+      "dataType": "STRING"
     },
     {
-      "dataType": "INT",
       "name": "DestAirportID",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "INT",
       "name": "DestAirportSeqID",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "INT",
       "name": "DestCityMarketID",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "STRING",
       "name": "DestCityName",
-      "singleValueField": true
+      "dataType": "STRING"
     },
     {
-      "dataType": "STRING",
       "name": "DestState",
-      "singleValueField": true
+      "dataType": "STRING"
     },
     {
-      "dataType": "INT",
       "name": "DestStateFips",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "STRING",
       "name": "DestStateName",
-      "singleValueField": true
+      "dataType": "STRING"
     },
     {
-      "dataType": "INT",
       "name": "DestWac",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "INT",
       "name": "Distance",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "INT",
       "name": "DistanceGroup",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "INT",
       "name": "DivActualElapsedTime",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "INT",
       "name": "DivAirportIDs",
+      "dataType": "INT",
       "singleValueField": false
     },
     {
-      "dataType": "INT",
       "name": "DivAirportLandings",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "INT",
       "name": "DivAirportSeqIDs",
+      "dataType": "INT",
       "singleValueField": false
     },
     {
-      "dataType": "STRING",
       "name": "DivAirports",
+      "dataType": "STRING",
       "singleValueField": false
     },
     {
-      "dataType": "INT",
       "name": "DivArrDelay",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "INT",
       "name": "DivDistance",
-      "singleValueField": true
+      "dataType": "INT"
     },
     {
-      "dataType": "FLOAT",
       "name": "DivLongestGTimes",
-      "singleValueField": false
-    },
-    {
-      "dataType": "INT",
-      "name": "DivReachedDest",
-      "singleValueField": true
-    },
-    {
-      "dataType": "STRING",
-      "name": "DivTailNums",
-      "singleValueField": false
-    },
-    {
-      "dataType": "LONG",
-      "name": "DivTotalGTimes",
-      "singleValueField": false
-    },
-    {
-      "dataType": "INT",
-      "name": "DivWheelsOffs",
-      "singleValueField": false
-    },
-    {
-      "dataType": "INT",
-      "name": "DivWheelsOns",
-      "singleValueField": false
-    },
-    {
-      "dataType": "INT",
-      "name": "Diverted",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "FirstDepTime",
-      "singleValueField": true
-    },
-    {
-      "dataType": "STRING",
-      "name": "FlightDate",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "FlightNum",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "Flights",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "LongestAddGTime",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "Month",
-      "singleValueField": true
-    },
-    {
-      "dataType": "STRING",
-      "name": "Origin",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "OriginAirportID",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "OriginAirportSeqID",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "OriginCityMarketID",
-      "singleValueField": true
-    },
-    {
-      "dataType": "STRING",
-      "name": "OriginCityName",
-      "singleValueField": true
-    },
-    {
-      "dataType": "STRING",
-      "name": "OriginState",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "OriginStateFips",
-      "singleValueField": true
-    },
-    {
-      "dataType": "STRING",
-      "name": "OriginStateName",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "OriginWac",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "Quarter",
-      "singleValueField": true
-    },
-    {
-      "dataType": "STRING",
-      "name": "RandomAirports",
-      "singleValueField": false
-    },
-    {
-      "dataType": "STRING",
-      "name": "TailNum",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "TaxiIn",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "TaxiOut",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "Year",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "WheelsOn",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "WheelsOff",
-      "singleValueField": true
-    },
-    {
-      "dataType": "STRING",
-      "name": "UniqueCarrier",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "TotalAddGTime",
-      "singleValueField": true
-    },
-    {
-      "dataType": "INT",
-      "name": "NewAddedIntDimension",
-      "singleValueField": true
-    },
-    {
-      "dataType": "LONG",
-      "name": "NewAddedLongDimension",
-      "singleValueField": true
-    },
-    {
       "dataType": "FLOAT",
-      "name": "NewAddedFloatDimension",
-      "singleValueField": true
+      "singleValueField": false
     },
     {
-      "dataType": "DOUBLE",
-      "name": "NewAddedDoubleDimension",
-      "singleValueField": true
+      "name": "DivReachedDest",
+      "dataType": "INT"
     },
     {
+      "name": "DivTailNums",
       "dataType": "STRING",
-      "name": "NewAddedStringDimension",
+      "singleValueField": false
+    },
+    {
+      "name": "DivTotalGTimes",
+      "dataType": "LONG",
+      "singleValueField": false
+    },
+    {
+      "name": "DivWheelsOffs",
+      "dataType": "INT",
+      "singleValueField": false
+    },
+    {
+      "name": "DivWheelsOns",
+      "dataType": "INT",
+      "singleValueField": false
+    },
+    {
+      "name": "Diverted",
+      "dataType": "INT"
+    },
+    {
+      "name": "FirstDepTime",
+      "dataType": "INT"
+    },
+    {
+      "name": "FlightDate",
+      "dataType": "STRING"
+    },
+    {
+      "name": "FlightNum",
+      "dataType": "INT"
+    },
+    {
+      "name": "Flights",
+      "dataType": "INT"
+    },
+    {
+      "name": "LongestAddGTime",
+      "dataType": "INT"
+    },
+    {
+      "name": "Month",
+      "dataType": "INT"
+    },
+    {
+      "name": "Origin",
+      "dataType": "STRING"
+    },
+    {
+      "name": "OriginAirportID",
+      "dataType": "INT"
+    },
+    {
+      "name": "OriginAirportSeqID",
+      "dataType": "INT"
+    },
+    {
+      "name": "OriginCityMarketID",
+      "dataType": "INT"
+    },
+    {
+      "name": "OriginCityName",
+      "dataType": "STRING"
+    },
+    {
+      "name": "OriginState",
+      "dataType": "STRING"
+    },
+    {
+      "name": "OriginStateFips",
+      "dataType": "INT"
+    },
+    {
+      "name": "OriginStateName",
+      "dataType": "STRING"
+    },
+    {
+      "name": "OriginWac",
+      "dataType": "INT"
+    },
+    {
+      "name": "Quarter",
+      "dataType": "INT"
+    },
+    {
+      "name": "RandomAirports",
+      "dataType": "STRING",
+      "singleValueField": false
+    },
+    {
+      "name": "TailNum",
+      "dataType": "STRING"
+    },
+    {
+      "name": "TaxiIn",
+      "dataType": "INT"
+    },
+    {
+      "name": "TaxiOut",
+      "dataType": "INT"
+    },
+    {
+      "name": "Year",
+      "dataType": "INT"
+    },
+    {
+      "name": "WheelsOn",
+      "dataType": "INT"
+    },
+    {
+      "name": "WheelsOff",
+      "dataType": "INT"
+    },
+    {
+      "name": "UniqueCarrier",
+      "dataType": "STRING"
+    },
+    {
+      "name": "TotalAddGTime",
+      "dataType": "INT"
+    },
+    {
+      "name": "NewAddedIntDimension",
+      "dataType": "INT"
+    },
+    {
+      "name": "NewAddedLongDimension",
+      "dataType": "LONG"
+    },
+    {
+      "name": "NewAddedFloatDimension",
+      "dataType": "FLOAT"
+    },
+    {
+      "name": "NewAddedDoubleDimension",
+      "dataType": "DOUBLE"
+    },
+    {
+      "name": "NewAddedSVStringDimension",
+      "dataType": "STRING"
+    },
+    {
+      "name": "NewAddedMVStringDimension",
+      "dataType": "STRING",
       "singleValueField": false,
-      "defaultNullValue": "newAdded"
+      "defaultNullValue": ""
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "name": "ActualElapsedTime",
+      "dataType": "INT"
+    },
+    {
+      "name": "AirTime",
+      "dataType": "INT"
+    },
+    {
+      "name": "ArrDel15",
+      "dataType": "INT"
+    },
+    {
+      "name": "ArrDelay",
+      "dataType": "FLOAT"
+    },
+    {
+      "name": "ArrivalDelayGroups",
+      "dataType": "INT"
+    },
+    {
+      "name": "ArrDelayMinutes",
+      "dataType": "DOUBLE"
+    },
+    {
+      "name": "Cancelled",
+      "dataType": "INT"
+    },
+    {
+      "name": "CarrierDelay",
+      "dataType": "INT"
+    },
+    {
+      "name": "DepDel15",
+      "dataType": "INT"
+    },
+    {
+      "name": "DepDelay",
+      "dataType": "DOUBLE"
+    },
+    {
+      "name": "DepDelayMinutes",
+      "dataType": "FLOAT"
+    },
+    {
+      "name": "DepartureDelayGroups",
+      "dataType": "INT"
+    },
+    {
+      "name": "LateAircraftDelay",
+      "dataType": "INT"
+    },
+    {
+      "name": "NASDelay",
+      "dataType": "INT"
+    },
+    {
+      "name": "SecurityDelay",
+      "dataType": "INT"
+    },
+    {
+      "name": "WeatherDelay",
+      "dataType": "INT"
+    },
+    {
+      "name": "NewAddedIntMetric",
+      "dataType": "INT",
+      "defaultNullValue": 1
+    },
+    {
+      "name": "NewAddedLongMetric",
+      "dataType": "LONG",
+      "defaultNullValue": 1
+    },
+    {
+      "name": "NewAddedFloatMetric",
+      "dataType": "FLOAT"
+    },
+    {
+      "name": "NewAddedDoubleMetric",
+      "dataType": "DOUBLE"
     }
   ],
   "timeFieldSpec": {
     "incomingGranularitySpec": {
+      "name": "DaysSinceEpoch",
       "dataType": "INT",
-      "timeType": "DAYS",
-      "name": "DaysSinceEpoch"
+      "timeType": "DAYS"
     }
-  },
-  "schemaName": "mytable"
+  }
 }

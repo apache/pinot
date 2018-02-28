@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -39,8 +40,7 @@ public class DataTableSerDeTest {
   private static final int NUM_ROWS = 100;
 
   @Test
-  public void testException()
-      throws IOException {
+  public void testException() throws IOException {
     Exception exception = new UnsupportedOperationException("Caught exception.");
     ProcessingException processingException =
         QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, exception);
@@ -58,8 +58,33 @@ public class DataTableSerDeTest {
   }
 
   @Test
-  public void testAllDataTypes()
-      throws IOException {
+  public void testEmptyStrings() throws IOException {
+    String emptyString = StringUtils.EMPTY;
+    String[] emptyStringArray = {StringUtils.EMPTY};
+
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"SV", "MV"}, new DataType[]{DataType.STRING, DataType.STRING_ARRAY});
+    DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
+    for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
+      dataTableBuilder.startRow();
+      dataTableBuilder.setColumn(0, emptyString);
+      dataTableBuilder.setColumn(1, emptyStringArray);
+      dataTableBuilder.finishRow();
+    }
+
+    DataTable dataTable = dataTableBuilder.build();
+    DataTable newDataTable = DataTableFactory.getDataTable(dataTable.toBytes());
+    Assert.assertEquals(newDataTable.getDataSchema(), dataSchema);
+    Assert.assertEquals(newDataTable.getNumberOfRows(), NUM_ROWS);
+
+    for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
+      Assert.assertEquals(newDataTable.getString(rowId, 0), emptyString);
+      Assert.assertEquals(newDataTable.getStringArray(rowId, 1), emptyStringArray);
+    }
+  }
+
+  @Test
+  public void testAllDataTypes() throws IOException {
     DataType[] columnTypes = DataType.values();
     int numColumns = columnTypes.length;
     String[] columnNames = new String[numColumns];
