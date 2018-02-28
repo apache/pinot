@@ -54,15 +54,15 @@ export default Route.extend({
    * ]
    */
   getMetricAlertLists() {
-    let metricList = [];
-    let alertList = [];
+    let metricList = new Set();
+    let alertList = new Set();
 
     applicationAnomalies.forEach(anomaly => {
-      metricList.push(anomaly.metric);
-      alertList.push(anomaly.functionName);
+      metricList.add(anomaly.metric);
+      alertList.add(anomaly.functionName);
     });
 
-    return [ metricList, alertList ];
+    return [ [...metricList], [...alertList] ];
   },
 
   setupController(controller) {

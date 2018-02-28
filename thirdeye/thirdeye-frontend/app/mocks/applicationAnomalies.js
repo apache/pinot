@@ -15,7 +15,7 @@ export default [
     metric: "Metric Name 1",
     functionName: "Alert Name 1"
   }, {
-    id: 11,
+    id: 2,
     start: 12345,
     end: 23456,
     dimensions: {
@@ -29,7 +29,7 @@ export default [
     metric: "Metric Name 1",
     functionName: "Alert Name 1"
   }, {
-    id: 12,
+    id: 3,
     start: 12345,
     end: 23456,
     dimensions: {
@@ -41,9 +41,9 @@ export default [
     baseline: 1000,
     feedback: "Yes, but New Trend",
     metric: "Metric Name 1",
-    functionName: "Alert Name 11"
+    functionName: "Alert Name 1"
   }, {
-    id: 2,
+    id: 4,
     start: 12345,
     end: 23456,
     dimensions: {
@@ -57,7 +57,7 @@ export default [
     metric: "Metric Name 2",
     functionName: "Alert Name 2"
   }, {
-    id: 21,
+    id: 5,
     start: 12345,
     end: 23456,
     dimensions: {
@@ -71,7 +71,7 @@ export default [
     metric: "Metric Name 2",
     functionName: "Alert Name 2"
   }, {
-    id: 22,
+    id: 6,
     start: 12345,
     end: 23456,
     dimensions: {
@@ -83,6 +83,6 @@ export default [
     baseline: 1000,
     feedback: "Yes, but New Trend",
     metric: "Metric Name 2",
-    functionName: "Alert Name 21"
+    functionName: "Alert Name 2"
   }
 ];
