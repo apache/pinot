@@ -18,7 +18,7 @@ package com.linkedin.pinot.controller.helix.core.rebalance;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.helix.PartitionAssignment;
+import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import java.io.IOException;
 import java.util.ArrayList;

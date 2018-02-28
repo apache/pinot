@@ -19,7 +19,8 @@ import com.linkedin.pinot.common.config.ReplicaGroupStrategyConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.PartitionToReplicaGroupMappingZKMetadata;
+import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignment;
+import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.util.ArrayList;
@@ -51,8 +52,10 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
 
     // Fetch the partition mapping table from the property store.
-    PartitionToReplicaGroupMappingZKMetadata partitionToReplicaGroupMapping =
-        ZKMetadataProvider.getPartitionToReplicaGroupMappingZKMedata(propertyStore, offlineTableName);
+    ReplicaGroupPartitionAssignmentGenerator partitionAssignmentGenerator =
+        new ReplicaGroupPartitionAssignmentGenerator(propertyStore);
+    ReplicaGroupPartitionAssignment replicaGroupPartitionAssignment =
+        partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(offlineTableName);
 
     // Fetch the segment assignment related configurations.
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(propertyStore, offlineTableName);
@@ -79,7 +82,7 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
     int index = 0;
     for (int groupId = 0; groupId < numReplicas; groupId++) {
       List<String> instancesInReplicaGroup =
-          partitionToReplicaGroupMapping.getInstancesfromReplicaGroup(partitionNumber, groupId);
+          replicaGroupPartitionAssignment.getInstancesfromReplicaGroup(partitionNumber, groupId);
       int numInstances = instancesInReplicaGroup.size();
       if (mirrorAssignmentAcrossReplicaGroups) {
         // Randomly pick the index and use the same index for all replica groups.

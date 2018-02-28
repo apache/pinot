@@ -16,7 +16,7 @@
 package com.linkedin.pinot.controller.helix.core.realtime.partition;
 
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.controller.helix.PartitionAssignment;
+import com.linkedin.pinot.common.partition.PartitionAssignment;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

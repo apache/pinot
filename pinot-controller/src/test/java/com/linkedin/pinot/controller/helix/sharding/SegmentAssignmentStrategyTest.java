@@ -21,8 +21,8 @@ import com.linkedin.pinot.common.config.ReplicaGroupStrategyConfig;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.PartitionToReplicaGroupMappingZKMetadata;
+import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignment;
+import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
@@ -43,16 +43,13 @@ import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.lang.math.IntRange;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
-
 
 public class SegmentAssignmentStrategyTest {
   private final static String ZK_SERVER = ZkStarter.DEFAULT_ZK_STR;
@@ -72,6 +69,7 @@ public class SegmentAssignmentStrategyTest {
   private final int _numServerInstance = 10;
   private final int _numBrokerInstance = 1;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
+  private ReplicaGroupPartitionAssignmentGenerator _partitionAssignmentGenerator;
 
   @BeforeTest
   public void setup() throws Exception {
@@ -90,6 +88,8 @@ public class SegmentAssignmentStrategyTest {
     final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_SERVER);
     _helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, instanceId, /*isUpdateStateModel=*/false);
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
+    _partitionAssignmentGenerator =
+        new ReplicaGroupPartitionAssignmentGenerator(_helixZkManager.getHelixPropertyStore());
 
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_SERVER,
         _numServerInstance, true);
@@ -137,9 +137,9 @@ public class SegmentAssignmentStrategyTest {
       }
       final Set<String> taggedInstances =
           _pinotHelixResourceManager.getAllInstancesForServerTenant("DefaultTenant_OFFLINE");
-      final Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
+      final Map<String, Integer> instanceToNumSegmentsMap = new HashMap<>();
       for (final String instance : taggedInstances) {
-        instance2NumSegmentsMap.put(instance, 0);
+        instanceToNumSegmentsMap.put(instance, 0);
       }
       IdealState idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME,
           TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME_RANDOM));
@@ -175,7 +175,7 @@ public class SegmentAssignmentStrategyTest {
 
     final Set<String> taggedInstances =
         _pinotHelixResourceManager.getAllInstancesForServerTenant("DefaultTenant_OFFLINE");
-    final Map<String, Integer> instance2NumSegmentsMap = new HashMap<String, Integer>();
+    final Map<String, Integer> instance2NumSegmentsMap = new HashMap<>();
     for (final String instance : taggedInstances) {
       instance2NumSegmentsMap.put(instance, 0);
     }
@@ -243,14 +243,13 @@ public class SegmentAssignmentStrategyTest {
     Map<String, Set<String>> serverToSegments = getServersToSegmentsMapping(TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP);
 
     // Fetch the replica group mapping table
-    ZkHelixPropertyStore<ZNRecord> propertyStore = _helixZkManager.getHelixPropertyStore();
-    PartitionToReplicaGroupMappingZKMetadata partitionToReplicaGroupMaping =
-        ZKMetadataProvider.getPartitionToReplicaGroupMappingZKMedata(propertyStore,
-            TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP);
+    ReplicaGroupPartitionAssignment partitionAssignment =
+        _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(offlineTableName);
 
     // Check that each replica group for contains all segments of the table.
     for (int group = 0; group < NUM_REPLICA; group++) {
-      List<String> serversInReplicaGroup = partitionToReplicaGroupMaping.getInstancesfromReplicaGroup(0, group);
+      List<String> serversInReplicaGroup = partitionAssignment.getInstancesfromReplicaGroup(0, group);
       Set<String> segmentsInReplicaGroup = new HashSet<>();
       for (String server : serversInReplicaGroup) {
         segmentsInReplicaGroup.addAll(serverToSegments.get(server));
@@ -262,7 +261,7 @@ public class SegmentAssignmentStrategyTest {
     for (int instanceIndex = 0; instanceIndex < numInstancesPerPartition; instanceIndex++) {
       Set<Set<String>> mirroringServerSegments = new HashSet<>();
       for (int group = 0; group < NUM_REPLICA; group++) {
-        List<String> serversInReplicaGroup = partitionToReplicaGroupMaping.getInstancesfromReplicaGroup(0, group);
+        List<String> serversInReplicaGroup = partitionAssignment.getInstancesfromReplicaGroup(0, group);
         String server = serversInReplicaGroup.get(instanceIndex);
         mirroringServerSegments.add(serverToSegments.get(server));
       }
@@ -331,16 +330,15 @@ public class SegmentAssignmentStrategyTest {
     Map<String, Set<String>> serverToSegments = getServersToSegmentsMapping(TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP);
 
     // Fetch the replica group mapping table.
-    ZkHelixPropertyStore<ZNRecord> propertyStore = _helixZkManager.getHelixPropertyStore();
-    PartitionToReplicaGroupMappingZKMetadata partitionToReplicaGroupMapping =
-        ZKMetadataProvider.getPartitionToReplicaGroupMappingZKMedata(propertyStore,
-            TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP);
+    String offlineTable = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP);
+    ReplicaGroupPartitionAssignment partitionAssignment =
+        _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(offlineTable);
 
     // Check that each replica group for a partition contains all segments that belong to the partition.
     for (int partition = 0; partition < totalPartitionNumber; partition++) {
       for (int group = 0; group < NUM_REPLICA; group++) {
         List<String> serversInReplicaGroup =
-            partitionToReplicaGroupMapping.getInstancesfromReplicaGroup(partition, group);
+            partitionAssignment.getInstancesfromReplicaGroup(partition, group);
         List<String> segmentsInReplicaGroup = new ArrayList<>();
         for (String server : serversInReplicaGroup) {
           Set<String> segmentsInServer = serverToSegments.get(server);
@@ -359,11 +357,8 @@ public class SegmentAssignmentStrategyTest {
   private boolean allSegmentsPushedToIdealState(String tableName, int segmentNum) {
     IdealState idealState =
         _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
-    if (idealState != null && idealState.getPartitionSet() != null
-        && idealState.getPartitionSet().size() == segmentNum) {
-      return true;
-    }
-    return false;
+    return idealState != null && idealState.getPartitionSet() != null
+        && idealState.getPartitionSet().size() == segmentNum;
   }
 
   private Map<String, Set<String>> getServersToSegmentsMapping(String tableName) {

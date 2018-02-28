@@ -17,8 +17,8 @@ package com.linkedin.pinot.controller.helix.core.realtime.partition;
 
 import com.linkedin.pinot.common.config.StreamConsumptionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
-import com.linkedin.pinot.controller.helix.PartitionAssignment;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;

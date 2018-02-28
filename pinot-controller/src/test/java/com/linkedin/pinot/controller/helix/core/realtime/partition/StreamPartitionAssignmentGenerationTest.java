@@ -20,7 +20,7 @@ import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.StreamConsumptionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TenantConfig;
-import com.linkedin.pinot.controller.helix.PartitionAssignment;
+import com.linkedin.pinot.common.partition.PartitionAssignment;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
