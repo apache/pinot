@@ -1,1 +1,11 @@
-{{outlet}}
+<div class="container card-container">
+  {{#each-in model as |metric alertList|}}
+    <p>Metric: {{metric}}</p>
+    {{#each-in alertList as |alert anomalyList|}}
+    {{!-- TODO: Replace below with a table --}}
+      <p>Alert: {{alert}}</p>
+      <p>Anomaly List: {{anomalyList}}</p>
+      ________________________
+    {{/each-in}}
+  {{/each-in}}
+</div>
