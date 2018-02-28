@@ -107,7 +107,7 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       File convertedIndexDir = convert(pinotTaskConfig, indexDir, workingDir);
 
       // Tar the converted segment
-      File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
+      final File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
       Preconditions.checkState(convertedTarredSegmentDir.mkdir());
       final File convertedTarredSegmentFile = new File(
           TarGzCompressionUtils.createTarGzOfDirectory(convertedIndexDir.getPath(),
@@ -153,8 +153,9 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
           @Override
           public Boolean call() throws Exception {
             try {
-              fileUploadDownloadClient.uploadSegment(new URI(uploadURL), segmentName, convertedTarredSegmentFile,
+              int responseCode = fileUploadDownloadClient.uploadSegment(new URI(uploadURL), segmentName, convertedTarredSegmentFile,
                   httpHeaders, parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+              LOGGER.info("Response code {} received for file {} from uri {}", responseCode, convertedTarredSegmentDir.getName(), uploadURL);
               return true;
             } catch (HttpErrorStatusException e) {
               int statusCode = e.getStatusCode();
