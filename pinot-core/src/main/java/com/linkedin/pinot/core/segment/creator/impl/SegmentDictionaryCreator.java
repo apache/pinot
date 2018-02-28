@@ -15,9 +15,11 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import it.unimi.dsi.fastutil.doubles.Double2IntOpenHashMap;
 import it.unimi.dsi.fastutil.floats.Float2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
@@ -26,9 +28,9 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,237 +39,194 @@ public class SegmentDictionaryCreator implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDictionaryCreator.class);
   private static final Charset UTF_8 = Charset.forName("UTF-8");
 
-  private final Object sortedList;
-  private final FieldSpec spec;
-  private final File dictionaryFile;
-  private final int rowCount;
+  private final Object _sortedValues;
+  private final FieldSpec _fieldSpec;
+  private final File _dictionaryFile;
 
-  private Int2IntOpenHashMap intValueToIndexMap;
-  private Long2IntOpenHashMap longValueToIndexMap;
-  private Float2IntOpenHashMap floatValueToIndexMap;
-  private Double2IntOpenHashMap doubleValueToIndexMap;
-  private Object2IntOpenHashMap<String> stringValueToIndexMap;
+  private Int2IntOpenHashMap _intValueToIndexMap;
+  private Long2IntOpenHashMap _longValueToIndexMap;
+  private Float2IntOpenHashMap _floatValueToIndexMap;
+  private Double2IntOpenHashMap _doubleValueToIndexMap;
+  private Object2IntOpenHashMap<String> _stringValueToIndexMap;
+  private int _numBytesPerString = 0;
 
-  private int stringColumnMaxLength = 0;
+  public SegmentDictionaryCreator(Object sortedValues, FieldSpec fieldSpec, File indexDir) throws IOException {
+    _sortedValues = sortedValues;
+    _fieldSpec = fieldSpec;
+    _dictionaryFile = new File(indexDir, fieldSpec.getName() + V1Constants.Dict.FILE_EXTENSION);
+    FileUtils.touch(_dictionaryFile);
+  }
 
-  public SegmentDictionaryCreator(boolean hasNulls, Object sortedList, FieldSpec spec, File indexDir)
-      throws IOException {
-    rowCount = ArrayUtils.getLength(sortedList);
+  public void build() throws IOException {
+    switch (_fieldSpec.getDataType()) {
+      case INT:
+        int[] sortedInts = (int[]) _sortedValues;
+        int numValues = sortedInts.length;
+        Preconditions.checkState(numValues > 0);
+        _intValueToIndexMap = new Int2IntOpenHashMap(numValues);
 
-    Object first = null;
-    Object last = null;
+        try (PinotDataBuffer dataBuffer = PinotDataBuffer.fromFile(_dictionaryFile, 0,
+            numValues * V1Constants.Numbers.INTEGER_SIZE, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
+            _dictionaryFile.getName());
+            FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
+          for (int i = 0; i < numValues; i++) {
+            int value = sortedInts[i];
+            _intValueToIndexMap.put(value, i);
+            writer.writeInt(i, value);
+          }
+        }
+        LOGGER.info("Created dictionary for INT column: {} with cardinality: {}, range: {} to {}", _fieldSpec.getName(),
+            numValues, sortedInts[0], sortedInts[numValues - 1]);
+        return;
+      case LONG:
+        long[] sortedLongs = (long[]) _sortedValues;
+        numValues = sortedLongs.length;
+        Preconditions.checkState(numValues > 0);
+        _longValueToIndexMap = new Long2IntOpenHashMap(numValues);
 
-    if (0 < rowCount) {
-      if (sortedList instanceof int[]) {
-        int[] intSortedList = (int[]) sortedList;
-        first = intSortedList[0];
-        last = intSortedList[rowCount - 1];
-      } else if (sortedList instanceof long[]) {
-        long[] longSortedList = (long[]) sortedList;
-        first = longSortedList[0];
-        last = longSortedList[rowCount - 1];
-      } else if (sortedList instanceof float[]) {
-        float[] floatSortedList = (float[]) sortedList;
-        first = floatSortedList[0];
-        last = floatSortedList[rowCount - 1];
-      } else if (sortedList instanceof double[]) {
-        double[] doubleSortedList = (double[]) sortedList;
-        first = doubleSortedList[0];
-        last = doubleSortedList[rowCount - 1];
-      } else if (sortedList instanceof String[]) {
-        String[] intSortedList = (String[]) sortedList;
-        first = intSortedList[0];
-        last = intSortedList[rowCount - 1];
-      } else if (sortedList instanceof Object[]) {
-        Object[] intSortedList = (Object[]) sortedList;
-        first = intSortedList[0];
-        last = intSortedList[rowCount - 1];
-      }
+        try (PinotDataBuffer dataBuffer = PinotDataBuffer.fromFile(_dictionaryFile, 0,
+            numValues * V1Constants.Numbers.LONG_SIZE, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
+            _dictionaryFile.getName());
+            FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
+          for (int i = 0; i < numValues; i++) {
+            long value = sortedLongs[i];
+            _longValueToIndexMap.put(value, i);
+            writer.writeLong(i, value);
+          }
+        }
+        LOGGER.info("Created dictionary for LONG column: {} with cardinality: {}, range: {} to {}",
+            _fieldSpec.getName(), numValues, sortedLongs[0], sortedLongs[numValues - 1]);
+        return;
+      case FLOAT:
+        float[] sortedFloats = (float[]) _sortedValues;
+        numValues = sortedFloats.length;
+        Preconditions.checkState(numValues > 0);
+        _floatValueToIndexMap = new Float2IntOpenHashMap(numValues);
+
+        try (PinotDataBuffer dataBuffer = PinotDataBuffer.fromFile(_dictionaryFile, 0,
+            numValues * V1Constants.Numbers.FLOAT_SIZE, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
+            _dictionaryFile.getName());
+            FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
+          for (int i = 0; i < numValues; i++) {
+            float value = sortedFloats[i];
+            _floatValueToIndexMap.put(value, i);
+            writer.writeFloat(i, value);
+          }
+        }
+        LOGGER.info("Created dictionary for FLOAT column: {} with cardinality: {}, range: {} to {}",
+            _fieldSpec.getName(), numValues, sortedFloats[0], sortedFloats[numValues - 1]);
+        return;
+      case DOUBLE:
+        double[] sortedDoubles = (double[]) _sortedValues;
+        numValues = sortedDoubles.length;
+        Preconditions.checkState(numValues > 0);
+        _doubleValueToIndexMap = new Double2IntOpenHashMap(numValues);
+
+        try (PinotDataBuffer dataBuffer = PinotDataBuffer.fromFile(_dictionaryFile, 0,
+            numValues * V1Constants.Numbers.DOUBLE_SIZE, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
+            _dictionaryFile.getName());
+            FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
+          for (int i = 0; i < numValues; i++) {
+            double value = sortedDoubles[i];
+            _doubleValueToIndexMap.put(value, i);
+            writer.writeDouble(i, value);
+          }
+        }
+        LOGGER.info("Created dictionary for DOUBLE column: {} with cardinality: {}, range: {} to {}",
+            _fieldSpec.getName(), numValues, sortedDoubles[0], sortedDoubles[numValues - 1]);
+        return;
+      case STRING:
+        String[] sortedStrings = (String[]) _sortedValues;
+        numValues = sortedStrings.length;
+        Preconditions.checkState(numValues > 0);
+        _stringValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
+
+        // Get the maximum length of all entries
+        byte[][] sortedStringBytes = new byte[numValues][];
+        for (int i = 0; i < numValues; i++) {
+          String value = sortedStrings[i];
+          _stringValueToIndexMap.put(value, i);
+          byte[] valueBytes = value.getBytes(UTF_8);
+          sortedStringBytes[i] = valueBytes;
+          _numBytesPerString = Math.max(_numBytesPerString, valueBytes.length);
+        }
+
+        try (PinotDataBuffer dataBuffer = PinotDataBuffer.fromFile(_dictionaryFile, 0, numValues * _numBytesPerString,
+            ReadMode.mmap, FileChannel.MapMode.READ_WRITE, _dictionaryFile.getName());
+            FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
+          for (int i = 0; i < numValues; i++) {
+            byte[] value = sortedStringBytes[i];
+            writer.writeUnpaddedString(i, _numBytesPerString, value);
+          }
+        }
+        LOGGER.info(
+            "Created dictionary for STRING column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
+            _fieldSpec.getName(), numValues, _numBytesPerString, sortedStrings[0], sortedStrings[numValues - 1]);
+        return;
+      default:
+        throw new UnsupportedOperationException("Unsupported data type: " + _fieldSpec.getDataType());
+    }
+  }
+
+  public int getNumBytesPerString() {
+    return _numBytesPerString;
+  }
+
+  public int indexOfSV(Object value) {
+    switch (_fieldSpec.getDataType()) {
+      case INT:
+        return _intValueToIndexMap.get((int) value);
+      case LONG:
+        return _longValueToIndexMap.get((long) value);
+      case FLOAT:
+        return _floatValueToIndexMap.get((float) value);
+      case DOUBLE:
+        return _doubleValueToIndexMap.get((double) value);
+      case STRING:
+        return _stringValueToIndexMap.getInt(value);
+      default:
+        throw new UnsupportedOperationException("Unsupported data type : " + _fieldSpec.getDataType());
+    }
+  }
+
+  public int[] indexOfMV(Object value) {
+    Object[] multiValues = (Object[]) value;
+    int[] indexes = new int[multiValues.length];
+
+    switch (_fieldSpec.getDataType()) {
+      case INT:
+        for (int i = 0; i < multiValues.length; i++) {
+          indexes[i] = _intValueToIndexMap.get((int) multiValues[i]);
+        }
+        break;
+      case LONG:
+        for (int i = 0; i < multiValues.length; i++) {
+          indexes[i] = _longValueToIndexMap.get((long) multiValues[i]);
+        }
+        break;
+      case FLOAT:
+        for (int i = 0; i < multiValues.length; i++) {
+          indexes[i] = _floatValueToIndexMap.get((float) multiValues[i]);
+        }
+        break;
+      case DOUBLE:
+        for (int i = 0; i < multiValues.length; i++) {
+          indexes[i] = _doubleValueToIndexMap.get((double) multiValues[i]);
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < multiValues.length; i++) {
+          indexes[i] = _stringValueToIndexMap.getInt(multiValues[i]);
+        }
+        break;
+      default:
+        throw new UnsupportedOperationException("Unsupported data type : " + _fieldSpec.getDataType());
     }
 
-    // make hll column log info different than other columns, since range makes no sense for hll column
-    if (spec instanceof MetricFieldSpec &&
-        ((MetricFieldSpec)spec).getDerivedMetricType() == MetricFieldSpec.DerivedMetricType.HLL) {
-      LOGGER.info(
-          "Creating segment for column {}, hasNulls = {}, cardinality = {}, dataType = {}, single value field = {}, is HLL derived column",
-          spec.getName(), hasNulls, rowCount, spec.getDataType(), spec.isSingleValueField());
-    } else {
-      LOGGER.info(
-          "Creating segment for column {}, hasNulls = {}, cardinality = {}, dataType = {}, single value field = {}, range = {} to {}",
-          spec.getName(), hasNulls, rowCount, spec.getDataType(), spec.isSingleValueField(), first, last);
-    }
-    this.sortedList = sortedList;
-    this.spec = spec;
-    dictionaryFile = new File(indexDir, spec.getName() + V1Constants.Dict.FILE_EXTENSION);
-    FileUtils.touch(dictionaryFile);
+    return indexes;
   }
 
   @Override
-  public void close() throws IOException {
-  }
-
-  public void build() throws Exception {
-    switch (spec.getDataType()) {
-      case INT:
-        final FixedByteSingleValueMultiColWriter intDictionaryWrite =
-            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1,
-                V1Constants.Dict.INT_DICTIONARY_COL_SIZE);
-        intValueToIndexMap = new Int2IntOpenHashMap(rowCount);
-        int[] sortedInts = (int[]) sortedList;
-        for (int i = 0; i < rowCount; i++) {
-          final int entry = sortedInts[i];
-          intDictionaryWrite.setInt(i, 0, entry);
-          intValueToIndexMap.put(entry, i);
-        }
-        intDictionaryWrite.close();
-        break;
-      case FLOAT:
-        final FixedByteSingleValueMultiColWriter floatDictionaryWrite =
-            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1,
-                V1Constants.Dict.FLOAT_DICTIONARY_COL_SIZE);
-        floatValueToIndexMap = new Float2IntOpenHashMap(rowCount);
-        float[] sortedFloats = (float[]) sortedList;
-        for (int i = 0; i < rowCount; i++) {
-          final float entry = sortedFloats[i];
-          floatDictionaryWrite.setFloat(i, 0, entry);
-          floatValueToIndexMap.put(entry, i);
-        }
-        floatDictionaryWrite.close();
-        break;
-      case LONG:
-        final FixedByteSingleValueMultiColWriter longDictionaryWrite =
-            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1,
-                V1Constants.Dict.LONG_DICTIONARY_COL_SIZE);
-        longValueToIndexMap = new Long2IntOpenHashMap(rowCount);
-        long[] sortedLongs = (long[]) sortedList;
-        for (int i = 0; i < rowCount; i++) {
-          final long entry = sortedLongs[i];
-          longDictionaryWrite.setLong(i, 0, entry);
-          longValueToIndexMap.put(entry, i);
-        }
-        longDictionaryWrite.close();
-        break;
-      case DOUBLE:
-        final FixedByteSingleValueMultiColWriter doubleDictionaryWrite =
-            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1,
-                V1Constants.Dict.DOUBLE_DICTIONARY_COL_SIZE);
-        doubleValueToIndexMap = new Double2IntOpenHashMap(rowCount);
-        double[] sortedDoubles = (double[]) sortedList;
-        for (int i = 0; i < rowCount; i++) {
-          final double entry = sortedDoubles[i];
-          doubleDictionaryWrite.setDouble(i, 0, entry);
-          doubleValueToIndexMap.put(entry, i);
-        }
-        doubleDictionaryWrite.close();
-        break;
-      case STRING:
-        // TODO: here we call getBytes() multiple times, could be optimized
-        String[] sortedStrings = (String[]) sortedList;
-
-        // Get the maximum length of all entries
-        stringColumnMaxLength = 1; // make sure that there is non-zero sized dictionary JIRA:PINOT-2947
-        for (String entry : sortedStrings) {
-          int length = entry.getBytes(UTF_8).length;
-          if (stringColumnMaxLength < length) {
-            stringColumnMaxLength = length;
-          }
-        }
-
-        final FixedByteSingleValueMultiColWriter stringDictionaryWrite =
-            new FixedByteSingleValueMultiColWriter(dictionaryFile, rowCount, 1, new int[]{stringColumnMaxLength});
-        stringValueToIndexMap = new Object2IntOpenHashMap<>(rowCount);
-        for (int i = 0; i < rowCount; i++) {
-          String entry = sortedStrings[i];
-          stringDictionaryWrite.setString(i, 0, getPaddedString(entry, stringColumnMaxLength));
-          stringValueToIndexMap.put(entry, i);
-        }
-        stringDictionaryWrite.close();
-        break;
-      default:
-        throw new RuntimeException("Unhandled type " + spec.getDataType());
-    }
-  }
-
-  public int getStringColumnMaxLength() {
-    return stringColumnMaxLength;
-  }
-
-  public int indexOfSV(Object e) {
-    switch (spec.getDataType()) {
-      case INT:
-        return intValueToIndexMap.get(e);
-      case FLOAT:
-        return floatValueToIndexMap.get(e);
-      case DOUBLE:
-        return doubleValueToIndexMap.get(e);
-      case LONG:
-        return longValueToIndexMap.get(e);
-      case STRING:
-      case BOOLEAN:
-        String value = e.toString();
-        return stringValueToIndexMap.get(value);
-      default:
-        throw new UnsupportedOperationException("Unsupported data type : " + spec.getDataType() +
-            " for column : " + spec.getName());
-    }
-  }
-
-  public int[] indexOfMV(Object e) {
-
-    final Object[] multiValues = (Object[]) e;
-    final int[] ret = new int[multiValues.length];
-
-    switch (spec.getDataType()) {
-      case INT:
-        for (int i = 0; i < multiValues.length; i++) {
-          ret[i] = intValueToIndexMap.get(multiValues[i]);
-        }
-        break;
-      case FLOAT:
-        for (int i = 0; i < multiValues.length; i++) {
-          ret[i] = floatValueToIndexMap.get(multiValues[i]);
-        }
-        break;
-      case LONG:
-        for (int i = 0; i < multiValues.length; i++) {
-          ret[i] = longValueToIndexMap.get(multiValues[i]);
-        }
-        break;
-      case DOUBLE:
-        for (int i = 0; i < multiValues.length; i++) {
-          ret[i] = doubleValueToIndexMap.get(multiValues[i]);
-        }
-        break;
-      case STRING:
-      case BOOLEAN:
-        for (int i = 0; i < multiValues.length; i++) {
-          String value = multiValues[i].toString();
-          ret[i] = stringValueToIndexMap.get(value);
-        }
-        break;
-      default:
-        throw new UnsupportedOperationException("Unsupported data type : " + spec.getDataType() +
-            " for multivalue column : " + spec.getName());
-    }
-
-    return ret;
-  }
-
-  /**
-   * Given an input string and a target length, appends padding characters (<code>'\0'</code>) to the string to make it
-   * of desired length.
-   */
-  public static String getPaddedString(String inputString, int targetLength) {
-    byte[] bytes = inputString.getBytes(UTF_8);
-    if (bytes.length == targetLength) {
-      return inputString;
-    }
-
-    StringBuilder stringBuilder = new StringBuilder(inputString);
-    int numBytesToPad = targetLength - bytes.length;
-    for (int i = 0; i < numBytesToPad; i++) {
-      stringBuilder.append(V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
-    }
-    return stringBuilder.toString();
+  public void close() {
   }
 }

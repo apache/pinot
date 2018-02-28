@@ -97,30 +97,30 @@ public class ImmutableDictionaryReaderTest {
     _stringValues = stringSet.toArray(new String[NUM_VALUES]);
     Arrays.sort(_stringValues);
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, _intValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_intValues,
         new DimensionFieldSpec(INT_COLUMN_NAME, FieldSpec.DataType.INT, true), TEMP_DIR)) {
       dictionaryCreator.build();
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, _longValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_longValues,
         new DimensionFieldSpec(LONG_COLUMN_NAME, FieldSpec.DataType.LONG, true), TEMP_DIR)) {
       dictionaryCreator.build();
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, _floatValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_floatValues,
         new DimensionFieldSpec(FLOAT_COLUMN_NAME, FieldSpec.DataType.FLOAT, true), TEMP_DIR)) {
       dictionaryCreator.build();
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, _doubleValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_doubleValues,
         new DimensionFieldSpec(DOUBLE_COLUMN_NAME, FieldSpec.DataType.DOUBLE, true), TEMP_DIR)) {
       dictionaryCreator.build();
     }
 
-    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, _stringValues,
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_stringValues,
         new DimensionFieldSpec(STRING_COLUMN_NAME, FieldSpec.DataType.STRING, true), TEMP_DIR)) {
       dictionaryCreator.build();
-      _numBytesPerStringValue = dictionaryCreator.getStringColumnMaxLength();
+      _numBytesPerStringValue = dictionaryCreator.getNumBytesPerString();
     }
   }
 

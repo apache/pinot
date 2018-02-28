@@ -53,10 +53,6 @@ public class V1Constants {
   }
 
   public static class Dict {
-    public static final int[] INT_DICTIONARY_COL_SIZE = new int[]{4};
-    public static final int[] LONG_DICTIONARY_COL_SIZE = new int[]{8};
-    public static final int[] FLOAT_DICTIONARY_COL_SIZE = new int[]{4};
-    public static final int[] DOUBLE_DICTIONARY_COL_SIZE = new int[]{8};
     public static final String FILE_EXTENSION = ".dict";
   }
 

@@ -267,14 +267,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     Object sortedArray;
     switch (dataType) {
-      case STRING:
-        Preconditions.checkState(defaultValue instanceof String);
-        String stringDefaultValue = (String) defaultValue;
-        // Length of the UTF-8 encoded byte array.
-        // Default size should be 1, to gracefully handle empty strings
-        dictionaryElementSize = Math.max(stringDefaultValue.getBytes("UTF8").length, 1);
-        sortedArray = new String[]{stringDefaultValue};
-        break;
       case INT:
         Preconditions.checkState(defaultValue instanceof Integer);
         sortedArray = new int[]{(Integer) defaultValue};
@@ -291,6 +283,13 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         Preconditions.checkState(defaultValue instanceof Double);
         sortedArray = new double[]{(Double) defaultValue};
         break;
+      case STRING:
+        Preconditions.checkState(defaultValue instanceof String);
+        String stringDefaultValue = (String) defaultValue;
+        // Length of the UTF-8 encoded byte array.
+        dictionaryElementSize = stringDefaultValue.getBytes("UTF8").length;
+        sortedArray = new String[]{stringDefaultValue};
+        break;
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType + " for column: " + column);
     }
@@ -304,8 +303,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
 
     // Create dictionary.
     // We will have only one value in the dictionary.
-    try (SegmentDictionaryCreator creator = new SegmentDictionaryCreator(false/*hasNulls*/, sortedArray, fieldSpec,
-        _indexDir)) {
+    try (SegmentDictionaryCreator creator = new SegmentDictionaryCreator(sortedArray, fieldSpec, _indexDir)) {
       creator.build();
     }
 
