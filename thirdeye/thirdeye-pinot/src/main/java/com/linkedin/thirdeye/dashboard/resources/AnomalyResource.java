@@ -748,13 +748,16 @@ public class AnomalyResource {
     String[] exploreDimensions = anomalyFunctionSpec.getExploreDimensions().split(",");
     Map<String, String> inputDimension = OBJECT_MAPPER.readValue(dimension, Map.class);
     DimensionMap dimensionsToBeEvaluated = new DimensionMap();
-    for (String exploreDimension : exploreDimensions) {
-      if (!inputDimension.containsKey(exploreDimension)) {
-        String msg = String.format("Query %s doesn't specify the value of explore dimension %s", dimension, exploreDimension);
-        LOG.error(msg);
-        throw new WebApplicationException(msg);
-      } else {
-        dimensionsToBeEvaluated.put(exploreDimension, inputDimension.get(exploreDimension));
+    if (exploreDimensions != null && StringUtils.isNotBlank(anomalyFunctionSpec.getExploreDimensions())) {
+      for (String exploreDimension : exploreDimensions) {
+        if (!inputDimension.containsKey(exploreDimension)) {
+          String msg =
+              String.format("Query %s doesn't specify the value of explore dimension %s", dimension, exploreDimension);
+          LOG.error(msg);
+          throw new WebApplicationException(msg);
+        } else {
+          dimensionsToBeEvaluated.put(exploreDimension, inputDimension.get(exploreDimension));
+        }
       }
     }
 
