@@ -41,7 +41,11 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
           env.put(Context.SECURITY_PROTOCOL, "ssl");
         }
         env.put(Context.SECURITY_AUTHENTICATION, "simple");
-        env.put(Context.SECURITY_PRINCIPAL, credentials.getPrincipal() + '@' + this.domainSuffix);
+        if (credentials.getPrincipal().contains("@")) {
+          env.put(Context.SECURITY_PRINCIPAL, credentials.getPrincipal());
+        } else {
+          env.put(Context.SECURITY_PRINCIPAL, credentials.getPrincipal() + '@' + this.domainSuffix);
+        }
         env.put(Context.SECURITY_CREDENTIALS, credentials.getPassword());
 
         // Attempt ldap authentication
