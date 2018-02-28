@@ -1,12 +1,9 @@
 <div class="container card-container">
-  <div class="te-anomaly-table">
-    {{models-table
-      data=applicationAnomalies
-      columns=columns
-      showColumnsDropdown=false
-      showGlobalFilter=false
-      filteringIgnoreCase=true
-      multipleExpand=true
-    }}
-  </div>
+  {{#each metricList as |metric|}}
+    {{#each alertList as |alert|}}
+      <p>Metric: {{metric}}</p>
+      <p>Alert: {{alert}}</p>
+      ________________________
+    {{/each}}
+  {{/each}}
 </div>

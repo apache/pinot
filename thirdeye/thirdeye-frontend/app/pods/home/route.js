@@ -22,7 +22,11 @@ export default Route.extend({
     let anomalyMapping = [];
 
     applicationAnomalies.forEach(anomaly => {
-      const { metric, functionName } = anomaly;
+      const { metric, functionName, current, baseline } = anomaly;
+      const value = {
+        current,
+        baseline
+      };
 
       if (!anomalyMapping[metric]) {
         anomalyMapping[metric] = [];
@@ -33,13 +37,41 @@ export default Route.extend({
       }
 
       anomalyMapping[metric][functionName].push(anomaly);
+      anomaly.value = value;
+      anomaly.investigationLink = `/rootcause?anomalyId=${anomaly.id}`;
     });
 
     return anomalyMapping;
   },
 
+  /**
+   * Retrieves metric and alert lists to index anomalies
+   * @type {Array} - array of array, where the first element is the metric list and the second is the alert list
+   * @example
+   * [
+   *  ["metric 1", "metric 2"],
+   *  ["alert 1", "alert 2"]
+   * ]
+   */
+  getMetricAlertLists() {
+    let metricList = [];
+    let alertList = [];
+
+    applicationAnomalies.forEach(anomaly => {
+      metricList.push(anomaly.metric);
+      alertList.push(anomaly.functionName);
+    });
+
+    return [ metricList, alertList ];
+  },
+
   setupController(controller) {
     this._super(...arguments);
-    controller.set('columns', columns);
+
+    controller.setProperties({
+      columns,
+      metricList: this.getMetricAlertLists()[0],
+      alertList: this.getMetricAlertLists()[1]
+    });
   }
 });
