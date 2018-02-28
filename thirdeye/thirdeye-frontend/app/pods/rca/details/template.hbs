@@ -2,6 +2,18 @@
   <div class="row">
     <h2 class="te-title">Summary</h2>
     <div class="card-container">
+      <div class="card-container__header card-container__header--no-border card-container__header--right">
+        {{#containers/primary-metric-container as |summary actions|}}
+          <label class="te-label">
+            {{x-toggle
+              classNames="te-toggle pull-right"
+              theme='ios'
+              onToggle=(action "onLegacyToggle" summary.primaryMetric.metricId)
+              value=true}}
+            Use Legacy RCA
+          </label>
+        {{/containers/primary-metric-container}}
+      </div>
       <div class="card-container__body">
         <section class="rca-summary">
           <div class="row">

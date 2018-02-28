@@ -186,9 +186,8 @@
               </ul>
 
               <ul class="nav navbar-nav thirdeye-nav__tabs">
-                <li class="te-nav__link"><a href="app/#/rca">Root Cause Analysis</a></li>
                 <li class="te-nav__link">
-                  <a href="app/#/rootcause">Root Cause Analysis (beta)</a>
+                  <a href="app/#/rootcause">Root Cause Analysis</a>
                 </li>
                 <li class="te-nav__link"><a href="app/#/manage/alerts">Manage Alerts</a></li>
               </ul>
