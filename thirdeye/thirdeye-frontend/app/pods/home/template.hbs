@@ -2,16 +2,17 @@
   {{#each-in model as |metric alertList|}}
     <p>Metric: {{metric}}</p>
     {{#each-in alertList as |alert anomalyList|}}
-    {{!-- TODO: Replace below with a table --}}
       <p>Alert: {{alert}}</p>
-      {{models-table
-        data=anomalyList
-        columns=columns
-        showColumnsDropdown=false
-        showGlobalFilter=false
-        filteringIgnoreCase=true
-        multipleExpand=true
-      }}
+      <div class="te-anomaly-table">
+        {{models-table
+          data=anomalyList
+          columns=columns
+          showColumnsDropdown=false
+          showGlobalFilter=false
+          filteringIgnoreCase=true
+          multipleExpand=true
+        }}
+      </div>
     {{/each-in}}
   {{/each-in}}
 </div>

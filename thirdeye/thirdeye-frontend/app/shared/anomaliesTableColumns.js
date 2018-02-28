@@ -20,6 +20,7 @@ export default [
   },
   {
     propertyName: 'baseline',
+    template: 'custom/anomalies-table/current-wow',
     title: 'Current/WoW',
     className: 'anomalies-table__column',
     disableFiltering: true

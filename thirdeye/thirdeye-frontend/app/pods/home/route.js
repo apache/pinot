@@ -39,11 +39,7 @@ export default Route.extend({
 
       anomalyMapping[metric][functionName].push(anomaly);
       anomaly.value = value;
-      anomaly.link = {
-        rootUrl: 'rootcause',
-        queryParam: 'anomalyId',
-        queryParamValue: anomaly.id
-      };
+      anomaly.change = ((current-baseline)/baseline)*100;
     });
 
     return anomalyMapping;
