@@ -4,8 +4,14 @@
     {{#each-in alertList as |alert anomalyList|}}
     {{!-- TODO: Replace below with a table --}}
       <p>Alert: {{alert}}</p>
-      <p>Anomaly List: {{anomalyList}}</p>
-      ________________________
+      {{models-table
+        data=anomalyList
+        columns=columns
+        showColumnsDropdown=false
+        showGlobalFilter=false
+        filteringIgnoreCase=true
+        multipleExpand=true
+      }}
     {{/each-in}}
   {{/each-in}}
 </div>
