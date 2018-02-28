@@ -31,8 +31,8 @@ export default [
     disableFiltering: true
   },
   {
-    propertyName: 'investigationLink',
-    template: 'custom/link-cell',
+    propertyName: 'link',
+    template: 'custom/anomalies-table/investigation-link',
     title: 'Investigation Link',
     className: 'anomalies-table__column',
     disableFiltering: true

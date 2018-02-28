@@ -39,7 +39,11 @@ export default Route.extend({
 
       anomalyMapping[metric][functionName].push(anomaly);
       anomaly.value = value;
-      anomaly.investigationLink = `/rootcause?anomalyId=${anomaly.id}`;
+      anomaly.link = {
+        rootUrl: 'rootcause',
+        queryParam: 'anomalyId',
+        queryParamValue: anomaly.id
+      };
     });
 
     return anomalyMapping;
