@@ -15,6 +15,7 @@ import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineOffset;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -225,11 +226,11 @@ public class RootCauseMetricResource {
     MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end, granularity));
     Baseline range = parseOffset(baseSlice, offset, timezone);
 
-    List<MetricSlice> slices = range.scatter(baseSlice);
+    List<MetricSlice> slices = new ArrayList<>(range.scatter(baseSlice));
+    slices.add(baseSlice); // add baseSlice for alignment
     logSlices(baseSlice, slices);
 
     Map<MetricSlice, DataFrame> data = fetchTimeSeries(slices);
-
     DataFrame result = range.gather(baseSlice, data);
 
     return makeTimeSeriesMap(result);
@@ -242,9 +243,11 @@ public class RootCauseMetricResource {
    * @return map of lists of double or long (keyed by series name)
    */
   private static Map<String, List<? extends Number>> makeTimeSeriesMap(DataFrame data) {
+    DataFrame trimmed = data.dropNull();
+
     Map<String, List<? extends Number>> output = new HashMap<>();
-    output.put(COL_TIME, data.getLongs(COL_TIME).toList());
-    output.put(COL_VALUE, data.getDoubles(COL_VALUE).toList());
+    output.put(COL_TIME, trimmed.getLongs(COL_TIME).toList());
+    output.put(COL_VALUE, trimmed.getDoubles(COL_VALUE).toList());
     return output;
   }
 

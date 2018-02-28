@@ -30,4 +30,25 @@ public class BaselineUtil {
 
     return LongSeries.sequence(start, count, interval);
   }
+
+  /**
+   * Returns a series of timestamps from a template, applied to an actual start offset.
+   *
+   * @param template template time series
+   * @param actual actual time series
+   * @return LongSeries
+   */
+  public static LongSeries alignTimestamps(LongSeries template, LongSeries actual) {
+    if (actual.size() <= 0)
+      return actual;
+
+    if (template.size() <= 0)
+      return actual;
+
+    if (actual.size() != template.size()) {
+      throw new IllegalArgumentException("Requires series with the same length");
+    }
+
+    return template.subtract(template.min().longValue()).add(actual.min());
+  }
 }

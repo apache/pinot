@@ -31,6 +31,8 @@ public interface Baseline {
 
   /**
    * Returns the synthetic baseline computed from a set of inputs.
+   * If a series is provided for slice, aligns timestamps for coarse grained data.
+   *
    * <br/><b>NOTE:</b> Must filter out non-matching slices from a potentially large pool of results.
    *
    * @param slice base metric slice
