@@ -98,6 +98,7 @@ public class DashboardResource {
   @Path(value = "/data/metrics")
   @Produces(MediaType.APPLICATION_JSON)
   public List<String> getMetrics(@QueryParam("dataset") String collection) throws Exception {
+    LOG.warn("Call to a deprecated end point /dashboard/data/metrics" + getClass().getName());
     try {
       List<String> metrics = new ArrayList<>();
       List<MetricConfigDTO> metricConfigs = metricConfigDAO.findActiveByDataset(collection);
@@ -116,6 +117,7 @@ public class DashboardResource {
   @Path(value = "/data/dimensions")
   @Produces(MediaType.APPLICATION_JSON)
   public String getDimensions(@QueryParam("dataset") String collection) {
+    LOG.warn("Call to a deprecated end point /dashboard/data/dimensions" + getClass().getName());
     String jsonDimensions = null;
     try {
       List<String> dimensions = Utils.getSortedDimensionNames(collection);
@@ -131,6 +133,8 @@ public class DashboardResource {
   @Path(value = "/data/info")
   @Produces(MediaType.APPLICATION_JSON)
   public String getMaxTime(@QueryParam("dataset") String collection) {
+    LOG.warn("Call to a deprecated end point /dashboard/data/info" + getClass().getName());
+
     String collectionInfo = null;
     try {
 
@@ -165,6 +169,7 @@ public class DashboardResource {
   @Path(value = "/data/filters")
   @Produces(MediaType.APPLICATION_JSON)
   public String getFilters(@QueryParam("dataset") String collection) {
+    LOG.warn("Call to a deprecated end point /dashboard/data/filters" + getClass().getName());
     String jsonFilters = null;
     try {
       jsonFilters = dimensionFiltersCache.get(collection);
@@ -185,6 +190,7 @@ public class DashboardResource {
       @QueryParam("currentStart") Long currentStart, @QueryParam("currentEnd") Long currentEnd,
       @QueryParam("compareMode") String compareMode, @QueryParam("metrics") String metricsJson)
       throws Exception {
+    LOG.warn("Call to a deprecated end point /dashboard/data/heatmap" + getClass().getName());
 
     HeatMapViewRequest request = new HeatMapViewRequest();
 
@@ -237,6 +243,7 @@ public class DashboardResource {
       @QueryParam("currentStart") Long currentStart, @QueryParam("currentEnd") Long currentEnd,
       @QueryParam("aggTimeGranularity") String aggTimeGranularity,
       @QueryParam("metrics") String metricsJson) throws Exception {
+    LOG.warn("Call to a deprecated end point /dashboard/data/tabular" + getClass().getName());
 
     TabularViewRequest request = new TabularViewRequest();
     request.setCollection(collection);
@@ -291,6 +298,7 @@ public class DashboardResource {
       @QueryParam("aggTimeGranularity") String aggTimeGranularity,
       @QueryParam("metrics") String metricsJson, @QueryParam("dimensions") String groupByDimensions)
       throws Exception {
+    LOG.warn("Call to a deprecated end point /dashboard/data/contributor" + getClass().getName());
 
     ContributorViewRequest request = new ContributorViewRequest();
     request.setCollection(collection);
@@ -437,6 +445,8 @@ public class DashboardResource {
   @Path(value = "/thirdeye")
   @Produces(MediaType.APPLICATION_JSON)
   public String saySomethingAwesome(@QueryParam("praise") String praise) {
+    LOG.warn("Call to a deprecated end point /dashboard/thirdeye" + getClass().getName());
+
     JSONObject hello = new JSONObject();
     try {
       hello.put("thirdeye", praise);

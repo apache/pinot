@@ -262,6 +262,7 @@ public class DataResource {
   @GET
   @Path("autocomplete/alert")
   public List<AlertConfigDTO> getAlertsWhereNameLike(@QueryParam("name") String name) {
+    LOG.warn("Call to a deprecated end point /data/autocomplete/alert" + getClass().getName());
     List<AlertConfigDTO> alerts = Collections.emptyList();
     if (StringUtils.isNotBlank(name)) {
       alerts = alertConfigDAO.findWhereNameLike("%" + name + "%");

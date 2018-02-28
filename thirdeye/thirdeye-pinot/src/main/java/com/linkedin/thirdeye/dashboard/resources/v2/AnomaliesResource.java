@@ -236,6 +236,7 @@ public class AnomaliesResource {
       @PathParam("metricId") Long metricId,
       @PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime) {
+    LOG.warn("Call to a deprecated end point " + "/anomalies/getAnomalyCount/{metricId}/{startTime}/{endTime} " + getClass().getName());
     AnomaliesSummary anomaliesSummary = new AnomaliesSummary();
     List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricIdInRange(metricId, startTime, endTime);
 

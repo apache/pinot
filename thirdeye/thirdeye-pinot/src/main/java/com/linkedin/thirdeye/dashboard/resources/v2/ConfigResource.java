@@ -76,6 +76,7 @@ public class ConfigResource {
   @Path("/{namespace}/")
   public Map<String, Object> list(
       @PathParam("namespace") String namespace) {
+    LOG.warn("Call to a deprecated end point " + "/config/{namespace}/ " + getClass().getName());
     return makeNamespace(namespace).getAll();
   }
 

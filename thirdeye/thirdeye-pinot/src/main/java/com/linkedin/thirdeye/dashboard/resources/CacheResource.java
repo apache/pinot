@@ -17,10 +17,14 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.cache.MetricDataset;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 @Path("/cache")
 @Produces(MediaType.APPLICATION_JSON)
 public class CacheResource {
+  private static final Logger LOG = LoggerFactory.getLogger(CacheResource.class);
 
   private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(20);
   private ThirdEyeCacheRegistry CACHE_INSTANCE = ThirdEyeCacheRegistry.getInstance();
@@ -30,6 +34,9 @@ public class CacheResource {
   @Path(value = "/")
   @Produces(MediaType.TEXT_HTML)
   public String getCaches() {
+    LOG.warn("Call to a deprecated end point " + "/cache/ " + getClass().getName());
+
+
     return "usage";
   }
 
