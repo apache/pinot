@@ -196,6 +196,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(instanceRequest.getRequestId()));
         //dataTable.getMetadata().put(DataTable.TRACE_INFO_METADATA_KEY,
         //        TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()))
+
+        queryProcessingTimer.stopAndRecord();
+
       }
       return dataTable;
 
