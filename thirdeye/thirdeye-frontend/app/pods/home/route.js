@@ -1,5 +1,6 @@
 import Route from '@ember/routing/route';
-import applicationAnomalies from 'thirdeye-frontend/mocks/applicationAnomalies';
+import applicationAnomalies from 'thirdeye-frontend/mirage/fixtures/applicationAnomalies';
+import { humanizeFloat } from 'thirdeye-frontend/utils/utils';
 import columns from 'thirdeye-frontend/shared/anomaliesTableColumns';
 
 export default Route.extend({
@@ -24,10 +25,6 @@ export default Route.extend({
 
     applicationAnomalies.forEach(anomaly => {
       const { metric, functionName, current, baseline } = anomaly;
-      const value = {
-        current,
-        baseline
-      };
 
       if (!anomalyMapping[metric]) {
         anomalyMapping[metric] = {};
@@ -37,9 +34,13 @@ export default Route.extend({
         anomalyMapping[metric][functionName] = [];
       }
 
+      // Group anomalies by metric and function name
       anomalyMapping[metric][functionName].push(anomaly);
-      anomaly.value = value;
-      anomaly.investigationLink = `/rootcause?anomalyId=${anomaly.id}`;
+
+      // Format current and baseline numbers, so numbers in the millions+ don't overflow
+      anomaly.current = humanizeFloat(anomaly.current);
+      anomaly.baseline = humanizeFloat(anomaly.baseline);
+      anomaly.change = (((current - baseline) / baseline) * 100).toFixed(2);
     });
 
     return anomalyMapping;

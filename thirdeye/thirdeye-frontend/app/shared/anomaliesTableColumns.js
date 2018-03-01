@@ -20,6 +20,7 @@ export default [
   },
   {
     propertyName: 'baseline',
+    template: 'custom/anomalies-table/current-wow',
     title: 'Current/WoW',
     className: 'anomalies-table__column',
     disableFiltering: true
@@ -31,6 +32,8 @@ export default [
     disableFiltering: true
   },
   {
+    propertyName: 'link',
+    template: 'custom/anomalies-table/investigation-link',
     title: 'Investigation Link',
     className: 'anomalies-table__column',
     disableFiltering: true
