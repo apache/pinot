@@ -4,6 +4,7 @@
 const EmberApp = require('ember-cli/lib/broccoli/ember-app');
 const Funnel = require('broccoli-funnel');
 const MergeTrees = require('broccoli-merge-trees');
+const path = require('path');
 
 module.exports = function(defaults) {
   let app = new EmberApp(defaults, {
@@ -17,7 +18,7 @@ module.exports = function(defaults) {
     },
 
     sassOptions: {
-      extension: 'scss',
+      extension: 'scss'
     },
 
     sourcemaps: {
@@ -45,11 +46,25 @@ module.exports = function(defaults) {
     destDir: '/assets'
   });
 
-  app.import('bower_components/source-sans-pro/source-sans-pro.css')
+  // const domToImageTree = new Funnel('node_modules/dom-to-image', {
+  //   files: ['dist/dom-to-image.min.js']
+  // });
+  app.import('bower_components/source-sans-pro/source-sans-pro.css');
+  // app.import('node_modules/dom-to-image/dist/dom-to-image.min.js', {
+  //   exports: {
+  //     'dom-to-image' : [
+  //       'default'
+  //     ]
+  //   }
+  // });
+
+  // var domToImageTree = new Funnel(path.dirname(require.resolve('dom-to-image/dist/dom-to-image.min.js')), {
+  //   files: ['dom-to-image.min.js']
+  // });
 
   // Use `app.import` to add additional libraries to the generated
   // output files.
-  
+
   // If you need to use different assets in different
   // environments, specify an object as the first parameter. That
   // object's keys should be the environment name and the values

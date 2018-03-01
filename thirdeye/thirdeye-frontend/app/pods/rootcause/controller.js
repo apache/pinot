@@ -3,6 +3,10 @@ import { later, debounce } from '@ember/runloop';
 import { reads, gt, or } from '@ember/object/computed';
 import { inject as service } from '@ember/service';
 import Controller from '@ember/controller';
+import domtoimage from 'npm:dom-to-image';
+import fileSaver from 'npm:file-saver';
+import $ from 'jQuery';
+
 import {
   filterObject,
   filterPrefix,
@@ -966,6 +970,17 @@ export default Controller.extend({
           break;
 
       }
+    },
+
+    onShareReport: async () => {
+      const blob = await domtoimage.toBlob(document.getElementById('download-report-anchor'));
+      fileSaver.saveAs(blob, 'report.png');
+    },
+
+    onShareGraph: async () => {
+      const blob = await domtoimage.toBlob(document.getElementById('download-graph-anchor'));
+      fileSaver.saveAs(blob, 'graph.png');
+      // $('#clipboard-anchor').trigger(new ClipboardEvent("copy"));
     }
   }
 });
