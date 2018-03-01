@@ -132,7 +132,7 @@ export default Route.extend({
       fetch(createAlertUrl, postProps('')).then(checkStatus)
         .then((result) => {
           newFunctionId = result.id;
-          return fetch(updateAlertUrl, postProps('')).then(checkStatus);
+          return fetch(updateAlertUrl, postProps(data)).then(checkStatus);
         })
         .then((result) => {
           this.get('checkJobCreateStatus').perform(result.jobId, newName, newFunctionId);
