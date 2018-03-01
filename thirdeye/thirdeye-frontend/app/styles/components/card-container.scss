@@ -54,6 +54,10 @@
     &--flush-bottom {
       padding-bottom: 0;
     }
+
+    &--right {
+      justify-content: flex-end;
+    }
   }
 
   &__title {
@@ -62,6 +66,11 @@
     font-weight: 600;
     color: app-shade(black, 9);
     margin-bottom: 0;
+
+    &--grow {
+      flex: 1;
+      align-self: flex-end;
+    }
   }
 
   &__subnav {

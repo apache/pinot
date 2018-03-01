@@ -24,15 +24,9 @@ export default Controller.extend({
       title: 'Anomalies'
     },
     {
-      className: 'rca',
-      link: 'rca',
-      title: 'Root Cause Analysis',
-      isCustomLink: false
-    },
-    {
       className: 'rootcause',
       link: 'rootcause',
-      title: 'Root Cause Analysis (beta)',
+      title: 'Root Cause Analysis',
       isCustomLink: false
     },
     {

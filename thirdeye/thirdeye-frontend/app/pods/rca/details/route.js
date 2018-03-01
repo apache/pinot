@@ -192,6 +192,14 @@ export default Route.extend({
       if (transition.targetName === 'rca.index') {
         this.refresh();
       }
+    },
+
+    /**
+     * Redirects the user from legacy to new rootcause
+     * @param {Number} metricId the metric id to redirect to
+     */
+    transitionToNewRca(metricId) {
+      this.transitionTo('rootcause', { queryParams: { metricId } });
     }
   }
 });

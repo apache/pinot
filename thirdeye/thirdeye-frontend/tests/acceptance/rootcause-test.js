@@ -20,6 +20,7 @@ const HEATMAP_DROPDOWN = '#select-heatmap-mode';
 const SELECTED_HEATMAP_MODE = '.ember-power-select-selected-item';
 const EVENTS_FILTER_BAR = '.filter-bar';
 const EVENTS_TABLE = '.events-table';
+const RCA_TOGGLE = '#rootcause-to-legacy';
 
 moduleForAcceptance('Acceptance | rootcause');
 
@@ -145,4 +146,11 @@ test('Metrics, Dimensions, and Events tabs exist and should have correct informa
   assert.ok(
     find(EVENTS_TABLE).get(0),
     'events table exists in events tab');
+});
+
+test('links to legacy rca should work', async (assert) => {
+  await visit('/rootcause');
+  await click(RCA_TOGGLE);
+
+  assert.ok(currentURL().includes('rca'), currentURL());
 });

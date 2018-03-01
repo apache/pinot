@@ -18,8 +18,8 @@
                 name="splitViewToggle"
                 onToggle=(action (mut splitView))
                 as |toggle|}}
-                  {{#toggle.label splitView=(not splitView)}}
-                    <span class="te-label">{{if splitView 'Combine View' 'Split View'}}</span>
+                  {{#toggle.label class="te-toggle__label"splitView=(not splitView)}}
+                    <span class="te-label te-label--flush">{{if splitView 'Combine View' 'Split View'}}</span>
                   {{/toggle.label}}
                   {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
               {{/x-toggle}}

@@ -316,7 +316,7 @@ export default Controller.extend({
     },
 
     /**
-     * Resets anoamly and investigations regions
+     * Resets anomaly and investigations regions
      */
     resetAnalysisDates() {
       let offset = 1;
@@ -341,7 +341,14 @@ export default Controller.extend({
           shouldReset: false
         });
       }
-    }
+    },
 
+    /**
+     * Redirects the user to the new rootcause
+     * @param {Number} metricId
+     */
+    onLegacyToggle(metricId) {
+      this.send('transitionToNewRca', metricId);
+    }
   }
 });

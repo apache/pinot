@@ -296,5 +296,32 @@ export default Route.extend(AuthenticatedRouteMixin, {
       setupMode,
       context
     });
+  },
+
+  actions: {
+    /**
+     * transition from the new rootcause to legacy rca details
+     * @param {Number} id metric Id
+     */
+    transitionToRcaDetails(id) {
+      this.transitionTo('rca.details', id, {
+        queryParams: {
+          startDate: undefined,
+          endDate: undefined,
+          analysisStart: undefined,
+          analysisEnd: undefined,
+          granularity: undefined,
+          filters: JSON.stringify({}),
+          compareMode: 'WoW'
+        }
+      });
+    },
+
+    /**
+     * transition from the new rootcause to legacy rca
+     */
+    transitionToRca() {
+      this.transitionTo('rca');
+    }
   }
 });
