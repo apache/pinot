@@ -363,6 +363,25 @@ public abstract class Grouping {
      * @return DataFrame with grouping results
      */
     public DataFrame aggregate(String... aggregationExpressions) {
+      return this.aggregate(Arrays.asList(aggregationExpressions));
+    }
+
+    /**
+     * Evaluates the {@code aggregationExpressions} and returns the result as a DataFrame with
+     * the index corresponding to the grouping key column. Each expression takes the format
+     * {@code seriesName[:operation[:outputName]]}, where {@code seriesName} is a valid column name in the
+     * underlying DataFrame and {@code operation} is one of {@code SUM, PRODUCT, MIN, MAX,
+     * FIRST, LAST, MEAN, MEDIAN, STD} and {@code outputName} is the name of the result series.
+     *
+     * <br/><b>NOTE:</b> This method is generally faster than aggregating with explicit function
+     * references, as it may take advantage of specialized code depending on the grouping.
+     *
+     * @see DataFrameGrouping#aggregate(String[], Series.Function[])
+     *
+     * @param aggregationExpressions {@code seriesName:operation} tuples
+     * @return DataFrame with grouping results
+     */
+    public DataFrame aggregate(List<String> aggregationExpressions) {
       DataFrame df = new DataFrame();
       df.addSeries(this.keyName, this.grouping.keys);
       df.setIndex(this.keyName);
