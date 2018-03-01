@@ -17,6 +17,7 @@ package com.linkedin.thirdeye.hadoop.push;
 
 import static com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants.*;
 
+import com.linkedin.pinot.common.utils.SimpleHttpResponse;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -129,8 +130,9 @@ public class SegmentPushPhase  extends Configured {
             segmentName = fileName.substring(0, fileName.lastIndexOf(ThirdEyeConstants.SEGMENT_JOINER));
           }
           LOGGER.info("******** Uploading file: {} to Host: {} and Port: {} *******", fileName, host, port);
-          int responseCode = fileUploadDownloadClient.uploadSegment(
+          SimpleHttpResponse simpleHttpResponse = fileUploadDownloadClient.uploadSegment(
               FileUploadDownloadClient.getUploadSegmentHttpURI(host, Integer.parseInt(port)), fileName, inputStream);
+          int responseCode = simpleHttpResponse.getStatusCode();
           LOGGER.info("Response code: {}", responseCode);
           if (responseCode != 200) {
             uploadSuccess = false;
