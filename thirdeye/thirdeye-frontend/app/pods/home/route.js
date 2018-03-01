@@ -40,7 +40,7 @@ export default Route.extend({
       // Format current and baseline numbers, so numbers in the millions+ don't overflow
       anomaly.current = humanizeFloat(anomaly.current);
       anomaly.baseline = humanizeFloat(anomaly.baseline);
-      anomaly.change = (((current-baseline)/baseline)*100).toFixed(2);
+      anomaly.change = (((current - baseline) / baseline) * 100).toFixed(2);
     });
 
     return anomalyMapping;
