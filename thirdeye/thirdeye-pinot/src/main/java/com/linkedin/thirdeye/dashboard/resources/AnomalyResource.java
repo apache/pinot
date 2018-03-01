@@ -745,10 +745,11 @@ public class AnomalyResource {
 
     // Get DimensionMap from input dimension String
     Multimap<String, String> functionFilters = anomalyFunctionSpec.getFilterSet();
-    String[] exploreDimensions = anomalyFunctionSpec.getExploreDimensions().split(",");
     Map<String, String> inputDimension = OBJECT_MAPPER.readValue(dimension, Map.class);
     DimensionMap dimensionsToBeEvaluated = new DimensionMap();
-    if (exploreDimensions != null && StringUtils.isNotBlank(anomalyFunctionSpec.getExploreDimensions())) {
+    if (anomalyFunctionSpec.getExploreDimensions() != null &&
+        StringUtils.isNotBlank(anomalyFunctionSpec.getExploreDimensions())) {
+      String[] exploreDimensions = anomalyFunctionSpec.getExploreDimensions().split(",");
       for (String exploreDimension : exploreDimensions) {
         if (!inputDimension.containsKey(exploreDimension)) {
           String msg =
