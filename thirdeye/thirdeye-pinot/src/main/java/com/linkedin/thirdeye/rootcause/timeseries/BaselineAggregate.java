@@ -82,12 +82,8 @@ public class BaselineAggregate implements Baseline {
       DataFrame df = new DataFrame(entry.getValue());
 
       df.addSeries(COL_TIME, df.getLongs(COL_TIME).subtract(offset));
-      //df.addSeries(COL_TIME, BaselineUtil.alignTimestamps(joined.getLongs(COL_TIME), df.getLongs(COL_TIME)));
-
-      System.out.println(entry.getKey());
-      System.out.println(df.dropNull());
-
       df.renameSeries(COL_VALUE, colName);
+
       if (isDailyData) {
         df = heuristicDSTCorrection(df, timestampSet);
       }
@@ -112,9 +108,13 @@ public class BaselineAggregate implements Baseline {
 
     String[] arrNames = colNames.toArray(new String[colNames.size()]);
 
-    //joined = joined.dropNull();
+    // aggregation
     output.addSeries(COL_VALUE, output.map(this.type.function, arrNames));
     output = output.dropNull();
+
+    // alignment
+    List<String> indexNames = output.getIndexNames();
+    output = output.setIndex(COL_TIME).joinRight(new DataFrame(COL_TIME, timestamps)).setIndex(indexNames);
     output.sortedBy(output.getIndexNames());
 
     return output;
