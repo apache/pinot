@@ -618,7 +618,7 @@ public class PinotLLCRealtimeSegmentManager {
      * Step 3: Update IDEALSTATES to include new segment in CONSUMING state, and change old segment to ONLINE state.
      *
      * The controller may fail between these three steps.
-     * So when a new controller takes over as leader, it needs to check the following:
+     * So when a new controller takes over as leader, or when validation manager runs, it needs to check the following:
      *
      * If it fails between step-1 and step-2:
      * Check whether there are any segments in the PROPERTYSTORE with status DONE, but no new segment in status IN_PROGRESS,
