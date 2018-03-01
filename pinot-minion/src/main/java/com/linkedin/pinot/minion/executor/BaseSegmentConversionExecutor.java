@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.exception.HttpErrorStatusException;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
+import com.linkedin.pinot.common.utils.SimpleHttpResponse;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
@@ -107,7 +108,7 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       File convertedIndexDir = convert(pinotTaskConfig, indexDir, workingDir);
 
       // Tar the converted segment
-      final File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
+      File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
       Preconditions.checkState(convertedTarredSegmentDir.mkdir());
       final File convertedTarredSegmentFile = new File(
           TarGzCompressionUtils.createTarGzOfDirectory(convertedIndexDir.getPath(),
@@ -153,9 +154,11 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
           @Override
           public Boolean call() throws Exception {
             try {
-              int responseCode = fileUploadDownloadClient.uploadSegment(new URI(uploadURL), segmentName, convertedTarredSegmentFile,
-                  httpHeaders, parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
-              LOGGER.info("Response code {} received for segment {} from table {} from uri {}", responseCode, segmentName, tableName, uploadURL);
+              SimpleHttpResponse response =
+                  fileUploadDownloadClient.uploadSegment(new URI(uploadURL), segmentName, convertedTarredSegmentFile,
+                      httpHeaders, parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+              LOGGER.info("Got response {}: {} while uploading table: {}, segment: {} with uploadURL: {}",
+                  response.getStatusCode(), response.getResponse(), tableName, segmentName, uploadURL);
               return true;
             } catch (HttpErrorStatusException e) {
               int statusCode = e.getStatusCode();

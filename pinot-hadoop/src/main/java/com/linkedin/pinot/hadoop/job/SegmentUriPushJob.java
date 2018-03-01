@@ -16,6 +16,7 @@
 package com.linkedin.pinot.hadoop.job;
 
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
+import com.linkedin.pinot.common.utils.SimpleHttpResponse;
 import java.util.Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -82,10 +83,10 @@ public class SegmentUriPushJob extends Configured {
         LOGGER.info("******** Uploading file: {} to Host: {} and Port: {} with download uri: {} *******", fileName,
             host, _port, uri);
         try {
-          int responseCode =
+          SimpleHttpResponse response =
               fileUploadDownloadClient.sendSegmentUri(FileUploadDownloadClient.getUploadSegmentHttpURI(host, _port),
                   uri);
-          LOGGER.info("Response code: {}", responseCode);
+          LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
         } catch (Exception e) {
           LOGGER.error("******** Error Uploading file: {} to Host: {} and Port: {}  *******", fileName, host, _port);
           LOGGER.error("Caught exception during upload", e);

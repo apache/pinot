@@ -233,7 +233,8 @@ public abstract class ClusterTest extends ControllerTest {
         tasks.add(executor.submit(new Callable<Integer>() {
           @Override
           public Integer call() throws Exception {
-            return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentName, segmentFile);
+            return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentName, segmentFile)
+                .getStatusCode();
           }
         }));
       }
