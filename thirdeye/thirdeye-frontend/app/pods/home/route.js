@@ -1,7 +1,9 @@
 import Route from '@ember/routing/route';
 import applicationAnomalies from 'thirdeye-frontend/mirage/fixtures/applicationAnomalies';
+import anomalyPerformance from 'thirdeye-frontend/mirage/fixtures/applicationAnomalies';
 import { humanizeFloat } from 'thirdeye-frontend/utils/utils';
 import columns from 'thirdeye-frontend/shared/anomaliesTableColumns';
+import RSVP from 'rsvp';
 
 export default Route.extend({
 
@@ -43,7 +45,10 @@ export default Route.extend({
       anomaly.change = (((current - baseline) / baseline) * 100).toFixed(2);
     });
 
-    return anomalyMapping;
+    return RSVP.hash({
+      anomalyMapping,
+      anomalyPerformance
+    });
   },
 
   /**

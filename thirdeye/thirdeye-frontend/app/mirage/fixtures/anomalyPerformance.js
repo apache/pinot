@@ -1,4 +1,4 @@
-// Mock data that returns alert performance by application
+// Mock data that returns anomaly performance by application
 export default {
   "totalAlerts":"7",   // displayed as "number of anomalies" on frontend
   "totalResponses":"6",
