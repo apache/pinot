@@ -6,7 +6,7 @@ import java.util.Set;
 
 
 public class ThirdEyePrincipal implements Principal {
-  String name;
+  String name; // 'username@domainName'
   Set<String> groups = new HashSet<>();
 
   @Override

@@ -29,9 +29,14 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
    */
   @Override
   public Optional<ThirdEyePrincipal> authenticate(Credentials credentials) throws AuthenticationException {
+    String principalName = credentials.getPrincipal();
     try {
-      if (credentials.getPrincipal() != null) {
-        LOG.info("Authenticating {} via username and password", credentials.getPrincipal());
+      if (principalName != null) {
+        // Append the default domain name if the given principal name doesn't have one
+        if (!principalName.contains("@")) {
+          principalName = principalName + '@' + this.domainSuffix;
+        }
+        LOG.info("Authenticating {} via username and password", principalName);
 
         Hashtable<String, String> env = new Hashtable<>();
         env.put(Context.INITIAL_CONTEXT_FACTORY, LDAP_CONTEXT_FACTORY);
@@ -41,25 +46,21 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
           env.put(Context.SECURITY_PROTOCOL, "ssl");
         }
         env.put(Context.SECURITY_AUTHENTICATION, "simple");
-        if (credentials.getPrincipal().contains("@")) {
-          env.put(Context.SECURITY_PRINCIPAL, credentials.getPrincipal());
-        } else {
-          env.put(Context.SECURITY_PRINCIPAL, credentials.getPrincipal() + '@' + this.domainSuffix);
-        }
+        env.put(Context.SECURITY_PRINCIPAL, principalName);
         env.put(Context.SECURITY_CREDENTIALS, credentials.getPassword());
 
         // Attempt ldap authentication
         try {
           new InitialDirContext(env).close();
         } catch (NamingException e) {
-          LOG.error("Could not authenticate {} with LDAP", credentials.getPrincipal(), e);
+          LOG.error("Could not authenticate {} with LDAP", principalName, e);
           return Optional.absent();
         }
 
         ThirdEyePrincipal principal = new ThirdEyePrincipal();
-        principal.setName(credentials.getPrincipal());
+        principal.setName(principalName);
 
-        LOG.info("Successfully authenticated {} with LDAP", credentials.getPrincipal());
+        LOG.info("Successfully authenticated {} with LDAP", principalName);
         return Optional.of(principal);
       }
 
@@ -69,7 +70,7 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
       throw new AuthenticationException(e);
     }
 
-    LOG.info("Could not authenticate {}", credentials.getPrincipal());
+    LOG.info("Could not authenticate {}", principalName);
     return Optional.absent();
   }
 }
