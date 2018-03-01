@@ -23,43 +23,7 @@ export default Controller.extend({
         ['Recall', recallDescription, floatToPercent(recall)]
       ];
 
-      return this.statsBuilder(statsArray);
+      return statsArray;
     }
-  ),
-
-  /**
-   * Given an array of values, configure the cards
-   * @param {Array.Array<String>} - entries of each stats card (i.e. [['entry1', ...], ['entry2', ...], ['entry3], ...])
-   * @return {Object[]} - array of objects, each of which represents a stats card
-   * @example
-   * [{
-   *    title: 'title',
-   *    description: 'description',
-   *    value: 7
-   *  }, {
-   *    title: 'title',
-   *    description: 'description',
-   *    value: '87.1%'
-   *  }, {
-   *    title: 'title',
-   *    description: 'description',
-   *    value: '87.1%'
-   * }];
-   */
-  statsBuilder(statsArray) {
-    const props = ['title', 'description', 'value'];
-    let cards = [];
-
-    statsArray.forEach(card => {
-      let obj = {};
-
-      card.forEach((stat, index) => {
-        const property = props[index];
-        obj[property] = stat;
-      });
-      cards.push(obj);
-    });
-
-    return cards;
-  }
+  )
 });

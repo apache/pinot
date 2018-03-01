@@ -122,6 +122,12 @@ export function toIso(dateStr) {
   return moment(Number(dateStr)).toISOString();
 }
 
+/**
+ * Converts a float to percent
+ * @example floatToPercent(0.553) --> "55.3%"
+ * @param {float} float
+ * @return {String} - percent value of float with a % sign
+ */
 export function floatToPercent(float) {
   return `${(float*100).toFixed(2)}%`;
 }
