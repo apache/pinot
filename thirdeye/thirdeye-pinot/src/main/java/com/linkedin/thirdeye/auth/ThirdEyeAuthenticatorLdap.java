@@ -70,7 +70,7 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
       throw new AuthenticationException(e);
     }
 
-    LOG.info("Could not authenticate {}", principalName);
+    LOG.info("Unable to authenticate empty user name.");
     return Optional.absent();
   }
 }
