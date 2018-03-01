@@ -288,6 +288,24 @@ export function buildAnomalyStats(alertEvalMetrics, anomalyStats, showProjected 
 }
 
 /**
+ * Returns selected alert object properties for config group table display
+ * @param {Object} alertData - a single alert record
+ * @param {Number} alertIndex - record index
+ * @returns {Array}
+ */
+export function formatConfigGroupProps(alertData, alertIndex) {
+  return {
+    number: alertIndex + 1,
+    id: alertData.id,
+    name: alertData.functionName,
+    metric: alertData.metric + '::' + alertData.collection,
+    owner: alertData.createdBy || 'N/A',
+    status: alertData.isActive ? 'active' : 'inactive',
+    isNewId: alertData.id === 0
+  };
+}
+
+/**
  * Caches duration data to local storage in order to persist it across pages
  * TODO: Move this to self-serve services
  * @method setDuration
@@ -308,6 +326,27 @@ export function setDuration(duration, startDate, endDate) {
  */
 export function getDuration() {
   return JSON.parse(sessionStorage.getItem('duration'));
+}
+
+/**
+ * Decides which time range to load as default (query params, default set, or locally cached)
+ * @method prepareTimeRange
+ * @return {Object}
+ */
+export function prepareTimeRange(queryParams, defaultDurationObj) {
+  const durationCached = sessionStorage.getItem('duration') !== null;
+  // Check for presence of each time range key in qeury params
+  const isDurationInQuery = isPresent(queryParams.duration) && isPresent(queryParams.startDate) && isPresent(queryParams.endDate)
+  // Use querystring time range if present. Else, use preset defaults
+  const defaultDuration = isDurationInQuery ? queryParams : defaultDurationObj;
+  // Prefer cached time range if present. Else, load from defaults
+  const durationObj = durationCached ? getDuration() : defaultDuration;
+  // If no time range is cached for the session, cache the new one
+  if (!durationCached) {
+    const { duration, startDate, endDate } = durationObj;
+    setDuration(duration, startDate, endDate);
+  }
+  return durationObj;
 }
 
 /**
@@ -332,8 +371,10 @@ export default {
   enhanceAnomalies,
   getTopDimensions,
   setUpTimeRangeOptions,
+  formatConfigGroupProps,
   buildAnomalyStats,
   buildMetricDataUrl,
+  prepareTimeRange,
   extractSeverity,
   setDuration,
   getDuration,

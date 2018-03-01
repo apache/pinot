@@ -368,7 +368,10 @@ export default Controller.extend({
         // When either replay is no longer pending or 60 seconds have passed, transition to full alert page.
         if (replayStatusList.includes(replayStatus) || isReplayTimeUp) {
           const repRunStatus = replayStatus === 'running' ? jobId : null;
-          this.transitionToRoute('manage.alert', alertId, { queryParams: { jobId: null, repRunStatus }});
+          // Replay may be complete. Give server time to load anomalies
+          later(this, function() {
+            this.transitionToRoute('manage.alert', alertId, { queryParams: { jobId: null, repRunStatus }});
+          }, 3000);
         } else {
           this.get('checkReplayStatus').perform(jobId);
         }

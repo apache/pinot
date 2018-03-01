@@ -149,13 +149,22 @@ body {
   }
 
   &__table-index {
-    text-align: right;
-    width: 100px;
+    text-align: center;
+    width: 90px;
   }
 
   &__table-metric {
-    overflow-wrap: break-word;
-    word-wrap: break-word;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 280px;
+  }
+
+  &__table-name {
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 480px;
   }
 
   // overriding bootstrap for create alert form
