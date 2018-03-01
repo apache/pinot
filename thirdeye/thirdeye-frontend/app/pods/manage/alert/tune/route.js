@@ -20,6 +20,7 @@ import {
 import {
   enhanceAnomalies,
   setUpTimeRangeOptions,
+  prepareTimeRange,
   toIdGroups,
   extractSeverity,
   getDuration
@@ -32,8 +33,11 @@ const durationDefault = '3m';
 const defaultSeverity = '0.3';
 const dateFormat = 'YYYY-MM-DD';
 const displayDateFormat = 'YYYY-MM-DD HH:mm';
-const startDateDefault = buildDateEod(3, 'month').valueOf();
-const endDateDefault = moment().valueOf();
+const defaultDurationObj = {
+  duration: '3m',
+  startDate: buildDateEod(3, 'month').valueOf(),
+  endDate: moment().valueOf()
+};
 
 /**
  * Pattern display options (power-select) and values
@@ -246,19 +250,20 @@ export default Route.extend({
 
     // Default to 3 months of anomalies to show if no dates present in query params
     if (!duration || (duration !== 'custom' && duration !== '3m') || !startDate) {
-      this.transitionTo({ queryParams: {
-        duration: durationDefault,
-        startDate: startDateDefault,
-        endDate: endDateDefault
-      }});
+      this.transitionTo({ queryParams: defaultDurationObj });
     }
   },
 
   model(params, transition) {
     const { id, alertData } = this.modelFor('manage.alert');
     if (!id) { return; }
-    // Fetch saved duration data
-    const { duration, startDate, endDate } = getDuration();
+
+    // Get duration data
+    const {
+      duration,
+      startDate,
+      endDate
+    } = prepareTimeRange(transition.queryParams, defaultDurationObj);
 
     // Prepare endpoints for the initial eval, mttd, projected metrics calls
     const tuneParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
@@ -408,11 +413,7 @@ export default Route.extend({
 
     // User clicks reset button
     resetPage() {
-      this.transitionTo({ queryParams: {
-        duration: durationDefault,
-        startDate: startDateDefault,
-        endDate: endDateDefault
-      }});
+      this.transitionTo({ queryParams: defaultDurationObj });
     },
 
     // User resets settings

@@ -290,12 +290,12 @@ export function buildAnomalyStats(alertEvalMetrics, anomalyStats, showProjected 
 /**
  * Returns selected alert object properties for config group table display
  * @param {Object} alertData - a single alert record
- * @param {Number} cnt - record index
+ * @param {Number} alertIndex - record index
  * @returns {Array}
  */
-export function formatConfigGroupProps(alertData, cnt) {
+export function formatConfigGroupProps(alertData, alertIndex) {
   return {
-    number: cnt + 1,
+    number: alertIndex + 1,
     id: alertData.id,
     name: alertData.functionName,
     metric: alertData.metric + '::' + alertData.collection,
@@ -329,6 +329,27 @@ export function getDuration() {
 }
 
 /**
+ * Decides which time range to load as default (query params, default set, or locally cached)
+ * @method prepareTimeRange
+ * @return {Object}
+ */
+export function prepareTimeRange(queryParams, defaultDurationObj) {
+  const durationCached = sessionStorage.getItem('duration') !== null;
+  // Check for presence of each time range key in qeury params
+  const isDurationInQuery = isPresent(queryParams.duration) && isPresent(queryParams.startDate) && isPresent(queryParams.endDate)
+  // Use querystring time range if present. Else, use preset defaults
+  const defaultDuration = isDurationInQuery ? queryParams : defaultDurationObj;
+  // Prefer cached time range if present. Else, load from defaults
+  const durationObj = durationCached ? getDuration() : defaultDuration;
+  // If no time range is cached for the session, cache the new one
+  if (!durationCached) {
+    const { duration, startDate, endDate } = durationObj;
+    setDuration(duration, startDate, endDate);
+  }
+  return durationObj;
+}
+
+/**
  * When fetching current and projected MTTD (minimum time to detect) data, we need to supply the
  * endpoint with a severity threshold. This decides whether to use the default or not.
  * @method extractSeverity
@@ -353,6 +374,7 @@ export default {
   formatConfigGroupProps,
   buildAnomalyStats,
   buildMetricDataUrl,
+  prepareTimeRange,
   extractSeverity,
   setDuration,
   getDuration,

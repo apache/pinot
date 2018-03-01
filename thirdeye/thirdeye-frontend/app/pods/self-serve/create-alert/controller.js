@@ -239,7 +239,7 @@ export default Controller.extend({
    * @param {String} functionName - name of alert or function
    * @return {Promise}
    */
-  fetchAnomalyByName(functionName) {
+  fetchAlertsByName(functionName) {
     const url = `/data/autocomplete/functionByName?name=${functionName}`;
     return fetch(url).then(checkStatus);
   },
@@ -321,9 +321,9 @@ export default Controller.extend({
   /**
    * Enriches the list of functions by Id, adding the properties we may want to display.
    * We are preparing to display the alerts that belong to the currently selected config group.
+   * TODO: Good candidate to move to self-serve shared services
    * @method prepareFunctions
    * @param {Object} configGroup - the currently selected alert config group
-   * @param {Object} newId - conditional param to help us tag any function that was "just added"
    * @return {RSVP.Promise} A new list of functions (alerts)
    */
   prepareFunctions(configGroup) {
@@ -333,7 +333,7 @@ export default Controller.extend({
 
     // Build object for each function(alert) to display in results table
     return new RSVP.Promise((resolve) => {
-      for (var functionId of existingFunctionList) {
+      existingFunctionList.forEach((functionId) => {
         this.fetchFunctionById(functionId).then(functionData => {
           newFunctionList.push(formatConfigGroupProps(functionData));
           cnt ++;
@@ -341,7 +341,7 @@ export default Controller.extend({
             resolve(newFunctionList);
           }
         });
-      }
+      });
     });
   },
 
@@ -917,19 +917,14 @@ export default Controller.extend({
     /**
      * Make sure alert name does not already exist in the system
      * @method validateAlertName
-     * @param {String} name - The new alert name
+     * @param {String} userProvidedName - The new alert name
      * @param {Boolean} userModified - Up to this moment, is the new name auto-generated, or user modified?
      * If user-modified, we will stop modifying it dynamically (via 'isAlertNameUserModified')
      * @return {undefined}
      */
-    validateAlertName(name, userModified = false) {
-      let isDuplicateName = false;
-      this.fetchAnomalyByName(name).then(anomaly => {
-        for (var resultObj of anomaly) {
-          if (resultObj.functionName === name) {
-            isDuplicateName = true;
-          }
-        }
+    validateAlertName(userProvidedName, userModified = false) {
+      this.fetchAlertsByName(userProvidedName).then(matchingAlerts => {
+        const isDuplicateName = matchingAlerts.find(alert => alert.functionName === userProvidedName);
         // If the user edits the alert name, we want to stop auto-generating it.
         if (userModified) {
           this.set('isAlertNameUserModified', true);

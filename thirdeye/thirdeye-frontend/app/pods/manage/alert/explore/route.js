@@ -15,8 +15,8 @@ import { checkStatus, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils'
 import {
   enhanceAnomalies,
   toIdGroups,
-  getDuration,
   setUpTimeRangeOptions,
+  prepareTimeRange,
   getTopDimensions,
   buildMetricDataUrl,
   extractSeverity
@@ -34,19 +34,21 @@ const displayDateFormat = 'YYYY-MM-DD HH:mm';
 const DEFAULT_SEVERITY = 0.3;
 const PAGINATION_DEFAULT = 10;
 const DIMENSION_COUNT = 7;
-const DURATION_DEFAULT = '3m';
 const METRIC_DATA_COLOR = 'blue';
 
 /**
  * Basic alert page defaults
  */
-const endDateDefault = moment();
 const resolutionOptions = ['All Resolutions'];
 const dimensionOptions = ['All Dimensions'];
 const wowOptions = ['Wow', 'Wo2W', 'Wo3W', 'Wo4W'];
 const durationMap = { m:'month', d:'day', w:'week' };
-const startDateDefault = buildDateEod(3, 'month').valueOf();
 const baselineOptions = [{ name: 'Predicted', isActive: true }];
+const defaultDurationObj = {
+  duration: '3m',
+  startDate: buildDateEod(3, 'month').valueOf(),
+  endDate: moment()
+};
 
 /**
  * Response type options for anomalies
@@ -103,7 +105,7 @@ const processRangeParams = (bucketUnit, duration, start, end) => {
   // In this case, we will use those instead of our parsed duration & defaults
   const isCustomDate = duration === 'custom';
   const baseStart = isCustomDate ? moment(parseInt(start, 10)) : buildDateEod(querySize, queryUnit);
-  const baseEnd = isCustomDate ? moment(parseInt(end, 10)) : endDateDefault;
+  const baseEnd = isCustomDate ? moment(parseInt(end, 10)) : moment();
 
   // These resulting timestamps are used for our graph and anomaly queries
   const startStamp = baseStart.valueOf();
@@ -130,14 +132,9 @@ export default Route.extend({
 
   beforeModel(transition) {
     const { duration, startDate } = transition.queryParams;
-
     // Default to 1 month of anomalies to show if no dates present in query params
     if (!duration || !startDate) {
-      this.transitionTo({ queryParams: {
-        duration: DURATION_DEFAULT,
-        startDate: startDateDefault,
-        endDate: endDateDefault
-      }});
+      this.transitionTo({ queryParams: defaultDurationObj });
     }
   },
 
@@ -145,12 +142,12 @@ export default Route.extend({
     const { id, alertData, jobId } = this.modelFor('manage.alert');
     if (!id) { return; }
 
-    // Fetch saved time range
+    // Get duration data
     const {
-      duration = DURATION_DEFAULT,
-      startDate = startDateDefault,
-      endDate = endDateDefault
-    } = getDuration();
+      duration,
+      startDate,
+      endDate
+    } = prepareTimeRange(transition.queryParams, defaultDurationObj);
 
     // Prepare endpoints for eval, mttd, projected metrics calls
     const dateParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;

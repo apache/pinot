@@ -39,10 +39,9 @@ export default Controller.extend({
    * @method initialize
    * @return {undefined}
    */
-  initialize() {
-    this.prepareFunctions(this.get('selectedConfigGroup')).then(functionData => {
-      this.set('selectedGroupFunctions', functionData);
-    });
+  initialize: async function() {
+    const functionData = await this.prepareFunctions(this.get('selectedConfigGroup'));
+    this.set('selectedGroupFunctions', functionData);
   },
 
   /**
@@ -66,7 +65,7 @@ export default Controller.extend({
         selectedApplication,
         alertConfigGroups
       } = this.getProperties('selectedApplication', 'alertConfigGroups');
-      const appName = selectedApplication ? selectedApplication.application : null;
+      const appName = getWithDefault(this, 'selectedConfigGroup.application', null);
       const activeGroups = alertConfigGroups ? alertConfigGroups.filterBy('active') : [];
       const groupsWithAppName = activeGroups.filter(group => isPresent(group.application));
       if (isPresent(appName)) {
@@ -238,7 +237,7 @@ export default Controller.extend({
 
     // Build object for each function(alert) to display in results table
     return new RSVP.Promise((resolve) => {
-      for (var functionId of existingFunctionList) {
+      existingFunctionList.forEach((functionId) => {
         this.fetchFunctionById(functionId).then(functionData => {
           newFunctionList.push(formatConfigGroupProps(functionData));
           cnt ++;
@@ -246,7 +245,7 @@ export default Controller.extend({
             resolve(newFunctionList);
           }
         });
-      }
+      });
     });
   },
 
@@ -317,25 +316,17 @@ export default Controller.extend({
 
     /**
      * Make sure alert name does not already exist in the system
+     * Either add or clear the "is duplicate name" banner
      * @method validateAlertName
-     * @param {String} name - The new alert name
-     * @param {Boolean} userModified - Up to this moment, is the new name auto-generated, or user modified?
-     * If user-modified, we will stop modifying it dynamically (via 'isAlertNameUserModified')
+     * @param {String} userProvidedName - The new alert name
      * @return {undefined}
      */
-    validateAlertName(name) {
-      let isDuplicateName = false;
-      this.fetchAlertByName(name).then(alert => {
-        for (var resultObj of alert) {
-          if (resultObj.functionName === name) {
-            isDuplicateName = true;
-          }
-        }
-        // Either add or clear the "is duplicate name" banner
+    validateAlertName(userProvidedName) {
+      this.fetchAlertByName(userProvidedName).then(matchingAlerts => {
+        const isDuplicateName = matchingAlerts.find(alert => alert.functionName === userProvidedName);
         this.set('isAlertNameDuplicate', isDuplicateName);
       });
     },
-
 
     /**
      * Verify that email address does not already exist in alert group. If it does, remove it and alert user.

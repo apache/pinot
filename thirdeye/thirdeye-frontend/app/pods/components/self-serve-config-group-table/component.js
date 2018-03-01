@@ -21,6 +21,7 @@ export default Component.extend({
 
   /**
    * Array to define alerts table columns for selected config group
+   * @type {Array}
    */
   alertsTableColumns: [
     {
