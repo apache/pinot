@@ -241,7 +241,7 @@ public class ValidationManager {
       if (_autoCreateOnError) {
         _llcRealtimeSegmentManager.createConsumingSegment(realtimeTableName, nonConsumingKafkaPartitions, llcSegments,
             tableConfig);
-        _llcRealtimeSegmentManager.completeCommittingSegments(realtimeTableName, llcSegments);
+        _llcRealtimeSegmentManager.completeCommittingSegments(realtimeTableName);
       }
     }
     // Make this call after other validations (so that we verify that we are consistent against the existing partition
