@@ -1,13 +1,7 @@
-{{#each stats as |card|}}
+{{#each statsTransformed as |card|}}
   <ul class="te-horizontal-cards__card">
-    <li class="te-horizontal-cards">
-      <div class="te-horizontal-cards__card-title">{{card.title}}</div>
-      <div class="te-horizontal-cards__card-text">{{card.description}}</div>
-    </li>
-    <li class="te-horizontal-cards__card-value">
-      <div class="te-horizontal-cards__card-number">
-        {{card.value}}
-      </div>
-    </li>
+    <li class="te-horizontal-cards__card-title">{{card.title}}</li>
+    <li class="te-horizontal-cards__card-text">{{card.description}}</li>
+    <li class="te-horizontal-cards__card-number">{{card.value}}</li>
   </ul>
 {{/each}}

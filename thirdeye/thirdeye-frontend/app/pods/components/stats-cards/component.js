@@ -1,9 +1,9 @@
 /**
  * Stats-Cards Component
  * Displays a row of cards, each of which contains stats, depending on the stats that are passed to the component
- * @module components/anomaly-stats-block
- * @property {object[]} stats  - [required] array of stats object that specify what to display on each card
- *
+ * @module components/stats-card
+ * @property {object[]} stats  - [required] array of stats object that specify values on each card. This will be
+ *                               transformed inside the component
  * @example
  * {{stats-cards
  *   stats=stats}}
@@ -21,12 +21,13 @@ export default Component.extend({
    */
   didReceiveAttrs() {
     set(this,
-      'stats',
+      'statsTransformed',
       this.statsBuilder(get(this, 'stats')));
   },
 
   /**
    * Given an array of values, configure the cards
+   * @method statsBuilder
    * @param {Array.Array<String>} - entries of each stats card (i.e. [['entry1', ...], ['entry2', ...], ['entry3], ...])
    * @return {Object[]} - array of objects, each of which represents a stats card
    * @example

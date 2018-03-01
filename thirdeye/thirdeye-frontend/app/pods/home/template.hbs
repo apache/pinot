@@ -1,6 +1,7 @@
 <div class="container card-container">
   {{stats-cards
     stats=stats}}
+
   {{#each-in model.anomalyMapping as |metric alertList|}}
     <p>Metric: {{metric}}</p>
     {{#each-in alertList as |alert anomalyList|}}
