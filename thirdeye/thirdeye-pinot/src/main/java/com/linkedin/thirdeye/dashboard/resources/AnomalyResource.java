@@ -762,23 +762,28 @@ public class AnomalyResource {
     }
 
     // Get the anomaly time lines view of the anomaly function on each dimension
-    HashMap<String, AnomalyTimelinesView> dimensionMapAnomalyTimelinesViewMap = new HashMap<>();
     AnomaliesResource anomaliesResource = new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory);
     DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(anomalyFunctionSpec.getCollection());
     AnomalyTimelinesView anomalyTimelinesView = null;
-    if (mode.equalsIgnoreCase("ONLINE")) {
-      // If online, use the monitoring time window to query time range and generate the baseline
-      anomalyTimelinesView =
-          anomaliesResource.getTimelinesViewInMonitoringWindow(anomalyFunctionSpec, datasetConfigDTO, startTime,
-              endTime, dimensionsToBeEvaluated);
-    } else {
-      // If offline, request baseline in user-defined data range
-      List<Pair<Long, Long>> dataRangeIntervals = new ArrayList<>();
-      dataRangeIntervals.add(new Pair<Long, Long>(endTime.getMillis(), endTime.getMillis()));
-      dataRangeIntervals.add(new Pair<Long, Long>(startTime.getMillis(), endTime.getMillis()));
-      anomalyTimelinesView =
-          anomaliesResource.getTimelinesViewInMonitoringWindow(anomalyFunctionSpec, datasetConfigDTO,
-              dataRangeIntervals, dimensionsToBeEvaluated);
+    try {
+      if (mode.equalsIgnoreCase("ONLINE")) {
+        // If online, use the monitoring time window to query time range and generate the baseline
+        anomalyTimelinesView =
+            anomaliesResource.getTimelinesViewInMonitoringWindow(anomalyFunctionSpec, datasetConfigDTO, startTime,
+                endTime, dimensionsToBeEvaluated);
+      } else {
+        // If offline, request baseline in user-defined data range
+        List<Pair<Long, Long>> dataRangeIntervals = new ArrayList<>();
+        dataRangeIntervals.add(new Pair<Long, Long>(endTime.getMillis(), endTime.getMillis()));
+        dataRangeIntervals.add(new Pair<Long, Long>(startTime.getMillis(), endTime.getMillis()));
+        anomalyTimelinesView =
+            anomaliesResource.getTimelinesViewInMonitoringWindow(anomalyFunctionSpec, datasetConfigDTO,
+                dataRangeIntervals, dimensionsToBeEvaluated);
+      }
+    } catch (Exception e) {
+      LOG.warn("Unable to generate baseline for given anomaly function: {}", functionId, e);
+      // Return no content with empty time line view upon exception
+      return Response.status(Response.Status.NO_CONTENT).entity(new AnomalyTimelinesView()).build();
     }
     anomalyTimelinesView = amendAnomalyTimelinesViewWithAnomalyResults(anomalyFunctionSpec, anomalyTimelinesView,
         dimensionsToBeEvaluated);
