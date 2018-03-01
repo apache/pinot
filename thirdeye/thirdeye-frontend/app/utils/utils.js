@@ -122,6 +122,10 @@ export function toIso(dateStr) {
   return moment(Number(dateStr)).toISOString();
 }
 
+export function floatToPercent(float) {
+  return `${(float*100).toFixed(2)}%`;
+}
+
 export default {
   checkStatus,
   humanizeFloat,
@@ -129,5 +133,6 @@ export default {
   humanizeScore,
   parseProps,
   postProps,
-  toIso
+  toIso,
+  floatToPercent
 };

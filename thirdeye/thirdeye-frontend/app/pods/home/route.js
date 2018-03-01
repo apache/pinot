@@ -1,6 +1,6 @@
 import Route from '@ember/routing/route';
 import applicationAnomalies from 'thirdeye-frontend/mirage/fixtures/applicationAnomalies';
-import anomalyPerformance from 'thirdeye-frontend/mirage/fixtures/applicationAnomalies';
+import anomalyPerformance from 'thirdeye-frontend/mirage/fixtures/anomalyPerformance';
 import { humanizeFloat } from 'thirdeye-frontend/utils/utils';
 import columns from 'thirdeye-frontend/shared/anomaliesTableColumns';
 import RSVP from 'rsvp';

@@ -1,10 +1,10 @@
 <div class="container card-container">
+  {{stats-cards
+    stats=stats}}
   {{#each-in model.anomalyMapping as |metric alertList|}}
     <p>Metric: {{metric}}</p>
     {{#each-in alertList as |alert anomalyList|}}
       <p>Alert: {{alert}}</p>
-      {{anomaly-stats-block
-        }}
       <div class="te-anomaly-table">
         {{models-table
           data=anomalyList
