@@ -168,7 +168,9 @@ public class ServerSegmentCompletionProtocolHandler {
 
   private SegmentCompletionProtocol.Response sendRequest(String url) {
     try {
-      String responseStr = _fileUploadDownloadClient.sendSegmentCompletionProtocolRequest(url, OTHER_REQUESTS_TIMEOUT);
+      String responseStr =
+          _fileUploadDownloadClient.sendSegmentCompletionProtocolRequest(new URI(url), OTHER_REQUESTS_TIMEOUT)
+              .getResponse();
       SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(responseStr);
       LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
@@ -182,9 +184,12 @@ public class ServerSegmentCompletionProtocolHandler {
     return SegmentCompletionProtocol.RESP_NOT_SENT;
   }
 
-  private SegmentCompletionProtocol.Response uploadSegment(String url, final String segmentName, final File segmentTarFile) {
+  private SegmentCompletionProtocol.Response uploadSegment(String url, final String segmentName,
+      final File segmentTarFile) {
     try {
-      String responseStr = _fileUploadDownloadClient.uploadSegment(url, segmentName, segmentTarFile, SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS);
+      String responseStr =
+          _fileUploadDownloadClient.uploadSegment(new URI(url), segmentName, segmentTarFile, null, null,
+              SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS).getResponse();
       SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(responseStr);
       LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {

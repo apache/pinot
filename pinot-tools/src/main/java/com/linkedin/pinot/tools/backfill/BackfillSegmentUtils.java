@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
+import com.linkedin.pinot.common.utils.SimpleHttpResponse;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -164,13 +165,14 @@ public class BackfillSegmentUtils {
       TarGzCompressionUtils.createTarGzOfDirectory(segmentDir.getAbsolutePath(), segmentTar.getAbsolutePath());
       LOGGER.info("Created tar of {} at {}", segmentDir.getAbsolutePath(), segmentTar.getAbsolutePath());
       try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-        int statusCode = fileUploadDownloadClient.uploadSegment(
+        SimpleHttpResponse response = fileUploadDownloadClient.uploadSegment(
             FileUploadDownloadClient.getUploadSegmentHttpURI(_controllerHost, Integer.parseInt(_controllerPort)),
             segmentName, segmentTar);
+        int statusCode = response.getStatusCode();
         if (statusCode != HttpStatus.SC_OK) {
           success = false;
         }
-        LOGGER.info("Uploaded segment: {} and got response status code: {}", segmentName, statusCode);
+        LOGGER.info("Uploaded segment: {} and got response {}: {}", segmentName, statusCode, response.getResponse());
       }
     } catch (Exception e) {
       LOGGER.error("Exception in segment upload {}", segmentTar, e);

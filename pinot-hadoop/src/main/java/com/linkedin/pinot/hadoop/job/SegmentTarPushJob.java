@@ -16,6 +16,7 @@
 package com.linkedin.pinot.hadoop.job;
 
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
+import com.linkedin.pinot.common.utils.SimpleHttpResponse;
 import java.io.InputStream;
 import java.util.Properties;
 import org.apache.hadoop.conf.Configuration;
@@ -78,10 +79,10 @@ public class SegmentTarPushJob extends Configured {
         try (InputStream inputStream = fs.open(path)) {
           fileName = fileName.split(".tar.gz")[0];
           LOGGER.info("******** Uploading file: {} to Host: {} and Port: {} *******", fileName, host, _port);
-          int responseCode =
+          SimpleHttpResponse response =
               fileUploadDownloadClient.uploadSegment(FileUploadDownloadClient.getUploadSegmentHttpURI(host, _port),
                   fileName, inputStream);
-          LOGGER.info("Response code: {}", responseCode);
+          LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
         } catch (Exception e) {
           LOGGER.error("******** Error Uploading file: {} to Host: {} and Port: {}  *******", fileName, host, _port);
           LOGGER.error("Caught exception during upload", e);

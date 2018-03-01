@@ -54,6 +54,11 @@ import org.apache.http.util.EntityUtils;
 import org.json.JSONObject;
 
 
+/**
+ * The <code>FileUploadDownloadClient</code> class provides methods to upload schema/segment, download segment or send
+ * segment completion protocol request through HTTP/HTTPS.
+ */
+@SuppressWarnings("unused")
 public class FileUploadDownloadClient implements Closeable {
   public static class CustomHeaders {
     public static final String UPLOAD_TYPE = "UPLOAD_TYPE";
@@ -166,13 +171,6 @@ public class FileUploadDownloadClient implements Closeable {
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getSegmentCompletionUriRequest(String uri, int socketTimeoutMs) {
-    RequestBuilder requestBuilder = RequestBuilder.get(uri)
-        .setVersion(HttpVersion.HTTP_1_1);
-    setTimeout(requestBuilder, socketTimeoutMs);
-    return requestBuilder.build();
-  }
-
   private static HttpUriRequest getSendSegmentJsonRequest(URI uri, String jsonString, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
     RequestBuilder requestBuilder = RequestBuilder.post(uri)
@@ -180,6 +178,12 @@ public class FileUploadDownloadClient implements Closeable {
         .setHeader(CustomHeaders.UPLOAD_TYPE, FileUploadType.JSON.toString())
         .setEntity(new StringEntity(jsonString, ContentType.APPLICATION_JSON));
     addHeadersAndParameters(requestBuilder, headers, parameters);
+    setTimeout(requestBuilder, socketTimeoutMs);
+    return requestBuilder.build();
+  }
+
+  private static HttpUriRequest getSegmentCompletionProtocolRequest(URI uri, int socketTimeoutMs) {
+    RequestBuilder requestBuilder = RequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
     setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();
   }
@@ -217,18 +221,17 @@ public class FileUploadDownloadClient implements Closeable {
     requestBuilder.setConfig(requestConfig);
   }
 
-  private int sendRequest(HttpUriRequest request) throws Exception {
+  private SimpleHttpResponse sendRequest(HttpUriRequest request) throws IOException, HttpErrorStatusException {
     try (CloseableHttpResponse response = _httpClient.execute(request)) {
-      StatusLine statusLine = response.getStatusLine();
-      int statusCode = statusLine.getStatusCode();
-      if (statusCode >= 400) {
+      int statusCode = response.getStatusLine().getStatusCode();
+      if (statusCode >= 300) {
         throw new HttpErrorStatusException(getErrorMessage(request, response), statusCode);
       }
-      return statusCode;
+      return new SimpleHttpResponse(statusCode, EntityUtils.toString(response.getEntity()));
     }
   }
 
-  private static String getErrorMessage(HttpUriRequest request, CloseableHttpResponse response) throws Exception {
+  private static String getErrorMessage(HttpUriRequest request, CloseableHttpResponse response) {
     String controllerHost = null;
     String controllerVersion = null;
     if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
@@ -236,7 +239,12 @@ public class FileUploadDownloadClient implements Closeable {
       controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
     }
     StatusLine statusLine = response.getStatusLine();
-    String reason = new JSONObject(EntityUtils.toString(response.getEntity())).getString("error");
+    String reason;
+    try {
+      reason = new JSONObject(EntityUtils.toString(response.getEntity())).getString("error");
+    } catch (Exception e) {
+      reason = "Failed to get reason";
+    }
     String errorMessage = String.format("Got error status code: %d (%s) with reason: \"%s\" while sending request: %s",
         statusLine.getStatusCode(), statusLine.getReasonPhrase(), reason, request.getURI());
     if (controllerHost != null) {
@@ -252,10 +260,12 @@ public class FileUploadDownloadClient implements Closeable {
    * @param uri URI
    * @param schemaName Schema name
    * @param schemaFile Schema file
-   * @return Response status code
-   * @throws Exception
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
    */
-  public int addSchema(URI uri, String schemaName, File schemaFile) throws Exception {
+  public SimpleHttpResponse addSchema(URI uri, String schemaName, File schemaFile)
+      throws IOException, HttpErrorStatusException {
     return sendRequest(getAddSchemaRequest(uri, schemaName, schemaFile));
   }
 
@@ -265,15 +275,17 @@ public class FileUploadDownloadClient implements Closeable {
    * @param uri URI
    * @param schemaName Schema name
    * @param schemaFile Schema file
-   * @return Response status code
-   * @throws Exception
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
    */
-  public int updateSchema(URI uri, String schemaName, File schemaFile) throws Exception {
+  public SimpleHttpResponse updateSchema(URI uri, String schemaName, File schemaFile)
+      throws IOException, HttpErrorStatusException {
     return sendRequest(getUpdateSchemaRequest(uri, schemaName, schemaFile));
   }
 
   /**
-   * Upload segment.
+   * Upload segment with segment file.
    *
    * @param uri URI
    * @param segmentName Segment name
@@ -281,51 +293,32 @@ public class FileUploadDownloadClient implements Closeable {
    * @param headers Optional http headers
    * @param parameters Optional query parameters
    * @param socketTimeoutMs Socket timeout in milliseconds
-   * @return Response status code
-   * @throws Exception
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
    */
-  public int uploadSegment(URI uri, String segmentName, File segmentFile, @Nullable List<Header> headers,
-      @Nullable List<NameValuePair> parameters, int socketTimeoutMs) throws Exception {
+  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters, int socketTimeoutMs) throws IOException, HttpErrorStatusException {
     return sendRequest(getUploadSegmentRequest(uri, segmentName, segmentFile, headers, parameters, socketTimeoutMs));
   }
 
-  public String uploadSegment(String url, String segmentName, File segmentFile, int socketTimeoutMs) throws Exception {
-    URI uri = URI.create(url);
-    HttpUriRequest request = getUploadSegmentRequest(uri, segmentName, segmentFile, null, null, socketTimeoutMs);
-    return sendSegmentCompletionProtocolRequest(request);
-  }
-
-  public String sendSegmentCompletionProtocolRequest(String url, int socketTimeoutMs) throws Exception {
-    HttpUriRequest request = getSegmentCompletionUriRequest(url, socketTimeoutMs);
-    return sendSegmentCompletionProtocolRequest(request);
-  }
-
-  private String sendSegmentCompletionProtocolRequest(HttpUriRequest request) throws Exception {
-    try (CloseableHttpResponse response = _httpClient.execute(request)) {
-      StatusLine statusLine = response.getStatusLine();
-      int statusCode = statusLine.getStatusCode();
-      if (statusCode >= 300) {
-        throw new HttpErrorStatusException(getErrorMessage(request, response), statusCode);
-      }
-      return EntityUtils.toString(response.getEntity());
-    }
-  }
-
   /**
-   * Upload segment using default settings.
+   * Upload segment with segment file using default settings.
    *
    * @param uri URI
    * @param segmentName Segment name
    * @param segmentFile Segment file
-   * @return Response status code
-   * @throws Exception
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
    */
-  public int uploadSegment(URI uri, String segmentName, File segmentFile) throws Exception {
+  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile)
+      throws IOException, HttpErrorStatusException {
     return uploadSegment(uri, segmentName, segmentFile, null, null, DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
   /**
-   * Upload segment.
+   * Upload segment with segment file input stream.
    *
    * @param uri URI
    * @param segmentName Segment name
@@ -333,24 +326,28 @@ public class FileUploadDownloadClient implements Closeable {
    * @param headers Optional http headers
    * @param parameters Optional query parameters
    * @param socketTimeoutMs Socket timeout in milliseconds
-   * @return Response status code
-   * @throws Exception
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
    */
-  public int uploadSegment(URI uri, String segmentName, InputStream inputStream, @Nullable List<Header> headers,
-      @Nullable List<NameValuePair> parameters, int socketTimeoutMs) throws Exception {
+  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, InputStream inputStream,
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
     return sendRequest(getUploadSegmentRequest(uri, segmentName, inputStream, headers, parameters, socketTimeoutMs));
   }
 
   /**
-   * Upload segment using default settings.
+   * Upload segment with segment file input stream using default settings.
    *
    * @param uri URI
    * @param segmentName Segment name
    * @param inputStream Segment file input stream
-   * @return Response status code
-   * @throws Exception
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
    */
-  public int uploadSegment(URI uri, String segmentName, InputStream inputStream) throws Exception {
+  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, InputStream inputStream)
+      throws IOException, HttpErrorStatusException {
     return uploadSegment(uri, segmentName, inputStream, null, null, DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
@@ -362,11 +359,12 @@ public class FileUploadDownloadClient implements Closeable {
    * @param headers Optional http headers
    * @param parameters Optional query parameters
    * @param socketTimeoutMs Socket timeout in milliseconds
-   * @return Response status code
-   * @throws Exception
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
    */
-  public int sendSegmentUri(URI uri, String downloadUri, @Nullable List<Header> headers,
-      @Nullable List<NameValuePair> parameters, int socketTimeoutMs) throws Exception {
+  public SimpleHttpResponse sendSegmentUri(URI uri, String downloadUri, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters, int socketTimeoutMs) throws IOException, HttpErrorStatusException {
     return sendRequest(getSendSegmentUriRequest(uri, downloadUri, headers, parameters, socketTimeoutMs));
   }
 
@@ -375,10 +373,11 @@ public class FileUploadDownloadClient implements Closeable {
    *
    * @param uri URI
    * @param downloadUri Segment download uri
-   * @return Response status code
-   * @throws Exception
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
    */
-  public int sendSegmentUri(URI uri, String downloadUri) throws Exception {
+  public SimpleHttpResponse sendSegmentUri(URI uri, String downloadUri) throws IOException, HttpErrorStatusException {
     return sendSegmentUri(uri, downloadUri, null, null, DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
@@ -390,11 +389,12 @@ public class FileUploadDownloadClient implements Closeable {
    * @param headers Optional http headers
    * @param parameters Optional query parameters
    * @param socketTimeoutMs Socket timeout in milliseconds
-   * @return Response status code
-   * @throws Exception
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
    */
-  public int sendSegmentJson(URI uri, String jsonString, @Nullable List<Header> headers,
-      @Nullable List<NameValuePair> parameters, int socketTimeoutMs) throws Exception {
+  public SimpleHttpResponse sendSegmentJson(URI uri, String jsonString, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters, int socketTimeoutMs) throws IOException, HttpErrorStatusException {
     return sendRequest(getSendSegmentJsonRequest(uri, jsonString, headers, parameters, socketTimeoutMs));
   }
 
@@ -403,11 +403,26 @@ public class FileUploadDownloadClient implements Closeable {
    *
    * @param uri URI
    * @param jsonString Segment json string
-   * @return Response status code
-   * @throws Exception
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
    */
-  public int sendSegmentJson(URI uri, String jsonString) throws Exception {
+  public SimpleHttpResponse sendSegmentJson(URI uri, String jsonString) throws IOException, HttpErrorStatusException {
     return sendSegmentJson(uri, jsonString, null, null, DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  /**
+   * Send segment completion protocol request.
+   *
+   * @param uri URI
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse sendSegmentCompletionProtocolRequest(URI uri, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return sendRequest(getSegmentCompletionProtocolRequest(uri, socketTimeoutMs));
   }
 
   /**
@@ -417,14 +432,15 @@ public class FileUploadDownloadClient implements Closeable {
    * @param socketTimeoutMs Socket timeout in milliseconds
    * @param dest File destination
    * @return Response status code
-   * @throws Exception
+   * @throws IOException
+   * @throws HttpErrorStatusException
    */
-  public int downloadFile(URI uri, int socketTimeoutMs, File dest) throws Exception {
+  public int downloadFile(URI uri, int socketTimeoutMs, File dest) throws IOException, HttpErrorStatusException {
     HttpUriRequest request = getDownloadFileRequest(uri, socketTimeoutMs);
     try (CloseableHttpResponse response = _httpClient.execute(request)) {
       StatusLine statusLine = response.getStatusLine();
       int statusCode = statusLine.getStatusCode();
-      if (statusCode >= 400) {
+      if (statusCode >= 300) {
         throw new HttpErrorStatusException(getErrorMessage(request, response), statusCode);
       }
 
@@ -453,9 +469,10 @@ public class FileUploadDownloadClient implements Closeable {
    * @param uri URI
    * @param dest File destination
    * @return Response status code
-   * @throws Exception
+   * @throws IOException
+   * @throws HttpErrorStatusException
    */
-  public int downloadFile(URI uri, File dest) throws Exception {
+  public int downloadFile(URI uri, File dest) throws IOException, HttpErrorStatusException {
     return downloadFile(uri, DEFAULT_SOCKET_TIMEOUT_MS, dest);
   }
 

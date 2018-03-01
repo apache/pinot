@@ -43,14 +43,14 @@ public class FileUploadDownloadClientTest {
   private static HttpServer TEST_SERVER;
 
   @BeforeClass
-  public void setup() throws Exception {
+  public void setUp() throws Exception {
     TEST_SERVER = HttpServer.create(new InetSocketAddress(TEST_PORT), 0);
     TEST_SERVER.createContext("/segments", new testSegmentUploadHandler());
     TEST_SERVER.setExecutor(null); // creates a default executor
     TEST_SERVER.start();
   }
 
-  static class testSegmentUploadHandler implements HttpHandler {
+  private static class testSegmentUploadHandler implements HttpHandler {
 
     @Override
     public void handle(HttpExchange httpExchange) throws IOException {
@@ -85,16 +85,13 @@ public class FileUploadDownloadClientTest {
     }
   }
 
-  @AfterClass
-  public void Shutdown() {
-    TEST_SERVER.stop(0);
-  }
-
   @Test
   public void testSendFileWithUri() throws Exception {
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      Assert.assertEquals(fileUploadDownloadClient.sendSegmentUri(
-          FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), TEST_URI), HttpStatus.SC_OK);
+      SimpleHttpResponse response = fileUploadDownloadClient.sendSegmentUri(
+          FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), TEST_URI);
+      Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
+      Assert.assertEquals(response.getResponse(), "OK");
     }
   }
 
@@ -104,8 +101,15 @@ public class FileUploadDownloadClientTest {
     segmentJson.put(CommonConstants.Segment.Offline.DOWNLOAD_URL, TEST_URI);
     String jsonString = segmentJson.toString();
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      Assert.assertEquals(fileUploadDownloadClient.sendSegmentJson(
-          FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), jsonString), HttpStatus.SC_OK);
+      SimpleHttpResponse response = fileUploadDownloadClient.sendSegmentJson(
+          FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), jsonString);
+      Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
+      Assert.assertEquals(response.getResponse(), "OK");
     }
+  }
+
+  @AfterClass
+  public void shutDown() {
+    TEST_SERVER.stop(0);
   }
 }
