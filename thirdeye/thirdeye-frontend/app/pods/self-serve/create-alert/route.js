@@ -129,7 +129,7 @@ export default Route.extend({
       let onboardStartTime = moment();
       let newFunctionId = null;
 
-      fetch(createAlertUrl, postProps('')).then(checkStatus)
+      fetch(createAlertUrl, postProps({ name: newName })).then(checkStatus)
         .then((result) => {
           newFunctionId = result.id;
           return fetch(updateAlertUrl, postProps(data)).then(checkStatus);
