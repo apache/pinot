@@ -13,7 +13,30 @@
   {{/if}}
 
   <a {{action "onShareReport"}}>Share!</a>
-  <a {{action "onShareGraph"}}>Share graph</a> 
+  {{#copy-button
+    id="clipboard-anchor"
+    clipboardText=clipBoardData
+    success=(action "onCopySuccess")
+    error=(action "onCopyError")
+  }}
+    <a {{action "onShareGraph"}}>Share graph</a>
+  {{/copy-button}}
+
+  <a {{action "onCopySuccess"}}>
+    <a {{action "onCopyError"}}>
+      Test which action will trigger first? 
+    </a>
+  </a>
+    {{!-- <a {{action "onShareGraph"}}>
+    {{#copy-button
+      id="clipboard-anchor"
+      clipboardText=clipBoardData
+      success=(action "onCopySuccess")
+      error=(action "onCopyError")
+    }}
+    Share graph
+    {{/copy-button}}
+  </a> --}}
 
   {{rootcause-header
     sessionId=sessionId

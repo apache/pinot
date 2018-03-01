@@ -5,7 +5,7 @@ import { inject as service } from '@ember/service';
 import Controller from '@ember/controller';
 import domtoimage from 'npm:dom-to-image';
 import fileSaver from 'npm:file-saver';
-import $ from 'jQuery';
+import $ from 'jquery';
 
 import {
   filterObject,
@@ -91,6 +91,8 @@ export default Controller.extend({
   // user details
   //
   username: reads('authService.data.authenticated.name'),
+
+  clipBoardData: 'png blob yo',
 
   //
   // user selection
@@ -972,15 +974,29 @@ export default Controller.extend({
       }
     },
 
-    onShareReport: async () => {
+    onShareReport: async function(){
       const blob = await domtoimage.toBlob(document.getElementById('download-report-anchor'));
       fileSaver.saveAs(blob, 'report.png');
     },
 
-    onShareGraph: async () => {
-      const blob = await domtoimage.toBlob(document.getElementById('download-graph-anchor'));
-      fileSaver.saveAs(blob, 'graph.png');
-      // $('#clipboard-anchor').trigger(new ClipboardEvent("copy"));
+    onShareGraph() {
+      const blob = domtoimage.toBlob(document.getElementById('download-graph-anchor')).then((blob) => {
+        var url = URL.createObjectURL(blob);
+        this.set('clipBoardData', url);
+        // mailto:username@example.com?subject=Subject&body=message%20goes%20here
+      });
+      // fileSaver.saveAs(blob, 'graph.png');
+      // $('#clipboard-anchor').trigger('click');
+    },
+
+    onCopySuccess() {
+      later(() => {
+        console.log('on Copy Success');
+      }, 1000);
+    },
+
+    onCopyError() {
+      console.log('on Copy error');
     }
   }
 });
