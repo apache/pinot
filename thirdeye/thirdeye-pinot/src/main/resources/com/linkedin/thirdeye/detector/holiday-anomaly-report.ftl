@@ -63,7 +63,7 @@
                   <#if newTable>
                   <p style="margin: 24px;">
                       <span style="color: #606060; font-size: 14px; line-height: 20px; margin-right: 16px;">Alert</span>
-                      <a href="${dashboardHost}/app/#/manage/alerts/${functionToId[function]?string.computer}" target="blank" style="text-decoration: none; color: #0B5EA1; font-size: 14px; font-weight: bold; line-height: 20px;">${function}</a>
+                      <a href="${dashboardHost}/app/#/manage/alert/${functionToId[function]?string.computer}" target="blank" style="text-decoration: none; color: #0B5EA1; font-size: 14px; font-weight: bold; line-height: 20px;">${function}</a>
                   </p>    
                   </#if>           
                   <table border="0" width="100%" align="center" style="width:100%; padding:0; margin:0; border-collapse: collapse;text-align:left;">
