@@ -20,7 +20,7 @@ const HEATMAP_DROPDOWN = '#select-heatmap-mode';
 const SELECTED_HEATMAP_MODE = '.ember-power-select-selected-item';
 const EVENTS_FILTER_BAR = '.filter-bar';
 const EVENTS_TABLE = '.events-table';
-const RCA_TOGGLE = '#rootcause-to-legacy';
+const RCA_TOGGLE = '.rootcause-to-legacy-toggle';
 
 moduleForAcceptance('Acceptance | rootcause');
 
