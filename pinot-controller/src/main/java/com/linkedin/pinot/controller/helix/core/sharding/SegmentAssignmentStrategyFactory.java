@@ -40,6 +40,8 @@ public class SegmentAssignmentStrategyFactory {
         return new BalancedSegmentSizeSegmentAssignmentStrategy();
       case BalancedLatencyBasedSegmentAssignmentStrategy:
         return new BalancedLatencyBasedSegmentAssignmentStrategy();
+      case BalancedCPULoadSegmentAssignmentStrategy:
+        return new BalancedCPULoadSegmentAssignmentStrategy();
       default:
         return new BalanceNumSegmentAssignmentStrategy();
     }

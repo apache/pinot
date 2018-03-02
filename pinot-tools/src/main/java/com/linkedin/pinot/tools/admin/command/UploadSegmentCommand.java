@@ -132,4 +132,16 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
     }
     return true;
   }
+
+
+  public static void main(String args[]){
+    UploadSegmentCommand uploadSegmentCommand = new UploadSegmentCommand();
+
+    try {
+      uploadSegmentCommand.setSegmentDir("/home/sajavadi/pinot-data/event-segment-2017/ProfileView/Jan-2017/ ").execute();
+    }catch (Exception e)
+    {
+      e.printStackTrace();
+    }
+  }
 }

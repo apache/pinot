@@ -40,12 +40,7 @@ public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {
     private static final Logger LOGGER = LoggerFactory.getLogger(BucketizedSegmentStrategy.class);
 
     @Override
-    public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager, ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
-        return null;
-    }
-
-    @Override
-    public List<String> getAssignedInstances(HelixAdmin helixAdmin,
+    public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager, HelixAdmin helixAdmin,
                                              ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
                                              int numReplicas, String tenantName) {
         String serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);

@@ -19,6 +19,8 @@ import com.linkedin.pinot.common.restlet.resources.ServerSegmentInfo;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.util.ServerPerfMetricsReader;
+
+import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.HttpConnectionManager;
@@ -38,6 +40,19 @@ public class SegmentSizeMetric implements ServerLoadMetric {
     ServerSegmentInfo serverSegmentInfo = serverPerfMetricsReader.getServerPerfMetrics(instance, true, 300);
 
     return serverSegmentInfo.getSegmentSizeInBytes();
+
+    //return  serverSegmentInfo.getSegmentCPULoad();
+
+    /*
+    double timeInterval = 0;
+    List<SegmentMetadata> segmentMetadataList = serverSegmentInfo.getSegmentList();
+    for(int i=0; i<segmentMetadataList.size();i++)
+    {
+      timeInterval += (segmentMetadataList.get(i).getStartTime() - segmentMetadataList.get(i).getEndTime())/(24*3600);
+    }
+
+    return  timeInterval;*/
+
   }
 
   @Override

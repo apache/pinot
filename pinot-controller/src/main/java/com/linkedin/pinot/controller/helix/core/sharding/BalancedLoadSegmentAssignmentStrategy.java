@@ -51,9 +51,8 @@ public class BalancedLoadSegmentAssignmentStrategy implements SegmentAssignmentS
   }
 
   @Override
-  public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
-      int numReplicas, String tenantName) {
+  public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
+                                           String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
 
     String serverTenantName;
     String tableName;
@@ -91,6 +90,7 @@ public class BalancedLoadSegmentAssignmentStrategy implements SegmentAssignmentS
         // By this approach, new segments will not be allotted to the server if tags changed.
         for (String instanceName : allTaggedInstances) {
           double reportedMetric = _serverLoadMetric.computeInstanceMetric(helixResourceManager, idealState, instanceName,tableName);
+          LOGGER.info("ReportedLoadMetric: Instance: " + instanceName + " metricValue: " + reportedMetric);
           if (reportedMetric != -1) {
             reportedLoadMetricPerInstanceMap.put(instanceName, reportedMetric);
           } else {
@@ -132,8 +132,4 @@ public class BalancedLoadSegmentAssignmentStrategy implements SegmentAssignmentS
     return selectedInstances;
   }
 
-  @Override
-  public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
-    return null;
-  }
 }

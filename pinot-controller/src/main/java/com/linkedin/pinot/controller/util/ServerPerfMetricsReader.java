@@ -68,6 +68,7 @@ public class ServerPerfMetricsReader {
     ServerSegmentInfo serverSegmentInfo = new ServerSegmentInfo(serverNameOrEndpoint);
 
     String serverPerfUrl;
+
     if (isThisServerName) {
       BiMap<String, String> endpoint = _helixResourceManager.getDataInstanceAdminEndpoints(
           Collections.singleton(serverNameOrEndpoint));
@@ -94,6 +95,9 @@ public class ServerPerfMetricsReader {
           new ObjectMapper().readValue(getMethod.getResponseBodyAsString(), ServerPerfMetrics.class);
       serverSegmentInfo.setSegmentCount(serverPerfMetrics.segmentCount);
       serverSegmentInfo.setSegmentSizeInBytes(serverPerfMetrics.segmentDiskSizeInBytes);
+      //serverSegmentInfo.setSegmentList(serverPerfMetrics.segmentList);
+      serverSegmentInfo.setSegmentCPULoad(serverPerfMetrics.segmentCPULoad);
+
     } catch (InterruptedException e) {
       LOGGER.warn("Interrupted exception while reading segments size for server: {}", serverNameOrEndpoint, e);
     } catch (ExecutionException e) {

@@ -13,41 +13,40 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.linkedin.pinot.controller.helix.core.sharding;
 
 import com.linkedin.pinot.common.restlet.resources.ServerSegmentInfo;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import java.util.Map;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-
 import com.linkedin.pinot.controller.util.ServerPerfMetricsReader;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.helix.model.IdealState;
 
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
-public class SegmentCountMetric implements ServerLoadMetric {
+public class SegmentCPULoadMetric implements ServerLoadMetric {
     private static final HttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
     private static final Executor executor = Executors.newFixedThreadPool(1);
+
     @Override
-    public double computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState,
-                                        String instance, String tableName) {
-        ServerPerfMetricsReader serverPerfMetricsReader =
-                  new ServerPerfMetricsReader(executor, connectionManager, helixResourceManager);
+    public double computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState, String instance, String tableName) {
+
+        ServerPerfMetricsReader serverPerfMetricsReader = new ServerPerfMetricsReader(executor, connectionManager, helixResourceManager);
         ServerSegmentInfo serverSegmentInfo = serverPerfMetricsReader.getServerPerfMetrics(instance, true, 300);
-        return serverSegmentInfo.getSegmentCount();
+        return  serverSegmentInfo.getSegmentCPULoad();
+
     }
 
     @Override
     public void updateServerLoadMetric(PinotHelixResourceManager helixResourceManager, String instance, Double currentLoadMetric, String tableName, SegmentMetadata segmentMetadata) {
-        return;
+
     }
 
     @Override
     public void resetServerLoadMetric(PinotHelixResourceManager helixResourceManager, String instance) {
-        return;
-    }
 
+    }
 }

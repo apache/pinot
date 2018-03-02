@@ -26,7 +26,10 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+
+import java.io.IOException;
 import java.util.Collection;
+
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -34,6 +37,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +50,8 @@ import org.slf4j.LoggerFactory;
 
 public class ServerPerfResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerPerfResource.class);
+  private final String TableCPULoadConfigFilePath = "SegmentAssignmentResource/TableCPULoadMetric.properties";
+
 
   @Inject
   ServerInstance serverInstance;
@@ -55,21 +61,40 @@ public class ServerPerfResource {
   @Path("/ServerPerfMetrics/SegmentInfo")
   @ApiOperation(value = "Show all hosted segments count and storage size", notes = "Storage size and count of all segments hosted by a Pinot Server")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")})
-  public ServerPerfMetrics getSegmentsSize() throws WebApplicationException {
+  public ServerPerfMetrics getSegmentInfo() throws WebApplicationException, IOException {
     InstanceDataManager dataManager = (InstanceDataManager) serverInstance.getInstanceDataManager();
     if (dataManager == null) {
       throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
     }
+
+    /*
+    ClassLoader classLoader = ServerPerfResource.class.getClassLoader();
+    String tableCPULoadModelPath = getFileFromResourceUrl(classLoader.getResource(TableCPULoadConfigFilePath));
+    List <String> CPULoadModels = FileUtils.readLines(new File(tableCPULoadModelPath));
+
+    Map <String, CPULoadFormulation> tableCPULoadFormulation = new HashMap <>();
+
+    for (int i = 1; i < CPULoadModels.size(); i++) {
+      String[] tableLoadModel = CPULoadModels.get(i).split(",");
+      tableCPULoadFormulation.put(tableLoadModel[0], new CPULoadFormulation(Double.parseDouble(tableLoadModel[1]), Double.parseDouble(tableLoadModel[2]), Double.parseDouble(tableLoadModel[3])));
+    }
+    */
+
     ServerPerfMetrics serverPerfMetrics = new ServerPerfMetrics();
-    Collection<TableDataManager> tableDataManagers = dataManager.getTableDataManagers();
+    Collection <TableDataManager> tableDataManagers = dataManager.getTableDataManagers();
     for (TableDataManager tableDataManager : tableDataManagers) {
-      ImmutableList<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
+      ImmutableList <SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
       try {
         serverPerfMetrics.segmentCount += segmentDataManagers.size();
         for (SegmentDataManager segmentDataManager : segmentDataManagers) {
           IndexSegment segment = segmentDataManager.getSegment();
           serverPerfMetrics.segmentDiskSizeInBytes += segment.getDiskSizeBytes();
+          //serverPerfMetrics.segmentList.add(segment.getSegmentMetadata());
+          // LOGGER.info("adding segment " + segment.getSegmentName() + " to the list in server side! st: " + segment.getSegmentMetadata().getStartTime() + " et: " + segment.getSegmentMetadata().getEndTime());
+          //serverPerfMetrics.segmentCPULoad += tableCPULoadFormulation.get(tableDataManager.getTableName()).computeCPULoad(segment.getSegmentMetadata());
+
         }
+
       } finally {
         // we could release segmentDataManagers as we iterate in the loop above
         // but this is cleaner with clear semantics of usage. Also, above loop
@@ -81,4 +106,50 @@ public class ServerPerfResource {
     }
     return serverPerfMetrics;
   }
+
+  /*
+  private static String getFileFromResourceUrl(@Nonnull URL resourceUrl) {
+    // For maven cross package use case, we need to extract the resource from jar to a temporary directory.
+    String resourceUrlStr = resourceUrl.toString();
+    if (resourceUrlStr.contains("jar!")) {
+      try {
+        String extension = resourceUrlStr.substring(resourceUrlStr.lastIndexOf('.'));
+        File tempFile = File.createTempFile("pinot-cpu-load-model-temp", extension);
+        String tempFilePath = tempFile.getAbsolutePath();
+        //LOGGER.info("Extracting from " + resourceUrlStr + " to " + tempFilePath);
+        FileUtils.copyURLToFile(resourceUrl, tempFile);
+        return tempFilePath;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    } else {
+      return resourceUrl.getFile();
+    }
+  }
+
+
+  class CPULoadFormulation {
+
+    //CPU Load for a segment
+    //(SegmentDocCount/avgDocCount)*a*e^(-bt)
+
+    private double _avgDocCount = 0;
+    private double _a = 0;
+    private double _b = 0;
+
+    public CPULoadFormulation(double avgDocCount, double a, double b) {
+      _avgDocCount = avgDocCount;
+      _a = a;
+      _b = b;
+
+    }
+
+    public double computeCPULoad(SegmentMetadata segmentMetadata) {
+      long segmentMiddleTime = (segmentMetadata.getStartTime() + segmentMetadata.getEndTime()) / 2;
+      long segmentAge = System.currentTimeMillis() / 1000 - segmentMiddleTime;
+      return (segmentMetadata.getTotalDocs() / _avgDocCount) * _a * Math.exp(-1 * _b * segmentAge);
+    }
+
+  }*/
+
 }

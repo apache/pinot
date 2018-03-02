@@ -15,7 +15,11 @@
  */
 package com.linkedin.pinot.common.restlet.resources;
 
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
 Server measure defined performance metrics as of object of this class
@@ -26,10 +30,15 @@ This class can be expanded to contain more load metrics
 public class ServerPerfMetrics {
   public long segmentCount = 0;
   public long segmentDiskSizeInBytes = 0;
+  public double segmentCPULoad = 0;
+
+  //public List<SegmentMetadata> segmentList;
 
   public ServerPerfMetrics() {
     segmentCount = 0;
     segmentDiskSizeInBytes = 0;
+    segmentCPULoad = 0;
+    //segmentList = new ArrayList <>();
   }
 
   public long getSegmentCount() {

@@ -16,6 +16,10 @@
 package com.linkedin.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+
+import java.util.ArrayList;
+import java.util.List;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -23,12 +27,16 @@ public class ServerSegmentInfo {
   private String _serverName;
   private long _segmentCount;
   private long _segmentSizeInBytes;
+  //private List<SegmentMetadata> _segmentList;
+  private  double _segmentCPULoad;
 
   public ServerSegmentInfo(String serverName) {
     this._serverName = serverName;
     //We set default value to -1 as indication of error (e.g., timeout) in returning segment info from a Pinot server
     _segmentCount = -1;
     _segmentSizeInBytes = -1;
+    //_segmentList = new ArrayList <>();
+    _segmentCPULoad = -1;
   }
 
   public String getServerName() {
@@ -49,5 +57,24 @@ public class ServerSegmentInfo {
 
   public void setSegmentSizeInBytes(long segmentSizeInBytes) {
     _segmentSizeInBytes = segmentSizeInBytes;
+  }
+
+  /*
+  public void  setSegmentList(List<SegmentMetadata> segmentList)
+  {
+    _segmentList = segmentList;
+  }
+
+  public List <SegmentMetadata> getSegmentList() {
+    return _segmentList;
+  }*/
+
+  public void setSegmentCPULoad(double segmentCPULoad)
+  {
+    _segmentCPULoad = segmentCPULoad;
+  }
+  public double getSegmentCPULoad()
+  {
+    return _segmentCPULoad;
   }
 }

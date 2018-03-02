@@ -18,20 +18,22 @@ package com.linkedin.pinot.integration.tests;
 import com.google.common.base.Function;
 import com.linkedin.pinot.common.restlet.resources.ServerSegmentInfo;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.controller.util.ServerPerfMetricsReader;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
+import org.apache.http.HttpStatus;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -57,8 +59,8 @@ public class BalancedSegmentSizeSegmentAssignmentStrategyIntegrationTest extends
   @Override
   protected String getSegmentAssignmentStrategy() {
 
-    //return "BalancedSegmentSizeSegmentAssignmentStrategy";
-    return "BalancedLatencyBasedSegmentAssignmentStrategy";
+    return "BalancedSegmentSizeSegmentAssignmentStrategy";
+   // return "BalancedLatencyBasedSegmentAssignmentStrategy";
   }
 
   @Override
@@ -94,7 +96,7 @@ public class BalancedSegmentSizeSegmentAssignmentStrategyIntegrationTest extends
     String[] segmentNames = segmentDir.list();
     Assert.assertNotNull(segmentNames);
     int count = 0;
-    for (String segmentName : segmentNames) {
+    for (final String segmentName : segmentNames) {
       count++;
       long prevCount;
       try {
@@ -103,16 +105,31 @@ public class BalancedSegmentSizeSegmentAssignmentStrategyIntegrationTest extends
         } else {
           prevCount = 0;
         }
-        File segmentFile = new File(segmentDir, segmentName);
-        //FileUploadUtils.sendSegmentFile(LOCAL_HOST, Integer.toString(_controllerPort), segmentName, segmentFile,
-          //  segmentFile.length());
-        // Wait for new segment loaded
+        final File segmentFile = new File(segmentDir, segmentName);
+        final URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort);
+        final FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient();
+
+        // Upload all segments in parallel
+        int numSegments = segmentNames.length;
+        ExecutorService executor = Executors.newFixedThreadPool(1);
+        List<Future<Integer>> tasks = new ArrayList<>(numSegments);
+        tasks.add(executor.submit(new Callable<Integer>() {
+            @Override
+            public Integer call() throws Exception {
+              return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentName, segmentFile);
+            }
+          }));
+          // Wait for new segment loaded
         waitForAllDocsLoaded(prevCount, 600_000L);
+        executor.shutdown();
       } catch (Exception e) {
+        e.printStackTrace();
         continue;
       }
     }
   }
+
+
 
   private long getCurrentTotalSegmentsAssigned() {
     long currentTotalSegmentAssigned = 0;

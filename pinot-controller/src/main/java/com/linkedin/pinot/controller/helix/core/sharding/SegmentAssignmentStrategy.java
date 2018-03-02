@@ -31,12 +31,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
  */
 public interface SegmentAssignmentStrategy {
 
-  List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager,
-                                           ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName,
-                                           SegmentMetadata segmentMetadata, int numReplicas, String tenantName);
-
-
-  List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
+  List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
                                     String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName);
 
 }
