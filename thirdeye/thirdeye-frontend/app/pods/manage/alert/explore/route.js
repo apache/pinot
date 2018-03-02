@@ -10,7 +10,12 @@ import Route from '@ember/routing/route';
 import { later } from "@ember/runloop";
 import { task, timeout } from 'ember-concurrency';
 import { isPresent } from "@ember/utils";
-import { set, get, setProperties, getWithDefault } from '@ember/object';
+import {
+  set,
+  get,
+  setProperties,
+  getWithDefault
+} from '@ember/object';
 import { checkStatus, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
 import {
   enhanceAnomalies,
