@@ -55,7 +55,6 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import scala.util.parsing.combinator.token.StdTokens;
 
 
 public class ServerQueryExecutorV1Impl implements QueryExecutor {

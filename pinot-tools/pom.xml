@@ -58,10 +58,6 @@
     </dependency>
      <dependency>
       <groupId>com.linkedin.pinot</groupId>
-      <artifactId>pinot-server</artifactId>
-    </dependency>
-     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-controller</artifactId>
     </dependency>
      <dependency>
@@ -92,6 +88,10 @@
     <dependency>
       <groupId>org.yaml</groupId>
       <artifactId>snakeyaml</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-server</artifactId>
     </dependency>
   </dependencies>
   <build>

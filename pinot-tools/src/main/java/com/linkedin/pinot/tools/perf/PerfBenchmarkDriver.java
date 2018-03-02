@@ -28,7 +28,6 @@ import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -55,6 +54,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
+
+import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 
 @SuppressWarnings("FieldCanBeLocal")
 public class PerfBenchmarkDriver {

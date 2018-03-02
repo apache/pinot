@@ -171,12 +171,24 @@
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
-     </repository>
+    </repository>
 
   </repositories>
 
   <dependencyManagement>
+
+
     <dependencies>
+
+
+      <!-- https://mvnrepository.com/artifact/commons-logging/commons-logging -->
+      <dependency>
+        <groupId>commons-logging</groupId>
+        <artifactId>commons-logging</artifactId>
+        <version>1.1.1</version>
+      </dependency>
+
+
       <dependency>
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpmime</artifactId>
@@ -392,7 +404,7 @@
             <groupId>org.jboss.netty</groupId>
             <artifactId>netty</artifactId>
           </exclusion>
-      </exclusions>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>log4j</groupId>
@@ -516,7 +528,7 @@
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-json</artifactId>
           </exclusion>
-      </exclusions>
+        </exclusions>
       </dependency>
 
       <dependency>
@@ -904,7 +916,7 @@
             <phase>site</phase>
             <configuration>
               <!-- Specific configuration for the aggregate report -->
-			  <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response</excludePackageNames>
+              <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response</excludePackageNames>
               <skip>false</skip>
             </configuration>
           </execution>
@@ -995,9 +1007,9 @@
           <shadedArtifactAttached>true</shadedArtifactAttached>
           <transformers>
             <transformer
-                implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                    implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
             <transformer
-                implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                    implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
               <mainClass>${mainClass}</mainClass>
             </transformer>
           </transformers>
@@ -1042,7 +1054,7 @@
             <id>non-aggregate</id>
             <configuration>
               <!-- Specific configuration for the non aggregate report -->
-			  <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response</excludePackageNames>
+              <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response</excludePackageNames>
               <skip>true</skip>
             </configuration>
             <reports>
@@ -1052,7 +1064,7 @@
           <reportSet>
             <id>aggregate</id>
             <configuration>
-			  <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response</excludePackageNames>
+              <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response</excludePackageNames>
               <skip>true</skip>
             </configuration>
             <reports>

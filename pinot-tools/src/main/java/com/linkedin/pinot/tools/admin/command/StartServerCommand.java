@@ -17,7 +17,6 @@ package com.linkedin.pinot.tools.admin.command;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import org.apache.commons.configuration.Configuration;
@@ -26,6 +25,7 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 
 /**
  * Class to implement StartServer command.

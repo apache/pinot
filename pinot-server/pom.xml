@@ -159,8 +159,8 @@
       <artifactId>swagger-jaxrs</artifactId>
     </dependency>
     <dependency>
-        <groupId>org.webjars</groupId>
-        <artifactId>swagger-ui</artifactId>
+      <groupId>org.webjars</groupId>
+      <artifactId>swagger-ui</artifactId>
     </dependency>
     <!-- test -->
     <dependency>
@@ -183,10 +183,6 @@
       <artifactId>jersey-client</artifactId>
       <scope>test</scope>
     </dependency>
-      <dependency>
-          <groupId>com.linkedin.pinot</groupId>
-          <artifactId>pinot-tools</artifactId>
-      </dependency>
   </dependencies>
   <build>
     <plugins>
