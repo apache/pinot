@@ -1,5 +1,5 @@
 import Controller from '@ember/controller';
-import { floatToPercent } from 'thirdeye-frontend/utils/utils';
+import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import { computed, get } from '@ember/object';
 
 export default Controller.extend({
