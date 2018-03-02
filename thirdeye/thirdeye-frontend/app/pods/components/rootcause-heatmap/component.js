@@ -7,7 +7,10 @@ import {
   isInverse,
   isAdditive
 } from 'thirdeye-frontend/utils/rca-utils';
-import { humanizeChange } from 'thirdeye-frontend/utils/utils';
+import {
+  humanizeChange,
+  humanizeFloat
+} from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
 
 const ROOTCAUSE_ROLLUP_MODE_CHANGE = 'change';
@@ -238,12 +241,12 @@ export default Component.extend({
             size,
             inverse: isInverse,
 
-            currTotal,
-            baseTotal,
+            currTotal: humanizeFloat(currTotal),
+            baseTotal: humanizeFloat(baseTotal),
             changeTotal: humanizeChange(currTotal / baseTotal - 1),
 
-            curr,
-            base,
+            curr: humanizeFloat(curr),
+            base: humanizeFloat(base),
             change: humanizeChange(curr / base - 1),
 
             currContrib: `${(Math.round(curr / currTotal * 1000) / 10.0).toFixed(1)}%`,
