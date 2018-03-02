@@ -38,7 +38,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-@Path("thirdeye/function")
 @Produces(MediaType.APPLICATION_JSON)
 public class AnomalyFunctionResource {
 
@@ -79,92 +78,5 @@ public class AnomalyFunctionResource {
         LOG.error("Unsupported anomaly function", e);
       }
     }
-  }
-
-  /**
-   * @return map of function name vs function property keys
-   * <p/>
-   * eg. { "WEEK_OVER_WEEK_RULE":["baseline","changeThreshold","averageVolumeThreshold"],
-   * "MIN_MAX_THRESHOLD":["min","max"] }
-   */
-  @GET
-  @Path("metadata")
-  public Map<String, Object> getAnomalyFunctionMetadata() {
-    return anomalyFunctionMetadata;
-  }
-
-  /**
-   * @return List of metric functions
-   * <p/>
-   * eg. ["SUM","AVG","COUNT"]
-   */
-  @GET
-  @Path("metric-function")
-  public MetricAggFunction[] getMetricFunctions() {
-    return MetricAggFunction.values();
-  }
-
-  @POST
-  @Path("/analyze")
-  @Consumes(MediaType.APPLICATION_JSON)
-  public Response analyze(AnomalyFunctionDTO anomalyFunctionSpec,
-      @QueryParam("startTime") Long startTime, @QueryParam("endTime") Long endTime)
-      throws Exception {
-    // TODO: replace this with Job/Task framework and job tracker page
-    BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
-
-    DateTime windowStart = new DateTime(startTime);
-    DateTime windowEnd = new DateTime(endTime);
-
-    AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
-        new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
-    anomalyDetectionInputContextBuilder
-        .setFunction(anomalyFunctionSpec)
-        .fetchTimeSeriesData(windowStart, windowEnd)
-        .fetchScalingFactors(windowStart, windowEnd);
-    AnomalyDetectionInputContext anomalyDetectionInputContext = anomalyDetectionInputContextBuilder.build();
-
-    Map<DimensionMap, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
-        anomalyDetectionInputContext.getDimensionMapMetricTimeSeriesMap();
-
-    List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
-    List<RawAnomalyResultDTO> results = new ArrayList<>();
-
-    for (Map.Entry<DimensionMap, MetricTimeSeries> entry : dimensionKeyMetricTimeSeriesMap.entrySet()) {
-      DimensionMap dimensionMap = entry.getKey();
-      if (entry.getValue().getTimeWindowSet().size() < 2) {
-        LOG.warn("Insufficient data for {} to run anomaly detection function", dimensionMap);
-        continue;
-      }
-      try {
-        // Run algorithm
-        MetricTimeSeries metricTimeSeries = entry.getValue();
-        LOG.info("Analyzing anomaly function with dimensionKey: {}, windowStart: {}, windowEnd: {}",
-            dimensionMap, startTime, endTime);
-
-        List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
-            .analyze(dimensionMap, metricTimeSeries, new DateTime(startTime), new DateTime(endTime),
-                new ArrayList<MergedAnomalyResultDTO>());
-        if (resultsOfAnEntry.size() != 0) {
-          results.addAll(resultsOfAnEntry);
-        }
-        LOG.info("{} has {} anomalies in window {} to {}", dimensionMap, resultsOfAnEntry.size(),
-            new DateTime(startTime), new DateTime(endTime));
-      } catch (Exception e) {
-        LOG.error("Could not compute for {}", dimensionMap, e);
-      }
-    }
-    if (results.size() > 0) {
-      List<RawAnomalyResultDTO> validResults = new ArrayList<>();
-      for (RawAnomalyResultDTO anomaly : results) {
-        if (!anomaly.isDataMissing()) {
-          LOG.info("Found anomaly, sev [{}] start [{}] end [{}]", anomaly.getWeight(),
-              new DateTime(anomaly.getStartTime()), new DateTime(anomaly.getEndTime()));
-          validResults.add(anomaly);
-        }
-      }
-      anomalyResults.addAll(validResults);
-    }
-    return Response.ok(anomalyResults).build();
   }
 }

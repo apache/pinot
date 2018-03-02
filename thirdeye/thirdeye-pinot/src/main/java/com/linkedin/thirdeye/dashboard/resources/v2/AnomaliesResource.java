@@ -224,46 +224,6 @@ public class AnomaliesResource {
 
 
   /**
-   * Get count of anomalies for metric in time range
-   * @param metricId
-   * @param startTime
-   * @param endTime
-   * @return
-   */
-  @GET
-  @Path("getAnomalyCount/{metricId}/{startTime}/{endTime}")
-  public AnomaliesSummary getAnomalyCountForMetricInRange(
-      @PathParam("metricId") Long metricId,
-      @PathParam("startTime") Long startTime,
-      @PathParam("endTime") Long endTime) {
-    LOG.warn("Call to a deprecated end point " + "/anomalies/getAnomalyCount/{metricId}/{startTime}/{endTime} " + getClass().getName());
-    AnomaliesSummary anomaliesSummary = new AnomaliesSummary();
-    List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricIdInRange(metricId, startTime, endTime);
-
-    int resolvedAnomalies = 0;
-    int unresolvedAnomalies = 0;
-    for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
-      AnomalyFeedback anomalyFeedback = mergedAnomaly.getFeedback();
-      if (anomalyFeedback == null || anomalyFeedback.getFeedbackType() == null) {
-        unresolvedAnomalies ++;
-      } else if (anomalyFeedback != null && anomalyFeedback.getFeedbackType() != null
-          && anomalyFeedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
-        unresolvedAnomalies ++;
-      } else {
-        resolvedAnomalies ++;
-      }
-    }
-    anomaliesSummary.setMetricId(metricId);
-    anomaliesSummary.setStartTime(startTime);
-    anomaliesSummary.setEndTime(endTime);
-    anomaliesSummary.setNumAnomalies(mergedAnomalies.size());
-    anomaliesSummary.setNumAnomaliesResolved(resolvedAnomalies);
-    anomaliesSummary.setNumAnomaliesUnresolved(unresolvedAnomalies);
-    return anomaliesSummary;
-  }
-
-
-  /**
    * Search anomalies only by time
    * @param startTime
    * @param endTime

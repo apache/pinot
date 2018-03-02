@@ -34,9 +34,6 @@ public class CacheResource {
   @Path(value = "/")
   @Produces(MediaType.TEXT_HTML)
   public String getCaches() {
-    LOG.warn("Call to a deprecated end point " + "/cache/ " + getClass().getName());
-
-
     return "usage";
   }
 
@@ -57,7 +54,6 @@ public class CacheResource {
 
 
   @POST
-  @Path("/refresh/maxDataTime")
   public Response refreshMaxDataTimeCache() {
     List<String> datasets = CACHE_INSTANCE.getDatasetsCache().getDatasets();
     final LoadingCache<String,Long> cache = CACHE_INSTANCE.getDatasetMaxDataTimeCache();
@@ -113,7 +109,7 @@ public class CacheResource {
 
 
   @POST
-  @Path("/refresh/filters")
+  // TODO: Deprecate endpoint called by our own code
   public Response refreshDimensionFiltersCache() {
     List<String> datasets = CACHE_INSTANCE.getDatasetsCache().getDatasets();
     final LoadingCache<String,String> cache = CACHE_INSTANCE.getDimensionFiltersCache();
@@ -131,7 +127,7 @@ public class CacheResource {
 
 
   @POST
-  @Path("/refresh/collections")
+  // TODO: Deprecate endpoint called by our own code
   public Response refreshDatasets() {
     Response response = Response.ok().build();
     CACHE_INSTANCE.getDatasetsCache().loadDatasets();

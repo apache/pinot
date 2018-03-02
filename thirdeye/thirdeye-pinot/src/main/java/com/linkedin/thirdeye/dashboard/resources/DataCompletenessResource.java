@@ -17,7 +17,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-@Path(value = "/data-completeness")
 @Produces(MediaType.APPLICATION_JSON)
 public class DataCompletenessResource {
   private static final Logger LOG = LoggerFactory.getLogger(DataCompletenessResource.class);
@@ -26,31 +25,6 @@ public class DataCompletenessResource {
 
   public DataCompletenessResource(DataCompletenessConfigManager dataCompletenessDAO) {
     this.dataCompletenessDAO = dataCompletenessDAO;
-  }
-
-  @GET
-  @Path(value = "/percent-completeness")
-  @Produces(MediaType.APPLICATION_JSON)
-  public double getPercentCompleteness(String payload) {
-    LOG.warn("Call to a deprecated end point /data-completeness/percent-completeness" + getClass().getName());
-    PercentCompletenessFunctionInput input = PercentCompletenessFunctionInput.fromJson(payload);
-    return DataCompletenessUtils.getPercentCompleteness(input);
-  }
-
-  @GET
-  @Path("/{dataset}/incomplete")
-  public Response getDataCompletenessForRangeIncomplete(@PathParam("dataset") String dataset,
-      @QueryParam("start") Long start, @QueryParam("end") Long end) throws Exception {
-    LOG.warn("Call to a deprecated end point /data-completeness/{dataset}/incomplete" + getClass().getName());
-    return makeDataCompletenessResponse(dataset, start, end, false);
-  }
-
-  @GET
-  @Path("/{dataset}/complete")
-  public Response getDataCompletenessForRangeComplete(@PathParam("dataset") String dataset,
-      @QueryParam("start") Long start, @QueryParam("end") Long end) throws Exception {
-    LOG.warn("Call to a deprecated end point /data-completeness/{dataset}/complete" + getClass().getName());
-    return makeDataCompletenessResponse(dataset, start, end, true);
   }
 
   Response makeDataCompletenessResponse(String dataset, long start, long end, boolean complete) throws Exception {

@@ -25,7 +25,6 @@ import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Path(value = "/event")
 @Produces(MediaType.APPLICATION_JSON)
 public class EventResource {
   private static final Logger LOG = LoggerFactory.getLogger(EventResource.class);
@@ -43,44 +42,5 @@ public class EventResource {
     if (rcaConfig.exists()) {
       EventDataProviderLoader.registerEventDataProvidersFromConfig(rcaConfig, EVENT_DATA_PROVIDER_MANAGER);
     }
-  }
-
-  @GET
-  @Path ("/{start}/{end}")
-  public List<EventDTO> getHolidayEventsByTime(@PathParam("start") long start,
-      @PathParam("end") long end) {
-    EventFilter eventFilter = new EventFilter();
-    eventFilter.setStartTime(start);
-    eventFilter.setEndTime(end);
-    eventFilter.setEventType(EventType.HOLIDAY.toString());
-    return EVENT_DATA_PROVIDER_MANAGER.getEvents(eventFilter);
-  }
-
-  @POST
-  @Path("/filter")
-  public List<EventDTO> getEventsByFilter(EventFilter eventFilter) {
-    return EVENT_DATA_PROVIDER_MANAGER.getEvents(eventFilter);
-  }
-
-  @POST
-  @Path("/upload")
-  public Response uploadEvents(List<EventDTO> eventDTOs) {
-    try {
-      for (EventDTO e : eventDTOs) {
-        List<EventDTO> dupes = eventDAO
-            .findEventsBetweenTimeRangeByName(e.getEventType(), e.getName(), e.getStartTime(),
-                e.getEndTime());
-
-        if (dupes.size() > 0) {
-          LOG.info("Found duplicate events, skipping {}", e.toString());
-        } else {
-          eventDAO.save(e);
-        }
-      }
-    } catch (Exception e) {
-      LOG.error("Could not ingest the event :" + e.toString(), e);
-      return Response.serverError().build();
-    }
-    return Response.ok().build();
   }
 }

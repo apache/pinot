@@ -63,31 +63,7 @@ public class EmailResource {
     this.phantonJsPath = phantonJsPath;
     this.rootDir = rootDir;
   }
-
-  @POST
-  @Path("alert")
-  public Response createAlertConfig(AlertConfigDTO alertConfigDTO) {
-    if (Strings.isNullOrEmpty(alertConfigDTO.getFromAddress())) {
-      alertConfigDTO.setFromAddress(failureToAddress);
-    }
-    if (Strings.isNullOrEmpty(alertConfigDTO.getRecipients())) {
-      LOG.error("Unable to proceed user request with empty recipients: {}", alertConfigDTO);
-      return Response.status(Response.Status.BAD_REQUEST).entity("Empty field on recipients").build();
-    }
-    if (Strings.isNullOrEmpty(alertConfigDTO.getCronExpression())) {
-      LOG.error("Unable to proceed user request with empty cron: {}", alertConfigDTO);
-      return Response.status(Response.Status.BAD_REQUEST).entity("Empty field on cron").build();
-    }
-    Long id = alertDAO.save(alertConfigDTO);
-    return Response.ok(id).build();
-  }
-
-  @GET
-  @Path("alert/{id}")
-  public AlertConfigDTO getAlertConfigById (@PathParam("id") Long id) {
-    return alertDAO.findById(id);
-  }
-
+  
   @DELETE
   @Path("alert/{alertId}")
   public Response deleteByAlertId(@PathParam("alertId") Long alertId) {
@@ -164,7 +140,6 @@ public class EmailResource {
   }
 
   @GET
-  @Path("functions")
   public Map<Long, List<AlertConfigDTO>> getAlertToSubscriberMapping() {
     Map<Long, List<AlertConfigDTO>> mapping = new HashMap<>();
     List<AlertConfigDTO> subscriberGroups = alertDAO.findAll();
@@ -436,8 +411,7 @@ public class EmailResource {
         teHost, smtpHost, smtpPort);
   }
 
-  @GET
-  @Path("notification")
+  // TODO: Deprecated Endpoint called by our own code
   public Response sendEmailWithText(
       @QueryParam("from") String fromAddr,
       @QueryParam("to") String toAddr,

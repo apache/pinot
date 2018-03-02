@@ -42,50 +42,6 @@ public class DatasetConfigResource {
     this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
   }
 
-  @GET
-  @Path("/create")
-  public String createDatasetConfig(
-      @QueryParam("dataset") String dataset,
-      @QueryParam("dimensions") String dimensions,
-      @QueryParam("dimensionsHaveNoPreAggregation") String dimensionsHaveNoPreAggregation,
-      @QueryParam("active") boolean active,
-      @QueryParam("additive") boolean additive,
-      @QueryParam("nonAdditiveBucketSize") Integer nonAdditiveBucketSize,
-      @QueryParam("nonAdditiveBucketUnit") String nonAdditiveBucketUnit,
-      @QueryParam("preAggregatedKeyword") String preAggregatedKeyword,
-      @QueryParam("timeColumn") String timeColumn,
-      @QueryParam("timeDuration") Integer timeDuration,
-      @QueryParam("timeFormat") String timeFormat,
-      @QueryParam("timeUnit") String timeUnit,
-      @QueryParam("timezone") String timezone) {
-    try {
-      DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();
-      datasetConfigDTO.setDataset(dataset);
-      datasetConfigDTO.setDimensions(toList(dimensions));
-      if (!StringUtils.isBlank(dimensionsHaveNoPreAggregation)) {
-        datasetConfigDTO.setDimensionsHaveNoPreAggregation(toList(dimensionsHaveNoPreAggregation));
-      }
-      datasetConfigDTO.setActive(active);
-      datasetConfigDTO.setAdditive(additive);
-      datasetConfigDTO.setNonAdditiveBucketSize(nonAdditiveBucketSize);
-      if(!StringUtils.isBlank(nonAdditiveBucketUnit)){
-        datasetConfigDTO.setNonAdditiveBucketUnit(TimeUnit.valueOf(nonAdditiveBucketUnit));
-      }
-      datasetConfigDTO.setPreAggregatedKeyword(preAggregatedKeyword);
-      datasetConfigDTO.setTimeColumn(timeColumn);
-      datasetConfigDTO.setTimeDuration(timeDuration);
-      datasetConfigDTO.setTimeFormat(timeFormat);
-      datasetConfigDTO.setTimeUnit(TimeUnit.valueOf(timeUnit));
-      datasetConfigDTO.setTimezone(timezone);
-      Long id = datasetConfigDAO.save(datasetConfigDTO);
-      datasetConfigDTO.setId(id);
-      return JsonResponseUtil.buildResponseJSON(datasetConfigDTO).toString();
-    } catch (Exception e) {
-      LOG.error("Couldn't create dataset {}", dataset, e);
-      return JsonResponseUtil.buildErrorResponseJSON("Failed to create dataset:" + dataset).toString();
-    }
-  }
-
   private List<String> toList(String string) {
     String[] splitArray = string.split(",");
     List<String> list = new ArrayList<>();
@@ -95,64 +51,6 @@ public class DatasetConfigResource {
     return list;
   }
 
-  @GET
-  @Path("/update")
-  public String updateDatasetConfig(
-      @NotNull @QueryParam("id") long datasetConfigId,
-      @QueryParam("dataset") String dataset,
-      @QueryParam("dimensions") String dimensions,
-      @QueryParam("dimensionsHaveNoPreAggregation") String dimensionsHaveNoPreAggregation,
-      @QueryParam("active") boolean active,
-      @QueryParam("additive") boolean additive,
-      @QueryParam("nonAdditiveBucketSize") Integer nonAdditiveBucketSize,
-      @QueryParam("nonAdditiveBucketUnit") String nonAdditiveBucketUnit,
-      @QueryParam("preAggregatedKeyword") String preAggregatedKeyword,
-      @QueryParam("timeColumn") String timeColumn,
-      @QueryParam("timeDuration") Integer timeDuration,
-      @QueryParam("timeFormat") String timeFormat,
-      @QueryParam("timezone") TimeUnit timeUnit,
-      @QueryParam("timezone") String timezone) {
-    try {
-      DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findById(datasetConfigId);
-      datasetConfigDTO.setDataset(dataset);
-      datasetConfigDTO.setDimensions(toList(dimensions));
-      datasetConfigDTO.setDimensionsHaveNoPreAggregation(toList(dimensionsHaveNoPreAggregation));
-      datasetConfigDTO.setActive(active);
-      datasetConfigDTO.setAdditive(additive);
-      datasetConfigDTO.setNonAdditiveBucketSize(nonAdditiveBucketSize);
-      datasetConfigDTO.setNonAdditiveBucketUnit(TimeUnit.valueOf(nonAdditiveBucketUnit));
-      datasetConfigDTO.setPreAggregatedKeyword(preAggregatedKeyword);
-      datasetConfigDTO.setTimeColumn(timeColumn);
-      datasetConfigDTO.setTimeDuration(timeDuration);
-      datasetConfigDTO.setTimeFormat(timeFormat);
-      datasetConfigDTO.setTimeUnit(timeUnit);
-      datasetConfigDTO.setTimezone(timezone);
-      int numRowsUpdated = datasetConfigDAO.update(datasetConfigDTO);
-      if (numRowsUpdated == 1) {
-        return JsonResponseUtil.buildResponseJSON(datasetConfigDTO).toString();
-      } else {
-        return JsonResponseUtil.buildErrorResponseJSON("Failed to update dataset config id:" + datasetConfigId).toString();
-      }
-    } catch (Exception e) {
-      return JsonResponseUtil.buildErrorResponseJSON("Failed to update dataset config id:" + datasetConfigId + ". Exception:" + e.getMessage()).toString();
-    }
-  }
-
-
-  @POST
-  @Path("/requiresCompletenessCheck/enable/{dataset}")
-  public Response enableRequiresCompletenessCheck(@PathParam("dataset") String dataset) throws Exception {
-    toggleRequiresCompletenessCheck(dataset, true);
-    return Response.ok().build();
-  }
-
-  @POST
-  @Path("/requiresCompletenessCheck/disable/{dataset}")
-  public Response disableRequiresCompletenessCheck(@PathParam("dataset") String dataset) throws Exception {
-    toggleRequiresCompletenessCheck(dataset, false);
-    return Response.ok().build();
-  }
-
   private void toggleRequiresCompletenessCheck(String dataset, boolean state) {
     DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
     if(datasetConfig == null) {
@@ -160,13 +58,6 @@ public class DatasetConfigResource {
     }
     datasetConfig.setRequiresCompletenessCheck(state);
     datasetConfigDAO.update(datasetConfig);
-  }
-
-  @GET
-  @Path("/delete")
-  public String deleteDatasetConfig(@NotNull @QueryParam("id") Long datasetConfigId) {
-    datasetConfigDAO.deleteById(datasetConfigId);
-    return JsonResponseUtil.buildSuccessResponseJSON("Successully deleted dataset id: " + datasetConfigId).toString();
   }
 
   @GET
@@ -185,28 +76,6 @@ public class DatasetConfigResource {
     List<DatasetConfigDTO> subList = Utils.sublist(datasetConfigDTOs, jtStartIndex, jtPageSize);
     ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(subList);
     return rootNode.toString();
-  }
-
-  @GET
-  @Path("/view/{dataset}")
-  @Produces(MediaType.APPLICATION_JSON)
-  public DatasetConfigDTO viewByDataset(@PathParam("dataset") String dataset) {
-    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
-    return datasetConfig;
-  }
-
-
-  @POST
-  @Path("/create/payload")
-  public Long createDatasetConfig(String payload) {
-    Long id = null;
-    try {
-      DatasetConfigDTO datasetConfig = OBJECT_MAPPER.readValue(payload, DatasetConfigDTO.class);
-      id = datasetConfigDAO.save(datasetConfig);
-    } catch (IOException e) {
-      LOG.error("Exception in creating dataset config with payload {}", payload);
-    }
-    return id;
   }
 
   public Long createDatasetConfig(DatasetConfigDTO datasetConfig) {

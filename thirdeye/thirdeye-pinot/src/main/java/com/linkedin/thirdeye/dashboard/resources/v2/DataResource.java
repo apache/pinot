@@ -109,12 +109,6 @@ public class DataResource {
   }
 
 //------------- endpoints to metric config -------------
-  @GET
-  @Path("data/metricId")
-  public List<MetricConfigDTO> getMetricsByName(@QueryParam("name") String name) {
-    List<MetricConfigDTO> metricConfigDTOs = metricConfigDAO.findByMetricName(name);
-    return metricConfigDTOs;
-  }
 
   @GET
   @Path("metric/{metricId}")
@@ -123,32 +117,6 @@ public class DataResource {
   }
 
   //------------- endpoints to fetch summary -------------
-  @GET
-  @Path("summary/metrics")
-  public List<String> getMetricNamesForDataset(@QueryParam("dataset") String dataset) {
-    List<MetricConfigDTO> metrics = new ArrayList<>();
-    if (Strings.isNullOrEmpty(dataset)) {
-      metrics.addAll(metricConfigDAO.findAll());
-    } else {
-      metrics.addAll(metricConfigDAO.findActiveByDataset(dataset));
-    }
-    List<String> metricsNames = new ArrayList<>();
-    for (MetricConfigDTO metricConfigDTO : metrics) {
-      metricsNames.add(metricConfigDTO.getName());
-    }
-    return metricsNames;
-  }
-
-  @GET
-  @Path("summary/datasets")
-  public List<String> getDatasetNames() {
-    List<String> output = new ArrayList<>();
-    List<DatasetConfigDTO> datasetConfigDTOs = datasetConfigDAO.findAll();
-    for (DatasetConfigDTO dto : datasetConfigDTOs) {
-      output.add(dto.getDataset());
-    }
-    return output;
-  }
 
   @GET
   @Path("maxDataTime/metricId/{metricId}")
@@ -262,7 +230,6 @@ public class DataResource {
   @GET
   @Path("autocomplete/alert")
   public List<AlertConfigDTO> getAlertsWhereNameLike(@QueryParam("name") String name) {
-    LOG.warn("Call to a deprecated end point /data/autocomplete/alert" + getClass().getName());
     List<AlertConfigDTO> alerts = Collections.emptyList();
     if (StringUtils.isNotBlank(name)) {
       alerts = alertConfigDAO.findWhereNameLike("%" + name + "%");

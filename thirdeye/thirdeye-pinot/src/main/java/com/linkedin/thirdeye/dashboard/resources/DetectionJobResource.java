@@ -107,49 +107,6 @@ public class DetectionJobResource {
     this.alertFilterFactory = alertFilterFactory;
   }
 
-  // Toggle Function Activation is redundant to endpoints defined in AnomalyResource
-  @Deprecated
-  @POST
-  @Path("/{id}")
-  public Response enable(@PathParam("id") Long id) throws Exception {
-    toggleActive(id, true);
-    return Response.ok().build();
-  }
-
-  @Deprecated
-  @DELETE
-  @Path("/{id}")
-  public Response disable(@PathParam("id") Long id) throws Exception {
-    toggleActive(id, false);
-    return Response.ok().build();
-  }
-
-  @Deprecated
-  private void toggleActive(Long id, boolean state) {
-    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
-    if (anomalyFunctionSpec == null) {
-      throw new NullArgumentException("Function spec not found");
-    }
-    anomalyFunctionSpec.setIsActive(state);
-    anomalyFunctionDAO.update(anomalyFunctionSpec);
-  }
-
-  // endpoints to modify to aonmaly detection function
-  // show remove to anomalyResource
-  @POST
-  @Path("/requiresCompletenessCheck/enable/{id}")
-  public Response enableRequiresCompletenessCheck(@PathParam("id") Long id) throws Exception {
-    toggleRequiresCompletenessCheck(id, true);
-    return Response.ok().build();
-  }
-
-  @POST
-  @Path("/requiresCompletenessCheck/disable/{id}")
-  public Response disableRequiresCompletenessCheck(@PathParam("id") Long id) throws Exception {
-    toggleRequiresCompletenessCheck(id, false);
-    return Response.ok().build();
-  }
-
   private void toggleRequiresCompletenessCheck(Long id, boolean state) {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
@@ -172,62 +129,6 @@ public class DetectionJobResource {
     endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
     detectionJobScheduler.runAdhocAnomalyFunction(id, startTime, endTime);
     return Response.ok().build();
-  }
-
-  /**
-   * Returns the weight of the metric at the given window. The calculation of baseline (history) data is specified by
-   * seasonal period (in days) and season count. Seasonal period is the difference of duration from one window to the
-   * other. For instance, to use the data that is one week before current window, set seasonal period to 7. The season
-   * count specify how many seasons of history data to retrieve. If there are more than 1 season, then the baseline is
-   * the average of all seasons.
-   *
-   * Examples of the configuration of baseline:
-   * 1. Week-Over-Week: seasonalPeriodInDays = 7, seasonCount = 1
-   * 2. Week-Over-4-Weeks-Mean: seasonalPeriodInDays = 7, seasonCount = 4
-   * 3. Month-Over-Month: seasonalPeriodInDays = 30, seasonCount = 1
-   *
-   * @param collectionName the collection to which the metric belong
-   * @param metricName the metric name
-   * @param startTimeIso start time of current window, inclusive
-   * @param endTimeIso end time of current window, exclusive
-   * @param seasonalPeriodInDays the difference of duration between the start time of each window
-   * @param seasonCount the number of history windows
-   *
-   * @return the weight of the metric at the given window
-   * @throws Exception
-   */
-  @POST
-  @Path("/anomaly-weight")
-  public Response computeSeverity(@NotNull @QueryParam("collection") String collectionName,
-      @NotNull @QueryParam("metric") String metricName, @NotNull @QueryParam("start") String startTimeIso,
-      @NotNull @QueryParam("end") String endTimeIso, @QueryParam("period") String seasonalPeriodInDays,
-      @QueryParam("seasonCount") String seasonCount) throws Exception {
-    DateTime startTime = null;
-    DateTime endTime = null;
-    if (StringUtils.isNotBlank(startTimeIso)) {
-      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
-    }
-    if (StringUtils.isNotBlank(endTimeIso)) {
-      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
-    }
-    long currentWindowStart = startTime.getMillis();
-    long currentWindowEnd = endTime.getMillis();
-
-    // Default is using one week data priors current values for calculating weight
-    long seasonalPeriodMillis = TimeUnit.DAYS.toMillis(7);
-    if (StringUtils.isNotBlank(seasonalPeriodInDays)) {
-      seasonalPeriodMillis = TimeUnit.DAYS.toMillis(Integer.parseInt(seasonalPeriodInDays));
-    }
-    int seasonCountInt = 1;
-    if (StringUtils.isNotBlank(seasonCount)) {
-      seasonCountInt = Integer.parseInt(seasonCount);
-    }
-
-    SeverityComputationUtil util = new SeverityComputationUtil(collectionName, metricName);
-    Map<String, Object> severity =
-        util.computeSeverity(currentWindowStart, currentWindowEnd, seasonalPeriodMillis, seasonCountInt);
-
-    return Response.ok(severity.toString(), MediaType.TEXT_PLAIN_TYPE).build();
   }
 
   /**
@@ -1055,63 +956,6 @@ public class DetectionJobResource {
     }
 
     return tuningParameters;
-  }
-
-  /**
-   * Single function Reply to generate anomalies given a time range
-   * Given anomaly function Id, or auto tuned Id, start time, end time, it clones a function with same configurations and replays from start time to end time
-   * Replay function with input auto tuned configurations and save the cloned function
-   * @param functionId functionId to be replayed
-   * @param autotuneId autotuneId that has auto tuned configurations as well as original functionId. If autotuneId is provided, the replay will apply auto tuned configurations to the auto tuned function
-   *                   If both functionId and autotuneId are provided, use autotuneId as principal
-   * Either functionId or autotuneId should be not null to provide function information, if functionId is not aligned with autotuneId's function, use all function information from autotuneId
-   * @param replayStartTimeIso replay start time in ISO format, e.g. 2017-02-27T00:00:00.000Z, replay start time inclusive
-   * @param replayEndTimeIso replay end time, e.g. 2017-02-27T00:00:00.000Z, replay end time exclusive
-   * @param speedUp boolean to determine should we speed up the replay process (by maximizing detection window size)
-   * @return cloned function Id
-   */
-  @Deprecated
-  @POST
-  @Path("/replay/singlefunction")
-  public Response replayAnomalyFunctionByFunctionId(@QueryParam("functionId") Long functionId,
-      @QueryParam("autotuneId") Long autotuneId, @QueryParam("start") @NotNull String replayStartTimeIso,
-      @QueryParam("end") @NotNull String replayEndTimeIso,
-      @QueryParam("speedUp") @DefaultValue("true") boolean speedUp) {
-
-    if (functionId == null && autotuneId == null) {
-      return Response.status(Response.Status.BAD_REQUEST).build();
-    }
-    DateTime replayStart;
-    DateTime replayEnd;
-    try {
-      replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTimeIso);
-      replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayEndTimeIso);
-    } catch (IllegalArgumentException e) {
-      return Response.status(Response.Status.BAD_REQUEST).entity("Input start and end time illegal! ").build();
-    }
-
-    FunctionReplayRunnable functionReplayRunnable;
-    AutotuneConfigDTO target = null;
-    if (autotuneId != null) {
-      target = DAO_REGISTRY.getAutotuneConfigDAO().findById(autotuneId);
-      functionReplayRunnable =
-          new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO,
-              rawAnomalyResultDAO, target.getConfiguration(), target.getFunctionId(), replayStart, replayEnd, false);
-    } else {
-      functionReplayRunnable =
-          new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO,
-              rawAnomalyResultDAO, new HashMap<String, String>(), functionId, replayStart, replayEnd, false);
-    }
-    functionReplayRunnable.setSpeedUp(speedUp);
-    functionReplayRunnable.run();
-
-    Map<String, String> responseMessages = new HashMap<>();
-    responseMessages.put("cloneFunctionId", String.valueOf(functionReplayRunnable.getLastClonedFunctionId()));
-    if (target != null && functionId != null && functionId != target.getFunctionId()) {
-      responseMessages.put("Warning",
-          "Input function Id does not consistent with autotune Id's function, use auto tune Id's information instead.");
-    }
-    return Response.ok(responseMessages).build();
   }
 
   /**
