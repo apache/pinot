@@ -12,7 +12,8 @@ export default [
     current: 1444,
     baseline: 1000,
     feedback: "Yes, but New Trend",
-    metric: "Metric Name 1",
+    metricName: "Metric Name 1",
+    metricId: 12345,
     functionName: "Alert Name 1"
   }, {
     id: 2,
@@ -26,7 +27,8 @@ export default [
     current: 1444,
     baseline: 1000,
     feedback: "Yes, but New Trend",
-    metric: "Metric Name 1",
+    metricName: "Metric Name 1",
+    metricId: 12345,
     functionName: "Alert Name 1"
   }, {
     id: 2,
@@ -40,7 +42,8 @@ export default [
     current: 1444,
     baseline: 1000,
     feedback: "Yes, but New Trend",
-    metric: "Metric Name 1",
+    metricName: "Metric Name 1",
+    metricId: 12345,
     functionName: "Alert Name 1"
   }, {
     id: 2,
@@ -54,7 +57,8 @@ export default [
     current: 1444,
     baseline: 1000,
     feedback: "Yes, but New Trend",
-    metric: "Metric Name 1",
+    metricName: "Metric Name 1",
+    metricId: 12345,
     functionName: "Alert Name 1"
   }, {
     id: 2,
@@ -68,7 +72,8 @@ export default [
     current: 1444,
     baseline: 1000,
     feedback: "Yes, but New Trend",
-    metric: "Metric Name 1",
+    metricName: "Metric Name 1",
+    metricId: 12345,
     functionName: "Alert Name 1"
   }, {
     id: 2,
@@ -82,7 +87,8 @@ export default [
     current: 1444,
     baseline: 1000,
     feedback: "Yes, but New Trend",
-    metric: "Metric Name 1",
+    metricName: "Metric Name 1",
+    metricId: 12345,
     functionName: "Alert Name 1"
   }, {
     id: 3,
@@ -96,7 +102,8 @@ export default [
     current: 1444,
     baseline: 1000,
     feedback: "Yes, but New Trend",
-    metric: "Metric Name 1",
+    metricName: "Metric Name 1",
+    metricId: 12345,
     functionName: "Alert Name 1"
   }, {
     id: 4,
@@ -110,7 +117,8 @@ export default [
     current: 1444,
     baseline: 1000,
     feedback: "Yes, but New Trend",
-    metric: "Metric Name 2",
+    metricName: "Metric Name 2",
+    metricId: 12345,
     functionName: "Alert Name 2"
   }, {
     id: 5,
@@ -124,7 +132,8 @@ export default [
     current: 1444,
     baseline: 1000,
     feedback: "Yes, but New Trend",
-    metric: "Metric Name 2",
+    metricName: "Metric Name 2",
+    metricId: 12345,
     functionName: "Alert Name 2"
   }, {
     id: 6,
@@ -138,7 +147,8 @@ export default [
     current: 1444,
     baseline: 1000,
     feedback: "Yes, but New Trend",
-    metric: "Metric Name 2",
+    metricName: "Metric Name 2",
+    metricId: 12345,
     functionName: "Alert Name 2"
   }
 ];

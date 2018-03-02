@@ -26,18 +26,18 @@ export default Route.extend({
     let anomalyMapping = {};
 
     applicationAnomalies.forEach(anomaly => {
-      const { metric, functionName, current, baseline } = anomaly;
+      const { metricName, functionName, current, baseline } = anomaly;
 
-      if (!anomalyMapping[metric]) {
-        anomalyMapping[metric] = {};
+      if (!anomalyMapping[metricName]) {
+        anomalyMapping[metricName] = {};
       }
 
-      if (!anomalyMapping[metric][functionName]) {
-        anomalyMapping[metric][functionName] = [];
+      if (!anomalyMapping[metricName][functionName]) {
+        anomalyMapping[metricName][functionName] = [];
       }
 
-      // Group anomalies by metric and function name
-      anomalyMapping[metric][functionName].push(anomaly);
+      // Group anomalies by metricName and function name
+      anomalyMapping[metricName][functionName].push(anomaly);
 
       // Format current and baseline numbers, so numbers in the millions+ don't overflow
       anomaly.current = humanizeFloat(anomaly.current);
@@ -59,7 +59,7 @@ export default Route.extend({
     let metricSet = new Set();
 
     applicationAnomalies.forEach(anomaly => {
-      metricSet.add(anomaly.metric);
+      metricSet.add(anomaly.metricName);
     });
 
     return [...metricSet];
