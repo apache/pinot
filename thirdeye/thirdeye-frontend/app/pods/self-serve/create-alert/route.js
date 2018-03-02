@@ -122,16 +122,16 @@ export default Route.extend({
     * @method triggerReplaySequence
     */
     triggerOnboardingJob(data) {
-      const newName = JSON.parse(data.payload).functionName;
+      const newName = data.payload.functionName;
       const createAlertUrl = `/function-onboard/create-function?name=${newName}`;
-      const updateAlertUrl = `/detection-onboard/create-job?jobName=${data.jobName}&payload=${encodeURIComponent(data.payload)}`;
+      const updateAlertUrl = `/detection-onboard/create-job?jobName=${data.jobName}`;
       let onboardStartTime = moment();
       let newFunctionId = null;
 
-      fetch(createAlertUrl, postProps({ name: newName })).then(checkStatus)
+      fetch(createAlertUrl, postProps('')).then(checkStatus)
         .then((result) => {
           newFunctionId = result.id;
-          return fetch(updateAlertUrl, postProps(data)).then(checkStatus);
+          return fetch(updateAlertUrl, postProps(data.payload)).then(checkStatus);
         })
         .then((result) => {
           if (result.jobStatus && result.jobStatus.toLowerCase() === 'failed') {

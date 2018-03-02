@@ -699,7 +699,7 @@ export default Controller.extend({
 
       return {
         jobName,
-        payload: JSON.stringify(newAlertObj)
+        payload: newAlertObj
       };
 
     }

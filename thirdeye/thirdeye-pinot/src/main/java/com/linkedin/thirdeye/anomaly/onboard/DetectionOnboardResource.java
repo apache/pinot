@@ -50,7 +50,7 @@ public class DetectionOnboardResource {
   @POST
   @Path("/create-job")
   public String createDetectionOnboardingJob(@NotNull @QueryParam("jobName") String jobName,
-      @QueryParam("payload") String jsonPayload) {
+      String jsonPayload) {
 
     // Check user's input
     if (jsonPayload == null) {
@@ -60,7 +60,7 @@ public class DetectionOnboardResource {
     // Invoke backend function
     DetectionOnboardJobStatus detectionOnboardingJobStatus;
     try {
-      Map<String, String> properties = OBJECT_MAPPER.readValue(jsonPayload, HashMap.class);
+      Map<String, String> properties = OBJECT_MAPPER.readValue(jsonPayload, Map.class);
 
       // Put System Configuration into properties
       Iterator<String> systemConfigKeyIterator = systemConfig.getKeys();
