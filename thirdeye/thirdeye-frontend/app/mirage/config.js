@@ -4,8 +4,8 @@ import entityApplication from 'thirdeye-frontend/mocks/entityApplication';
 import metric from 'thirdeye-frontend/mocks/metric';
 import timeseriesCompare from 'thirdeye-frontend/mocks/timeseriesCompare';
 import { onboardJobStatus, onboardJobCreate } from 'thirdeye-frontend/mocks/detectionOnboard';
-import rootcause from 'thirdeye-frontend/mirage/endpoints/rootcause';
-
+import rootcause from './endpoints/rootcause';
+import auth from './endpoints/auth';
 /**
  * TODO: Group endpoints together and put them in files under the endpoints folder to prevent overloading this file
  */
@@ -197,4 +197,5 @@ export default function() {
   });
 
   rootcause(this);
+  auth(this);
 }
