@@ -9,7 +9,7 @@
       {{!-- modal header --}}
       {{#if hasHeader}}
         <div class="row te-modal__header">
-          <h4 class="te-modal__title">{{headerText}}</h4>
+          <h4 class="te-modal__title">{{headerText}} <span class="te-modal__title--bold">{{subText}}</span></h4>
           {{#if isCancellable}}
             <div class="te-modal__close-icon">
               <button {{action "onCancel"}} class="thirdeye-link thirdeye-link--tertiary thirdeye-link--muted" title="cancel">
@@ -31,9 +31,11 @@
           <button {{action "onCancel"}} type="Cancel" class="te-button te-button--small te-button--muted btn">
             {{cancelButtonText}}
           </button>
+
           <button {{action "onSubmit"}} type="submit" class="te-button te-button--small te-button--submit btn">
             {{submitButtonText}}
           </button>
+
         </div>
       {{/if}}
     </div>

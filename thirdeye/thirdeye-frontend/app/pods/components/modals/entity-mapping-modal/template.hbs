@@ -1,0 +1,86 @@
+{{#te-modal
+  headerText="Configure Filters for analyzing"
+  subText=metric.label
+  cancelButtonText="Back"
+  submitButtonText="Reload Analysis"
+  submitTooltip="Unsaved changes will be lost."
+  isShowingModal=showEntityMappingModal
+  cancelAction=(action "onExit")
+  hasFooter=false
+}}
+  <div class="row te-modal__settings">
+    <p class="col-md-2">
+      <span class="te-label te-label--bold te-label--dark">When Analyzing</span>
+    </p>
+    <p class="col-md-10">{{metric.label}}</p>
+  </div>
+  <div class="row te-modal__settings">
+    <p class="col-md-2">
+      <span class="te-label te-label--bold te-label--dark">Set mapping to</span>
+    </p>
+    <p class="col-md-10 te-modal__filters">
+      {{#power-select
+        triggerClass="te-modal__filter-select"
+        placeholder="Choose a type"
+        selected=selectedMappingType
+        options=mappingTypes
+        triggerId="select-mapping-type"
+        renderInPlace=true
+        disabled=true
+        onchange=(action (mut selectedMappingType))
+        searchEnabled=false
+        as |type|
+      }}
+        {{type}}
+      {{/power-select}}
+      {{#if isMetricEntityType}}
+        <div class="te-modal__dropdown--expand">
+          {{#power-select 
+            triggerClass="te-modal__filter-select te-modal__filter-select--flushed"
+            selected=selectedEntity
+            disabled=(unless selectedMappingType true false)
+            renderInPlace=true
+            onchange=(action "onEntitySelection")
+            search=(action "onSearch")
+            searchPlaceholder=(concat "Searching for a " selectedMappingType)
+            placeholder=(concat "Search for a " selectedMappingType)
+            as |entity|
+          }}
+            {{entity.alias}}
+          {{/power-select}}
+        </div>
+      {{/if}}
+      <a class="thirdeye-link thirdeye-link--secondary {{if mappingExists 'thirdeye-link--disabled'}}" {{action "onAddFilter"}}>
+        Add Mapping
+        {{#tooltip-on-element 
+          class="te-modal__tooltip"
+          }}
+          {{#if mappingExists}}
+            This mapping already exists
+          {{else}}
+            Click to create mapping
+          {{/if}}
+        {{/tooltip-on-element}}
+
+        {{#tooltip-on-element
+          class="te-modal__tooltip"
+          isShown=showTooltip
+          event='none'}}
+          Click here to add filters
+        {{/tooltip-on-element}}
+      </a>
+    </p>
+  </div>
+  <div class="te-modal__table">
+    {{models-table
+      data=relatedEntities
+      customClasses=classes
+      columns=entityColumns
+      filteringIgnoreCase=true
+      showColumnsDropdown=false
+      sortFilterOptions=true
+      pageSize=5
+      showGlobalFilter=false
+      delete="onDeleteEntity"}}
+  </div>
+{{/te-modal}}

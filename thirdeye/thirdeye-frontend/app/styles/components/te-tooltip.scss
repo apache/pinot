@@ -1,3 +1,10 @@
+
+// this wrapper contains te-tooltip and an `?` icon 
+.te-tooltip-wrapper { 
+  color: app-shade(black, 9);
+}
+
+
 .te-tooltip {
   background-color: white;
   border-radius: 2px;

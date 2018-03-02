@@ -6,6 +6,7 @@ import timeseriesCompare from 'thirdeye-frontend/mocks/timeseriesCompare';
 import { onboardJobStatus, onboardJobCreate } from 'thirdeye-frontend/mocks/detectionOnboard';
 import rootcause from './endpoints/rootcause';
 import auth from './endpoints/auth';
+import entityMapping from './endpoints/entity-mapping';
 /**
  * TODO: Group endpoints together and put them in files under the endpoints folder to prevent overloading this file
  */
@@ -198,4 +199,5 @@ export default function() {
 
   rootcause(this);
   auth(this);
+  entityMapping(this);
 }
