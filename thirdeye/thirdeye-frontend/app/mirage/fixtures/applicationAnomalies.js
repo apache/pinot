@@ -1,4 +1,4 @@
-// Temporary mock data that returns an application's anomalies until API is ready
+// Mock data that returns an application's anomalies
 export default [
   {
     id: 1,
