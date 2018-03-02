@@ -8,9 +8,6 @@ moduleForComponent('stats-cards', 'Integration | Component | stats cards', {
 const CARD = '.te-horizontal-cards__card';
 
 test('it renders', function(assert) {
-  const $title = this.$(`${CARD}-title`);
-  const $description = this.$(`${CARD}-text`);
-  const $number = this.$(`${CARD}-number`);
   const stats = [
     ['Number of anomalies', 'total anomalies', 10],
     ['Response Rate', 'description of response', 0.9],
@@ -20,8 +17,11 @@ test('it renders', function(assert) {
 
   this.render(
     hbs`{{stats-cards
-          stats=stats}}`
+        stats=stats}}`
   );
+  const $title = this.$(`${CARD}-title`);
+  const $description = this.$(`${CARD}-text`);
+  const $number = this.$(`${CARD}-number`);
 
   // Testing titles of all cards
   assert.equal(
