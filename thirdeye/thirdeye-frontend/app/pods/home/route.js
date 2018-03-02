@@ -43,6 +43,7 @@ export default Route.extend({
       }
 
       if (!redirectLink[metricName][functionName]) {
+        // TODO: Once start/end times are introduced, add these to the link below
         redirectLink[metricName][functionName] = `/thirdeye#anomalies?anomaliesSearchMode=metric&pageNumber=1&metricId=${metricId}\
                               &searchFilters={"functionFilterMap":["${functionName}"]}`;
       }
