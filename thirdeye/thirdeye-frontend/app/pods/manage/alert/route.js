@@ -37,7 +37,7 @@ export default Route.extend({
         startDate: startDateDefault,
         endDate: endDateDefault,
         functionName: null,
-        jobId: null
+        jobId
       }});
       // Save duration to sessionStorage for guaranteed availability
       setDuration(durationDefault, startDateDefault, endDateDefault);
