@@ -58,4 +58,14 @@ public class DetectionStatusManagerImpl extends AbstractManagerImpl<DetectionSta
     }
     return list.size();
   }
+
+  @Override
+  public List<DetectionStatusDTO> findByDataset(String dataset) {
+    return findByPredicate(Predicate.EQ("dataset", dataset));
+  }
+
+  @Override
+  public List<DetectionStatusDTO> findByFunctionId(long functionId) {
+    return findByPredicate(Predicate.EQ("functionId", functionId));
+  }
 }

@@ -493,4 +493,11 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     }
     return convertMergedAnomalyBean2DTO(beanList, true);
   }
+
+  @Override
+  public void delete(MergedAnomalyResultDTO entity) {
+    List<Long> rawAnomalyIdList = entity.getRawAnomalyIdList();
+    genericPojoDao.deleteByIds(rawAnomalyIdList, RawAnomalyResultBean.class);
+    genericPojoDao.delete(entity.getId(), MergedAnomalyResultBean.class);
+  }
 }

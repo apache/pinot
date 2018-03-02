@@ -11,5 +11,6 @@ public interface DetectionStatusManager extends AbstractManager<DetectionStatusD
   List<DetectionStatusDTO> findAllInTimeRangeForFunctionAndDetectionRun(long startTime, long endTime, long functionId,
       boolean detectionRun);
   int deleteRecordsOlderThanDays(int days);
-
+  List<DetectionStatusDTO> findByDataset(String dataset);
+  List<DetectionStatusDTO> findByFunctionId(long funtionId);
 }

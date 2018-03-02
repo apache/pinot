@@ -562,6 +562,36 @@ public class GenericPojoDao {
     }
   }
 
+  public <E extends AbstractBean> int deleteByIds(final List<Long> idsToDelete, final Class<E> pojoClass) {
+    long tStart = System.nanoTime();
+    try {
+      return runTask(new QueryTask<Integer>() {
+        @Override
+        public Integer handle(Connection connection) throws Exception {
+          PojoInfo pojoInfo = pojoInfoMap.get(pojoClass);
+          int baseRowsDeleted = 0;
+          if (CollectionUtils.isNotEmpty(idsToDelete)) {
+            //delete the ids from both base table and index table
+            int indexRowsDeleted = 0;
+            try (PreparedStatement statement = sqlQueryBuilder.createDeleteStatement(connection,
+                pojoInfo.indexEntityClass, idsToDelete, true)) {
+              indexRowsDeleted = statement.executeUpdate();
+            }
+            try (PreparedStatement baseTableDeleteStatement = sqlQueryBuilder
+                .createDeleteStatement(connection, GenericJsonEntity.class, idsToDelete, false)) {
+              baseRowsDeleted = baseTableDeleteStatement.executeUpdate();
+            }
+            assert (baseRowsDeleted == indexRowsDeleted);
+          }
+          return baseRowsDeleted;
+        }
+      }, 0);
+    } finally {
+      ThirdeyeMetricsUtil.dbWriteCallCounter.inc();
+      ThirdeyeMetricsUtil.dbWriteDurationCounter.inc(System.nanoTime() - tStart);
+    }
+  }
+
   public <E extends AbstractBean> int deleteByParams(final Map<String, Object> filters,
       final Class<E> pojoClass) {
     long tStart = System.nanoTime();
@@ -590,11 +620,11 @@ public class GenericPojoDao {
             //delete the ids from both base table and index table
             int indexRowsDeleted = 0;
             try (PreparedStatement statement = sqlQueryBuilder.createDeleteStatement(connection,
-                pojoInfo.indexEntityClass, idsToDelete)) {
+                pojoInfo.indexEntityClass, idsToDelete, true)) {
               indexRowsDeleted = statement.executeUpdate();
             }
             try (PreparedStatement baseTableDeleteStatement = sqlQueryBuilder
-                .createDeleteStatement(connection, GenericJsonEntity.class, idsToDelete)) {
+                .createDeleteStatement(connection, GenericJsonEntity.class, idsToDelete, false)) {
               baseRowsDeleted = baseTableDeleteStatement.executeUpdate();
             }
             assert (baseRowsDeleted == indexRowsDeleted);
