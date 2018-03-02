@@ -222,6 +222,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
       preAggregatedDimensionNames.removeAll(groupByDimensions);
     }
     // Add pre-aggregated dimension value to the remaining dimension names
+    // exclude pre-aggregated dimension for group by dimensions
     Multimap<String, String> decoratedFilterSet;
     if (filterSet != null) {
       decoratedFilterSet = HashMultimap.create(filterSet);
@@ -231,6 +232,9 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
     if (preAggregatedDimensionNames.size() != 0) {
       for (String preComputedDimensionName : preAggregatedDimensionNames) {
         decoratedFilterSet.put(preComputedDimensionName, preAggregatedKeyword);
+      }
+      for (String dimensionName : groupByDimensions) {
+        decoratedFilterSet.put(dimensionName, "!" + preAggregatedKeyword);
       }
     }
 
