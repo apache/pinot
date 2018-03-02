@@ -519,18 +519,21 @@ public class PinotLLCRealtimeSegmentManager {
 
   }
 
-  protected boolean writeSegmentsToPropertyStore(String oldZnodePath, String newZnodePath, ZNRecord oldRecord, ZNRecord newRecord,
-      final String realtimeTableName, int expectedVersion) {
-
-    boolean success = _propertyStore.set(oldZnodePath, oldRecord, expectedVersion, AccessOption.PERSISTENT);
+  protected boolean writeSegmentToPropertyStore(String znodePath, ZNRecord znRecord, final String realtimeTableName,
+      int expectedVersion) {
+    boolean success = _propertyStore.set(znodePath, znRecord, expectedVersion, AccessOption.PERSISTENT);
     if (!success) {
-      LOGGER.error("Failed to write old segments to property store for table {}. Expected zookeeper version number: {}",
-          realtimeTableName, expectedVersion);
+      LOGGER.error("Failed to write segment to property store at {} for table {}. Expected zookeeper version number: {}",
+          znodePath, realtimeTableName, expectedVersion);
       return false;
     }
-    success = _propertyStore.set(newZnodePath, newRecord, AccessOption.PERSISTENT);
+    return success;
+  }
+
+  protected boolean writeSegmentToPropertyStore(String znodePath, ZNRecord znRecord, final String realtimeTableName) {
+    boolean success = _propertyStore.set(znodePath, znRecord, AccessOption.PERSISTENT);
     if (!success) {
-      LOGGER.error("Failed to write new segments to property store for table {}.", realtimeTableName);
+      LOGGER.error("Failed to write segment to property store at {} for table {}.", znodePath, realtimeTableName);
     }
     return success;
   }
@@ -605,96 +608,58 @@ public class PinotLLCRealtimeSegmentManager {
    */
   public boolean commitSegmentMetadata(String rawTableName, final String committingSegmentNameStr, long nextOffset,
       long memoryUsedBytes) {
-    final long now = System.currentTimeMillis();
     final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
 
-    Stat stat = new Stat();
-    final LLCRealtimeSegmentZKMetadata oldSegMetadata = getRealtimeSegmentZKMetadata(realtimeTableName,
-        committingSegmentNameStr, stat);
-    final LLCSegmentName oldSegmentName = new LLCSegmentName(committingSegmentNameStr);
-    final int partitionId = oldSegmentName.getPartitionId();
-    final int oldSeqNum = oldSegmentName.getSequenceNumber();
+    /*
+     * Update zookeeper in 3 steps.
+     *
+     * Step 1: Update PROPERTYSTORE to change the old segment metadata status to DONE
+     * Step 2: Update PROPERTYSTORE to create the new segment metadata with status IN_PROGRESS
+     * Step 3: Update IDEALSTATES to include new segment in CONSUMING state, and change old segment to ONLINE state.
+     *
+     * The controller may fail between these three steps.
+     * So when a new controller takes over as leader, or when validation manager runs, it needs to check the following:
+     *
+     * If it fails between step-1 and step-2:
+     * Check whether there are any segments in the PROPERTYSTORE with status DONE, but no new segment in status IN_PROGRESS,
+     * and hence the status of the segment in the IDEALSTATE is still CONSUMING
+     *
+     * If it fails between step-2 and-3:
+     * Check whether there are any segments in PROPERTYSTORE with status IN_PROGRESS, that are not accounted for in idealState.
+     * If so, it should create the new segments in idealState.
+     *
+     * If the controller fails after step-3, we are fine because the idealState has the new segments.
+     * If the controller fails before step-1, the server will see this as an upload failure, and will re-try.
+     */
 
-    if (oldSegMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
-      LOGGER.warn("Status of segment metadata {} has already been changed by other controller for table {}: Status={}",
-          committingSegmentNameStr, rawTableName, oldSegMetadata.getStatus());
-      return false;
-    }
-
-    // TODO: set number of rows to end consumption in new segment metadata, based on memory used and number of rows from old segment
-    oldSegMetadata.setEndOffset(nextOffset);
-    oldSegMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-    oldSegMetadata.setDownloadUrl(
-        ControllerConf.constructDownloadUrl(rawTableName, committingSegmentNameStr, _controllerConf.generateVipUrl()));
-    // Pull segment metadata from incoming segment and set it in zk segment metadata
-    SegmentMetadataImpl segmentMetadata = extractSegmentMetadata(rawTableName, committingSegmentNameStr);
-    oldSegMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
-    oldSegMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
-    oldSegMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
-    oldSegMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
-    oldSegMetadata.setIndexVersion(segmentMetadata.getVersion());
-    oldSegMetadata.setTotalRawDocs(segmentMetadata.getTotalRawDocs());
-    oldSegMetadata.setPartitionMetadata(getPartitionMetadataFromSegmentMetadata(segmentMetadata));
-
-    final ZNRecord oldZnRecord = oldSegMetadata.toZNRecord();
-    final String oldZnodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, committingSegmentNameStr);
+    final LLCSegmentName committingLLCSegmentName = new LLCSegmentName(committingSegmentNameStr);
+    final int partitionId = committingLLCSegmentName.getPartitionId();
+    final int newSeqNum = committingLLCSegmentName.getSequenceNumber() + 1;
+    final long now = System.currentTimeMillis();
+    LLCSegmentName newLLCSegmentName = new LLCSegmentName(committingLLCSegmentName.getTableName(), partitionId, newSeqNum, now);
+    String newSegmentNameStr = newLLCSegmentName.getSegmentName();
 
     final PartitionAssignment partitionAssignment = getStreamPartitionAssignment(realtimeTableName);
-    // If an LLC table is dropped (or cleaned up), we will get null here. In that case we should not be
-    // creating a new segment
+    // If an LLC table is dropped (or cleaned up), we will get null here. In that case we should not be creating a new segment
     if (partitionAssignment == null) {
       LOGGER.warn("Kafka partition assignment not found for {}", realtimeTableName);
       throw new RuntimeException("Kafka partition assignment not found. Not committing segment");
     }
-    List<String> newInstances = partitionAssignment.getInstancesListForPartition(Integer.toString(partitionId));
+    List<String> newInstances = partitionAssignment.getInstancesListForPartition(String.valueOf(partitionId));
 
-    // Construct segment metadata and idealstate for the new segment
-    final int newSeqNum = oldSeqNum + 1;
-    final long newStartOffset = nextOffset;
-    LLCSegmentName newHolder = new LLCSegmentName(oldSegmentName.getTableName(), partitionId, newSeqNum, now);
-    final String newSegmentNameStr = newHolder.getSegmentName();
-    final int numPartitions = partitionAssignment.getNumPartitions();
-
-    ZNRecord newZnRecord =
-        makeZnRecordForNewSegment(rawTableName, newInstances.size(), newStartOffset, newHolder, numPartitions);
-
-    final LLCRealtimeSegmentZKMetadata newSegmentZKMetadata = new LLCRealtimeSegmentZKMetadata(newZnRecord);
-
-    updateFlushThresholdForSegmentMetadata(newSegmentZKMetadata, partitionAssignment,
-        getRealtimeTableFlushSizeForTable(rawTableName));
-    newZnRecord = newSegmentZKMetadata.toZNRecord();
-
-    final String newZnodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, newSegmentNameStr);
-
-    if (!isConnected() || !isLeader()) {
-      // We can potentially log a different value than what we saw ....
-      LOGGER.warn("Lost leadership while committing segment metadata for {} for table {}: isLeader={}, isConnected={}",
-          committingSegmentNameStr, rawTableName, isLeader(), isConnected());
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
-      return false;
-    }
-    /*
-     * Update zookeeper in two steps.
-     *
-     * Step 1: Update PROPERTYSTORE to change the segment metadata for old segment and add a new one for new segment
-     * Step 2: Update IDEALSTATES to include the new segment in the idealstate for the table in CONSUMING state, and change
-     *         the old segment to ONLINE state.
-     *
-     * The controller may fail between these two steps, so when a new controller takes over as leader, it needs to
-     * check whether there are any recent segments in PROPERTYSTORE that are not accounted for in idealState. If so,
-     * it should create the new segments in idealState.
-     *
-     * If the controller fails after step-2, we are fine because the idealState has the new segments.
-     * If the controller fails before step-1, the server will see this as an upload failure, and will re-try.
-     */
-    boolean success = writeSegmentsToPropertyStore(oldZnodePath, newZnodePath, oldZnRecord, newZnRecord,
-        realtimeTableName, stat.getVersion());
+    // Step-1
+    boolean success = updateOldSegmentMetadataZNRecord(realtimeTableName, committingLLCSegmentName, nextOffset);
     if (!success) {
-      LOGGER.warn("Fail to write segments to property store for {} for table {}: isLeader={}, isConnected={}",
-          committingSegmentNameStr, rawTableName, isLeader(), isConnected());
       return false;
     }
 
+    // Step-2
+    success = createNewSegmentMetadataZNRecord(realtimeTableName, newLLCSegmentName, nextOffset, partitionAssignment);
+    if (!success) {
+      return false;
+    }
+
+    // Step-3
     // TODO Introduce a controller failure here for integration testing
 
     // When multiple segments of the same table complete around the same time it is possible that
@@ -716,6 +681,103 @@ public class PinotLLCRealtimeSegmentManager {
     notifyOnSegmentFlush(realtimeTableName);
 
     return true;
+  }
+
+  /**
+   * Update segment metadata of committing segment
+   * @param realtimeTableName - table name for which segment is being committed
+   * @param committingLLCSegmentName - name of the segment being committed
+   * @param nextOffset - the end offset for this committing segment
+   * @return
+   */
+  private boolean updateOldSegmentMetadataZNRecord(String realtimeTableName, LLCSegmentName committingLLCSegmentName,
+      long nextOffset) {
+
+    Stat stat = new Stat();
+    String committingSegmentNameStr = committingLLCSegmentName.getSegmentName();
+    final LLCRealtimeSegmentZKMetadata oldSegMetadata = getRealtimeSegmentZKMetadata(realtimeTableName,
+        committingSegmentNameStr, stat);
+
+    if (oldSegMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+      LOGGER.warn("Status of segment metadata {} has already been changed by other controller for table {}: Status={}",
+          committingSegmentNameStr, realtimeTableName, oldSegMetadata.getStatus());
+      return false;
+    }
+
+    // TODO: set number of rows to end consumption in new segment metadata, based on memory used and number of rows from old segment
+    oldSegMetadata.setEndOffset(nextOffset);
+    oldSegMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
+    oldSegMetadata.setDownloadUrl(
+        ControllerConf.constructDownloadUrl(rawTableName, committingSegmentNameStr, _controllerConf.generateVipUrl()));
+    // Pull segment metadata from incoming segment and set it in zk segment metadata
+    SegmentMetadataImpl segmentMetadata = extractSegmentMetadata(rawTableName, committingSegmentNameStr);
+    oldSegMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
+    oldSegMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
+    oldSegMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
+    oldSegMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
+    oldSegMetadata.setIndexVersion(segmentMetadata.getVersion());
+    oldSegMetadata.setTotalRawDocs(segmentMetadata.getTotalRawDocs());
+    oldSegMetadata.setPartitionMetadata(getPartitionMetadataFromSegmentMetadata(segmentMetadata));
+
+    final ZNRecord oldZnRecord = oldSegMetadata.toZNRecord();
+    final String oldZnodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, committingSegmentNameStr);
+
+    if (!isConnected() || !isLeader()) {
+      // We can potentially log a different value than what we saw ....
+      LOGGER.warn("Lost leadership while committing segment metadata for {} for table {}: isLeader={}, isConnected={}",
+          committingSegmentNameStr, realtimeTableName, isLeader(), isConnected());
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
+      return false;
+    }
+    boolean success = writeSegmentToPropertyStore(oldZnodePath, oldZnRecord, realtimeTableName, stat.getVersion());
+    if (!success) {
+      LOGGER.warn("Fail to write old segment to property store for {} for table {}: isLeader={}, isConnected={}",
+          committingSegmentNameStr, realtimeTableName, isLeader(), isConnected());
+    }
+    return success;
+  }
+
+  /**
+   * Creates segment metadata for next sequence number from the segment just committed
+   * @param realtimeTableName - table name of the segment for which new metadata is being created
+   * @param newLLCSegmentName - new segment name
+   * @param nextOffset - start offset for new segment
+   * @param partitionAssignment - stream partition assignment for this table
+   * @return
+   */
+  protected boolean createNewSegmentMetadataZNRecord(String realtimeTableName, LLCSegmentName newLLCSegmentName,
+      long nextOffset, PartitionAssignment partitionAssignment) {
+
+    String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
+    int partitionId = newLLCSegmentName.getPartitionId();
+    int numReplicas = partitionAssignment.getInstancesListForPartition(String.valueOf(partitionId)).size();
+    ZNRecord newZnRecord = makeZnRecordForNewSegment(rawTableName, numReplicas, nextOffset, newLLCSegmentName,
+        partitionAssignment.getNumPartitions());
+    final LLCRealtimeSegmentZKMetadata newSegmentZKMetadata = new LLCRealtimeSegmentZKMetadata(newZnRecord);
+
+    updateFlushThresholdForSegmentMetadata(newSegmentZKMetadata, partitionAssignment,
+        getRealtimeTableFlushSizeForTable(rawTableName));
+    newZnRecord = newSegmentZKMetadata.toZNRecord();
+
+    final String newSegmentNameStr = newLLCSegmentName.getSegmentName();
+    final String newZnodePath =
+        ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, newSegmentNameStr);
+
+    if (!isConnected() || !isLeader()) {
+      // We can potentially log a different value than what we saw ....
+      LOGGER.warn("Lost leadership while committing new segment metadata for {} for table {}: isLeader={}, isConnected={}",
+          newSegmentNameStr, rawTableName, isLeader(), isConnected());
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
+      return false;
+    }
+
+    boolean success = writeSegmentToPropertyStore(newZnodePath, newZnRecord, realtimeTableName);
+    if (!success) {
+      LOGGER.warn("Fail to write new segment to property store for {} for table {}: isLeader={}, isConnected={}",
+          newSegmentNameStr, rawTableName, isLeader(), isConnected());
+    }
+    return success;
   }
 
   /**
@@ -862,44 +924,73 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  protected void completeCommittingSegments(String realtimeTableName) {
+  public void completeCommittingSegments(String realtimeTableName) {
     List<ZNRecord> segmentMetadataList = getExistingSegmentMetadata(realtimeTableName);
     if (segmentMetadataList == null || segmentMetadataList.isEmpty()) {
       return;
     }
-    final List<String> segmentIds = new ArrayList<>(segmentMetadataList.size());
-
+    final Map<String, LLCRealtimeSegmentZKMetadata> segmentIdToMetadataMap = new HashMap<>(segmentMetadataList.size());
     for (ZNRecord segment : segmentMetadataList) {
       if (SegmentName.isLowLevelConsumerSegmentName(segment.getId())) {
-        segmentIds.add(segment.getId());
+        segmentIdToMetadataMap.put(segment.getId(), new LLCRealtimeSegmentZKMetadata(segment));
       }
     }
 
-    if (segmentIds.isEmpty()) {
+    if (segmentIdToMetadataMap.isEmpty()) {
       return;
     }
 
-    completeCommittingSegments(realtimeTableName, segmentIds);
+    completeCommittingSegments(realtimeTableName, segmentIdToMetadataMap);
   }
 
   private void completeCommittingSegmentsInternal(String realtimeTableName,
-      Map<Integer, MinMaxPriorityQueue<LLCSegmentName>> partitionToLatestSegments) {
+      Map<Integer, MinMaxPriorityQueue<LLCSegmentName>> partitionToLatestSegments,
+      Map<String, LLCRealtimeSegmentZKMetadata> segmentIdToMetadataMap) {
     IdealState idealState = getTableIdealState(realtimeTableName);
     Set<String> segmentNamesIS = idealState.getPartitionSet();
 
     final PartitionAssignment partitionAssignment = getStreamPartitionAssignment(realtimeTableName);
+
     for (Map.Entry<Integer, MinMaxPriorityQueue<LLCSegmentName>> entry : partitionToLatestSegments.entrySet()) {
+      final int partitionId = entry.getKey();
+      List<String> newInstances = partitionAssignment.getInstancesListForPartition(Integer.toString(partitionId));
       final LLCSegmentName segmentName = entry.getValue().pollFirst();
       final String segmentId = segmentName.getSegmentName();
-      final int partitionId = entry.getKey();
-      if (!segmentNamesIS.contains(segmentId)) {
+      LLCRealtimeSegmentZKMetadata segmentZKMetadata = segmentIdToMetadataMap.get(segmentId);
+
+      if (segmentNamesIS.contains(segmentId)) {
+        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentId);
+        if (segmentZKMetadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.DONE)
+            && instanceStateMap.values().contains(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE)) {
+          // controller failed between step-1 and step-2 of commitSegmentMetadata.
+          // i.e. after updating old segment metadata (segment metadata state = DONE),
+          // but before creating new segment metadata and updating ideal state (new segment metadata missing, old segment ideal state = CONSUMING)
+
+          LOGGER.info("{}:Repairing segment for partition {}. "
+              + "Old segment metadata {} has status DONE, but segments are still in CONSUMING state in ideal STATE",
+              realtimeTableName, partitionId, segmentId);
+
+          final int newSeqNum = segmentName.getSequenceNumber() + 1;
+          final long now = System.currentTimeMillis();
+          LLCSegmentName newLLCSegmentName = new LLCSegmentName(segmentName.getTableName(), partitionId, newSeqNum, now);
+
+          LOGGER.info("{}: Creating new segment metadata for {}", realtimeTableName, newLLCSegmentName.getSegmentName());
+          createNewSegmentMetadataZNRecord(realtimeTableName, newLLCSegmentName, segmentZKMetadata.getEndOffset(),
+              partitionAssignment);
+          updateIdealState(realtimeTableName, newInstances, segmentId, newLLCSegmentName.getSegmentName());
+        }
+      } else {
+        // controller failed between step-2 and step-3 of commitSegmentMetadata.
+        // i.e. after updating old segment metadata (old segment metadata state = DONE) and creating new segment metadata (new segment metadata state = IN_PROGRESS),
+        // but before updating ideal state (new segment ideal missing from ideal state)
+
         LOGGER.info("{}:Repairing segment for partition {}. Segment {} not found in idealstate", realtimeTableName,
             partitionId, segmentId);
 
-        List<String> newInstances = partitionAssignment.getInstancesListForPartition(Integer.toString(partitionId));
         LOGGER.info("{}: Assigning segment {} to {}", realtimeTableName, segmentId, newInstances);
         // TODO Re-write num-partitions in metadata if needed.
         // If there was a prev segment in the same partition, then we need to fix it to be ONLINE.
+
         LLCSegmentName prevSegmentName = entry.getValue().pollLast();
         String prevSegmentNameStr = null;
         if (prevSegmentName != null) {
@@ -910,7 +1001,8 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  public void completeCommittingSegments(String realtimeTableName, List<String> segmentIds) {
+  public void completeCommittingSegments(String realtimeTableName,
+      Map<String, LLCRealtimeSegmentZKMetadata> segmentIdToMetadataMap) {
     Comparator<LLCSegmentName> comparator = new Comparator<LLCSegmentName>() {
       @Override
       public int compare(LLCSegmentName o1, LLCSegmentName o2) {
@@ -920,7 +1012,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     Map<Integer, MinMaxPriorityQueue<LLCSegmentName>> partitionToLatestSegments = new HashMap<>();
 
-    for (String segmentId : segmentIds) {
+    for (String segmentId : segmentIdToMetadataMap.keySet()) {
       LLCSegmentName segmentName = new LLCSegmentName(segmentId);
       final int partitionId = segmentName.getPartitionId();
       MinMaxPriorityQueue latestSegments = partitionToLatestSegments.get(partitionId);
@@ -931,7 +1023,7 @@ public class PinotLLCRealtimeSegmentManager {
       latestSegments.offer(segmentName);
     }
 
-    completeCommittingSegmentsInternal(realtimeTableName, partitionToLatestSegments);
+    completeCommittingSegmentsInternal(realtimeTableName, partitionToLatestSegments, segmentIdToMetadataMap);
   }
 
   protected long getKafkaPartitionOffset(KafkaStreamMetadata kafkaStreamMetadata, final String offsetCriteria,

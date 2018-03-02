@@ -773,7 +773,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       final IdealState idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName,
           19);
-      int nIncompleteCommits = 0;
+      int nIncompleteCommitsStepOne = 0;
+      int nIncompleteCommitsStepTwo = 0;
       final String topic = "someTopic";
       final int nInstances = 5;
       final int nReplicas = 3;
@@ -793,37 +794,60 @@ public class PinotLLCRealtimeSegmentManagerTest {
         if (curSeq == 0) {
           curSeq++;
         }
-        boolean incomplete = false;
+        // Step-1 : update committing segment metadata status to DONE
+        // Step-2 : create new segment metadata
+        // Step-3 : update ideal state - committing segments to ONLINE, new segments to CONSUMING
+        boolean failAfterStepOne = false;
+        boolean failAfterStepTwo = false;
         if (random.nextBoolean()) {
-          incomplete = true;
+          failAfterStepOne = true;
+        }
+        if (!failAfterStepOne) {
+          if (random.nextBoolean()) {
+            failAfterStepTwo = true;
+          }
         }
         for (int s = 0; s < curSeq; s++) {
           LLCSegmentName segmentName = new LLCSegmentName(tableName, p, s, now);
           String segNameStr = segmentName.getSegmentName();
-          String state = PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE;
           CommonConstants.Segment.Realtime.Status status = CommonConstants.Segment.Realtime.Status.DONE;
-          if (s == curSeq - 1) {
-            state = PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE;
-            if (!incomplete) {
+          String state = PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE;
+          if (s == curSeq - 1) { // for last segment in the sequence
+            if (failAfterStepOne) {
+              // failAfterStepOne means segment metadata was updated to DONE,
+              // but no steps after that
+              status = CommonConstants.Segment.Realtime.Status.DONE;
+              nIncompleteCommitsStepOne ++;
+            } else if (failAfterStepTwo) {
+              // failAfterStepTwo means segment metadata was updated to DONE,
+              // new segment metadata was created with IN_PROGRESS (will do that below),
+              // but no steps after that
+              status = CommonConstants.Segment.Realtime.Status.DONE;
+              nIncompleteCommitsStepTwo ++;
+            } else {
               status = CommonConstants.Segment.Realtime.Status.IN_PROGRESS;
             }
+            state = PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE;
           }
-          List<String> instancesForThisSeg = partitionAssignment.getInstancesListForPartition(Integer.toString(p));
-          for (String instance : instancesForThisSeg) {
-            idealState.setPartitionState(segNameStr, instance, state);
-          }
+          // add metadata to segment metadata
           LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
           metadata.setSegmentName(segNameStr);
           metadata.setStatus(status);
           existingSegmentMetadata.add(metadata.toZNRecord());
+
+          // add segment to ideal state
+          List<String> instancesForThisSeg = partitionAssignment.getInstancesListForPartition(Integer.toString(p));
+          for (String instance : instancesForThisSeg) {
+            idealState.setPartitionState(segNameStr, instance, state);
+          }
         }
-        // Add an incomplete commit to some of them
-        if (incomplete) {
-          nIncompleteCommits++;
+        if (failAfterStepTwo) {
+          // failAfterStepTwo means segment metadata was updated to DONE (did that above),
+          // new segment metadata was created with IN_PROGRESS, but no steps after that
           LLCSegmentName segmentName = new LLCSegmentName(tableName, p, curSeq, now);
           LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
           metadata.setSegmentName(segmentName.getSegmentName());
-          metadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+          metadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
           existingSegmentMetadata.add(metadata.toZNRecord());
         }
       }
@@ -833,7 +857,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
       segmentManager.completeCommittingSegments(TableNameBuilder.REALTIME.tableNameWithType(tableName));
 
-      Assert.assertEquals(segmentManager._nCallsToUpdateHelix, nIncompleteCommits, "Failed with seed " + seed);
+      Assert.assertEquals(segmentManager._nCallsToCreateNewSegmentMetadata, nIncompleteCommitsStepOne, "Failed with seed " + seed);
+      Assert.assertEquals(segmentManager._nCallsToUpdateHelix, nIncompleteCommitsStepOne + nIncompleteCommitsStepTwo, "Failed with seed " + seed);
     }
   }
 
@@ -1014,6 +1039,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     public List<ZNRecord> _existingSegmentMetadata;
 
     public int _nCallsToUpdateHelix = 0;
+    public int _nCallsToCreateNewSegmentMetadata = 0;
     public IdealState _tableIdealState;
     public List<String> _currentInstanceList;
     public String _currentTable;
@@ -1086,15 +1112,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected boolean writeSegmentsToPropertyStore(String oldZnodePath, String newZnodePath, ZNRecord oldRecord, ZNRecord newRecord,
-        final String realtimeTableName, int expectedVersion) {
+    protected boolean writeSegmentToPropertyStore(String nodePath, ZNRecord znRecord, final String realtimeTableName,
+        int expectedVersion) {
       List<String> paths = new ArrayList<>();
       List<ZNRecord> records = new ArrayList<>();
-      paths.add(oldZnodePath);
-      paths.add(newZnodePath);
-      records.add(oldRecord);
-      records.add(newRecord);
-      // Check whether the version is the valid or not, i.e. no one else has modified the metadata.
+      paths.add(nodePath);
+      records.add(znRecord);
+      // Check zn the version is the valid or not, i.e. no one else has modified the metadata.
       if (expectedVersion == _version) {
         _version++;
         writeSegmentsToPropertyStore(paths, records, realtimeTableName);
@@ -1102,6 +1126,16 @@ public class PinotLLCRealtimeSegmentManagerTest {
       } else {
         return false;
       }
+    }
+
+    @Override
+    protected boolean writeSegmentToPropertyStore(String nodePath, ZNRecord znRecord, final String realtimeTableName) {
+      List<String> paths = new ArrayList<>();
+      List<ZNRecord> records = new ArrayList<>();
+      paths.add(nodePath);
+      records.add(znRecord);
+      writeSegmentsToPropertyStore(paths, records, realtimeTableName);
+      return true;
     }
 
     @Override
@@ -1147,6 +1181,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
       for (Map.Entry<String, List<String>> entry: idealStateEntries.entrySet()) {
         _idealStateEntries.put(entry.getKey(), entry.getValue());
       }
+    }
+
+    @Override
+    protected boolean createNewSegmentMetadataZNRecord(String realtimeTableName, LLCSegmentName newLLCSegmentName,
+        long nextOffset, PartitionAssignment partitionAssignment) {
+      _nCallsToCreateNewSegmentMetadata ++;
+      return super.createNewSegmentMetadataZNRecord(realtimeTableName, newLLCSegmentName, nextOffset, partitionAssignment);
     }
 
     protected void updateIdealState(final String realtimeTableName, final List<String> newInstances,
