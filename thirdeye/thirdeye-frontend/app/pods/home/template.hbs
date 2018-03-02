@@ -16,9 +16,11 @@
           pageSize=5
           showComponentFooter=false
         }}
+      {{#if (gt anomalyList.length 5) }}
         <a href="{{get (get model.redirectLink metric) alert}}" class="te-anomaly-table__redirect-link">
           See More
         </a>
+      {{/if}}
     {{/each-in}}
   {{/each-in}}
 </div>
