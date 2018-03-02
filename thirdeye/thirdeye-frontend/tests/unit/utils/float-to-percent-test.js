@@ -7,4 +7,5 @@ test('it works', function(assert) {
   assert.equal(floatToPercent(0), '0.00%');
   assert.equal(floatToPercent(0.55), '55.00%');
   assert.equal(floatToPercent(0.123456), '12.35%');
+  assert.equal(floatToPercent(NaN), 'NaN');
 });

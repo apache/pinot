@@ -5,5 +5,5 @@
  * @return {String} - percent value of float with a % sign
  */
 export default function floatToPercent(float) {
-  return `${(float*100).toFixed(2)}%`;
+  return Number.isNaN(float) ? 'NaN' : `${(float * 100).toFixed(2)}%`;
 }
