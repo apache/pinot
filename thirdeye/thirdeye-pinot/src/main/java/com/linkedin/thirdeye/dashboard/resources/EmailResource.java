@@ -63,7 +63,7 @@ public class EmailResource {
     this.phantonJsPath = phantonJsPath;
     this.rootDir = rootDir;
   }
-  
+
   @DELETE
   @Path("alert/{alertId}")
   public Response deleteByAlertId(@PathParam("alertId") Long alertId) {
@@ -139,8 +139,9 @@ public class EmailResource {
     return Response.ok(id).build();
   }
 
-  @GET
+
   public Map<Long, List<AlertConfigDTO>> getAlertToSubscriberMapping() {
+    // TODO：Clean deprecated Endpoint called by our own code
     Map<Long, List<AlertConfigDTO>> mapping = new HashMap<>();
     List<AlertConfigDTO> subscriberGroups = alertDAO.findAll();
     for(AlertConfigDTO alertConfigDTO : subscriberGroups) {

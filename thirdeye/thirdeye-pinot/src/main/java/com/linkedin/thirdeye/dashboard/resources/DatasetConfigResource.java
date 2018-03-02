@@ -78,6 +78,15 @@ public class DatasetConfigResource {
     return rootNode.toString();
   }
 
+  @GET
+  @Path("/view/{dataset}")
+  @Produces(MediaType.APPLICATION_JSON)
+  public DatasetConfigDTO viewByDataset(@PathParam("dataset") String dataset) {
+    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
+    return datasetConfig;
+  }
+
+
   public Long createDatasetConfig(DatasetConfigDTO datasetConfig) {
     Long id = datasetConfigDAO.save(datasetConfig);
     return id;
