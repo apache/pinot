@@ -6,7 +6,6 @@
     <p>Metric: {{metric}}</p>
     {{#each-in alertList as |alert anomalyList|}}
       <p>Alert: {{alert}}</p>
-      <div class="te-anomaly-table">
         {{models-table
           data=anomalyList
           columns=columns
@@ -14,8 +13,10 @@
           showGlobalFilter=false
           filteringIgnoreCase=true
           multipleExpand=true
+          pageSize=5
+          showComponentFooter=false
         }}
-      </div>
+        {{#link-to 'index'}}See More{{/link-to}}
     {{/each-in}}
   {{/each-in}}
 </div>
