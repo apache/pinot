@@ -8,7 +8,8 @@ import RSVP from 'rsvp';
 export default Route.extend({
 
   /**
-   * Returns a two-dimensional array, which maps anomalies by metric and functionName (aka alert)
+   * Returns a mapping of anomalies by metric and functionName (aka alert), performance stats for anomalies by
+   * application, and redirect links to the anomaly search page for each metric-alert mapping
    * @return {Object}
    * @example
    * {
@@ -24,9 +25,10 @@ export default Route.extend({
    */
   model() {
     let anomalyMapping = {};
+    let redirectLink = {};
 
     applicationAnomalies.forEach(anomaly => {
-      const { metricName, functionName, current, baseline } = anomaly;
+      const { metricName, functionName, current, baseline, metricId } = anomaly;
 
       if (!anomalyMapping[metricName]) {
         anomalyMapping[metricName] = {};
@@ -34,6 +36,15 @@ export default Route.extend({
 
       if (!anomalyMapping[metricName][functionName]) {
         anomalyMapping[metricName][functionName] = [];
+      }
+
+      if(!redirectLink[metricName]) {
+        redirectLink[metricName] = {};
+      }
+
+      if (!redirectLink[metricName][functionName]) {
+        redirectLink[metricName][functionName] = `/thirdeye#anomalies?anomaliesSearchMode=metric&pageNumber=1&metricId=${metricId}\
+                              &searchFilters={"functionFilterMap":["${functionName}"]}`;
       }
 
       // Group anomalies by metricName and function name
@@ -47,7 +58,8 @@ export default Route.extend({
 
     return RSVP.hash({
       anomalyMapping,
-      anomalyPerformance
+      anomalyPerformance,
+      redirectLink
     });
   },
 

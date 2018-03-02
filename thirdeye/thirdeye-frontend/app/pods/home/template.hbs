@@ -16,9 +16,9 @@
           pageSize=5
           showComponentFooter=false
         }}
-        {{#link-to 'index' class="te-anomaly-table__redirect-link"}}
+        <a href="{{get (get model.redirectLink metric) alert}}" class="te-anomaly-table__redirect-link">
           See More
-        {{/link-to}}
+        </a>
     {{/each-in}}
   {{/each-in}}
 </div>
