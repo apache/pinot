@@ -246,6 +246,7 @@ public class SqlQueryBuilder {
     String delim = "";
     for (Long id : ids) {
       whereClause.append(delim).append(id);
+      delim = ",";
     }
     whereClause.append(")");
     sqlBuilder.append(whereClause.toString());

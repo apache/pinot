@@ -622,8 +622,7 @@ public class GenericPojoDao {
 
   public <E extends AbstractBean> int deleteByPredicate(final Predicate predicate, final Class<E> pojoClass) {
     List<Long> idsToDelete = getIdsByPredicate(predicate, pojoClass);
-    delete(idsToDelete, pojoClass);
-    return idsToDelete.size();
+    return delete(idsToDelete, pojoClass);
   }
 
 
