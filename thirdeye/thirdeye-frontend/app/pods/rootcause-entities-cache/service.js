@@ -30,6 +30,13 @@ export default Service.extend({
     this.setProperties({ errors: new Set() });
   },
 
+  /**
+   * Flushing the context cache so that the data reloads
+  */
+  flushCache() {
+    this.set('context', null);
+  },
+
   request(requestContext, urns) {
     const { context, entities, nativeUrns } = this.getProperties('context', 'entities', 'nativeUrns');
 
