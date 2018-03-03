@@ -17,6 +17,7 @@ package com.linkedin.pinot.server.api.resources;
 
 import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.restlet.resources.ServerPerfMetrics;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
@@ -27,9 +28,15 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
+import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -38,6 +45,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,18 +75,18 @@ public class ServerPerfResource {
       throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
     }
 
-    /*
+
     ClassLoader classLoader = ServerPerfResource.class.getClassLoader();
     String tableCPULoadModelPath = getFileFromResourceUrl(classLoader.getResource(TableCPULoadConfigFilePath));
-    List <String> CPULoadModels = FileUtils.readLines(new File(tableCPULoadModelPath));
+    List<String> CPULoadModels = FileUtils.readLines(new File(tableCPULoadModelPath));
 
-    Map <String, CPULoadFormulation> tableCPULoadFormulation = new HashMap <>();
+    Map<String, CPULoadFormulation> tableCPULoadFormulation = new HashMap<>();
 
     for (int i = 1; i < CPULoadModels.size(); i++) {
       String[] tableLoadModel = CPULoadModels.get(i).split(",");
       tableCPULoadFormulation.put(tableLoadModel[0], new CPULoadFormulation(Double.parseDouble(tableLoadModel[1]), Double.parseDouble(tableLoadModel[2]), Double.parseDouble(tableLoadModel[3])));
     }
-    */
+
 
     ServerPerfMetrics serverPerfMetrics = new ServerPerfMetrics();
     Collection <TableDataManager> tableDataManagers = dataManager.getTableDataManagers();
@@ -90,9 +98,10 @@ public class ServerPerfResource {
           IndexSegment segment = segmentDataManager.getSegment();
           serverPerfMetrics.segmentDiskSizeInBytes += segment.getDiskSizeBytes();
           //serverPerfMetrics.segmentList.add(segment.getSegmentMetadata());
-          // LOGGER.info("adding segment " + segment.getSegmentName() + " to the list in server side! st: " + segment.getSegmentMetadata().getStartTime() + " et: " + segment.getSegmentMetadata().getEndTime());
-          //serverPerfMetrics.segmentCPULoad += tableCPULoadFormulation.get(tableDataManager.getTableName()).computeCPULoad(segment.getSegmentMetadata());
 
+          // LOGGER.info("adding segment " + segment.getSegmentName() + " to the list in server side! st: " + segment.getSegmentMetadata().getStartTime() + " et: " + segment.getSegmentMetadata().getEndTime());
+          serverPerfMetrics.segmentCPULoad += tableCPULoadFormulation.get(tableDataManager.getTableName()).computeCPULoad(segment.getSegmentMetadata());
+          LOGGER.info("CPU Load is updated to " + serverPerfMetrics.segmentCPULoad + " beacuse of segment " + segment.getSegmentName() );
         }
 
       } finally {
@@ -107,7 +116,7 @@ public class ServerPerfResource {
     return serverPerfMetrics;
   }
 
-  /*
+
   private static String getFileFromResourceUrl(@Nonnull URL resourceUrl) {
     // For maven cross package use case, we need to extract the resource from jar to a temporary directory.
     String resourceUrlStr = resourceUrl.toString();
@@ -150,6 +159,6 @@ public class ServerPerfResource {
       return (segmentMetadata.getTotalDocs() / _avgDocCount) * _a * Math.exp(-1 * _b * segmentAge);
     }
 
-  }*/
+  }
 
 }
