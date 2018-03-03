@@ -26,6 +26,7 @@
   &__title {
     color: app-shade(black,0.9);
     font-size: 21px;
+    line-height: 28px;
     padding: 0;
     margin: 0;
     flex-grow: 1;
@@ -36,11 +37,109 @@
       font-size: 16px;
       line-height: 24px;
     }
+
+    &--bold {
+      font-weight: 600;
+    }
+  }
+
+  &__dropdown {
+    &--expand {
+      flex-grow: 4;
+    }
+  }
+
+  &__body {
+    // needed to avoid unscrollable overflow
+    max-height: 80vh;
+    overflow: scroll;
   }
 
   &__footer {
     border-top: 1px solid rgba(0,0,0,0.15);
     padding: 16px 24px;
     text-align: right;
+  }
+
+  &__table-cell {
+    // important is used here to override bootstrap's css
+    padding: $te-spacing $te-spacing--lg !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+    vertical-align: middle !important;
+    background-color: white;
+    color: app-shade(black, 7);
+    font-size: $te-font-size-small;
+    user-select: none;
+
+    &--capitalized {
+      text-transform: capitalize;
+    }
+    &--dark {
+      color: app-shade(black, 0.55);
+    }
+    &--delete {
+      text-align: center;
+      font-size: $te-font-size-medium;
+    }
+  }
+
+  &__table {
+    margin-bottom: $te-spacing--lg;
+  }
+
+  &__tooltip {
+    // necessary so that the tooltip is deployed above the modal
+    z-index: 10000;
+  }
+
+  &__table-header {
+    // important is used here to override bootstrap's css
+    border-right: 0 !important;
+    border-left: 0 !important;
+    background-color: #F3F6F8;
+    padding: $te-spacing--sm $te-spacing--lg !important;
+    font-size: $te-font-size-small;
+    line-height: 20px;
+    color: app-shade(black, 0.85);
+    user-select: none;
+  }
+
+  &__filters {
+    display: flex;
+    align-items: center;
+  }
+
+  &__filter-select {
+    flex-grow: 1;
+    border-radius: 0 !important;
+    flex-basis: 200px;
+    min-width: 150px;
+
+    &--flushed {
+      border-left: 0 !important;
+      flex-grow: 4;
+      margin-right: $te-spacing--md;
+    }
+  }
+
+  &__label-wrapper {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+  }
+
+  &__label {
+    line-height: 20px;
+  }
+
+  &__urn {
+    line-height: 16px;
+    font-size: $te-font-size-tiny;
+    color: app-shade(black, 7);
+  }
+
+  &__settings {
+    margin: $te-spacing--lg;
   }
 }

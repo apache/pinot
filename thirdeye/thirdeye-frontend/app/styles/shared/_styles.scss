@@ -190,6 +190,14 @@ body {
   &--taller {
     margin-top: 14px;
   }
+
+  &--bold {
+    font-weight: bold;
+  }
+
+  &--dark {
+    color: app-shade(black, 0.85);
+  }
 }
 
 .te-input {

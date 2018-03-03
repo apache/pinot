@@ -4,6 +4,7 @@
  * a cancelAction and a submitAction
  * @module components/te-modal
  * @property {String} headerText        - text for the header
+ * @property {String} headerSubext     - optional secondary text for the header
  * @property {String} cancelButtonText  - text for the cancel button
  * @property {String} submitButtonText  - text for the submit button
  * @property {Boolean} isCancellable    - wether the modal can be exited
@@ -33,6 +34,7 @@ export default Component.extend({
   overlayClassNames: ['te-modal-overlay'],
   targetAttachment: 'center',
   headerText: 'Title',
+  headerSubtext: '',
   isCancellable: true,
   hasHeader: true,
   hasFooter: true,
@@ -45,7 +47,7 @@ export default Component.extend({
      * Invokes the passed submit closure action
      */
     submitAction() {
-      const action = this.attrs.saveAction;
+      const action = this.attrs.submitAction;
       if (action) {
         return action();
       }

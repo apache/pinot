@@ -1,0 +1,10 @@
+<a {{action "sendAction" "delete" record}} class="thirdeye-link thirdeye-link--tertiary thirdeye-link--muted {{unless record.isDeletable 'thirdeye-link--disabled'}}">
+  <span><i class="glyphicon glyphicon-trash"></i></span>
+  {{#tooltip-on-element class="te-modal__tooltip"}}
+    {{#if record.isDeletable}}
+      Delete mapping
+    {{else}}
+      Only the creator may delete this mapping.
+    {{/if}}
+  {{/tooltip-on-element}}
+</a>

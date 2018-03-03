@@ -119,14 +119,14 @@ export default function(server) {
    */
   server.get('/aggregation/aggregate', () => {
     return {};
-});
+  });
 
   /**
    * TODO: Once API is finalized, have this call return something meaningful
    */
   server.get('/aggregation/query', () => {
     return {};
-});
+  });
 
   /**
    * TODO: Once API is finalized, have this call return something meaningful
