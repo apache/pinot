@@ -141,48 +141,48 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       queryRequest.setSegmentCountAfterPruning(numSegmentsMatched);
       LOGGER.debug("Matched {} segments", numSegmentsMatched);
       if (numSegmentsMatched == 0) {
-        dataTable = DataTableBuilder.buildEmptyDataTable(brokerRequest);
-        Map<String, String> metadata = dataTable.getMetadata();
-        metadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(totalRawDocs));
-        metadata.put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, "0");
-        metadata.put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, "0");
-        metadata.put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, "0");
-        dataTable.getMetadata().put(DataTable.EXECUTOR_CPU_TIME,"0");
+          dataTable = DataTableBuilder.buildEmptyDataTable(brokerRequest);
+          Map<String, String> metadata = dataTable.getMetadata();
+          metadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(totalRawDocs));
+          metadata.put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, "0");
+          metadata.put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, "0");
+          metadata.put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, "0");
+          dataTable.getMetadata().put(DataTable.EXECUTOR_CPU_TIME,"0");
 
       } else {
-        TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
-        Plan globalQueryPlan =
-            _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, executorService,
-                getResourceTimeOut(brokerRequest));
-        planBuildTimer.stopAndRecord();
+          TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
+          Plan globalQueryPlan =
+              _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, executorService,
+                  getResourceTimeOut(brokerRequest));
+          planBuildTimer.stopAndRecord();
 
-        if (PRINT_QUERY_PLAN) {
-          LOGGER.debug("***************************** Query Plan for Request {} ***********************************",
-              instanceRequest.getRequestId());
-          globalQueryPlan.print();
-          LOGGER.debug("*********************************** End Query Plan ***********************************");
-        }
-
-        TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
-        dataTable = globalQueryPlan.execute();
-        planExecTimer.stopAndRecord();
-
-        // Update the total docs in the metadata based on un-pruned segments.
-        dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, Long.toString(totalRawDocs));
-
-        long cpuTime = 0;
-        if(bean.isCurrentThreadCpuTimeSupported())
-        {
-          long endCpuTime = bean.getCurrentThreadCpuTime();
-          if(endCpuTime >= startCpuTime)
-          {
-            cpuTime = endCpuTime-startCpuTime;
+          if (PRINT_QUERY_PLAN) {
+            LOGGER.debug("***************************** Query Plan for Request {} ***********************************",
+                instanceRequest.getRequestId());
+            globalQueryPlan.print();
+            LOGGER.debug("*********************************** End Query Plan ***********************************");
           }
-          else
+
+          TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
+          dataTable = globalQueryPlan.execute();
+          planExecTimer.stopAndRecord();
+
+          // Update the total docs in the metadata based on un-pruned segments.
+          dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, Long.toString(totalRawDocs));
+
+          long cpuTime = 0;
+          if(bean.isCurrentThreadCpuTimeSupported())
           {
-            cpuTime = Long.MIN_VALUE - startCpuTime;
-            cpuTime += endCpuTime;
-          }
+            long endCpuTime = bean.getCurrentThreadCpuTime();
+            if(endCpuTime >= startCpuTime)
+            {
+              cpuTime = endCpuTime-startCpuTime;
+            }
+            else
+            {
+              cpuTime = Long.MIN_VALUE - startCpuTime;
+              cpuTime += endCpuTime;
+            }
 
         }
         else

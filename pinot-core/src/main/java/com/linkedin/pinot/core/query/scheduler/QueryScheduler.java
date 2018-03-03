@@ -178,7 +178,7 @@ public abstract class QueryScheduler {
 
     //String segmentList= request.getInstanceRequest().getSearchSegments().toString();
 
-    LOGGER.info("RequestProcessed${},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+    LOGGER.info("RequestProcessed${},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             System.currentTimeMillis(),
             request.getInstanceRequest().getRequestId(),
             request.getTableName(),
@@ -191,7 +191,7 @@ public abstract class QueryScheduler {
             timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
             timerContext.getPhaseDurationMs(ServerQueryPhase.RESPONSE_SERIALIZATION),
             timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME),
-            //request.getBrokerId(),
+            request.getInstanceRequest().getBrokerId(),
             getMetadataValue(dataTableMetadata, DataTable.NUM_DOCS_SCANNED_METADATA_KEY),
             getMetadataValue(dataTableMetadata, DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY),
             getMetadataValue(dataTableMetadata, DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY),
