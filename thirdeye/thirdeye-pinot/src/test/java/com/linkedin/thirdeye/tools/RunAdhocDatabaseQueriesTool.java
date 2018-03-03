@@ -1,8 +1,6 @@
 package com.linkedin.thirdeye.tools;
 
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
-import com.linkedin.thirdeye.auto.onboard.ConfigGenerator;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
@@ -38,12 +36,10 @@ import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
+import com.linkedin.thirdeye.datalayer.util.Predicate;
 import java.io.File;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -56,7 +52,6 @@ import java.util.Map;
 
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
-import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,35 +132,26 @@ public class RunAdhocDatabaseQueriesTool {
     if (deleteCounter != 0) {
       LOG.info("Removed {} alert configs that depends on function {}.", deleteCounter, id);
     }
+
+    Predicate predicate = Predicate.EQ("functionId", id);
     // Delete merged anomaly that is associated with the specified anomaly function
+    LOG.info("Deleting {} merged anomalies of function {}.", mergedResultDAO.findIdsByPredicate(predicate).size(), id);
     List<MergedAnomalyResultDTO> mergedAnomalyResults = mergedResultDAO.findByFunctionId(id, false);
-    LOG.info("Deleting {} merged anomalies of function {}.", mergedAnomalyResults.size(), id);
-    int deletedRawAnomalyCount = 0;
     for (MergedAnomalyResultDTO mergedAnomalyResult : mergedAnomalyResults) {
       // Delete feedback of this merged anomaly
       if (mergedAnomalyResult.getFeedback() != null) {
         AnomalyFeedbackDTO feedback = (AnomalyFeedbackDTO) mergedAnomalyResult.getFeedback();
         mergedResultDAO.deleteById(feedback.getId());
       }
-      if (CollectionUtils.isNotEmpty(mergedAnomalyResult.getRawAnomalyIdList())) {
-        deletedRawAnomalyCount += mergedAnomalyResult.getRawAnomalyIdList().size();
-      }
-      // Delete merged anomaly and its raw anomalies in bulk
-      mergedResultDAO.delete(mergedAnomalyResult);
     }
-    LOG.info("Deleted {} raw anomalies alone with merged anomalies of function {}.", deletedRawAnomalyCount, id);
+    mergedResultDAO.deleteByPredicate(predicate);
+    assert (mergedResultDAO.findIdsByPredicate(predicate).size() == 0);
     // Delete raw anomaly that is associated with the specified anoamly function
-    List<RawAnomalyResultDTO> rawAnomalyResults = rawResultDAO.findByFunctionId(id);
-    LOG.info("Deleting {} dangling raw anomalies of function {}.", rawAnomalyResults.size(), id);
-    for (RawAnomalyResultDTO rawAnomalyResult : rawAnomalyResults) {
-      rawResultDAO.deleteById(rawAnomalyResult.getId());
-    }
+    LOG.info("Deleted {} raw anomalies of function {}.", rawResultDAO.deleteByPredicate(predicate), id);
+    assert (rawResultDAO.findIdsByPredicate(predicate).size() == 0);
     // Delete detection status
-    List<DetectionStatusDTO> detectionStatusList = detectionStatusDAO.findByFunctionId(id);
-    LOG.info("Deleting {} detection status.", detectionStatusList.size());
-    for (DetectionStatusDTO detectionStatus : detectionStatusList) {
-      detectionStatusDAO.deleteById(detectionStatus.getId());
-    }
+    LOG.info("Deleted {} detection status of funtion {}.", detectionStatusDAO.deleteByPredicate(predicate), id);
+    assert (detectionStatusDAO.findIdsByPredicate(predicate).size() == 0);
     // Delete the specified anomaly function
     anomalyFunctionDAO.deleteById(id);
     LOG.info("Deleted function {}.", id);
@@ -197,6 +183,44 @@ public class RunAdhocDatabaseQueriesTool {
       }
     }
     LOG.info("Deleted {} functions: {}", count, deletedFunctions);
+  }
+
+  /**
+   * Delete the specified dataset. The anomaly functions, raw anomalies, merged anomalies, data completeness
+   * entries, detection status entries, and metrics of the dataset will be deleted too.
+   *
+   * @param datasetName the dataset to be deleted.
+   */
+  private void deleteDataset(String datasetName) {
+    DatasetConfigDTO dataset = datasetConfigDAO.findByDataset(datasetName);
+    if (dataset == null) {
+      return;
+    }
+    LOG.info("Deleting dataset {}, name={}.", dataset.getId(), datasetName);
+    // Disable anomaly functions
+    List<AnomalyFunctionDTO> functions = anomalyFunctionDAO.findAllByCollection(datasetName);
+    for (AnomalyFunctionDTO function : functions) {
+      function.setActive(false);
+      anomalyFunctionDAO.save(function);
+    }
+    Predicate predicate = Predicate.EQ("dataset", datasetName);
+    // Delete datacompleteness entries
+    LOG.info("Deleted {} data completeness.", dataCompletenessConfigDAO.deleteByPredicate(predicate));
+    assert (dataCompletenessConfigDAO.findIdsByPredicate(predicate).size() == 0);
+    // Delete detection status
+    LOG.info("Deleted {} detection status.", detectionStatusDAO.deleteByPredicate(predicate));
+    assert (detectionStatusDAO.findIdsByPredicate(predicate).size() == 0);
+    // Delete the anomaly functions, raw and merged anomalies, feedbacks that are associate with the specified dataset
+    LOG.info("Deleting {} functions.", functions.size());
+    for (AnomalyFunctionDTO function : functions) {
+      deleteAnomalyFunction(function.getId());
+    }
+    // Delete metrics of the specified dataset
+    LOG.info("Deleted {} metrics.", metricConfigDAO.deleteByPredicate(predicate));
+    assert (metricConfigDAO.findIdsByPredicate(predicate).size() == 0);
+    // Delete dataset
+    datasetConfigDAO.deleteById(dataset.getId());
+    LOG.info("Deleted dataset {}, name={}.", dataset.getId(), datasetName);
   }
 
   private void updateField(Long id) {
@@ -353,8 +377,7 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
-  private void cleanupDataset(String dataset) {
-
+  private void deactivateDataset(String dataset) {
     List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByDataset(dataset);
     for (MetricConfigDTO metricConfig : metricConfigs) {
       metricConfig.setActive(false);
@@ -394,45 +417,6 @@ public class RunAdhocDatabaseQueriesTool {
         anomalyFunctionDAO.update(functionSpec);
       }
     }
-  }
-
-  private void deleteDataset(String datasetName) {
-    DatasetConfigDTO dataset = datasetConfigDAO.findByDataset(datasetName);
-    if (dataset == null) {
-      return;
-    }
-    // Disable anomaly functions
-    List<AnomalyFunctionDTO> functions = anomalyFunctionDAO.findAllByCollection(datasetName);
-    for (AnomalyFunctionDTO function : functions) {
-      function.setActive(false);
-      anomalyFunctionDAO.save(function);
-    }
-    // Delete datacompleteness entries
-    List<DataCompletenessConfigDTO> dataCompletenessConfigs = dataCompletenessConfigDAO.findAllByDataset(datasetName);
-    LOG.info("Deleting {} data completeness.", dataCompletenessConfigs.size());
-    for (DataCompletenessConfigDTO dataCompletenessConfig : dataCompletenessConfigs) {
-      dataCompletenessConfigDAO.deleteById(dataCompletenessConfig.getId());
-    }
-    // Delete detection status
-    List<DetectionStatusDTO> detectionStatusList = detectionStatusDAO.findByDataset(datasetName);
-    LOG.info("Deleting {} detection status.", detectionStatusList.size());
-    for (DetectionStatusDTO detectionStatus : detectionStatusList) {
-      detectionStatusDAO.deleteById(detectionStatus.getId());
-    }
-    // Delete the anomaly functions, raw and merged anomalies, feedbacks that are associate with the specified dataset
-    LOG.info("Deleting {} functions.", functions.size());
-    for (AnomalyFunctionDTO function : functions) {
-      deleteAnomalyFunction(function.getId());
-    }
-    // Delete metrics of the specified dataset
-    List<MetricConfigDTO> metrics = metricConfigDAO.findByDataset(datasetName);
-    LOG.info("Deleting {} metrics.", metrics.size());
-    for (MetricConfigDTO metric : metrics) {
-      metricConfigDAO.deleteById(metric.getId());
-    }
-    // Delete dataset
-    LOG.info("Deleting dataset {}, name={}.", dataset.getId(), datasetName);
-    datasetConfigDAO.deleteById(dataset.getId());
   }
 
   public static void main(String[] args) throws Exception {

@@ -15,15 +15,21 @@ public interface AbstractManager<E extends AbstractDTO> {
 
   E findById(Long id);
 
-  void delete(E entity);
+  int delete(E entity);
 
-  void deleteById(Long id);
+  int deleteById(Long id);
+
+  int deleteByIds(List<Long> ids);
+
+  int deleteByPredicate(Predicate predicate);
 
   List<E> findAll();
 
   List<E> findByParams(Map<String, Object> filters);
 
   List<E> findByPredicate(Predicate predicate);
+
+  List<Long> findIdsByPredicate(Predicate predicate);
 
   int update(E entity, Predicate predicate);
 }
