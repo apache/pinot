@@ -37,6 +37,7 @@ export default Component.extend({
   session: service(),
   /**
    * Default selected mapping type
+   * @type {Array}
    */
   selectedMappingType: 'metric',
 
@@ -137,6 +138,7 @@ export default Component.extend({
    * Data masssages the entity based on the user
    * @param {Object} entity - the related entity
    * @param {String} user   - the current logged in user
+   * @return {Object}
    */
   formatEntity(entity, user) {
     // Todo: allow all users to edit for now since
