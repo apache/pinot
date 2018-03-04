@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.tools.admin.command;
 
-import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.tools.Command;
 import com.linkedin.pinot.tools.pacelab.benchmark.EventTableGenerator;
 import org.apache.commons.io.FileUtils;
@@ -43,7 +42,7 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
     private int _numRecords = 10000;
 
 
-    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals.properties";
+    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_2018.properties";
     final String _tableConfig = "pinot_benchmark/event_data_config/event_table_config.properties";
 
 

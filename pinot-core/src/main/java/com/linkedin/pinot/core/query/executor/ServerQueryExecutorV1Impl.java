@@ -148,6 +148,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           metadata.put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, "0");
           metadata.put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, "0");
           dataTable.getMetadata().put(DataTable.EXECUTOR_CPU_TIME,"0");
+          queryProcessingTimer.stopAndRecord();
 
       } else {
           TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);

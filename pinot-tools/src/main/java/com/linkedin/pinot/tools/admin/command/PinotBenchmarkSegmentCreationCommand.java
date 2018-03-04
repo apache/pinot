@@ -17,7 +17,6 @@
 
 package com.linkedin.pinot.tools.admin.command;
 
-import com.linkedin.pinot.controller.helix.core.sharding.LatencyBasedLoadMetric;
 import com.linkedin.pinot.tools.Command;
 import com.linkedin.pinot.tools.pacelab.benchmark.EventTableGenerator;
 import org.apache.commons.io.FileUtils;
@@ -40,7 +39,7 @@ public class PinotBenchmarkSegmentCreationCommand extends AbstractBaseAdminComma
     @Option(name = "-overwrite", required = false, usage = "Overwrite existing output directory.")
     private boolean _overwrite = false;
 
-    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals.properties";
+    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_2018.properties";
     final String _tableNameFile = "pinot_benchmark/event_data_config/event_table_config.properties";
 
 

@@ -25,6 +25,7 @@ import com.linkedin.pinot.core.data.extractors.FieldExtractor;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReader;
+import com.linkedin.pinot.tools.data.generator.AvroWriter;
 import com.linkedin.pinot.tools.data.generator.RangeIntGenerator;
 import com.linkedin.pinot.tools.data.generator.RangeLongGenerator;
 import com.linkedin.pinot.tools.data.generator.SchemaAnnotation;
@@ -240,7 +241,8 @@ public class EventTableGenerator {
 
     private DataFileWriter<GenericData.Record> createRecordWriter(String schemaFile, File avroFile) throws Exception
     {
-        org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(schemaFile))).toString());
+        //org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(schemaFile))).toString());
+        org.apache.avro.Schema schemaJSON = AvroWriter.getAvroSchema(Schema.fromFile(new File(schemaFile)));
         final GenericDatumWriter<GenericData.Record> datum = new GenericDatumWriter<GenericData.Record>(schemaJSON);
         DataFileWriter<GenericData.Record> recordWriter = new DataFileWriter<GenericData.Record>(datum);
         recordWriter.create(schemaJSON, avroFile);
@@ -284,7 +286,9 @@ public class EventTableGenerator {
         File avroFile = createOutDirAndFile("ProfileView");
         DataFileWriter<GenericData.Record> recordWriter = createRecordWriter(profileViewSchemaFile,avroFile);
 
-        org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(profileViewSchemaFile))).toString());
+        //org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(profileViewSchemaFile))).toString());
+
+        org.apache.avro.Schema schemaJSON = AvroWriter.getAvroSchema(Schema.fromFile(new File(profileViewSchemaFile)));
 
         for(int i=0;i<numRecords;i++)
         {
@@ -336,7 +340,8 @@ public class EventTableGenerator {
         File avroFile = createOutDirAndFile("AdClick");
         DataFileWriter<GenericData.Record> recordWriter = createRecordWriter(adClickSchemaFile,avroFile);
 
-        org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(adClickSchemaFile))).toString());
+        //org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(adClickSchemaFile))).toString());
+        org.apache.avro.Schema schemaJSON = AvroWriter.getAvroSchema(Schema.fromFile(new File(adClickSchemaFile)));
 
         for(int i=0;i<numRecords;i++)
         {
@@ -386,7 +391,9 @@ public class EventTableGenerator {
         File avroFile = createOutDirAndFile("JobApply");
         DataFileWriter<GenericData.Record> recordWriter = createRecordWriter(jobApplySchemaFile,avroFile);
 
-        org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(jobApplySchemaFile))).toString());
+        //org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(jobApplySchemaFile))).toString());
+        org.apache.avro.Schema schemaJSON = AvroWriter.getAvroSchema(Schema.fromFile(new File(jobApplySchemaFile)));
+
 
         for(int i=0;i<numRecords;i++)
         {
@@ -436,7 +443,9 @@ public class EventTableGenerator {
         File avroFile = createOutDirAndFile("ArticleRead");
         DataFileWriter<GenericData.Record> recordWriter = createRecordWriter(articleReadSchemaFile,avroFile);
 
-        org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(articleReadSchemaFile))).toString());
+        //org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(articleReadSchemaFile))).toString());
+        org.apache.avro.Schema schemaJSON = AvroWriter.getAvroSchema(Schema.fromFile(new File(articleReadSchemaFile)));
+
 
         for(int i=0;i<numRecords;i++)
         {
