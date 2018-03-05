@@ -29,7 +29,6 @@ import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 
 
 /**
@@ -48,10 +47,6 @@ public class MetadataEqualsHashCodeTest {
         usingGetClass().verify();
     EqualsVerifier.forClass(RealtimeSegmentZKMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
         usingGetClass().verify();
-
-    EqualsVerifier.forClass(KafkaStreamMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
-        usingGetClass().verify();
-
     EqualsVerifier.forClass(Schema.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
         usingGetClass().verify();
     EqualsVerifier.forClass(DimensionFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).

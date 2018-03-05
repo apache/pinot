@@ -21,8 +21,8 @@ import com.yammer.metrics.core.Meter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.realtime.StreamProvider;
-import com.linkedin.pinot.core.realtime.StreamProviderConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamProvider;
+import com.linkedin.pinot.core.realtime.stream.StreamProviderConfig;
 import kafka.consumer.ConsumerIterator;
 import kafka.javaapi.consumer.ConsumerConnector;
 

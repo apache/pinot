@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
@@ -33,6 +32,8 @@ import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadataFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -148,20 +149,20 @@ public class ValidationManager {
             ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(propertyStore, tableNameWithType);
         boolean countHLCSegments = true;  // false if this table has ONLY LLC segments (i.e. fully migrated)
         TableConfig tableConfig = null;
-        KafkaStreamMetadata streamMetadata = null;
+        StreamMetadata streamMetadata = null;
         try {
           tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableNameWithType);
           if (tableConfig == null) {
             continue;
           }
-          streamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
-          if (streamMetadata.hasSimpleKafkaConsumerType() && !streamMetadata.hasHighLevelKafkaConsumerType()) {
+          streamMetadata = StreamMetadataFactory.getStreamMetadata(tableConfig);
+          if (streamMetadata.hasSimpleConsumerType() && !streamMetadata.hasHighLevelConsumerType()) {
             countHLCSegments = false;
           }
           // Update the gauge to contain the total document count in the segments
           _validationMetrics.updateTotalDocumentCountGauge(tableNameWithType,
               computeRealtimeTotalDocumentInSegments(realtimeSegmentZKMetadataList, countHLCSegments));
-          if (streamMetadata.hasSimpleKafkaConsumerType()) {
+          if (streamMetadata.hasSimpleConsumerType()) {
             validateLLCSegments(tableNameWithType, tableConfig);
           }
         } catch (Exception e) {
@@ -246,7 +247,7 @@ public class ValidationManager {
     }
     // Make this call after other validations (so that we verify that we are consistent against the existing partition
     // assignment). This call may end up changing the kafka partition assignment for the table.
-    _llcRealtimeSegmentManager.updateKafkaPartitionsIfNecessary(tableConfig);
+    _llcRealtimeSegmentManager.updateStreamPartitionsIfNecessary(tableConfig);
   }
 
   // For offline segment pushes, validate that there are no missing segments, and update metrics

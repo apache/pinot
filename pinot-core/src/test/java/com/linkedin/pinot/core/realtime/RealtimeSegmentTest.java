@@ -40,6 +40,8 @@ import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
+import com.linkedin.pinot.core.realtime.stream.StreamProvider;
+import com.linkedin.pinot.core.realtime.stream.StreamProviderConfig;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;

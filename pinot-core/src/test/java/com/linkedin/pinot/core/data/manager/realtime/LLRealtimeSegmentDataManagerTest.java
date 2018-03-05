@@ -41,7 +41,6 @@ import junit.framework.Assert;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.common.protocol.Errors;
 import org.json.JSONObject;
-import org.mockito.Mockito;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -743,22 +742,6 @@ public class LLRealtimeSegmentDataManagerTest {
     @Override
     protected void postStopConsumedMsg(String reason) {
       _postConsumeStoppedCalled = true;
-    }
-
-    @Override
-    protected KafkaLowLevelStreamProviderConfig createStreamProviderConfig() {
-      KafkaLowLevelStreamProviderConfig config = mock(KafkaLowLevelStreamProviderConfig.class);
-      Mockito.doNothing().when(config).init(any(TableConfig.class), any(InstanceZKMetadata.class), any(Schema.class));
-      when(config.getTopicName()).thenReturn(_topicName);
-      when(config.getStreamName()).thenReturn(_topicName);
-      when(config.getSizeThresholdToFlushSegment()).thenReturn(maxRowsInSegment);
-      when(config.getTimeThresholdToFlushSegment()).thenReturn(maxTimeForSegmentCloseMs);
-      try {
-        when(config.getDecoder()).thenReturn(null);
-      } catch (Exception e) {
-        Assert.fail("Exception setting up streapProviderConfig");
-      }
-      return config;
     }
 
     @Override

@@ -26,7 +26,7 @@ import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
-import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentGenerator;
+import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentManager;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -92,10 +92,10 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
 
         String tableNameWithType = tableConfig.getTableName();
 
-        StreamPartitionAssignmentGenerator streamPartitionAssignmentGenerator =
-            new StreamPartitionAssignmentGenerator(_propertyStore);
+        StreamPartitionAssignmentManager streamPartitionAssignmentManager =
+            new StreamPartitionAssignmentManager(_propertyStore);
         PartitionAssignment streamPartitionAssignment =
-            streamPartitionAssignmentGenerator.getStreamPartitionAssignment(tableNameWithType);
+            streamPartitionAssignmentManager.getStreamPartitionAssignment(tableNameWithType);
         int numPartitions = streamPartitionAssignment.getNumPartitions();
 
         RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
@@ -103,14 +103,14 @@ public class DefaultRebalanceSegmentStrategy extends BaseRebalanceSegmentStrateg
             _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, realtimeTagConfig.getConsumingServerTag());
 
         Map<String, PartitionAssignment> tableNameToStreamPartitionAssignmentMap =
-            streamPartitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions,
+            streamPartitionAssignmentManager.generatePartitionAssignment(tableConfig, numPartitions,
                 consumingInstances, Lists.newArrayList(tableNameWithType));
         newPartitionAssignment = tableNameToStreamPartitionAssignmentMap.get(tableNameWithType);
 
         boolean dryRun = rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN, DEFAULT_DRY_RUN);
         if (!dryRun) {
           LOGGER.info("Updating stream partition assignment for table {}", tableNameWithType);
-          streamPartitionAssignmentGenerator.writeStreamPartitionAssignment(tableNameToStreamPartitionAssignmentMap);
+          streamPartitionAssignmentManager.writeStreamPartitionAssignment(tableNameToStreamPartitionAssignmentMap);
         } else {
           LOGGER.info("Dry run. Skip writing stream partition assignment to property store");
         }

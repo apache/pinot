@@ -20,8 +20,8 @@ import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.realtime.StreamProvider;
-import com.linkedin.pinot.core.realtime.StreamProviderConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamProvider;
+import com.linkedin.pinot.core.realtime.stream.StreamProviderConfig;
 import java.io.File;
 import java.io.IOException;
 

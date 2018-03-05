@@ -18,9 +18,8 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-import com.linkedin.pinot.core.realtime.StreamProviderConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamProviderConfig;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -76,7 +75,6 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
   private String kafkaTopicName;
   private String zkString;
   private String groupId;
-  private KafkaMessageDecoder decoder;
   private String decodeKlass;
   private Schema indexingSchema;
   private Map<String, String> decoderProps;
@@ -185,11 +183,6 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
   }
 
   @Override
-  public String getStreamProviderClass() {
-    return null;
-  }
-
-  @Override
   public void init(TableConfig tableConfig, InstanceZKMetadata instanceMetadata, Schema schema) {
     this.indexingSchema = schema;
     if (instanceMetadata != null) {
@@ -197,7 +190,7 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
       this.groupId = instanceMetadata.getGroupId(tableConfig.getTableName());
     }
     KafkaStreamMetadata kafkaMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
-    this.kafkaTopicName = kafkaMetadata.getKafkaTopicName();
+    this.kafkaTopicName = kafkaMetadata.getStreamName();
     this.decodeKlass = kafkaMetadata.getDecoderClass();
     this.decoderProps = kafkaMetadata.getDecoderProperties();
     this.kafkaConsumerProps = kafkaMetadata.getKafkaConsumerProperties();
@@ -269,7 +262,6 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
         isEqual(kafkaTopicName, that.kafkaTopicName) &&
         isEqual(zkString, that.zkString) &&
         isEqual(groupId, that.groupId) &&
-        isEqual(decoder, that.decoder) &&
         isEqual(decodeKlass, that.decodeKlass) &&
         isEqual(indexingSchema, that.indexingSchema) &&
         isEqual(decoderProps, that.decoderProps) &&
@@ -281,7 +273,6 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     int result = hashCodeOf(kafkaTopicName);
     result = hashCodeOf(result, zkString);
     result = hashCodeOf(result, groupId);
-    result = hashCodeOf(result, decoder);
     result = hashCodeOf(result, decodeKlass);
     result = hashCodeOf(result, indexingSchema);
     result = hashCodeOf(result, decoderProps);

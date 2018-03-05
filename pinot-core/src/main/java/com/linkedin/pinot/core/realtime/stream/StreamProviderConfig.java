@@ -13,13 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.metadata.stream;
+package com.linkedin.pinot.core.realtime.stream;
 
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import java.util.Map;
 
 
-public interface StreamMetadata {
+public interface StreamProviderConfig {
 
-  Map<String, String> toMap();
+  void init(Map<String, String> properties, Schema schema);
 
+  void init(TableConfig tableConfig, InstanceZKMetadata instanceMetadata, Schema schema);
+
+  Schema getSchema();
+
+  int getSizeThresholdToFlushSegment();
+
+  long getTimeThresholdToFlushSegment();
+
+  /**
+   * @return Name of this stream. May return null if called before init() is called.
+   */
+  String getStreamName();
 }

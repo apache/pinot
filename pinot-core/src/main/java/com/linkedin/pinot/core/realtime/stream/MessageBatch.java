@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.pinot.core.realtime.impl.kafka;
+package com.linkedin.pinot.core.realtime.stream;
 
 /**
  * Interface wrapping Kafka consumer. Throws IndexOutOfBoundsException when trying to access a message at an
@@ -54,5 +54,5 @@ public interface MessageBatch<T> {
      * @param index
      * @return
      */
-    long getNextKafkaMessageOffsetAtIndex(int index);
+    long getNextStreamMessageOffsetAtIndex(int index);
 }
