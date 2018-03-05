@@ -257,8 +257,8 @@ public class BrokerRequestHandler {
 
     LOGGER.debug("Broker Response: {}", brokerResponse);
     // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended).
-    LOGGER.info("RequestId: {}, table: {}, totalTimeMs: {}, numDocsScanned: {}, numEntriesScannedInFilter: {}, "
-            + "numEntriesScannedPostFilter: {}, totalDocs: {}, scatterGatherStats: {}, query: {}", requestId,
+    LOGGER.info("Time: {}, RequestId: {}, table: {}, totalTimeMs: {}, numDocsScanned: {}, numEntriesScannedInFilter: {}, "
+            + "numEntriesScannedPostFilter: {}, totalDocs: {}, scatterGatherStats: {}, query: {}", System.currentTimeMillis(), requestId,
         brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
         brokerResponse.getNumEntriesScannedInFilter(), brokerResponse.getNumEntriesScannedPostFilter(),
         brokerResponse.getTotalDocs(), scatterGatherStats, StringUtils.substring(pql, 0, _queryLogLength));
