@@ -6,6 +6,7 @@
     <p>Metric: {{metric}}</p>
     {{#each-in alertList as |alert anomalyList|}}
       <p>Alert: {{alert}}</p>
+      <div class="te-anomaly-table--no-padding-bottom">
         {{models-table
           data=anomalyList
           columns=columns
@@ -16,6 +17,7 @@
           pageSize=5
           showComponentFooter=false
         }}
+      </div>
       {{#if (gt anomalyList.length 5) }}
         <a href="{{get (get model.redirectLink metric) alert}}" class="te-anomaly-table__redirect-link">
           See More

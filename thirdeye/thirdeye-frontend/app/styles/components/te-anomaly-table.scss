@@ -150,10 +150,15 @@
     display: flex;
     justify-content: center;
     border: solid 1px $te-light-grey;
-    margin-top: -21px;
+    // margin-top: -21px;
     border-top: none;
     padding-top: 10px;
     padding-bottom: 10px;
     margin-bottom: 30px;
+  }
+
+  &--no-padding-bottom {
+    padding-bottom: 0;
+    margin-bottom: 0;
   }
 }

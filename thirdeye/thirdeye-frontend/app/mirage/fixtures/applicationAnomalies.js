@@ -1,4 +1,5 @@
 // Mock data that returns an application's anomalies
+// TODO: Refactor this into a factory
 export default [
   {
     id: 1,
