@@ -235,6 +235,19 @@ public class AnomalyResource {
     return alertFilter.getProbability(mergedAnomaly);
   }
 
+  // get preview anomaly scores
+  @GET
+  @Path("eval/projected/anomalies/score/{autotuneId}")
+  public double getPreviewedAnomalyScore(@NotNull @PathParam("autotuneId") long autotuneId, @NotNull  @QueryParam("mergedAnomalyId") long mergedAnomalyId) {
+    MergedAnomalyResultDTO mergedAnomaly = anomalyMergedResultDAO.findById(mergedAnomalyId);
+    // Initiate tuned alert filter
+    AutotuneConfigDTO target = DAO_REGISTRY.getAutotuneConfigDAO().findById(autotuneId);
+    // Initiate alert filter to BaseAlertFilter
+    Map<String, String> alertFilterParams = target.getConfiguration();
+    BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(alertFilterParams);
+    return alertFilter.getProbability(mergedAnomaly);
+  }
+
   //View raw anomalies for collection
   @GET
   @Path("/raw-anomalies/view")
