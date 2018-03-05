@@ -459,6 +459,7 @@ public class GenericPojoDao {
   }
 
   public <E extends AbstractBean> List<E> get(final Predicate predicate, final Class<E> pojoClass) {
+    final List<Long> idsToFind = getIdsByPredicate(predicate, pojoClass);
     long tStart = System.nanoTime();
     try {
       //apply the predicates and fetch the primary key ids
@@ -466,22 +467,6 @@ public class GenericPojoDao {
       return runTask(new QueryTask<List<E>>() {
         @Override
         public List<E> handle(Connection connection) throws Exception {
-          PojoInfo pojoInfo = pojoInfoMap.get(pojoClass);
-          //find the matching ids to delete
-          List<? extends AbstractIndexEntity> indexEntities;
-          try (PreparedStatement findByParamsStatement = sqlQueryBuilder
-              .createFindByParamsStatement(connection, pojoInfo.indexEntityClass, predicate)) {
-            try (ResultSet rs = findByParamsStatement.executeQuery()) {
-              indexEntities = genericResultSetMapper.mapAll(rs, pojoInfo.indexEntityClass);
-            }
-          }
-          List<Long> idsToFind = new ArrayList<>();
-          if (CollectionUtils.isNotEmpty(indexEntities)) {
-            for (AbstractIndexEntity entity : indexEntities) {
-              idsToFind.add(entity.getBaseId());
-            }
-          }
-          dumpTable(connection, pojoInfo.indexEntityClass);
           //fetch the entities
           List<E> ret = new ArrayList<>();
           if (!idsToFind.isEmpty()) {
@@ -507,6 +492,38 @@ public class GenericPojoDao {
         }
 
       }, Collections.<E>emptyList());
+    } finally {
+      ThirdeyeMetricsUtil.dbReadCallCounter.inc();
+      ThirdeyeMetricsUtil.dbReadDurationCounter.inc(System.nanoTime() - tStart);
+    }
+  }
+
+  public <E extends AbstractBean> List<Long> getIdsByPredicate(final Predicate predicate, final Class<E> pojoClass) {
+    long tStart = System.nanoTime();
+    try {
+      //apply the predicates and fetch the primary key ids
+      return runTask(new QueryTask<List<Long>>() {
+        @Override
+        public List<Long> handle(Connection connection) throws Exception {
+          PojoInfo pojoInfo = pojoInfoMap.get(pojoClass);
+          //find the matching ids
+          List<? extends AbstractIndexEntity> indexEntities;
+          try (PreparedStatement findByParamsStatement = sqlQueryBuilder
+              .createFindByParamsStatement(connection, pojoInfo.indexEntityClass, predicate)) {
+            try (ResultSet rs = findByParamsStatement.executeQuery()) {
+              indexEntities = genericResultSetMapper.mapAll(rs, pojoInfo.indexEntityClass);
+            }
+          }
+          List<Long> idsToReturn = new ArrayList<>();
+          if (CollectionUtils.isNotEmpty(indexEntities)) {
+            for (AbstractIndexEntity entity : indexEntities) {
+              idsToReturn.add(entity.getBaseId());
+            }
+          }
+          dumpTable(connection, pojoInfo.indexEntityClass);
+          return idsToReturn;
+        }
+      }, Collections.<Long>emptyList());
     } finally {
       ThirdeyeMetricsUtil.dbReadCallCounter.inc();
       ThirdeyeMetricsUtil.dbReadDurationCounter.inc(System.nanoTime() - tStart);
@@ -562,51 +579,50 @@ public class GenericPojoDao {
     }
   }
 
-  public <E extends AbstractBean> int deleteByParams(final Map<String, Object> filters,
-      final Class<E> pojoClass) {
+  public <E extends AbstractBean> int delete(final List<Long> idsToDelete, final Class<E> pojoClass) {
     long tStart = System.nanoTime();
     try {
       return runTask(new QueryTask<Integer>() {
         @Override
         public Integer handle(Connection connection) throws Exception {
           PojoInfo pojoInfo = pojoInfoMap.get(pojoClass);
-          //find the matching ids to delete
-          List<? extends AbstractIndexEntity> indexEntities;
-          try (PreparedStatement findByParamsStatement = sqlQueryBuilder
-              .createFindByParamsStatement(connection, pojoInfo.indexEntityClass, filters)) {
-            try (ResultSet rs = findByParamsStatement.executeQuery()) {
-              indexEntities = genericResultSetMapper.mapAll(rs, pojoInfo.indexEntityClass);
-            }
-          }
+          int totalBaseRowsDeleted = 0;
+          if (CollectionUtils.isNotEmpty(idsToDelete)) {
+            final int maxSublistSize = 100000;
+            int minIdx = 0;
+            int maxIdx = maxSublistSize;
+            while (minIdx < idsToDelete.size()) {
+              List<Long> subList = idsToDelete.subList(minIdx, Math.min(maxIdx, idsToDelete.size()));
+              //delete the ids from both base table and index table
+              int indexRowsDeleted;
+              try (PreparedStatement statement = sqlQueryBuilder.createDeleteStatement(connection,
+                  pojoInfo.indexEntityClass, subList, true)) {
+                indexRowsDeleted = statement.executeUpdate();
+              }
+              int baseRowsDeleted;
+              try (PreparedStatement baseTableDeleteStatement = sqlQueryBuilder
+                  .createDeleteStatement(connection, GenericJsonEntity.class, subList, false)) {
+                baseRowsDeleted = baseTableDeleteStatement.executeUpdate();
+              }
+              assert (baseRowsDeleted == indexRowsDeleted);
 
-          List<Long> idsToDelete = new ArrayList<>();
-          if (CollectionUtils.isNotEmpty(indexEntities)) {
-            for (AbstractIndexEntity entity : indexEntities) {
-              idsToDelete.add(entity.getBaseId());
+              totalBaseRowsDeleted += baseRowsDeleted;
+              minIdx = Math.min(maxIdx, idsToDelete.size());
+              maxIdx += maxSublistSize;
             }
           }
-          int baseRowsDeleted = 0;
-          if (!idsToDelete.isEmpty()) {
-            //delete the ids from both base table and index table
-            int indexRowsDeleted = 0;
-            try (PreparedStatement statement = sqlQueryBuilder.createDeleteStatement(connection,
-                pojoInfo.indexEntityClass, idsToDelete)) {
-              indexRowsDeleted = statement.executeUpdate();
-            }
-            try (PreparedStatement baseTableDeleteStatement = sqlQueryBuilder
-                .createDeleteStatement(connection, GenericJsonEntity.class, idsToDelete)) {
-              baseRowsDeleted = baseTableDeleteStatement.executeUpdate();
-            }
-            assert (baseRowsDeleted == indexRowsDeleted);
-          }
-          return baseRowsDeleted;
-
+          return totalBaseRowsDeleted;
         }
       }, 0);
     } finally {
       ThirdeyeMetricsUtil.dbWriteCallCounter.inc();
       ThirdeyeMetricsUtil.dbWriteDurationCounter.inc(System.nanoTime() - tStart);
     }
+  }
+
+  public <E extends AbstractBean> int deleteByPredicate(final Predicate predicate, final Class<E> pojoClass) {
+    List<Long> idsToDelete = getIdsByPredicate(predicate, pojoClass);
+    return delete(idsToDelete, pojoClass);
   }
 
 

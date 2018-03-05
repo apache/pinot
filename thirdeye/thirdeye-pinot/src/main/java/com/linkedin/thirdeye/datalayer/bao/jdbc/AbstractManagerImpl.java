@@ -78,13 +78,23 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
   }
 
   @Override
-  public void delete(E entity) {
-    genericPojoDao.delete(entity.getId(), beanClass);
+  public int delete(E entity) {
+    return genericPojoDao.delete(entity.getId(), beanClass);
   }
 
   @Override
-  public void deleteById(Long id) {
-    genericPojoDao.delete(id, beanClass);
+  public int deleteById(Long id) {
+    return genericPojoDao.delete(id, beanClass);
+  }
+
+  @Override
+  public int deleteByIds(List<Long> ids) {
+    return genericPojoDao.delete(ids, beanClass);
+  }
+
+  @Override
+  public int deleteByPredicate(Predicate predicate) {
+    return genericPojoDao.deleteByPredicate(predicate, beanClass);
   }
 
   @Override
@@ -108,6 +118,11 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
   public List<E> findByPredicate(Predicate predicate) {
     List<? extends AbstractBean> list = genericPojoDao.get(predicate, beanClass);
     return convertBeanListToDTOList(list);
+  }
+
+  @Override
+  public List<Long> findIdsByPredicate(Predicate predicate) {
+    return genericPojoDao.getIdsByPredicate(predicate, beanClass);
   }
 
   protected List<E> convertBeanListToDTOList(List<? extends AbstractBean> beans) {
