@@ -14,11 +14,14 @@
  * limitations under the License.
  */
 
-package com.linkedin.pinot.controller.helix;
+package com.linkedin.pinot.common.partition;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 
 /**
@@ -26,9 +29,8 @@ import java.util.Map;
  */
 public class PartitionAssignment {
 
-  private String _tableName;
-  // TODO: include replica in the key, by creating a class PartitionKey to encapsulate partitionId and replicaNum
-  private Map<String, List<String>> _partitionToInstances;
+  protected String _tableName;
+  protected Map<String, List<String>> _partitionToInstances;
 
   public PartitionAssignment(String tableName) {
     _tableName = tableName;
@@ -58,6 +60,19 @@ public class PartitionAssignment {
 
   public int getNumPartitions() {
     return _partitionToInstances.size();
+  }
+
+  /**
+   * Get all instances.
+   *
+   * @return Set of all instances for this table
+   */
+  public List<String> getAllInstances() {
+    Set<String> serverList = new HashSet<>();
+    for(List<String> servers: getPartitionToInstances().values()) {
+      serverList.addAll(servers);
+    }
+    return new ArrayList<>(serverList);
   }
 
   @Override

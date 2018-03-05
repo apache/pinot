@@ -34,10 +34,11 @@ import com.linkedin.pinot.common.messages.SegmentReloadMessage;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.PartitionToReplicaGroupMappingZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
+import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignment;
+import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOnlineOfflineStateModel;
@@ -52,7 +53,7 @@ import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.pojos.Instance;
-import com.linkedin.pinot.controller.helix.PartitionAssignment;
+import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.ResponseStatus;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy;
@@ -95,7 +96,6 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.zookeeper.data.Stat;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -365,6 +365,7 @@ public class PinotHelixResourceManager {
     }
     return resourceNames;
   }
+
   /**
    * Get all Pinot raw table names.
    *
@@ -1087,10 +1088,12 @@ public class PinotHelixResourceManager {
         String assignmentStrategy = segmentsConfig.getSegmentAssignmentStrategy();
         if (assignmentStrategy != null && SegmentAssignmentStrategyEnum.valueOf(assignmentStrategy)
             == SegmentAssignmentStrategyEnum.ReplicaGroupSegmentAssignmentStrategy) {
-          PartitionToReplicaGroupMappingZKMetadata partitionMappingMetadata =
-              buildPartitionToReplicaGroupMapping(offlineTableName, tableConfig);
-          _propertyStore.set(ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(offlineTableName),
-              partitionMappingMetadata.toZNRecord(), AccessOption.PERSISTENT);
+          ReplicaGroupPartitionAssignmentGenerator partitionAssignmentGenerator =
+              new ReplicaGroupPartitionAssignmentGenerator(_propertyStore);
+          List<String> servers = getServerInstancesForTable(offlineTableName, TableType.OFFLINE);
+          ReplicaGroupPartitionAssignment partitionAssignment =
+              partitionAssignmentGenerator.buildReplicaGroupPartitionAssignment(offlineTableName, tableConfig, servers);
+          partitionAssignmentGenerator.writeReplicaGroupPartitionAssignment(partitionAssignment);
         }
 
         break;
@@ -1334,64 +1337,6 @@ public class PinotHelixResourceManager {
         }
       }
     }
-  }
-
-  /**
-   * Build the partition mapping table that maps a tuple of (partition number, replica group number) to a list of
-   * servers. Two important configurations are explained below.
-   *
-   * - 'numInstancesPerPartition': this number decides the number of servers within a replica group.
-   *
-   * - 'partitionColumn': this configuration decides whether to use the table or partition level replica groups.
-   *
-   * @param tableName: Name of table
-   * @param tableConfig: Configuration for table
-   * @return Partition mapping table from the given configuration
-   */
-  private PartitionToReplicaGroupMappingZKMetadata buildPartitionToReplicaGroupMapping(String tableName,
-      TableConfig tableConfig) {
-
-    // Fetch the server instances for the table.
-    List<String> servers = getServerInstancesForTable(tableName, TableType.OFFLINE);
-
-    // Fetch information required to build the mapping table from the table configuration.
-    ReplicaGroupStrategyConfig replicaGroupStrategyConfig = tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
-    String partitionColumn = replicaGroupStrategyConfig.getPartitionColumn();
-    int numInstancesPerPartition = replicaGroupStrategyConfig.getNumInstancesPerPartition();
-
-    // If we do not have the partition column configuration, we assume to use the table level replica groups,
-    // which is equivalent to have the same partition number for all segments (i.e. 1 partition).
-    int numPartitions = 1;
-    if (partitionColumn != null) {
-      numPartitions = tableConfig.getIndexingConfig().getSegmentPartitionConfig().getNumPartitions(partitionColumn);
-    }
-    int numReplicas = tableConfig.getValidationConfig().getReplicationNumber();
-    int numServers = servers.size();
-
-    // Enforcing disjoint server sets for each replica group.
-    if (numInstancesPerPartition * numReplicas > numServers) {
-      throw new UnsupportedOperationException("Replica group aware segment assignment assumes that servers in "
-          + "each replica group are disjoint. Check the configurations to see if the following inequality holds. "
-          + "'numInstancePerPartition' * 'numReplicas' <= 'totalServerNumbers'" );
-    }
-
-    // Creating a mapping table
-    PartitionToReplicaGroupMappingZKMetadata
-        partitionToReplicaGroupMapping = new PartitionToReplicaGroupMappingZKMetadata();
-    partitionToReplicaGroupMapping.setTableName(tableName);
-
-    Collections.sort(servers);
-    for (int partitionId = 0; partitionId < numPartitions; partitionId++) {
-      // If the configuration contains partition column information, we use the segment level replica groups.
-      if (numPartitions != 1) {
-        Collections.shuffle(servers);
-      }
-      for (int i = 0; i < numInstancesPerPartition * numReplicas; i++) {
-        int groupId = i / numInstancesPerPartition;
-        partitionToReplicaGroupMapping.addInstanceToReplicaGroup(partitionId, groupId, servers.get(i));
-      }
-    }
-    return partitionToReplicaGroupMapping;
   }
 
   /**

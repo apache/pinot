@@ -21,7 +21,6 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.PartitionToReplicaGroupMappingZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.SchemaUtils;
@@ -137,13 +136,6 @@ public class ZKMetadataProvider {
     }
   }
 
-  public static void setInstancePartitionAssignmentFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      PartitionToReplicaGroupMappingZKMetadata partitionMappingZKMetadata) {
-    propertyStore.set(constructPropertyStorePathForInstancePartitions(
-        TableNameBuilder.OFFLINE.tableNameWithType(partitionMappingZKMetadata.getTableName())),
-        partitionMappingZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
-  }
-
   public static boolean setOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
       OfflineSegmentZKMetadata offlineSegmentZKMetadata, int expectedVersion) {
     // NOTE: Helix will throw ZkBadVersionException if version does not match
@@ -210,19 +202,6 @@ public class ZKMetadataProvider {
     } else {
       return new LLCRealtimeSegmentZKMetadata(znRecord);
     }
-  }
-
-  @Nullable
-  public static PartitionToReplicaGroupMappingZKMetadata getPartitionToReplicaGroupMappingZKMedata(
-      @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull String tableName) {
-    // Segment Assignment Strategy is triggered only for offline table.
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForInstancePartitions(offlineTableName), null,
-        AccessOption.PERSISTENT);
-    if (znRecord == null) {
-      return null;
-    }
-    return new PartitionToReplicaGroupMappingZKMetadata(znRecord);
   }
 
   @Nullable

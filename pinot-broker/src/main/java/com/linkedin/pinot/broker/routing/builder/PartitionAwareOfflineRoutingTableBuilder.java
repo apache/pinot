@@ -18,9 +18,10 @@ package com.linkedin.pinot.broker.routing.builder;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.ColumnPartitionMetadata;
-import com.linkedin.pinot.common.metadata.segment.PartitionToReplicaGroupMappingZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignment;
+import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -83,8 +84,10 @@ public class PartitionAwareOfflineRoutingTableBuilder extends BasePartitionAware
     Set<String> segmentSet = externalView.getPartitionSet();
 
     // Fetch the partition to replica group mapping table from the property store
-    PartitionToReplicaGroupMappingZKMetadata partitionToReplicaGroupMappingZKMetadata =
-        ZKMetadataProvider.getPartitionToReplicaGroupMappingZKMedata(_propertyStore, tableName);
+    ReplicaGroupPartitionAssignmentGenerator partitionAssignmentGenerator =
+        new ReplicaGroupPartitionAssignmentGenerator(_propertyStore);
+    ReplicaGroupPartitionAssignment partitionAssignment =
+        partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableName);
 
     // 1. Compute the partition id set by looking at the segment zk metadata and cache metadata when possible
     Set<Integer> partitionIds = new HashSet<>();
@@ -108,7 +111,7 @@ public class PartitionAwareOfflineRoutingTableBuilder extends BasePartitionAware
     for (Integer partitionId : partitionIds) {
       for (int replicaId = 0; replicaId < _numReplicas; replicaId++) {
         List<String> serversForPartitionAndReplica =
-            partitionToReplicaGroupMappingZKMetadata.getInstancesfromReplicaGroup(partitionId, replicaId);
+            partitionAssignment.getInstancesfromReplicaGroup(partitionId, replicaId);
         for (String serverName : serversForPartitionAndReplica) {
           Map<String, Integer> serverToReplicaMap = partitionToServerToReplicaMap.get(partitionId);
           if (serverToReplicaMap == null) {
