@@ -206,6 +206,12 @@ export default Controller.extend({
   filterConfig: filterBarConfig,
 
   /**
+   * flag that toogles the modal view
+   * @type {Boolean}
+   */
+  showEntityMappingModal: false,
+
+  /**
    * Default settings
    */
   init() {
@@ -983,6 +989,23 @@ export default Controller.extend({
           this.send('transitionToRca');
         }
       }, 1000);
+    },
+
+    /**
+     * Toggles the modal view
+    */
+    onEntityMappingClick() {
+      this.set('showEntityMappingModal', true);
+    },
+
+    /**
+     * Handles the modal submit action
+     * Flushes the cache to reload the related entities
+    */
+    onModalSubmit() {
+      this.get('entitiesService').flushCache();
+      this.notifyPropertyChange('context');
+      this.set('showEntityMappingModal', false);
     }
   }
 });
