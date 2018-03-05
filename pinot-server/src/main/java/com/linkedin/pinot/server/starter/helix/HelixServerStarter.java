@@ -26,10 +26,15 @@ import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
+import com.linkedin.pinot.common.utils.ServiceStatus.Status;
+import com.linkedin.pinot.common.utils.retry.ExponentialBackoffRetryPolicy;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import com.linkedin.pinot.server.starter.ServerInstance;
+
+import java.sql.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +57,8 @@ import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.joda.time.DateTime;
+import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,6 +84,7 @@ public class HelixServerStarter {
 
   public HelixServerStarter(String helixClusterName, String zkServer, Configuration helixServerConfig)
       throws Exception {
+    DateTime startTime = DateTime.now();
     LOGGER.info("Starting Pinot server");
     _helixClusterName = helixClusterName;
 
@@ -133,7 +141,6 @@ public class HelixServerStarter {
         CommonConstants.Server.DEFAULT_ADMIN_API_PORT);
     _adminApiApplication = new AdminApiApplication(_serverInstance);
     _adminApiApplication.start(adminApiPort);
-    updateInstanceConfigInHelix(adminApiPort, false/*shutDownStatus*/);
 
     // Register message handler factory
     SegmentMessageHandlerFactory messageHandlerFactory =
@@ -156,15 +163,46 @@ public class HelixServerStarter {
     });
 
     // Register the service status handler
-    ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
+    final ServiceStatus.MultipleCallbackServiceStatusCallback serviceStatusCallback = new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
         new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _helixClusterName,
             _instanceId),
         new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _helixClusterName,
-            _instanceId))));
+            _instanceId)));
+    ServiceStatus.setServiceStatusCallback(serviceStatusCallback);
 
     ControllerLeaderLocator.create(_helixManager);
 
-    LOGGER.info("Pinot server ready");
+    
+    LOGGER.info("Checking for serviceStatus from:{} before marking server ready to serve requests", serviceStatusCallback);
+
+    //TODO:can we come with a better timeout based on number of tables/segments?
+    final Duration maxWaitDuration = Duration.standardHours(1);
+    final DateTime maxWaitEndTime = DateTime.now().plus(maxWaitDuration);
+
+    int maxNumAttempts = (int) Math.log(maxWaitDuration.getMillis()) + 1; 
+    ExponentialBackoffRetryPolicy exponentialBackoffRetryPolicy = RetryPolicies.exponentialBackoffRetryPolicy(maxNumAttempts, 1000/* initialDelayMs */,
+        2/* delayScaleFactor */);
+    exponentialBackoffRetryPolicy.attempt(new Callable<Boolean>() {
+
+      @Override
+      public Boolean call() throws Exception {
+        Status serviceStatus = ServiceStatus.getServiceStatus();
+        if (serviceStatus == Status.GOOD) {
+          LOGGER.info("Pinot server ready to take requests");
+          return true;
+        }
+        if (DateTime.now().isAfter(maxWaitEndTime)) {
+          LOGGER.warn(" Marking server ready even though ServiceStatusCheck:{} did not return GOOD even after {}", serviceStatusCallback, maxWaitDuration);
+          return true;
+        }
+        LOGGER.info("Checking for serviceStatus from:{} before marking server ready to serve requests", serviceStatusCallback);
+        return false;
+      }
+    });
+
+    LOGGER.info("Start up time:{}", new Duration(DateTime.now().getMillis() - startTime.getMillis()));
+    //mark server ready for broker to start routing requests to server.
+    updateInstanceConfigInHelix(adminApiPort, false/*shutDownStatus*/);
 
     // Create metrics for mmap stuff
     _serverInstance.getServerMetrics().addCallbackGauge("memory.directByteBufferUsage", new Callable<Long>() {
