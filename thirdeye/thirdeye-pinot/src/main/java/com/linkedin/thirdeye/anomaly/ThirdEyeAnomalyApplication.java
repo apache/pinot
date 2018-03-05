@@ -4,35 +4,29 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import com.linkedin.thirdeye.anomaly.classification.ClassificationJobScheduler;
 import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
+import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
+import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardResource;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardServiceExecutor;
+import com.linkedin.thirdeye.anomaly.task.TaskDriver;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
-import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
+import com.linkedin.thirdeye.auto.onboard.AutoOnboardService;
+import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
+import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
+import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
 import com.linkedin.thirdeye.dashboard.resources.EmailResource;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.pinot.resources.PinotDataSourceResource;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-
-import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
-import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
-import com.linkedin.thirdeye.anomaly.task.TaskDriver;
-import com.linkedin.thirdeye.auto.onboard.AutoOnboardService;
-import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.MapConfiguration;
 
 
 public class ThirdEyeAnomalyApplication
@@ -113,7 +107,6 @@ public class ThirdEyeAnomalyApplication
           detectionJobScheduler.start();
           environment.jersey().register(
               new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory, emailResource));
-          environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
         }
         if (config.isMonitor()) {
           monitorJobScheduler = new MonitorJobScheduler(config.getMonitorConfiguration());
