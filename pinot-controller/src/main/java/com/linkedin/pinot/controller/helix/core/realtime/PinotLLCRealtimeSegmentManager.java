@@ -47,9 +47,9 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentManager;
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
+import com.linkedin.pinot.core.realtime.impl.kafka.CombinedStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadataFactory;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -345,7 +345,7 @@ public class PinotLLCRealtimeSegmentManager {
       PartitionAssignment partitionAssignment, int tableFlushSize) {
     // If config does not have a flush threshold, use the default.
     if (tableFlushSize < 1) {
-      tableFlushSize = KafkaHighLevelStreamProviderConfig.getDefaultMaxRealtimeRowsCount();
+      tableFlushSize = CombinedStreamProviderConfig.getDefaultMaxRealtimeRowsCount();
     }
 
     // Gather list of instances for this partition

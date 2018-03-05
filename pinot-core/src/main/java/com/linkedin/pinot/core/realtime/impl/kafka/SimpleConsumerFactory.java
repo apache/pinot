@@ -40,8 +40,8 @@ public class SimpleConsumerFactory extends PinotStreamConsumerFactory {
 
   @Override
   public StreamMessageDecoder getDecoder(StreamProviderConfig streamProviderConfig) throws Exception {
-    KafkaLowLevelStreamProviderConfig kafkaLowLevelStreamProviderConfig =
-        (KafkaLowLevelStreamProviderConfig) streamProviderConfig;
-    return kafkaLowLevelStreamProviderConfig.getDecoder();
+    PartitionLevelStreamProviderConfig partitionLevelStreamProviderConfig =
+        (PartitionLevelStreamProviderConfig) streamProviderConfig;
+    return partitionLevelStreamProviderConfig.getDecoder();
   }
 }

@@ -33,7 +33,7 @@ import kafka.javaapi.consumer.ConsumerConnector;
 public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   private static final Logger STATIC_LOGGER = LoggerFactory.getLogger(KafkaHighLevelConsumerStreamProvider.class);
 
-  private KafkaHighLevelStreamProviderConfig streamProviderConfig;
+  private CombinedStreamProviderConfig streamProviderConfig;
   private KafkaMessageDecoder decoder;
 
   private ConsumerConnector consumer;
@@ -54,7 +54,7 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   @Override
   public void init(StreamProviderConfig streamProviderConfig, String tableName, ServerMetrics serverMetrics)
       throws Exception {
-    this.streamProviderConfig = (KafkaHighLevelStreamProviderConfig) streamProviderConfig;
+    this.streamProviderConfig = (CombinedStreamProviderConfig) streamProviderConfig;
     this.decoder = this.streamProviderConfig.getDecoder();
     tableAndStreamName = tableName + "-" + streamProviderConfig.getStreamName();
     INSTANCE_LOGGER = LoggerFactory.getLogger(

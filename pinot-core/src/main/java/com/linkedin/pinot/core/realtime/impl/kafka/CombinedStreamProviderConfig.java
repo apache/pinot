@@ -35,7 +35,7 @@ import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass
 import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
 
 
-public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig {
+public class CombinedStreamProviderConfig implements StreamProviderConfig {
   private static final Map<String, String> defaultProps;
 
   private static final int DEFAULT_MAX_REALTIME_ROWS_COUNT = 5000000;
@@ -82,7 +82,7 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
   private long segmentTimeInMillis = ONE_HOUR;
   private int realtimeRecordsThreshold = DEFAULT_MAX_REALTIME_ROWS_COUNT;
 
-  public KafkaHighLevelStreamProviderConfig() {
+  public CombinedStreamProviderConfig() {
 
   }
 
@@ -117,7 +117,7 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     }
 
     if (groupId == null || zkString == null || kafkaTopicName == null || this.decodeKlass == null) {
-      throw new RuntimeException("Cannot initialize KafkaHighLevelStreamProviderConfig as: " + "groupId = " + groupId
+      throw new RuntimeException("Cannot initialize CombinedStreamProviderConfig as: " + "groupId = " + groupId
           + ", zkString = " + zkString + ", kafkaTopicName = " + kafkaTopicName + ", decodeKlass = " + decodeKlass);
     }
 
@@ -255,7 +255,7 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
       return false;
     }
 
-    KafkaHighLevelStreamProviderConfig that = (KafkaHighLevelStreamProviderConfig) o;
+    CombinedStreamProviderConfig that = (CombinedStreamProviderConfig) o;
 
     return isEqual(segmentTimeInMillis, that.segmentTimeInMillis) &&
         isEqual(realtimeRecordsThreshold, that.realtimeRecordsThreshold) &&

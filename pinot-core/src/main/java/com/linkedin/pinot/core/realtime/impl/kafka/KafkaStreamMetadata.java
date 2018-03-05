@@ -164,7 +164,7 @@ public class KafkaStreamMetadata implements StreamMetadata {
 
   @Override
   public StreamProviderConfig createStreamProviderConfig() {
-    return new KafkaLowLevelStreamProviderConfig();
+    return new PartitionLevelStreamProviderConfig();
   }
 
   @Override

@@ -27,7 +27,7 @@ import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
+import com.linkedin.pinot.core.realtime.impl.kafka.PartitionLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -167,7 +167,7 @@ public class LLRealtimeSegmentDataManagerTest {
       TableConfig tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
       InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
       Schema schema = Schema.fromString(makeSchema());
-      KafkaLowLevelStreamProviderConfig config = new KafkaLowLevelStreamProviderConfig();
+      PartitionLevelStreamProviderConfig config = new PartitionLevelStreamProviderConfig();
       config.init(tableConfig, instanceZKMetadata, schema);
       Assert.assertEquals(3 * 3600 * 1000L, config.getTimeThresholdToFlushSegment());
     }
@@ -177,7 +177,7 @@ public class LLRealtimeSegmentDataManagerTest {
       TableConfig tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
       InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
       Schema schema = Schema.fromString(makeSchema());
-      KafkaLowLevelStreamProviderConfig config = new KafkaLowLevelStreamProviderConfig();
+      PartitionLevelStreamProviderConfig config = new PartitionLevelStreamProviderConfig();
       config.init(tableConfig, instanceZKMetadata, schema);
       Assert.assertEquals((3 * 3600  + 30 * 60) * 1000L, config.getTimeThresholdToFlushSegment());
     }
@@ -188,7 +188,7 @@ public class LLRealtimeSegmentDataManagerTest {
       TableConfig tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
       InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
       Schema schema = Schema.fromString(makeSchema());
-      KafkaLowLevelStreamProviderConfig config = new KafkaLowLevelStreamProviderConfig();
+      PartitionLevelStreamProviderConfig config = new PartitionLevelStreamProviderConfig();
       config.init(tableConfig, instanceZKMetadata, schema);
       Assert.assertEquals(segTime, config.getTimeThresholdToFlushSegment());
     }
