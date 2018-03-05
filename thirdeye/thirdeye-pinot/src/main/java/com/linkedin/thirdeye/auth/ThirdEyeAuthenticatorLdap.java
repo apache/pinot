@@ -4,9 +4,12 @@ import com.google.common.base.Optional;
 import io.dropwizard.auth.AuthenticationException;
 import io.dropwizard.auth.Authenticator;
 import java.util.Hashtable;
+import java.util.List;
 import javax.naming.Context;
 import javax.naming.NamingException;
 import javax.naming.directory.InitialDirContext;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,10 +19,10 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
 
   private static final String LDAP_CONTEXT_FACTORY = "com.sun.jndi.ldap.LdapCtxFactory";
 
-  private final String domainSuffix;
+  private final List<String> domainSuffix;
   private final String ldapUrl;
 
-  public ThirdEyeAuthenticatorLdap(String domainSuffix, String ldapUrl) {
+  public ThirdEyeAuthenticatorLdap(List<String> domainSuffix, String ldapUrl) {
     this.domainSuffix = domainSuffix;
     this.ldapUrl = ldapUrl;
   }
@@ -29,14 +32,10 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
    */
   @Override
   public Optional<ThirdEyePrincipal> authenticate(Credentials credentials) throws AuthenticationException {
-    String principalName = credentials.getPrincipal();
     try {
-      if (principalName != null) {
-        // Append the default domain name if the given principal name doesn't have one
-        if (!principalName.contains("@")) {
-          principalName = principalName + '@' + this.domainSuffix;
-        }
-        LOG.info("Authenticating {} via username and password", principalName);
+      String simplePrincipalName = credentials.getPrincipal();
+      if (StringUtils.isNotBlank(simplePrincipalName)) {
+        LOG.info("Authenticating {} via username and password", simplePrincipalName);
 
         Hashtable<String, String> env = new Hashtable<>();
         env.put(Context.INITIAL_CONTEXT_FACTORY, LDAP_CONTEXT_FACTORY);
@@ -46,31 +45,49 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
           env.put(Context.SECURITY_PROTOCOL, "ssl");
         }
         env.put(Context.SECURITY_AUTHENTICATION, "simple");
-        env.put(Context.SECURITY_PRINCIPAL, principalName);
         env.put(Context.SECURITY_CREDENTIALS, credentials.getPassword());
 
         // Attempt ldap authentication
-        try {
-          new InitialDirContext(env).close();
-        } catch (NamingException e) {
-          LOG.error("Could not authenticate {} with LDAP", principalName, e);
-          return Optional.absent();
+        boolean isAuthenticated = false;
+        if (CollectionUtils.isEmpty(domainSuffix)) {
+          env.put(Context.SECURITY_PRINCIPAL, simplePrincipalName);
+          isAuthenticated = authenticate(env);
+        } else {
+          for (String suffix : domainSuffix) {
+            env.put(Context.SECURITY_PRINCIPAL, simplePrincipalName + '@' + suffix);
+            if (authenticate(env)) {
+              isAuthenticated = true;
+              break;
+            }
+          }
         }
 
-        ThirdEyePrincipal principal = new ThirdEyePrincipal();
-        principal.setName(principalName);
+        if (isAuthenticated) {
+          ThirdEyePrincipal principal = new ThirdEyePrincipal();
+          principal.setName(env.get(Context.SECURITY_PRINCIPAL));
 
-        LOG.info("Successfully authenticated {} with LDAP", principalName);
-        return Optional.of(principal);
+          LOG.info("Successfully authenticated {} with LDAP", simplePrincipalName);
+          return Optional.of(principal);
+        } else {
+          LOG.error("Could not authenticate {} with LDAP", simplePrincipalName);
+          return Optional.absent();
+        }
+      } else {
+        LOG.info("Unable to authenticate empty user name.");
+        return Optional.absent();
       }
-
-      // TODO add support for authentication via DB token
-
     } catch (Exception e) {
       throw new AuthenticationException(e);
     }
+  }
 
-    LOG.info("Unable to authenticate empty user name.");
-    return Optional.absent();
+  private boolean authenticate(Hashtable<String, String> authEnv) {
+    try {
+      new InitialDirContext(authEnv).close();
+      return true;
+    } catch (NamingException e) {
+      LOG.warn("Could not authenticate {} with LDAP", authEnv.get(Context.SECURITY_PRINCIPAL), e);
+      return false;
+    }
   }
 }
