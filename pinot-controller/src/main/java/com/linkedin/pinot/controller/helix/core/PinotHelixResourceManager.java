@@ -1650,6 +1650,7 @@ public class PinotHelixResourceManager {
             segmentAssignmentStrategy.getAssignedInstances(this, _helixAdmin, _propertyStore, _helixClusterName, segmentMetadata,
                     numReplicas, serverTenant);
 
+    LOGGER.info("SegmentAssigmentStrategyResultFor: Segment: {}, AssignedInstances: {}", segmentName, assignedInstances.toString());
     HelixHelper.addSegmentToIdealState(_helixZkManager, offlineTableName, segmentName, assignedInstances);
   }
 
