@@ -40,6 +40,7 @@ public interface StreamMetadata {
 
   StreamProviderConfig createStreamProviderConfig();
 
+  // TODO: change references to highLevel and lowLevel to combinedConsumer and partitionedConsumer respectively
   boolean hasHighLevelConsumerType();
 
   boolean hasSimpleConsumerType();
