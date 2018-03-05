@@ -6,7 +6,7 @@
     <p>Metric: {{metric}}</p>
     {{#each-in alertList as |alert anomalyList|}}
       <p>Alert: {{alert}}</p>
-      <div class="te-anomaly-table--no-padding-bottom">
+      <div class="te-anomaly-table te-anomaly-table--no-bottom-space">
         {{models-table
           data=anomalyList
           columns=columns
