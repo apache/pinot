@@ -84,7 +84,15 @@ public class ServerPerfResource {
 
     for (int i = 1; i < CPULoadModels.size(); i++) {
       String[] tableLoadModel = CPULoadModels.get(i).split(",");
-      tableCPULoadFormulation.put(tableLoadModel[0], new CPULoadFormulation(Double.parseDouble(tableLoadModel[1]), Double.parseDouble(tableLoadModel[2]), Double.parseDouble(tableLoadModel[3])));
+      String tableName = tableLoadModel[0];
+      double avgDocCount = Double.parseDouble(tableLoadModel[1]);
+      double a = Double.parseDouble(tableLoadModel[2]);
+      double alpha = Double.parseDouble(tableLoadModel[3]);
+      double b =  Double.parseDouble(tableLoadModel[4]);
+      double lifeTime =  Double.parseDouble(tableLoadModel[5]);
+      double timeScale =  Double.parseDouble(tableLoadModel[6]);
+      //LOGGER.info("ReadingTableConfig: {}, {}, {}, {}, {}, {},{}", tableName, avgDocCount, a, alpha,b,lifeTime,timeScale);
+      tableCPULoadFormulation.put(tableName, new CPULoadFormulation(avgDocCount,a,alpha,b,lifeTime,timeScale));
     }
 
 
@@ -100,8 +108,9 @@ public class ServerPerfResource {
           //serverPerfMetrics.segmentList.add(segment.getSegmentMetadata());
 
           // LOGGER.info("adding segment " + segment.getSegmentName() + " to the list in server side! st: " + segment.getSegmentMetadata().getStartTime() + " et: " + segment.getSegmentMetadata().getEndTime());
-          serverPerfMetrics.segmentCPULoad += tableCPULoadFormulation.get(tableDataManager.getTableName()).computeCPULoad(segment.getSegmentMetadata());
-          LOGGER.info("CPU Load is updated to " + serverPerfMetrics.segmentCPULoad + " beacuse of segment " + segment.getSegmentName() );
+          double segmentLoad = tableCPULoadFormulation.get(tableDataManager.getTableName()).computeCPULoad(segment.getSegmentMetadata());
+          serverPerfMetrics.segmentCPULoad += segmentLoad;
+          LOGGER.info("SegmentLoadIsComputed: {}, {}, {}", System.currentTimeMillis(), segment.getSegmentMetadata().getName(), segmentLoad);
         }
 
       } finally {
@@ -145,18 +154,51 @@ public class ServerPerfResource {
     private double _avgDocCount = 0;
     private double _a = 0;
     private double _b = 0;
+    private double _alpha = 0;
+    private double _lifeTimeInMonth=0;
+    private double _timeScale=0;
 
-    public CPULoadFormulation(double avgDocCount, double a, double b) {
+    public CPULoadFormulation(double avgDocCount, double a, double alpha, double b, double lifeTimeInMonth, double timeScale) {
       _avgDocCount = avgDocCount;
       _a = a;
       _b = b;
+      _alpha = alpha;
+      _lifeTimeInMonth = lifeTimeInMonth;
+      _timeScale = timeScale;
 
     }
 
     public double computeCPULoad(SegmentMetadata segmentMetadata) {
-      long segmentMiddleTime = (segmentMetadata.getStartTime() + segmentMetadata.getEndTime()) / 2;
-      long segmentAge = System.currentTimeMillis() / 1000 - segmentMiddleTime;
-      return (segmentMetadata.getTotalDocs() / _avgDocCount) * _a * Math.exp(-1 * _b * segmentAge);
+
+      //LOGGER.info("ComputingLoadFor: {}, {}, {}, {}, {}, {}", _avgDocCount, _a, _alpha, _b, _lifeTimeInMonth, _timeScale);
+
+      double lifeTimeInScaleSeconds = (_lifeTimeInMonth * 30 * 24 * 3600)/_timeScale;
+
+      double segmentMiddleTime = (segmentMetadata.getStartTime() + segmentMetadata.getEndTime()) / 2;
+      double segmentAgeInScaleSeconds = ((System.currentTimeMillis()/1000) - segmentMiddleTime)/_timeScale;
+
+      if(segmentAgeInScaleSeconds < 0)
+      {
+        segmentAgeInScaleSeconds = (1525132800 - segmentMiddleTime)/_timeScale;
+      }
+
+      if(segmentAgeInScaleSeconds < 0)
+      {
+        segmentAgeInScaleSeconds = 0;
+      }
+
+      if(segmentAgeInScaleSeconds > lifeTimeInScaleSeconds) {
+        return 0;
+      }
+
+      double tmp = 1 - _alpha;
+
+      //LOGGER.info("ComputingLoadFor: {}, {}, {}, {}, {}", tmp,  _a*(lifeTimeInScaleSeconds - segmentAgeInScaleSeconds), (_b/tmp), Math.pow(lifeTimeInScaleSeconds,tmp), Math.pow(segmentAgeInScaleSeconds,tmp));
+
+      double segmentCost = _a*(lifeTimeInScaleSeconds - segmentAgeInScaleSeconds) + (_b/tmp)*(Math.pow(lifeTimeInScaleSeconds,tmp) - Math.pow(segmentAgeInScaleSeconds,tmp));
+      segmentCost *= segmentMetadata.getTotalDocs()/_avgDocCount;
+      return segmentCost;
+
     }
 
   }
