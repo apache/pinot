@@ -1,8 +1,7 @@
 import Service from '@ember/service';
 import {
-  toAbsoluteRange,
-  toFilters,
-  toFilterMap
+  toAbsoluteUrn,
+  toMetricUrn
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
@@ -57,8 +56,7 @@ export default Service.extend({
 
     // metrics
     missing.forEach(urn => {
-      const range = toAbsoluteRange(urn, requestContext.anomalyRange, requestContext.compareMode);
-      return this._fetchSlice(urn, range, requestContext);
+      return this._fetchSlice(urn, requestContext);
     });
   },
 
@@ -78,25 +76,18 @@ export default Service.extend({
   },
 
   _extractAggregates(incoming, urn) {
-    // NOTE: only supports single time range
     const aggregates = {};
-    aggregates[urn] = Number.NaN; // default
-
-    Object.keys(incoming).forEach(range => {
-      Object.keys(incoming[range]).forEach(mid => {
-        aggregates[urn] = incoming[range][mid];
-      });
-    });
+    aggregates[urn] = incoming;
     return aggregates;
   },
 
-  _fetchSlice(urn, range, context) {
-    const metricId = urn.split(':')[3];
-    const metricFilters = toFilters([urn]);
-    const filters = toFilterMap(metricFilters);
-    const filterString = encodeURIComponent(JSON.stringify(filters));
+  _fetchSlice(urn, context) {
+    const metricUrn = toMetricUrn(urn);
+    const range = context.anomalyRange;
+    const offset = toAbsoluteUrn(urn, context.compareMode).split(':')[2].toLowerCase();
+    const timezone = moment.tz.guess();
 
-    const url = `/aggregation/aggregate?metricIds=${metricId}&ranges=${range[0]}:${range[1]}&filters=${filterString}`;
+    const url = `/rootcause/metric/aggregate?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&timezone=${timezone}`;
     return fetch(url)
       .then(checkStatus)
       .then(res => this._extractAggregates(res, urn))

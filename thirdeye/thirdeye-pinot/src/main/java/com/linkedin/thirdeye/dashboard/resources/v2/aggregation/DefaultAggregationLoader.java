@@ -91,11 +91,15 @@ public class DefaultAggregationLoader implements AggregationLoader {
     ThirdEyeResponse res = this.cache.getQueryResult(rc.getRequest());
     DataFrame df = DataFrameUtils.evaluateResponse(res, rc);
 
+    if (df.isEmpty() || df.get(COL_VALUE).isNull(0)) {
+      return Double.NaN;
+    }
+
     final long maxTime = this.cache.getDataSource(dataset.getDataSource()).getMaxDataTime(dataset.getDataset());
     if (slice.getStart() > maxTime) {
       return Double.NaN;
     }
 
-    return df.getDoubles(COL_VALUE).fillNull().doubleValue();
+    return df.getDoubles(COL_VALUE).doubleValue();
   }
 }

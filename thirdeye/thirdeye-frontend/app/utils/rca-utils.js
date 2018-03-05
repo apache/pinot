@@ -185,6 +185,35 @@ export function toOffsetUrn(urn, offset) {
 }
 
 /**
+ * Converts any metric urn to its frontend metric-reference equivalent, with an absolute time offset.
+ * (I.e. the resulting metric urn does not use 'baseline', but rather the compare mode specified in the context)
+ *
+ * @param {string} urn metric urn
+ * @param {string} contextCompareMode compare mode offset ('wo1w', 'wo2w', 'wo3w', 'wo4w')
+ * @returns {string} frontend metric-reference urn with given offset
+ */
+export function toAbsoluteUrn(urn, contextCompareMode) {
+  if (urn.startsWith('thirdeye:metric:')) {
+    urn = toCurrentUrn(urn);
+  }
+
+  if (!urn.startsWith('frontend:metric:')) {
+    return urn;
+  }
+
+  let offset = urn.split(':')[2].toLowerCase();
+  if (offset === 'baseline') {
+    offset = contextCompareMode.toLowerCase();
+  }
+
+  if (offset === 'wow') {
+    offset = 'wo1w';
+  }
+
+  return metricUrnHelper(`frontend:metric:${offset}:`, urn);
+}
+
+/**
  * Converts any metric urn to its entity equivalent
  * Example: 'frontend:metric:wo2w:123:country=IT' returns 'thirdeye:metric:123:country=IT'
  *
@@ -310,7 +339,11 @@ export function toBaselineRange(range, offset) {
     wo1w: 1,
     wo2w: 2,
     wo3w: 3,
-    wo4w: 4
+    wo4w: 4,
+    mean4w: 1, // default. not fully supported by backend yet
+    median4w: 1, // default. not fully supported by backend yet
+    min4w: 1, // default. not fully supported by backend yet
+    max4w: 1, // default. not fully supported by backend yet
   }[offset.toLowerCase()];
 
   if (offsetWeeks === 0) {
@@ -533,6 +566,7 @@ export default {
   toBaselineUrn,
   toMetricUrn,
   toOffsetUrn,
+  toAbsoluteUrn,
   stripTail,
   extractTail,
   appendTail,

@@ -525,7 +525,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
 
   @Override
   int hashCode(int index) {
-    return this.values[index].hashCode();
+    return Objects.hashCode(this.values[index]);
   }
 
   /**

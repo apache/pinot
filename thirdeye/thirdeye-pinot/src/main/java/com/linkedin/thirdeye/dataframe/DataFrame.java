@@ -21,6 +21,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
 
 
 /**
@@ -35,37 +38,6 @@ public class DataFrame {
   public static final String COLUMN_JOIN_LEFT = "_left";
   public static final String COLUMN_JOIN_RIGHT = "_right";
   public static final int DEFAULT_MAX_COLUMN_WIDTH = 30;
-
-  /**
-   * Strategy interface for resampling series with different native types with a common
-   * strategy.
-   */
-  public interface ResamplingStrategy {
-    Grouping.GroupingDataFrame apply(Grouping grouping, Series s);
-  }
-
-  /**
-   * Resampling by last value in each grouped interval
-   */
-  public static final class ResampleLast implements ResamplingStrategy {
-    @Override
-    public Grouping.GroupingDataFrame apply(Grouping grouping, Series s) {
-      switch(s.type()) {
-        case DOUBLE:
-          return grouping.aggregate(s, DoubleSeries.LAST);
-        case LONG:
-          return grouping.aggregate(s, LongSeries.LAST);
-        case STRING:
-          return grouping.aggregate(s, StringSeries.LAST);
-        case BOOLEAN:
-          return grouping.aggregate(s, BooleanSeries.LAST);
-        case OBJECT:
-          return grouping.aggregate(s, ObjectSeries.LAST);
-        default:
-          throw new IllegalArgumentException(String.format("Cannot resample series type '%s'", s.type()));
-      }
-    }
-  }
 
   /**
    * Builder for DataFrame in row-by-row sequence. Constructs each column as a StringSeries
@@ -1334,39 +1306,6 @@ public class DataFrame {
   }
 
   /**
-   * Returns a copy of the DataFrame with values resampled by {@code interval} using {@code strategy}
-   * on the series referenced by {@code seriesName}. The method first applies an interval-based
-   * grouping to the series and then aggregates the DataFrame using the specified strategy. If
-   * the series referenced by {@code seriesName} is not of native type {@code LongSeries} it is
-   * converted transparently.
-   *
-   * @param seriesName target series for resampling
-   * @param interval resampling interval
-   * @param strategy resampling strategy
-   * @throws IllegalArgumentException if the series does not exist
-   * @return resampled DataFrame copy
-   */
-  public DataFrame resample(String seriesName, long interval, ResamplingStrategy strategy) {
-    DataFrame baseDataFrame = this.sortedBy(seriesName);
-
-    Grouping grouping = Grouping.GroupingByInterval.from(baseDataFrame.get(seriesName), interval);
-
-    // resample series
-    DataFrame newDataFrame = new DataFrame(this);
-    newDataFrame.series.clear();
-
-    for(Map.Entry<String, Series> e : baseDataFrame.getSeries().entrySet()) {
-      if(e.getKey().equals(seriesName))
-        continue;
-      newDataFrame.addSeries(e.getKey(), strategy.apply(grouping, e.getValue()).getValues());
-    }
-
-    // new series
-    newDataFrame.addSeries(seriesName, grouping.keys());
-    return newDataFrame;
-  }
-
-  /**
    * Returns a copy of the DataFrame with rows filtered by {@code series}. If the value of {@code series}
    * associated with a row is {@code true} the row is copied, otherwise it is set to {@code null}.
    *
@@ -1546,6 +1485,39 @@ public class DataFrame {
    */
   public Grouping.DataFrameGrouping groupByExpandingWindow() {
     return new Grouping.DataFrameGrouping(Grouping.GROUP_KEY, this, Grouping.GroupingByExpandingWindow.from(this.size()));
+  }
+
+  /**
+   * Returns a DataFrameGrouping based on an time period
+   *
+   * @see Grouping.GroupingByPeriod
+   *
+   * @return DataFrameGrouping
+   */
+  public Grouping.DataFrameGrouping groupByPeriod(Series timestamps, DateTime origin, Period period) {
+    return new Grouping.DataFrameGrouping(Grouping.GROUP_KEY, this, Grouping.GroupingByPeriod.from(timestamps.getLongs(), origin, period));
+  }
+
+  /**
+   * Returns a DataFrameGrouping based on an time period
+   *
+   * @see Grouping.GroupingByPeriod
+   *
+   * @return DataFrameGrouping
+   */
+  public Grouping.DataFrameGrouping groupByPeriod(Series timestamps, DateTimeZone timezone, Period period) {
+    return new Grouping.DataFrameGrouping(Grouping.GROUP_KEY, this, Grouping.GroupingByPeriod.from(timestamps.getLongs(), timezone, period));
+  }
+
+  /**
+   * Returns a DataFrameGrouping based on an time period
+   *
+   * @see Grouping.GroupingByPeriod
+   *
+   * @return DataFrameGrouping
+   */
+  public Grouping.DataFrameGrouping groupByPeriod(String seriesName, DateTimeZone timezone, Period period) {
+    return new Grouping.DataFrameGrouping(Grouping.GROUP_KEY, this, Grouping.GroupingByPeriod.from(assertSeriesExists(seriesName).getLongs(), timezone, period));
   }
 
   /**

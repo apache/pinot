@@ -8,6 +8,11 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
@@ -928,6 +933,53 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testLongGroupByPeriod() {
+    LongSeries in = LongSeries.buildFrom(
+        parseDateMillis("2018-01-01 00:00:00 PST"),
+        parseDateMillis("2018-01-01 03:00:00 PST"),
+        parseDateMillis("2018-01-01 06:00:00 PST"),
+        parseDateMillis("2018-01-01 09:00:00 PST"),
+        parseDateMillis("2018-01-01 12:00:00 PST"),
+        parseDateMillis("2018-01-01 15:00:00 PST"),
+        parseDateMillis("2018-01-01 18:00:00 PST"),
+        parseDateMillis("2018-01-01 21:00:00 PST"),
+        parseDateMillis("2018-01-02 00:00:00 PST")
+    );
+
+    // timestamps with timezone
+    Grouping.SeriesGrouping grouping = in.groupByPeriod(DateTimeZone.forID("America/Los_Angeles"), Period.hours(6));
+    Assert.assertEquals(grouping.size(), 5);
+    assertEquals(grouping.count().getValues().getLongs(), 2, 2, 2, 2, 1);
+
+    // timestamps from (truncating) origin
+    Grouping.SeriesGrouping groupingOffset = in.groupByPeriod(parseDate("2018-01-01 02:00:00 PST"), Period.hours(6));
+    Assert.assertEquals(groupingOffset.size(), 4);
+    assertEquals(groupingOffset.count().getValues().getLongs(), 2, 2, 2, 2);
+  }
+
+  @Test
+  public void testLongGroupByPeriodDaylightSavingsTime() {
+    LongSeries in = LongSeries.buildFrom(
+        parseDateMillis("2018-03-11 01:30:00 PST"),
+        parseDateMillis("2018-03-11 03:00:00 PDT"),
+        parseDateMillis("2018-03-11 04:00:00 PDT"),
+        parseDateMillis("2018-03-12 01:30:00 PDT"), // 1 day later
+        parseDateMillis("2018-03-12 02:00:00 PDT"), // 23.5 hours later
+        parseDateMillis("2018-03-12 03:00:00 PDT")
+    );
+
+    // 24 hours
+    Grouping.SeriesGrouping groupingHours = in.groupByPeriod(parseDate("2018-03-11 01:30:00 PST"), Period.hours(24));
+    Assert.assertEquals(groupingHours.size(), 2);
+    assertEquals(groupingHours.count().getValues().getLongs(), 5, 1);
+
+    // 1 day
+    Grouping.SeriesGrouping groupingDays = in.groupByPeriod(parseDate("2018-03-11 01:30:00 PST"), Period.days(1));
+    Assert.assertEquals(groupingDays.size(), 2);
+    assertEquals(groupingDays.count().getValues().getLongs(), 3, 3);
+  }
+
+  @Test
   public void testBooleanGroupByValueEmpty() {
     Assert.assertTrue(BooleanSeries.empty().groupByValue().isEmpty());
   }
@@ -1054,21 +1106,6 @@ public class DataFrameTest {
 
     ObjectSeries os = grouping.aggregate("object", ObjectSeries.TOSTRING).getValues().getObjects();
     assertEquals(os, "[0]", "[-2.3, 1, 0.5, true]");
-  }
-
-  @Test
-  public void testResampleEndToEnd() {
-    DataFrame out = df.resample("index", 2, new DataFrame.ResampleLast());
-
-    Assert.assertEquals(out.size(), 4);
-    Assert.assertEquals(out.getSeriesNames().size(), 6);
-
-    assertEquals(out.getLongs("index"), -2, 0, 2, 4);
-    assertEquals(out.getDoubles("double"), -2.1, -0.1, 1.3, 0.5);
-    assertEquals(out.getLongs("long"), -2, 1, 2, 1);
-    assertEquals(out.getStrings("string"), "-2.3", "-1", "0.13e1", "0.5");
-    assertEquals(out.getBooleans("boolean"), TRUE, TRUE, TRUE, TRUE);
-    assertEquals(out.getObjects("object"), "-2.3", 1L, true, 0.5d);
   }
 
   @Test
@@ -3882,5 +3919,13 @@ public class DataFrameTest {
 
   private static CompTestTuple tup(int a, int b) {
     return new CompTestTuple(a, b);
+  }
+
+  private static DateTime parseDate(String date) {
+    return DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss z").parseDateTime(date);
+  }
+
+  private static long parseDateMillis(String date) {
+    return parseDate(date).getMillis();
   }
 }
