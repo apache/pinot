@@ -317,7 +317,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
       TimeGranularity dataGranularity = null;
       long startTime = request.getStartTimeInclusive().getMillis();
       DateTimeZone dateTimeZone = Utils.getDataTimeZone(dataset);
-      DateTime startDateTime = new DateTime(startTime, dateTimeZone);
+      DateTime startDateTime = new DateTime(startTime, DateTimeZone.UTC);
       dataGranularity = dataTimeSpec.getDataGranularity();
       boolean isISOFormat = false;
       DateTimeFormatter inputDataDateTimeFormatter = null;
@@ -358,7 +358,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
                 }
                 timeBucket = TimeRangeUtils
                     .computeBucketIndex(request.getGroupByTimeGranularity(), startDateTime,
-                        new DateTime(millis, dateTimeZone));
+                        new DateTime(millis, DateTimeZone.UTC));
                 groupKeyVal = String.valueOf(timeBucket);
               }
               groupKeys[grpKeyIdx] = groupKeyVal;

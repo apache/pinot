@@ -173,7 +173,7 @@ public class TimeSeriesResource {
    * <p>Sample requests for endpoint:
    * <pre>
    * minimal example:    curl -X GET 'localhost:1426/timeseries/query?metricIds=0&ranges=1504076400000:1504162800000'
-   * multiple metrics:   curl -X GET 'localhost:1426/timeseries/query?metricIds=0,1&ranges=1504076400000:1504162800000&granularity=1_HOURS'
+   * multiple metrics:   curl -X GET 'localhost:1426/timeseries/query?metricIds=0,1&ranges=1504076400000:1504162800000&granularity=1_HOURS&granularityOffset=1800000'
    * transformations:    curl -X GET 'localhost:1426/timeseries/query?metricIds=0&ranges=1504076400000:1504162800000transformations=fillforward,log'
    * aggregations:       curl -X GET 'localhost:1426/timeseries/query?metricIds=0&ranges=1503990000000:1504076400000,1504076400000:1504162800000&transformations=fillforward&aggregations=sum,max'
    * </pre></p>
@@ -184,6 +184,7 @@ public class TimeSeriesResource {
    * @param granularityString (optional) time series granularity "[count]_[unit]"
    * @param transformationsString (optional) transformations to apply to time series, separated by ","
    * @param aggregationsString (optional) aggregations to apply to transformed time series, separated by ","
+   * @param granularityOffsetString (optional) UTC-offset for time buckets (in millis)
    * @return Map (keyed by range or aggregation) of maps (keyed by metric id) of list of values
    * @throws Exception
    */
@@ -195,7 +196,8 @@ public class TimeSeriesResource {
       @QueryParam("filters") String filterString,
       @QueryParam("granularity") String granularityString,
       @QueryParam("transformations") String transformationsString,
-      @QueryParam("aggregations") String aggregationsString) throws Exception {
+      @QueryParam("aggregations") String aggregationsString,
+      @QueryParam("granularityOffset") String granularityOffsetString) throws Exception {
 
     // validate input
     if (StringUtils.isBlank(metricIdsString)) {
@@ -253,8 +255,13 @@ public class TimeSeriesResource {
 
     List<String> metricIds = Arrays.asList(metricIdsString.split(","));
 
-    LOG.info("Requesting {} metrics from {} time ranges with granularity '{}', transformations '{}', aggregations '{}'",
-        metricIds.size(), ranges.size(), granularity, transformations, aggregations);
+    long granularityOffset = 0;
+    if (!StringUtils.isBlank(granularityOffsetString)) {
+      granularityOffset = Long.parseLong(granularityOffsetString);
+    }
+
+    LOG.info("Requesting {} metrics from {} time ranges with granularity '{}', transformations '{}', aggregations '{}', granularityOffset {}",
+        metricIds.size(), ranges.size(), granularity, transformations, aggregations, granularityOffset);
 
     Map<MetricSlice, Future<DataFrame>> requests = new HashMap<>();
     for (String id : metricIds) {
@@ -262,7 +269,7 @@ public class TimeSeriesResource {
         long metricId = Long.valueOf(id);
         long start = range.getStartMillis();
         long end = range.getEndMillis();
-        MetricSlice slice = MetricSlice.from(metricId, start, end, filters, granularity);
+        MetricSlice slice = MetricSlice.from(metricId, start, end, filters, granularity, granularityOffset);
 
         requests.put(slice, fetchMetricTimeSeriesAsync(slice));
       }

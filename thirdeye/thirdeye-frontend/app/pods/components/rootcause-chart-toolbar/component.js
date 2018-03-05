@@ -18,6 +18,7 @@ const granularityMapping = {
   '15 Minutes': '15_MINUTES',
   '1 Hour': '1_HOURS',
   '3 Hours': '3_HOURS',
+  '6 Hours': '6_HOURS',
   '1 Day': '1_DAYS'
 };
 

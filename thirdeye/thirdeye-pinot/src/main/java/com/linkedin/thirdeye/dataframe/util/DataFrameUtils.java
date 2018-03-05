@@ -28,7 +28,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.concurrent.ExecutionException;
+import org.joda.time.DateTime;
 
 
 /**
@@ -188,8 +190,8 @@ public class DataFrameUtils {
    * @return response as dataframe
    */
   public static DataFrame evaluateResponse(ThirdEyeResponse response, TimeSeriesRequestContainer rc) throws Exception {
-    long start = ((rc.start + rc.interval - 1) / rc.interval) * rc.interval;
-    long end = ((rc.end + rc.interval - 1) / rc.interval) * rc.interval;
+    long start = ((rc.start - rc.offset + rc.interval - 1) / rc.interval) * rc.interval + rc.offset;
+    long end = ((rc.end - rc.offset + rc.interval - 1) / rc.interval) * rc.interval + rc.offset;
     return alignTimestamps(evaluateExpressions(parseResponse(response), rc.getExpressions()), start, end, rc.getInterval());
   }
 
@@ -291,8 +293,8 @@ public class DataFrameUtils {
     }
 
     long timeGranularity = granularity.toMillis();
-    long start = (slice.start / timeGranularity) * timeGranularity;
-    long end = ((slice.end + timeGranularity - 1) / timeGranularity) * timeGranularity;
+    long start = ((slice.start - slice.granularityOffset) / timeGranularity) * timeGranularity + slice.granularityOffset;
+    long end = (((slice.end - slice.granularityOffset) + timeGranularity - 1) / timeGranularity) * timeGranularity + slice.granularityOffset;
 
     MetricSlice alignedSlice = MetricSlice.from(slice.metricId, start, end, slice.filters, slice.granularity);
 
@@ -300,7 +302,7 @@ public class DataFrameUtils {
         .setGroupByTimeGranularity(granularity)
         .build(reference);
 
-    return new TimeSeriesRequestContainer(request, expressions, start, end, timeGranularity);
+    return new TimeSeriesRequestContainer(request, expressions, start, end, timeGranularity, slice.granularityOffset);
   }
 
   /**
@@ -335,7 +337,7 @@ public class DataFrameUtils {
         .setGroupByTimeGranularity(granularity)
         .build(reference);
 
-    return new TimeSeriesRequestContainer(request, expressions, slice.start, slice.end, granularity.toMillis());
+    return new TimeSeriesRequestContainer(request, expressions, slice.start, slice.end, granularity.toMillis(), slice.granularityOffset);
   }
 
   /**
