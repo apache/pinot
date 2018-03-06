@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.configs;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -18,7 +19,7 @@ public class AuthConfiguration {
   /**
    * @xyz.com
    */
-  String domainSuffix;
+  List<String> domainSuffix = Collections.emptyList();
 
   /**
    * System admins
@@ -63,11 +64,11 @@ public class AuthConfiguration {
     this.ldapUrl = ldapUrl;
   }
 
-  public String getDomainSuffix() {
+  public List<String> getDomainSuffix() {
     return domainSuffix;
   }
 
-  public void setDomainSuffix(String domainSuffix) {
+  public void setDomainSuffix(List<String> domainSuffix) {
     this.domainSuffix = domainSuffix;
   }
 
