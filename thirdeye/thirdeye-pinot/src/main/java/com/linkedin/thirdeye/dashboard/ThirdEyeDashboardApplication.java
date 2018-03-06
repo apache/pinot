@@ -12,8 +12,7 @@ import com.linkedin.thirdeye.auth.ThirdEyeAuthenticatorDisabled;
 import com.linkedin.thirdeye.auth.ThirdEyeAuthenticatorLdap;
 import com.linkedin.thirdeye.auth.ThirdEyePrincipal;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.common.ThirdEyeSwaggerBunddle;
+import com.linkedin.thirdeye.common.ThirdEyeSwaggerBundle;
 import com.linkedin.thirdeye.dashboard.configs.AuthConfiguration;
 import com.linkedin.thirdeye.dashboard.configs.ResourceConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.AdminResource;
@@ -60,8 +59,6 @@ import io.dropwizard.bundles.redirect.RedirectBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.dropwizard.views.ViewBundle;
-import io.federecio.dropwizard.swagger.SwaggerBundle;
-import io.federecio.dropwizard.swagger.SwaggerBundleConfiguration;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -106,7 +103,7 @@ public class ThirdEyeDashboardApplication
     bootstrap.addBundle(new AssetsBundle("/assets/lib", "/assets/lib", null, "lib"));
     bootstrap.addBundle(new AssetsBundle("/assets/img", "/assets/img", null, "img"));
     bootstrap.addBundle(new AssetsBundle("/assets/data", "/assets/data", null, "data"));
-    bootstrap.addBundle(new ThirdEyeSwaggerBunddle());
+    bootstrap.addBundle(new ThirdEyeSwaggerBundle());
   }
 
   @Override

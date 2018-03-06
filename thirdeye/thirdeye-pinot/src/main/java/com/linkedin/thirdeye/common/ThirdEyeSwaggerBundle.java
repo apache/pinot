@@ -4,7 +4,7 @@ import io.federecio.dropwizard.swagger.SwaggerBundle;
 import io.federecio.dropwizard.swagger.SwaggerBundleConfiguration;
 
 
-public class ThirdEyeSwaggerBunddle extends SwaggerBundle<ThirdEyeConfiguration> {
+public class ThirdEyeSwaggerBundle extends SwaggerBundle<ThirdEyeConfiguration> {
   @Override
   protected SwaggerBundleConfiguration getSwaggerBundleConfiguration(
       ThirdEyeConfiguration thirdEyeDashboardApplication) {
