@@ -6,6 +6,7 @@ import {
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
+import moment from 'moment';
 
 export default Service.extend({
   timeseries: null, // {}
