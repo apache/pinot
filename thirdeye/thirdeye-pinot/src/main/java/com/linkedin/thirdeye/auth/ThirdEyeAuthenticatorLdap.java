@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.auth;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import io.dropwizard.auth.AuthenticationException;
 import io.dropwizard.auth.Authenticator;
 import java.util.ArrayList;
@@ -41,7 +42,7 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
         LOG.info("Unable to authenticate empty user name.");
         return Optional.absent();
       } else {
-        LOG.info("Authenticating {} via username and password", principalName);
+        LOG.info("Authenticating '{}' via username and password", principalName);
 
         Hashtable<String, String> env = new Hashtable<>();
         env.put(Context.INITIAL_CONTEXT_FACTORY, LDAP_CONTEXT_FACTORY);
@@ -56,30 +57,32 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
         // 1. If user's name contains domain name or the system doesn't have any given domain names, then
         //    use the username as is.
         // 2. Else, try out all combinations of username and the given domain names of the system.
-        AuthenticationResult authenticationResult = new AuthenticationResult();
+        AuthenticationResults authenticationResults = new AuthenticationResults();
         if (principalName.contains("@") || CollectionUtils.isEmpty(domainSuffix)) {
           env.put(Context.SECURITY_PRINCIPAL, principalName);
-          authenticate(env, authenticationResult);
+          AuthenticationResult authenticationResult = authenticate(env);
+          authenticationResults.appendAuthenticationResult(authenticationResult);
         } else {
           for (String suffix : domainSuffix) {
             env.put(Context.SECURITY_PRINCIPAL, principalName + '@' + suffix);
-            authenticate(env, authenticationResult);
-            if (authenticationResult.isAuthenticated()) {
+            AuthenticationResult authenticationResult = authenticate(env);
+            authenticationResults.appendAuthenticationResult(authenticationResult);
+            if (authenticationResults.isAuthenticated()) {
               break;
             }
           }
         }
 
-        if (authenticationResult.isAuthenticated()) {
+        if (authenticationResults.isAuthenticated()) {
           ThirdEyePrincipal principal = new ThirdEyePrincipal();
           principal.setName(env.get(Context.SECURITY_PRINCIPAL));
           LOG.info("Successfully authenticated {} with LDAP", principalName);
           return Optional.of(principal);
         } else {
           // Failed to authenticate the user; log all error messages.
-          List<String> errorMessages = authenticationResult.getMessages();
+          List<String> errorMessages = authenticationResults.getMessages();
           for (String errorMessage : errorMessages) {
-            LOG.error("Unable authenticate user '{}'.\nReason: {}", principalName, errorMessage);
+            LOG.error(errorMessage);
           }
           return Optional.absent();
         }
@@ -94,31 +97,34 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
    * authentication results.
    *
    * @param authEnv the table that contains the authentication information.
-   * @param authenticationResult the container for the result.
+   *
+   * @return authenticationResults the container for the result.
    */
-  private void authenticate(Hashtable<String, String> authEnv, AuthenticationResult authenticationResult) {
+  private AuthenticationResult authenticate(Hashtable<String, String> authEnv) {
+    AuthenticationResult authenticationResult = new AuthenticationResult();
     try {
       new InitialDirContext(authEnv).close();
       authenticationResult.setAuthenticated(true);
-      authenticationResult.addMessage(
+      authenticationResult.setMessage(
           String.format("Successfully authenticated '%s' with LDAP", authEnv.get(Context.SECURITY_PRINCIPAL)));
     } catch (NamingException e) {
       authenticationResult.setAuthenticated(false);
-      authenticationResult.addMessage(
+      authenticationResult.setMessage(
           String.format("Failed to authenticate '%s' with LDAP: %s", authEnv.get(Context.SECURITY_PRINCIPAL),
-              ExceptionUtils.getStackTrace(e)));
+              e.getMessage()));
     }
+    return authenticationResult;
   }
 
   /**
-   * The class holds the authentication result (true or false) and the error messages from previous iterations.
+   * The authentication result of one authentication try.
    */
   private class AuthenticationResult {
     private boolean isAuthenticated = false;
-    private List<String> messages = new ArrayList<>();
+    private String message = "";
 
     /**
-     * Returns the authentication result of the last try.
+     * Returns the authentication status.
      *
      * @return true if the last try is succeeded.
      */
@@ -127,21 +133,49 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
     }
 
     /**
-     * Sets the authentication result of the last try.
+     * Sets the authentication status.
      *
-     * @param authenticated true if the last try is succeeded.
+     * @param authenticated true if the authentication is succeeded.
      */
     public void setAuthenticated(boolean authenticated) {
       isAuthenticated = authenticated;
     }
 
+    public String getMessage() {
+      return message;
+    }
+
+    public void setMessage(String message) {
+      this.message = Preconditions.checkNotNull(message);
+    }
+  }
+
+  /**
+   * The container that holds multiple authentication results.
+   */
+  private class AuthenticationResults {
+    private boolean isAuthenticated = false;
+    private List<String> messages = new ArrayList<>();
+
     /**
-     * Add the message to the message queue.
+     * Sets the authentication status to the given result and append the message to the message queue.
      *
-     * @param message the message to be added.
+     * @param authenticationResult the authentication result to be appended to this container.
      */
-    public void addMessage(String message) {
-      messages.add(message);
+    public void appendAuthenticationResult(AuthenticationResult authenticationResult) {
+      Preconditions.checkNotNull(authenticationResult);
+
+      isAuthenticated = authenticationResult.isAuthenticated();
+      messages.add(Preconditions.checkNotNull(authenticationResult.getMessage()));
+    }
+
+    /**
+     * Returns the authentication status of the last try.
+     *
+     * @return true if the last try is succeeded.
+     */
+    public boolean isAuthenticated() {
+      return isAuthenticated;
     }
 
     /**
