@@ -8,7 +8,8 @@ import RSVP from 'rsvp';
 export default Route.extend({
 
   /**
-   * Returns a two-dimensional array, which maps anomalies by metric and functionName (aka alert)
+   * Returns a mapping of anomalies by metric and functionName (aka alert), performance stats for anomalies by
+   * application, and redirect links to the anomaly search page for each metric-alert mapping
    * @return {Object}
    * @example
    * {
@@ -24,20 +25,31 @@ export default Route.extend({
    */
   model() {
     let anomalyMapping = {};
+    let redirectLink = {};
 
     applicationAnomalies.forEach(anomaly => {
-      const { metric, functionName, current, baseline } = anomaly;
+      const { metricName, functionName, current, baseline, metricId } = anomaly;
 
-      if (!anomalyMapping[metric]) {
-        anomalyMapping[metric] = {};
+      if (!anomalyMapping[metricName]) {
+        anomalyMapping[metricName] = {};
       }
 
-      if (!anomalyMapping[metric][functionName]) {
-        anomalyMapping[metric][functionName] = [];
+      if (!anomalyMapping[metricName][functionName]) {
+        anomalyMapping[metricName][functionName] = [];
       }
 
-      // Group anomalies by metric and function name
-      anomalyMapping[metric][functionName].push(anomaly);
+      if(!redirectLink[metricName]) {
+        redirectLink[metricName] = {};
+      }
+
+      if (!redirectLink[metricName][functionName]) {
+        // TODO: Once start/end times are introduced, add these to the link below
+        redirectLink[metricName][functionName] = `/thirdeye#anomalies?anomaliesSearchMode=metric&pageNumber=1&metricId=${metricId}\
+                              &searchFilters={"functionFilterMap":["${functionName}"]}`;
+      }
+
+      // Group anomalies by metricName and function name
+      anomalyMapping[metricName][functionName].push(anomaly);
 
       // Format current and baseline numbers, so numbers in the millions+ don't overflow
       anomaly.current = humanizeFloat(anomaly.current);
@@ -47,7 +59,8 @@ export default Route.extend({
 
     return RSVP.hash({
       anomalyMapping,
-      anomalyPerformance
+      anomalyPerformance,
+      redirectLink
     });
   },
 
@@ -59,7 +72,7 @@ export default Route.extend({
     let metricSet = new Set();
 
     applicationAnomalies.forEach(anomaly => {
-      metricSet.add(anomaly.metric);
+      metricSet.add(anomaly.metricName);
     });
 
     return [...metricSet];

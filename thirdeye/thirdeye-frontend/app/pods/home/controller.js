@@ -5,6 +5,13 @@ import { computed, get } from '@ember/object';
 export default Controller.extend({
 
   /**
+   * Overrides ember-models-table's css classes
+   */
+  classes: {
+    table: 'table-bordered table-condensed te-anomaly-table--no-margin'
+  },
+
+  /**
    * Stats to display in cards
    * @type {Object[]} - array of objects, each of which represents a stats card
    */
