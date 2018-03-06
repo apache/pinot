@@ -32,8 +32,7 @@ public class SegmentCountMetric implements ServerLoadMetric {
     private static final HttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
     private static final Executor executor = Executors.newFixedThreadPool(1);
     @Override
-    public double computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState,
-                                        String instance, String tableName) {
+    public double computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState, String instance, String tableName, SegmentMetadata segmentMetadata) {
         ServerPerfMetricsReader serverPerfMetricsReader =
                   new ServerPerfMetricsReader(executor, connectionManager, helixResourceManager);
         ServerSegmentInfo serverSegmentInfo = serverPerfMetricsReader.getServerPerfMetrics(instance, true, 300);

@@ -36,12 +36,14 @@ public class SegmentAssignmentStrategyFactory {
         return new BucketizedSegmentStrategy();
       case ReplicaGroupSegmentAssignmentStrategy:
         return new ReplicaGroupSegmentAssignmentStrategy();
-      case BalancedSegmentSizeSegmentAssignmentStrategy:
-        return new BalancedSegmentSizeSegmentAssignmentStrategy();
-      case BalancedLatencyBasedSegmentAssignmentStrategy:
-        return new BalancedLatencyBasedSegmentAssignmentStrategy();
-      case BalancedCPULoadSegmentAssignmentStrategy:
-        return new BalancedCPULoadSegmentAssignmentStrategy();
+      case BalanceSizeSegmentAssignmentStrategy:
+        return new BalanceSizeSegmentAssignmentStrategy();
+      case BalanceLatencySegmentAssignmentStrategy:
+        return new BalanceLatencySegmentAssignmentStrategy();
+      case BalanceCPULoadSegmentAssignmentStrategy:
+        return new BalanceCPULoadSegmentAssignmentStrategy();
+      case DruidSegmentAssignmentStrategy:
+        return  new DruidSegmentAssignmentStrategy();
       default:
         return new BalanceNumSegmentAssignmentStrategy();
     }

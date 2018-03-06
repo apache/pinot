@@ -39,7 +39,7 @@ public class PinotBenchmarkSegmentCreationCommand extends AbstractBaseAdminComma
     @Option(name = "-overwrite", required = false, usage = "Overwrite existing output directory.")
     private boolean _overwrite = false;
 
-    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_2018.properties";
+    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_40_days_of_2018.properties";
     final String _tableNameFile = "pinot_benchmark/event_data_config/event_table_config.properties";
 
 

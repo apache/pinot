@@ -42,12 +42,20 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
     private int _numRecords = 10000;
 
 
-    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_2018.properties";
+    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_40_days_of_2018.properties";
     final String _tableConfig = "pinot_benchmark/event_data_config/event_table_config.properties";
 
 
-    private int[] _numRecordList={200000,210000,220000,230000,240000,250000,260000,270000,280000,290000,300000};
+
+   // private int[] _numRecordList={200000,210000,220000,230000,240000,250000,260000,270000,280000,290000,300000};
     private double[] _numRecordRatio={1,0.6,0.5,0.3,0.2};
+
+    //private int[] _numRecordList={200000,210000,220000,230000,240000,250000,260000,270000,280000,290000,300000};
+
+    private int[] _numRecordList={80000,90000,100000,110000,120000,130000,140000,150000};
+
+    //private double[] _numRecordRatio={1,0.6,0.5,0.3};
+
 
     public PinotBenchmarkEventTableCreationCommand setDataDir(String dataDir) {
         _dataDir = dataDir;

@@ -69,7 +69,7 @@ public class LatencyBasedLoadMetric implements ServerLoadMetric {
 
 
     @Override
-    public double computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState, String instance, String tableName) {
+    public double computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState, String instance, String tableName, SegmentMetadata segmentMetadata) {
         /*
         Map<String,Double> serverLoadMap = helixResourceManager.getServerLoadMap();
         if(serverLoadMap.containsKey(instance))

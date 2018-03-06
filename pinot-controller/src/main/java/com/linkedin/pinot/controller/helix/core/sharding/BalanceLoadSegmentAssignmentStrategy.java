@@ -41,12 +41,12 @@ This class implements a load-based segment assignment strategy where it needs a 
 It then asks all tagged instances to return the load metric using the ServerLatencyMetric object.
 Finally numReplicas of instances that have the least load are selected.
  */
-public class BalancedLoadSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BalancedLoadSegmentAssignmentStrategy.class);
+public class BalanceLoadSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BalanceLoadSegmentAssignmentStrategy.class);
   private final double MAX_ACCEPTABLE_ERROR_RATE = 0.5;
   ServerLoadMetric _serverLoadMetric;
 
-  public BalancedLoadSegmentAssignmentStrategy(ServerLoadMetric serverLoadMetric) {
+  public BalanceLoadSegmentAssignmentStrategy(ServerLoadMetric serverLoadMetric) {
     _serverLoadMetric = serverLoadMetric;
   }
 
@@ -89,7 +89,7 @@ public class BalancedLoadSegmentAssignmentStrategy implements SegmentAssignmentS
         // We Do not add servers, that are not tagged, to the map.
         // By this approach, new segments will not be allotted to the server if tags changed.
         for (String instanceName : allTaggedInstances) {
-          double reportedMetric = _serverLoadMetric.computeInstanceMetric(helixResourceManager, idealState, instanceName,tableName);
+          double reportedMetric = _serverLoadMetric.computeInstanceMetric(helixResourceManager, idealState, instanceName,tableName, segmentMetadata);
           LOGGER.info("ReportedLoadMetric: Instance: " + instanceName + " metricValue: " + reportedMetric);
           if (reportedMetric != -1) {
             reportedLoadMetricPerInstanceMap.put(instanceName, reportedMetric);
