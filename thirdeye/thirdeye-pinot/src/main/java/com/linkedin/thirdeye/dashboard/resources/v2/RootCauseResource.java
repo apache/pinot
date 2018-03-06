@@ -1,11 +1,15 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.RCAFrameworkExecutionResult;
 import com.linkedin.thirdeye.rootcause.impl.EntityUtils;
 import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiOperation;
+import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -25,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 @Path(value = "/rootcause")
 @Produces(MediaType.APPLICATION_JSON)
+@Api(tags = {Constants.RCA_TAG})
 public class RootCauseResource {
   private static final Logger LOG = LoggerFactory.getLogger(RootCauseResource.class);
 
@@ -44,6 +49,7 @@ public class RootCauseResource {
 
   @GET
   @Path("/query")
+  @ApiOperation(value = "Send query")
   public List<RootCauseEntity> query(
       @QueryParam("framework") String framework,
       @QueryParam("anomalyStart") Long anomalyStart,
@@ -118,6 +124,7 @@ public class RootCauseResource {
 
   @GET
   @Path("/raw")
+  @ApiOperation(value = "Raw")
   public List<RootCauseEntity> raw(
       @QueryParam("framework") String framework,
       @QueryParam("formatterDepth") Integer formatterDepth,

@@ -12,6 +12,7 @@ import com.linkedin.thirdeye.auth.ThirdEyeAuthenticatorDisabled;
 import com.linkedin.thirdeye.auth.ThirdEyeAuthenticatorLdap;
 import com.linkedin.thirdeye.auth.ThirdEyePrincipal;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
+import com.linkedin.thirdeye.common.ThirdEyeSwaggerBundle;
 import com.linkedin.thirdeye.dashboard.configs.AuthConfiguration;
 import com.linkedin.thirdeye.dashboard.configs.ResourceConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.AdminResource;
@@ -77,6 +78,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * The type Third eye dashboard application.
+ */
 public class ThirdEyeDashboardApplication
     extends BaseThirdEyeApplication<ThirdEyeDashboardConfiguration> {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDashboardApplication.class);
@@ -99,6 +103,7 @@ public class ThirdEyeDashboardApplication
     bootstrap.addBundle(new AssetsBundle("/assets/lib", "/assets/lib", null, "lib"));
     bootstrap.addBundle(new AssetsBundle("/assets/img", "/assets/img", null, "img"));
     bootstrap.addBundle(new AssetsBundle("/assets/data", "/assets/data", null, "data"));
+    bootstrap.addBundle(new ThirdEyeSwaggerBundle());
   }
 
   @Override
@@ -250,6 +255,12 @@ public class ThirdEyeDashboardApplication
     return rcaConfigFile;
   }
 
+  /**
+   * The entry point of application.
+   *
+   * @param args the input arguments
+   * @throws Exception the exception
+   */
   public static void main(String[] args) throws Exception {
     if (args.length == 0) {
       throw new IllegalArgumentException("Please provide config directory as parameter");

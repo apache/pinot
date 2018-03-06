@@ -1,11 +1,15 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
 import com.linkedin.thirdeye.datalayer.bao.RootcauseSessionManager;
 import com.linkedin.thirdeye.datalayer.dto.RootcauseSessionDTO;
 import com.linkedin.thirdeye.datalayer.pojo.RootcauseSessionBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.rootcause.impl.AnomalyEventEntity;
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiOperation;
+import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -25,6 +29,7 @@ import org.joda.time.DateTime;
 
 
 @Path(value = "/session")
+@Api(tags = { Constants.RCA_TAG })
 @Produces(MediaType.APPLICATION_JSON)
 public class RootCauseSessionResource {
   private final RootcauseSessionManager sessionDAO;
@@ -37,7 +42,9 @@ public class RootCauseSessionResource {
 
   @GET
   @Path("/{sessionId}")
-  public RootcauseSessionDTO get(@PathParam("sessionId") Long sessionId) {
+  @ApiOperation(value = "Get RootCauseSession by sessionId")
+  public RootcauseSessionDTO get(
+  @PathParam("sessionId") Long sessionId) {
     if (sessionId == null) {
       throw new IllegalArgumentException("Must provide sessionId");
     }
@@ -53,6 +60,7 @@ public class RootCauseSessionResource {
 
   @POST
   @Path("/")
+  @ApiOperation(value = "Post a session")
   public Long post(String jsonString) throws Exception {
     RootcauseSessionDTO session = this.mapper.readValue(jsonString, new TypeReference<RootcauseSessionDTO>() {});
 
@@ -85,6 +93,7 @@ public class RootCauseSessionResource {
 
   @GET
   @Path("/query")
+  @ApiOperation(value = "Query")
   public List<RootcauseSessionDTO> query(
       @QueryParam("id") String idsString,
       @QueryParam("name") String namesString,

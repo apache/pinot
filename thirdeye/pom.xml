@@ -58,6 +58,7 @@
     <!-- force bump up for LI usage -->
     <glassfish.hk2.utils.version>2.5.0-b34</glassfish.hk2.utils.version>
     <kafka.clients.version>0.10.2.1</kafka.clients.version>
+    <swagger.version>0.7.0</swagger.version>
   </properties>
 
   <build>
@@ -381,6 +382,13 @@
         <groupId>org.hsqldb</groupId>
         <artifactId>hsqldb</artifactId>
         <version>${hsqldb.version}</version>
+      </dependency>
+
+      <!-- swagger -->
+      <dependency>
+        <groupId>io.federecio</groupId>
+        <artifactId>dropwizard-swagger</artifactId>
+        <version>${swagger.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

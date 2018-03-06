@@ -12,6 +12,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskDriver;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.auto.onboard.AutoOnboardService;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
+import com.linkedin.thirdeye.common.ThirdEyeSwaggerBundle;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
 import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
 import com.linkedin.thirdeye.dashboard.resources.EmailResource;
@@ -70,6 +71,7 @@ public class ThirdEyeAnomalyApplication
   @Override
   public void initialize(final Bootstrap<ThirdEyeAnomalyConfiguration> bootstrap) {
     bootstrap.addBundle(new AssetsBundle("/assets/", "/", "index.html"));
+    bootstrap.addBundle(new ThirdEyeSwaggerBundle());
   }
 
   @Override

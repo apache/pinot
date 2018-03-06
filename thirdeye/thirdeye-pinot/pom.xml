@@ -231,6 +231,12 @@
       <version>1.4.192</version>
       <scope>test</scope>
     </dependency>
+
+    <!-- Swagger -->
+    <dependency>
+      <groupId>io.federecio</groupId>
+      <artifactId>dropwizard-swagger</artifactId>
+    </dependency>
   </dependencies>
 
   <build>
