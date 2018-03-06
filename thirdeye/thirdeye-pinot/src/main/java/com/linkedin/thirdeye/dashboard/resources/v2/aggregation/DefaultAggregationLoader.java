@@ -48,6 +48,7 @@ public class DefaultAggregationLoader implements AggregationLoader {
 
     List<String> dimensions = new ArrayList<>(dataset.getDimensions());
     dimensions.removeAll(slice.getFilters().keySet());
+    dimensions.remove(dataset.getTimeColumn());
 
     LOG.info("Aggregating metric id {} with {} filters for dimensions {}", metricId, slice.getFilters().size(), dimensions);
 
