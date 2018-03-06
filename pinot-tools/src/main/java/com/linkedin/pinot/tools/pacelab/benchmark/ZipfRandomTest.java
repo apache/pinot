@@ -21,7 +21,7 @@ import org.xerial.util.ZipfRandom;
 public class ZipfRandomTest {
     public static void main(String[] args)
     {
-        ZipfRandom zipfRandom = new ZipfRandom(0.5, 100);
+        ZipfRandom zipfRandom = new ZipfRandom(0.8, 100);
         int[] randomNumFreq = new int[101];
         for(int i=0;i<1000;i++)
         {
