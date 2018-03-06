@@ -150,16 +150,15 @@
     display: flex;
     justify-content: center;
     border: solid 1px $te-light-grey;
-    margin-top: -21px;
     border-top: none;
     padding-top: 10px;
     padding-bottom: 10px;
     margin-bottom: 30px;
   }
 
-  &--no-bottom-space {
-    padding-bottom: 0;
-    margin-bottom: 0;
-    border: none
+  &--no-margin {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
   }
 }
