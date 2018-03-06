@@ -46,8 +46,14 @@ export default Controller.extend({
   ),
 
   actions: {
+
+    /**
+     * Sets the selected application property based on user selection
+     * @param {Object} selectedApplication - object that represents selected application
+     * @return {undefined}
+     */
     selectApplication(selectedApplication) {
-      setProperties(this, {selectedApplication});
+      setProperties(this, { selectedApplication });
     }
   }
 });

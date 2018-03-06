@@ -1,13 +1,15 @@
 <div class="container card-container">
   <div class="application-header">
-    <p>{{selectedApplication.application}}</p>
-    {{#power-select
-    options=model.applications
-    selected=selectedApplication
-    onchange=(action "selectApplication")
-    as |app|}}
-      {{app.application}}
-    {{/power-select}}
+    <p class="te-title">{{selectedApplication.application}}</p>
+    <div class="application-header__dropdown">
+      {{#power-select
+      options=model.applications
+      selected=selectedApplication
+      onchange=(action "selectApplication")
+      as |app|}}
+        {{app.application}}
+      {{/power-select}}
+    </div>
   </div>
 
   {{stats-cards
