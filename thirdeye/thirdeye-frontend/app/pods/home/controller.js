@@ -11,7 +11,7 @@ export default Controller.extend({
     table: 'table-bordered table-condensed te-anomaly-table--no-margin'
   },
 
-  /*
+  /**
    * Default application for the application dropdown
    * @type {Object} - the first application object from a list of applications
    */
