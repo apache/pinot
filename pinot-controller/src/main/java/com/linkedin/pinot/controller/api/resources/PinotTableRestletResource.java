@@ -166,7 +166,10 @@ public class PinotTableRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}")
-  @ApiOperation(value = "Enable/Disable/Drop a table", notes = "Enable/Disable/Drop a table")
+  @ApiOperation(value = "Get/Enable/Disable/Drop a table",
+      notes = "Get/Enable/Disable/Drop a table. If table name is the only parameter specified " +
+          ", the tableconfig will be printed"
+  )
   public String alterTableStateOrListTableConfig(
       @ApiParam(value = "Name of the table", required = false) @PathParam("tableName") String tableName,
       @ApiParam(value = "enable|disable|drop", required = false) @QueryParam("state") String stateStr,
