@@ -41,7 +41,6 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import com.linkedin.thirdeye.util.TimeSeriesUtils;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
-import com.wordnik.swagger.annotations.ApiParam;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -122,7 +121,6 @@ public class AnomalyResource {
   @Path("/anomalies/view/{anomaly_merged_result_id}")
   @ApiOperation(value = "Get anomalies")
   public MergedAnomalyResultDTO getMergedAnomalyDetail(
-      @ApiParam(value = "anomaly_merged_result_id",required = true)
       @NotNull @PathParam("anomaly_merged_result_id") long mergedAnomalyId) {
     return anomalyMergedResultDAO.findById(mergedAnomalyId);
   }
@@ -132,17 +130,11 @@ public class AnomalyResource {
   @Path("/anomalies/view")
   @ApiOperation(value = "View merged anomalies for collection")
   public List<MergedAnomalyResultDTO> viewMergedAnomaliesInRange(
-      @ApiParam(value = "dataset", required = true)
       @NotNull @QueryParam("dataset") String dataset,
-      @ApiParam(value = "startTimeIso")
       @QueryParam("startTimeIso") String startTimeIso,
-      @ApiParam(value = "endTimeIso")
       @QueryParam("endTimeIso") String endTimeIso,
-      @ApiParam(value = "metric")
       @QueryParam("metric") String metric,
-      @ApiParam(value = "dimensions")
       @QueryParam("dimensions") String exploredDimensions,
-      @ApiParam(value = "applyAlertFilter", defaultValue = "true")
       @DefaultValue("true") @QueryParam("applyAlertFilter") boolean applyAlertFiler) {
 
     if (StringUtils.isBlank(dataset)) {
@@ -209,7 +201,6 @@ public class AnomalyResource {
   @ApiOperation(value = "Get anomaly score")
   @Path("/anomalies/score/{anomaly_merged_result_id}")
   public double getAnomalyScore(
-      @ApiParam(value = "anomaly_merged_result_id", required = true)
       @NotNull @PathParam("anomaly_merged_result_id") long mergedAnomalyId) {
     MergedAnomalyResultDTO mergedAnomaly = anomalyMergedResultDAO.findById(mergedAnomalyId);
     BaseAlertFilter alertFilter = new DummyAlertFilter();
@@ -224,7 +215,9 @@ public class AnomalyResource {
   // View all anomaly functions
   @GET
   @Path("/anomaly-function")
-  public List<AnomalyFunctionDTO> viewAnomalyFunctions(@NotNull @QueryParam("dataset") String dataset,
+  @ApiOperation(value = "View all anomaly functions")
+  public List<AnomalyFunctionDTO> viewAnomalyFunctions(
+      @NotNull @QueryParam("dataset") String dataset,
       @QueryParam("metric") String metric) {
 
     if (StringUtils.isBlank(dataset)) {
@@ -268,6 +261,7 @@ public class AnomalyResource {
    */
   @POST
   @Path("/anomaly-function")
+  @ApiOperation("Endpoint to be used for creating new anomaly function")
   public Response createAnomalyFunction(@NotNull @QueryParam("dataset") String dataset,
       @NotNull @QueryParam("functionName") String functionName, @NotNull @QueryParam("metric") String metric,
       @NotNull @QueryParam("metricFunction") String metric_function, @QueryParam("type") String type,
@@ -381,6 +375,7 @@ public class AnomalyResource {
    */
   @POST
   @Path("/anomaly-function/apply/{autotuneConfigId}")
+  @ApiOperation("Apply an autotune configuration to an existing function")
   public Response applyAutotuneConfig(@PathParam("autotuneConfigId") @NotNull long id,
       @QueryParam("cloneFunction") @DefaultValue("false") boolean isCloneFunction,
       @QueryParam("cloneAnomalies") Boolean isCloneAnomalies) {
@@ -477,6 +472,7 @@ public class AnomalyResource {
   @GET
   @Path(value = "/anomaly-function/{id}/baseline")
   @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation("Get the timeseries with function baseline for an anomaly function")
   public Response getTimeSeriesAndBaselineData(@PathParam("id") long functionId,
       @QueryParam("start") String startTimeIso, @QueryParam("end") String endTimeIso,
       @QueryParam("mode") @DefaultValue("ONLINE") String mode,
@@ -741,6 +737,7 @@ public class AnomalyResource {
    */
   @GET
   @Path("anomaly-function/{id}/anomalies")
+  @ApiOperation("Show the content of merged anomalies whose start time is located in the given time ranges")
   public List<Long> getAnomaliesByFunctionId(@PathParam("id") Long functionId, @QueryParam("start") String startTimeIso,
       @QueryParam("end") String endTimeIso, @QueryParam("type") @DefaultValue("merged") String anomalyType,
       @QueryParam("apply-alert-filter") @DefaultValue("false") boolean applyAlertFiler,
@@ -832,9 +829,7 @@ public class AnomalyResource {
   @Path("/anomaly-function")
   @ApiOperation(value = "Delete anomaly function")
   public Response deleteAnomalyFunctions(
-      @ApiParam(value = "id")
       @NotNull @QueryParam("id") Long id,
-      @ApiParam(value = "functionName")
       @QueryParam("functionName") String functionName) throws IOException {
 
     if (id == null) {
@@ -882,6 +877,7 @@ public class AnomalyResource {
    */
   @POST
   @Path(value = "anomaly-merged-result/feedback/{anomaly_merged_result_id}")
+  @ApiOperation("update anomaly merged result feedback")
   public void updateAnomalyMergedResultFeedback(@PathParam("anomaly_merged_result_id") long anomalyResultId,
       String payload) {
     try {

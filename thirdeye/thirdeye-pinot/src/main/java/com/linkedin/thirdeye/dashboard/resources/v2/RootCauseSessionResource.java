@@ -43,7 +43,7 @@ public class RootCauseSessionResource {
   @GET
   @Path("/{sessionId}")
   @ApiOperation(value = "Get RootCauseSession by sessionId")
-  public RootcauseSessionDTO get(      @ApiParam(value = "sessionId")
+  public RootcauseSessionDTO get(
   @PathParam("sessionId") Long sessionId) {
     if (sessionId == null) {
       throw new IllegalArgumentException("Must provide sessionId");
@@ -95,27 +95,16 @@ public class RootCauseSessionResource {
   @Path("/query")
   @ApiOperation(value = "Query")
   public List<RootcauseSessionDTO> query(
-      @ApiParam(value = "id")
       @QueryParam("id") String idsString,
-      @ApiParam(value = "name")
       @QueryParam("name") String namesString,
-      @ApiParam(value = "owner")
       @QueryParam("owner") String ownersString,
-      @ApiParam(value = "previousId")
       @QueryParam("previousId") String previousIdsString,
-      @ApiParam(value = "anomalyId")
       @QueryParam("anomalyId") String anomalyIdsString,
-      @ApiParam(value = "anomalyRangeStart")
       @QueryParam("anomalyRangeStart") Long anomalyRangeStart,
-      @ApiParam(value = "anomalyRangeEnd")
       @QueryParam("anomalyRangeEnd") Long anomalyRangeEnd,
-      @ApiParam(value = "createdRangeStart")
       @QueryParam("createdRangeStart") Long createdRangeStart,
-      @ApiParam(value = "createdRangeEnd")
       @QueryParam("createdRangeEnd") Long createdRangeEnd,
-      @ApiParam(value = "updatedRangeStart")
       @QueryParam("updatedRangeStart") Long updatedRangeStart,
-      @ApiParam(value = "updatedRangeEnd")
       @QueryParam("updatedRangeEnd") Long updatedRangeEnd) {
 
     List<Predicate> predicates = new ArrayList<>();

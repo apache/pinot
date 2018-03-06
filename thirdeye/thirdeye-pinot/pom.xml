@@ -236,7 +236,6 @@
     <dependency>
       <groupId>io.federecio</groupId>
       <artifactId>dropwizard-swagger</artifactId>
-      <version>0.7.0</version>
     </dependency>
   </dependencies>
 

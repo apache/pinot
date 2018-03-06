@@ -51,23 +51,14 @@ public class RootCauseResource {
   @Path("/query")
   @ApiOperation(value = "Send query")
   public List<RootCauseEntity> query(
-      @ApiParam(value = "framework")
       @QueryParam("framework") String framework,
-      @ApiParam(value = "anomalyStart")
       @QueryParam("anomalyStart") Long anomalyStart,
-      @ApiParam(value = "anomalyEnd")
       @QueryParam("anomalyEnd") Long anomalyEnd,
-      @ApiParam(value = "baselineStart")
       @QueryParam("baselineStart") Long baselineStart,
-      @ApiParam(value = "baselineEnd")
       @QueryParam("baselineEnd") Long baselineEnd,
-      @ApiParam(value = "analysisStart")
       @QueryParam("analysisStart") Long analysisStart,
-      @ApiParam(value = "analysisEnd")
       @QueryParam("analysisEnd") Long analysisEnd,
-      @ApiParam(value = "formatterDepth")
       @QueryParam("formatterDepth") Integer formatterDepth,
-      @ApiParam(value = "urns")
       @QueryParam("urns") List<String> urns) throws Exception {
 
     // configuration validation
@@ -135,11 +126,8 @@ public class RootCauseResource {
   @Path("/raw")
   @ApiOperation(value = "Raw")
   public List<RootCauseEntity> raw(
-      @ApiParam(value = "framework")
       @QueryParam("framework") String framework,
-      @ApiParam(value = "formatterDepth")
       @QueryParam("formatterDepth") Integer formatterDepth,
-      @ApiParam(value = "urns")
       @QueryParam("urns") List<String> urns) throws Exception {
 
     // configuration validation

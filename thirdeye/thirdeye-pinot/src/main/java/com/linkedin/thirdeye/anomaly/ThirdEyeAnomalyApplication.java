@@ -13,6 +13,7 @@ import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAut
 import com.linkedin.thirdeye.auto.onboard.AutoOnboardService;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
+import com.linkedin.thirdeye.common.ThirdEyeSwaggerBunddle;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
 import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
 import com.linkedin.thirdeye.dashboard.resources.EmailResource;
@@ -73,16 +74,7 @@ public class ThirdEyeAnomalyApplication
   @Override
   public void initialize(final Bootstrap<ThirdEyeAnomalyConfiguration> bootstrap) {
     bootstrap.addBundle(new AssetsBundle("/assets/", "/", "index.html"));
-    bootstrap.addBundle(new SwaggerBundle<ThirdEyeConfiguration>() {
-      @Override
-      protected SwaggerBundleConfiguration getSwaggerBundleConfiguration(
-          ThirdEyeConfiguration thirdEyeDashboardApplication) {
-        SwaggerBundleConfiguration swaggerBundleConfiguration = thirdEyeDashboardApplication.swaggerBundleConfiguration;
-        swaggerBundleConfiguration.setTitle("ThirdEye");
-        swaggerBundleConfiguration.setDescription("ThirdEye REST endpoints");
-        return swaggerBundleConfiguration;
-      }
-    });
+    bootstrap.addBundle(new ThirdEyeSwaggerBunddle());
   }
 
   @Override
