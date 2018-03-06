@@ -22,6 +22,7 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.core.realtime.stream.MessageBatch;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;

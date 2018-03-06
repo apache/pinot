@@ -30,14 +30,17 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
 /**
- * Class to help generate partition assignment, given the table config, number of stream partitions,
- * instances and all tables needing reassignment
+ * Manager class to help with following functions related to stream partition assignment:
+ * 1. Read: fetch partition assignment from property store for given table
+ * 2. Write: write given partition assignments to property store
+ * 3. Delete: delete a partition assignment from property store for given table
+ * 4. Create: generate a new partition assignment for tables, given the table names, numPartitions and instances
  */
-public class StreamPartitionAssignmentGenerator {
+public class StreamPartitionAssignmentManager {
 
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
-  public StreamPartitionAssignmentGenerator(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public StreamPartitionAssignmentManager(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _propertyStore = propertyStore;
   }
 
@@ -109,5 +112,13 @@ public class StreamPartitionAssignmentGenerator {
       final String path = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(entry.getKey());
       _propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
     }
+  }
+
+  /**
+   * Given a table name, delete the partition assignment of the stream from the property store
+   * @param realtimeTableName
+   */
+  public void deleteStreamPartitionAssignment(String realtimeTableName) {
+    ZKMetadataProvider.removeKafkaPartitionAssignmentFromPropertyStore(_propertyStore, realtimeTableName);
   }
 }

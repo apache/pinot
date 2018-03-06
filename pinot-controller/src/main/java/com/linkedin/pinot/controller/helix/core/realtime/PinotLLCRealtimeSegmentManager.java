@@ -29,7 +29,6 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentPartitionMetadata;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.metrics.ControllerGauge;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
@@ -46,13 +45,11 @@ import com.linkedin.pinot.controller.api.events.MetadataEventNotifierFactory;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
-import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
-import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentGenerator;
+import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentManager;
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
-import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumer;
-import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumerFactory;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
+import com.linkedin.pinot.core.realtime.impl.kafka.CombinedStreamProviderConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadataFactory;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -74,13 +71,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.math.IntRange;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ControllerChangeListener;
@@ -97,7 +92,6 @@ import org.slf4j.LoggerFactory;
 
 public class PinotLLCRealtimeSegmentManager {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotLLCRealtimeSegmentManager.class);
-  private static final int KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS = 10000;
   protected static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
   protected static final long END_OFFSET_FOR_CONSUMING_SEGMENTS = Long.MAX_VALUE;
   private static final int NUM_LOCKS = 4;
@@ -117,7 +111,7 @@ public class PinotLLCRealtimeSegmentManager {
   private final ControllerMetrics _controllerMetrics;
   private final Lock[] _idealstateUpdateLocks;
   private final TableConfigCache _tableConfigCache;
-  private final StreamPartitionAssignmentGenerator _streamPartitionAssignmentGenerator;
+  private final StreamPartitionAssignmentManager _streamPartitionAssignmentManager;
 
   public boolean getIsSplitCommitEnabled() {
     return _controllerConf.getAcceptSplitCommit();
@@ -169,7 +163,7 @@ public class PinotLLCRealtimeSegmentManager {
       _idealstateUpdateLocks[i] = new ReentrantLock();
     }
     _tableConfigCache = new TableConfigCache(_propertyStore);
-    _streamPartitionAssignmentGenerator = new StreamPartitionAssignmentGenerator(_propertyStore);
+    _streamPartitionAssignmentManager = new StreamPartitionAssignmentManager(_propertyStore);
   }
 
   public static PinotLLCRealtimeSegmentManager getInstance() {
@@ -189,7 +183,7 @@ public class PinotLLCRealtimeSegmentManager {
         // idempotent.The user can retry the failed operation and it will work.
         //
         // Go through all partitions of all tables that have LL configured, and check that they have as many
-        // segments in CONSUMING state in Idealstate as there are kafka partitions.
+        // segments in CONSUMING state in Idealstate as there are stream partitions.
         completeCommittingSegments();
       } else {
         // We already had leadership, nothing to do.
@@ -210,18 +204,16 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /*
-   * Use helix balancer to balance the kafka partitions amongst the realtime nodes (for a table).
+   * Use helix balancer to balance the stream partitions amongst the realtime nodes (for a table).
    * The topic name is being used as a dummy helix resource name. We do not read or write to zk in this
    * method.
    */
-  public void setupHelixEntries(RealtimeTagConfig realtimeTagConfig, KafkaStreamMetadata kafkaStreamMetadata,
+  public void setupHelixEntries(RealtimeTagConfig realtimeTagConfig, StreamMetadata streamMetadata,
       int nPartitions, final List<String> instanceNames, IdealState idealState, boolean create) {
-
-    // TODO: introduce some abstraction, to make PinotLLCRealtimeSegmentManager handle all types of streams
 
     TableConfig tableConfig = realtimeTagConfig.getTableConfig();
     final int nReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
-    final String topicName = kafkaStreamMetadata.getKafkaTopicName();
+    final String topicName = streamMetadata.getStreamName();
     final String realtimeTableName = tableConfig.getTableName();
     final int flushSize = PinotLLCRealtimeSegmentManager.getLLCRealtimeTableFlushSize(tableConfig);
 
@@ -233,18 +225,21 @@ public class PinotLLCRealtimeSegmentManager {
     List<String> realtimeTablesWithSameTenant =
         getRealtimeTablesWithServerTenant(realtimeTagConfig.getServerTenantName());
     Map<String, PartitionAssignment> newPartitionAssignment =
-        _streamPartitionAssignmentGenerator.generatePartitionAssignment(tableConfig, nPartitions, instanceNames,
+        _streamPartitionAssignmentManager.generatePartitionAssignment(tableConfig, nPartitions, instanceNames,
             realtimeTablesWithSameTenant);
-    _streamPartitionAssignmentGenerator.writeStreamPartitionAssignment(newPartitionAssignment);
-    setupInitialSegments(tableConfig, kafkaStreamMetadata, newPartitionAssignment.get(realtimeTableName), idealState,
+    _streamPartitionAssignmentManager.writeStreamPartitionAssignment(newPartitionAssignment);
+    setupInitialSegments(tableConfig, streamMetadata, newPartitionAssignment.get(realtimeTableName), idealState,
         create, flushSize);
   }
 
-  // Remove all trace of LLC for this table.
+  /**
+   * Remove a stream partition assignment from the property store, along with all its segments from ideal satte
+   * @param realtimeTableName
+   */
   public void cleanupLLC(final String realtimeTableName) {
-    // Start by removing the kafka partition assigment znode. This will prevent any new segments being created.
-    ZKMetadataProvider.removeKafkaPartitionAssignmentFromPropertyStore(_propertyStore, realtimeTableName);
-    LOGGER.info("Removed Kafka partition assignment (if any) record for {}", realtimeTableName);
+    // Start by removing the stream partition assigment znode. This will prevent any new segments being created.
+    _streamPartitionAssignmentManager.deleteStreamPartitionAssignment(realtimeTableName);
+    LOGGER.info("Removed stream partition assignment (if any) record for {}", realtimeTableName);
     // If there are any completions in the pipeline we let them commit.
     Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
 
@@ -259,24 +254,22 @@ public class PinotLLCRealtimeSegmentManager {
       }
     }
     LOGGER.info("Attempting to remove {} LLC segments of table {}", removeCount, realtimeTableName);
-
     _helixResourceManager.deleteSegments(realtimeTableName, segmentsToRemove);
   }
 
 
 
-  protected void setupInitialSegments(TableConfig tableConfig, KafkaStreamMetadata kafkaStreamMetadata, PartitionAssignment partitionAssignment,
-      IdealState idealState, boolean create, int flushSize) {
+  protected void setupInitialSegments(TableConfig tableConfig, StreamMetadata streamMetadata,
+      PartitionAssignment partitionAssignment, IdealState idealState, boolean create, int flushSize) {
     final String realtimeTableName = tableConfig.getTableName();
     final int nReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
-    final String initialOffset = kafkaStreamMetadata.getKafkaConsumerProperties().get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
 
     List<String> currentSegments = getExistingSegments(realtimeTableName);
     // Make sure that there are no low-level segments existing.
     if (currentSegments != null) {
       for (String segment : currentSegments) {
         if (!SegmentName.isHighLevelConsumerSegmentName(segment)) {
-          // For now, we don't support changing of kafka partitions, or otherwise re-creating the low-level
+          // For now, we don't support changing of stream partitions, or otherwise re-creating the low-level
           // realtime segments for any other reason.
           throw new RuntimeException("Low-level segments already exist for table " + realtimeTableName);
         }
@@ -287,7 +280,7 @@ public class PinotLLCRealtimeSegmentManager {
     final Map<String, List<String>> partitionToServersMap = partitionAssignment.getPartitionToInstances();
     final int nPartitions = partitionToServersMap.size();
 
-    // Create one segment entry in PROPERTYSTORE for each kafka partition.
+    // Create one segment entry in PROPERTYSTORE for each stream partition.
     // Any of these may already be there, so bail out clean if they are already present.
     final long now = System.currentTimeMillis();
     final int seqNum = STARTING_SEQUENCE_NUMBER;
@@ -304,7 +297,8 @@ public class PinotLLCRealtimeSegmentManager {
 
       metadata.setCreationTime(now);
 
-      final long startOffset = getPartitionOffset(initialOffset, i, kafkaStreamMetadata);
+      String initialCriteria = streamMetadata.getInitialConsumerOffsetCriteria();
+      final long startOffset = getPartitionOffset(i, initialCriteria, streamMetadata);
       LOGGER.info("Setting start offset for segment {} to {}", segName, startOffset);
       metadata.setStartOffset(startOffset);
       metadata.setEndOffset(END_OFFSET_FOR_CONSUMING_SEGMENTS);
@@ -351,7 +345,7 @@ public class PinotLLCRealtimeSegmentManager {
       PartitionAssignment partitionAssignment, int tableFlushSize) {
     // If config does not have a flush threshold, use the default.
     if (tableFlushSize < 1) {
-      tableFlushSize = KafkaHighLevelStreamProviderConfig.getDefaultMaxRealtimeRowsCount();
+      tableFlushSize = CombinedStreamProviderConfig.getDefaultMaxRealtimeRowsCount();
     }
 
     // Gather list of instances for this partition
@@ -642,8 +636,8 @@ public class PinotLLCRealtimeSegmentManager {
     final PartitionAssignment partitionAssignment = getStreamPartitionAssignment(realtimeTableName);
     // If an LLC table is dropped (or cleaned up), we will get null here. In that case we should not be creating a new segment
     if (partitionAssignment == null) {
-      LOGGER.warn("Kafka partition assignment not found for {}", realtimeTableName);
-      throw new RuntimeException("Kafka partition assignment not found. Not committing segment");
+      LOGGER.warn("Stream partition assignment not found for {}", realtimeTableName);
+      throw new RuntimeException("Stream partition assignment not found. Not committing segment");
     }
     List<String> newInstances = partitionAssignment.getInstancesListForPartition(String.valueOf(partitionId));
 
@@ -1026,35 +1020,16 @@ public class PinotLLCRealtimeSegmentManager {
     completeCommittingSegmentsInternal(realtimeTableName, partitionToLatestSegments, segmentIdToMetadataMap);
   }
 
-  protected long getKafkaPartitionOffset(KafkaStreamMetadata kafkaStreamMetadata, final String offsetCriteria,
-      int partitionId) {
-    return getPartitionOffset(offsetCriteria, partitionId, kafkaStreamMetadata);
-  }
-
-  private long getPartitionOffset(final String offsetCriteria, int partitionId,
-      KafkaStreamMetadata kafkaStreamMetadata) {
-    KafkaOffsetFetcher kafkaOffsetFetcher = new KafkaOffsetFetcher(offsetCriteria, partitionId, kafkaStreamMetadata);
-    try {
-      RetryPolicies.fixedDelayRetryPolicy(3, 1000L).attempt(kafkaOffsetFetcher);
-      return kafkaOffsetFetcher.getOffset();
-    } catch (Exception e) {
-      Exception fetcherException = kafkaOffsetFetcher.getException();
-      LOGGER.error("Could not get offset for topic {} partition {}, criteria {}",
-          kafkaStreamMetadata.getKafkaTopicName(), partitionId, offsetCriteria, fetcherException);
-      throw new RuntimeException(fetcherException);
-    }
-  }
-
   /**
-   * Create a consuming segment for the kafka partitions that are missing one.
+   * Create a consuming segment for the stream partitions that are missing one.
    *
    * @param realtimeTableName is the name of the realtime table (e.g. "table_REALTIME")
-   * @param nonConsumingPartitions is a set of integers (kafka partitions that do not have a consuming segment)
+   * @param nonConsumingPartitions is a set of integers (stream partitions that do not have a consuming segment)
    * @param llcSegments is a list of segment names in the ideal state as was observed last.
    */
   public void createConsumingSegment(final String realtimeTableName, final Set<Integer> nonConsumingPartitions,
       final List<String> llcSegments, final TableConfig tableConfig) {
-    final KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+    final StreamMetadata streamMetadata = StreamMetadataFactory.getStreamMetadata(tableConfig);
     final PartitionAssignment partitionAssignment = getStreamPartitionAssignment(realtimeTableName);
     final HashMap<Integer, LLCSegmentName> ncPartitionToLatestSegment = new HashMap<>(nonConsumingPartitions.size());
     final int nReplicas = partitionAssignment.getInstancesListForPartition("0").size(); // Number of replicas (should be same for all partitions)
@@ -1088,18 +1063,17 @@ public class PinotLLCRealtimeSegmentManager {
           nextSeqNum = STARTING_SEQUENCE_NUMBER;
           LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", realtimeTableName, partition,
               nextSeqNum);
-          String consumerStartOffsetSpec = kafkaStreamMetadata.getKafkaConsumerProperties()
-              .get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
-          startOffset = getKafkaPartitionOffset(kafkaStreamMetadata, consumerStartOffsetSpec, partition);
-          LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, realtimeTableName, partition);
+          String consumerStartOffsetSpec = streamMetadata.getInitialConsumerOffsetCriteria();
+          startOffset = getPartitionOffset(partition, consumerStartOffsetSpec, streamMetadata);
+          LOGGER.info("Found stream offset {} for table {} for partition {}", startOffset, realtimeTableName, partition);
         } else {
           nextSeqNum = latestSegment.getSequenceNumber() + 1;
           LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", realtimeTableName, partition,
               nextSeqNum);
-          // To begin with, set startOffset to the oldest available offset in kafka. Fix it to be the one we want,
+          // To begin with, set startOffset to the oldest available offset in stream. Fix it to be the one we want,
           // depending on what the prev segment had.
-          startOffset = getKafkaPartitionOffset(kafkaStreamMetadata, "smallest", partition);
-          LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, realtimeTableName, partition);
+          startOffset = getPartitionOffset(partition, "smallest", streamMetadata);
+          LOGGER.info("Found stream offset {} for table {} for partition {}", startOffset, realtimeTableName, partition);
           startOffset = getBetterStartOffsetIfNeeded(realtimeTableName, partition, latestSegment, startOffset,
               nextSeqNum);
         }
@@ -1110,44 +1084,48 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
+  protected long getPartitionOffset(int partitionId, String offsetCriteria, StreamMetadata streamMetadata) {
+    return streamMetadata.getPartitionOffset(partitionId, offsetCriteria);
+  }
+
   private long getBetterStartOffsetIfNeeded(final String realtimeTableName, final int partition,
-      final LLCSegmentName latestSegment, final long oldestOffsetInKafka, final int nextSeqNum) {
+      final LLCSegmentName latestSegment, final long oldestOffsetInStream, final int nextSeqNum) {
     final LLCRealtimeSegmentZKMetadata oldSegMetadata =
         getRealtimeSegmentZKMetadata(realtimeTableName, latestSegment.getSegmentName(), null);
     CommonConstants.Segment.Realtime.Status status = oldSegMetadata.getStatus();
-    long segmentStartOffset = oldestOffsetInKafka;
+    long segmentStartOffset = oldestOffsetInStream;
     final long prevSegStartOffset = oldSegMetadata.getStartOffset();  // Offset at which the prev segment intended to start consuming
     if (status.equals(CommonConstants.Segment.Realtime.Status.IN_PROGRESS)) {
-      if (oldestOffsetInKafka <= prevSegStartOffset) {
+      if (oldestOffsetInStream <= prevSegStartOffset) {
         // We still have the same start offset available, re-use it.
         segmentStartOffset = prevSegStartOffset;
         LOGGER.info("Choosing previous segment start offset {} for table {} for partition {}, sequence {}",
-            oldestOffsetInKafka,
+            oldestOffsetInStream,
             realtimeTableName, partition, nextSeqNum);
       } else {
         // There is data loss.
-        LOGGER.warn("Data lost from kafka offset {} to {} for table {} partition {} sequence {}",
-            prevSegStartOffset, oldestOffsetInKafka, realtimeTableName, partition, nextSeqNum);
-        // Start from the earliest offset in kafka
+        LOGGER.warn("Data lost from stream offset {} to {} for table {} partition {} sequence {}",
+            prevSegStartOffset, oldestOffsetInStream, realtimeTableName, partition, nextSeqNum);
+        // Start from the earliest offset in stream
         _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_KAFKA_DATA_LOSS, 1);
       }
     } else {
       // Status must be DONE, so we have a valid end-offset for the previous segment
       final long prevSegEndOffset = oldSegMetadata.getEndOffset();  // Will be 0 if the prev segment was not completed.
-      if (oldestOffsetInKafka < prevSegEndOffset) {
+      if (oldestOffsetInStream < prevSegEndOffset) {
         // We don't want to create a segment that overlaps in data with the prev segment. We know that the previous
-        // segment's end offset is available in Kafka, so use that.
+        // segment's end offset is available in stream, so use that.
         segmentStartOffset = prevSegEndOffset;
-        LOGGER.info("Choosing newer kafka offset {} for table {} for partition {}, sequence {}", oldestOffsetInKafka,
+        LOGGER.info("Choosing newer stream offset {} for table {} for partition {}, sequence {}", oldestOffsetInStream,
             realtimeTableName, partition, nextSeqNum);
-      } else if (oldestOffsetInKafka > prevSegEndOffset) {
-        // Kafka's oldest offset is greater than the end offset of the prev segment, so there is data loss.
-        LOGGER.warn("Data lost from kafka offset {} to {} for table {} partition {} sequence {}", prevSegEndOffset,
-            oldestOffsetInKafka, realtimeTableName, partition, nextSeqNum);
+      } else if (oldestOffsetInStream > prevSegEndOffset) {
+        // stream's oldest offset is greater than the end offset of the prev segment, so there is data loss.
+        LOGGER.warn("Data lost from stream offset {} to {} for table {} partition {} sequence {}", prevSegEndOffset,
+            oldestOffsetInStream, realtimeTableName, partition, nextSeqNum);
         _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_KAFKA_DATA_LOSS, 1);
       } else {
         // The two happen to be equal. A rarity, so log it.
-        LOGGER.info("Kafka earliest offset {} is the same as new segment start offset", oldestOffsetInKafka);
+        LOGGER.info("Stream earliest offset {} is the same as new segment start offset", oldestOffsetInStream);
       }
     }
     return segmentStartOffset;
@@ -1206,7 +1184,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
-   * An instance is reporting that it has stopped consuming a kafka topic due to some error.
+   * An instance is reporting that it has stopped consuming a stream topic due to some error.
    * Mark the state of the segment to be OFFLINE in idealstate.
    * When all replicas of this segment are marked offline, the ValidationManager, in its next
    * run, will auto-create a new segment with the appropriate offset.
@@ -1237,35 +1215,35 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
-   * Update the kafka partitions as necessary to accommodate changes in number of replicas, number of tenants or
-   * number of kafka partitions. As new segments are assigned, they will obey the new kafka partition assignment.
+   * Update the stream partitions as necessary to accommodate changes in number of replicas, number of tenants or
+   * number of stream partitions. As new segments are assigned, they will obey the new stream partition assignment.
    *
    * @param tableConfig tableConfig from propertystore
    */
-  public void updateKafkaPartitionsIfNecessary(TableConfig tableConfig) {
+  public void updateStreamPartitionsIfNecessary(TableConfig tableConfig) {
 
     RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
 
     final String realtimeTableName = tableConfig.getTableName();
     final PartitionAssignment partitionAssignment = getStreamPartitionAssignment(realtimeTableName);
     final Map<String, List<String>> partitionToServersMap = partitionAssignment.getPartitionToInstances();
-    final KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+    final StreamMetadata streamMetadata = StreamMetadataFactory.getStreamMetadata(tableConfig);
 
     String consumingServersTag = realtimeTagConfig.getConsumingServerTag();
     final List<String> currentInstances = getInstances(consumingServersTag);
 
-    // Previous partition count is what we find in the Kafka partition assignment znode.
-    // Get the current partition count from Kafka.
+    // Previous partition count is what we find in the stream partition assignment znode.
+    // Get the current partition count from stream.
     final int prevPartitionCount = partitionToServersMap.size();
     int currentPartitionCount = -1;
     try {
-      currentPartitionCount = getKafkaPartitionCount(kafkaStreamMetadata);
+      currentPartitionCount = getStreamPartitionCount(streamMetadata);
     } catch (Exception e) {
-      LOGGER.warn("Could not get partition count for {}. Leaving kafka partition count at {}", realtimeTableName, currentPartitionCount);
+      LOGGER.warn("Could not get partition count for {}. Leaving stream partition count at {}", realtimeTableName, currentPartitionCount);
       return;
     }
 
-    // Previous instance set is what we find in the Kafka partition assignment znode (values of the map entries)
+    // Previous instance set is what we find in the stream partition assignment znode (values of the map entries)
     final Set<String> prevInstances = new HashSet<>(currentInstances.size());
     for (List<String> servers : partitionToServersMap.values()) {
       prevInstances.addAll(servers);
@@ -1274,29 +1252,30 @@ public class PinotLLCRealtimeSegmentManager {
     final int prevReplicaCount = partitionToServersMap.entrySet().iterator().next().getValue().size();
     final int currentReplicaCount = Integer.valueOf(tableConfig.getValidationConfig().getReplicasPerPartition());
 
-    boolean updateKafkaAssignment = false;
+    boolean updateStreamPartitionAssignment = false;
 
     if (!prevInstances.equals(new HashSet<>(currentInstances))) {
       LOGGER.info("Detected change in instances for table {}", realtimeTableName);
-      updateKafkaAssignment = true;
+      updateStreamPartitionAssignment = true;
     }
 
     if (prevPartitionCount != currentPartitionCount) {
-      LOGGER.info("Detected change in Kafka partition count for table {} from {} to {}", realtimeTableName, prevPartitionCount, currentPartitionCount);
-      updateKafkaAssignment = true;
+      LOGGER.info("Detected change in stream {} partition count for table {} from {} to {}", realtimeTableName,
+          prevPartitionCount, currentPartitionCount);
+      updateStreamPartitionAssignment = true;
     }
 
     if (prevReplicaCount != currentReplicaCount) {
       LOGGER.info("Detected change in per-partition replica count for table {} from {} to {}", realtimeTableName, prevReplicaCount, currentReplicaCount);
-      updateKafkaAssignment = true;
+      updateStreamPartitionAssignment = true;
     }
 
-    if (!updateKafkaAssignment) {
-      LOGGER.info("Not updating Kafka partition assignment for table {}", realtimeTableName);
+    if (!updateStreamPartitionAssignment) {
+      LOGGER.info("Not updating stream partition assignment for table {}", realtimeTableName);
       return;
     }
 
-    // Generate new kafka partition assignment and update the znode
+    // Generate new stream partition assignment and update the znode
     if (currentInstances.size() < currentReplicaCount) {
       LOGGER.error("Cannot have {} replicas in {} instances for {}.Not updating partition assignment", currentReplicaCount, currentInstances.size(), realtimeTableName);
       long numOfInstancesNeeded = currentReplicaCount - currentInstances.size();
@@ -1346,13 +1325,15 @@ public class PinotLLCRealtimeSegmentManager {
     List<String> realtimeTablesWithSameTenant =
         getRealtimeTablesWithServerTenant(realtimeTagConfig.getServerTenantName());
     Map<String, PartitionAssignment> newPartitionAssignment =
-        _streamPartitionAssignmentGenerator.generatePartitionAssignment(tableConfig, currentPartitionCount,
+        _streamPartitionAssignmentManager.generatePartitionAssignment(tableConfig, currentPartitionCount,
             currentInstances, realtimeTablesWithSameTenant);
-    _streamPartitionAssignmentGenerator.writeStreamPartitionAssignment(newPartitionAssignment);
-    LOGGER.info("Successfully updated Kafka partition assignment for table {}", realtimeTableName);
+    _streamPartitionAssignmentManager.writeStreamPartitionAssignment(newPartitionAssignment);
+    LOGGER.info("Successfully updated stream partition assignment for table {}", realtimeTableName);
   }
 
-
+  protected int getStreamPartitionCount(StreamMetadata streamMetadata) {
+    return streamMetadata.getPartitionCount();
+  }
 
   /**
    * Get all realtime tables with given tenant
@@ -1381,66 +1362,13 @@ public class PinotLLCRealtimeSegmentManager {
     metadataEventNotifierFactory.create().notifyOnSegmentFlush(tableConfig);
   }
 
-  protected int getKafkaPartitionCount(KafkaStreamMetadata kafkaStreamMetadata) {
-    return PinotTableIdealStateBuilder.getPartitionCount(kafkaStreamMetadata);
-  }
-
   public PartitionAssignment getStreamPartitionAssignment(String realtimeTableName) {
-    return _streamPartitionAssignmentGenerator.getStreamPartitionAssignment(realtimeTableName);
+    return _streamPartitionAssignmentManager.getStreamPartitionAssignment(realtimeTableName);
   }
 
   protected List<String> getInstances(String tenantName) {
     return _helixAdmin.getInstancesInClusterWithTag(_clusterName, tenantName);
   }
 
-  private static class KafkaOffsetFetcher implements Callable<Boolean> {
-    private final String _topicName;
-    private final String _offsetCriteria;
-    private final int _partitionId;
 
-    private Exception _exception = null;
-    private long _offset = -1;
-    private PinotKafkaConsumerFactory _pinotKafkaConsumerFactory;
-    KafkaStreamMetadata _kafkaStreamMetadata;
-
-
-    private KafkaOffsetFetcher(final String offsetCriteria, int partitionId, KafkaStreamMetadata kafkaStreamMetadata) {
-      _offsetCriteria = offsetCriteria;
-      _partitionId = partitionId;
-      _pinotKafkaConsumerFactory = PinotKafkaConsumerFactory.create(kafkaStreamMetadata);
-      _kafkaStreamMetadata = kafkaStreamMetadata;
-      _topicName = kafkaStreamMetadata.getKafkaTopicName();
-    }
-
-    private long getOffset() {
-      return _offset;
-    }
-
-    private Exception getException() {
-      return _exception;
-    }
-
-    @Override
-    public Boolean call() throws Exception {
-
-      PinotKafkaConsumer
-          kafkaConsumer = _pinotKafkaConsumerFactory.buildConsumer("dummyClientId", _partitionId, _kafkaStreamMetadata);
-      try {
-        _offset = kafkaConsumer.fetchPartitionOffset(_offsetCriteria, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
-        if (_exception != null) {
-          LOGGER.info("Successfully retrieved offset({}) for kafka topic {} partition {}", _offset, _topicName, _partitionId);
-        }
-        return Boolean.TRUE;
-      } catch (SimpleConsumerWrapper.TransientConsumerException e) {
-        LOGGER.warn("Temporary exception when fetching offset for topic {} partition {}:{}", _topicName, _partitionId, e.getMessage());
-        _exception = e;
-        return Boolean.FALSE;
-      } catch (Exception e) {
-        _exception = e;
-        throw e;
-      } finally {
-        IOUtils.closeQuietly(kafkaConsumer);
-      }
-    }
-  }
 }

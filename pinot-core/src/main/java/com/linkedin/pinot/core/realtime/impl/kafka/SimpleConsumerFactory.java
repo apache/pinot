@@ -16,20 +16,32 @@
 
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamProviderConfig;
 import javax.annotation.Nonnull;
 
 
-public class SimpleConsumerFactory extends PinotKafkaConsumerFactory {
-  public PinotKafkaConsumer buildConsumer(String clientId, int partition, KafkaStreamMetadata kafkaStreamMetadata) {
+public class SimpleConsumerFactory extends PinotStreamConsumerFactory {
+  public PinotKafkaConsumer buildConsumer(String clientId, int partition, StreamMetadata streamMetadata) {
     KafkaSimpleConsumerFactoryImpl kafkaSimpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
+    KafkaStreamMetadata kafkaStreamMetadata = (KafkaStreamMetadata) streamMetadata;
     return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, kafkaStreamMetadata.getBootstrapHosts(),
-        clientId, kafkaStreamMetadata.getKafkaTopicName(), partition, kafkaStreamMetadata.getKafkaConnectionTimeoutMillis());
+        clientId, kafkaStreamMetadata.getStreamName(), partition, kafkaStreamMetadata.getConnectionTimeoutMillis());
   }
 
-  public PinotKafkaConsumer buildMetadataFetcher(@Nonnull String clientId, KafkaStreamMetadata kafkaStreamMetadata) {
+  public PinotKafkaConsumer buildMetadataFetcher(@Nonnull String clientId, StreamMetadata streamMetadata) {
     KafkaSimpleConsumerFactoryImpl kafkaSimpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
+    KafkaStreamMetadata kafkaStreamMetadata = (KafkaStreamMetadata) streamMetadata;
     return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, kafkaStreamMetadata.getBootstrapHosts(),
-        clientId, kafkaStreamMetadata.getKafkaConnectionTimeoutMillis());
+        clientId, kafkaStreamMetadata.getConnectionTimeoutMillis());
+  }
+
+  @Override
+  public StreamMessageDecoder getDecoder(StreamProviderConfig streamProviderConfig) throws Exception {
+    PartitionLevelStreamProviderConfig partitionLevelStreamProviderConfig =
+        (PartitionLevelStreamProviderConfig) streamProviderConfig;
+    return partitionLevelStreamProviderConfig.getDecoder();
   }
 }

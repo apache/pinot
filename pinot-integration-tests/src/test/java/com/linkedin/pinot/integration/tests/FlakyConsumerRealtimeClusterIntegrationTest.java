@@ -17,9 +17,9 @@ package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.realtime.StreamProvider;
-import com.linkedin.pinot.core.realtime.StreamProviderConfig;
-import com.linkedin.pinot.core.realtime.StreamProviderFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamProvider;
+import com.linkedin.pinot.core.realtime.stream.StreamProviderConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamProviderFactory;
 import java.util.Random;
 import org.testng.annotations.BeforeClass;
 

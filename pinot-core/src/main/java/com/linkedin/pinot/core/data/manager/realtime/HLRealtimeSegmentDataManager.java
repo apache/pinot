@@ -32,13 +32,13 @@ import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.realtime.StreamProvider;
-import com.linkedin.pinot.core.realtime.StreamProviderConfig;
-import com.linkedin.pinot.core.realtime.StreamProviderFactory;
+import com.linkedin.pinot.core.realtime.impl.kafka.CombinedStreamProviderConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamProvider;
+import com.linkedin.pinot.core.realtime.stream.StreamProviderConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamProviderFactory;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.ArrayList;
@@ -141,7 +141,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // create and init stream provider config
     // TODO : ideally resourceMetatda should create and give back a streamProviderConfig
-    this.kafkaStreamProviderConfig = new KafkaHighLevelStreamProviderConfig();
+    this.kafkaStreamProviderConfig = new CombinedStreamProviderConfig();
     this.kafkaStreamProviderConfig.init(tableConfig, instanceMetadata, schema);
     segmentLogger = LoggerFactory.getLogger(HLRealtimeSegmentDataManager.class.getName() +
             "_" + segmentName +

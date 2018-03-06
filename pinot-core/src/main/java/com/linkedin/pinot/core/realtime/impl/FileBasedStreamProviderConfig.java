@@ -19,7 +19,7 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.realtime.StreamProviderConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamProviderConfig;
 import java.util.Map;
 
 
@@ -59,11 +59,6 @@ public class FileBasedStreamProviderConfig implements StreamProviderConfig {
   @Override
   public void init(Map<String, String> properties, Schema schema) {
     // TODO Auto-generated method stub
-  }
-
-  @Override
-  public String getStreamProviderClass() {
-    return null;
   }
 
   @Override

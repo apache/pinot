@@ -62,7 +62,7 @@ public class KafkaConsumerManager {
       CONSUMER_AND_ITERATOR_FOR_CONFIG_KEY = new HashMap<>();
   private static final IdentityHashMap<ConsumerAndIterator, Long> CONSUMER_RELEASE_TIME = new IdentityHashMap<>();
 
-  public static ConsumerAndIterator acquireConsumerAndIteratorForConfig(KafkaHighLevelStreamProviderConfig config) {
+  public static ConsumerAndIterator acquireConsumerAndIteratorForConfig(CombinedStreamProviderConfig config) {
     final ImmutableTriple<String, String, String> configKey =
         new ImmutableTriple<>(config.getTopicName(), config.getGroupId(), config.getZkString());
 

@@ -15,36 +15,9 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import java.util.Map;
-
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 
 
-public interface KafkaMessageDecoder<T> {
+public interface KafkaMessageDecoder<T> extends StreamMessageDecoder<T> {
 
-  /**
-   *
-   * @param props
-   * @throws Exception
-   */
-  void init(Map<String, String> props, Schema indexingSchema, String kafkaTopicName) throws Exception;
-
-  /**
-   *
-   * @param payload
-   * @return
-   */
-  GenericRow decode(T payload, GenericRow destination);
-
-  /**
-   * Decodes a row.
-   *
-   * @param payload The buffer from which to read the row.
-   * @param offset The offset into the array from which the row contents starts
-   * @param length The length of the row contents in bytes
-   * @param destination The {@link GenericRow} to write the decoded row into
-   * @return A new row decoded from the buffer
-   */
-  GenericRow decode(T payload, int offset, int length, GenericRow destination);
 }

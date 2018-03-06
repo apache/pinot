@@ -36,7 +36,6 @@ import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignment;
 import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -64,6 +63,8 @@ import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrate
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadataFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -1150,37 +1151,37 @@ public class PinotHelixResourceManager {
     }
   }
 
-  private void ensureRealtimeClusterIsSetUp(TableConfig config, String realtimeTableName,
+  private void ensureRealtimeClusterIsSetUp(TableConfig tableConfig, String realtimeTableName,
       IndexingConfig indexingConfig) {
-    KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(indexingConfig.getStreamConfigs());
+    StreamMetadata streamMetadata = StreamMetadataFactory.getStreamMetadata(tableConfig);
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, realtimeTableName);
 
-    if (kafkaStreamMetadata.hasHighLevelKafkaConsumerType()) {
-     if (kafkaStreamMetadata.hasSimpleKafkaConsumerType()) {
+    if (streamMetadata.hasHighLevelConsumerType()) {
+     if (streamMetadata.hasSimpleConsumerType()) {
        // We may be adding on low-level, or creating both.
        if (idealState == null) {
          // Need to create both. Create high-level consumer first.
-         createHelixEntriesForHighLevelConsumer(config, realtimeTableName, idealState);
+         createHelixEntriesForHighLevelConsumer(tableConfig, realtimeTableName, idealState);
          idealState = _helixAdmin.getResourceIdealState(_helixClusterName, realtimeTableName);
          LOGGER.info("Configured new HLC for table {}", realtimeTableName);
        }
        // Fall through to create low-level consumers
      } else {
        // Only high-level consumer specified in the config.
-       createHelixEntriesForHighLevelConsumer(config, realtimeTableName, idealState);
+       createHelixEntriesForHighLevelConsumer(tableConfig, realtimeTableName, idealState);
        // Clean up any LLC table if they are present
        PinotLLCRealtimeSegmentManager.getInstance().cleanupLLC(realtimeTableName);
      }
     }
 
     // Either we have only low-level consumer, or both.
-    if (kafkaStreamMetadata.hasSimpleKafkaConsumerType()) {
+    if (streamMetadata.hasSimpleConsumerType()) {
       // Will either create idealstate entry, or update the IS entry with new segments
       // (unless there are low-level segments already present)
       final String llcKafkaPartitionAssignmentPath = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(
           realtimeTableName);
       if(!_propertyStore.exists(llcKafkaPartitionAssignmentPath, AccessOption.PERSISTENT)) {
-        PinotTableIdealStateBuilder.buildLowLevelRealtimeIdealStateFor(realtimeTableName, config, _helixAdmin,
+        PinotTableIdealStateBuilder.buildLowLevelRealtimeIdealStateFor(realtimeTableName, tableConfig, _helixAdmin,
             _helixClusterName, _helixZkManager, idealState);
         LOGGER.info("Successfully added Helix entries for low-level consumers for {} ", realtimeTableName);
       } else {

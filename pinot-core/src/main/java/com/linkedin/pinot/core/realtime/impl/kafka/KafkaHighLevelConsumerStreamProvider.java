@@ -21,8 +21,8 @@ import com.yammer.metrics.core.Meter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.realtime.StreamProvider;
-import com.linkedin.pinot.core.realtime.StreamProviderConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamProvider;
+import com.linkedin.pinot.core.realtime.stream.StreamProviderConfig;
 import kafka.consumer.ConsumerIterator;
 import kafka.javaapi.consumer.ConsumerConnector;
 
@@ -33,7 +33,7 @@ import kafka.javaapi.consumer.ConsumerConnector;
 public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   private static final Logger STATIC_LOGGER = LoggerFactory.getLogger(KafkaHighLevelConsumerStreamProvider.class);
 
-  private KafkaHighLevelStreamProviderConfig streamProviderConfig;
+  private CombinedStreamProviderConfig streamProviderConfig;
   private KafkaMessageDecoder decoder;
 
   private ConsumerConnector consumer;
@@ -54,7 +54,7 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   @Override
   public void init(StreamProviderConfig streamProviderConfig, String tableName, ServerMetrics serverMetrics)
       throws Exception {
-    this.streamProviderConfig = (KafkaHighLevelStreamProviderConfig) streamProviderConfig;
+    this.streamProviderConfig = (CombinedStreamProviderConfig) streamProviderConfig;
     this.decoder = this.streamProviderConfig.getDecoder();
     tableAndStreamName = tableName + "-" + streamProviderConfig.getStreamName();
     INSTANCE_LOGGER = LoggerFactory.getLogger(

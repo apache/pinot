@@ -300,8 +300,8 @@ public class StreamPartitionAssignmentGenerationTest {
     Map<String, Integer> kafkaPartitionsMap = new HashMap<>(1);
     List<String> allTables = new ArrayList<>(1);
 
-    MockStreamPartitionAssignmentGenerator streamPartitionAssignmentGenerator =
-        new MockStreamPartitionAssignmentGenerator(null);
+    MockStreamPartitionAssignmentManager streamPartitionAssignmentGenerator =
+        new MockStreamPartitionAssignmentManager(null);
 
     // new table: 1st table in server tenant, with BalancedStreamPartitionAssignment
     int nKafkaPartitions1 = 8;
@@ -516,12 +516,12 @@ public class StreamPartitionAssignmentGenerationTest {
 
 
 
-  static class MockStreamPartitionAssignmentGenerator extends StreamPartitionAssignmentGenerator {
+  static class MockStreamPartitionAssignmentManager extends StreamPartitionAssignmentManager {
 
     private Map<String, TableConfig> _tableConfigsStore;
     private Map<String, PartitionAssignment> _tableNameToPartitionsListMap;
 
-    public MockStreamPartitionAssignmentGenerator(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    public MockStreamPartitionAssignmentManager(ZkHelixPropertyStore<ZNRecord> propertyStore) {
       super(propertyStore);
       _tableConfigsStore = new HashMap<>(1);
       _tableNameToPartitionsListMap = new HashMap<>(1);

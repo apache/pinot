@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactory;
 import kafka.javaapi.consumer.SimpleConsumer;
 
 

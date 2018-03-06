@@ -20,7 +20,6 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -28,6 +27,8 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadataFactory;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -328,23 +329,23 @@ public class PinotTableRestletResource {
     }
   }
 
-  private void ensureMinReplicas(TableConfig config) {
+  private void ensureMinReplicas(TableConfig tableConfig) {
     // For self-serviced cluster, ensure that the tables are created with at least min replication factor irrespective
     // of table configuration value
-    SegmentsValidationAndRetentionConfig segmentsConfig = config.getValidationConfig();
+    SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
     int configMinReplication = _controllerConf.getDefaultTableMinReplicas();
     boolean verifyReplicasPerPartition = false;
     boolean verifyReplication = true;
 
-    if (config.getTableType() == CommonConstants.Helix.TableType.REALTIME) {
-      KafkaStreamMetadata kafkaStreamMetadata;
+    if (tableConfig.getTableType() == CommonConstants.Helix.TableType.REALTIME) {
+      StreamMetadata streamMetadata;
       try {
-        kafkaStreamMetadata = new KafkaStreamMetadata(config.getIndexingConfig().getStreamConfigs());
+        streamMetadata = StreamMetadataFactory.getStreamMetadata(tableConfig);
       } catch (Exception e) {
         throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid tableIndexConfig or streamConfigs", e);
       }
-      verifyReplicasPerPartition = kafkaStreamMetadata.hasSimpleKafkaConsumerType();
-      verifyReplication = kafkaStreamMetadata.hasHighLevelKafkaConsumerType();
+      verifyReplicasPerPartition = streamMetadata.hasSimpleConsumerType();
+      verifyReplication = streamMetadata.hasHighLevelConsumerType();
     }
 
     if (verifyReplication) {

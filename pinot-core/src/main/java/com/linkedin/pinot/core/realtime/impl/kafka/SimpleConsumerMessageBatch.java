@@ -16,11 +16,12 @@
 
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.linkedin.pinot.core.realtime.stream.MessageBatch;
 import java.util.ArrayList;
 import kafka.message.MessageAndOffset;
 
 
-public class SimpleConsumerMessageBatch implements MessageBatch<byte[]>{
+public class SimpleConsumerMessageBatch implements MessageBatch<byte[]> {
 
   private ArrayList<MessageAndOffset> messageList = new ArrayList<>();
 
@@ -46,7 +47,7 @@ public class SimpleConsumerMessageBatch implements MessageBatch<byte[]>{
     return messageList.get(index).message().payloadSize();
   }
 
-  public long getNextKafkaMessageOffsetAtIndex(int index) {
+  public long getNextStreamMessageOffsetAtIndex(int index) {
     return messageList.get(index).nextOffset();
   }
 }

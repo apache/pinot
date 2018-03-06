@@ -26,7 +26,7 @@ import java.util.Map;
 /**
  * Low level stream config, adds some overrides for llc-specific properties.
  */
-public class KafkaLowLevelStreamProviderConfig extends KafkaHighLevelStreamProviderConfig {
+public class PartitionLevelStreamProviderConfig extends CombinedStreamProviderConfig {
   private static final int NOT_DEFINED = Integer.MIN_VALUE;
 
   private long llcSegmentTimeInMillis = NOT_DEFINED;
