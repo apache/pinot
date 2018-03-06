@@ -75,6 +75,11 @@ public class EventTableGenerator {
     final String _articleSchemaFile = "pinot_benchmark/main_schemas/ArticleSchema.json";
     final String _articleReadSchemaFile = "pinot_benchmark/main_schemas/ArticleReadSchema.json";
     final String _articleReadSchemaAnnFile = "pinot_benchmark/main_schemas/ArticleReadSchemaAnnotation.json";
+
+    final String _companySchemaFile = "pinot_benchmark/main_schemas/CompanySchema.json";
+    final String _companySearchAppearanceSchemaFile = "pinot_benchmark/main_schemas/CompanySearchAppearanceSchema.json";
+    final String _companySearchAppearanceSchemaAnnFile = "pinot_benchmark/main_schemas/CompanySearchAppearanceAnnotation.json";
+
     Random _randGen = new Random(System.currentTimeMillis());
 
     public EventTableGenerator(String dataDir)
@@ -121,6 +126,15 @@ public class EventTableGenerator {
         String articleSchemaFile = getFileFromResourceUrl(classLoader.getResource(_articleSchemaFile));
         List<GenericRow> articleTable = readBaseTableData(articleSchemaFile,articleDataFile);
         return articleTable;
+    }
+
+    public  List<GenericRow> readCompanyTable() throws Exception
+    {
+        String companyDataFile = getTableDataDirectory("company");
+        ClassLoader classLoader = LatencyBasedLoadMetric.class.getClassLoader();
+        String companySchemaFile = getFileFromResourceUrl(classLoader.getResource(_companySchemaFile));
+        List<GenericRow> companyTable = readBaseTableData(companySchemaFile,companyDataFile);
+        return companyTable;
     }
 
     public String getTableDataDirectory(String tableName)
@@ -467,6 +481,56 @@ public class EventTableGenerator {
             outRecord.put("ArticleAuthor", articleInfo.getValue("Author"));
             outRecord.put("ArticleCompany", articleInfo.getValue("Company"));
             outRecord.put("ArticleTopic", articleInfo.getValue("Topic"));
+
+            recordWriter.append(outRecord);
+        }
+
+        recordWriter.close();
+        return true;
+    }
+
+    public boolean generateCompanySearchTable(long timeColumnStart, long timeColumnEnd, int numRecords) throws Exception
+    {
+        ClassLoader classLoader = EventTableGenerator.class.getClassLoader();
+        String profileSchemaFile = getFileFromResourceUrl(classLoader.getResource(_profileSchemaFile));
+        String companySchemaFile = getFileFromResourceUrl(classLoader.getResource(_companySchemaFile));
+        String companySearchAppearanceSchemaAnn = getFileFromResourceUrl(classLoader.getResource(_companySearchAppearanceSchemaAnnFile));
+        String companySearchAppearanceSchemaFile = getFileFromResourceUrl(classLoader.getResource(_companySearchAppearanceSchemaFile));
+
+        String profileDataFile = getTableDataDirectory("profile");
+        List<GenericRow> profileTable = readBaseTableData(profileSchemaFile,profileDataFile);
+
+        String companyDataFile = getTableDataDirectory("company");
+        List<GenericRow> companyTable = readBaseTableData(companySchemaFile,companyDataFile);
+
+        List<SchemaAnnotation> saList = readSchemaAnnotationFile(companySearchAppearanceSchemaAnn);
+        RangeLongGenerator eventTimeGenerator = new RangeLongGenerator(timeColumnStart, timeColumnEnd);
+        RangeIntGenerator timeSpentGenerator = createIntRangeGenerator(saList,"TimeSpent");
+
+        File avroFile = createOutDirAndFile("CompanySearchAppearance");
+        DataFileWriter<GenericData.Record> recordWriter = createRecordWriter(companySearchAppearanceSchemaFile,avroFile);
+
+        //org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(companySearchAppearanceSchemaFile))).toString());
+		org.apache.avro.Schema schemaJSON = AvroWriter.getAvroSchema(Schema.fromFile(new File(companySearchAppearanceSchemaFile)));
+        for(int i=0;i<numRecords;i++)
+        {
+            final GenericData.Record outRecord = new GenericData.Record(schemaJSON);
+
+            GenericRow searchedProfile = getRandomGenericRow(profileTable);
+            GenericRow companyInfo = getRandomGenericRow(companyTable);
+
+            outRecord.put("SearchTime", eventTimeGenerator.next());
+            outRecord.put("TimeSpent", timeSpentGenerator.next());
+            outRecord.put("CompanyId", companyInfo.getValue("ID"));
+            outRecord.put("CompanyName", companyInfo.getValue("Name"));
+            outRecord.put("CompanyDomain", companyInfo.getValue("Domain"));
+            outRecord.put("CompanyURL", companyInfo.getValue("Url"));
+            outRecord.put("CompanySize", companyInfo.getValue("CompanySize"));
+            outRecord.put("ViewedProfileId", searchedProfile.getValue("ID"));
+            outRecord.put("ViewedProfileWorkPlace", searchedProfile.getValue("WorkPlace"));
+            outRecord.put("ViewedProfileHeadline", searchedProfile.getValue("Headline"));
+            outRecord.put("ViewedProfilePosition", searchedProfile.getValue("Position"));
+            outRecord.put("ViewedProfileStrength", searchedProfile.getValue("Strength"));
 
             recordWriter.append(outRecord);
         }

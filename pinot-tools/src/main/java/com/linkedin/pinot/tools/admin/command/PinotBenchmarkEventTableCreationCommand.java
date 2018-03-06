@@ -47,7 +47,7 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
 
 
     private int[] _numRecordList={200000,210000,220000,230000,240000,250000,260000,270000,280000,290000,300000};
-    private double[] _numRecordRatio={1,0.6,0.5,0.3};
+    private double[] _numRecordRatio={1,0.6,0.5,0.3,0.2};
 
     public PinotBenchmarkEventTableCreationCommand setDataDir(String dataDir) {
         _dataDir = dataDir;
@@ -91,6 +91,7 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
             eventTableGenerator.generateAdClickTable(timeIntervalStart,timeIntervalEnd,(int)(numRecord*_numRecordRatio[1]));
             eventTableGenerator.generateArticleReadTable(timeIntervalStart,timeIntervalEnd,(int)(numRecord*_numRecordRatio[2]));
             eventTableGenerator.generateJobApplyTable(timeIntervalStart,timeIntervalEnd,(int)(numRecord*_numRecordRatio[3]));
+            eventTableGenerator.generateCompanySearchTable(timeIntervalStart,timeIntervalEnd,(int)(numRecord*_numRecordRatio[4]));
 
         }
 

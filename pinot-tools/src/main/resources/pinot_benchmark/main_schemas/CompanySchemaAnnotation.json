@@ -1,0 +1,53 @@
+[
+  {
+    "column" : "ID",
+    "range" : false,
+    "cardinality" : 100000,
+    "fieldRole" : "ID",
+    "minLength" : 16,
+    "maxLength" : 64
+  },
+  {
+    "column" : "Url",
+    "range" : false,
+    "cardinality" : 100000,
+    "minLength" : 32,
+    "maxLength" : 256
+  },
+  {
+    "column" : "Name",
+    "range" : false,
+    "cardinality" : 50000,
+    "minLength" : 32,
+    "maxLength" : 512
+  },
+  {
+    "column" : "Location",
+    "range" : false,
+    "cardinality" : 5000,
+    "minLength" : 8,
+    "maxLength" : 128
+  },
+  {
+    "column" : "CompanySize",
+    "range" : false,
+    "cardinality" : 1000,
+    "minLength" : 64,
+    "maxLength" : 200000
+  },
+  {
+    "column" : "Domain",
+    "range" : false,
+    "cardinality" : 5000,
+    "minLength" : 8,
+    "maxLength" : 128
+  },
+  {
+    "column" : "FollowerCount",
+    "range" : false,
+    "cardinality" : 1000,
+    "minLength" : 256,
+    "maxLength" : 200000
+  }
+
+]
