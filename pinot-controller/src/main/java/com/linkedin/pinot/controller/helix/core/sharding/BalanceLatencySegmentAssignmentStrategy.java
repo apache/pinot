@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.controller.helix.core.sharding;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -24,15 +23,19 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 import java.util.List;
 
-public class BalancedCPULoadSegmentAssignmentStrategy implements SegmentAssignmentStrategy {
+public class BalanceLatencySegmentAssignmentStrategy implements SegmentAssignmentStrategy {
+
     @Override
-    public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
-
-        ServerLoadMetric serverLoadMetric = new SegmentCPULoadMetric();
-
-        BalancedLoadSegmentAssignmentStrategy BalancedLoadSegmentAssignmentStrategy = new BalancedLoadSegmentAssignmentStrategy(serverLoadMetric);
-
-        return BalancedLoadSegmentAssignmentStrategy.getAssignedInstances(helixResourceManager, helixAdmin, propertyStore, helixClusterName,
+    public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager, HelixAdmin helixAdmin,
+                                             ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName,
+                                             SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
+        //We create a SegmentSizeMetric and pass it to BalanceLoadSegmentAssignmentStrategy
+        //This means BalanceSizeSegmentAssignmentStrategy
+        ServerLoadMetric serverLoadMetric = new LatencyBasedLoadMetric();
+        BalanceLoadSegmentAssignmentStrategy BalanceLoadSegmentAssignmentStrategy = new BalanceLoadSegmentAssignmentStrategy(serverLoadMetric);
+        return BalanceLoadSegmentAssignmentStrategy.getAssignedInstances(helixResourceManager, helixAdmin, propertyStore, helixClusterName,
                 segmentMetadata, numReplicas, tenantName);
     }
+
 }
+

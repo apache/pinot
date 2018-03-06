@@ -5,7 +5,7 @@
     "segmentPushType": "APPEND",
     "timeColumnName": "ViewStartTime",
     "timeType": "SECONDS",
-    "segmentAssignmentStrategy": "BalancedCPULoadSegmentAssignmentStrategy",
+    "segmentAssignmentStrategy": "BalanceCPULoadSegmentAssignmentStrategy",
     "schemaName": "ProfileViewSchema",
     "replication": "1"
   },

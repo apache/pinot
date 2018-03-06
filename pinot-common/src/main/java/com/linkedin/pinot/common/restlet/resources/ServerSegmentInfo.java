@@ -30,6 +30,9 @@ public class ServerSegmentInfo {
   //private List<SegmentMetadata> _segmentList;
   private  double _segmentCPULoad;
 
+  private  List<String> _tableList;
+  private  List<List<Double>> _segmentTimeInfo;
+
   public ServerSegmentInfo(String serverName) {
     this._serverName = serverName;
     //We set default value to -1 as indication of error (e.g., timeout) in returning segment info from a Pinot server
@@ -77,4 +80,15 @@ public class ServerSegmentInfo {
   {
     return _segmentCPULoad;
   }
+
+  public List<String> getTableList()
+  {
+    return _tableList;
+  }
+
+  public List<List<Double>> getSegmentTimeInfo()
+  {
+    return  _segmentTimeInfo;
+  }
+
 }

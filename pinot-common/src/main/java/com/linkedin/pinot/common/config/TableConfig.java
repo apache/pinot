@@ -330,7 +330,7 @@ public class TableConfig {
     private static final String DEFAULT_SEGMENT_PUSH_TYPE = "APPEND";
     private static final String REFRESH_SEGMENT_PUSH_TYPE = "REFRESH";
     //private static final String DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceNumSegmentAssignmentStrategy";
-    private static final String DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY = "BalancedSegmentSizeSegmentAssignmentStrategy";
+    private static final String DEFAULT_SEGMENT_ASSIGNMENT_STRATEGY = "BalanceSizeSegmentAssignmentStrategy";
     private static final String DEFAULT_STREAM_PARTITION_ASSIGNMENT_STRATEGY = "UniformStreamPartitionAssignment";
     private static final String DEFAULT_NUM_REPLICAS = "1";
     private static final String DEFAULT_LOAD_MODE = "HEAP";

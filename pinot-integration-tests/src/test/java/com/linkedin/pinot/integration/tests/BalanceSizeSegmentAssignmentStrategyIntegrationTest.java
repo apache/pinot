@@ -39,10 +39,10 @@ import org.testng.annotations.Test;
 
 
 /*
-This class extends offline cluster integration test while it uses BalancedSegmentSizeSegmentAssignmentStrategy
+This class extends offline cluster integration test while it uses BalanceSizeSegmentAssignmentStrategy
 for segment assignment strategy. It then verifies that the segments are distributed properly.
  */
-public class BalancedSegmentSizeSegmentAssignmentStrategyIntegrationTest extends OfflineClusterIntegrationTest {
+public class BalanceSizeSegmentAssignmentStrategyIntegrationTest extends OfflineClusterIntegrationTest {
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 6;
 
@@ -58,9 +58,7 @@ public class BalancedSegmentSizeSegmentAssignmentStrategyIntegrationTest extends
 
   @Override
   protected String getSegmentAssignmentStrategy() {
-
-    return "BalancedSegmentSizeSegmentAssignmentStrategy";
-   // return "BalancedLatencyBasedSegmentAssignmentStrategy";
+    return "BalanceSizeSegmentAssignmentStrategy";
   }
 
   @Override
@@ -89,7 +87,7 @@ public class BalancedSegmentSizeSegmentAssignmentStrategyIntegrationTest extends
 
   /*
   We override uploadSegments to make sure that a current segment upload is completed before starting a new segment upload.
-  This is a necessary to verify that BalancedSegmentSizeSegmentAssignmentStrategy logic is correct.
+  This is a necessary to verify that BalanceSizeSegmentAssignmentStrategy logic is correct.
    */
   @Override
   protected void uploadSegments(@Nonnull File segmentDir) {

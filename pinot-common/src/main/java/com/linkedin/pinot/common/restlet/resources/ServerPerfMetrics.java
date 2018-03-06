@@ -31,6 +31,7 @@ public class ServerPerfMetrics {
   public long segmentCount = 0;
   public long segmentDiskSizeInBytes = 0;
   public double segmentCPULoad = 0;
+  public String segmentList = "";
 
   //public List<SegmentMetadata> segmentList;
 

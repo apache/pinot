@@ -26,7 +26,7 @@ Example load metrics are number of segments, storage size of segments, STeP pape
 STeP paper: http://people.csail.mit.edu/rytaft/step.pdf
 */
 public interface ServerLoadMetric {
-  double computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState, String instance,String tableName);
+  double computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState, String instance,String tableName, SegmentMetadata segmentMetadata);
   void updateServerLoadMetric(PinotHelixResourceManager helixResourceManager, String instance, Double currentLoadMetric, String tableName, SegmentMetadata segmentMetadata);
   void resetServerLoadMetric(PinotHelixResourceManager helixResourceManager, String instance);
 }
