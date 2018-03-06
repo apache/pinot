@@ -19,6 +19,7 @@ import com.google.common.base.Splitter;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka.ConsumerType;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
@@ -26,7 +27,6 @@ import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.core.realtime.stream.StreamProviderConfig;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -35,8 +35,6 @@ import java.util.concurrent.Callable;
 import org.apache.commons.compress.utils.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static com.linkedin.pinot.common.utils.EqualityUtils.*;
 
 
 /**
@@ -66,18 +64,19 @@ public class KafkaStreamMetadata implements StreamMetadata {
 
     _streamType = streamConfigMap.get(CommonConstants.Helix.DataSource.Realtime.STREAM_TYPE);
 
-    _zkBrokerUrl =
-        streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
-            Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING));
+    _zkBrokerUrl = streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
+        Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING));
 
-    final String bootstrapHostConfigKey = Helix.DataSource.STREAM_PREFIX + "." + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST;
+    final String bootstrapHostConfigKey =
+        Helix.DataSource.STREAM_PREFIX + "." + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST;
     if (streamConfigMap.containsKey(bootstrapHostConfigKey)) {
       _bootstrapHosts = streamConfigMap.get(bootstrapHostConfigKey);
     } else {
       _bootstrapHosts = null;
     }
 
-    String consumerTypesCsv =streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE));
+    String consumerTypesCsv = streamConfigMap.get(
+        StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE));
     Iterable<String> parts = Splitter.on(',').trimResults().split(consumerTypesCsv);
     for (String part : parts) {
       _consumerTypes.add(ConsumerType.valueOf(part));
@@ -87,15 +86,13 @@ public class KafkaStreamMetadata implements StreamMetadata {
     }
     Collections.sort(_consumerTypes);
 
-    _kafkaTopicName =
-        streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
-            Helix.DataSource.Realtime.Kafka.TOPIC_NAME));
-    _decoderClass =
-        streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
-            Helix.DataSource.Realtime.Kafka.DECODER_CLASS));
+    _kafkaTopicName = streamConfigMap.get(
+        StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.TOPIC_NAME));
+    _decoderClass = streamConfigMap.get(
+        StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.DECODER_CLASS));
 
-    _consumerFactoryName = streamConfigMap.get(StringUtil
-        .join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.CONSUMER_FACTORY));
+    _consumerFactoryName = streamConfigMap.get(
+        StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.CONSUMER_FACTORY));
     if (_consumerFactoryName == null) {
       _consumerFactoryName = Helix.DataSource.Realtime.Kafka.ConsumerFactory.SIMPLE_CONSUMER_FACTORY_STRING;
     }
@@ -139,10 +136,9 @@ public class KafkaStreamMetadata implements StreamMetadata {
       if (key.startsWith(Helix.DataSource.STREAM_PREFIX + ".")) {
         _streamConfigMap.put(key, streamConfigMap.get(key));
       }
-      if (key.startsWith(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
-          Helix.DataSource.Realtime.Kafka.DECODER_PROPS_PREFIX))) {
-        _decoderProperties.put(Helix.DataSource.Realtime.Kafka.getDecoderPropertyKey(key),
-            streamConfigMap.get(key));
+      if (key.startsWith(
+          StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.DECODER_PROPS_PREFIX))) {
+        _decoderProperties.put(Helix.DataSource.Realtime.Kafka.getDecoderPropertyKey(key), streamConfigMap.get(key));
       }
       if (key.startsWith(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
           Helix.DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX))) {
@@ -159,7 +155,7 @@ public class KafkaStreamMetadata implements StreamMetadata {
 
   @Override
   public String getStreamType() {
-   return _streamType;
+    return _streamType;
   }
 
   @Override
@@ -209,8 +205,8 @@ public class KafkaStreamMetadata implements StreamMetadata {
       return kafkaOffsetFetcher.getOffset();
     } catch (Exception e) {
       Exception fetcherException = kafkaOffsetFetcher.getException();
-      LOGGER.error("Could not get offset for topic {} partition {}, criteria {}",
-          getStreamName(), partitionId, offsetCriteria, fetcherException);
+      LOGGER.error("Could not get offset for topic {} partition {}, criteria {}", getStreamName(), partitionId,
+          offsetCriteria, fetcherException);
       throw new RuntimeException(fetcherException);
     }
   }
@@ -252,62 +248,55 @@ public class KafkaStreamMetadata implements StreamMetadata {
 
   @Override
   public String toString() {
-    final StringBuilder result = new StringBuilder();
-    String newline = "\n";
-    result.append(this.getClass().getName());
-    result.append(" Object {");
-    result.append(newline);
-    String[] keys = _streamConfigMap.keySet().toArray(new String[0]);
-    Arrays.sort(keys);
-    for (final String key : keys) {
-      if (key.startsWith(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
-          Helix.DataSource.KAFKA))) {
-        result.append("  ");
-        result.append(key);
-        result.append(": ");
-        result.append(_streamConfigMap.get(key));
-        result.append(newline);
-      }
-    }
-    result.append("}");
-
-    return result.toString();
+    return "KafkaStreamMetadata{" + "_streamType='" + _streamType + '\'' + ", _kafkaTopicName='" + _kafkaTopicName
+        + '\'' + ", _consumerTypes=" + _consumerTypes + ", _zkBrokerUrl='" + _zkBrokerUrl + '\'' + ", _bootstrapHosts='"
+        + _bootstrapHosts + '\'' + ", _decoderClass='" + _decoderClass + '\'' + ", _consumerFactoryName='"
+        + _consumerFactoryName + '\'' + ", _kafkaConnectionTimeoutMillis=" + _kafkaConnectionTimeoutMillis
+        + ", _kafkaFetchTimeoutMillis=" + _kafkaFetchTimeoutMillis + ", _decoderProperties=" + _decoderProperties
+        + ", _kafkaConsumerProperties=" + _kafkaConsumerProperties + ", _streamConfigMap=" + _streamConfigMap
+        + ", _pinotStreamConsumerFactory=" + _pinotStreamConsumerFactory + '}';
   }
 
   @Override
   public boolean equals(Object o) {
-    if (isSameReference(this, o)) {
+    if (EqualityUtils.isSameReference(this, o)) {
       return true;
     }
 
-    if (isNullOrNotSameClass(this, o)) {
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
       return false;
     }
 
-    KafkaStreamMetadata
-        that = (KafkaStreamMetadata) o;
+    KafkaStreamMetadata that = (KafkaStreamMetadata) o;
 
-    return isEqual(_kafkaTopicName, that._kafkaTopicName) &&
-        isEqual(_consumerTypes, that._consumerTypes) &&
-        isEqual(_zkBrokerUrl, that._zkBrokerUrl) &&
-        isEqual(_decoderClass, that._decoderClass) &&
-        isEqual(_decoderProperties, that._decoderProperties) &&
-        isEqual(_streamConfigMap, that._streamConfigMap) &&
-        isEqual(_consumerFactoryName, that._consumerFactoryName);
+    return EqualityUtils.isEqual(_kafkaConnectionTimeoutMillis, that._kafkaConnectionTimeoutMillis)
+        && EqualityUtils.isEqual(_kafkaFetchTimeoutMillis, that._kafkaFetchTimeoutMillis) && EqualityUtils.isEqual(
+        _streamType, that._streamType) && EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName)
+        && EqualityUtils.isEqual(_consumerTypes, that._consumerTypes) && EqualityUtils.isEqual(_zkBrokerUrl,
+        that._zkBrokerUrl) && EqualityUtils.isEqual(_bootstrapHosts, that._bootstrapHosts) && EqualityUtils.isEqual(
+        _decoderClass, that._decoderClass) && EqualityUtils.isEqual(_consumerFactoryName, that._consumerFactoryName)
+        && EqualityUtils.isEqual(_decoderProperties, that._decoderProperties) && EqualityUtils.isEqual(
+        _kafkaConsumerProperties, that._kafkaConsumerProperties) && EqualityUtils.isEqual(_streamConfigMap,
+        that._streamConfigMap) && EqualityUtils.isEqual(_pinotStreamConsumerFactory, that._pinotStreamConsumerFactory);
   }
 
   @Override
   public int hashCode() {
-    int result = hashCodeOf(_kafkaTopicName);
-    result = hashCodeOf(result, _consumerTypes);
-    result = hashCodeOf(result, _zkBrokerUrl);
-    result = hashCodeOf(result, _decoderClass);
-    result = hashCodeOf(result, _decoderProperties);
-    result = hashCodeOf(result, _streamConfigMap);
-    result = hashCodeOf(result, _consumerFactoryName);
+    int result = EqualityUtils.hashCodeOf(_streamType);
+    result = EqualityUtils.hashCodeOf(result, _kafkaTopicName);
+    result = EqualityUtils.hashCodeOf(result, _consumerTypes);
+    result = EqualityUtils.hashCodeOf(result, _zkBrokerUrl);
+    result = EqualityUtils.hashCodeOf(result, _bootstrapHosts);
+    result = EqualityUtils.hashCodeOf(result, _decoderClass);
+    result = EqualityUtils.hashCodeOf(result, _consumerFactoryName);
+    result = EqualityUtils.hashCodeOf(result, _kafkaConnectionTimeoutMillis);
+    result = EqualityUtils.hashCodeOf(result, _kafkaFetchTimeoutMillis);
+    result = EqualityUtils.hashCodeOf(result, _decoderProperties);
+    result = EqualityUtils.hashCodeOf(result, _kafkaConsumerProperties);
+    result = EqualityUtils.hashCodeOf(result, _streamConfigMap);
+    result = EqualityUtils.hashCodeOf(result, _pinotStreamConsumerFactory);
     return result;
   }
-
 
   private static class KafkaPartitionsCountFetcher implements Callable<Boolean> {
     private int _partitionCount = -1;
@@ -333,8 +322,8 @@ public class KafkaStreamMetadata implements StreamMetadata {
       if (bootstrapHosts == null || bootstrapHosts.isEmpty()) {
         throw new RuntimeException("Invalid value for " + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
       }
-      PinotStreamConsumer consumerWrapper = _kafkaStreamMetadata.getPinotStreamConsumerFactory().buildMetadataFetcher(
-          KafkaStreamMetadata.class.getSimpleName() + "-" + kafkaTopicName, _kafkaStreamMetadata);
+      PinotStreamConsumer consumerWrapper = _kafkaStreamMetadata.getPinotStreamConsumerFactory()
+          .buildMetadataFetcher(KafkaStreamMetadata.class.getSimpleName() + "-" + kafkaTopicName, _kafkaStreamMetadata);
       try {
         _partitionCount = consumerWrapper.getPartitionCount(kafkaTopicName, /*maxWaitTimeMs=*/5000L);
         if (_exception != null) {
@@ -386,16 +375,18 @@ public class KafkaStreamMetadata implements StreamMetadata {
     @Override
     public Boolean call() throws Exception {
 
-      PinotStreamConsumer
-          kafkaConsumer = _pinotStreamConsumerFactory.buildConsumer("dummyClientId", _partitionId, _kafkaStreamMetadata);
+      PinotStreamConsumer kafkaConsumer =
+          _pinotStreamConsumerFactory.buildConsumer("dummyClientId", _partitionId, _kafkaStreamMetadata);
       try {
         _offset = kafkaConsumer.fetchPartitionOffset(_offsetCriteria, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
         if (_exception != null) {
-          LOGGER.info("Successfully retrieved offset({}) for kafka topic {} partition {}", _offset, _topicName, _partitionId);
+          LOGGER.info("Successfully retrieved offset({}) for kafka topic {} partition {}", _offset, _topicName,
+              _partitionId);
         }
         return Boolean.TRUE;
       } catch (SimpleConsumerWrapper.TransientConsumerException e) {
-        LOGGER.warn("Temporary exception when fetching offset for topic {} partition {}:{}", _topicName, _partitionId, e.getMessage());
+        LOGGER.warn("Temporary exception when fetching offset for topic {} partition {}:{}", _topicName, _partitionId,
+            e.getMessage());
         _exception = e;
         return Boolean.FALSE;
       } catch (Exception e) {
