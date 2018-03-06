@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.TimeSeriesLoader;
@@ -15,6 +16,9 @@ import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineOffset;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiOperation;
+import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -48,6 +52,7 @@ import org.slf4j.LoggerFactory;
  */
 @Path(value = "/rootcause/metric")
 @Produces(MediaType.APPLICATION_JSON)
+@Api(tags = {Constants.RCA_TAG})
 public class RootCauseMetricResource {
   private static final Logger LOG = LoggerFactory.getLogger(RootCauseMetricResource.class);
 
@@ -101,11 +106,17 @@ public class RootCauseMetricResource {
    */
   @GET
   @Path("/aggregate")
+  @ApiOperation(value = "Returns an aggregate value for the specified metric and time range, and (optionally) offset.")
   public double getAggregate(
+      @ApiParam(value = "metric urn", required = true)
       @QueryParam("urn") @NotNull String urn,
+      @ApiParam(value = "start time (in millis)", required = true)
       @QueryParam("start") @NotNull long start,
+      @ApiParam(value = "end time (in millis)", required = true)
       @QueryParam("end") @NotNull long end,
+      @ApiParam(value = "offset identifier (e.g. \"current\", \"wo2w\")")
       @QueryParam("offset") String offset,
+      @ApiParam(value = "timezone identifier (e.g. \"America/Los_Angeles\")")
       @QueryParam("timezone") String timezone) throws Exception {
 
     if (StringUtils.isBlank(offset)) {
@@ -151,12 +162,20 @@ public class RootCauseMetricResource {
    */
   @GET
   @Path("/breakdown")
+  @ApiOperation(value = "Returns a breakdown (de-aggregation) of the specified metric and time range, and (optionally) offset.\n"
+      + "Aligns time stamps if necessary and omits null values.")
   public Map<String, Map<String, Double>> getBreakdown(
+      @ApiParam(value = "metric urn", required = true)
       @QueryParam("urn") @NotNull String urn,
+      @ApiParam(value = "start time (in millis)", required = true)
       @QueryParam("start") @NotNull long start,
+      @ApiParam(value = "end time (in millis)", required = true)
       @QueryParam("end") @NotNull long end,
+      @ApiParam(value = "offset identifier (e.g. \"current\", \"wo2w\")")
       @QueryParam("offset") String offset,
+      @ApiParam(value = "timezone identifier (e.g. \"America/Los_Angeles\")")
       @QueryParam("timezone") String timezone,
+      @ApiParam(value = "limit results to the top k elements, plus an 'OTHER' rollup element")
       @QueryParam("rollup") Long rollup) throws Exception {
 
     if (StringUtils.isBlank(offset)) {
@@ -202,12 +221,20 @@ public class RootCauseMetricResource {
    */
   @GET
   @Path("/timeseries")
+  @ApiOperation(value = "Returns a time series for the specified metric and time range, and (optionally) offset at an (optional)\n"
+      + "time granularity. Aligns time stamps if necessary.")
   public Map<String, List<? extends Number>> getTimeSeries(
+      @ApiParam(value = "metric urn", required = true)
       @QueryParam("urn") @NotNull String urn,
+      @ApiParam(value = "start time (in millis)", required = true)
       @QueryParam("start") @NotNull long start,
+      @ApiParam(value = "end time (in millis)", required = true)
       @QueryParam("end") @NotNull long end,
+      @ApiParam(value = "offset identifier (e.g. \"current\", \"wo2w\")")
       @QueryParam("offset") String offset,
+      @ApiParam(value = "timezone identifier (e.g. \"America/Los_Angeles\")")
       @QueryParam("timezone") String timezone,
+      @ApiParam(value = "limit results to the top k elements, plus an 'OTHER' rollup element")
       @QueryParam("granularity") String granularityString) throws Exception {
 
     if (StringUtils.isBlank(offset)) {

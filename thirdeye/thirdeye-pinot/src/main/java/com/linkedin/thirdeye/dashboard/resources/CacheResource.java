@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.linkedin.thirdeye.api.Constants;
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiOperation;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -22,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 
 @Path("/cache")
+@Api(tags = { Constants.CACHE_TAG })
 @Produces(MediaType.APPLICATION_JSON)
 public class CacheResource {
   private static final Logger LOG = LoggerFactory.getLogger(CacheResource.class);
@@ -39,6 +43,7 @@ public class CacheResource {
 
   @POST
   @Path("/refresh")
+  @ApiOperation(value = "Refresh all caches")
   public Response refreshAllCaches() {
 
     refreshDatasets();

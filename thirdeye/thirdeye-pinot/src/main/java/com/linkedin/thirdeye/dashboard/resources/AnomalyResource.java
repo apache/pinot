@@ -1,27 +1,22 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Multimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
-import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
-import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import com.linkedin.thirdeye.anomaly.onboard.utils.FunctionCreationUtils;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
+import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
-import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
@@ -35,33 +30,25 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
-import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
-import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import com.linkedin.thirdeye.util.TimeSeriesUtils;
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiOperation;
+import com.wordnik.swagger.annotations.ApiParam;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import javax.validation.constraints.NotNull;
@@ -69,7 +56,6 @@ import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -77,15 +63,10 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.text.StrSubstitutor;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
 import org.joda.time.format.ISODateTimeFormat;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,6 +76,7 @@ import static com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType.*;
 
 
 @Path(value = "/dashboard")
+@Api(tags = { Constants.ANOMALY_TAG })
 @Produces(MediaType.APPLICATION_JSON)
 public class AnomalyResource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
@@ -138,7 +120,9 @@ public class AnomalyResource {
   /************** CRUD for anomalies of a collection ********************************************************/
   @GET
   @Path("/anomalies/view/{anomaly_merged_result_id}")
+  @ApiOperation(value = "Get anomalies")
   public MergedAnomalyResultDTO getMergedAnomalyDetail(
+      @ApiParam(value = "anomaly_merged_result_id",required = true)
       @NotNull @PathParam("anomaly_merged_result_id") long mergedAnomalyId) {
     return anomalyMergedResultDAO.findById(mergedAnomalyId);
   }
@@ -146,9 +130,19 @@ public class AnomalyResource {
   // View merged anomalies for collection
   @GET
   @Path("/anomalies/view")
-  public List<MergedAnomalyResultDTO> viewMergedAnomaliesInRange(@NotNull @QueryParam("dataset") String dataset,
-      @QueryParam("startTimeIso") String startTimeIso, @QueryParam("endTimeIso") String endTimeIso,
-      @QueryParam("metric") String metric, @QueryParam("dimensions") String exploredDimensions,
+  @ApiOperation(value = "View merged anomalies for collection")
+  public List<MergedAnomalyResultDTO> viewMergedAnomaliesInRange(
+      @ApiParam(value = "dataset", required = true)
+      @NotNull @QueryParam("dataset") String dataset,
+      @ApiParam(value = "startTimeIso")
+      @QueryParam("startTimeIso") String startTimeIso,
+      @ApiParam(value = "endTimeIso")
+      @QueryParam("endTimeIso") String endTimeIso,
+      @ApiParam(value = "metric")
+      @QueryParam("metric") String metric,
+      @ApiParam(value = "dimensions")
+      @QueryParam("dimensions") String exploredDimensions,
+      @ApiParam(value = "applyAlertFilter", defaultValue = "true")
       @DefaultValue("true") @QueryParam("applyAlertFilter") boolean applyAlertFiler) {
 
     if (StringUtils.isBlank(dataset)) {
@@ -212,8 +206,11 @@ public class AnomalyResource {
 
   // Get anomaly score
   @GET
+  @ApiOperation(value = "Get anomaly score")
   @Path("/anomalies/score/{anomaly_merged_result_id}")
-  public double getAnomalyScore(@NotNull @PathParam("anomaly_merged_result_id") long mergedAnomalyId) {
+  public double getAnomalyScore(
+      @ApiParam(value = "anomaly_merged_result_id", required = true)
+      @NotNull @PathParam("anomaly_merged_result_id") long mergedAnomalyId) {
     MergedAnomalyResultDTO mergedAnomaly = anomalyMergedResultDAO.findById(mergedAnomalyId);
     BaseAlertFilter alertFilter = new DummyAlertFilter();
     if (mergedAnomaly != null) {
@@ -833,7 +830,11 @@ public class AnomalyResource {
   // Delete anomaly function
   @DELETE
   @Path("/anomaly-function")
-  public Response deleteAnomalyFunctions(@NotNull @QueryParam("id") Long id,
+  @ApiOperation(value = "Delete anomaly function")
+  public Response deleteAnomalyFunctions(
+      @ApiParam(value = "id")
+      @NotNull @QueryParam("id") Long id,
+      @ApiParam(value = "functionName")
       @QueryParam("functionName") String functionName) throws IOException {
 
     if (id == null) {
