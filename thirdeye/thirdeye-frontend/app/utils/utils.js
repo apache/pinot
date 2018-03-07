@@ -59,11 +59,11 @@ export function humanizeFloat(f) {
  */
 export function humanizeChange(f) {
   if (!isValidForDisplay(f)) { return '-'; }
-  if (Math.abs(f) < 10.0) {
+  // if (Math.abs(f) < 10.0) {
     return `${f > 0 ? '+' : ''}${Math.round(f * 100).toFixed(1)}%`;
-  } else {
-    return `${f > 0 ? '+' : '-'}1000%+`;
-  }
+  // } else {
+    // return `${f > 0 ? '+' : '-'}1000%+`;
+  // }
 }
 
 /**

@@ -1,7 +1,7 @@
 import Route from '@ember/routing/route';
 import applicationAnomalies from 'thirdeye-frontend/mirage/fixtures/applicationAnomalies';
 import anomalyPerformance from 'thirdeye-frontend/mirage/fixtures/anomalyPerformance';
-import { humanizeFloat } from 'thirdeye-frontend/utils/utils';
+import { humanizeFloat, humanizeChange } from 'thirdeye-frontend/utils/utils';
 import columns from 'thirdeye-frontend/shared/anomaliesTableColumns';
 import { hash } from 'rsvp';
 import fetch from 'fetch';
@@ -55,7 +55,11 @@ export default Route.extend({
       // Format current and baseline numbers, so numbers in the millions+ don't overflow
       anomaly.current = humanizeFloat(anomaly.current);
       anomaly.baseline = humanizeFloat(anomaly.baseline);
-      anomaly.change = (((current - baseline) / baseline) * 100).toFixed(2);
+
+      // Calculate change
+      const changeFloat = (current - baseline) / baseline;
+      anomaly.change = (changeFloat * 100).toFixed(2);
+      anomaly.humanizedChange = humanizeChange(changeFloat);
     });
 
     return hash({

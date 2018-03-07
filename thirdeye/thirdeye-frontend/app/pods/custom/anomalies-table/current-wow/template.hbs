@@ -1,7 +1,7 @@
 {{!-- TODO: Replace css classes below with te-anomaly-table styles --}}
-<p class="anomalies-table__values">
+<p>
   {{record.current}}/{{record.baseline}}
 </p>
-<p class="anomalies-table__change anomalies-table__change--{{color-delta record.change}}">
-  {{record.change}}
+<p class="te-anomaly-table__value-label te-anomaly-table__value-label--{{calculate-direction record.change}}">
+  {{record.humanizedChange}}
 </p>
