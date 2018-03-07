@@ -9,7 +9,7 @@ import _ from 'lodash';
 import moment from 'moment';
 import Route from '@ember/routing/route';
 import { task, timeout } from 'ember-concurrency';
-import { general, onboarding } from 'thirdeye-frontend/api/self-serve';
+import { selfServeApiCommon, selfServeApiOnboard } from 'thirdeye-frontend/utils/api/self-serve';
 import { postProps, checkStatus } from 'thirdeye-frontend/utils/utils';
 
 let onboardStartTime = {};
@@ -23,8 +23,8 @@ export default Route.extend({
    */
   model(params, transition) {
     return RSVP.hash({
-      allConfigGroups: fetch(general.allConfigGroups).then(res => res.json()),
-      allAppNames: fetch(general.allApplications).then(res => res.json())
+      allConfigGroups: fetch(selfServeApiCommon.allConfigGroups).then(checkStatus),
+      allAppNames: fetch(selfServeApiCommon.allApplications).then(checkStatus)
     });
   },
 
@@ -67,7 +67,7 @@ export default Route.extend({
       method: 'delete',
       headers: { 'content-type': 'text/plain' }
     };
-    return fetch(onboard.deleteAlertFunction(functionId), postProps).then(checkStatus);
+    return fetch(selfServeApiOnboard.deleteAlert(functionId), postProps).then(checkStatus);
   },
 
   /**
@@ -79,7 +79,7 @@ export default Route.extend({
    */
   checkJobCreateStatus: task(function * (jobId, functionName, functionId) {
     yield timeout(2000);
-    const checkStatusUrl = onboard.jobStatus(jobId);
+    const checkStatusUrl = selfServeApiOnboard.jobStatus(jobId);
 
     // In replay status check, continue to display "pending" banner unless we have success or create job takes more than 10 seconds.
     return fetch(checkStatusUrl).then(checkStatus)
@@ -127,10 +127,10 @@ export default Route.extend({
       let onboardStartTime = moment();
       let newFunctionId = null;
 
-      fetch(onboard.createAlertFunction(newName), postProps('')).then(checkStatus)
+      fetch(selfServeApiOnboard.createAlert(newName), postProps('')).then(checkStatus)
         .then((result) => {
           newFunctionId = result.id;
-          return fetch(onboard.updateAlertFunction(jobName), postProps(payload)).then(checkStatus);
+          return fetch(selfServeApiOnboard.updateAlert(jobName), postProps(payload)).then(checkStatus);
         })
         .then((result) => {
           if (result.jobStatus && result.jobStatus.toLowerCase() === 'failed') {

@@ -23,7 +23,7 @@ const jobStatus = jobId => `/detection-onboard/get-status?jobId=${jobId}`;
  * @param {String} newAlertName: Name of new alert function
  * @see {@link namepathOrURL|link text}
  */
-const createAlertFunction = newAlertName => `/function-onboard/create-function?name=${newAlertName}`;
+const createAlert = newAlertName => `/function-onboard/create-function?name=${newAlertName}`;
 
 /**
  * POST request to update an existing alert function with properties payload
@@ -31,7 +31,7 @@ const createAlertFunction = newAlertName => `/function-onboard/create-function?n
  * @param {String} jobName: unique name of new job for alert setup task
  * @see {@link namepathOrURL|link text}
  */
-const updateAlertFunction = jobName => `/detection-onboard/create-job?jobName=${jobName}`;
+const updateAlert = jobName => `/detection-onboard/create-job?jobName=${jobName}`;
 
 /**
  * DELETE request to remove an alert function from the DB
@@ -39,12 +39,12 @@ const updateAlertFunction = jobName => `/detection-onboard/create-job?jobName=${
  * @param {String} functionId: id of alert to remove
  * @see {@link namepathOrURL|link text}
  */
-const deleteAlertFunction = functionId => `/dashboard/anomaly-function?id=${functionId}`;
+const deleteAlert = functionId => `/dashboard/anomaly-function?id=${functionId}`;
 
 /**
  * General self-serve endpoints
  */
-export const general = {
+export const selfServeApiCommon = {
   allConfigGroups,
   allApplications
 };
@@ -52,14 +52,14 @@ export const general = {
 /**
  * Onboarding endpoints for self-serve
  */
-export const onboard = {
+export const selfServeApiOnboard = {
   jobStatus,
-  createAlertFunction,
-  updateAlertFunction,
-  deleteAlertFunction
+  createAlert,
+  updateAlert,
+  deleteAlert
 };
 
 export default {
-  general,
-  onboard
+  selfServeApiCommon,
+  selfServeApiOnboard
 };
