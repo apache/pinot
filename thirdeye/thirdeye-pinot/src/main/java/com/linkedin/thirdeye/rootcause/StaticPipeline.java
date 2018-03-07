@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.rootcause;
 
-import com.linkedin.thirdeye.rootcause.impl.EntityUtils;
-import java.util.ArrayList;
+import com.linkedin.thirdeye.rootcause.util.EntityUtils;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;

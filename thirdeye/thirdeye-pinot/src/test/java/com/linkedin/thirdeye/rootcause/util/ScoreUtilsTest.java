@@ -1,5 +1,6 @@
-package com.linkedin.thirdeye.rootcause.impl;
+package com.linkedin.thirdeye.rootcause.util;
 
+import com.linkedin.thirdeye.rootcause.util.ScoreUtils;
 import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.Test;

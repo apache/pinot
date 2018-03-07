@@ -21,6 +21,7 @@ import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
+import com.linkedin.thirdeye.rootcause.util.EntityUtils;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;

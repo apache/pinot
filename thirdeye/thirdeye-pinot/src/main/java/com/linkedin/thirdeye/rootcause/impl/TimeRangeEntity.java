@@ -2,7 +2,10 @@ package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
+import com.linkedin.thirdeye.rootcause.util.EntityUtils;
+import com.linkedin.thirdeye.rootcause.util.ParsedUrn;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -53,17 +56,18 @@ public class TimeRangeEntity extends Entity {
   }
 
   public static TimeRangeEntity fromURN(String urn, double score) {
-    if(!TYPE.isType(urn))
-      throw new IllegalArgumentException(String.format("URN '%s' is not type '%s'", urn, TYPE.getPrefix()));
-    String[] parts = urn.split(":", 5);
-    if(parts.length != 5)
-      throw new IllegalArgumentException(String.format("Timerange URN must have 5 parts but has '%d'", parts.length));
-    return fromRange(score, parts[2], Long.valueOf(parts[3]), Long.valueOf(parts[4]));
+    ParsedUrn parsedUrn = EntityUtils.parseUrnString(urn, TYPE);
+    parsedUrn.assertPrefixOnly();
+
+    String type = parsedUrn.getPrefixes().get(2);
+    long start = Long.valueOf(parsedUrn.getPrefixes().get(3));
+    long end = Long.valueOf(parsedUrn.getPrefixes().get(4));
+    return fromRange(score, type, start, end);
   }
 
   public static TimeRangeEntity fromRange(double score, String type, long start, long end) {
     String urn = TYPE.formatURN(type, start, end);
-    return new TimeRangeEntity(urn, score, new ArrayList<Entity>(), type, start, end);
+    return new TimeRangeEntity(urn, score, Collections.<Entity>emptyList(), type, start, end);
   }
 
   /**

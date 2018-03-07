@@ -7,6 +7,8 @@ import com.linkedin.thirdeye.rootcause.MaxScoreSet;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
+import com.linkedin.thirdeye.rootcause.util.EntityUtils;
+import com.linkedin.thirdeye.rootcause.util.ScoreUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;

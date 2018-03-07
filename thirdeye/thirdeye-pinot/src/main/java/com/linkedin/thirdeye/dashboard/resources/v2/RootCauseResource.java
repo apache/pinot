@@ -5,7 +5,7 @@ import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.RCAFrameworkExecutionResult;
-import com.linkedin.thirdeye.rootcause.impl.EntityUtils;
+import com.linkedin.thirdeye.rootcause.util.EntityUtils;
 import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;

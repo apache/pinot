@@ -1,13 +1,10 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
+import com.linkedin.thirdeye.rootcause.util.EntityUtils;
 import java.util.Map;
 import java.util.Set;
 

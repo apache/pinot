@@ -2,7 +2,10 @@ package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.util.EntityUtils;
+import com.linkedin.thirdeye.rootcause.util.ParsedUrn;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 
@@ -31,11 +34,10 @@ public class AnomalyEventEntity extends EventEntity {
   }
 
   public static AnomalyEventEntity fromURN(String urn, double score) {
-    if(!TYPE.isType(urn))
-      throw new IllegalArgumentException(String.format("URN '%s' is not type '%s'", urn, TYPE.getPrefix()));
-    String[] parts = urn.split(":", 4);
-    if(parts.length != 4)
-      throw new IllegalArgumentException(String.format("URN must have 4 parts but has '%d'", parts.length));
-    return new AnomalyEventEntity(urn, score, new ArrayList<Entity>(), Long.parseLong(parts[3]));
+    ParsedUrn parsedUrn = EntityUtils.parseUrnString(urn, TYPE);
+    parsedUrn.assertPrefixOnly();
+
+    long id = Long.parseLong(parsedUrn.getPrefixes().get(3));
+    return new AnomalyEventEntity(urn, score, Collections.<Entity>emptyList(), id);
   }
 }

@@ -1,7 +1,10 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.util.EntityUtils;
+import com.linkedin.thirdeye.rootcause.util.ParsedUrn;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 
@@ -27,8 +30,8 @@ public class HyperlinkEntity extends Entity {
   }
 
   public static HyperlinkEntity fromURL(String url, double score) {
-    if(!TYPE.isType(url))
-      throw new IllegalArgumentException(String.format("Requires prefix '%s' but got '%s'", TYPE.getPrefix(), url));
-    return new HyperlinkEntity(url, score, new ArrayList<Entity>());
+    ParsedUrn parsedUrn = EntityUtils.parseUrnString(url, TYPE);
+    parsedUrn.assertPrefixOnly();
+    return new HyperlinkEntity(url, score, Collections.<Entity>emptyList());
   }
 }

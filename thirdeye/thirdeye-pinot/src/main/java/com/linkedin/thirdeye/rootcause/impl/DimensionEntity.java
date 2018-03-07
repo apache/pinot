@@ -4,6 +4,8 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
+import com.linkedin.thirdeye.rootcause.util.EntityUtils;
+import com.linkedin.thirdeye.rootcause.util.ParsedUrn;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -71,6 +73,7 @@ public class DimensionEntity extends Entity {
     if(parts.length != 5)
       throw new IllegalArgumentException(String.format("Dimension URN must have 5 parts but has '%d'", parts.length));
     return fromDimension(score, EntityUtils.decodeURNComponent(parts[2]), EntityUtils.decodeURNComponent(parts[3]), parts[4]);
+
   }
 
   public static  Set<DimensionEntity> getContextDimensions(PipelineContext context, String type) {

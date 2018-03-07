@@ -3,9 +3,12 @@ package com.linkedin.thirdeye.rootcause.impl;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
 import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.util.EntityUtils;
+import com.linkedin.thirdeye.rootcause.util.ParsedUrn;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 
@@ -68,13 +71,8 @@ public class MetricEntity extends Entity {
   }
 
   public static MetricEntity fromURN(String urn, double score) {
-    if(!TYPE.isType(urn))
-      throw new IllegalArgumentException(String.format("URN '%s' is not type '%s'", urn, TYPE.getPrefix()));
-    // TODO handle filter strings containing ":"
-    String[] parts = urn.split(":");
-    if(parts.length <= 2)
-      throw new IllegalArgumentException(String.format("URN must have at least 3 parts but has '%d'", parts.length));
-    List<String> filterStrings = Arrays.asList(Arrays.copyOfRange(parts, 3, parts.length));
-    return fromMetric(score, Long.parseLong(parts[2]), EntityUtils.decodeDimensions(filterStrings));
+    ParsedUrn parsedUrn = EntityUtils.parseUrnString(urn, TYPE, 3);
+    long id = Long.parseLong(parsedUrn.getPrefixes().get(2));
+    return new MetricEntity(urn, score, Collections.<Entity>emptyList(), id, parsedUrn.toFilters());
   }
 }

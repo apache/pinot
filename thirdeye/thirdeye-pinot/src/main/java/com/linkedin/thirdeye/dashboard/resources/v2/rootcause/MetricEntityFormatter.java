@@ -14,7 +14,7 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.impl.EntityUtils;
+import com.linkedin.thirdeye.rootcause.util.EntityUtils;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
 import java.util.HashMap;
