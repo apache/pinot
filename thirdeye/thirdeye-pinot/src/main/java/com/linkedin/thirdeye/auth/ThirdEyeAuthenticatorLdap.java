@@ -13,7 +13,6 @@ import javax.naming.NamingException;
 import javax.naming.directory.InitialDirContext;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,10 +24,16 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
 
   private final List<String> domainSuffix;
   private final String ldapUrl;
+  private String ldapContextFactory;
 
   public ThirdEyeAuthenticatorLdap(List<String> domainSuffix, String ldapUrl) {
     this.domainSuffix = domainSuffix;
     this.ldapUrl = ldapUrl;
+    this.ldapContextFactory = LDAP_CONTEXT_FACTORY;
+  }
+
+  public void setInitialContextFactory(String ldapContextFactory) {
+    this.ldapContextFactory = Preconditions.checkNotNull(ldapContextFactory);
   }
 
   /**
@@ -45,7 +50,7 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
         LOG.info("Authenticating '{}' via username and password", principalName);
 
         Hashtable<String, String> env = new Hashtable<>();
-        env.put(Context.INITIAL_CONTEXT_FACTORY, LDAP_CONTEXT_FACTORY);
+        env.put(Context.INITIAL_CONTEXT_FACTORY, ldapContextFactory);
         env.put(Context.PROVIDER_URL, this.ldapUrl);
         if (this.ldapUrl.startsWith("ldaps")) {
           env.put(Context.SECURITY_PROTOCOL, "ssl");
@@ -76,7 +81,7 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
         if (authenticationResults.isAuthenticated()) {
           ThirdEyePrincipal principal = new ThirdEyePrincipal();
           principal.setName(env.get(Context.SECURITY_PRINCIPAL));
-          LOG.info("Successfully authenticated {} with LDAP", principalName);
+          LOG.info("Successfully authenticated {} with LDAP", env.get(Context.SECURITY_PRINCIPAL));
           return Optional.of(principal);
         } else {
           // Failed to authenticate the user; log all error messages.
