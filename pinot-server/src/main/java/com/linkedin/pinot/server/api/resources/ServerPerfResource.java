@@ -152,20 +152,24 @@ public class ServerPerfResource {
     //(SegmentDocCount/avgDocCount)*a*e^(-bt)
 
     private double _avgDocCount = 0;
-    private double _a = 0;
-    private double _b = 0;
-    private double _alpha = 0;
+    private double _cpuModelA = 0;
+    private double _cpuModelB = 0;
+    private double _cpuModelAlpha = 0;
     private double _lifeTimeInMonth=0;
     private double _timeScale=0;
+    private double _docScannedModelA = 0;
+    private double _docScannedModelB = 0;
 
-    public CPULoadFormulation(double avgDocCount, double a, double alpha, double b, double lifeTimeInMonth, double timeScale) {
+
+    public CPULoadFormulation(double avgDocCount, double cpuModelA, double cpuModelAlpha, double cpuModelB, double lifeTimeInMonth, double timeScale) {
       _avgDocCount = avgDocCount;
-      _a = a;
-      _b = b;
-      _alpha = alpha;
+      _cpuModelA = cpuModelA;
+      _cpuModelB = cpuModelB;
+      _cpuModelAlpha = cpuModelAlpha;
       _lifeTimeInMonth = lifeTimeInMonth;
       _timeScale = timeScale;
-
+      //_docScannedModelA = docScannedModelA;
+      //_docScannedModelB = docScannedModelB;
     }
 
     public double computeCPULoad(SegmentMetadata segmentMetadata) {
@@ -191,13 +195,18 @@ public class ServerPerfResource {
         return 0;
       }
 
-      double tmp = 1 - _alpha;
+      double tmp = 1 - _cpuModelAlpha;
 
-      //LOGGER.info("ComputingLoadFor: {}, {}, {}, {}, {}", tmp,  _a*(lifeTimeInScaleSeconds - segmentAgeInScaleSeconds), (_b/tmp), Math.pow(lifeTimeInScaleSeconds,tmp), Math.pow(segmentAgeInScaleSeconds,tmp));
+      LOGGER.info("ComputingLoadFor: {}, {}, {}, {}, {}", tmp,  _cpuModelA*(lifeTimeInScaleSeconds - segmentAgeInScaleSeconds), (_cpuModelB/tmp), Math.pow(lifeTimeInScaleSeconds,tmp), Math.pow(segmentAgeInScaleSeconds,tmp));
+      //For monthly segments
+      double segmentCost = _cpuModelA*(lifeTimeInScaleSeconds - segmentAgeInScaleSeconds) + (_cpuModelB/tmp)*(Math.pow(lifeTimeInScaleSeconds,tmp) - Math.pow(segmentAgeInScaleSeconds,tmp));
 
-      double segmentCost = _a*(lifeTimeInScaleSeconds - segmentAgeInScaleSeconds) + (_b/tmp)*(Math.pow(lifeTimeInScaleSeconds,tmp) - Math.pow(segmentAgeInScaleSeconds,tmp));
+      //For daily segments
+
       segmentCost *= segmentMetadata.getTotalDocs()/_avgDocCount;
       return segmentCost;
+
+      //return 0;
 
     }
 

@@ -16,27 +16,34 @@
 
 package com.linkedin.pinot.tools.pacelab.benchmark;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 public class CreateTimeIntervals {
     public static void main(String args[])
     {
-        long startTime = 1514764801;
-        int segmentCount = 40;
+        long startTime = 1512172801;
+        int segmentCount = 120;
+        SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
+        SimpleDateFormat sdf2 = new SimpleDateFormat("ddMMyyyy");
 
         for(int i=0;i<segmentCount;i++)
         {
-            String folderName = "Day-" + (i+1);
+            //String folderName = "Day-" + (i+1);
+            Date date = new Date(startTime*1000);
+            String folderName = "Date-"+ sdf.format(date);
             long intStartTime= startTime;
             long intEndTime = intStartTime + 24*3600;
 
             startTime = intEndTime +1;
             Integer segNames[] = new Integer[4];
 
+            int dateDigit = Integer.parseInt(sdf2.format(date));
             for(int j=1;j<=4;j++)
             {
-                segNames[j-1]=((j*1000)+(i+1))*10000+2018;
+                segNames[j-1]=j*100000000 + dateDigit;
             }
 
             System.out.println(folderName + "," + intStartTime + "," + intEndTime + "," + segNames[0] + "," + segNames[1] + "," + segNames[2] + "," + segNames[3]);
