@@ -1,10 +1,10 @@
 <div class="container card-container">
   <div class="application-header">
-    <p class="te-title">{{selectedApplication.application}}</p>
+    <p class="te-title">{{defaultApplication.application}}</p>
     <div class="application-header__dropdown">
       {{#power-select
       options=model.applications
-      selected=selectedApplication
+      selected=defaultApplication
       onchange=(action "selectApplication")
       as |app|}}
         {{app.application}}

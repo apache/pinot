@@ -96,13 +96,14 @@ export default Route.extend({
    * Sets the table column, metricList, and alertList
    * @return {undefined}
    */
-  setupController(controller) {
+  setupController(controller, model) {
     this._super(...arguments);
 
     controller.setProperties({
       columns,
       metricList: this.getMetrics(),
-      alertList: this.getAlerts()
+      alertList: this.getAlerts(),
+      defaultApplication: model.applications[0]
     });
   }
 });

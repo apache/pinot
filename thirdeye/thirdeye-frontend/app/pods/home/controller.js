@@ -1,6 +1,6 @@
 import Controller from '@ember/controller';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
-import { computed, get, setProperties } from '@ember/object';
+import { computed, get, set } from '@ember/object';
 
 export default Controller.extend({
 
@@ -10,17 +10,6 @@ export default Controller.extend({
   classes: {
     table: 'table-bordered table-condensed te-anomaly-table--no-margin'
   },
-
-  /**
-   * Default application for the application dropdown
-   * @type {Object} - the first application object from a list of applications
-   */
-  selectedApplication: computed(
-    'model.applications',
-    function() {
-      return this.get('model.applications')[0];
-    }
-  ),
 
   /**
    * Stats to display in cards
@@ -53,7 +42,7 @@ export default Controller.extend({
      * @return {undefined}
      */
     selectApplication(selectedApplication) {
-      setProperties(this, { selectedApplication });
+      set(this, 'defaultApplication', selectedApplication);
     }
   }
 });
