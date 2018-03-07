@@ -126,7 +126,7 @@ public class AvroDataPublisherTest {
     final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_MULTI_DATA));
 
     final SegmentGeneratorConfig config =
-        new SegmentGeneratorConfig(AvroUtils.extractSchemaFromAvro(new File(filePath)));
+        new SegmentGeneratorConfig(AvroUtils.getPinotSchemaFromAvroDataFile(new File(filePath)));
     config.setFormat(FileFormat.AVRO);
     config.setInputFilePath(filePath);
 

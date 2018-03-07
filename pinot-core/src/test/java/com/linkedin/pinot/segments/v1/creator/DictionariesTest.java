@@ -93,7 +93,7 @@ public class DictionariesTest {
     driver.init(config);
     driver.build();
     segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
-    final Schema schema = AvroUtils.extractSchemaFromAvro(new File(filePath));
+    final Schema schema = AvroUtils.getPinotSchemaFromAvroDataFile(new File(filePath));
 
     final DataFileStream<GenericRecord> avroReader = AvroUtils.getAvroReader(new File(filePath));
     final org.apache.avro.Schema avroSchema = avroReader.getSchema();

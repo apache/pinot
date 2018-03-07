@@ -16,14 +16,21 @@
 package com.linkedin.pinot.core.util;
 
 import com.google.common.base.Preconditions;
-
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.core.data.GenericRow;
-
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.zip.GZIPInputStream;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileStream;
@@ -31,101 +38,50 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.zip.GZIPInputStream;
-
 
 public class AvroUtils {
   private AvroUtils() {
   }
 
-  private static final String COUNT = "count";
-  private static final String METRIC = "met";
-  private static final String DAY = "days";
-  private static final String DAYS_SINCE_EPOCH = "daysSinceEpoch";
-
   /**
-   * gives back a basic pinot schema object with field type as unknown and not aware of whether SV or MV
-   * this is just a util method for testing
-   * @param avroFile
-   * @return
-   * @throws FileNotFoundException
+   * Given an Avro schema, map from column to field type and time unit, return the equivalent Pinot schema.
+   *
+   * @param avroSchema Avro schema
+   * @param fieldTypeMap Map from column to field type
+   * @param timeUnit Time unit
+   * @return Pinot schema
    * @throws IOException
    */
-  public static Schema extractSchemaFromAvro(File avroFile) throws IOException {
-    try (DataFileStream<GenericRecord> dataStreamReader = getAvroReader(avroFile)) {
-      org.apache.avro.Schema avroSchema = dataStreamReader.getSchema();
-      return getPinotSchemaFromAvroSchema(avroSchema, getDefaultFieldTypes(avroSchema), TimeUnit.DAYS);
-    }
-  }
-
-  /**
-   * This is just a refactor of the original code that had the hard-coded logic for deducing
-   * if a column is dimension/metric/time. This is used only for testing purposes.
-   *
-   * @param avroSchema The input avro schema for which to deduce the dimension/metric/time columns.
-   * @return Hash map containing column names as keys and field type (dim/metric/time) as value.
-   */
-  private static Map<String, FieldSpec.FieldType> getDefaultFieldTypes(org.apache.avro.Schema avroSchema) {
-    Map<String, FieldSpec.FieldType> fieldTypes = new HashMap<>();
-
-    for (final Field field : avroSchema.getFields()) {
-      FieldSpec.FieldType fieldType;
-
-      if (field.name().contains(COUNT) || field.name().contains(METRIC)) {
-        fieldType = FieldSpec.FieldType.METRIC;
-      } else if (field.name().contains(DAY) || field.name().equalsIgnoreCase(DAYS_SINCE_EPOCH)) {
-        fieldType = FieldSpec.FieldType.TIME;
-      } else {
-        fieldType = FieldSpec.FieldType.DIMENSION;
-      }
-
-      fieldTypes.put(field.name(), fieldType);
-    }
-
-    return fieldTypes;
-  }
-
-  /**
-   * Given an avro schema object along with column field types and time unit, return the equivalent
-   * pinot schema object.
-   *
-   * @param avroSchema Avro schema for which to get the Pinot schema.
-   * @param fieldTypes Map containing fieldTypes for each column.
-   * @param timeUnit Time unit to be used for the time column.
-   * @return Return the equivalent pinot schema for the given avro schema.
-   */
-  private static Schema getPinotSchemaFromAvroSchema(org.apache.avro.Schema avroSchema,
-      Map<String, FieldSpec.FieldType> fieldTypes, TimeUnit timeUnit) {
+  public static Schema getPinotSchemaFromAvroSchema(@Nonnull org.apache.avro.Schema avroSchema,
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit) {
     Schema pinotSchema = new Schema();
 
     for (Field field : avroSchema.getFields()) {
       String fieldName = field.name();
       FieldSpec.DataType dataType = extractFieldDataType(field);
       boolean isSingleValueField = isSingleValueField(field);
-
-      FieldSpec.FieldType fieldType = fieldTypes.get(fieldName);
-      switch (fieldType) {
-        case DIMENSION:
-          pinotSchema.addField(new DimensionFieldSpec(fieldName, dataType, isSingleValueField));
-          break;
-        case METRIC:
-          Preconditions.checkState(isSingleValueField, "Unsupported multi-value for metric field.");
-          pinotSchema.addField(new MetricFieldSpec(fieldName, dataType));
-          break;
-        case TIME:
-          Preconditions.checkState(isSingleValueField, "Unsupported multi-value for time field.");
-          pinotSchema.addField(new TimeFieldSpec(field.name(), dataType, timeUnit));
-          break;
-        default:
-          throw new UnsupportedOperationException("Unsupported field type: " + fieldType + " for field: " + fieldName);
+      if (fieldTypeMap == null) {
+        pinotSchema.addField(new DimensionFieldSpec(fieldName, dataType, isSingleValueField));
+      } else {
+        FieldSpec.FieldType fieldType = fieldTypeMap.get(fieldName);
+        Preconditions.checkNotNull(fieldType, "Field type not specified for field: %s", fieldName);
+        switch (fieldType) {
+          case DIMENSION:
+            pinotSchema.addField(new DimensionFieldSpec(fieldName, dataType, isSingleValueField));
+            break;
+          case METRIC:
+            Preconditions.checkState(isSingleValueField, "Metric field: %s cannot be multi-valued", fieldName);
+            pinotSchema.addField(new MetricFieldSpec(fieldName, dataType));
+            break;
+          case TIME:
+            Preconditions.checkState(isSingleValueField, "Time field: %s cannot be multi-valued", fieldName);
+            Preconditions.checkNotNull(timeUnit, "Time unit cannot be null");
+            pinotSchema.addField(new TimeFieldSpec(field.name(), dataType, timeUnit));
+            break;
+          default:
+            throw new UnsupportedOperationException(
+                "Unsupported field type: " + fieldType + " for field: " + fieldName);
+        }
       }
     }
 
@@ -133,21 +89,47 @@ public class AvroUtils {
   }
 
   /**
-   * Given a avro schema file name, field types for columns and type unit, return the equivalent
-   * pinot schema object.
+   * Given an Avro data file, map from column to field type and time unit, return the equivalent Pinot schema.
    *
-   * @param avroSchemaFileName Name of the text file containing avro schema.
-   * @return PinotSchema equivalent of avro schema.
+   * @param avroDataFile Avro data file
+   * @param fieldTypeMap Map from column to field type
+   * @param timeUnit Time unit
+   * @return Pinot schema
+   * @throws IOException
    */
-  public static Schema getPinotSchemaFromAvroSchemaFile(String avroSchemaFileName,
-      Map<String, FieldSpec.FieldType> fieldTypes, TimeUnit timeUnit) throws IOException {
-    File avroSchemaFile = new File(avroSchemaFileName);
-    if (!avroSchemaFile.exists()) {
-      throw new FileNotFoundException();
+  public static Schema getPinotSchemaFromAvroDataFile(@Nonnull File avroDataFile,
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit) throws IOException {
+    try (DataFileStream<GenericRecord> reader = getAvroReader(avroDataFile)) {
+      org.apache.avro.Schema avroSchema = reader.getSchema();
+      return getPinotSchemaFromAvroSchema(avroSchema, fieldTypeMap, timeUnit);
     }
+  }
 
+  /**
+   * Given an Avro data file, count all columns as dimension and return the equivalent Pinot schema.
+   * <p>Should be used for testing purpose only.
+   *
+   * @param avroDataFile Avro data file
+   * @return Pinot schema
+   * @throws IOException
+   */
+  public static Schema getPinotSchemaFromAvroDataFile(@Nonnull File avroDataFile) throws IOException {
+    return getPinotSchemaFromAvroDataFile(avroDataFile, null, null);
+  }
+
+  /**
+   * Given an Avro schema file, map from column to field type and time unit, return the equivalent Pinot schema.
+   *
+   * @param avroSchemaFile Avro schema file
+   * @param fieldTypeMap Map from column to field type
+   * @param timeUnit Time unit
+   * @return Pinot schema
+   * @throws IOException
+   */
+  public static Schema getPinotSchemaFromAvroSchemaFile(@Nonnull File avroSchemaFile,
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit) throws IOException {
     org.apache.avro.Schema avroSchema = new org.apache.avro.Schema.Parser().parse(avroSchemaFile);
-    return getPinotSchemaFromAvroSchema(avroSchema, fieldTypes, timeUnit);
+    return getPinotSchemaFromAvroSchema(avroSchema, fieldTypeMap, timeUnit);
   }
 
   /**
@@ -156,7 +138,7 @@ public class AvroUtils {
    * @param pinotSchema Pinot schema.
    * @return Avro schema.
    */
-  public static org.apache.avro.Schema getAvroSchemaFromPinotSchema(com.linkedin.pinot.common.data.Schema pinotSchema) {
+  public static org.apache.avro.Schema getAvroSchemaFromPinotSchema(Schema pinotSchema) {
     SchemaBuilder.FieldAssembler<org.apache.avro.Schema> fieldAssembler = SchemaBuilder.record("record").fields();
 
     for (FieldSpec fieldSpec : pinotSchema.getAllFieldSpecs()) {
