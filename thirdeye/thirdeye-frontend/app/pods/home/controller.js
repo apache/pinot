@@ -1,6 +1,6 @@
 import Controller from '@ember/controller';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
-import { computed, get } from '@ember/object';
+import { computed, get, set } from '@ember/object';
 
 export default Controller.extend({
 
@@ -32,5 +32,17 @@ export default Controller.extend({
 
       return statsArray;
     }
-  )
+  ),
+
+  actions: {
+
+    /**
+     * Sets the selected application property based on user selection
+     * @param {Object} selectedApplication - object that represents selected application
+     * @return {undefined}
+     */
+    selectApplication(selectedApplication) {
+      set(this, 'defaultApplication', selectedApplication);
+    }
+  }
 });

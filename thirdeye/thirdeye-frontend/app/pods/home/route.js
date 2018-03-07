@@ -3,7 +3,8 @@ import applicationAnomalies from 'thirdeye-frontend/mirage/fixtures/applicationA
 import anomalyPerformance from 'thirdeye-frontend/mirage/fixtures/anomalyPerformance';
 import { humanizeFloat } from 'thirdeye-frontend/utils/utils';
 import columns from 'thirdeye-frontend/shared/anomaliesTableColumns';
-import RSVP from 'rsvp';
+import { hash } from 'rsvp';
+import fetch from 'fetch';
 
 export default Route.extend({
 
@@ -57,10 +58,10 @@ export default Route.extend({
       anomaly.change = (((current - baseline) / baseline) * 100).toFixed(2);
     });
 
-    return RSVP.hash({
+    return hash({
       anomalyMapping,
       anomalyPerformance,
-      redirectLink
+      applications: fetch('/thirdeye/entity/APPLICATION').then(res => res.json())
     });
   },
 
@@ -95,13 +96,14 @@ export default Route.extend({
    * Sets the table column, metricList, and alertList
    * @return {undefined}
    */
-  setupController(controller) {
+  setupController(controller, model) {
     this._super(...arguments);
 
     controller.setProperties({
       columns,
       metricList: this.getMetrics(),
-      alertList: this.getAlerts()
+      alertList: this.getAlerts(),
+      defaultApplication: model.applications[0]
     });
   }
 });

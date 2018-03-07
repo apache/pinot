@@ -1,0 +1,9 @@
+.application-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+
+  &__dropdown {
+    width: 200px;
+  }
+}
