@@ -64,7 +64,11 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
+import org.joda.time.Days;
+import org.joda.time.Hours;
 import org.joda.time.Interval;
+import org.joda.time.Period;
+import org.joda.time.Weeks;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.CronExpression;
 import org.slf4j.Logger;
@@ -469,6 +473,7 @@ public class AnomalyResource {
    *      the Map that maps dimension string to the AnomalyTimelinesView
    * @throws Exception
    */
+  private static final Period DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD = Weeks.THREE.toPeriod();
   @GET
   @Path(value = "/anomaly-function/{id}/baseline")
   @Produces(MediaType.APPLICATION_JSON)
@@ -500,8 +505,28 @@ public class AnomalyResource {
       return Response.status(Response.Status.BAD_REQUEST).entity("Start time is after end time").build();
     }
 
+    // enlarge view window when is view window is small
+    if (!mode.equalsIgnoreCase("ONLINE")) {
+      switch (anomalyFunctionSpec.getBucketUnit()) {
+        case MINUTES:
+          if (Weeks.weeksBetween(startTime, endTime).getWeeks() < DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD.toStandardDuration().getStandardDays()/7) {
+            mode = "ONLINE";
+          }
+          break;
+        case HOURS:
+          if (Hours.hoursBetween(startTime, endTime).getHours() < DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD.toStandardDuration().getStandardHours()) {
+            startTime = endTime.minus(DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD);
+          }
+          break;
+        case DAYS:
+          if (Days.daysBetween(startTime, endTime).getDays() < DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD.toStandardDuration().getStandardDays()) {
+            startTime = endTime.minus(DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD);
+          }
+          break;
+      }
+    }
+
     // Get DimensionMap from input dimension String
-    Multimap<String, String> functionFilters = anomalyFunctionSpec.getFilterSet();
     Map<String, String> inputDimension = OBJECT_MAPPER.readValue(dimension, Map.class);
     DimensionMap dimensionsToBeEvaluated = new DimensionMap();
     if (anomalyFunctionSpec.getExploreDimensions() != null &&
