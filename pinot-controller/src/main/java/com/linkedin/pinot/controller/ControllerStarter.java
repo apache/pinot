@@ -35,6 +35,7 @@ import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
+import com.linkedin.pinot.controller.helix.core.relocation.RelocationManager;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.validation.ValidationManager;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -73,6 +74,7 @@ public class ControllerStarter {
 
   // Can only be constructed after resource manager getting started
   private ValidationManager _validationManager;
+  private RelocationManager _relocationManager;
   private PinotHelixTaskResourceManager _helixTaskResourceManager;
   private PinotTaskManager _taskManager;
 
@@ -152,6 +154,9 @@ public class ControllerStarter {
 
       LOGGER.info("Starting segment status manager");
       _segmentStatusChecker.start();
+
+      LOGGER.info("Starting relocation manager");
+      _relocationManager.start();
 
       LOGGER.info("Creating rebalance segments factory");
       RebalanceSegmentStrategyFactory.createInstance(_helixResourceManager.getHelixZkManager());
@@ -345,6 +350,7 @@ public class ControllerStarter {
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setValidationControllerFrequencyInSeconds(3600);
     conf.setStatusCheckerFrequencyInSeconds(5*60);
+    conf.setRelocationManagerFrequencyInSeconds(60*60);
     conf.setStatusCheckerWaitForPushTimeInSeconds(10*60);
     conf.setTenantIsolationEnabled(true);
     final ControllerStarter starter = new ControllerStarter(conf);
