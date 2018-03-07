@@ -110,7 +110,7 @@ public class RootCauseSessionResource {
     List<Predicate> predicates = new ArrayList<>();
 
     if (!StringUtils.isBlank(idsString)) {
-      predicates.add(Predicate.IN("base_id", split(idsString)));
+      predicates.add(Predicate.IN("baseId", split(idsString)));
     }
 
     if (!StringUtils.isBlank(namesString)) {
