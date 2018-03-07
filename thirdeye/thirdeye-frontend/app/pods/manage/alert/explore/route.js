@@ -330,7 +330,7 @@ export default Route.extend({
     // Begin loading anomaly and graph data as concurrency tasks
     // See https://github.com/linkedin/pinot/pull/2518#discussion-diff-169751380R366
     if (jobId !== -1) {
-      this.get('loadAnomalyData').perform(anomalyIds);
+      this.get('loadAnomalyData').perform(anomalyIds, exploreDimensions);
       this.get('loadGraphData').perform(metricDataUrl, exploreDimensions);
     }
   },
@@ -453,9 +453,8 @@ export default Route.extend({
    * @param {Array} anomalyIds - the IDs of anomalies that have been reported for this alert.
    * @return {undefined}
    */
-  loadAnomalyData: task(function * (anomalyIds) {
-    yield timeout(300);
-    const hasDimensions = this.currentModel.exploreDimensions && this.currentModel.exploreDimensions.length;
+  loadAnomalyData: task(function * (anomalyIds, exploreDimensions) {
+    const hasDimensions = exploreDimensions && exploreDimensions.length;
     // Load data for each anomaly Id
     const rawAnomalies = yield this.get('fetchCombinedAnomalies').perform(anomalyIds);
     // Fetch and append severity score to each anomaly record
@@ -470,10 +469,11 @@ export default Route.extend({
     }
     // Push anomaly data into controller
     this.controller.setProperties({
-      anomaliesLoaded: true,
       anomalyData,
+      dimensionOptions,
       resolutionOptions,
-      dimensionOptions
+      anomaliesLoaded: true,
+      baselineOptionsLoading: false
     });
     // Fetch and append extra WoW data for each anomaly record
     const wowData = yield this.get('fetchCombinedAnomalyChangeData').perform(anomalyData);
@@ -483,7 +483,6 @@ export default Route.extend({
     // Load enhanced dataset into controller (WoW options will appear)
     this.controller.setProperties({
       anomalyData,
-      baselineOptionsLoading: false,
       baselineOptions: [baselineOptions[0], ...newWowList]
     });
   // We use .cancelOn('deactivate') to make sure the task cancels when the user leaves the route.
@@ -526,9 +525,9 @@ export default Route.extend({
     * Refresh anomaly data when changes are made
     */
     refreshAnomalyTable() {
-      const ids = this.currentModel.anomalyIds;
-      if (ids && ids.length) {
-        this.get('loadAnomalyData').perform(ids);
+      const { anomalyIds, exploreDimensions } = this.currentModel;
+      if (anomalyIds && anomalyIds.length) {
+        this.get('loadAnomalyData').perform(anomalyIds, exploreDimensions);
       }
     },
 
