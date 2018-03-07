@@ -55,7 +55,8 @@ public class JobApplyQueryTask extends QueryTask {
         long maxApplyStartTime = Long.parseLong(config.getProperty("MaxApplyStartTime"));
 
         double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
-        LongRange timeRange = CommonTools.getZipfRandomTimeRange(minApplyStartTime,maxApplyStartTime,zipfS);
+        //LongRange timeRange = CommonTools.getZipfRandomDailyTimeRange(minApplyStartTime,maxApplyStartTime,zipfS);
+        LongRange timeRange = CommonTools.getZipfRandomHourlyTimeRange(minApplyStartTime,maxApplyStartTime,zipfS);
 
         int selectLimit = CommonTools.getSelectLimt(config);
         int groupByLimit = Integer.parseInt(config.getProperty("GroupByLimit"));

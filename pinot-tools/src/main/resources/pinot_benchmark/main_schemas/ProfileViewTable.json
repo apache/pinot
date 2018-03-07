@@ -13,7 +13,7 @@
   },
   "tableIndexConfig": {
     "loadMode": "HEAP",
-    "invertedIndexColumns": [],
+    "invertedIndexColumns": ["ViewedProfileId"],
     "lazyLoad"  : "true"
   },
   "metadata": {

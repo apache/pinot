@@ -57,7 +57,8 @@ public class AdClickQueryTask extends QueryTask {
         long maxClickTime = Long.parseLong(config.getProperty("MaxClickTime"));
 
         double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
-        LongRange timeRange = CommonTools.getZipfRandomTimeRange(minClickTime,maxClickTime,zipfS);
+        //LongRange timeRange = CommonTools.getZipfRandomDailyTimeRange(minClickTime,maxClickTime,zipfS);
+        LongRange timeRange = CommonTools.getZipfRandomHourlyTimeRange(minClickTime,maxClickTime,zipfS);
 
         int selectLimit = CommonTools.getSelectLimt(config);
         int groupByLimit = Integer.parseInt(config.getProperty("GroupByLimit"));
