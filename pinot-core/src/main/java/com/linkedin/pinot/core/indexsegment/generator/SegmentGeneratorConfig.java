@@ -511,7 +511,7 @@ public class SegmentGeneratorConfig {
       schema = Schema.fromFile(new File(_schemaFile));
       setSchema(schema);
     } else if (_format == FileFormat.AVRO) {
-      schema = AvroUtils.extractSchemaFromAvro(new File(_inputFilePath));
+      schema = AvroUtils.getPinotSchemaFromAvroDataFile(new File(_inputFilePath));
       setSchema(schema);
     } else {
       throw new RuntimeException("Input format " + _format + " requires schema.");
