@@ -354,7 +354,7 @@ public class ControllerStarter {
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setValidationControllerFrequencyInSeconds(3600);
     conf.setStatusCheckerFrequencyInSeconds(5*60);
-    conf.setRelocationManagerFrequencyInMinutes(60*60);
+    conf.setRelocationManagerFrequencyInMinutes(60);
     conf.setStatusCheckerWaitForPushTimeInSeconds(10*60);
     conf.setTenantIsolationEnabled(true);
     final ControllerStarter starter = new ControllerStarter(conf);
