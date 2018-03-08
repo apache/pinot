@@ -31,6 +31,11 @@ public class MockDatasetConfigManager extends AbstractMockManager<DatasetConfigD
   }
 
   @Override
+  public int deleteRecordsOlderThanDays(int days) {
+    return 0;
+  }
+
+  @Override
   public List<DatasetConfigDTO> findAll() {
     return new ArrayList<>(this.datasets);
   }

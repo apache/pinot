@@ -44,6 +44,11 @@ public abstract class AbstractMockManager<T extends AbstractDTO> implements Abst
   }
 
   @Override
+  public int deleteRecordsOlderThanDays(int days) {
+    throw new AssertionError("not implemented");
+  }
+
+  @Override
   public List<T> findAll() {
     throw new AssertionError("not implemented");
   }

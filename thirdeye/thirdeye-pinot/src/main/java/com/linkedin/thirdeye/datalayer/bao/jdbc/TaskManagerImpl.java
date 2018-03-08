@@ -103,12 +103,7 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
 
     Predicate timestampPredicate = Predicate.LT("createTime", expireTimestamp);
     Predicate statusPredicate = Predicate.EQ("status", status.toString());
-    List<TaskBean> list =
-        genericPojoDao.get(Predicate.AND(statusPredicate, timestampPredicate), TaskBean.class);
-    for (TaskBean bean : list) {
-      deleteById(bean.getId());
-    }
-    return list.size();
+    return deleteByPredicate(Predicate.AND(statusPredicate, timestampPredicate));
   }
 
   @Override

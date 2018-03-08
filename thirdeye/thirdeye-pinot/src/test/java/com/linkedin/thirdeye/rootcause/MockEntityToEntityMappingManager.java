@@ -73,6 +73,11 @@ public class MockEntityToEntityMappingManager extends AbstractMockManager<Entity
   }
 
   @Override
+  public int deleteRecordsOlderThanDays(int days) {
+    throw new AssertionError("not implemented");
+  }
+
+  @Override
   public List<EntityToEntityMappingDTO> findAll() {
     return new ArrayList<>(this.entities);
   }

@@ -40,7 +40,7 @@ public class MonitorTaskRunner implements TaskRunner {
   }
 
   private void executeMonitorUpdate(MonitorTaskInfo monitorTaskInfo) {
-    LOG.info("Execute monitor udpate {}", monitorTaskInfo);
+    LOG.info("Execute monitor update {}", monitorTaskInfo);
     try {
 
       // All jobs with status SCHEDULED
@@ -64,17 +64,63 @@ public class MonitorTaskRunner implements TaskRunner {
 
   private void executeMonitorExpire(MonitorTaskInfo monitorTaskInfo) {
     LOG.info("Execute monitor expire {}", monitorTaskInfo);
+
+    // Delete completed jobs and tasks that are expired (14 days by default)
     try {
-      int expireDaysAgo = monitorTaskInfo.getExpireDaysAgo();
-      // fist delete tasks then jobs, as task has a foreign key
-      int numAnomalyTasksDeleted = DAO_REGISTRY.getTaskDAO().deleteRecordsOlderThanDaysWithStatus(expireDaysAgo, TaskStatus.COMPLETED);
-      int numAnomalyJobsDeleted = DAO_REGISTRY.getJobDAO().deleteRecordsOlderThanDaysWithStatus(expireDaysAgo, JobStatus.COMPLETED);
-      // delete rows from detection status table, older than
-      int numDetectionStatusRowsDeleted = DAO_REGISTRY.getDetectionStatusDAO().deleteRecordsOlderThanDays(7);
-      LOG.info("Deleted {} anomaly jobs and {} anomaly tasks", numAnomalyJobsDeleted, numAnomalyTasksDeleted);
-      LOG.info("Deleted {} rows from detectionStatus table", numDetectionStatusRowsDeleted);
+      // CAUTION: Fist delete tasks then jobs, as task has a foreign key.
+      int completedJobRetentionDays = monitorTaskInfo.getCompletedJobRetentionDays();
+      int deletedCompletedTasks = DAO_REGISTRY.getTaskDAO()
+          .deleteRecordsOlderThanDaysWithStatus(completedJobRetentionDays, TaskStatus.COMPLETED);
+      int deletedCompletedJobs =
+          DAO_REGISTRY.getJobDAO().deleteRecordsOlderThanDaysWithStatus(completedJobRetentionDays, JobStatus.COMPLETED);
+      LOG.info("Deleted {} completed jobs and {} completed tasks that are older than {} days.", deletedCompletedJobs,
+          deletedCompletedTasks, completedJobRetentionDays);
     } catch (Exception e) {
-      LOG.error("Exception in monitor expire task", e);
+      LOG.error("Exception when expiring jobs and tasks.", e);
+    }
+
+    // Delete all types of jobs and tasks that are expired (30 days by default)
+    try {
+      // CAUTION: Fist delete tasks then jobs, as task has a foreign key.
+      int jobRetentionDays = monitorTaskInfo.getDefaultRetentionDays();
+      int deletedTasks =
+          DAO_REGISTRY.getTaskDAO().deleteRecordsOlderThanDaysWithStatus(jobRetentionDays, TaskStatus.COMPLETED);
+      int deletedJobs =
+          DAO_REGISTRY.getJobDAO().deleteRecordsOlderThanDaysWithStatus(jobRetentionDays, JobStatus.COMPLETED);
+      LOG.info("Deleted {} jobs and {} tasks that are older than {} days.", deletedTasks, deletedJobs,
+          jobRetentionDays);
+    } catch (Exception e) {
+      LOG.error("Exception when expiring jobs and tasks.", e);
+    }
+
+    // Delete expired detection status (7 days by default)
+    try {
+      int deletedDetectionStatus = DAO_REGISTRY.getDetectionStatusDAO()
+          .deleteRecordsOlderThanDays(monitorTaskInfo.getDetectionStatusRetentionDays());
+      LOG.info("Deleted {} detection status that are older than {} days.", deletedDetectionStatus,
+          monitorTaskInfo.getDetectionStatusRetentionDays());
+    } catch (Exception e) {
+      LOG.error("Exception when expiring detection status.", e);
+    }
+
+    // Delete expired data completeness entries (30 days)
+    try {
+      int deletedDetectionStatus = DAO_REGISTRY.getDataCompletenessConfigDAO()
+          .deleteRecordsOlderThanDays(monitorTaskInfo.getDefaultRetentionDays());
+      LOG.info("Deleted {} data completeness entries that are older than {} days.", deletedDetectionStatus,
+          monitorTaskInfo.getDefaultRetentionDays());
+    } catch (Exception e) {
+      LOG.error("Exception when expiring data completeness entries.", e);
+    }
+
+    // Delete expired raw anomalies (30 days by default)
+    try {
+      int deletedRawAnomalies = DAO_REGISTRY.getRawAnomalyResultDAO()
+          .deleteRecordsOlderThanDays(monitorTaskInfo.getRawAnomalyRetentionDays());
+      LOG.info("Deleted {} raw anomalies that are older than {} days.", deletedRawAnomalies,
+          monitorTaskInfo.getRawAnomalyRetentionDays());
+    } catch (Exception e) {
+      LOG.error("Exception when expiring raw anomalies.", e);
     }
   }
 

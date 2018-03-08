@@ -79,18 +79,21 @@ public class TaskGenerator {
     MonitorConfiguration monitorConfiguration = monitorJobContext.getMonitorConfiguration();
     MonitorTaskInfo expireTaskInfo = new MonitorTaskInfo();
     expireTaskInfo.setMonitorType(MonitorType.EXPIRE);
-    expireTaskInfo.setExpireDaysAgo(monitorConfiguration.getExpireDaysAgo());
+    expireTaskInfo.setCompletedJobRetentionDays(monitorConfiguration.getCompletedJobRetentionDays());
+    expireTaskInfo.setDefaultRetentionDays(monitorConfiguration.getDefaultRetentionDays());
+    expireTaskInfo.setDetectionStatusRetentionDays(monitorConfiguration.getDetectionStatusRetentionDays());
+    expireTaskInfo.setRawAnomalyRetentionDays(monitorConfiguration.getRawAnomalyRetentionDays());
     tasks.add(expireTaskInfo);
 
     return tasks;
   }
 
   public List<ClassificationTaskInfo> createGroupingTasks(ClassificationJobContext classificationJobContext,
-      long monitoringWindowStartTime, long monitoringWindowEndTime) throws Exception {
-    long jobexecutionId = classificationJobContext.getJobExecutionId();
+      long monitoringWindowStartTime, long monitoringWindowEndTime) {
+    long jobExecutionId = classificationJobContext.getJobExecutionId();
     ClassificationConfigDTO groupingConfig = classificationJobContext.getConfigDTO();
     ClassificationTaskInfo classificationTaskInfo =
-        new ClassificationTaskInfo(jobexecutionId, monitoringWindowStartTime, monitoringWindowEndTime,
+        new ClassificationTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime,
             groupingConfig);
 
     List<ClassificationTaskInfo> tasks = new ArrayList<>();

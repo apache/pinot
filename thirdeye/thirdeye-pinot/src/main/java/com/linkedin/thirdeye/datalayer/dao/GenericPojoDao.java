@@ -588,7 +588,7 @@ public class GenericPojoDao {
           PojoInfo pojoInfo = pojoInfoMap.get(pojoClass);
           int totalBaseRowsDeleted = 0;
           if (CollectionUtils.isNotEmpty(idsToDelete)) {
-            final int maxSublistSize = 100000;
+            final int maxSublistSize = 1000;
             int minIdx = 0;
             int maxIdx = maxSublistSize;
             while (minIdx < idsToDelete.size()) {
@@ -609,6 +609,10 @@ public class GenericPojoDao {
               totalBaseRowsDeleted += baseRowsDeleted;
               minIdx = Math.min(maxIdx, idsToDelete.size());
               maxIdx += maxSublistSize;
+              // Trigger commit() to ensure this batch of deletion is executed
+              if (!connection.getAutoCommit()) {
+                connection.commit();
+              }
             }
           }
           return totalBaseRowsDeleted;

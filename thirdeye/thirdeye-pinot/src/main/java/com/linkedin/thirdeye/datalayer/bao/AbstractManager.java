@@ -23,6 +23,8 @@ public interface AbstractManager<E extends AbstractDTO> {
 
   int deleteByPredicate(Predicate predicate);
 
+  int deleteRecordsOlderThanDays(int days);
+
   List<E> findAll();
 
   List<E> findByParams(Map<String, Object> filters);
