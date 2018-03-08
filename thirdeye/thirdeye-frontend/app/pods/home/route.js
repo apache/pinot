@@ -4,11 +4,12 @@ import anomalyPerformance from 'thirdeye-frontend/mirage/fixtures/anomalyPerform
 import { humanizeFloat, humanizeChange } from 'thirdeye-frontend/utils/utils';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import columns from 'thirdeye-frontend/shared/anomaliesTableColumns';
-import { hash } from 'rsvp';
 import fetch from 'fetch';
+import { hash } from 'rsvp';
+import { getFormatedDuration } from 'thirdeye-frontend/utils/anomaly';
+import moment from 'moment';
 
 export default Route.extend({
-
   /**
    * Returns a mapping of anomalies by metric and functionName (aka alert), performance stats for anomalies by
    * application, and redirect links to the anomaly search page for each metric-alert mapping
@@ -61,6 +62,7 @@ export default Route.extend({
       const changeFloat = (current - baseline) / baseline;
       anomaly.change = floatToPercent(changeFloat);
       anomaly.humanizedChange = humanizeChange(changeFloat);
+      anomaly.duration = getFormatedDuration(anomaly.start, anomaly.end);
     });
 
     return hash({
