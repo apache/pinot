@@ -75,7 +75,6 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
     // Set up anomaly change rate display
     const changeRate = (anomaly.current && anomaly.baseline) ? ((anomaly.current - anomaly.baseline) / anomaly.baseline * 100).toFixed(2) : 0;
     const changeDirection = (anomaly.current > anomaly.baseline) ? '-' : '+';
-    const changeDirectionLabel = changeRate < 0 ? 'down' : 'up';
     const isNullChangeRate = Number.isNaN(Number(changeRate));
 
     // We want to display only non-zero duration values in our table
@@ -93,7 +92,6 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
       changeRate,
       changeDirection,
       isNullChangeRate,
-      changeDirectionLabel,
       shownChangeRate: changeRate,
       isUserReported: anomaly.anomalyResultSource === 'USER_LABELED_ANOMALY',
       startDateStr: moment(anomaly.anomalyStart).format('MMM D, hh:mm A'),

@@ -257,7 +257,7 @@
                  <td class="te-anomaly-table__cell">
                    <ul class="te-anomaly-table__list">
                       <li>{{anomaly.shownCurrent}} / {{anomaly.shownBaseline}}</li>
-                      <li class="te-anomaly-table__value-label te-anomaly-table__value-label--{{anomaly.changeDirectionLabel}}">
+                      <li class="te-anomaly-table__value-label te-anomaly-table__value-label--{{calucate-direction anomaly.shownChangeRate}}">
                         ({{anomaly.shownChangeRate}}%)
                       </li>
                    </ul>

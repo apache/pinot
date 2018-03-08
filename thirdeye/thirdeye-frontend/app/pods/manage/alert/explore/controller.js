@@ -682,8 +682,7 @@ export default Controller.extend({
           setProperties(anomaly, {
             shownCurrent: curr,
             shownBaseline: base,
-            shownChangeRate: change,
-            changeDirectionLabel: change < 0 ? 'down' : 'up'
+            shownChangeRate: change
           });
         });
       }

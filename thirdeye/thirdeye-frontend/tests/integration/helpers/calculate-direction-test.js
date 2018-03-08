@@ -6,12 +6,15 @@ moduleForComponent('calculate-direction', 'helper:calculate-direction', {
   integration: true
 });
 
-// Replace this with your real tests.
-test('it renders', function(assert) {
+test('when input is positive, calculate direction should return "up"', function(assert) {
   this.set('inputValue', '1234');
-
   this.render(hbs`{{calculate-direction inputValue}}`);
-
   assert.equal(this.$().text().trim(), 'up');
+});
+
+test('when input is negative, calculate direction should return "down"', function(assert) {
+  this.set('inputValue', '-1000');
+  this.render(hbs`{{calculate-direction inputValue}}`);
+  assert.equal(this.$().text().trim(), 'down');
 });
 
