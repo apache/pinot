@@ -1,5 +1,10 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.thirdeye.api.Constants;
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiModel;
+import com.wordnik.swagger.annotations.ApiOperation;
+import com.wordnik.swagger.annotations.ApiParam;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -69,6 +74,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
  */
 @Path(value = "/data")
 @Produces(MediaType.APPLICATION_JSON)
+@Api(tags = {Constants.DASHBOARD_TAG})
 public class DataResource {
   private static final Logger LOG = LoggerFactory.getLogger(DataResource.class);
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
@@ -120,6 +126,7 @@ public class DataResource {
 
   @GET
   @Path("maxDataTime/metricId/{metricId}")
+  @ApiOperation("GET the timestamp for the end of the time range of available data for a given metric")
   public Long getMetricMaxDataTime(@PathParam("metricId") Long metricId) {
     MetricConfigDTO metricConfig = DAO_REGISTRY.getMetricConfigDAO().findById(metricId);
     String dataset = metricConfig.getDataset();
@@ -141,7 +148,8 @@ public class DataResource {
 
   @GET
   @Path("autocomplete/metric")
-  public List<MetricConfigDTO> getMetricsWhereNameLike(@QueryParam("name") String name) {
+  @ApiOperation("GET autocomplete request for metric data by name")
+  public List<MetricConfigDTO> getMetricsWhereNameLike(@ApiParam("metric name") @QueryParam("name") String name) {
     List<MetricConfigDTO> metricConfigs = Collections.emptyList();
     if (StringUtils.isNotBlank(name)) {
       Set<String> aliasParts = new HashSet<>(Arrays.asList(name.split("\\s+")));
@@ -163,7 +171,8 @@ public class DataResource {
    */
   @GET
   @Path("autocomplete/functionByName")
-  public List<AnomalyFunctionDTO> getFunctionsWhereNameLike(@QueryParam("name") String name) {
+  @ApiOperation("GET autocomplete request for alert by name")
+  public List<AnomalyFunctionDTO> getFunctionsWhereNameLike(@ApiParam("alert name") @QueryParam("name") String name) {
     List<AnomalyFunctionDTO> functions = Collections.emptyList();
     if (StringUtils.isNotBlank(name)) {
       functions = anomalyFunctionDAO.findWhereNameLike("%" + name + "%");
@@ -239,6 +248,7 @@ public class DataResource {
 
   @GET
   @Path("autocomplete/dimensions/metric/{metricId}")
+  @ApiOperation("GET a list of dimensions by metric.")
   public List<String> getDimensionsForMetric(@PathParam("metricId") Long metricId) {
     List<String> list = new ArrayList<>();
     list.add("All");
@@ -254,6 +264,7 @@ public class DataResource {
 
   @GET
   @Path("autocomplete/filters/metric/{metricId}")
+  @ApiOperation("GET the all filters associated with this metric")
   public Map<String, List<String>> getFiltersForMetric(@PathParam("metricId") Long metricId) {
     Map<String, List<String>> filterMap = new HashMap<>();
     try {
@@ -281,6 +292,7 @@ public class DataResource {
    */
   @GET
   @Path("agg/granularity/metric/{metricId}")
+  @ApiOperation("GET the timestamp for the end of the time range of available data for a given metric")
   public List<String> getDataAggregationGranularities(@PathParam("metricId") Long metricId) {
 
     MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);

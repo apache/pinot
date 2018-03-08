@@ -7,6 +7,10 @@ import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
+import com.linkedin.thirdeye.api.Constants;
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiOperation;
+import com.wordnik.swagger.annotations.ApiParam;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -25,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 @Path("/detection-onboard")
 @Produces(MediaType.APPLICATION_JSON)
+@Api(tags = {Constants.ONBOARD_TAG})
 public class DetectionOnboardResource {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionOnboardResource.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -49,8 +54,9 @@ public class DetectionOnboardResource {
    */
   @POST
   @Path("/create-job")
-  public String createDetectionOnboardingJob(@NotNull @QueryParam("jobName") String jobName,
-      String jsonPayload) {
+  @ApiOperation("POST request to update an existing alert function with properties payload")
+  public String createDetectionOnboardingJob(@ApiParam(required = true) @NotNull @QueryParam("jobName") String jobName,
+      @ApiParam("jsonPayload") String jsonPayload) {
 
     // Check user's input
     if (jsonPayload == null) {
@@ -90,6 +96,7 @@ public class DetectionOnboardResource {
    */
   @GET
   @Path("/get-status")
+  @ApiOperation("GET request for job status (a sequence of events including create, replay, autotune)")
   public String getDetectionOnboardingJobStatus(@QueryParam("jobId") long jobId) {
     DetectionOnboardJobStatus detectionOnboardingJobStatus =
         detectionOnboardService.getDetectionOnboardingJobStatus(jobId);

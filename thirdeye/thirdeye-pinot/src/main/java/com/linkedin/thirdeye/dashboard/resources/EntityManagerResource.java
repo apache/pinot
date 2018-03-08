@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
+import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
@@ -22,6 +23,8 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiOperation;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -46,6 +49,7 @@ import org.slf4j.LoggerFactory;
 @Path("thirdeye/entity")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
+@Api(tags = {Constants.DASHBOARD_TAG})
 public class EntityManagerResource {
   private final AnomalyFunctionManager anomalyFunctionManager;
   private final MetricConfigManager metricConfigManager;
@@ -86,6 +90,7 @@ public class EntityManagerResource {
 
   @GET
   @Path("{entityType}")
+  @ApiOperation(value = "GET request to get all entities for a type.")
   public Response getAllEntitiesForType(@PathParam("entityType") String entityTypeStr) {
     EntityType entityType = EntityType.valueOf(entityTypeStr);
     List<AbstractDTO> results = new ArrayList<>();

@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.datalayer.dto;
 
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 
+
 public class MetricConfigDTO extends MetricConfigBean {
 
   private DatasetConfigDTO datasetConfig;
