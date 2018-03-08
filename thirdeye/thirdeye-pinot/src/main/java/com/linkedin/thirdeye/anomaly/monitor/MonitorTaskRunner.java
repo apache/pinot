@@ -83,10 +83,8 @@ public class MonitorTaskRunner implements TaskRunner {
     try {
       // CAUTION: Fist delete tasks then jobs, as task has a foreign key.
       int jobRetentionDays = monitorTaskInfo.getDefaultRetentionDays();
-      int deletedTasks =
-          DAO_REGISTRY.getTaskDAO().deleteRecordsOlderThanDaysWithStatus(jobRetentionDays, TaskStatus.COMPLETED);
-      int deletedJobs =
-          DAO_REGISTRY.getJobDAO().deleteRecordsOlderThanDaysWithStatus(jobRetentionDays, JobStatus.COMPLETED);
+      int deletedTasks = DAO_REGISTRY.getTaskDAO().deleteRecordsOlderThanDays(jobRetentionDays);
+      int deletedJobs = DAO_REGISTRY.getJobDAO().deleteRecordsOlderThanDays(jobRetentionDays);
       LOG.info("Deleted {} jobs and {} tasks that are older than {} days.", deletedTasks, deletedJobs,
           jobRetentionDays);
     } catch (Exception e) {

@@ -419,10 +419,6 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
-  int deleteRawAnomalyOlderThan(int days) {
-    return rawResultDAO.deleteRecordsOlderThanDays(days);
-  }
-
   public static void main(String[] args) throws Exception {
 
     File persistenceFile = new File(args[0]);
@@ -432,9 +428,6 @@ public class RunAdhocDatabaseQueriesTool {
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
 
-//    dq.deleteRawAnomalyOlderThan(25);
-    List<Long> sitespeedFunction = new ArrayList<>(Arrays.asList(90794L));
-    dq.disableAllActiveFunction(sitespeedFunction);
   }
 
 }
