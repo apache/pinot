@@ -1,8 +1,11 @@
 package com.linkedin.thirdeye.anomaly.onboard;
 
+import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiOperation;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -13,6 +16,7 @@ import javax.ws.rs.core.MediaType;
 
 @Path("/function-onboard")
 @Produces(MediaType.APPLICATION_JSON)
+@Api(tags = {Constants.ONBOARD_TAG})
 public class FunctionOnboardingResource {
   private AnomalyFunctionManager anomalyFunctionDAO;
   public FunctionOnboardingResource(){
@@ -29,6 +33,7 @@ public class FunctionOnboardingResource {
    */
   @POST
   @Path("/create-function")
+  @ApiOperation("POST request to create alert container in database")
   public AnomalyFunctionDTO createAnomalyFunction(@NotNull @QueryParam("name") String functionName ) {
     AnomalyFunctionDTO functionDTO = new AnomalyFunctionDTO();
     functionDTO.setFunctionName(functionName);

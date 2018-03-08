@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.datalayer.dto;
 
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
+import com.wordnik.swagger.annotations.ApiModel;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
@@ -11,7 +12,6 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 public class AnomalyFunctionDTO extends AnomalyFunctionBean {
   private static final Logger LOGGER = LoggerFactory.getLogger(AnomalyFunctionDTO.class);

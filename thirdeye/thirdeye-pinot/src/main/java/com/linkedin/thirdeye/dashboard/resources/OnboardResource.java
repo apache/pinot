@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.wordnik.swagger.annotations.ApiOperation;
+import com.wordnik.swagger.annotations.ApiParam;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -54,7 +56,8 @@ public class OnboardResource {
 
   @GET
   @Path("function/{id}")
-  public AnomalyFunctionDTO getAnomalyFunction(@PathParam("id") Long id) {
+  @ApiOperation("GET a single function record by id")
+  public AnomalyFunctionDTO getAnomalyFunction(@ApiParam("alert function id\n") @PathParam("id") Long id) {
     return anomalyFunctionDAO.findById(id);
   }
 
