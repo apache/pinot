@@ -12,7 +12,10 @@
   "scripts": {
     "build": "ember build",
     "start": "ember server --proxy http://localhost:1426",
-    "test": "ember test"
+    "test": "ember test",
+    "eslint": "node_modules/.bin/eslint",
+    "eslint-app": "npm run eslint app/",
+    "eslint-tests": "npm run eslint tests/"
   },
   "devDependencies": {
     "autosize": "^4.0.0",

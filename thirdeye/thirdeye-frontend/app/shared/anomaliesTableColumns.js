@@ -2,6 +2,7 @@
 export default [
   {
     propertyName: 'start',
+    template: 'custom/anomalies-table/start-duration',
     title: 'Start/Duration',
     className: 'anomalies-table__column',
     disableFiltering: true
