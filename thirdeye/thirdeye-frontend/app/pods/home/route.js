@@ -2,6 +2,7 @@ import Route from '@ember/routing/route';
 import applicationAnomalies from 'thirdeye-frontend/mirage/fixtures/applicationAnomalies';
 import anomalyPerformance from 'thirdeye-frontend/mirage/fixtures/anomalyPerformance';
 import { humanizeFloat, humanizeChange } from 'thirdeye-frontend/utils/utils';
+import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import columns from 'thirdeye-frontend/shared/anomaliesTableColumns';
 import { hash } from 'rsvp';
 import fetch from 'fetch';
@@ -58,7 +59,7 @@ export default Route.extend({
 
       // Calculate change
       const changeFloat = (current - baseline) / baseline;
-      anomaly.change = (changeFloat * 100).toFixed(2);
+      anomaly.change = floatToPercent(changeFloat);
       anomaly.humanizedChange = humanizeChange(changeFloat);
     });
 

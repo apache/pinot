@@ -4,8 +4,8 @@
  * @exports anomaly-id
  */
 import { computed } from '@ember/object';
-
 import Component from '@ember/component';
+import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 
 export default Component.extend({
   /**
@@ -29,7 +29,7 @@ export default Component.extend({
     const baselineValue = this.get('anomaly.baseline') || 0;
 
     if (baselineValue !== 0) {
-      return ((currentValue - baselineValue) / baselineValue * 100).toFixed(2);
+      return floatToPercent((currentValue - baselineValue) / baselineValue);
     } else {
       return 0;
     }

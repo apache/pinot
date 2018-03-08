@@ -13,7 +13,6 @@ import { task, timeout } from 'ember-concurrency';
 import {
   computed,
   set,
-  get,
   setProperties,
   getWithDefault
 } from '@ember/object';
@@ -27,6 +26,7 @@ import {
   extractSeverity,
   setDuration
 } from 'thirdeye-frontend/utils/manage-alert-utils';
+import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 
 export default Controller.extend({
   /**
@@ -675,7 +675,7 @@ export default Controller.extend({
           if (wowDetails) {
             curr = wow.currentVal.toFixed(2);
             base = wowDetails.baselineValue.toFixed(2);
-            change = (wowDetails.change * 100).toFixed(2);
+            change = floatToPercent(wowDetails.change);
           }
 
           // Set displayed value properties. Note: ensure no CP watching these props

@@ -24,10 +24,10 @@ export default Controller.extend({
       const precisionDescription = '% of all anomalies detected by the system that are true';
       const recallDescription = '% of all anomalies detected by the system';
       const statsArray = [
-        ['Number of anomalies', totalAlertsDescription, totalAlerts],
-        ['Response Rate', responseRateDescription, floatToPercent(responseRate)],
-        ['Precision', precisionDescription, floatToPercent(precision)],
-        ['Recall', recallDescription, floatToPercent(recall)]
+        ['Number of anomalies', totalAlertsDescription, totalAlerts, 'digit'],
+        ['Response Rate', responseRateDescription, floatToPercent(responseRate), 'percent'],
+        ['Precision', precisionDescription, floatToPercent(precision), 'percent'],
+        ['Recall', recallDescription, floatToPercent(recall), 'percent']
       ];
 
       return statsArray;
