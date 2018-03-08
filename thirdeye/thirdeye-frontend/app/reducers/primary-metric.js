@@ -44,7 +44,6 @@ const INITIAL_STATE = {
   graphStart: null,
   graphEnd: null,
   isSelected: true,
-  
   /**
    * Default color for primary Metric
    */
@@ -185,7 +184,7 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
 
     case ActionTypes.SELECT_PRIMARY: {
       const {isSelected} = state;
-      return _.assign(state, { isSelected: !isSelected})
+      return _.assign(state, { isSelected: !isSelected});
     }
 
     case ActionTypes.SELECT_DIMENSION: {

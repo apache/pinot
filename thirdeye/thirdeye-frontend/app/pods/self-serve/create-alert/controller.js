@@ -20,6 +20,11 @@ import {
 } from "@ember/utils";
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import {
+  selfServeApiGraph,
+  selfServeApiCommon,
+  selfServeApiOnboard
+} from 'thirdeye-frontend/utils/api/self-serve';
+import {
   buildMetricDataUrl,
   formatConfigGroupProps,
   getTopDimensions
@@ -202,7 +207,7 @@ export default Controller.extend({
    */
   searchMetricsList: task(function* (metric) {
     yield timeout(600);
-    const url = `/data/autocomplete/metric?name=${metric}`;
+    const url = selfServeApiCommon.metricAutoComplete(metric);
     return fetch(url).then(checkStatus);
   }),
 
@@ -228,7 +233,7 @@ export default Controller.extend({
    * @return {Promise}
    */
   fetchFunctionById(functionId) {
-    const url = `/onboard/function/${functionId}`;
+    const url = selfServeApiCommon.alertById(functionId);
     return fetch(url).then(checkStatus);
   },
 
@@ -240,7 +245,7 @@ export default Controller.extend({
    * @return {Promise}
    */
   fetchAlertsByName(functionName) {
-    const url = `/data/autocomplete/functionByName?name=${functionName}`;
+    const url = selfServeApiCommon.alertAutoComplete(functionName);
     return fetch(url).then(checkStatus);
   },
 
@@ -254,10 +259,10 @@ export default Controller.extend({
    */
   fetchMetricData(metricId) {
     const promiseHash = {
-      maxTime: fetch(`/data/maxDataTime/metricId/${metricId}`).then(res => checkStatus(res, 'get', true)),
-      granularities: fetch(`/data/agg/granularity/metric/${metricId}`).then(res => checkStatus(res, 'get', true)),
-      filters: fetch(`/data/autocomplete/filters/metric/${metricId}`).then(res => checkStatus(res, 'get', true)),
-      dimensions: fetch(`/data/autocomplete/dimensions/metric/${metricId}`).then(res => checkStatus(res, 'get', true))
+      maxTime: fetch(selfServeApiGraph.maxDataTime(metricId)).then(res => checkStatus(res, 'get', true)),
+      granularities: fetch(selfServeApiGraph.metricGranularity(metricId)).then(res => checkStatus(res, 'get', true)),
+      filters: fetch(selfServeApiGraph.metricFilters(metricId)).then(res => checkStatus(res, 'get', true)),
+      dimensions: fetch(selfServeApiGraph.metricDimensions(metricId)).then(res => checkStatus(res, 'get', true))
     };
     return RSVP.hash(promiseHash);
   },

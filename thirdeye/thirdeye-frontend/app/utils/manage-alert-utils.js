@@ -333,7 +333,7 @@ export function getDuration() {
 export function prepareTimeRange(queryParams, defaultDurationObj) {
   const durationCached = sessionStorage.getItem('duration') !== null;
   // Check for presence of each time range key in qeury params
-  const isDurationInQuery = isPresent(queryParams.duration) && isPresent(queryParams.startDate) && isPresent(queryParams.endDate)
+  const isDurationInQuery = isPresent(queryParams.duration) && isPresent(queryParams.startDate) && isPresent(queryParams.endDate);
   // Use querystring time range if present. Else, use preset defaults
   const defaultDuration = isDurationInQuery ? queryParams : defaultDurationObj;
   // Prefer cached time range if present. Else, load from defaults
