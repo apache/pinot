@@ -261,7 +261,8 @@ public class ServerPerfResource {
 
       double segmentCost = segmentMetadata.getTotalDocs() * perDocCost;
       //LOGGER.info("DifferentLevelComputation: {}, {}, {}, {}, {}, {}, {}", tmp1,tmp2,tmp3,tmp4,tmp5,perDocCost,segmentCost);
-
+      if(segmentCost < 0)
+        segmentCost = 0;
       return segmentCost;
 
       //return 0;
