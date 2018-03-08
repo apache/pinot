@@ -117,7 +117,7 @@ public class ServerPerfResource {
           //serverPerfMetrics.segmentList.add(segment.getSegmentMetadata());
 
           // LOGGER.info("adding segment " + segment.getSegmentName() + " to the list in server side! st: " + segment.getSegmentMetadata().getStartTime() + " et: " + segment.getSegmentMetadata().getEndTime());
-          double segmentLoad = tableCPULoadFormulation.get(tableDataManager.getTableName()).computeCPULoad(segment.getSegmentMetadata(),1522540921);
+          double segmentLoad = tableCPULoadFormulation.get(tableDataManager.getTableName()).computeCPULoad(segment.getSegmentMetadata(),1519948890);
           serverPerfMetrics.segmentCPULoad += segmentLoad;
           LOGGER.info("SegmentLoadIsComputed: {}, {}, {}", System.currentTimeMillis(), segment.getSegmentMetadata().getName(), segmentLoad);
         }
