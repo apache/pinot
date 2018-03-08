@@ -57,13 +57,13 @@ public class RealtimeSegmentRelocationManager {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
-  private final long _runFrequencySeconds;
+  private final long _runFrequencyMinutes;
 
   public RealtimeSegmentRelocationManager(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _helixManager = pinotHelixResourceManager.getHelixZkManager();
     _helixAdmin = pinotHelixResourceManager.getHelixAdmin();
-    _runFrequencySeconds = config.getRelocationManagerFrequencyInSeconds();
+    _runFrequencyMinutes = config.getRelocationManagerFrequencyInMinutes();
 
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override
@@ -87,7 +87,7 @@ public class RealtimeSegmentRelocationManager {
           LOGGER.warn("Caught exception while running relocation manager", e);
         }
       }
-    }, 120, _runFrequencySeconds, TimeUnit.SECONDS);
+    }, 5, _runFrequencyMinutes, TimeUnit.MINUTES);
   }
 
   public void stop() {

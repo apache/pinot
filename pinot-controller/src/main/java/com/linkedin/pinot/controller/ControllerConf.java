@@ -41,7 +41,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String RETENTION_MANAGER_FREQUENCY_IN_SECONDS = "controller.retention.frequencyInSeconds";
   private static final String VALIDATION_MANAGER_FREQUENCY_IN_SECONDS = "controller.validation.frequencyInSeconds";
   private static final String STATUS_CHECKER_FREQUENCY_IN_SECONDS = "controller.statuschecker.frequencyInSeconds";
-  private static final String RELOCATION_MANAGER_FREQUENCY_IN_SECONDS = "controller.relocation.frequencyInSeconds";
+  private static final String REALTIME_SEGMENTS_RELOCATION_MANAGER_FREQUENCY_IN_MINUTES = "controller.segment.relocation.frequencyInMinutes";
   private static final String STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS = "controller.statuschecker.waitForPushTimeInSeconds";
   private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
   private static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
@@ -59,7 +59,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
   private static final int DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
-  private static final int DEFAULT_RELOCATION_MANAGER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 hour
+  private static final int DEFAULT_REALTIME_SEGMENTS_RELOCATION_MANAGER_FREQUENCY_IN_MINUTES = 60; // 1 hour
   private static final int DEFAULT_STATUS_CONTROLLER_WAIT_FOR_PUSH_TIME_IN_SECONDS = 10 * 60; // 10 minutes
   private static final long DEFAULT_EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
   private static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
@@ -267,15 +267,16 @@ public class ControllerConf extends PropertiesConfiguration {
     setProperty(STATUS_CHECKER_FREQUENCY_IN_SECONDS, Integer.toString(statusCheckerFrequencyInSeconds));
   }
 
-  public int getRelocationManagerFrequencyInSeconds() {
-    if (containsKey(RELOCATION_MANAGER_FREQUENCY_IN_SECONDS)) {
-      return Integer.parseInt((String) getProperty(RELOCATION_MANAGER_FREQUENCY_IN_SECONDS));
+  public int getRelocationManagerFrequencyInMinutes() {
+    if (containsKey(REALTIME_SEGMENTS_RELOCATION_MANAGER_FREQUENCY_IN_MINUTES)) {
+      return Integer.parseInt((String) getProperty(REALTIME_SEGMENTS_RELOCATION_MANAGER_FREQUENCY_IN_MINUTES));
     }
-    return DEFAULT_RELOCATION_MANAGER_FREQUENCY_IN_SECONDS;
+    return DEFAULT_REALTIME_SEGMENTS_RELOCATION_MANAGER_FREQUENCY_IN_MINUTES;
   }
 
-  public void setRelocationManagerFrequencyInSeconds(int relocationManagerFrequencyInSeconds) {
-    setProperty(RELOCATION_MANAGER_FREQUENCY_IN_SECONDS, Integer.toString(relocationManagerFrequencyInSeconds));
+  public void setRelocationManagerFrequencyInMinutes(int relocationManagerFrequencyInMinutes) {
+    setProperty(REALTIME_SEGMENTS_RELOCATION_MANAGER_FREQUENCY_IN_MINUTES,
+        Integer.toString(relocationManagerFrequencyInMinutes));
   }
 
   public int getStatusCheckerWaitForPushTimeInSeconds() {
