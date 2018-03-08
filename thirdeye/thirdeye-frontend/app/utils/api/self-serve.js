@@ -42,11 +42,73 @@ const updateAlert = jobName => `/detection-onboard/create-job?jobName=${jobName}
 const deleteAlert = functionId => `/dashboard/anomaly-function?id=${functionId}`;
 
 /**
+ * GET autocomplete request for metric data by name
+ * @param {String} metricName: metric name
+ * @see {@link https://tinyurl.com/y7hhzm33|class DataResource}
+ */
+const metricAutoComplete = metricName => `/data/autocomplete/metric?name=${metricName}`;
+
+/**
+ * GET autocomplete request for alert by name
+ * @param {String} functionName: alert name
+ * @see {@link https://tinyurl.com/ybelagey|class DataResource}
+ */
+const alertAutoComplete = functionName => `/data/autocomplete/functionByName?name=${functionName}`;
+
+/**
+ * GET a single function record by id
+ * @param {String} id: alert function id
+ * @see {@link https://tinyurl.com/y76fu5vp|class OnboardResource}
+ */
+const alertById = functionId => `/onboard/function/${functionId}`;
+
+/**
+ * GET the timestamp for the end of the time range of available data for a given metric
+ * @param {Numer} metricId
+ * @see {@link https://tinyurl.com/y8vxqvg7|class DataResource}
+ */
+const maxDataTime = metricId => `/data/maxDataTime/metricId/${metricId}`;
+
+/**
+ * GET the timestamp for the end of the time range of available data for a given metric
+ * @param {Numer} metricId
+ * @see {@link https://tinyurl.com/y8vxqvg7|class DataResource}
+ */
+const metricGranularity = metricId => `/data/agg/granularity/metric/${metricId}`;
+
+/**
+ * GET the all filters associated with this metric
+ * @param {Numer} metricId
+ * @see {@link https://tinyurl.com/y7o864cq|class DataResource}
+ */
+const metricFilters = metricId => `/data/autocomplete/filters/metric/${metricId}`;
+
+/**
+ * GET a list of dimensions by metric.
+ * @param {Numer} metricId
+ * @see {@link https://tinyurl.com/yca7j4hz|class DataResource}
+ */
+const metricDimensions = metricId => `/data/autocomplete/dimensions/metric/${metricId}`;
+
+/**
  * General self-serve endpoints
  */
 export const selfServeApiCommon = {
+  alertById,
   allConfigGroups,
-  allApplications
+  allApplications,
+  alertAutoComplete,
+  metricAutoComplete
+};
+
+/**
+ * Graph-related self-serve endpoints
+ */
+export const selfServeApiGraph = {
+  maxDataTime,
+  metricGranularity,
+  metricDimensions,
+  metricFilters
 };
 
 /**
@@ -61,5 +123,6 @@ export const selfServeApiOnboard = {
 
 export default {
   selfServeApiCommon,
-  selfServeApiOnboard
+  selfServeApiOnboard,
+  selfServeApiGraph
 };

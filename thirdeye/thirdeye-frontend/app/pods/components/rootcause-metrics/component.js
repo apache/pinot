@@ -211,7 +211,7 @@ export default Component.extend({
             sortable_wo4w: this._makeChange(urn, 'wo4w', aggregates)
           };
         });
-      
+
       return _.sortBy(rows, (row) => -1 * scores[row.urn]);
     }
   ),

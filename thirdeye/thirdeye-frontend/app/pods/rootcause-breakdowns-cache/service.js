@@ -78,7 +78,7 @@ export default Service.extend({
 
   _extractBreakdowns(incoming, urn) {
     const breakdowns = {};
-    breakdowns[urn] = incoming
+    breakdowns[urn] = incoming;
     return breakdowns;
   },
 

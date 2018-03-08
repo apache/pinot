@@ -31,7 +31,7 @@ export default Component.extend({
     'mean4w',
     'median4w',
     'min4w',
-    'max4w',
+    'max4w'
   ],
 
   maxDateFormatted: computed({
