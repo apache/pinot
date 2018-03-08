@@ -201,6 +201,10 @@ public class RealtimeSegmentRelocationManager {
       MinMaxPriorityQueue<Map.Entry<String, Integer>> completedServersQueue) {
 
     Map<String, Map<String, String>> segmentNameToInstancesMap = new HashMap<>();
+    // TODO: we are scanning the entire segments list every time. This is unnecessary because only the latest segments will need relocation
+    // Can we do something to avoid this?
+    // 1. Time boundary: scan only last day whereas runFrequency = hourly
+    // 2. For each partition, scan in descending order, and stop when the first segment not needing relocation is found
     for (Map.Entry<String, Map<String, String>> entry : mapFields.entrySet()) {
 
       String segmentName = entry.getKey();
