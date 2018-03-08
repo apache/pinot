@@ -84,15 +84,24 @@ public class ServerPerfResource {
 
     for (int i = 1; i < CPULoadModels.size(); i++) {
       String[] tableLoadModel = CPULoadModels.get(i).split(",");
+
+
+
       String tableName = tableLoadModel[0];
       double avgDocCount = Double.parseDouble(tableLoadModel[1]);
-      double a = Double.parseDouble(tableLoadModel[2]);
-      double alpha = Double.parseDouble(tableLoadModel[3]);
-      double b =  Double.parseDouble(tableLoadModel[4]);
-      double lifeTime =  Double.parseDouble(tableLoadModel[5]);
+      double cpuModelA = Double.parseDouble(tableLoadModel[2]);
+      double cpuModelB =  Double.parseDouble(tableLoadModel[3]);
+      double cpuModelAlpha = Double.parseDouble(tableLoadModel[4]);
+      double lifeTimeInMonth =  Double.parseDouble(tableLoadModel[5]);
       double timeScale =  Double.parseDouble(tableLoadModel[6]);
-      //LOGGER.info("ReadingTableConfig: {}, {}, {}, {}, {}, {},{}", tableName, avgDocCount, a, alpha,b,lifeTime,timeScale);
-      tableCPULoadFormulation.put(tableName, new CPULoadFormulation(avgDocCount,a,alpha,b,lifeTime,timeScale));
+      double docScannedModelP1 = Double.parseDouble(tableLoadModel[7]);
+      double docScannedModelP2 = Double.parseDouble(tableLoadModel[8]);
+      double docScannedModelP3 = Double.parseDouble(tableLoadModel[9]);;
+
+      //LOGGER.info("ReadingTableConfig: {}, {}, {}, {}, {}, {}, {}, {}, {}", tableName, avgDocCount, cpuModelA,cpuModelB,cpuModelAlpha,lifeTimeInMonth,timeScale,docScannedModelP1,docScannedModelP2,docScannedModelP3);
+      //tableCPULoadFormulation.put(tableName, new CPULoadFormulation(avgDocCount,cpuModelA,alpha,b,lifeTime,timeScale));
+
+      tableCPULoadFormulation.put(tableName, new CPULoadFormulation(avgDocCount,cpuModelA,cpuModelB,cpuModelAlpha,lifeTimeInMonth,timeScale,docScannedModelP1,docScannedModelP2,docScannedModelP3));
     }
 
 
@@ -108,7 +117,7 @@ public class ServerPerfResource {
           //serverPerfMetrics.segmentList.add(segment.getSegmentMetadata());
 
           // LOGGER.info("adding segment " + segment.getSegmentName() + " to the list in server side! st: " + segment.getSegmentMetadata().getStartTime() + " et: " + segment.getSegmentMetadata().getEndTime());
-          double segmentLoad = tableCPULoadFormulation.get(tableDataManager.getTableName()).computeCPULoad(segment.getSegmentMetadata());
+          double segmentLoad = tableCPULoadFormulation.get(tableDataManager.getTableName()).computeCPULoad(segment.getSegmentMetadata(),1522540921);
           serverPerfMetrics.segmentCPULoad += segmentLoad;
           LOGGER.info("SegmentLoadIsComputed: {}, {}, {}", System.currentTimeMillis(), segment.getSegmentMetadata().getName(), segmentLoad);
         }
@@ -157,9 +166,9 @@ public class ServerPerfResource {
     private double _cpuModelAlpha = 0;
     private double _lifeTimeInMonth=0;
     private double _timeScale=0;
-    private double _docScannedModelA = 0;
-    private double _docScannedModelB = 0;
-
+    private double _docScannedModelP1 = 0;
+    private double _docScannedModelP2 = 0;
+    private double _docScannedModelP3 = 0;
 
     public CPULoadFormulation(double avgDocCount, double cpuModelA, double cpuModelAlpha, double cpuModelB, double lifeTimeInMonth, double timeScale) {
       _avgDocCount = avgDocCount;
@@ -168,9 +177,21 @@ public class ServerPerfResource {
       _cpuModelAlpha = cpuModelAlpha;
       _lifeTimeInMonth = lifeTimeInMonth;
       _timeScale = timeScale;
-      //_docScannedModelA = docScannedModelA;
-      //_docScannedModelB = docScannedModelB;
     }
+
+    public CPULoadFormulation(double avgDocCount, double cpuModelA, double cpuModelB, double cpuModelAlpha, double lifeTimeInMonth, double timeScale, double docScannedModelP1, double docScannedModelP2, double docScannedModelP3) {
+      _avgDocCount = avgDocCount;
+      _cpuModelA = cpuModelA;
+      _cpuModelB = cpuModelB;
+      _cpuModelAlpha = cpuModelAlpha;
+      _lifeTimeInMonth = lifeTimeInMonth;
+      _timeScale = timeScale;
+
+      _docScannedModelP1 = docScannedModelP1;
+      _docScannedModelP2 = docScannedModelP2;
+      _docScannedModelP3 = docScannedModelP3;
+    }
+
 
     public double computeCPULoad(SegmentMetadata segmentMetadata) {
 
@@ -207,7 +228,43 @@ public class ServerPerfResource {
       return segmentCost;
 
       //return 0;
+    }
 
+    public double computeCPULoad(SegmentMetadata segmentMetadata, long maxTime) {
+
+      //LOGGER.info("ComputingLoadFor: {}, {}, {}, {}, {}, {}, {}, {}", _avgDocCount, _cpuModelA,_cpuModelB,_cpuModelAlpha,_lifeTimeInMonth,_timeScale,_docScannedModelP1,_docScannedModelP2,_docScannedModelP3);
+
+      double lifeTimeInScaleSeconds = (_lifeTimeInMonth * 30 * 24 * 3600)/_timeScale;
+
+      double segmentMiddleTime = (segmentMetadata.getStartTime() + segmentMetadata.getEndTime()) / 2;
+      double segmentAgeInScaleSeconds = ( maxTime - segmentMiddleTime)/_timeScale;
+
+      if(segmentAgeInScaleSeconds > lifeTimeInScaleSeconds) {
+        return 0;
+      }
+
+
+
+      double tmp1 = 1 - _cpuModelAlpha;
+      double tmp2 = 2 - _cpuModelAlpha;
+      double tmp3 = 3 - _cpuModelAlpha;
+
+      double tmp4 = (_docScannedModelP1/tmp3) * (Math.pow(lifeTimeInScaleSeconds,tmp3)-Math.pow(segmentAgeInScaleSeconds,tmp3));
+      tmp4 += (_docScannedModelP2/tmp2) * (Math.pow(lifeTimeInScaleSeconds,tmp2)-Math.pow(segmentAgeInScaleSeconds,tmp2));
+      tmp4 += (_docScannedModelP3/tmp1) * (Math.pow(lifeTimeInScaleSeconds,tmp1)-Math.pow(segmentAgeInScaleSeconds,tmp1));
+
+      double tmp5 = (_docScannedModelP1/3)*(Math.pow(lifeTimeInScaleSeconds,3)-Math.pow(segmentAgeInScaleSeconds,3));
+      tmp5 += (_docScannedModelP2/2)*(Math.pow(lifeTimeInScaleSeconds,2)-Math.pow(segmentAgeInScaleSeconds,2));
+      tmp5 += (_docScannedModelP3)*(lifeTimeInScaleSeconds-segmentAgeInScaleSeconds);
+
+      double perDocCost = (_cpuModelA * tmp4) + (_cpuModelB * tmp5);
+
+      double segmentCost = segmentMetadata.getTotalDocs() * perDocCost;
+      //LOGGER.info("DifferentLevelComputation: {}, {}, {}, {}, {}, {}, {}", tmp1,tmp2,tmp3,tmp4,tmp5,perDocCost,segmentCost);
+
+      return segmentCost;
+
+      //return 0;
     }
 
   }
