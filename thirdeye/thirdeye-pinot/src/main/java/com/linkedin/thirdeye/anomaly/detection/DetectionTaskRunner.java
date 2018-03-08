@@ -28,6 +28,7 @@ import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
 
@@ -266,6 +267,10 @@ public class DetectionTaskRunner implements TaskRunner {
           retainExistingMergedAnomalies(windowStart.getMillis(), windowEnd.getMillis(), knownMergedAnomaliesOfAnEntry);
       resultsOfAnEntry = removeFromExistingMergedAnomalies(resultsOfAnEntry, existingMergedAnomalies);
     }
+    // Clean up duplicate and overlapped raw anomalies
+    if (CollectionUtils.isNotEmpty(resultsOfAnEntry)) {
+      resultsOfAnEntry = cleanUpDuplicateRawAnomalies(resultsOfAnEntry);
+    }
 
     return resultsOfAnEntry;
   }
@@ -372,6 +377,53 @@ public class DetectionTaskRunner implements TaskRunner {
     }
 
     return newRawAnomalies;
+  }
+
+  /**
+   * Remove duplicated raw anomalies (assuming the given list of anomalies are sorted by start time).
+   *
+   * @param rawAnomalies the list of raw anomalies.
+   *
+   * @return a list of raw anomalies that are not duplicated.
+   */
+  public static List<RawAnomalyResultDTO> cleanUpDuplicateRawAnomalies(List<RawAnomalyResultDTO> rawAnomalies) {
+    if (rawAnomalies.size() < 2) {
+      return rawAnomalies;
+    } else {
+      // Sort raw anomalies by their start time (in acending order) and
+      // then window size (in decending order)
+      Collections.sort(rawAnomalies, new Comparator<RawAnomalyResultDTO>() {
+        @Override
+        public int compare(RawAnomalyResultDTO o1, RawAnomalyResultDTO o2) {
+          if (o1.getStartTime() == o2.getStartTime()) {
+            long anomaly1Range = o1.getEndTime() - o1.getStartTime();
+            long anomaly2Range = o2.getEndTime() - o2.getStartTime();
+            return Long.compare(anomaly2Range, anomaly1Range);
+          } else {
+            return Long.compare(o1.getStartTime(), o2.getStartTime());
+          }
+        }
+      });
+
+      List<RawAnomalyResultDTO> cleanedUpRawAnomalies = new ArrayList<>();
+      cleanedUpRawAnomalies.add(rawAnomalies.get(0));
+      for (int suspect = 1; suspect < rawAnomalies.size(); suspect++) {
+        RawAnomalyResultDTO rawAnomaly = rawAnomalies.get(suspect);
+        boolean duplicated = false;
+        for (int idxToCompare = 0; idxToCompare < suspect; ++idxToCompare) {
+          RawAnomalyResultDTO rawAnomalyToCompare = rawAnomalies.get(idxToCompare);
+          if (rawAnomalyToCompare.getStartTime().compareTo(rawAnomaly.getStartTime()) <= 0
+              && rawAnomaly.getEndTime().compareTo(rawAnomalyToCompare.getEndTime()) <= 0) {
+            duplicated = true;
+            break;
+          }
+        }
+        if (!duplicated) {
+          cleanedUpRawAnomalies.add(rawAnomaly);
+        }
+      }
+      return cleanedUpRawAnomalies;
+    }
   }
 
   private void handleResults(List<RawAnomalyResultDTO> results) {
