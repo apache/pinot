@@ -57,7 +57,9 @@ public class ProfileViewQueryTask extends QueryTask {
         long minProfileViewStartTime = Long.parseLong(config.getProperty("MinProfileViewStartTime"));
         long maxProfileViewStartTime = Long.parseLong(config.getProperty("MaxProfileViewStartTime"));
         double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
-        LongRange timeRange = CommonTools.getZipfRandomTimeRange(minProfileViewStartTime,maxProfileViewStartTime,zipfS);
+        //LongRange timeRange = CommonTools.getZipfRandomDailyTimeRange(minProfileViewStartTime,maxProfileViewStartTime,zipfS);
+        LongRange timeRange = CommonTools.getZipfRandomHourlyTimeRange(minProfileViewStartTime,maxProfileViewStartTime,zipfS);
+
 
         int selectLimit = CommonTools.getSelectLimt(config);
         int groupByLimit = Integer.parseInt(config.getProperty("GroupByLimit"));

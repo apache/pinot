@@ -93,6 +93,12 @@ public class EventTableGenerator {
         _numRecords = numRecords;
     }
 
+    public EventTableGenerator(String dataDir, String outDir)
+    {
+        _dataDir = dataDir;
+        _outDir = outDir;
+    }
+
     public  List<GenericRow> readProfileTable() throws Exception
     {
         String profileDataFile = getTableDataDirectory("profile");

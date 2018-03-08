@@ -56,7 +56,8 @@ public class ArticleReadQueryTask extends QueryTask {
         long maxReadStartTime = Long.parseLong(config.getProperty("MaxReadStartTime"));
 
         double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
-        LongRange timeRange = CommonTools.getZipfRandomTimeRange(minReadStartTime,maxReadStartTime,zipfS);
+        //LongRange timeRange = CommonTools.getZipfRandomDailyTimeRange(minReadStartTime,maxReadStartTime,zipfS);
+        LongRange timeRange = CommonTools.getZipfRandomHourlyTimeRange(minReadStartTime,maxReadStartTime,zipfS);
 
         int selectLimit = CommonTools.getSelectLimt(config);
         int groupByLimit = Integer.parseInt(config.getProperty("GroupByLimit"));

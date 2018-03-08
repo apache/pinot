@@ -23,10 +23,16 @@ import java.util.Random;
 
 public class CommonTools {
     final static int DaySecond = 3600*24;
-    public static LongRange getZipfRandomTimeRange(long minProfileViewStartTime, long maxProfileViewStartTime, double zipfS)
+    final static int HourSecond = 3600;
+
+    public static LongRange getZipfRandomDailyTimeRange(long minProfileViewStartTime, long maxProfileViewStartTime, double zipfS)
     {
-        int dayCount = (int)((maxProfileViewStartTime-minProfileViewStartTime)/(DaySecond));
-        ZipfRandom zipfRandom = new ZipfRandom(zipfS,dayCount);
+
+
+        //int dayCount = (int) Math.ceil((maxProfileViewStartTime-minProfileViewStartTime)/(DaySecond));
+
+        int hourCount = (int) Math.ceil((maxProfileViewStartTime-minProfileViewStartTime)/(HourSecond));
+        ZipfRandom zipfRandom = new ZipfRandom(zipfS,hourCount);
 
         int firstDay = zipfRandom.nextInt();
         int secondDay = zipfRandom.nextInt();
@@ -51,6 +57,37 @@ public class CommonTools {
         }
         return new LongRange(queriedStartTime,queriedEndTime);
     }
+
+    public static LongRange getZipfRandomHourlyTimeRange(long minProfileViewStartTime, long maxProfileViewStartTime, double zipfS)
+    {
+
+        int hourCount = (int) Math.ceil((maxProfileViewStartTime-minProfileViewStartTime)/(HourSecond));
+        ZipfRandom zipfRandom = new ZipfRandom(zipfS,hourCount);
+
+        int firstHour = zipfRandom.nextInt();
+        int secondHour = zipfRandom.nextInt();
+        while(secondHour == firstHour)
+        {
+            secondHour = zipfRandom.nextInt();
+        }
+
+        long queriedStartTime;
+        long queriedEndTime;
+
+        if(firstHour<secondHour)
+        {
+
+            queriedStartTime = maxProfileViewStartTime - secondHour*HourSecond;
+            queriedEndTime = maxProfileViewStartTime - firstHour*HourSecond;
+        }
+        else
+        {
+            queriedStartTime = maxProfileViewStartTime - firstHour*HourSecond;
+            queriedEndTime = maxProfileViewStartTime - secondHour*HourSecond;
+        }
+        return new LongRange(queriedStartTime,queriedEndTime);
+    }
+
     public static int getSelectLimt(Properties config)
     {
         Random randGen = new Random(System.currentTimeMillis());

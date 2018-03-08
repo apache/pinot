@@ -42,7 +42,7 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
     private int _numRecords = 10000;
 
 
-    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_40_days_of_2018.properties";
+    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_100_days_of_2017_2018.properties";
     final String _tableConfig = "pinot_benchmark/event_data_config/event_table_config.properties";
 
 
@@ -56,6 +56,9 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
 
     //private double[] _numRecordRatio={1,0.6,0.5,0.3};
 
+
+    private  int[] _meanDocCount = {30000,15000,10000,20000};
+    private  int[] _standardDeviation = {1000,4000,2000,3000};
 
     public PinotBenchmarkEventTableCreationCommand setDataDir(String dataDir) {
         _dataDir = dataDir;
@@ -82,6 +85,7 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
         List<String> timeIntervals =  FileUtils.readLines(new File(timeIntervalConfigPath));
         //BufferedReader br = new BufferedReader(new FileReader(trained_cost_file));
         Random rand = new Random(System.currentTimeMillis());
+        int[] everyRoundRecordCount = new int[4];
 
         for(int i=1; i < timeIntervals.size();i++)
         {
@@ -92,14 +96,29 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
 
             long timeIntervalStart= Long.parseLong(timeIntervalInfo[1]);
             long timeIntervalEnd= Long.parseLong(timeIntervalInfo[2]);
+
+
+            for(int j=0;j<4;j++)
+            {
+                double gussianNumber = rand.nextGaussian();
+                everyRoundRecordCount[j] = (int)(gussianNumber*_standardDeviation[j] + _meanDocCount[j]);
+            }
+
+            EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir,outDir);
+            eventTableGenerator.generateProfileViewTable(timeIntervalStart,timeIntervalEnd,everyRoundRecordCount[0]);
+            eventTableGenerator.generateAdClickTable(timeIntervalStart,timeIntervalEnd,everyRoundRecordCount[1]);
+            eventTableGenerator.generateArticleReadTable(timeIntervalStart,timeIntervalEnd,everyRoundRecordCount[2]);
+            eventTableGenerator.generateJobApplyTable(timeIntervalStart,timeIntervalEnd,everyRoundRecordCount[3]);
+
+            /*
             int index = rand.nextInt(_numRecordList.length);
             int numRecord = _numRecordList[index];
-            EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir,outDir, _numRecords);
             eventTableGenerator.generateProfileViewTable(timeIntervalStart,timeIntervalEnd, (int)(numRecord*_numRecordRatio[0]));
             eventTableGenerator.generateAdClickTable(timeIntervalStart,timeIntervalEnd,(int)(numRecord*_numRecordRatio[1]));
             eventTableGenerator.generateArticleReadTable(timeIntervalStart,timeIntervalEnd,(int)(numRecord*_numRecordRatio[2]));
             eventTableGenerator.generateJobApplyTable(timeIntervalStart,timeIntervalEnd,(int)(numRecord*_numRecordRatio[3]));
-            eventTableGenerator.generateCompanySearchTable(timeIntervalStart,timeIntervalEnd,(int)(numRecord*_numRecordRatio[4]));
+            */
+
 
         }
 
