@@ -35,7 +35,7 @@ import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
-import com.linkedin.pinot.controller.helix.core.relocation.RelocationManager;
+import com.linkedin.pinot.controller.helix.core.relocation.RealtimeSegmentRelocationManager;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.validation.ValidationManager;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -74,7 +74,7 @@ public class ControllerStarter {
 
   // Can only be constructed after resource manager getting started
   private ValidationManager _validationManager;
-  private RelocationManager _relocationManager;
+  private RealtimeSegmentRelocationManager _realtimeSegmentRelocationManager;
   private PinotHelixTaskResourceManager _helixTaskResourceManager;
   private PinotTaskManager _taskManager;
 
@@ -156,7 +156,7 @@ public class ControllerStarter {
       _segmentStatusChecker.start();
 
       LOGGER.info("Starting relocation manager");
-      _relocationManager.start();
+      _realtimeSegmentRelocationManager.start();
 
       LOGGER.info("Creating rebalance segments factory");
       RebalanceSegmentStrategyFactory.createInstance(_helixResourceManager.getHelixZkManager());

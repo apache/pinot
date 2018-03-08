@@ -35,6 +35,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.MapUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
@@ -45,19 +46,20 @@ import org.slf4j.LoggerFactory;
 /**
  * Manager to relocate completed segments from consuming servers to completed servers
  * Segment relocation will be done by this manager, instead of directly moving segments to completed servers on completion,
- * We designed a separate service for the segments relocation, so that we don't get segment downtime when a segment is in transition
- * The Relocation Manager will move one replica at a time, so that we don't face any down time for the segment
+ * so that we don't get segment downtime when a segment is in transition
  *
+ * We only relocate segments for realtime tables, and only if tenant config indicates that relocation is required
+ * A segment will be relocated, one replica at a time, once all of its replicas are in ONLINE state and on consuming servers
  */
-public class RelocationManager {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RelocationManager.class);
+public class RealtimeSegmentRelocationManager {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentRelocationManager.class);
   private final ScheduledExecutorService _executorService;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
   private final long _runFrequencySeconds;
 
-  public RelocationManager(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
+  public RealtimeSegmentRelocationManager(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _helixManager = pinotHelixResourceManager.getHelixZkManager();
     _helixAdmin = pinotHelixResourceManager.getHelixAdmin();
@@ -92,6 +94,9 @@ public class RelocationManager {
     _executorService.shutdown();
   }
 
+  /**
+   * Check all tables. Perform relocation of segments if table is realtime and relocation is required
+   */
   public void runRelocation() {
     if (!_pinotHelixResourceManager.isLeader()) {
       LOGGER.info("Skipping relocation, not leader!");
@@ -109,12 +114,19 @@ public class RelocationManager {
 
         TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableNameWithType);
 
+        RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
+        if (!realtimeTagConfig.isRelocateCompletedSegments()) {
+          LOGGER.info("Skipping relocation of segments for {}", tableNameWithType);
+          return;
+        }
+
         IdealState idealState = HelixHelper.getTableIdealState(_helixManager, tableNameWithType);
         if (!idealState.isEnabled()) {
           LOGGER.info("Skipping relocation of segments for {} since ideal state is disabled", tableNameWithType);
           return;
         }
-        Map<String, Map<String, String>> segmentNameToInstancesMap = relocateSegments(tableConfig, idealState);
+
+        Map<String, Map<String, String>> segmentNameToInstancesMap = relocateSegments(realtimeTagConfig, idealState);
         if (!segmentNameToInstancesMap.isEmpty()) {
           updateIdealState(tableNameWithType, segmentNameToInstancesMap);
         }
@@ -124,52 +136,55 @@ public class RelocationManager {
   }
 
   /**
-   * Given a realtime table config, relocate the segments
+   * Given a realtime tag config and an ideal state, relocate the segments
    * which are completed but still hanging around on consuming servers, one replica at a time
-   * @param realtimeTableConfig
+   * @param  realtimeTagConfig
    * @param idealState
    */
-  protected Map<String, Map<String, String>> relocateSegments(TableConfig realtimeTableConfig, IdealState idealState) {
-    Map<String, Map<String, String>> segmentNameToInstancesMap = new HashMap<>(1);
+  protected Map<String, Map<String, String>> relocateSegments(RealtimeTagConfig realtimeTagConfig,
+      IdealState idealState) {
+    Map<String, Map<String, String>> segmentNameToInstancesMap;
 
-    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(realtimeTableConfig, _helixManager);
+    List<String> consumingServers = _helixAdmin.getInstancesInClusterWithTag(_helixManager.getClusterName(),
+        realtimeTagConfig.getConsumingServerTag());
+    if (consumingServers.isEmpty()) {
+      throw new IllegalStateException(
+          "Found no realtime consuming servers with tag " + realtimeTagConfig.getConsumingServerTag());
+    }
+    List<String> completedServers = _helixAdmin.getInstancesInClusterWithTag(_helixManager.getClusterName(),
+        realtimeTagConfig.getCompletedServerTag());
+    if (completedServers.isEmpty()) {
+      throw new IllegalStateException(
+          "Found no realtime completed servers with tag " + realtimeTagConfig.getCompletedServerTag());
+    }
 
-    // move the completed segments only if consuming and completed server tags are different
-    if (realtimeTagConfig.isRelocateCompletedSegments()) {
+    Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
 
-      List<String> consumingServers = _helixAdmin.getInstancesInClusterWithTag(_helixManager.getClusterName(),
-          realtimeTagConfig.getConsumingServerTag());
-      List<String> completedServers = _helixAdmin.getInstancesInClusterWithTag(_helixManager.getClusterName(),
-          realtimeTagConfig.getCompletedServerTag());
-
-      Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
-
-      // create map of completed server name to num segments it holds.
-      // This will help us decide which completed server to choose for replacing a consuming server
-      Map<String, Integer> completedServerToNumSegments = new HashMap<>(completedServers.size());
-      for (String server : completedServers) {
-        completedServerToNumSegments.put(server, 0);
-      }
-      for (Map.Entry<String, Map<String, String>> entry : mapFields.entrySet()) {
-        for (String instance : entry.getValue().keySet()) {
-          if (completedServers.contains(instance)) {
-            completedServerToNumSegments.put(instance, completedServerToNumSegments.get(instance) + 1);
-          }
+    // create map of completed server name to num segments it holds.
+    // This will help us decide which completed server to choose for replacing a consuming server
+    Map<String, Integer> completedServerToNumSegments = new HashMap<>(completedServers.size());
+    for (String server : completedServers) {
+      completedServerToNumSegments.put(server, 0);
+    }
+    for (Map.Entry<String, Map<String, String>> entry : mapFields.entrySet()) {
+      for (String instance : entry.getValue().keySet()) {
+        if (completedServers.contains(instance)) {
+          completedServerToNumSegments.put(instance, completedServerToNumSegments.get(instance) + 1);
         }
       }
-      MinMaxPriorityQueue<Map.Entry<String, Integer>> completedServersQueue =
-          MinMaxPriorityQueue.orderedBy(new Comparator<Map.Entry<String, Integer>>() {
-            @Override
-            public int compare(Map.Entry<String, Integer> entry1, Map.Entry<String, Integer> entry2) {
-              return Integer.compare(entry1.getValue(), entry2.getValue());
-            }
-          }).maximumSize(completedServers.size()).create();
-      completedServersQueue.addAll(completedServerToNumSegments.entrySet());
-
-      // get new mapping for segments that need relocation
-      segmentNameToInstancesMap =
-          createNewSegmentToInstanceStateMap(mapFields, consumingServers, completedServersQueue);
     }
+    MinMaxPriorityQueue<Map.Entry<String, Integer>> completedServersQueue =
+        MinMaxPriorityQueue.orderedBy(new Comparator<Map.Entry<String, Integer>>() {
+          @Override
+          public int compare(Map.Entry<String, Integer> entry1, Map.Entry<String, Integer> entry2) {
+            return Integer.compare(entry1.getValue(), entry2.getValue());
+          }
+        }).maximumSize(completedServers.size()).create();
+    completedServersQueue.addAll(completedServerToNumSegments.entrySet());
+
+    // get new mapping for segments that need relocation
+    segmentNameToInstancesMap = createNewSegmentToInstanceStateMap(mapFields, consumingServers, completedServersQueue);
+
     return segmentNameToInstancesMap;
   }
 
@@ -191,10 +206,9 @@ public class RelocationManager {
       String segmentName = entry.getKey();
       Map<String, String> instanceStateMap = entry.getValue();
 
-      Map<String, String> newInstanceStateMap = new HashMap<>(instanceStateMap.size());
-      boolean replaced =
-          createNewInstanceStateMap(instanceStateMap, consumingServers, completedServersQueue, newInstanceStateMap);
-      if (replaced) {
+      Map<String, String> newInstanceStateMap =
+          createNewInstanceStateMap(instanceStateMap, consumingServers, completedServersQueue);
+      if (MapUtils.isNotEmpty(newInstanceStateMap)) {
         segmentNameToInstancesMap.put(segmentName, newInstanceStateMap);
       }
     }
@@ -207,40 +221,53 @@ public class RelocationManager {
    * @param instanceStateMap
    * @param consumingServers
    * @param completedServersQueue
-   * @param newInstanceStateMap
    * @return
    */
-  private boolean createNewInstanceStateMap(Map<String, String> instanceStateMap, List<String> consumingServers,
-      MinMaxPriorityQueue<Map.Entry<String, Integer>> completedServersQueue, Map<String, String> newInstanceStateMap) {
+  private Map<String, String> createNewInstanceStateMap(Map<String, String> instanceStateMap,
+      List<String> consumingServers, MinMaxPriorityQueue<Map.Entry<String, Integer>> completedServersQueue) {
+
+    Map<String, String> newInstanceStateMap = null;
 
     // proceed only if all segments are ONLINE, and at least 1 server is from consuming list
     for (String state : instanceStateMap.values()) {
       if (!state.equals(PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE)) {
-        return false;
+        return newInstanceStateMap;
       }
     }
 
-    boolean replaced = false;
     for (String instance : instanceStateMap.keySet()) {
-      if (!replaced && consumingServers.contains(instance)) {
-        replaced = true;
-        // TODO: decide best strategy to pick completed server. Using 2 for now.
+      if (consumingServers.contains(instance)) {
+        // Decide best strategy to pick completed server.
         // 1. pick random from list of completed servers
         // 2. pick completed server with minimum segments, based on ideal state of this resource
         // 3. pick completed server with minimum segment, based on ideal state of all resources in this tenant
+        // 4. use SegmentAssignmentStrategy
+
+        // TODO: Using 2 for now. We should use 4. However the current interface and implementations cannot be used as is.
+        // We should refactor the SegmentAssignmentStrategy interface suitably and reuse it here
+
         Map.Entry<String, Integer> completedInstance = completedServersQueue.pollFirst();
+
+        newInstanceStateMap = new HashMap<>(instanceStateMap.size());
+        newInstanceStateMap.putAll(instanceStateMap);
+        newInstanceStateMap.remove(instance);
         newInstanceStateMap.put(completedInstance.getKey(),
             PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+
         completedInstance.setValue(completedInstance.getValue() + 1);
         completedServersQueue.add(completedInstance);
-      } else {
-        newInstanceStateMap.put(instance, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+        break;
       }
     }
-    return replaced;
+    return newInstanceStateMap;
   }
 
-  protected void updateIdealState(final String tableNameWithType,
+  /**
+   * Updates the ideal state of given tablename with the new segment to instance state map
+   * @param tableNameWithType
+   * @param segmentNameToInstanceMap
+   */
+  private void updateIdealState(final String tableNameWithType,
       final Map<String, Map<String, String>> segmentNameToInstanceMap) {
     HelixHelper.updateIdealState(_helixManager, tableNameWithType, new Function<IdealState, IdealState>() {
       @Nullable
