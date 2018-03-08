@@ -3,6 +3,7 @@ import _ from 'lodash';
 import moment from 'moment';
 import { isPresent } from "@ember/utils";
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
+import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 
 /**
  * Handles types and defaults returned from eval/projected endpoints
@@ -73,9 +74,7 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
     const durationArr = [pluralizeTime(days, 'day'), pluralizeTime(hours, 'hour'), pluralizeTime(minutes, 'minute')];
 
     // Set up anomaly change rate display
-    const changeRate = (anomaly.current && anomaly.baseline) ? ((anomaly.current - anomaly.baseline) / anomaly.baseline * 100).toFixed(2) : 0;
-    const changeDirection = (anomaly.current > anomaly.baseline) ? '-' : '+';
-    const changeDirectionLabel = changeRate < 0 ? 'down' : 'up';
+    const changeRate = (anomaly.current && anomaly.baseline) ? floatToPercent((anomaly.current - anomaly.baseline) / anomaly.baseline) : 0;
     const isNullChangeRate = Number.isNaN(Number(changeRate));
 
     // We want to display only non-zero duration values in our table
@@ -91,9 +90,7 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
     // Add missing properties
     Object.assign(anomaly, {
       changeRate,
-      changeDirection,
       isNullChangeRate,
-      changeDirectionLabel,
       shownChangeRate: changeRate,
       isUserReported: anomaly.anomalyResultSource === 'USER_LABELED_ANOMALY',
       startDateStr: moment(anomaly.anomalyStart).format('MMM D, hh:mm A'),

@@ -1,9 +1,9 @@
 /**
  * Converts a float to percent
- * @example floatToPercent(0.553) --> "55.3%"
+ * @example floatToPercent(0.55333) --> 55.3
  * @param {float} float
- * @return {String} - percent value of float with a % sign
+ * @return {float} - percentage value of float
  */
 export default function floatToPercent(float) {
-  return Number.isNaN(float) ? 'NaN' : `${(float * 100).toFixed(2)}%`;
+  return (float * 100).toFixed(2);
 }

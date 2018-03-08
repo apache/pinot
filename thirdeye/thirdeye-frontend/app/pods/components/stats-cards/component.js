@@ -34,19 +34,22 @@ export default Component.extend({
    * [{
    *    title: 'title',
    *    description: 'description',
-   *    value: 7
+   *    value: 7,
+   *    unit: 'digit'
    *  }, {
    *    title: 'title',
    *    description: 'description',
-   *    value: '87.1%'
+   *    value: 87.1,
+   *    unit: 'percent'
    *  }, {
    *    title: 'title',
    *    description: 'description',
-   *    value: '87.1%'
+   *    value: 87.1,
+   *    unit: 'percent'
    * }];
    */
   statsBuilder(statsArray) {
-    const props = ['title', 'description', 'value'];
+    const props = ['title', 'description', 'value', 'unit'];
     let cards = [];
 
     statsArray.forEach(card => {

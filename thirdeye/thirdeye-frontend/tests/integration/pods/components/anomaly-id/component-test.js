@@ -1,5 +1,6 @@
 import { moduleForComponent, test } from 'ember-qunit';
 import hbs from 'htmlbars-inline-precompile';
+import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 
 moduleForComponent('anomaly-id', 'Integration | Component | anomaly id', {
   integration: true
@@ -19,7 +20,7 @@ const anomaly = {
   anomalyFunctionName: 'some-function-name'
 };
 const calculateChangeRate = (current, baseline) => {
-  return (baseline === 0) ? 0 : ((current - baseline) / baseline * 100).toFixed(2);
+  return (baseline === 0) ? 0 : floatToPercent((current - baseline) / baseline);
 };
 
 // Test for proper rendering of all Anomaly ID Block data
