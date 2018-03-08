@@ -99,11 +99,11 @@ public class RealtimeSegmentRelocationManager {
    */
   public void runRelocation() {
     if (!_pinotHelixResourceManager.isLeader()) {
-      LOGGER.info("Skipping relocation, not leader!");
+      LOGGER.info("Skipping realtime segment relocation, not leader!");
       return;
     }
 
-    LOGGER.info("Starting relocation of segments");
+    LOGGER.info("Starting relocation of realtime segments");
     List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
 
     for (String tableNameWithType : allTableNames) {
@@ -132,7 +132,7 @@ public class RealtimeSegmentRelocationManager {
         }
       }
     }
-    LOGGER.info("Segment relocation completed");
+    LOGGER.info("Realtime segment relocation completed");
   }
 
   /**

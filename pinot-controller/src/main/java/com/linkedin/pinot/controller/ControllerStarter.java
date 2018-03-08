@@ -156,7 +156,7 @@ public class ControllerStarter {
       LOGGER.info("Starting segment status manager");
       _segmentStatusChecker.start();
 
-      LOGGER.info("Starting relocation manager");
+      LOGGER.info("Starting realtime segment relocation manager");
       _realtimeSegmentRelocationManager.start();
 
       LOGGER.info("Creating rebalance segments factory");
