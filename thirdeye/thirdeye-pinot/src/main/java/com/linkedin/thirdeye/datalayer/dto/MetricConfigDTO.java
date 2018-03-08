@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.datalayer.dto;
 
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
-import com.wordnik.swagger.annotations.ApiModel;
 
 
 public class MetricConfigDTO extends MetricConfigBean {

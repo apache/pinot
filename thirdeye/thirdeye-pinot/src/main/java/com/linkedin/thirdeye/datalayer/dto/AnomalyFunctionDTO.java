@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.datalayer.dto;
 
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
-import com.wordnik.swagger.annotations.ApiModel;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
