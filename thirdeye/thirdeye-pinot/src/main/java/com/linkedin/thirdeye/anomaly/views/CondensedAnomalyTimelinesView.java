@@ -8,21 +8,48 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.joda.time.Minutes;
 
 
 /**
  * We face a problem that if we store the timelines view using AnomalyTimelinesView. The DB has overflow exception when
  * storing merged anomalies. As TimeBucket is not space efficient for storage. To solve the problem, we introduce a
  * condensed version of AnomalyTimelinesView.
+ * To save the space in DB, three techniques has been applied:
+ *  - Flatten the time buckets to timestamp and bucket millis
+ *  - An offset has been saved; no need to store the whole timestamp value
+ *  - A bucket unit, 1_MIN, is applied to reduce the space (Currently we don't have time granularity less than 1_MIN)
+ * An compress method is also implemented. It compresses the time series data by enlarge the bucket millis.
  */
 public class CondensedAnomalyTimelinesView {
+  public static final int DEFAULT_MAX_LENGTH = 1024 * 10; // 10 kilobytes
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  public static final Long DEFAULT_MIN_BUCKET_UNIT = Minutes.ONE.toStandardDuration().getMillis();
 
-  Long bucketMillis = 0l;  // the bucket size of current time series
+  Long timestampOffset = 0l; // the timestamp offset of the original time series
+  Long minBucketUnit = 1l;
+  Long bucketMillis = 0l;  // the bucket size of original time series
   List<Long> timeStamps = new ArrayList<>(); // the start time of data points
   Map<String, String> summary = new HashMap<>(); // the summary of the view
   List<Double> currentValues = new ArrayList<>();  // the observed values
   List<Double> baselineValues = new ArrayList<>(); // the expected values
+
+  public CondensedAnomalyTimelinesView() {
+
+  }
+
+  public CondensedAnomalyTimelinesView(Long bucketMillis, List<Long> timeStamps, List<Double> currentValues,
+      List<Double> baselineValues, Map<String, String> summary) {
+    this.timestampOffset = timeStamps.get(0);
+    this.minBucketUnit = DEFAULT_MIN_BUCKET_UNIT;
+    this.bucketMillis = bucketMillis / minBucketUnit;
+    for (long timestamp : timeStamps) {
+      this.timeStamps.add((timestamp - timestampOffset)/minBucketUnit);
+    }
+    this.summary = summary;
+    this.currentValues = currentValues;
+    this.baselineValues = baselineValues;
+  }
 
   public Long getBucketMillis() {
     return bucketMillis;
@@ -33,11 +60,11 @@ public class CondensedAnomalyTimelinesView {
   }
 
   public List<Long> getTimeStamps() {
-    return timeStamps;
+    return this.timeStamps;
   }
 
-  public void addTimeStamps(Long timeStamp) {
-    this.timeStamps.add(timeStamp);
+  public void addRealTimeStamps(Long timeStamp) {
+    this.timeStamps.add((timeStamp - timestampOffset) / DEFAULT_MIN_BUCKET_UNIT);
   }
 
   public Map<String, String> getSummary() {
@@ -64,6 +91,22 @@ public class CondensedAnomalyTimelinesView {
     this.baselineValues.add(baselineValue);
   }
 
+  public Long getTimestampOffset() {
+    return timestampOffset;
+  }
+
+  public void setTimestampOffset(Long timestampOffset) {
+    this.timestampOffset = timestampOffset;
+  }
+
+  public Long getMinBucketUnit() {
+    return minBucketUnit;
+  }
+
+  public void setMinBucketUnit(Long minBucketUnit) {
+    this.minBucketUnit = minBucketUnit;
+  }
+
   /**
    * Convert current instance to an AnomalyTimelinesView instance
    * @return
@@ -71,8 +114,11 @@ public class CondensedAnomalyTimelinesView {
   public AnomalyTimelinesView toAnomalyTimelinesView() {
     AnomalyTimelinesView anomalyTimelinesView = new AnomalyTimelinesView();
     for (int i = 0; i < timeStamps.size(); i++) {
-      TimeBucket timeBucket = new TimeBucket(timeStamps.get(i), timeStamps.get(i) + bucketMillis,
-          timeStamps.get(i), timeStamps.get(i) + bucketMillis);
+      long startTime = timeStamps.get(i);
+      TimeBucket timeBucket = new TimeBucket(startTime * minBucketUnit + timestampOffset,
+          (startTime + bucketMillis) * minBucketUnit + timestampOffset,
+          startTime * minBucketUnit + timestampOffset,
+          (startTime + bucketMillis) * minBucketUnit + timestampOffset);
       anomalyTimelinesView.addTimeBuckets(timeBucket);
       anomalyTimelinesView.addBaselineValues(baselineValues.get(i));
       anomalyTimelinesView.addCurrentValues(currentValues.get(i));
@@ -89,19 +135,77 @@ public class CondensedAnomalyTimelinesView {
    * @return
    */
   public static CondensedAnomalyTimelinesView fromAnomalyTimelinesView(AnomalyTimelinesView anomalyTimelinesView) {
-    CondensedAnomalyTimelinesView condensedView = new CondensedAnomalyTimelinesView();
+    if (anomalyTimelinesView == null || anomalyTimelinesView.getTimeBuckets().isEmpty()) {
+      return new CondensedAnomalyTimelinesView();
+    }
+    long maxBucketMillis = 0l;
+    List<Long> timestamps = new ArrayList<>();
     for (int i = 0; i < anomalyTimelinesView.getTimeBuckets().size(); i++) {
       TimeBucket timeBucket = anomalyTimelinesView.getTimeBuckets().get(i);
-      condensedView.setBucketMillis(timeBucket.getCurrentEnd() - timeBucket.getCurrentStart());
-      condensedView.addTimeStamps(timeBucket.getCurrentStart());
-      condensedView.addCurrentValues(anomalyTimelinesView.getCurrentValues().get(i));
-      condensedView.addBaselineValues(anomalyTimelinesView.getBaselineValues().get(i));
+      maxBucketMillis = Math.max(maxBucketMillis, timeBucket.getCurrentEnd() - timeBucket.getCurrentStart());
+      timestamps.add(timeBucket.getCurrentStart());
+    }
+    return new CondensedAnomalyTimelinesView(maxBucketMillis, timestamps, anomalyTimelinesView.getCurrentValues(),
+        anomalyTimelinesView.getBaselineValues(), anomalyTimelinesView.getSummary());
+  }
+
+  /**
+   * Compress this instance of timelines view to under DEFAULT_MAX_LENGTH bytes
+   * The concept of the time series compression is to enlarge the bucket size; from 5 min to 10 min for example.
+   * @return a compressed CondensedAnomalyTimelinesView
+   */
+  public CondensedAnomalyTimelinesView compress() {
+    return compress(DEFAULT_MAX_LENGTH);
+  }
+
+  /**
+   * Compress this instance of timelines view to under ${maxLength} bytes
+   * The concept of the time series compression is to enlarge the bucket size; from 5 min to 10 min for example.
+   * @param maxLength customized maximum length
+   * @return a compressed CondensedAnomalyTimelinesView
+   */
+  public CondensedAnomalyTimelinesView compress(int maxLength) {
+    if (timeStamps.size() == 0) {
+      return this;
+    }
+    try {
+      if (this.toJsonString().length() < maxLength) {
+        return this;
+      }
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("Unable to parse view to json string", e);
     }
 
-    for (Map.Entry<String, String> entry : anomalyTimelinesView.getSummary().entrySet()) {
-      condensedView.addSummary(entry.getKey(), entry.getValue());
+    List<Long> aggregatedTimestamps = new ArrayList<>();
+    List<Double> aggregatedObservedValues = new ArrayList<>();
+    List<Double> aggregatedExpectedValues = new ArrayList<>();
+    long maxBucketMills = this.bucketMillis * 2;
+    long lastTimestampEnd = this.timeStamps.get(this.timeStamps.size() - 1) + this.bucketMillis;
+
+    for (int i = 0; i < timeStamps.size(); i++) {
+      int count = 1;
+      long timestamp = this.timeStamps.get(i);
+      double observedValue = this.currentValues.get(i);
+      double expectedValue = this.baselineValues.get(i);
+      /*
+       Aggregate data points fit in the bucket window; remain the same if it cannot fit
+       */
+      if ((lastTimestampEnd - timestamp) >= maxBucketMills) {
+        while (i + 1 < this.timeStamps.size() && (this.timeStamps.get(i + 1) - timestamp) < maxBucketMills) {
+          observedValue += this.currentValues.get(i + 1);
+          expectedValue += this.baselineValues.get(i + 1);
+          i++;
+          count++;
+        }
+      }
+      aggregatedTimestamps.add(timestamp * DEFAULT_MIN_BUCKET_UNIT + timestampOffset);
+      aggregatedObservedValues.add(observedValue/((double)count));
+      aggregatedExpectedValues.add(expectedValue/((double)count));
     }
-    return condensedView;
+
+
+    return new CondensedAnomalyTimelinesView(maxBucketMills * DEFAULT_MIN_BUCKET_UNIT, aggregatedTimestamps, aggregatedObservedValues,
+        aggregatedExpectedValues, new HashMap<String, String>(summary)).compress(maxLength);
   }
 
   /**

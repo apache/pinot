@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 public class AnomalyTimelinesView {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyTimelinesView.class);
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  public static int DEFAULT_MAX_SIZE = CondensedAnomalyTimelinesView.DEFAULT_MAX_LENGTH;
 
   List<TimeBucket> timeBuckets = new ArrayList<>();
   Map<String, String> summary = new HashMap<>();
@@ -64,7 +65,7 @@ public class AnomalyTimelinesView {
    */
   public String toJsonString() throws JsonProcessingException {
     // Convert the new AnomalyTimelinesView to condensed one
-    return CondensedAnomalyTimelinesView.fromAnomalyTimelinesView(this).toJsonString();
+    return CondensedAnomalyTimelinesView.fromAnomalyTimelinesView(this).compress(DEFAULT_MAX_SIZE).toJsonString();
   }
 
   /**
