@@ -107,7 +107,7 @@ export default Route.extend({
     // We do not have a valid alertId. Set error state.
     if (isLoadError) {
       Object.assign(newAlertData, { functionName, isActive: false });
-      errorText = `Creation of alert: ${functionName.toUpperCase()} has failed. Please try again or email ask_thirdeye@linkedin.com`;
+      errorText = `${functionName.toUpperCase()} has failed to create. Please try again or email ask_thirdeye@linkedin.com`;
     }
 
     controller.setProperties({
