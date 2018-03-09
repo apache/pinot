@@ -19,8 +19,6 @@ import com.google.common.base.Function;
 import com.google.common.collect.MinMaxPriorityQueue;
 import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -39,6 +37,9 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
+import org.joda.time.Period;
+import org.joda.time.format.PeriodFormatter;
+import org.joda.time.format.PeriodFormatterBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,32 +52,35 @@ import org.slf4j.LoggerFactory;
  * We only relocate segments for realtime tables, and only if tenant config indicates that relocation is required
  * A segment will be relocated, one replica at a time, once all of its replicas are in ONLINE state and on consuming servers
  */
-public class RealtimeSegmentRelocationManager {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentRelocationManager.class);
+public class RealtimeSegmentRelocator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentRelocator.class);
+  private final static PeriodFormatter PERIOD_FORMATTER =
+      new PeriodFormatterBuilder().appendHours().appendSuffix("h").appendMinutes().appendSuffix("m").toFormatter();
+
   private final ScheduledExecutorService _executorService;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
-  private final long _runFrequencyMinutes;
+  private final long _runFrequencySeconds;
 
-  public RealtimeSegmentRelocationManager(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
+  public RealtimeSegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _helixManager = pinotHelixResourceManager.getHelixZkManager();
     _helixAdmin = pinotHelixResourceManager.getHelixAdmin();
-    _runFrequencyMinutes = config.getRelocationManagerFrequencyInMinutes();
+    _runFrequencySeconds = getRunFrequencySeconds(config.getRealtimeSegmentRelocatorFrequency());
 
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override
       public Thread newThread(Runnable runnable) {
         Thread thread = new Thread(runnable);
-        thread.setName("PinotRelocationManagerExecutorService");
+        thread.setName("RealtimeSegmentRelocatorExecutorService");
         return thread;
       }
     });
   }
 
   public void start() {
-    LOGGER.info("Starting relocation manager");
+    LOGGER.info("Starting realtime segment relocator");
 
     _executorService.scheduleWithFixedDelay(new Runnable() {
       @Override
@@ -84,10 +88,10 @@ public class RealtimeSegmentRelocationManager {
         try {
           runRelocation();
         } catch (Exception e) {
-          LOGGER.warn("Caught exception while running relocation manager", e);
+          LOGGER.warn("Caught exception while running realtime segment relocator", e);
         }
       }
-    }, 5, _runFrequencyMinutes, TimeUnit.MINUTES);
+    }, 120, _runFrequencySeconds, TimeUnit.SECONDS);
   }
 
   public void stop() {
@@ -104,32 +108,27 @@ public class RealtimeSegmentRelocationManager {
     }
 
     LOGGER.info("Starting relocation of realtime segments");
-    List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
+    List<String> allRealtimeTableNames = _pinotHelixResourceManager.getAllRealtimeTables();
 
-    for (String tableNameWithType : allTableNames) {
+    for (String tableNameWithType : allRealtimeTableNames) {
+      LOGGER.info("Starting relocation of segments for table: {}", tableNameWithType);
 
-      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      if (tableType.equals(TableType.REALTIME)) {
-        LOGGER.info("Starting relocation of segments for table: {}", tableNameWithType);
+      TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableNameWithType);
+      RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
+      if (!realtimeTagConfig.isRelocateCompletedSegments()) {
+        LOGGER.info("Skipping relocation of segments for {}", tableNameWithType);
+        return;
+      }
 
-        TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableNameWithType);
+      IdealState idealState = HelixHelper.getTableIdealState(_helixManager, tableNameWithType);
+      if (!idealState.isEnabled()) {
+        LOGGER.info("Skipping relocation of segments for {} since ideal state is disabled", tableNameWithType);
+        return;
+      }
 
-        RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
-        if (!realtimeTagConfig.isRelocateCompletedSegments()) {
-          LOGGER.info("Skipping relocation of segments for {}", tableNameWithType);
-          return;
-        }
-
-        IdealState idealState = HelixHelper.getTableIdealState(_helixManager, tableNameWithType);
-        if (!idealState.isEnabled()) {
-          LOGGER.info("Skipping relocation of segments for {} since ideal state is disabled", tableNameWithType);
-          return;
-        }
-
-        Map<String, Map<String, String>> segmentNameToInstancesMap = relocateSegments(realtimeTagConfig, idealState);
-        if (!segmentNameToInstancesMap.isEmpty()) {
-          updateIdealState(tableNameWithType, segmentNameToInstancesMap);
-        }
+      Map<String, Map<String, String>> segmentNameToInstancesMap = relocateSegments(realtimeTagConfig, idealState);
+      if (!segmentNameToInstancesMap.isEmpty()) {
+        updateIdealState(tableNameWithType, segmentNameToInstancesMap);
       }
     }
     LOGGER.info("Realtime segment relocation completed");
@@ -159,6 +158,8 @@ public class RealtimeSegmentRelocationManager {
     }
 
     Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
+
+    // TODO: use segment assignment strategy to decide where to place relocated segment
 
     // create map of completed server name to num segments it holds.
     // This will help us decide which completed server to choose for replacing a consuming server
@@ -283,5 +284,16 @@ public class RealtimeSegmentRelocationManager {
         return idealState;
       }
     }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000, 2.0f));
+  }
+
+  private long getRunFrequencySeconds(String timeStr) {
+    long seconds;
+    try {
+      Period p = PERIOD_FORMATTER.parsePeriod(timeStr);
+      seconds = p.toStandardDuration().getStandardSeconds();
+    } catch (Exception e) {
+      throw new RuntimeException("Invalid time spec '" + timeStr + "' (Valid examples: '3h', '4h30m', '30m')", e);
+    }
+    return seconds;
   }
 }

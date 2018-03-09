@@ -35,7 +35,7 @@ import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
-import com.linkedin.pinot.controller.helix.core.relocation.RealtimeSegmentRelocationManager;
+import com.linkedin.pinot.controller.helix.core.relocation.RealtimeSegmentRelocator;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.validation.ValidationManager;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -74,7 +74,7 @@ public class ControllerStarter {
 
   // Can only be constructed after resource manager getting started
   private ValidationManager _validationManager;
-  private RealtimeSegmentRelocationManager _realtimeSegmentRelocationManager;
+  private RealtimeSegmentRelocator _realtimeSegmentRelocator;
   private PinotHelixTaskResourceManager _helixTaskResourceManager;
   private PinotTaskManager _taskManager;
 
@@ -90,7 +90,7 @@ public class ControllerStarter {
     _executorService = Executors.newCachedThreadPool(
         new ThreadFactoryBuilder().setNameFormat("restapi-multiget-thread-%d").build());
     _segmentStatusChecker = new SegmentStatusChecker(_helixResourceManager, _config, _controllerMetrics);
-    _realtimeSegmentRelocationManager = new RealtimeSegmentRelocationManager(_helixResourceManager, _config);
+    _realtimeSegmentRelocator = new RealtimeSegmentRelocator(_helixResourceManager, _config);
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -157,7 +157,7 @@ public class ControllerStarter {
       _segmentStatusChecker.start();
 
       LOGGER.info("Starting realtime segment relocation manager");
-      _realtimeSegmentRelocationManager.start();
+      _realtimeSegmentRelocator.start();
 
       LOGGER.info("Creating rebalance segments factory");
       RebalanceSegmentStrategyFactory.createInstance(_helixResourceManager.getHelixZkManager());
@@ -298,7 +298,7 @@ public class ControllerStarter {
       _validationManager.stop();
 
       LOGGER.info("Stopping realtime segment relocation manager");
-      _realtimeSegmentRelocationManager.stop();
+      _realtimeSegmentRelocator.stop();
 
       LOGGER.info("Stopping retention manager");
       _retentionManager.stop();
@@ -354,7 +354,7 @@ public class ControllerStarter {
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setValidationControllerFrequencyInSeconds(3600);
     conf.setStatusCheckerFrequencyInSeconds(5*60);
-    conf.setRelocationManagerFrequencyInMinutes(60);
+    conf.setRealtiemSegmentRelocatorFrequency("1h");
     conf.setStatusCheckerWaitForPushTimeInSeconds(10*60);
     conf.setTenantIsolationEnabled(true);
     final ControllerStarter starter = new ControllerStarter(conf);

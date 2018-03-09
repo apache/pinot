@@ -37,9 +37,9 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.*;
 
 
-public class RealtimeSegmentRelocationManagerTest {
+public class RealtimeSegmentRelocatorTest {
 
-  private RealtimeSegmentRelocationManager _realtimeSegmentRelocationManager;
+  private RealtimeSegmentRelocator _realtimeSegmentRelocator;
   private HelixManager _mockHelixManager;
   private MockHelixAdmin _mockHelixAdmin;
 
@@ -66,8 +66,8 @@ public class RealtimeSegmentRelocationManagerTest {
     when(mockPinotHelixResourceManager.getHelixZkManager()).thenReturn(_mockHelixManager);
     when(mockPinotHelixResourceManager.getHelixAdmin()).thenReturn(_mockHelixAdmin);
     ControllerConf controllerConfig = new ControllerConf();
-    _realtimeSegmentRelocationManager =
-        new RealtimeSegmentRelocationManager(mockPinotHelixResourceManager, controllerConfig);
+    _realtimeSegmentRelocator =
+        new RealtimeSegmentRelocator(mockPinotHelixResourceManager, controllerConfig);
 
     final int maxInstances = 20;
     serverNames = new String[maxInstances];
@@ -111,7 +111,7 @@ public class RealtimeSegmentRelocationManagerTest {
     _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantCompleted, completedInstanceList);
     boolean exception = false;
     try {
-      _realtimeSegmentRelocationManager.relocateSegments(realtimeTagConfig, idealState);
+      _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     } catch (Exception e) {
       exception = true;
     }
@@ -122,7 +122,7 @@ public class RealtimeSegmentRelocationManagerTest {
     _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantConsuming, consumingInstanceList);
     _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantCompleted, new ArrayList<String>());
     try {
-      _realtimeSegmentRelocationManager.relocateSegments(realtimeTagConfig, idealState);
+      _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     } catch (Exception e) {
       exception = true;
     }
@@ -131,7 +131,7 @@ public class RealtimeSegmentRelocationManagerTest {
     // empty ideal state
     _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantConsuming, consumingInstanceList);
     _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantCompleted, completedInstanceList);
-    _realtimeSegmentRelocationManager.relocateSegments(realtimeTagConfig, idealState);
+    _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
 
     // no move required, 1 segment all replicas in CONSUMING
     Map<String, String> instanceStateMap0 = new HashMap<>(3);
@@ -139,36 +139,36 @@ public class RealtimeSegmentRelocationManagerTest {
     instanceStateMap0.put(consumingInstanceList.get(1), "CONSUMING");
     instanceStateMap0.put(consumingInstanceList.get(2), "CONSUMING");
     idealState.setInstanceStateMap("segment0", instanceStateMap0);
-    segmentToInstanceStateMap = _realtimeSegmentRelocationManager.relocateSegments(realtimeTagConfig, idealState);
+    segmentToInstanceStateMap = _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertTrue(segmentToInstanceStateMap.isEmpty());
 
     // no move necessary, 1 replica ONLINE on consuming, others CONSUMING
     instanceStateMap0.put(consumingInstanceList.get(0), "ONLINE");
-    segmentToInstanceStateMap = _realtimeSegmentRelocationManager.relocateSegments(realtimeTagConfig, idealState);
+    segmentToInstanceStateMap = _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertTrue(segmentToInstanceStateMap.isEmpty());
 
     // no move necessary, 2 replicas ONLINE on consuming, 1 CONSUMING
     instanceStateMap0.put(consumingInstanceList.get(1), "ONLINE");
-    segmentToInstanceStateMap = _realtimeSegmentRelocationManager.relocateSegments(realtimeTagConfig, idealState);
+    segmentToInstanceStateMap = _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertTrue(segmentToInstanceStateMap.isEmpty());
 
     // all replicas ONLINE on consuming servers. relocate 1 replica from consuming to completed
     instanceStateMap0.put(consumingInstanceList.get(2), "ONLINE");
-    segmentToInstanceStateMap = _realtimeSegmentRelocationManager.relocateSegments(realtimeTagConfig, idealState);
+    segmentToInstanceStateMap = _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     segmentNameToExpectedNumCompletedInstances.put("segment0", 1);
     verifySegmentAssignment(segmentToInstanceStateMap, idealState, completedInstanceList, consumingInstanceList,
         nReplicas, segmentNameToExpectedNumCompletedInstances);
     idealState.setInstanceStateMap("segment0", segmentToInstanceStateMap.get("segment0"));
 
     // 2 replicas ONLINE on consuming servers, and 1 already relocated. relocate 1 replica from consuming to completed
-    segmentToInstanceStateMap = _realtimeSegmentRelocationManager.relocateSegments(realtimeTagConfig, idealState);
+    segmentToInstanceStateMap = _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     segmentNameToExpectedNumCompletedInstances.put("segment0", 2);
     verifySegmentAssignment(segmentToInstanceStateMap, idealState, completedInstanceList, consumingInstanceList,
         nReplicas, segmentNameToExpectedNumCompletedInstances);
     idealState.setInstanceStateMap("segment0", segmentToInstanceStateMap.get("segment0"));
 
     // 1 replica ONLINE on consuming, 2 already relocated. relocate the 3rd replica.
-    segmentToInstanceStateMap = _realtimeSegmentRelocationManager.relocateSegments(realtimeTagConfig, idealState);
+    segmentToInstanceStateMap = _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     segmentNameToExpectedNumCompletedInstances.put("segment0", 3);
     verifySegmentAssignment(segmentToInstanceStateMap, idealState, completedInstanceList, consumingInstanceList,
         nReplicas, segmentNameToExpectedNumCompletedInstances);
@@ -181,7 +181,7 @@ public class RealtimeSegmentRelocationManagerTest {
     instanceStateMap1.put(consumingInstanceList.get(1), "CONSUMING");
     instanceStateMap1.put(consumingInstanceList.get(2), "CONSUMING");
     idealState.setInstanceStateMap("segment1", instanceStateMap1);
-    segmentToInstanceStateMap = _realtimeSegmentRelocationManager.relocateSegments(realtimeTagConfig, idealState);
+    segmentToInstanceStateMap = _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertTrue(segmentToInstanceStateMap.isEmpty());
 
     instanceStateMap1.put(consumingInstanceList.get(0), "ONLINE");
@@ -194,7 +194,7 @@ public class RealtimeSegmentRelocationManagerTest {
     idealState.setInstanceStateMap("segment2", instanceStateMap2);
     segmentNameToExpectedNumCompletedInstances.put("segment1", 1);
     segmentNameToExpectedNumCompletedInstances.put("segment2", 1);
-    segmentToInstanceStateMap = _realtimeSegmentRelocationManager.relocateSegments(realtimeTagConfig, idealState);
+    segmentToInstanceStateMap = _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     verifySegmentAssignment(segmentToInstanceStateMap, idealState, completedInstanceList, consumingInstanceList,
         nReplicas, segmentNameToExpectedNumCompletedInstances);
 
