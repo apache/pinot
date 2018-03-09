@@ -30,7 +30,27 @@ public class TestCondensedAnomalyTimelinesView {
 
     DateTime date = new DateTime(2018, 1, 1, 0, 0, 0);
     for (int i = 0; i < testNum; i++) {
-      Assert.assertEquals(condensedView.getTimeStamps().get(i).longValue(), date.getMillis() / minBucketMillis);
+      Assert.assertEquals(condensedView.getTimeStamps().get(i).longValue(),
+          (date.getMillis() - condensedView.timestampOffset)/minBucketMillis);
+      Assert.assertEquals(condensedView.getCurrentValues().get(i), i + 0d);
+      Assert.assertEquals(condensedView.getBaselineValues().get(i), i + 0.1);
+      date = date.plusHours(1);
+    }
+  }
+
+  @Test
+  public void testFromJsonString() throws Exception{
+    int testNum = 100;
+    CondensedAnomalyTimelinesView condensedView = CondensedAnomalyTimelinesView.fromAnomalyTimelinesView(getTestData(testNum));
+
+    AnomalyTimelinesView anomalyTimelinesView = CondensedAnomalyTimelinesView
+        .fromJsonString(condensedView.toJsonString()).toAnomalyTimelinesView();
+
+    DateTime date = new DateTime(2018, 1, 1, 0, 0, 0);
+    for (int i = 0; i < testNum; i++) {
+      TimeBucket timeBucket = anomalyTimelinesView.getTimeBuckets().get(i);
+      Assert.assertEquals(timeBucket.getCurrentStart(), date.getMillis());
+      Assert.assertEquals(timeBucket.getBaselineEnd(), date.plusHours(1).getMillis());
       Assert.assertEquals(condensedView.getCurrentValues().get(i), i + 0d);
       Assert.assertEquals(condensedView.getBaselineValues().get(i), i + 0.1);
       date = date.plusHours(1);
@@ -39,17 +59,18 @@ public class TestCondensedAnomalyTimelinesView {
 
   @Test
   public void testCompress() throws Exception {
-    int testNum = 1000;
+    int testNum = 1500;
     long minBucketMillis = CondensedAnomalyTimelinesView.DEFAULT_MIN_BUCKET_UNIT;
     CondensedAnomalyTimelinesView condensedView = CondensedAnomalyTimelinesView.fromAnomalyTimelinesView(getTestData(testNum));
     Assert.assertTrue(condensedView.toJsonString().length() > CondensedAnomalyTimelinesView.DEFAULT_MAX_LENGTH);
 
     CondensedAnomalyTimelinesView compressedView = condensedView.compress();
     Assert.assertTrue(compressedView.toJsonString().length() < CondensedAnomalyTimelinesView.DEFAULT_MAX_LENGTH);
-    Assert.assertEquals(compressedView.bucketMillis.longValue(), 14400l);
+    Assert.assertEquals(compressedView.bucketMillis.longValue(), 240l);
     DateTime date = new DateTime(2018, 1, 1, 0, 0, 0);
     for (int i = 0; i < compressedView.getTimeStamps().size(); i++) {
-      Assert.assertEquals(compressedView.getTimeStamps().get(i).longValue(), date.getMillis() / minBucketMillis);
+      Assert.assertEquals(compressedView.getTimeStamps().get(i).longValue(),
+          (date.getMillis() - condensedView.timestampOffset)/minBucketMillis);
       Assert.assertEquals(compressedView.getCurrentValues().get(i), i * 4 + 1.5, 0.000001);
       Assert.assertEquals(compressedView.getBaselineValues().get(i), i * 4 + 1.6, 0.000001);
       date = date.plusHours(4);
