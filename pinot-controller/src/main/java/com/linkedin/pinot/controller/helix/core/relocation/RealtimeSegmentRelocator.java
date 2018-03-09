@@ -111,24 +111,28 @@ public class RealtimeSegmentRelocator {
     List<String> allRealtimeTableNames = _pinotHelixResourceManager.getAllRealtimeTables();
 
     for (String tableNameWithType : allRealtimeTableNames) {
-      LOGGER.info("Starting relocation of segments for table: {}", tableNameWithType);
 
-      TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableNameWithType);
-      RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
-      if (!realtimeTagConfig.isRelocateCompletedSegments()) {
-        LOGGER.info("Skipping relocation of segments for {}", tableNameWithType);
-        return;
-      }
+      try {
+        LOGGER.info("Starting relocation of segments for table: {}", tableNameWithType);
+        TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableNameWithType);
+        RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
+        if (!realtimeTagConfig.isRelocateCompletedSegments()) {
+          LOGGER.info("Skipping relocation of segments for {}", tableNameWithType);
+          return;
+        }
 
-      IdealState idealState = HelixHelper.getTableIdealState(_helixManager, tableNameWithType);
-      if (!idealState.isEnabled()) {
-        LOGGER.info("Skipping relocation of segments for {} since ideal state is disabled", tableNameWithType);
-        return;
-      }
+        IdealState idealState = HelixHelper.getTableIdealState(_helixManager, tableNameWithType);
+        if (!idealState.isEnabled()) {
+          LOGGER.info("Skipping relocation of segments for {} since ideal state is disabled", tableNameWithType);
+          return;
+        }
 
-      Map<String, Map<String, String>> segmentNameToInstancesMap = relocateSegments(realtimeTagConfig, idealState);
-      if (!segmentNameToInstancesMap.isEmpty()) {
-        updateIdealState(tableNameWithType, segmentNameToInstancesMap);
+        Map<String, Map<String, String>> segmentNameToInstancesMap = relocateSegments(realtimeTagConfig, idealState);
+        if (!segmentNameToInstancesMap.isEmpty()) {
+          updateIdealState(tableNameWithType, segmentNameToInstancesMap);
+        }
+      } catch (Exception e) {
+        LOGGER.error("Exception in relocating realtime segments of table {}", tableNameWithType, e);
       }
     }
     LOGGER.info("Realtime segment relocation completed");
