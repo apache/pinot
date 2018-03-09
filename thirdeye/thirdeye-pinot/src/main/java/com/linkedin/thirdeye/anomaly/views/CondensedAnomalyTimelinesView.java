@@ -27,6 +27,7 @@ public class CondensedAnomalyTimelinesView {
   public static final Long DEFAULT_MIN_BUCKET_UNIT = Minutes.ONE.toStandardDuration().getMillis();
 
   Long timestampOffset = 0l; // the timestamp offset of the original time series
+  Long minBucketUnit = 1l;
   Long bucketMillis = 0l;  // the bucket size of original time series
   List<Long> timeStamps = new ArrayList<>(); // the start time of data points
   Map<String, String> summary = new HashMap<>(); // the summary of the view
@@ -40,9 +41,10 @@ public class CondensedAnomalyTimelinesView {
   public CondensedAnomalyTimelinesView(Long bucketMillis, List<Long> timeStamps, List<Double> currentValues,
       List<Double> baselineValues, Map<String, String> summary) {
     this.timestampOffset = timeStamps.get(0);
-    this.bucketMillis = bucketMillis / DEFAULT_MIN_BUCKET_UNIT;
+    this.minBucketUnit = DEFAULT_MIN_BUCKET_UNIT;
+    this.bucketMillis = bucketMillis / minBucketUnit;
     for (long timestamp : timeStamps) {
-      this.timeStamps.add((timestamp - timestampOffset)/DEFAULT_MIN_BUCKET_UNIT);
+      this.timeStamps.add((timestamp - timestampOffset)/minBucketUnit);
     }
     this.summary = summary;
     this.currentValues = currentValues;
@@ -97,6 +99,14 @@ public class CondensedAnomalyTimelinesView {
     this.timestampOffset = timestampOffset;
   }
 
+  public Long getMinBucketUnit() {
+    return minBucketUnit;
+  }
+
+  public void setMinBucketUnit(Long minBucketUnit) {
+    this.minBucketUnit = minBucketUnit;
+  }
+
   /**
    * Convert current instance to an AnomalyTimelinesView instance
    * @return
@@ -105,10 +115,10 @@ public class CondensedAnomalyTimelinesView {
     AnomalyTimelinesView anomalyTimelinesView = new AnomalyTimelinesView();
     for (int i = 0; i < timeStamps.size(); i++) {
       long startTime = timeStamps.get(i);
-      TimeBucket timeBucket = new TimeBucket(startTime * DEFAULT_MIN_BUCKET_UNIT + timestampOffset,
-          (startTime + bucketMillis) * DEFAULT_MIN_BUCKET_UNIT + timestampOffset,
-          startTime * DEFAULT_MIN_BUCKET_UNIT + timestampOffset,
-          (startTime + bucketMillis) * DEFAULT_MIN_BUCKET_UNIT + timestampOffset);
+      TimeBucket timeBucket = new TimeBucket(startTime * minBucketUnit + timestampOffset,
+          (startTime + bucketMillis) * minBucketUnit + timestampOffset,
+          startTime * minBucketUnit + timestampOffset,
+          (startTime + bucketMillis) * minBucketUnit + timestampOffset);
       anomalyTimelinesView.addTimeBuckets(timeBucket);
       anomalyTimelinesView.addBaselineValues(baselineValues.get(i));
       anomalyTimelinesView.addCurrentValues(currentValues.get(i));
