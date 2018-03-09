@@ -54,59 +54,51 @@ public class BalanceLoadSegmentAssignmentStrategy implements SegmentAssignmentSt
   public List<String> getAssignedInstances(PinotHelixResourceManager helixResourceManager, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
                                            String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
 
-    String serverTenantName;
-    String tableName;
 
-
-    //if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
-    //  tableName = TableNameBuilder.REALTIME.tableNameWithType(segmentMetadata.getTableName());
-    //  serverTenantName = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName);
-    //} else {
-      tableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
-      serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
-    //}
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
+    String serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
 
     List<String> selectedInstances = new ArrayList<>();
     Map<String, Double> reportedLoadMetricPerInstanceMap = new HashMap<>();
     List<String> allTaggedInstances =
-        HelixHelper.getEnabledInstancesWithTag(helixResourceManager.getHelixAdmin(), helixClusterName,
-            serverTenantName);
+            HelixHelper.getEnabledInstancesWithTag(helixAdmin, helixClusterName, serverTenantName);
+
+    for (String instance : allTaggedInstances) {
+      reportedLoadMetricPerInstanceMap.put(instance, 0.0);
+    }
 
     // Calculate load metric for every eligible instance
     // We also log if more than a threshold percentage of servers return error for SegmentsInfo requests
     long numOfAllEligibleServers = allTaggedInstances.size();
     long numOfServersReturnError = 0;
-    IdealState idealState = helixResourceManager.getHelixAdmin().getResourceIdealState(helixClusterName, tableName);
+    IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, offlineTableName);
     if (idealState != null) {
-      //If the partition set is empty, then mostly this is the first segment is being uploaded; load metric is zero
-      //Otherwise we ask servers to return their load parameter
-      if (idealState.getPartitionSet().isEmpty()) {
-        for (String instance : allTaggedInstances) {
-          reportedLoadMetricPerInstanceMap.put(instance, 0D);
-          _serverLoadMetric.resetServerLoadMetric(helixResourceManager,instance);
-        }
-      } else {
-        // We Do not add servers, that are not tagged, to the map.
-        // By this approach, new segments will not be allotted to the server if tags changed.
-        for (String instanceName : allTaggedInstances) {
-          double reportedMetric = _serverLoadMetric.computeInstanceMetric(helixResourceManager, idealState, instanceName,tableName, segmentMetadata);
+       for (String instanceName : allTaggedInstances) {
+          double reportedMetric = _serverLoadMetric.computeInstanceMetric(helixResourceManager, idealState, instanceName,offlineTableName, segmentMetadata);
           LOGGER.info("ReportedLoadMetric: Instance: " + instanceName + " metricValue: " + reportedMetric);
-          if (reportedMetric != -1) {
+          if (reportedMetric != -1)
+          {
             reportedLoadMetricPerInstanceMap.put(instanceName, reportedMetric);
-          } else {
+          }
+          else
+          {
             numOfServersReturnError++;
           }
         }
-        if (numOfAllEligibleServers != 0) {
+
+        if (numOfAllEligibleServers != 0)
+        {
           float serverErrorRate = ((float) numOfServersReturnError) / numOfAllEligibleServers;
-          if (serverErrorRate >= MAX_ACCEPTABLE_ERROR_RATE) {
+          if (serverErrorRate >= MAX_ACCEPTABLE_ERROR_RATE)
+          {
             LOGGER.warn(
                 "More than " + MAX_ACCEPTABLE_ERROR_RATE + "% of servers return error for the segmentInfo requests");
           }
-        } else {
+        }
+        else
+        {
           LOGGER.info("There is no instance to assign segments for");
         }
-      }
     }
 
     // Select up to numReplicas instances with the least load assigned
@@ -127,7 +119,7 @@ public class BalanceLoadSegmentAssignmentStrategy implements SegmentAssignmentSt
 
     for(int i=0; i<selectedInstances.size(); i++)
     {
-      _serverLoadMetric.updateServerLoadMetric(helixResourceManager,selectedInstances.get(i),reportedLoadMetricPerInstanceMap.get(selectedInstances.get(i)),tableName,segmentMetadata);
+      _serverLoadMetric.updateServerLoadMetric(helixResourceManager,selectedInstances.get(i),reportedLoadMetricPerInstanceMap.get(selectedInstances.get(i)),offlineTableName,segmentMetadata);
     }
     return selectedInstances;
   }

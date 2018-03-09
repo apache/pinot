@@ -57,8 +57,8 @@ public class ServerPerfMetricsReader {
   }
 
   public @Nullable
-  ServerSegmentInfo getServerPerfMetrics(@Nonnull String serverNameOrEndpoint, boolean isThisServerName,
-      @Nonnegative int timeoutMsec) {
+  ServerSegmentInfo getServerPerfMetrics(@Nonnull String serverNameOrEndpoint, boolean isThisServerName, @Nonnegative int timeoutMsec) {
+
     Preconditions.checkNotNull(serverNameOrEndpoint, "Server Name Or Endpoint name should not be null");
     Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be greater than 0");
     if (isThisServerName) {
@@ -97,6 +97,9 @@ public class ServerPerfMetricsReader {
       serverSegmentInfo.setSegmentSizeInBytes(serverPerfMetrics.segmentDiskSizeInBytes);
       //serverSegmentInfo.setSegmentList(serverPerfMetrics.segmentList);
       serverSegmentInfo.setSegmentCPULoad(serverPerfMetrics.segmentCPULoad);
+
+      serverSegmentInfo.setTableList(serverPerfMetrics.tableList);
+      serverSegmentInfo.setSegmentTimeInfo(serverPerfMetrics.segmentTimeInfo);
 
     } catch (InterruptedException e) {
       LOGGER.warn("Interrupted exception while reading segments size for server: {}", serverNameOrEndpoint, e);
