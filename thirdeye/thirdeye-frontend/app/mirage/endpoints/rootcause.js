@@ -1,3 +1,5 @@
+import moment from 'moment';
+
 export default function(server) {
   /**
    * Get request for rootcause page
@@ -37,6 +39,8 @@ export default function(server) {
       attributes : { }
     }, {
       urn : "thirdeye:event:anomaly:1",
+      end: moment().valueOf(),
+      start: moment().startOf('day').valueOf(),
       score : 1.0,
       label : "anomaly_label",
       type : "event",
@@ -126,6 +130,19 @@ export default function(server) {
    */
   server.get('/aggregation/query', () => {
     return {};
+  });
+
+  /**
+   * TODO: Once API is finalized, the following new rootcause endpoint
+   * should return mocked data
+   */
+  server.get('/rootcause/metric/aggregate', () => {});
+  server.get('/rootcause/metric/breakdown', () => {});
+  server.get('/rootcause/metric/timeseries', () => {
+    return {
+      timestamp: [moment().valueOf()],
+      value: [1]
+    };
   });
 
   /**
