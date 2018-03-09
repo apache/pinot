@@ -21,7 +21,6 @@ import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.IndexingConfig;
-import com.linkedin.pinot.common.config.ReplicaGroupStrategyConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableCustomConfig;
@@ -36,7 +35,7 @@ import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignment;
 import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -1152,11 +1151,11 @@ public class PinotHelixResourceManager {
 
   private void ensureRealtimeClusterIsSetUp(TableConfig config, String realtimeTableName,
       IndexingConfig indexingConfig) {
-    KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(indexingConfig.getStreamConfigs());
+    StreamMetadata streamMetadata = new StreamMetadata(indexingConfig.getStreamConfigs());
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, realtimeTableName);
 
-    if (kafkaStreamMetadata.hasHighLevelKafkaConsumerType()) {
-     if (kafkaStreamMetadata.hasSimpleKafkaConsumerType()) {
+    if (streamMetadata.hasHighLevelKafkaConsumerType()) {
+     if (streamMetadata.hasSimpleKafkaConsumerType()) {
        // We may be adding on low-level, or creating both.
        if (idealState == null) {
          // Need to create both. Create high-level consumer first.
@@ -1174,7 +1173,7 @@ public class PinotHelixResourceManager {
     }
 
     // Either we have only low-level consumer, or both.
-    if (kafkaStreamMetadata.hasSimpleKafkaConsumerType()) {
+    if (streamMetadata.hasSimpleKafkaConsumerType()) {
       // Will either create idealstate entry, or update the IS entry with new segments
       // (unless there are low-level segments already present)
       final String llcKafkaPartitionAssignmentPath = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(

@@ -34,7 +34,7 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   private static final Logger STATIC_LOGGER = LoggerFactory.getLogger(KafkaHighLevelConsumerStreamProvider.class);
 
   private KafkaHighLevelStreamProviderConfig streamProviderConfig;
-  private KafkaMessageDecoder decoder;
+  private StreamMessageDecoder decoder;
 
   private ConsumerConnector consumer;
   private ConsumerIterator<byte[], byte[]> kafkaIterator;

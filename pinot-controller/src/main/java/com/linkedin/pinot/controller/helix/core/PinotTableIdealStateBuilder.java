@@ -19,15 +19,15 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumer;
-import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
+import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import java.util.List;
 import java.util.Map;
@@ -206,7 +206,7 @@ public class PinotTableIdealStateBuilder {
       create = true;
     }
     LOGGER.info("Assigning partitions to instances for simple consumer for table {}", realtimeTableName);
-    final KafkaStreamMetadata kafkaMetadata = new KafkaStreamMetadata(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
+    final StreamMetadata kafkaMetadata = new StreamMetadata(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
     final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
     final int nPartitions = getPartitionCount(kafkaMetadata);
     LOGGER.info("Assigning {} partitions to instances for simple consumer for table {}", nPartitions, realtimeTableName);
@@ -217,7 +217,7 @@ public class PinotTableIdealStateBuilder {
     segmentManager.setupHelixEntries(realtimeTagConfig, kafkaMetadata, nPartitions, realtimeInstances, idealState, create);
   }
 
-  public static int getPartitionCount(KafkaStreamMetadata kafkaMetadata) {
+  public static int getPartitionCount(StreamMetadata kafkaMetadata) {
     KafkaPartitionsCountFetcher fetcher = new KafkaPartitionsCountFetcher(kafkaMetadata);
     try {
       RetryPolicies.noDelayRetryPolicy(3).attempt(fetcher);
@@ -283,11 +283,11 @@ public class PinotTableIdealStateBuilder {
 
   private static class KafkaPartitionsCountFetcher implements Callable<Boolean> {
     private int _partitionCount = -1;
-    private final KafkaStreamMetadata _kafkaStreamMetadata;
+    private final StreamMetadata _streamMetadata;
     private Exception _exception;
 
-    private KafkaPartitionsCountFetcher(KafkaStreamMetadata kafkaStreamMetadata) {
-      _kafkaStreamMetadata = kafkaStreamMetadata;
+    private KafkaPartitionsCountFetcher(StreamMetadata streamMetadata) {
+      _streamMetadata = streamMetadata;
     }
 
     private int getPartitionCount() {
@@ -300,14 +300,14 @@ public class PinotTableIdealStateBuilder {
 
     @Override
     public Boolean call() throws Exception {
-      final String bootstrapHosts = _kafkaStreamMetadata.getBootstrapHosts();
-      final String kafkaTopicName = _kafkaStreamMetadata.getKafkaTopicName();
+      final String bootstrapHosts = _streamMetadata.getBootstrapHosts();
+      final String kafkaTopicName = _streamMetadata.getKafkaTopicName();
       if (bootstrapHosts == null || bootstrapHosts.isEmpty()) {
         throw new RuntimeException("Invalid value for " + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
       }
-      PinotKafkaConsumerFactory pinotKafkaConsumerFactory = PinotKafkaConsumerFactory.create(_kafkaStreamMetadata);
-      PinotKafkaConsumer consumerWrapper = pinotKafkaConsumerFactory.buildMetadataFetcher(
-          PinotTableIdealStateBuilder.class.getSimpleName() + "-" + kafkaTopicName, _kafkaStreamMetadata);
+      PinotStreamConsumerFactory pinotStreamConsumerFactory = PinotStreamConsumerFactory.create(_streamMetadata);
+      PinotStreamConsumer consumerWrapper = pinotStreamConsumerFactory.buildMetadataFetcher(
+          PinotTableIdealStateBuilder.class.getSimpleName() + "-" + kafkaTopicName, _streamMetadata);
       try {
         _partitionCount = consumerWrapper.getPartitionCount(kafkaTopicName, /*maxWaitTimeMs=*/5000L);
         if (_exception != null) {

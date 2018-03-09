@@ -18,7 +18,7 @@ package com.linkedin.pinot.broker.routing;
 import com.linkedin.pinot.broker.routing.builder.PartitionAwareOfflineRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.PartitionAwareRealtimeRoutingTableBuilder;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
@@ -125,7 +125,7 @@ public class RoutingTableBuilderFactory {
         break;
       case PartitionAwareRealtime:
         // Check that the table uses LLC kafka consumer.
-        KafkaStreamMetadata streamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+        StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
 
         if (streamMetadata.getConsumerTypes().size() == 1 && streamMetadata.getConsumerTypes().get(0)
             == CommonConstants.Helix.DataSource.Realtime.Kafka.ConsumerType.simple) {

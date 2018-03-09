@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
 
 
 @NotThreadSafe
-public class KafkaAvroMessageDecoder implements KafkaMessageDecoder<byte[]> {
+public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaAvroMessageDecoder.class);
 
   private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";

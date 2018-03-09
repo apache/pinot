@@ -21,7 +21,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 
 
-public interface KafkaMessageDecoder<T> {
+public interface StreamMessageDecoder<T> {
 
   /**
    *
