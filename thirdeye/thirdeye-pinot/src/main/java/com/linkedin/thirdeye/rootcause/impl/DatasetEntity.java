@@ -1,8 +1,11 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.util.EntityUtils;
+import com.linkedin.thirdeye.rootcause.util.ParsedUrn;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 
@@ -46,11 +49,10 @@ public class DatasetEntity extends Entity {
   }
 
   public static DatasetEntity fromURN(String urn, double score) {
-    if(!TYPE.isType(urn))
-      throw new IllegalArgumentException(String.format("URN '%s' is not type '%s'", urn, TYPE.getPrefix()));
-    String[] parts = urn.split(":", 3);
-    if(parts.length != 3)
-      throw new IllegalArgumentException(String.format("URN must have 3 parts but has '%d'", parts.length));
-    return new DatasetEntity(urn, score, new ArrayList<Entity>(), parts[2]);
+    ParsedUrn parsedUrn = EntityUtils.parseUrnString(urn, TYPE);
+    parsedUrn.assertPrefixOnly();
+
+    String dataset = parsedUrn.getPrefixes().get(2);
+    return new DatasetEntity(urn, score, Collections.<Entity>emptyList(), dataset);
   }
 }

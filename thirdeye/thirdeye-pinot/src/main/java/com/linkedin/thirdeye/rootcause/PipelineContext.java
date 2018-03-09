@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.rootcause;
 
-import com.linkedin.thirdeye.rootcause.impl.EntityUtils;
+import com.linkedin.thirdeye.rootcause.util.EntityUtils;
 import java.util.Map;
 import java.util.Set;
 

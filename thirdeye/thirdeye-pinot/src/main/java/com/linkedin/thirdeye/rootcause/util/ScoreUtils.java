@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.rootcause.impl;
+package com.linkedin.thirdeye.rootcause.util;
 
 import java.util.concurrent.TimeUnit;
 import org.joda.time.Period;

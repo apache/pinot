@@ -1,20 +1,33 @@
-package com.linkedin.thirdeye.rootcause.impl;
+package com.linkedin.thirdeye.rootcause.util;
 
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.MaxScoreSet;
+import com.linkedin.thirdeye.rootcause.impl.AnomalyEventEntity;
+import com.linkedin.thirdeye.rootcause.impl.DatasetEntity;
+import com.linkedin.thirdeye.rootcause.impl.DimensionEntity;
+import com.linkedin.thirdeye.rootcause.impl.DimensionsEntity;
+import com.linkedin.thirdeye.rootcause.impl.EntityType;
+import com.linkedin.thirdeye.rootcause.impl.HyperlinkEntity;
+import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
+import com.linkedin.thirdeye.rootcause.impl.ServiceEntity;
+import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.commons.lang.StringUtils;
 
 
@@ -22,6 +35,8 @@ import org.apache.commons.lang.StringUtils;
  * Utility class to simplify type-checking and extraction of entities
  */
 public class EntityUtils {
+  private static Pattern PATTERN_FILTER_OPERATOR = Pattern.compile("!=|>=|<=|==|>|<|=");
+
   /**
    * Returns {@code true} if the URN encodes the specified entity type {@code type}, or
    * {@code false} otherwise.
@@ -200,7 +215,7 @@ public class EntityUtils {
 
     } else if(DimensionsEntity.TYPE.isType(urn)) {
       return DimensionsEntity.fromURN(urn, score);
-      
+
     }
     throw new IllegalArgumentException(String.format("Could not parse URN '%s'", urn));
   }
@@ -341,7 +356,7 @@ public class EntityUtils {
         continue;
       }
 
-      String[] parts = EntityUtils.decodeURNComponent(filterString).split("=", 2);
+      String[] parts = EntityUtils.decodeURNComponent(filterString).split("!=|<=|>=|<|>|=", 2);
       if (parts.length != 2) {
         throw new IllegalArgumentException(String.format("Could not parse filter string '%s'", filterString));
       }
@@ -367,6 +382,132 @@ public class EntityUtils {
     }
 
     return output;
+  }
+
+  /**
+   * Returns the parsed urn without filters.
+   *
+   * @param urn entity urn string
+   * @return ParsedUrn
+   */
+  public static ParsedUrn parseUrnString(String urn) {
+    return new ParsedUrn(Arrays.asList(urn.split(":")), Collections.<FilterPredicate>emptySet());
+  }
+
+  /**
+   * Returns the parsed urn for a given filter start offset. Handles ambiguous filter/urn values.
+   *
+   * <br/><b>Example:</b>
+   * <pre>
+   *   >> "thirdeye:metric:123:filter!=double:colon"
+   *   << {["thirdeye", "metric", "123"], {"filter", "!=", "double:colon"}}
+   * </pre>
+   *
+   * @param urn entity urn string
+   * @param filterOffset start offset for filter values
+   * @return ParsedUrn
+   */
+  public static ParsedUrn parseUrnString(String urn, int filterOffset) {
+    String[] parts = urn.split(":", filterOffset + 1);
+
+    // leading fragments are copied as-is
+    List<String> prefixes = Arrays.asList(Arrays.copyOf(parts, filterOffset));
+
+    // filter fragment (last fragment) is parsed back to front
+    Set<FilterPredicate> predicates = new HashSet<>();
+
+    if (parts.length > filterOffset && !parts[filterOffset].isEmpty()) {
+      String[] filterFragments = parts[filterOffset].split(":");
+
+      String currentFragment = decodeURNComponent(filterFragments[filterFragments.length - 1]);
+      for (int i = filterFragments.length - 1; i > 0; i--) {
+        if (currentFragment.isEmpty()) {
+          // skip empty filter fragment, retain separator
+          currentFragment = ":" + currentFragment;
+          continue;
+        }
+
+        try {
+          // attempt parsing current filter fragment
+          predicates.add(extractFilterPredicate(currentFragment));
+          currentFragment = decodeURNComponent(filterFragments[i-1]);
+
+        } catch (IllegalArgumentException ignore) {
+          // merge filter fragment with next if it doesn't parse
+          currentFragment = String.format("%s:%s", decodeURNComponent(filterFragments[i - 1]), currentFragment);
+        }
+      }
+
+      // last (combined) filter fragment must parse
+      predicates.add(extractFilterPredicate(currentFragment));
+    }
+
+    return new ParsedUrn(prefixes, predicates);
+  }
+
+  /**
+   * Return the urn parsed for the given type. Validates whether urn matches type and extracts
+   * optional filter tail.
+   *
+   * @param urn entity urn string
+   * @param type expected entity type
+   * @return ParsedUrn
+   */
+  public static ParsedUrn parseUrnString(String urn, EntityType type) {
+    if (!type.isType(urn)) {
+      throw new IllegalArgumentException(String.format("Expected type '%s' but got '%s'", type.getPrefix(), urn));
+    }
+    return parseUrnString(urn);
+  }
+
+  /**
+   * Return the urn parsed for the given type. Validates whether urn matches type and extracts
+   * optional filter tail.
+   *
+   * @param urn entity urn string
+   * @param type expected entity type
+   * @param filterOffset start offset for filter values
+   * @return ParsedUrn
+   */
+  public static ParsedUrn parseUrnString(String urn, EntityType type, int filterOffset) {
+    if (!type.isType(urn)) {
+      throw new IllegalArgumentException(String.format("Expected type '%s' but got '%s'", type.getPrefix(), urn));
+    }
+    return parseUrnString(urn, filterOffset);
+  }
+
+  /**
+   * Returns the filter predicate for a given filter string
+   *
+   * <br/><b>Example:</b>
+   * <pre>
+   *   >> "country != us"
+   *   << {"country", "!=", "us"}
+   * </pre>
+   *
+   * @param filterString raw (decoded) filter string
+   * @return filter predicate
+   */
+  public static FilterPredicate extractFilterPredicate(String filterString) {
+    Matcher m = PATTERN_FILTER_OPERATOR.matcher(filterString);
+    if (!m.find()) {
+      throw new IllegalArgumentException(
+          String.format("Could not find filter predicate operator. Expected regex '%s'", PATTERN_FILTER_OPERATOR.pattern()));
+    }
+
+    int keyStart = 0;
+    int keyEnd = m.start();
+    String key = filterString.substring(keyStart, keyEnd);
+
+    int opStart = m.start();
+    int opEnd = m.end();
+    String operator = filterString.substring(opStart, opEnd);
+
+    int valueStart = m.end();
+    int valueEnd = filterString.length();
+    String value = filterString.substring(valueStart, valueEnd);
+
+    return new FilterPredicate(key, operator, value);
   }
 
 }

@@ -1,15 +1,12 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.util.ParsedUrn;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.Objects;
 import org.apache.commons.lang.StringUtils;
 
 
@@ -61,6 +58,16 @@ public final class EntityType {
 
   public boolean isType(Entity e) {
     return e.getUrn().startsWith(this.prefix);
+  }
+
+  public boolean isType(ParsedUrn parsedUrn) {
+    final int prefixSize = this.getPrefixSize();
+    List<String> parts = Arrays.asList(this.prefix.split(":"));
+    return Objects.equals(parts, parsedUrn.getPrefixes().subList(0, prefixSize));
+  }
+
+  public int getPrefixSize() {
+    return this.prefix.split(":").length;
   }
 
 }

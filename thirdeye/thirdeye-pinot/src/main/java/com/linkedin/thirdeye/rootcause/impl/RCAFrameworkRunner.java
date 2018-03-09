@@ -15,6 +15,7 @@ import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.RCAFrameworkExecutionResult;
+import com.linkedin.thirdeye.rootcause.util.EntityUtils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -122,7 +123,7 @@ public class RCAFrameworkRunner {
       setLogger(cmd.getOptionValue(CLI_LOG_WARN), Level.WARN);
     if (cmd.hasOption(CLI_LOG_ERROR))
       setLogger(cmd.getOptionValue(CLI_LOG_ERROR), Level.ERROR);
-    
+
     if(cmd.hasOption(CLI_VERBOSE))
       setLogger(Logger.ROOT_LOGGER_NAME, Level.DEBUG);
 

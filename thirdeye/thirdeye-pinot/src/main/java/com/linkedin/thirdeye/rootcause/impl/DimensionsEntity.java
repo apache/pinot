@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.rootcause.impl;
 
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.util.EntityUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -56,13 +57,6 @@ public class DimensionsEntity extends Entity {
   }
 
   public static DimensionsEntity fromURN(String urn, double score) {
-    if(!TYPE.isType(urn))
-      throw new IllegalArgumentException(String.format("URN '%s' is not type '%s'", urn, TYPE.getPrefix()));
-    // TODO handle filter strings containing ":"
-    String[] parts = urn.split(":");
-    if(parts.length <= 1)
-      throw new IllegalArgumentException(String.format("URN must have at least 2 parts but has '%d'", parts.length));
-    List<String> filterStrings = Arrays.asList(Arrays.copyOfRange(parts, 2, parts.length));
-    return fromDimensions(score, EntityUtils.decodeDimensions(filterStrings));
+    return fromDimensions(score, EntityUtils.parseUrnString(urn, TYPE, 2).toFilters());
   }
 }
