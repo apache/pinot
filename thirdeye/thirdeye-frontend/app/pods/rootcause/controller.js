@@ -142,7 +142,7 @@ export default Controller.extend({
    * @type {string}
    */
   activeTab: null,
-
+  emailBody: encodeURIComponent('<img src="http://via.placeholder.com/350x150"></img>Testing'),
   /**
    * display mode for timeseries chart
    * @type {string}
