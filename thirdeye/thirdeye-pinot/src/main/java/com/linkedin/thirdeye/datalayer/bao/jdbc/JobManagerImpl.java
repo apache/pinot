@@ -55,12 +55,7 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
     Timestamp expireTimestamp = new Timestamp(expireDate.getMillis());
     Predicate statusPredicate = Predicate.EQ("status", status.toString());
     Predicate timestampPredicate = Predicate.LT("updateTime", expireTimestamp);
-    List<JobBean> list =
-        genericPojoDao.get(Predicate.AND(statusPredicate, timestampPredicate), JobBean.class);
-    for (JobBean jobBean : list) {
-      deleteById(jobBean.getId());
-    }
-    return list.size();
+    return deleteByPredicate(Predicate.AND(statusPredicate, timestampPredicate));
   }
 
   @Override

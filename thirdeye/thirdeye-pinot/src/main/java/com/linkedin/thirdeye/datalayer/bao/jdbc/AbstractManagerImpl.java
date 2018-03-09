@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.datalayer.bao.AbstractManager;
 import com.linkedin.thirdeye.datalayer.dao.GenericPojoDao;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
@@ -11,9 +12,11 @@ import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.joda.time.DateTime;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.convention.MatchingStrategies;
 import org.slf4j.Logger;
@@ -95,6 +98,15 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
   @Override
   public int deleteByPredicate(Predicate predicate) {
     return genericPojoDao.deleteByPredicate(predicate, beanClass);
+  }
+
+  @Override
+  @Transactional
+  public int deleteRecordsOlderThanDays(int days) {
+    DateTime expireDate = new DateTime().minusDays(days);
+    Timestamp expireTimestamp = new Timestamp(expireDate.getMillis());
+    Predicate timestampPredicate = Predicate.LT("createTime", expireTimestamp);
+    return deleteByPredicate(timestampPredicate);
   }
 
   @Override

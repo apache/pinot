@@ -79,6 +79,7 @@ import org.slf4j.LoggerFactory;
 public class GenericPojoDao {
   private static final Logger LOG = LoggerFactory.getLogger(GenericPojoDao.class);
   private static boolean IS_DEBUG = LOG.isDebugEnabled();
+  private static int MAX_RECORDS_TO_DELETED = 1000;
 
   static Map<Class<? extends AbstractBean>, PojoInfo> pojoInfoMap =
       new HashMap<Class<? extends AbstractBean>, GenericPojoDao.PojoInfo>();
@@ -588,9 +589,8 @@ public class GenericPojoDao {
           PojoInfo pojoInfo = pojoInfoMap.get(pojoClass);
           int totalBaseRowsDeleted = 0;
           if (CollectionUtils.isNotEmpty(idsToDelete)) {
-            final int maxSublistSize = 100000;
             int minIdx = 0;
-            int maxIdx = maxSublistSize;
+            int maxIdx = MAX_RECORDS_TO_DELETED;
             while (minIdx < idsToDelete.size()) {
               List<Long> subList = idsToDelete.subList(minIdx, Math.min(maxIdx, idsToDelete.size()));
               //delete the ids from both base table and index table
@@ -608,7 +608,11 @@ public class GenericPojoDao {
 
               totalBaseRowsDeleted += baseRowsDeleted;
               minIdx = Math.min(maxIdx, idsToDelete.size());
-              maxIdx += maxSublistSize;
+              maxIdx += MAX_RECORDS_TO_DELETED;
+              // Trigger commit() to ensure this batch of deletion is executed
+              if (!connection.getAutoCommit()) {
+                connection.commit();
+              }
             }
           }
           return totalBaseRowsDeleted;

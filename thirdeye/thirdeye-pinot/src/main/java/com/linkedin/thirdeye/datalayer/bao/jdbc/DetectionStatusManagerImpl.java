@@ -45,17 +45,4 @@ public class DetectionStatusManagerImpl extends AbstractManagerImpl<DetectionSta
 
     return findByPredicate(predicate);
   }
-
-  @Override
-  @Transactional
-  public int deleteRecordsOlderThanDays(int days) {
-    DateTime expireDate = new DateTime().minusDays(days);
-    Timestamp expireTimestamp = new Timestamp(expireDate.getMillis());
-    Predicate timestampPredicate = Predicate.LT("createTime", expireTimestamp);
-    List<DetectionStatusBean> list = genericPojoDao.get(timestampPredicate, DetectionStatusBean.class);
-    for (DetectionStatusBean bean : list) {
-      deleteById(bean.getId());
-    }
-    return list.size();
-  }
 }
