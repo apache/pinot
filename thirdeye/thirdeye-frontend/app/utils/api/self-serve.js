@@ -91,6 +91,33 @@ const metricFilters = metricId => `/data/autocomplete/filters/metric/${metricId}
 const metricDimensions = metricId => `/data/autocomplete/dimensions/metric/${metricId}`;
 
 /**
+ * GET | Validates whether the entered dashboard name exists in inGraphs
+ * @param {String} dashboardName
+ */
+const dashboardByName = dashboardName => `/autometrics/isIngraphDashboard/${dashboardName}`;
+
+/**
+ * GET all metrics that belong to a dataset
+ * @param {String} dataSet
+ * @see {@link https://tinyurl.com/yb34ubfd|class MetricConfigResource}
+ */
+const metricsByDataset = dataSet => `/thirdeye-admin/metric-config/metrics?dataset=${dataSet}`;
+
+/**
+ * POST | Trigger onboarding task of all new imported metrics
+ * @see {@link https://tinyurl.com/y9mezgdr|class AutoOnboardResource}
+ */
+const triggerInstantOnboard = '/autoOnboard/runAdhoc/AutometricsThirdeyeDataSource';
+
+/**
+ * POST | Add metric & dataset to thirdEye DB
+ * Requires payload containing: 'datasetName', 'metricName', 'dataSource', 'properties'
+ * @see {@link https://tinyurl.com/y9g77y87|class OnboardDatasetMetricResource}
+ */
+const createNewDataset = '/onboard/create';
+
+
+/**
  * General self-serve endpoints
  */
 export const selfServeApiCommon = {
@@ -118,7 +145,11 @@ export const selfServeApiOnboard = {
   jobStatus,
   createAlert,
   updateAlert,
-  deleteAlert
+  deleteAlert,
+  dashboardByName,
+  metricsByDataset,
+  createNewDataset,
+  triggerInstantOnboard
 };
 
 export default {

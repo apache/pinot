@@ -3,13 +3,13 @@
  * @module self-serve/create/import-metric
  * @exports import-metric
  */
+import fetch from 'fetch';
+import Controller from '@ember/controller';
 import { and } from '@ember/object/computed';
-
 import { isPresent } from '@ember/utils';
 import { computed } from '@ember/object';
-import Controller from '@ember/controller';
-import fetch from 'fetch';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import { selfServeApiOnboard } from 'thirdeye-frontend/utils/api/self-serve';
 
 export default Controller.extend({
   /**
@@ -93,7 +93,7 @@ export default Controller.extend({
    * @return {Promise}
    */
   validateDashboardName(isRrdImport, dashboardName) {
-    const url = `/autometrics/isIngraphDashboard/${dashboardName}`;
+    const url = selfServeApiOnboard.dashboardByName(dashboardName);
     // Only make the call if we are importing an existing inGraphs dashboard (isRrdImport = false)
     if (isRrdImport) {
       return Promise.resolve(true);
@@ -109,7 +109,7 @@ export default Controller.extend({
    * @return {Promise}
    */
   fetchMetricsList(dataSet) {
-    const url = `/thirdeye-admin/metric-config/metrics?dataset=${dataSet}`;
+    const url = selfServeApiOnboard.metricsByDataset(dataSet);
     return fetch(url).then(checkStatus);
   },
 
@@ -120,7 +120,7 @@ export default Controller.extend({
    * @return {Ember.RSVP.Promise}
    */
   triggerInstantOnboard() {
-    const url = '/autoOnboard/runAdhoc/AutometricsThirdeyeDataSource';
+    const url = selfServeApiOnboard.triggerInstantOnboard;
     return fetch(url, { method: 'post' }).then((res) => checkStatus(res, 'post'));
   },
 
@@ -137,7 +137,7 @@ export default Controller.extend({
       body: JSON.stringify(importObj),
       headers: { 'content-type': 'Application/Json' }
     };
-    const url = '/onboard/create';
+    const url = selfServeApiOnboard.createNewDataset;
     return fetch(url, postProps).then((res) => checkStatus(res, 'post'));
   },
 
@@ -239,7 +239,7 @@ export default Controller.extend({
      * @method submit
      * @return {undefined}
      */
-    submit() {
+    onSubmit() {
       const isRrdImport = this.get('isExistingDashFieldDisabled');
       const datasetName = isRrdImport ? this.get('importCustomNewDataset') : this.get('importExistingDashboardName');
       const importObj = { datasetName: datasetName, dataSource: 'AutometricsThirdeyeDataSource' };
