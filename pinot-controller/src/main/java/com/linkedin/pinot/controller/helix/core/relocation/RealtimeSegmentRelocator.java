@@ -110,27 +110,32 @@ public class RealtimeSegmentRelocator {
     LOGGER.info("Starting relocation of realtime segments");
     List<String> allRealtimeTableNames = _pinotHelixResourceManager.getAllRealtimeTables();
 
-    for (String tableNameWithType : allRealtimeTableNames) {
-
+    for (final String tableNameWithType : allRealtimeTableNames) {
       try {
         LOGGER.info("Starting relocation of segments for table: {}", tableNameWithType);
+
         TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableNameWithType);
-        RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
+        final RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
         if (!realtimeTagConfig.isRelocateCompletedSegments()) {
           LOGGER.info("Skipping relocation of segments for {}", tableNameWithType);
           return;
         }
 
-        IdealState idealState = HelixHelper.getTableIdealState(_helixManager, tableNameWithType);
-        if (!idealState.isEnabled()) {
-          LOGGER.info("Skipping relocation of segments for {} since ideal state is disabled", tableNameWithType);
-          return;
-        }
+        Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
+          @Nullable
+          @Override
+          public IdealState apply(@Nullable IdealState idealState) {
+            if (!idealState.isEnabled()) {
+              LOGGER.info("Skipping relocation of segments for {} since ideal state is disabled", tableNameWithType);
+              return null;
+            }
+            relocateSegments(realtimeTagConfig, idealState);
+            return idealState;
+          }
+        };
 
-        Map<String, Map<String, String>> segmentNameToInstancesMap = relocateSegments(realtimeTagConfig, idealState);
-        if (!segmentNameToInstancesMap.isEmpty()) {
-          updateIdealState(tableNameWithType, segmentNameToInstancesMap);
-        }
+        HelixHelper.updateIdealState(_helixManager, tableNameWithType, updater,
+            RetryPolicies.exponentialBackoffRetryPolicy(5, 1000, 2.0f));
       } catch (Exception e) {
         LOGGER.error("Exception in relocating realtime segments of table {}", tableNameWithType, e);
       }
@@ -144,9 +149,7 @@ public class RealtimeSegmentRelocator {
    * @param  realtimeTagConfig
    * @param idealState
    */
-  protected Map<String, Map<String, String>> relocateSegments(RealtimeTagConfig realtimeTagConfig,
-      IdealState idealState) {
-    Map<String, Map<String, String>> segmentNameToInstancesMap;
+  protected void relocateSegments(RealtimeTagConfig realtimeTagConfig, IdealState idealState) {
 
     List<String> consumingServers = _helixAdmin.getInstancesInClusterWithTag(_helixManager.getClusterName(),
         realtimeTagConfig.getConsumingServerTag());
@@ -161,8 +164,6 @@ public class RealtimeSegmentRelocator {
           "Found no realtime completed servers with tag " + realtimeTagConfig.getCompletedServerTag());
     }
 
-    Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
-
     // TODO: use segment assignment strategy to decide where to place relocated segment
 
     // create map of completed server name to num segments it holds.
@@ -171,8 +172,9 @@ public class RealtimeSegmentRelocator {
     for (String server : completedServers) {
       completedServerToNumSegments.put(server, 0);
     }
-    for (Map.Entry<String, Map<String, String>> entry : mapFields.entrySet()) {
-      for (String instance : entry.getValue().keySet()) {
+    for (String segmentName : idealState.getPartitionSet()) {
+      Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
+      for (String instance : instanceStateMap.keySet()) {
         if (completedServers.contains(instance)) {
           completedServerToNumSegments.put(instance, completedServerToNumSegments.get(instance) + 1);
         }
@@ -188,40 +190,32 @@ public class RealtimeSegmentRelocator {
     completedServersQueue.addAll(completedServerToNumSegments.entrySet());
 
     // get new mapping for segments that need relocation
-    segmentNameToInstancesMap = createNewSegmentToInstanceStateMap(mapFields, consumingServers, completedServersQueue);
-
-    return segmentNameToInstancesMap;
+    createNewIdealState(idealState, consumingServers, completedServersQueue);
   }
 
   /**
-   * Given an ideal state mapping, list of consuming serves and completed servers,
+   * Given an ideal state, list of consuming serves and completed servers,
    * create a mapping for those segments that should relocate a replica from consuming to completed server
-   * @param mapFields
+   * @param idealState
    * @param consumingServers
    * @param completedServersQueue
    * @return
    */
-  private Map<String, Map<String, String>> createNewSegmentToInstanceStateMap(
-      Map<String, Map<String, String>> mapFields, List<String> consumingServers,
+  private void createNewIdealState(IdealState idealState, List<String> consumingServers,
       MinMaxPriorityQueue<Map.Entry<String, Integer>> completedServersQueue) {
 
-    Map<String, Map<String, String>> segmentNameToInstancesMap = new HashMap<>();
     // TODO: we are scanning the entire segments list every time. This is unnecessary because only the latest segments will need relocation
     // Can we do something to avoid this?
     // 1. Time boundary: scan only last day whereas runFrequency = hourly
     // 2. For each partition, scan in descending order, and stop when the first segment not needing relocation is found
-    for (Map.Entry<String, Map<String, String>> entry : mapFields.entrySet()) {
-
-      String segmentName = entry.getKey();
-      Map<String, String> instanceStateMap = entry.getValue();
-
+    for (String segmentName : idealState.getPartitionSet()) {
+      Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
       Map<String, String> newInstanceStateMap =
           createNewInstanceStateMap(instanceStateMap, consumingServers, completedServersQueue);
       if (MapUtils.isNotEmpty(newInstanceStateMap)) {
-        segmentNameToInstancesMap.put(segmentName, newInstanceStateMap);
+        idealState.setInstanceStateMap(segmentName, newInstanceStateMap);
       }
     }
-    return segmentNameToInstancesMap;
   }
 
   /**
@@ -269,25 +263,6 @@ public class RealtimeSegmentRelocator {
       }
     }
     return newInstanceStateMap;
-  }
-
-  /**
-   * Updates the ideal state of given tablename with the new segment to instance state map
-   * @param tableNameWithType
-   * @param segmentNameToInstanceMap
-   */
-  private void updateIdealState(final String tableNameWithType,
-      final Map<String, Map<String, String>> segmentNameToInstanceMap) {
-    HelixHelper.updateIdealState(_helixManager, tableNameWithType, new Function<IdealState, IdealState>() {
-      @Nullable
-      @Override
-      public IdealState apply(@Nullable IdealState idealState) {
-        for (Map.Entry<String, Map<String, String>> entry : segmentNameToInstanceMap.entrySet()) {
-          idealState.setInstanceStateMap(entry.getKey(), entry.getValue());
-        }
-        return idealState;
-      }
-    }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000, 2.0f));
   }
 
   private long getRunFrequencySeconds(String timeStr) {

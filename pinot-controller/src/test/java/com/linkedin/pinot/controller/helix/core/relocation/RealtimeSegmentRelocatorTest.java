@@ -26,7 +26,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.HelixManager;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
+import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
@@ -104,8 +106,6 @@ public class RealtimeSegmentRelocatorTest {
 
     Map<String, Integer> segmentNameToExpectedNumCompletedInstances = new HashMap<>(1);
 
-    Map<String, Map<String, String>> segmentToInstanceStateMap;
-
     // no consuming instances found
     _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantConsuming, new ArrayList<String>());
     _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantCompleted, completedInstanceList);
@@ -129,9 +129,13 @@ public class RealtimeSegmentRelocatorTest {
     Assert.assertTrue(exception);
 
     // empty ideal state
+    ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
     _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantConsuming, consumingInstanceList);
     _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantCompleted, completedInstanceList);
+    IdealState prevIdealState = new IdealState(
+        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
+    Assert.assertEquals(idealState, prevIdealState);
 
     // no move required, 1 segment all replicas in CONSUMING
     Map<String, String> instanceStateMap0 = new HashMap<>(3);
@@ -139,41 +143,52 @@ public class RealtimeSegmentRelocatorTest {
     instanceStateMap0.put(consumingInstanceList.get(1), "CONSUMING");
     instanceStateMap0.put(consumingInstanceList.get(2), "CONSUMING");
     idealState.setInstanceStateMap("segment0", instanceStateMap0);
-    segmentToInstanceStateMap = _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
-    Assert.assertTrue(segmentToInstanceStateMap.isEmpty());
+    prevIdealState = new IdealState(
+        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
+    Assert.assertEquals(idealState, prevIdealState);
 
     // no move necessary, 1 replica ONLINE on consuming, others CONSUMING
     instanceStateMap0.put(consumingInstanceList.get(0), "ONLINE");
-    segmentToInstanceStateMap = _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
-    Assert.assertTrue(segmentToInstanceStateMap.isEmpty());
+    prevIdealState = new IdealState(
+        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
+    Assert.assertEquals(idealState, prevIdealState);
 
     // no move necessary, 2 replicas ONLINE on consuming, 1 CONSUMING
     instanceStateMap0.put(consumingInstanceList.get(1), "ONLINE");
-    segmentToInstanceStateMap = _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
-    Assert.assertTrue(segmentToInstanceStateMap.isEmpty());
+    prevIdealState = new IdealState(
+        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
+    Assert.assertEquals(idealState, prevIdealState);
 
     // all replicas ONLINE on consuming servers. relocate 1 replica from consuming to completed
     instanceStateMap0.put(consumingInstanceList.get(2), "ONLINE");
-    segmentToInstanceStateMap = _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
+    prevIdealState = new IdealState(
+        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
+    Assert.assertNotSame(idealState, prevIdealState);
     segmentNameToExpectedNumCompletedInstances.put("segment0", 1);
-    verifySegmentAssignment(segmentToInstanceStateMap, idealState, completedInstanceList, consumingInstanceList,
+    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, consumingInstanceList,
         nReplicas, segmentNameToExpectedNumCompletedInstances);
-    idealState.setInstanceStateMap("segment0", segmentToInstanceStateMap.get("segment0"));
 
     // 2 replicas ONLINE on consuming servers, and 1 already relocated. relocate 1 replica from consuming to completed
-    segmentToInstanceStateMap = _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
+    prevIdealState = new IdealState(
+        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
+    Assert.assertNotSame(idealState, prevIdealState);
     segmentNameToExpectedNumCompletedInstances.put("segment0", 2);
-    verifySegmentAssignment(segmentToInstanceStateMap, idealState, completedInstanceList, consumingInstanceList,
+    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, consumingInstanceList,
         nReplicas, segmentNameToExpectedNumCompletedInstances);
-    idealState.setInstanceStateMap("segment0", segmentToInstanceStateMap.get("segment0"));
 
     // 1 replica ONLINE on consuming, 2 already relocated. relocate the 3rd replica.
-    segmentToInstanceStateMap = _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
+    prevIdealState = new IdealState(
+        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
+    Assert.assertNotSame(idealState, prevIdealState);
     segmentNameToExpectedNumCompletedInstances.put("segment0", 3);
-    verifySegmentAssignment(segmentToInstanceStateMap, idealState, completedInstanceList, consumingInstanceList,
+    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, consumingInstanceList,
         nReplicas, segmentNameToExpectedNumCompletedInstances);
-    idealState.setInstanceStateMap("segment0", segmentToInstanceStateMap.get("segment0"));
-    segmentNameToExpectedNumCompletedInstances.remove("segment0");
 
     // no move necessary
     Map<String, String> instanceStateMap1 = new HashMap<>(3);
@@ -181,8 +196,10 @@ public class RealtimeSegmentRelocatorTest {
     instanceStateMap1.put(consumingInstanceList.get(1), "CONSUMING");
     instanceStateMap1.put(consumingInstanceList.get(2), "CONSUMING");
     idealState.setInstanceStateMap("segment1", instanceStateMap1);
-    segmentToInstanceStateMap = _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
-    Assert.assertTrue(segmentToInstanceStateMap.isEmpty());
+    prevIdealState = new IdealState(
+        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
+    Assert.assertEquals(idealState, prevIdealState);
 
     instanceStateMap1.put(consumingInstanceList.get(0), "ONLINE");
     instanceStateMap1.put(consumingInstanceList.get(1), "ONLINE");
@@ -192,20 +209,23 @@ public class RealtimeSegmentRelocatorTest {
     instanceStateMap2.put(consumingInstanceList.get(1), "ONLINE");
     instanceStateMap2.put(consumingInstanceList.get(2), "ONLINE");
     idealState.setInstanceStateMap("segment2", instanceStateMap2);
+    prevIdealState = new IdealState(
+        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
+    Assert.assertNotSame(idealState, prevIdealState);
     segmentNameToExpectedNumCompletedInstances.put("segment1", 1);
     segmentNameToExpectedNumCompletedInstances.put("segment2", 1);
-    segmentToInstanceStateMap = _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
-    verifySegmentAssignment(segmentToInstanceStateMap, idealState, completedInstanceList, consumingInstanceList,
+    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, consumingInstanceList,
         nReplicas, segmentNameToExpectedNumCompletedInstances);
-
   }
 
-  private void verifySegmentAssignment(Map<String, Map<String, String>> segmentToInstanceStateMap,
-      IdealState idealState, List<String> completedInstanceList, List<String> consumingInstanceList, int nReplicas,
+  private void verifySegmentAssignment(IdealState updatedIdealState,
+      IdealState prevIdealState, List<String> completedInstanceList, List<String> consumingInstanceList, int nReplicas,
       Map<String, Integer> segmentNameToNumCompletedInstances) {
-    Assert.assertTrue(idealState.getPartitionSet().containsAll(segmentToInstanceStateMap.keySet()));
-    for (String segmentName : segmentNameToNumCompletedInstances.keySet()) {
-      Map<String, String> newInstanceStateMap = segmentToInstanceStateMap.get(segmentName);
+    Assert.assertEquals(updatedIdealState.getPartitionSet().size(), prevIdealState.getPartitionSet().size());
+    Assert.assertTrue(prevIdealState.getPartitionSet().containsAll(updatedIdealState.getPartitionSet()));
+    for (String segmentName : updatedIdealState.getPartitionSet()) {
+      Map<String, String> newInstanceStateMap = updatedIdealState.getInstanceStateMap(segmentName);
       int completed = 0;
       int consuming = 0;
       for (String instance : newInstanceStateMap.keySet()) {
