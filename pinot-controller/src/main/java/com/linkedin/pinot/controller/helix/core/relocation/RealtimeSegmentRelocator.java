@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -100,6 +101,8 @@ public class RealtimeSegmentRelocator {
 
   /**
    * Check all tables. Perform relocation of segments if table is realtime and relocation is required
+   * TODO: Model this to implement {@link com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy} interface
+   * https://github.com/linkedin/pinot/issues/2609
    */
   public void runRelocation() {
     if (!_pinotHelixResourceManager.isLeader()) {
@@ -164,6 +167,10 @@ public class RealtimeSegmentRelocator {
           "Found no realtime completed servers with tag " + realtimeTagConfig.getCompletedServerTag());
     }
 
+    if (completedServers.size() < Integer.valueOf(idealState.getReplicas())) {
+      throw new IllegalStateException(
+          "Number of completed servers: " + completedServers.size() + " is less than num replicas: " + idealState.getReplicas());
+    }
     // TODO: use segment assignment strategy to decide where to place relocated segment
 
     // create map of completed server name to num segments it holds.
@@ -249,16 +256,30 @@ public class RealtimeSegmentRelocator {
         // TODO: Using 2 for now. We should use 4. However the current interface and implementations cannot be used as is.
         // We should refactor the SegmentAssignmentStrategy interface suitably and reuse it here
 
-        Map.Entry<String, Integer> completedInstance = completedServersQueue.pollFirst();
+        Map.Entry<String, Integer> chosenServer = null;
+        List<Map.Entry<String, Integer>> polledServers = new ArrayList<>(1);
+        while (!completedServersQueue.isEmpty()) {
+          Map.Entry<String, Integer> server = completedServersQueue.pollFirst();
+          if (instanceStateMap.keySet().contains(server.getKey())) {
+            polledServers.add(server);
+          } else {
+            chosenServer = server;
+            break;
+          }
+        }
+        completedServersQueue.addAll(polledServers);
+        if (chosenServer == null) {
+          throw new IllegalStateException("Could not find server to relocate segment");
+        }
 
         newInstanceStateMap = new HashMap<>(instanceStateMap.size());
         newInstanceStateMap.putAll(instanceStateMap);
         newInstanceStateMap.remove(instance);
-        newInstanceStateMap.put(completedInstance.getKey(),
+        newInstanceStateMap.put(chosenServer.getKey(),
             PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
 
-        completedInstance.setValue(completedInstance.getValue() + 1);
-        completedServersQueue.add(completedInstance);
+        chosenServer.setValue(chosenServer.getValue() + 1);
+        completedServersQueue.add(chosenServer);
         break;
       }
     }

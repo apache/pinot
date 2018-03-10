@@ -90,7 +90,7 @@ public class RealtimeSegmentRelocatorTest {
     String serverTenantConsuming = "aServerTenant_REALTIME_CONSUMING";
     String serverTenantCompleted = "aServerTenant_REALTIME_COMPLETED";
     List<String> consumingInstanceList = getConsumingInstanceList(3);
-    List<String> completedInstanceList = getInstanceList(6);
+    List<String> completedInstanceList = getInstanceList(3);
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(tableName);
     customModeIdealStateBuilder.setStateModel(
         PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
@@ -105,6 +105,7 @@ public class RealtimeSegmentRelocatorTest {
     when(realtimeTagConfig.getCompletedServerTag()).thenReturn(serverTenantCompleted);
 
     Map<String, Integer> segmentNameToExpectedNumCompletedInstances = new HashMap<>(1);
+    ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
 
     // no consuming instances found
     _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantConsuming, new ArrayList<String>());
@@ -129,7 +130,6 @@ public class RealtimeSegmentRelocatorTest {
     Assert.assertTrue(exception);
 
     // empty ideal state
-    ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
     _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantConsuming, consumingInstanceList);
     _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantCompleted, completedInstanceList);
     IdealState prevIdealState = new IdealState(
@@ -182,6 +182,22 @@ public class RealtimeSegmentRelocatorTest {
         nReplicas, segmentNameToExpectedNumCompletedInstances);
 
     // 1 replica ONLINE on consuming, 2 already relocated. relocate the 3rd replica.
+    // However, only 2 completed servers, which is less than num replicas
+    completedInstanceList = getInstanceList(2);
+    _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantCompleted, completedInstanceList);
+    prevIdealState = new IdealState(
+        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    exception = false;
+    try {
+      _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
+    } catch (Exception e) {
+      exception = true;
+    }
+    Assert.assertTrue(exception);
+
+    // Revise list of completed servers to 3. Now we have enough completed servers for all replicas
+    completedInstanceList = getInstanceList(3);
+    _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantCompleted, completedInstanceList);
     prevIdealState = new IdealState(
         (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
@@ -190,7 +206,7 @@ public class RealtimeSegmentRelocatorTest {
     verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, consumingInstanceList,
         nReplicas, segmentNameToExpectedNumCompletedInstances);
 
-    // no move necessary
+    // new segment, all CONSUMING, no move necessary
     Map<String, String> instanceStateMap1 = new HashMap<>(3);
     instanceStateMap1.put(consumingInstanceList.get(0), "CONSUMING");
     instanceStateMap1.put(consumingInstanceList.get(1), "CONSUMING");
@@ -201,6 +217,7 @@ public class RealtimeSegmentRelocatorTest {
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertEquals(idealState, prevIdealState);
 
+    // 2 segments, both in ONLINE on consuming. move 1 replica for each of 2 segments
     instanceStateMap1.put(consumingInstanceList.get(0), "ONLINE");
     instanceStateMap1.put(consumingInstanceList.get(1), "ONLINE");
     instanceStateMap1.put(consumingInstanceList.get(2), "ONLINE");

@@ -274,7 +274,7 @@ public class ControllerConf extends PropertiesConfiguration {
     return DEFAULT_REALTIME_SEGMENT_RELOCATOR_FREQUENCY;
   }
 
-  public void setRealtiemSegmentRelocatorFrequency(String relocatorFrequency) {
+  public void setRealtimeSegmentRelocatorFrequency(String relocatorFrequency) {
     setProperty(REALTIME_SEGMENT_RELOCATOR_FREQUENCY, relocatorFrequency);
   }
 
