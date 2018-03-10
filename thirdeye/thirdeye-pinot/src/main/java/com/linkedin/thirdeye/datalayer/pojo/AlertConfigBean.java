@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.eclipse.jetty.util.StringUtil;
 
 
@@ -309,5 +310,33 @@ public class AlertConfigBean extends AbstractBean {
 
   public enum COMPARE_MODE {
     WoW, Wo2W, Wo3W, Wo4W
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    AlertConfigBean that = (AlertConfigBean) o;
+    return isActive() == that.isActive() && Objects.equals(getName(), that.getName()) && Objects
+        .equals(getApplication(), that.getApplication()) && Objects
+        .equals(getCronExpression(), that.getCronExpression()) && Objects
+        .equals(getHolidayCronExpression(), that.getHolidayCronExpression()) && Objects
+        .equals(getAnomalyFeedConfig(), that.getAnomalyFeedConfig()) && Objects
+        .equals(getEmailConfig(), that.getEmailConfig()) && Objects
+        .equals(getReportConfigCollection(), that.getReportConfigCollection()) && Objects
+        .equals(getAlertGroupConfig(), that.getAlertGroupConfig()) && Objects
+        .equals(getEmailFormatterConfig(), that.getEmailFormatterConfig()) && Objects
+        .equals(getRecipients(), that.getRecipients()) && Objects.equals(getFromAddress(), that.getFromAddress());
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(getName(), getApplication(), getCronExpression(), getHolidayCronExpression(), isActive(),
+        getAnomalyFeedConfig(), getEmailConfig(), getReportConfigCollection(), getAlertGroupConfig(),
+        getEmailFormatterConfig(), getRecipients(), getFromAddress());
   }
 }
