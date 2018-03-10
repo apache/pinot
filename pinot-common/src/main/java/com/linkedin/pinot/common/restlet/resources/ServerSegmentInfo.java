@@ -31,7 +31,7 @@ public class ServerSegmentInfo {
   private  double _segmentCPULoad;
 
   private  List<String> _tableList;
-  private  List<List<Double>> _segmentTimeInfo;
+  private  List<List<Long>> _segmentTimeInfo;
 
   public ServerSegmentInfo(String serverName) {
     this._serverName = serverName;
@@ -81,12 +81,20 @@ public class ServerSegmentInfo {
     return _segmentCPULoad;
   }
 
+  public void setTableList(List<String> tableList)
+  {
+    _tableList = tableList;
+  }
+  public void setSegmentTimeInfo(List<List<Long>> segmentTimeInfo)
+  {
+    _segmentTimeInfo = segmentTimeInfo;
+  }
   public List<String> getTableList()
   {
     return _tableList;
   }
 
-  public List<List<Double>> getSegmentTimeInfo()
+  public List<List<Long>> getSegmentTimeInfo()
   {
     return  _segmentTimeInfo;
   }

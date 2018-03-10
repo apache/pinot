@@ -5,7 +5,7 @@
     "segmentPushType": "APPEND",
     "timeColumnName": "ApplyStartTime",
     "timeType": "SECONDS",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "segmentAssignmentStrategy": "DruidSegmentAssignmentStrategy",
     "schemaName": "JobApplySchema",
     "replication": "1"
   },

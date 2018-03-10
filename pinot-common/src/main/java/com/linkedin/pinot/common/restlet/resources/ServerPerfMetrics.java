@@ -31,7 +31,8 @@ public class ServerPerfMetrics {
   public long segmentCount = 0;
   public long segmentDiskSizeInBytes = 0;
   public double segmentCPULoad = 0;
-  public String segmentList = "";
+  public List<String> tableList;
+  public List<List<Long>> segmentTimeInfo;
 
   //public List<SegmentMetadata> segmentList;
 
@@ -39,7 +40,10 @@ public class ServerPerfMetrics {
     segmentCount = 0;
     segmentDiskSizeInBytes = 0;
     segmentCPULoad = 0;
-    //segmentList = new ArrayList <>();
+
+    tableList = new ArrayList <>();
+    segmentTimeInfo = new ArrayList <>();
+
   }
 
   public long getSegmentCount() {

@@ -23,11 +23,15 @@ import com.linkedin.pinot.controller.util.ServerPerfMetricsReader;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.helix.model.IdealState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 public class SegmentCPULoadMetric implements ServerLoadMetric {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCPULoadMetric.class);
+
     private static final HttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
     private static final Executor executor = Executors.newFixedThreadPool(1);
 
@@ -35,7 +39,7 @@ public class SegmentCPULoadMetric implements ServerLoadMetric {
     public double computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState, String instance, String tableName, SegmentMetadata segmentMetadata) {
 
         ServerPerfMetricsReader serverPerfMetricsReader = new ServerPerfMetricsReader(executor, connectionManager, helixResourceManager);
-        ServerSegmentInfo serverSegmentInfo = serverPerfMetricsReader.getServerPerfMetrics(instance, true, 300);
+        ServerSegmentInfo serverSegmentInfo = serverPerfMetricsReader.getServerPerfMetrics(instance, true, 5000);
         return  serverSegmentInfo.getSegmentCPULoad();
 
     }

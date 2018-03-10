@@ -31,10 +31,7 @@ import io.swagger.annotations.ApiResponses;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
@@ -107,7 +104,12 @@ public class ServerPerfResource {
 
     ServerPerfMetrics serverPerfMetrics = new ServerPerfMetrics();
     Collection <TableDataManager> tableDataManagers = dataManager.getTableDataManagers();
+    int tableIndex = 0;
+
     for (TableDataManager tableDataManager : tableDataManagers) {
+      serverPerfMetrics.tableList.add(tableDataManager.getTableName());
+      serverPerfMetrics.segmentTimeInfo.add(new ArrayList <Long>());
+
       ImmutableList <SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
       try {
         serverPerfMetrics.segmentCount += segmentDataManagers.size();
@@ -117,10 +119,20 @@ public class ServerPerfResource {
           //serverPerfMetrics.segmentList.add(segment.getSegmentMetadata());
 
           // LOGGER.info("adding segment " + segment.getSegmentName() + " to the list in server side! st: " + segment.getSegmentMetadata().getStartTime() + " et: " + segment.getSegmentMetadata().getEndTime());
-          double segmentLoad = tableCPULoadFormulation.get(tableDataManager.getTableName()).computeCPULoad(segment.getSegmentMetadata(),1519948890);
+          String tableName= tableDataManager.getTableName();
+          if(!tableCPULoadFormulation.containsKey(tableName))
+          {
+            LOGGER.error("Table {} does not have an entry in {}", tableName, TableCPULoadConfigFilePath);
+          }
+          double segmentLoad = tableCPULoadFormulation.get(tableName).computeCPULoad(segment.getSegmentMetadata(),1519948890);
           serverPerfMetrics.segmentCPULoad += segmentLoad;
-          LOGGER.info("SegmentLoadIsComputed: {}, {}, {}", System.currentTimeMillis(), segment.getSegmentMetadata().getName(), segmentLoad);
+          LOGGER.info("SegmentLoadIsComputed: {}, {}, {}, {}", System.currentTimeMillis(), tableDataManager.getTableName(), segment.getSegmentMetadata().getName(), segmentLoad);
+
+          serverPerfMetrics.segmentTimeInfo.get(tableIndex).add(segment.getSegmentMetadata().getStartTime());
+          serverPerfMetrics.segmentTimeInfo.get(tableIndex).add(segment.getSegmentMetadata().getEndTime());
         }
+
+        tableIndex++;
 
       } finally {
         // we could release segmentDataManagers as we iterate in the loop above
@@ -131,6 +143,8 @@ public class ServerPerfResource {
         }
       }
     }
+
+
     return serverPerfMetrics;
   }
 

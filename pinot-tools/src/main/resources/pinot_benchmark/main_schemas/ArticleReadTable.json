@@ -5,7 +5,7 @@
     "segmentPushType": "APPEND",
     "timeColumnName": "ReadStartTime",
     "timeType": "SECONDS",
-    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "segmentAssignmentStrategy": "DruidSegmentAssignmentStrategy",
     "schemaName": "ArticleReadSchema",
     "replication": "1"
   },

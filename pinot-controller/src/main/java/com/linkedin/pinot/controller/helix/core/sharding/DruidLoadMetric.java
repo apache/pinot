@@ -22,6 +22,8 @@ import com.linkedin.pinot.controller.util.ServerPerfMetricsReader;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.helix.model.IdealState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +31,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 public class DruidLoadMetric implements ServerLoadMetric {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DruidLoadMetric.class);
+
     private static final HttpConnectionManager _connectionManager = new MultiThreadedHttpConnectionManager();
     private static final Executor _executor = Executors.newFixedThreadPool(1);
 
@@ -40,8 +44,8 @@ public class DruidLoadMetric implements ServerLoadMetric {
     private static final double MILLIS_IN_HOUR = 3600000.0; // RM: 3,600,000 ms in an hour
     private static final double MILLIS_FACTOR = MILLIS_IN_HOUR / LAMBDA;
 
-    public static double computeJointSegmentsCost(Double segmentAStartTime,Double segmentAEndTime,String segmentATableName,
-                                                  Double segmentBStartTime,Double segmentBEndTime,String segmentBTableName)
+    public static double computeJointSegmentsCost(Long segmentAStartTime,Long segmentAEndTime,String segmentATableName,
+                                                  Long segmentBStartTime,Long segmentBEndTime,String segmentBTableName)
     {
 
         final double t0 = segmentAStartTime*1000;
@@ -147,16 +151,16 @@ public class DruidLoadMetric implements ServerLoadMetric {
     }
 
     // RM: The job of this method is to return cost of placing segment to a particular server
-    public double computeSegmentPlacementCost(List<String> tableNameList, List<List<Double>> segmentTimeList,
-                                              Double segmentAStartTime,Double segmentAEndTime,String segmentATableName)
+    public double computeSegmentPlacementCost(List<String> tableNameList, List<List<Long>> segmentTimeList,
+                                              Long segmentAStartTime,Long segmentAEndTime,String segmentATableName)
     {
         double computedCost = 0.0;
         //Compute the druid metric and return it
         for(int i=0; i<tableNameList.size();i++){
-            List<Double> timeList = segmentTimeList.get(i);
+            List<Long> timeList = segmentTimeList.get(i);
             for(int j=0;j<timeList.size();j+=2){
-                Double segmentBStart = timeList.get(j);
-                Double segmentBEnd = timeList.get(j+1);
+                Long segmentBStart = timeList.get(j);
+                Long segmentBEnd = timeList.get(j+1);
                 computedCost += computeJointSegmentsCost(segmentAStartTime,segmentAEndTime,segmentATableName,
                         segmentBStart,segmentBEnd,tableNameList.get(i));
             }
@@ -170,15 +174,31 @@ public class DruidLoadMetric implements ServerLoadMetric {
     public double computeInstanceMetric(PinotHelixResourceManager helixResourceManager, IdealState idealState, String instance, String tableName, SegmentMetadata segmentMetadata) {
 
         ServerPerfMetricsReader serverPerfMetricsReader = new ServerPerfMetricsReader(_executor, _connectionManager, helixResourceManager);
-        ServerSegmentInfo serverSegmentInfo = serverPerfMetricsReader.getServerPerfMetrics(instance, true, 300);
+        ServerSegmentInfo serverSegmentInfo = serverPerfMetricsReader.getServerPerfMetrics(instance, true, 5000);
+
 
         //fetch list
         List<String> tableNameList = serverSegmentInfo.getTableList();
-        List<List<Double>> segmentTimeList = serverSegmentInfo.getSegmentTimeInfo();
+        List<List<Long>> segmentTimeList = serverSegmentInfo.getSegmentTimeInfo();
+
+        //LOGGER.info("TableListFor: instance:{}, list:{}", instance,tableNameList.toString());
+
+        //for(int i=0;i<segmentTimeList.size();i++)
+        //{
+        //    LOGGER.info("SegmentTimeListFor: instance:{}, table:{}, list:{}", instance, tableNameList.get(i), segmentTimeList.get(i).toString());
+        //}
+
+
         // send values of segment start and end by converting them to seconds.
-        Double segmentAStart = (Double.valueOf(segmentMetadata.getTimeInterval().getStartMillis())/1000);
-        Double segmentAEnd = (Double.valueOf(segmentMetadata.getTimeInterval().getEndMillis())/1000);
-        return computeSegmentPlacementCost(tableNameList,segmentTimeList,segmentAStart,segmentAEnd,segmentMetadata.getTableName());
+        //Double segmentAStart = (Double.valueOf(segmentMetadata.getTimeInterval().getStartMillis())/1000);
+        //Double segmentAEnd = (Double.valueOf(segmentMetadata.getTimeInterval().getEndMillis())/1000);
+
+        Long segmentAStart = segmentMetadata.getStartTime();
+        Long segmentAEnd = segmentMetadata.getEndTime();
+
+        double segmentPlaceCost = computeSegmentPlacementCost(tableNameList,segmentTimeList,segmentAStart,segmentAEnd,segmentMetadata.getTableName());
+        LOGGER.info("DruidVsPACE: instance: {}, DruidCost: {}, PACECost: {}", instance, segmentPlaceCost, serverSegmentInfo.getSegmentCPULoad());
+        return segmentPlaceCost;
     }
 
     @Override
@@ -200,17 +220,17 @@ public class DruidLoadMetric implements ServerLoadMetric {
         tables.add("Mar-2018");
 
         // epoch time for first day of the month
-        Double janStart = 1514764800.0;
-        Double febStart = 1517443200.0;
-        Double marStart = 1519862400.0;
+        Long janStart = new Long(1514764800);
+        Long febStart = new Long(1517443200);
+        Long marStart = new Long(1519862400);
 
         // Lists to be sent for computing cost.
-        List<List<Double>> segmentTimeList = new ArrayList<>();
-        List<Double> timeList = new ArrayList<>();
+        List<List<Long>> segmentTimeList = new ArrayList<>();
+        List<Long> timeList = new ArrayList<>();
 
         // create start and end time for 15 days segments for january
         for(int j=0;j<15;j++) {
-            Double temp = janStart + 24*3600;
+            Long temp = janStart + 24*3600;
             timeList.add(janStart);
             timeList.add(temp-1);
             janStart = temp;
@@ -218,9 +238,9 @@ public class DruidLoadMetric implements ServerLoadMetric {
         segmentTimeList.add(timeList);
 
         // create start and end time for 15 days segments for february
-        timeList = new ArrayList<Double>();
+        timeList = new ArrayList<Long>();
         for(int j=0;j<15;j++) {
-            Double temp = febStart + 24*3600;
+            Long temp = febStart + 24*3600;
             timeList.add(febStart);
             timeList.add(temp-1);
             febStart = temp;
@@ -228,9 +248,9 @@ public class DruidLoadMetric implements ServerLoadMetric {
         segmentTimeList.add(timeList);
 
         // create start and end time for 15 days segments for march
-        timeList = new ArrayList<Double>();
+        timeList = new ArrayList<Long>();
         for(int j=0;j<15;j++) {
-            Double temp = marStart + 24*3600;
+            Long temp = marStart + 24*3600;
             timeList.add(marStart);
             timeList.add(temp-1);
             marStart = temp;
@@ -240,14 +260,14 @@ public class DruidLoadMetric implements ServerLoadMetric {
         System.out.println("\nServer contains data from January 1 to 15, February 1 to 15, March 1 to 15");
         // Test adding a new segment for April 2018 (1 month data) into a server that has segments form jan, feb, march
         // This should give a LOW cost value as segment doesn't belong to same tables or overlaps in time.
-        Double recv = metric.computeSegmentPlacementCost(tables,segmentTimeList,1522540800.0,
-                1525046401.0,"Apr-2018");
+        Double recv = metric.computeSegmentPlacementCost(tables,segmentTimeList,new Long(1522540800),
+                new Long(1525046401),"Apr-2018");
         System.out.println("Cost of placing Segment of April: "+recv);
 
         // Test adding a new segment for March 2018 (1 month data) into a server that has segments form jan, feb, march
         // This should give a HIGH cost value as segment belongs to same table (March) and overlaps in time.
-        recv = metric.computeSegmentPlacementCost(tables,segmentTimeList,1519862401.0,
-                1522368001.0,"Mar-2018");
+        recv = metric.computeSegmentPlacementCost(tables,segmentTimeList,new Long(1519862401),
+                new Long(1522368001),"Mar-2018");
         System.out.println("Cost of placing Segment of March: "+recv);
     }
 }
