@@ -56,7 +56,6 @@ public class RealtimeNoDictionaryTest {
     _memoryManager.close();
   }
 
-  @SuppressWarnings("Duplicates")
   private DataFetcher makeDataFetcher(long seed) {
     FieldSpec intSpec = new MetricFieldSpec(INT_COL_NAME, FieldSpec.DataType.INT);
     FieldSpec longSpec = new MetricFieldSpec(LONG_COL_NAME, FieldSpec.DataType.LONG);
@@ -64,19 +63,23 @@ public class RealtimeNoDictionaryTest {
     FieldSpec doubleSpec = new MetricFieldSpec(DOUBLE_COL_NAME, FieldSpec.DataType.DOUBLE);
     _random = new Random(seed);
 
-    FixedByteSingleColumnSingleValueReaderWriter intRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        _random.nextInt(NUM_ROWS)+1, Integer.SIZE/8, _memoryManager, "int");
-    FixedByteSingleColumnSingleValueReaderWriter longRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        _random.nextInt(NUM_ROWS)+1, Long.SIZE/8, _memoryManager, "long");
-    FixedByteSingleColumnSingleValueReaderWriter floatRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        _random.nextInt(NUM_ROWS)+1, Float.SIZE/8, _memoryManager, "float");
-    FixedByteSingleColumnSingleValueReaderWriter doubleRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        _random.nextInt(NUM_ROWS)+1, Double.SIZE/8, _memoryManager, "double");
+    FixedByteSingleColumnSingleValueReaderWriter intRawIndex =
+        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Integer.SIZE / 8,
+            _memoryManager, "int");
+    FixedByteSingleColumnSingleValueReaderWriter longRawIndex =
+        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Long.SIZE / 8, _memoryManager,
+            "long");
+    FixedByteSingleColumnSingleValueReaderWriter floatRawIndex =
+        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Float.SIZE / 8, _memoryManager,
+            "float");
+    FixedByteSingleColumnSingleValueReaderWriter doubleRawIndex =
+        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Double.SIZE / 8, _memoryManager,
+            "double");
 
     for (int i = 0; i < NUM_ROWS; i++) {
       _intVals[i] = _random.nextInt();
       intRawIndex.setInt(i, _intVals[i]);
-      _longVals[i]  = _random.nextLong();
+      _longVals[i] = _random.nextLong();
       longRawIndex.setLong(i, _longVals[i]);
       _floatVals[i] = _random.nextFloat();
       floatRawIndex.setFloat(i, _floatVals[i]);
@@ -94,42 +97,37 @@ public class RealtimeNoDictionaryTest {
   }
 
   @Test
-  public void testIntColumn() throws Exception {
-    final long seed = new Random().nextLong();
+  public void testIntColumn() {
+    long seed = new Random().nextLong();
     DataFetcher dataFetcher = makeDataFetcher(seed);
     int[] docIds = new int[NUM_ROWS];
-    final int startIndex = _random.nextInt(NUM_ROWS);
-    final int numDocIds = _random.nextInt(NUM_ROWS-startIndex) + 1;
+    int numDocIds = _random.nextInt(NUM_ROWS) + 1;
     for (int i = 0; i < numDocIds; i++) {
-      docIds[i+startIndex] = _random.nextInt(NUM_ROWS);
+      docIds[i] = _random.nextInt(NUM_ROWS);
     }
     try {
-      int valStart = _random.nextInt(NUM_ROWS-numDocIds);
       int[] intValues = new int[NUM_ROWS];
-      dataFetcher.fetchIntValues(INT_COL_NAME, docIds, startIndex, numDocIds, intValues, valStart);
+      dataFetcher.fetchIntValues(INT_COL_NAME, docIds, numDocIds, intValues);
       for (int i = 0; i < numDocIds; i++) {
-        Assert.assertEquals(intValues[valStart + i], _intVals[docIds[startIndex + i]], " for row " + docIds[startIndex+i]);
+        Assert.assertEquals(intValues[i], _intVals[docIds[i]], " for row " + docIds[i]);
       }
 
-      valStart = _random.nextInt(NUM_ROWS-numDocIds);
       long[] longValues = new long[NUM_ROWS];
-      dataFetcher.fetchLongValues(INT_COL_NAME, docIds, startIndex, numDocIds, longValues, valStart);
+      dataFetcher.fetchLongValues(INT_COL_NAME, docIds, numDocIds, longValues);
       for (int i = 0; i < numDocIds; i++) {
-        Assert.assertEquals(longValues[valStart + i], _intVals[docIds[startIndex + i]], " for row " + docIds[startIndex+i]);
+        Assert.assertEquals(longValues[i], (long) _intVals[docIds[i]], " for row " + docIds[i]);
       }
 
-      valStart = _random.nextInt(NUM_ROWS-numDocIds);
       float[] floatValues = new float[NUM_ROWS];
-      dataFetcher.fetchFloatValues(INT_COL_NAME, docIds, startIndex, numDocIds, floatValues, valStart);
+      dataFetcher.fetchFloatValues(INT_COL_NAME, docIds, numDocIds, floatValues);
       for (int i = 0; i < numDocIds; i++) {
-        Assert.assertEquals(floatValues[valStart + i], (float)_intVals[docIds[startIndex + i]], " for row " + docIds[startIndex+i]);
+        Assert.assertEquals(floatValues[i], (float) _intVals[docIds[i]], " for row " + docIds[i]);
       }
 
-      valStart = _random.nextInt(NUM_ROWS-numDocIds);
       double[] doubleValues = new double[NUM_ROWS];
-      dataFetcher.fetchDoubleValues(INT_COL_NAME, docIds, startIndex, numDocIds, doubleValues, valStart);
+      dataFetcher.fetchDoubleValues(INT_COL_NAME, docIds, numDocIds, doubleValues);
       for (int i = 0; i < numDocIds; i++) {
-        Assert.assertEquals(doubleValues[valStart + i], (double)_intVals[docIds[startIndex + i]], " for row " + docIds[startIndex+i]);
+        Assert.assertEquals(doubleValues[i], (double) _intVals[docIds[i]], " for row " + docIds[i]);
       }
     } catch (Throwable t) {
       t.printStackTrace();
@@ -138,43 +136,40 @@ public class RealtimeNoDictionaryTest {
   }
 
   @Test
-  public void testLongValues() throws Exception {
-    final long seed = new Random().nextLong();
+  public void testLongValues() {
+    long seed = new Random().nextLong();
     DataFetcher dataFetcher = makeDataFetcher(seed);
     int[] docIds = new int[NUM_ROWS];
-    final int startIndex = _random.nextInt(NUM_ROWS);
-    final int numDocIds = _random.nextInt(NUM_ROWS-startIndex) + 1;
+    int numDocIds = _random.nextInt(NUM_ROWS) + 1;
     for (int i = 0; i < numDocIds; i++) {
-      docIds[i+startIndex] = _random.nextInt(NUM_ROWS);
+      docIds[i] = _random.nextInt(NUM_ROWS);
     }
-    final int valStart = _random.nextInt(NUM_ROWS-numDocIds);
     try {
       try {
         int[] intValues = new int[NUM_ROWS];
-        dataFetcher.fetchIntValues(LONG_COL_NAME, docIds, startIndex, numDocIds, intValues, valStart);
+        dataFetcher.fetchIntValues(LONG_COL_NAME, docIds, numDocIds, intValues);
         Assert.fail("Expected exception converting long to int");
       } catch (UnsupportedOperationException e) {
         // We should see an exception
       }
 
       long[] longValues = new long[NUM_ROWS];
-      dataFetcher.fetchLongValues(LONG_COL_NAME, docIds, startIndex, numDocIds, longValues, valStart);
+      dataFetcher.fetchLongValues(LONG_COL_NAME, docIds, numDocIds, longValues);
       for (int i = 0; i < numDocIds; i++) {
-        Assert.assertEquals(longValues[valStart + i], _longVals[docIds[startIndex + i]], " for row " + docIds[startIndex+i]);
+        Assert.assertEquals(longValues[i], _longVals[docIds[i]], " for row " + docIds[i]);
       }
 
       float[] floatValues = new float[NUM_ROWS];
-      dataFetcher.fetchFloatValues(LONG_COL_NAME, docIds, startIndex, numDocIds, floatValues, valStart);
+      dataFetcher.fetchFloatValues(LONG_COL_NAME, docIds, numDocIds, floatValues);
       for (int i = 0; i < numDocIds; i++) {
-        Assert.assertEquals(floatValues[valStart + i], (float)_longVals[docIds[startIndex + i]], " for row " + docIds[startIndex+i]);
+        Assert.assertEquals(floatValues[i], (float) _longVals[docIds[i]], " for row " + docIds[i]);
       }
 
       double[] doubleValues = new double[NUM_ROWS];
-      dataFetcher.fetchDoubleValues(LONG_COL_NAME, docIds, startIndex, numDocIds, doubleValues, valStart);
+      dataFetcher.fetchDoubleValues(LONG_COL_NAME, docIds, numDocIds, doubleValues);
       for (int i = 0; i < numDocIds; i++) {
-        Assert.assertEquals(doubleValues[valStart + i], (double)_longVals[docIds[startIndex + i]], " for row " + docIds[startIndex+i]);
+        Assert.assertEquals(doubleValues[i], (double) _longVals[docIds[i]], " for row " + docIds[i]);
       }
-
     } catch (Throwable t) {
       t.printStackTrace();
       Assert.fail("Failed with seed " + seed);
@@ -182,20 +177,18 @@ public class RealtimeNoDictionaryTest {
   }
 
   @Test
-  public void testFloatValues() throws Exception {
-    final long seed = new Random().nextLong();
+  public void testFloatValues() {
+    long seed = new Random().nextLong();
     DataFetcher dataFetcher = makeDataFetcher(seed);
     int[] docIds = new int[NUM_ROWS];
-    final int startIndex = _random.nextInt(NUM_ROWS);
-    final int numDocIds = _random.nextInt(NUM_ROWS-startIndex) + 1;
+    int numDocIds = _random.nextInt(NUM_ROWS) + 1;
     for (int i = 0; i < numDocIds; i++) {
-      docIds[i+startIndex] = _random.nextInt(NUM_ROWS);
+      docIds[i] = _random.nextInt(NUM_ROWS);
     }
-    final int valStart = _random.nextInt(NUM_ROWS-numDocIds);
     try {
       try {
         int[] intValues = new int[NUM_ROWS];
-        dataFetcher.fetchIntValues(FLOAT_COL_NAME, docIds, startIndex, numDocIds, intValues, valStart);
+        dataFetcher.fetchIntValues(FLOAT_COL_NAME, docIds, numDocIds, intValues);
         Assert.fail("Expected exception converting float to int");
       } catch (UnsupportedOperationException e) {
         // We should see an exception
@@ -203,24 +196,23 @@ public class RealtimeNoDictionaryTest {
 
       long[] longValues = new long[NUM_ROWS];
       try {
-        dataFetcher.fetchLongValues(FLOAT_COL_NAME, docIds, startIndex, numDocIds, longValues, valStart);
+        dataFetcher.fetchLongValues(FLOAT_COL_NAME, docIds, numDocIds, longValues);
         Assert.fail("Expected exception converting float to long");
       } catch (UnsupportedOperationException e) {
         // We should see an exception
       }
 
       float[] floatValues = new float[NUM_ROWS];
-      dataFetcher.fetchFloatValues(FLOAT_COL_NAME, docIds, startIndex, numDocIds, floatValues, valStart);
+      dataFetcher.fetchFloatValues(FLOAT_COL_NAME, docIds, numDocIds, floatValues);
       for (int i = 0; i < numDocIds; i++) {
-        Assert.assertEquals(floatValues[valStart + i], _floatVals[docIds[startIndex + i]], " for row " + docIds[startIndex+i]);
+        Assert.assertEquals(floatValues[i], _floatVals[docIds[i]], " for row " + docIds[i]);
       }
 
       double[] doubleValues = new double[NUM_ROWS];
-      dataFetcher.fetchDoubleValues(FLOAT_COL_NAME, docIds, startIndex, numDocIds, doubleValues, valStart);
+      dataFetcher.fetchDoubleValues(FLOAT_COL_NAME, docIds, numDocIds, doubleValues);
       for (int i = 0; i < numDocIds; i++) {
-        Assert.assertEquals(doubleValues[valStart + i], (double)_floatVals[docIds[startIndex + i]], " for row " + docIds[startIndex+i]);
+        Assert.assertEquals(doubleValues[i], (double) _floatVals[docIds[i]], " for row " + docIds[i]);
       }
-
     } catch (Throwable t) {
       t.printStackTrace();
       Assert.fail("Failed with seed " + seed);
@@ -228,20 +220,18 @@ public class RealtimeNoDictionaryTest {
   }
 
   @Test
-  public void testDoubleValues() throws Exception {
-    final long seed = new Random().nextLong();
+  public void testDoubleValues() {
+    long seed = new Random().nextLong();
     DataFetcher dataFetcher = makeDataFetcher(seed);
     int[] docIds = new int[NUM_ROWS];
-    final int startIndex = _random.nextInt(NUM_ROWS);
-    final int numDocIds = _random.nextInt(NUM_ROWS-startIndex) + 1;
+    int numDocIds = _random.nextInt(NUM_ROWS) + 1;
     for (int i = 0; i < numDocIds; i++) {
-      docIds[i+startIndex] = _random.nextInt(NUM_ROWS);
+      docIds[i] = _random.nextInt(NUM_ROWS);
     }
-    final int valStart = _random.nextInt(NUM_ROWS-numDocIds);
     try {
       try {
         int[] intValues = new int[NUM_ROWS];
-        dataFetcher.fetchIntValues(DOUBLE_COL_NAME, docIds, startIndex, numDocIds, intValues, valStart);
+        dataFetcher.fetchIntValues(DOUBLE_COL_NAME, docIds, numDocIds, intValues);
         Assert.fail("Expected exception converting double to int");
       } catch (UnsupportedOperationException e) {
         // We should see an exception
@@ -249,7 +239,7 @@ public class RealtimeNoDictionaryTest {
 
       long[] longValues = new long[NUM_ROWS];
       try {
-        dataFetcher.fetchLongValues(DOUBLE_COL_NAME, docIds, startIndex, numDocIds, longValues, valStart);
+        dataFetcher.fetchLongValues(DOUBLE_COL_NAME, docIds, numDocIds, longValues);
         Assert.fail("Expected exception converting double to long");
       } catch (UnsupportedOperationException e) {
         // We should see an exception
@@ -257,18 +247,17 @@ public class RealtimeNoDictionaryTest {
 
       float[] floatValues = new float[NUM_ROWS];
       try {
-        dataFetcher.fetchFloatValues(DOUBLE_COL_NAME, docIds, startIndex, numDocIds, floatValues, valStart);
+        dataFetcher.fetchFloatValues(DOUBLE_COL_NAME, docIds, numDocIds, floatValues);
         Assert.fail("Expected exception converting double to float");
       } catch (UnsupportedOperationException e) {
         // We should see an exception
       }
 
       double[] doubleValues = new double[NUM_ROWS];
-      dataFetcher.fetchDoubleValues(DOUBLE_COL_NAME, docIds, startIndex, numDocIds, doubleValues, valStart);
+      dataFetcher.fetchDoubleValues(DOUBLE_COL_NAME, docIds, numDocIds, doubleValues);
       for (int i = 0; i < numDocIds; i++) {
-        Assert.assertEquals(doubleValues[valStart + i], _doubleVals[docIds[startIndex + i]], " for row " + docIds[startIndex+i]);
+        Assert.assertEquals(doubleValues[i], _doubleVals[docIds[i]], " for row " + docIds[i]);
       }
-
     } catch (Throwable t) {
       t.printStackTrace();
       Assert.fail("Failed with seed " + seed);

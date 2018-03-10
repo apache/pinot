@@ -131,12 +131,12 @@ public class HllIndexCreationTest {
         dataSourceMap.put(column, indexSegment.getDataSource(column));
       }
       DataBlockCache blockCache = new DataBlockCache(new DataFetcher(dataSourceMap));
-      blockCache.initNewBlock(docIdSet, 0, maxDocLength);
+      blockCache.initNewBlock(docIdSet, maxDocLength);
 
-      String[] strings = blockCache.getStringValueArrayForColumn("column1_hll");
+      String[] strings = blockCache.getStringValuesForSVColumn("column1_hll");
       Assert.assertEquals(strings.length, maxDocLength);
 
-      double[] ints = blockCache.getDoubleValueArrayForColumn("column1");
+      double[] ints = blockCache.getDoubleValuesForSVColumn("column1");
       Assert.assertEquals(ints.length, maxDocLength);
     } catch (Exception e) {
       hasException = true;

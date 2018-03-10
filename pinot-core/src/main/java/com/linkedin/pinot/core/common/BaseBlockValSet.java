@@ -113,18 +113,18 @@ public abstract class BaseBlockValSet implements BlockValSet {
   }
 
   @Override
-  public int[] getDictionaryIds() {
+  public int[] getDictionaryIdsSV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int[][] getDictionaryIdsMV() {
     throw new UnsupportedOperationException();
   }
 
   @Override
   public void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds,
       int outStartPos) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public int getDictionaryIdsForDocId(int docId, int[] outputDictIds) {
     throw new UnsupportedOperationException();
   }
 

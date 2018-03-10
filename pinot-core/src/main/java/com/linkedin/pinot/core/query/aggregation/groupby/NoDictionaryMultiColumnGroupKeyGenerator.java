@@ -19,10 +19,10 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
-import com.linkedin.pinot.core.util.FixedIntArray;
 import com.linkedin.pinot.core.query.aggregation.groupby.utils.ValueToIdMap;
 import com.linkedin.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.util.FixedIntArray;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -94,7 +94,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
 
       if (blockMetadata.hasDictionary()) {
         hasDictionary[i] = true;
-        values[i] = blockValSet.getDictionaryIds();
+        values[i] = blockValSet.getDictionaryIdsSV();
       } else {
         hasDictionary[i] = false;
         values[i] = getValuesFromBlockValSet(blockValSet, dataTypes[i]);

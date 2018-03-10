@@ -39,7 +39,7 @@ public class ProjectionBlock implements Block {
     _blockMap = blockMap;
     _docIdSetBlock = docIdSetBlock;
     _dataBlockCache = dataBlockCache;
-    _dataBlockCache.initNewBlock(docIdSetBlock.getDocIdSet(), 0, docIdSetBlock.getSearchableLength());
+    _dataBlockCache.initNewBlock(docIdSetBlock.getDocIdSet(), docIdSetBlock.getSearchableLength());
   }
 
   @Override
@@ -67,7 +67,7 @@ public class ProjectionBlock implements Block {
   }
 
   public BlockValSet getBlockValueSet(String column) {
-    return new ProjectionBlockValSet(_dataBlockCache, column);
+    return new ProjectionBlockValSet(_dataBlockCache, column,_blockMap.get(column).getMetadata().getDataType());
   }
 
   public BlockMetadata getMetadata(String column) {
