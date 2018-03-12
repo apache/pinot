@@ -63,6 +63,7 @@ module.exports = function(environment) {
 
     // Testem prefers this...
     ENV.locationType = 'none';
+    ENV.APP.autoboot = false;
 
     // keep test console output quieter
     ENV.APP.LOG_ACTIVE_GENERATION = false;

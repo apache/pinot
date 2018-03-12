@@ -23,7 +23,7 @@ export default Route.extend({
   },
 
   beforeModel(transition) {
-    const id = transition.params['manage.alert'].alertId;
+    const id = transition.params['manage.alert'].alert_id;
     const { jobId, functionName } = transition.queryParams;
     const durationDefault = '3m';
     const startDateDefault = buildDateEod(3, 'month').valueOf();
@@ -45,7 +45,7 @@ export default Route.extend({
   },
 
   model(params, transition) {
-    const { alertId: id, jobId, functionName } = params;
+    const { alert_id: id, jobId, functionName } = params;
     if (!id) { return; }
 
     // Fetch all the basic alert data needed in manage.alert subroutes
