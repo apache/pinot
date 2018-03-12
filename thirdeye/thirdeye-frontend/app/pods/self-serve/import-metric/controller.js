@@ -236,7 +236,7 @@ export default Controller.extend({
 
     /**
      * Handles form submit
-     * @method submit
+     * @method onSubmit
      * @return {undefined}
      */
     onSubmit() {
