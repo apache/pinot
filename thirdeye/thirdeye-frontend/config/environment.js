@@ -9,7 +9,7 @@ module.exports = function(environment) {
 
     modulePrefix: 'thirdeye-frontend',
 
-    environment: environment,
+    environment,
 
     podModulePrefix: 'thirdeye-frontend/pods',
 
