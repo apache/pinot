@@ -52,49 +52,52 @@ export default Component.extend({
   ),
 
   // Require to display a loader for long rendering
-  didUpdateAttrs(...args) {
+  didUpdateAttrs() {
     later(() => {
-      this._super(args);
+      this._super(...arguments);
     });
   },
 
-  /**
-   * Columns required by ember-models-table
-   */
-  columns: [
-    {
-      template: 'custom/checkbox',
-      useFilter: false,
-      mayBeHidden: false,
-      className: 'events-table__column--checkbox'
-    },
-    {
-      propertyName: 'displayLabel',
-      template: 'custom/eventLabel',
-      title: 'Event Name',
-      className: 'events-table__column'
-    },
-    {
-      propertyName: 'eventType',
-      title: 'Type',
-      filterWithSelect: true,
-      sortFilterOptions: true,
-      className: 'events-table__column--compact'
-    },
-    {
-      propertyName: 'humanRelStart',
-      title: 'Start',
-      className: 'events-table__column--compact',
-      sortedBy: 'relStart',
-      disableFiltering: true
-    },
-    {
-      propertyName: 'humanDuration',
-      title: 'Duration',
-      className: 'events-table__column--compact',
-      sortedBy: 'duration',
-      disableFiltering: true
-    }
+  init() {
+    this._super(...arguments);
+
+    /**
+     * Columns required by ember-models-table
+     */
+    const columns = [
+      {
+        template: 'custom/checkbox',
+        useFilter: false,
+        mayBeHidden: false,
+        className: 'events-table__column--checkbox'
+      },
+      {
+        propertyName: 'displayLabel',
+        template: 'custom/eventLabel',
+        title: 'Event Name',
+        className: 'events-table__column'
+      },
+      {
+        propertyName: 'eventType',
+        title: 'Type',
+        filterWithSelect: true,
+        sortFilterOptions: true,
+        className: 'events-table__column--compact'
+      },
+      {
+        propertyName: 'humanRelStart',
+        title: 'Start',
+        className: 'events-table__column--compact',
+        sortedBy: 'relStart',
+        disableFiltering: true
+      },
+      {
+        propertyName: 'humanDuration',
+        title: 'Duration',
+        className: 'events-table__column--compact',
+        sortedBy: 'duration',
+        disableFiltering: true
+      }
     // {
     //   propertyName: 'score',
     //   title: 'Score',
@@ -102,7 +105,9 @@ export default Component.extend({
     //   className: 'events-table__column--compact',
     //   sortDirection: 'desc'
     // }
-  ],
+    ];
+    this.set('columns', columns);
+  },
 
   actions: {
     /**

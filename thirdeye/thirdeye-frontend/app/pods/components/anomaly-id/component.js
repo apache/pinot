@@ -24,7 +24,7 @@ export default Component.extend({
    * @method anomalyChangeRate
    * @return {Number} - total % change from baseline
    */
-  anomalyChangeRate: computed('anomaly.current', 'anomaly.baseline', function() {
+  anomalyChangeRate: computed('anomaly.{current, baseline}', function() {
     const currentValue = this.get('anomaly.current') || 0;
     const baselineValue = this.get('anomaly.baseline') || 0;
 
