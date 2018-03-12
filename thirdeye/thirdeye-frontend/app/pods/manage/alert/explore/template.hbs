@@ -142,10 +142,10 @@
       {{#if filteredAnomalies}}
         {{!-- Baseline type selector --}}
         <div class="te-pill-selectors__wrapper">
-          <div class="te-pill-selectors__label">Baseline</div>
-          <ul class="te-alert-page-hzlist">
+          <div class="te-pill-selectors__title">Baseline</div>
+          <ul class="te-pill-selectors">
             {{#each baselineOptions as |baseline|}}
-              <li class="te-alert-page-hzlist__item {{if baseline.isActive "te-alert-page-hzlist__item--active"}}" {{action "onBaselineOptionClick" baseline}}>
+              <li class="te-pill-selectors__item {{if baseline.isActive "te-pill-selectors__item--active"}}" {{action "onBaselineOptionClick" baseline}}>
                 {{baseline.name}}
               </li>
             {{/each}}

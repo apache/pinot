@@ -423,30 +423,6 @@ export default Controller.extend({
   },
 
   /**
-   * Reset all time range options and activate the selected one
-   * @method newTimeRangeOptions
-   * @param {String} activeKey - label for currently active time range
-   * @return {undefined}
-   */
-/*  newTimeRangeOptions(activeKey) {
-    const timeRangeOptions = this.get('timeRangeOptions');
-    const newOptions = timeRangeOptions.map((range) => {
-      return {
-        name: range.name,
-        value: range.value,
-        isActive: false
-      };
-    });
-    const foundRangeOption = newOptions.find((range) => range.value === activeKey);
-
-    if (foundRangeOption) {
-      foundRangeOption.isActive = true;
-    }
-
-    return newOptions;
-  },
-*/
-  /**
    * Send a POST request to the report anomaly API (2-step process)
    * http://go/te-ss-alert-flow-api
    * @method reportAnomaly
