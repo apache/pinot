@@ -696,13 +696,33 @@ public class GenericPojoDao {
   }
 
   <T> T runTask(QueryTask<T> task, T defaultReturnValue) {
-    try (Connection connection = getConnection()) {
+    Connection connection = null;
+    try {
+      connection = getConnection();
+      // Enable transaction
+      connection.setAutoCommit(false);
       T t = task.handle(connection);
       connection.commit();
       return t;
     } catch (Exception e) {
       LOG.error("Exception while executing query task", e);
+      // Rollback data in case json table is updated but index table isn't due to error (duplicate key, etc.)
+      if (connection != null) {
+        try {
+          connection.rollback();
+        } catch (SQLException e1) {
+          LOG.error("Failed to rollback SQL execution", e);
+        }
+      }
       return defaultReturnValue;
+    } finally {
+      if (connection != null) {
+        try {
+          connection.close();
+        } catch (SQLException e) {
+          LOG.error("Failed to close connection", e);
+        }
+      }
     }
   }
 

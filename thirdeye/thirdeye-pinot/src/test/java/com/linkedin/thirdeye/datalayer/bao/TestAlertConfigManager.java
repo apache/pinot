@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -80,7 +81,7 @@ public class TestAlertConfigManager {
 
   /*
    * The Following section is the tests for AbstractManagerImpl and GenericPojoDao, which doesn't have a concrete class
-   * to be tested upon.
+   * to be tested upon. These test cannot be executed concurrently with above tests.
    */
   private List<AlertConfigDTO> createBatchAlertConfigs() {
     List<AlertConfigDTO> alertConfigList = new ArrayList<>();
@@ -103,6 +104,27 @@ public class TestAlertConfigManager {
   }
 
   @Test (dependsOnMethods = "testDeleteAlertConfig")
+  public void testInterruptedSingleUpdate() {
+    AlertConfigDTO alertConfig1 = createAlertConfig("100");
+    Long id1 =alertConfigDAO.save(alertConfig1);
+
+    AlertConfigDTO alertConfig2 = createAlertConfig("200");
+    Long id2 = alertConfigDAO.save(alertConfig2);
+    alertConfig2 = alertConfigDAO.findById(id2);
+
+    // Trigger error due to duplicate names
+    alertConfig2.setName("100");
+    int update = alertConfigDAO.update(alertConfig2);// this should fail
+    Assert.assertEquals(update, 0);
+    AlertConfigDTO actualAlertConfig2 = alertConfigDAO.findById(id2);
+    // Make sure the original data is preserved
+    Assert.assertEquals(actualAlertConfig2.getName(), "200");
+
+    // Clean up
+    alertConfigDAO.deleteByIds(Arrays.asList(id1, id2));
+  }
+
+  @Test (dependsOnMethods = "testInterruptedSingleUpdate")
   public void testBatchUpdate() {
     List<AlertConfigDTO> initAlertConfigs = createBatchAlertConfigs();
     // Add multiple alert config to DB
