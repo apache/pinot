@@ -79,14 +79,11 @@ public class BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRequestHandler.class);
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
 
-  private static final String BROKER_QUERY_SPLIT_IN_CLAUSE = "pinot.broker.query.split.in.clause";
   private static final String BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";
   private static final ResponseType DEFAULT_BROKER_RESPONSE_TYPE = ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
-  private static final boolean DEFAULT_BROKER_QUERY_SPLIT_IN_CLAUSE = false;
   private static final int DEFAULT_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
 
   private final SegmentZKMetadataPrunerService _segmentPrunerService;
-  private final boolean _splitInClause;
   private final int _queryLogLength;
   private final AccessControlFactory _accessControlFactory;
   private final RoutingTable _routingTable;
@@ -113,7 +110,6 @@ public class BrokerRequestHandler {
     _requestIdGenerator = new AtomicLong(0);
     _queryResponseLimit = config.getInt(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT,
         CommonConstants.Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
-    _splitInClause = config.getBoolean(BROKER_QUERY_SPLIT_IN_CLAUSE, DEFAULT_BROKER_QUERY_SPLIT_IN_CLAUSE);
     _queryLogLength = config.getInt(BROKER_QUERY_LOG_LENGTH, DEFAULT_QUERY_LOG_LENGTH);
     _brokerTimeOutMs = config.getLong(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
         CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
@@ -168,7 +164,7 @@ public class BrokerRequestHandler {
     final long compilationStartTime = System.nanoTime();
     BrokerRequest brokerRequest;
     try {
-      brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pql, _splitInClause);
+      brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pql);
     } catch (Exception e) {
       LOGGER.info("Parsing error on requestId {}: {}, {}", requestId, pql, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1L);

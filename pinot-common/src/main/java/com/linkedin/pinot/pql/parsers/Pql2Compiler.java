@@ -30,6 +30,7 @@ import com.linkedin.pinot.pql.parsers.pql2.ast.RegexpLikePredicateAstNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
+import javax.annotation.concurrent.ThreadSafe;
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.BaseErrorListener;
@@ -51,8 +52,8 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 /**
  * PQL 2 compiler.
  */
+@ThreadSafe
 public class Pql2Compiler implements AbstractCompiler {
-  private boolean _splitInClause = false;
 
   private static class ErrorListener extends BaseErrorListener {
     @Override
@@ -64,22 +65,15 @@ public class Pql2Compiler implements AbstractCompiler {
 
   private static final ErrorListener ERROR_LISTENER = new ErrorListener();
 
-  @Override
-  public BrokerRequest compileToBrokerRequest(String expression) throws Pql2CompilationException {
-    return compileToBrokerRequest(expression, false);
-  }
-
   /**
    * Compile the given expression into {@link BrokerRequest}.
    *
    * @param expression Expression to compile
-   * @param splitInClause Value of in clause sent as list if true, joined with delimiter otherwise. This is a temporary
-   *                      argument to keep the broker and server compatible, and will be removed.
    * @return BrokerRequest
    * @throws Pql2CompilationException
    */
-  public BrokerRequest compileToBrokerRequest(String expression, boolean splitInClause) throws Pql2CompilationException {
-    _splitInClause = splitInClause;
+  @Override
+  public BrokerRequest compileToBrokerRequest(String expression) throws Pql2CompilationException {
     try {
       //
       CharStream charStream = new ANTLRInputStream(expression);
@@ -97,7 +91,7 @@ public class Pql2Compiler implements AbstractCompiler {
       ParseTree parseTree = parser.root();
 
       ParseTreeWalker walker = new ParseTreeWalker();
-      Pql2AstListener listener = new Pql2AstListener(expression, _splitInClause);
+      Pql2AstListener listener = new Pql2AstListener(expression);
       walker.walk(listener, parseTree);
 
       AstNode rootNode = listener.getRootNode();
@@ -127,7 +121,7 @@ public class Pql2Compiler implements AbstractCompiler {
     ParseTree parseTree = parser.expression();
 
     ParseTreeWalker walker = new ParseTreeWalker();
-    Pql2AstListener listener = new Pql2AstListener(expression, _splitInClause);
+    Pql2AstListener listener = new Pql2AstListener(expression);
     walker.walk(listener, parseTree);
 
     final AstNode rootNode = listener.getRootNode();
@@ -172,7 +166,7 @@ public class Pql2Compiler implements AbstractCompiler {
           }
         }
 
-        if (functionCallIsInSelectList == false) {
+        if (!functionCallIsInSelectList) {
           OutputColumnAstNode havingFunctionAstNode = new OutputColumnAstNode();
           havingFunction.setIsInSelectList(false);
           havingFunctionAstNode.addChild(havingFunction);
@@ -185,8 +179,8 @@ public class Pql2Compiler implements AbstractCompiler {
   }
 
   private List<FunctionCallAstNode> havingTreeDFSTraversalToFindFunctionCalls(HavingAstNode havingList) {
-    List<FunctionCallAstNode> functionCalls = new ArrayList<FunctionCallAstNode>();
-    Stack<AstNode> astNodeStack = new Stack<AstNode>();
+    List<FunctionCallAstNode> functionCalls = new ArrayList<>();
+    Stack<AstNode> astNodeStack = new Stack<>();
     astNodeStack.add(havingList);
     while (!astNodeStack.isEmpty()) {
       AstNode visitingNode = astNodeStack.pop();

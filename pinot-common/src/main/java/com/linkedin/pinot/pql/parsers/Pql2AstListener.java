@@ -57,11 +57,9 @@ public class Pql2AstListener extends PQL2BaseListener {
   Stack<AstNode> _nodeStack = new Stack<>();
   AstNode _rootNode = null;
   private String _expression;
-  private final boolean _splitInClause;
 
-  public Pql2AstListener(String expression, boolean splitInClause) {
+  public Pql2AstListener(String expression) {
     _expression = expression; // Original expression being parsed.
-    _splitInClause = splitInClause;
   }
 
   private void pushNode(AstNode node) {
@@ -271,7 +269,7 @@ public class Pql2AstListener extends PQL2BaseListener {
     if ("not".equalsIgnoreCase(ctx.getChild(0).getChild(1).getText())) {
       isNotInClause = true;
     }
-    pushNode(new InPredicateAstNode(isNotInClause, _splitInClause));
+    pushNode(new InPredicateAstNode(isNotInClause));
   }
 
   @Override

@@ -31,17 +31,14 @@ import java.util.TreeSet;
  * AST node for IN predicates.
  */
 public class InPredicateAstNode extends PredicateAstNode {
-  private static final String DELIMITER = "\t\t";
   private final boolean _isNotInClause;
-  private final boolean _splitInClause;
 
-  public InPredicateAstNode(boolean isNotInClause, boolean splitInClause) {
+  public InPredicateAstNode(boolean isNotInClause) {
     _isNotInClause = isNotInClause;
-    _splitInClause = splitInClause;
   }
 
   public ArrayList<String> getValues() {
-    ArrayList<String> values = new ArrayList<String>();
+    ArrayList<String> values = new ArrayList<>();
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof LiteralAstNode) {
         LiteralAstNode node = (LiteralAstNode) astNode;
@@ -108,17 +105,12 @@ public class InPredicateAstNode extends PredicateAstNode {
       filterOperator = FilterOperator.IN;
     }
 
-    if (_splitInClause) {
-      return new FilterQueryTree(_identifier, new ArrayList<>(values), filterOperator, null);
-    } else {
-      String[] valueArray = values.toArray(new String[values.size()]);
-      return new FilterQueryTree(_identifier, Collections.singletonList(StringUtil.join(DELIMITER, valueArray)),
-          filterOperator, null);
-    }
+    return new FilterQueryTree(_identifier, new ArrayList<>(values), filterOperator, null);
   }
 
   @Override
   public HavingQueryTree buildHavingQueryTree() {
+
     if (_function == null) {
       throw new Pql2CompilationException("IN predicate has no function");
     }

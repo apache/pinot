@@ -40,8 +40,9 @@ public abstract class BaseInPredicate extends Predicate {
   public String[] getValues() {
     /* To maintain backward compatibility, we always split if number of values is one. We do not support
        case where DELIMITER is a sub-string of value.
+       TODO: Clean this up after broker changes to enable splitting have been around for sometime.
      */
     List<String> values = getRhs();
-    return (values.size() == 1) ? values.get(0).split(DELIMITER) : values.toArray(new String[values.size()]);
+    return (values.size() > 1) ? values.toArray(new String[values.size()]) : values.get(0).split(DELIMITER);
   }
 }

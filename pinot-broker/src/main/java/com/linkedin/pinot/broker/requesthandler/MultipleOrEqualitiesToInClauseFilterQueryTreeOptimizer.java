@@ -159,15 +159,11 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
     // If there's only one value, turn it into an equality, otherwise turn it into an IN clause
     if (columnAndValues.getValue().size() == 1) {
       return new FilterQueryTree(columnAndValues.getKey(),
-          elementListToDoubleTabSingletonList(columnAndValues.getValue()), FilterOperator.EQUALITY, null);
+          new ArrayList<>(columnAndValues.getValue()), FilterOperator.EQUALITY, null);
     } else {
-      return new FilterQueryTree(columnAndValues.getKey(),
-          elementListToDoubleTabSingletonList(columnAndValues.getValue()), FilterOperator.IN, null);
+      return new FilterQueryTree(columnAndValues.getKey(), new ArrayList<>(columnAndValues.getValue()),
+          FilterOperator.IN, null);
     }
-  }
-
-  private List<String> elementListToDoubleTabSingletonList(Collection<String> elementList) {
-    return Collections.singletonList(StringUtil.join("\t\t", elementList.toArray(new String[elementList.size()])));
   }
 
   private List<String> valueDoubleTabListToElements(List<String> doubleTabSeparatedElements) {
@@ -179,10 +175,5 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
     }
 
     return valueElements;
-  }
-
-  private List<String> valueDoubleTabListToElements(String doubleTabSeparatedElements) {
-    Splitter valueSplitter = Splitter.on("\t\t");
-    return valueSplitter.splitToList(doubleTabSeparatedElements);
   }
 }
