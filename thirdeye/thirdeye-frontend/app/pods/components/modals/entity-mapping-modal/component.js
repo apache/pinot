@@ -200,7 +200,7 @@ export default Component.extend({
       if (!item.urn) {
         return;
       }
-      const { createdBy } = _.find(entities, { toURN: item.urn });
+      const { createdBy } = _.find(entities, { toURN: item.urn }) || { createdBy: null};
       item.createdBy = createdBy;
       return item;
     });

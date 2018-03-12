@@ -11,7 +11,7 @@ export default function (server) {
         createdBy: null,
         updatedBy: null,
         fromURN: 'thirdeye:metric:1',
-        toUrn: 'thirdeye:metric:100000'
+        toURN: 'thirdeye:metric:100000'
       }
     ];
   });
