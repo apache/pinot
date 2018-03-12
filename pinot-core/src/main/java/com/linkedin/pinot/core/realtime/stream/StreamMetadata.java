@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.metadata.stream;
+package com.linkedin.pinot.core.realtime.stream;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,8 +35,20 @@ import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass
 import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
 
 
-public class KafkaStreamMetadata implements StreamMetadata {
-  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaStreamMetadata.class);
+/*
+ * TODO (Issue 2583)
+ * Rename generic member variables from (and accessor methods) to be kafka-agnostic.
+ * It is expected that an incoming partitioned stream has the following properties that can be configured in general:
+ * - Topic name
+ * - Decoder class
+ * - Consumer factory name
+ * - Connection timeout: (max time to establish a connection/session to the source)
+ * - Fetch timeout (max time to wait to fetch messages once a connection is established)
+ * - Decoder-specific properties
+ * Add a derived class that is Kafka-specific that includes members like zk string and bootstrap hosts.
+ */
+public class StreamMetadata {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StreamMetadata.class);
 
   private final String _kafkaTopicName;
   private final List<ConsumerType> _consumerTypes = new ArrayList<>(2);
@@ -53,7 +65,7 @@ public class KafkaStreamMetadata implements StreamMetadata {
   private static final long DEFAULT_KAFKA_CONNECTION_TIMEOUT_MILLIS = 30000L;
   private static final int DEFAULT_KAFKA_FETCH_TIMEOUT_MILLIS = 5000;
 
-  public KafkaStreamMetadata(Map<String, String> streamConfigMap) {
+  public StreamMetadata(Map<String, String> streamConfigMap) {
     _zkBrokerUrl =
         streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
             Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING));
@@ -166,6 +178,8 @@ public class KafkaStreamMetadata implements StreamMetadata {
     return _streamConfigMap;
   }
 
+  // TODO This is the only Kafka-specific method, used in HLC.
+  // Need to figure out a way to move this to a kafka-specific class
   public String getZkBrokerUrl() {
     return _zkBrokerUrl;
   }
@@ -220,7 +234,7 @@ public class KafkaStreamMetadata implements StreamMetadata {
       return false;
     }
 
-    KafkaStreamMetadata that = (KafkaStreamMetadata) o;
+    StreamMetadata that = (StreamMetadata) o;
 
     return isEqual(_kafkaTopicName, that._kafkaTopicName) &&
         isEqual(_consumerTypes, that._consumerTypes) &&
@@ -241,11 +255,6 @@ public class KafkaStreamMetadata implements StreamMetadata {
     result = hashCodeOf(result, _streamConfigMap);
     result = hashCodeOf(result, _consumerFactoryName);
     return result;
-  }
-
-  @Override
-  public Map<String, String> toMap() {
-    return _streamConfigMap;
   }
 
   public String getBootstrapHosts() {

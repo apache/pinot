@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import java.util.Arrays;
 import java.util.Map;
 import org.json.JSONArray;
@@ -28,7 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class KafkaJSONMessageDecoder implements KafkaMessageDecoder<byte[]> {
+public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaJSONMessageDecoder.class);
 
   private Schema schema;

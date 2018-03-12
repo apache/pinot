@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.pinot.core.realtime.impl.kafka;
+package com.linkedin.pinot.core.realtime.stream;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -24,7 +24,7 @@ import javax.annotation.Nonnull;
 /**
  * Interface that allows us to plugin different Kafka consumers. The default implementation is SimpleConsumerWrapper.
  */
-public interface PinotKafkaConsumer extends Closeable {
+public interface PinotStreamConsumer extends Closeable {
   int getPartitionCount(String topic, long timeoutMillis);
 
   MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)

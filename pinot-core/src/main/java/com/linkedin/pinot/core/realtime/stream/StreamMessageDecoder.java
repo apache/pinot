@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.realtime.impl.kafka;
+package com.linkedin.pinot.core.realtime.stream;
 
 import java.util.Map;
 
@@ -21,7 +21,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 
 
-public interface KafkaMessageDecoder<T> {
+public interface StreamMessageDecoder<T> {
 
   /**
    *

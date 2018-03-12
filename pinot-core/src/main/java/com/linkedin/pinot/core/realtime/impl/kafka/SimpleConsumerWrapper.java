@@ -22,6 +22,8 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.core.realtime.stream.MessageBatch;
+import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -51,7 +53,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Wrapper for Kafka's SimpleConsumer which ensures that we're connected to the appropriate broker for consumption.
  */
-public class SimpleConsumerWrapper implements PinotKafkaConsumer {
+public class SimpleConsumerWrapper implements PinotStreamConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(SimpleConsumerWrapper.class);
   private static final int SOCKET_TIMEOUT_MILLIS = 10000;
   private static final int SOCKET_BUFFER_SIZE = 512000;

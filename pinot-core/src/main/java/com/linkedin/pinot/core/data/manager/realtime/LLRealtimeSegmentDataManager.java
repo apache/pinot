@@ -27,7 +27,7 @@ import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
@@ -46,10 +46,10 @@ import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
-import com.linkedin.pinot.core.realtime.impl.kafka.MessageBatch;
-import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumer;
-import com.linkedin.pinot.core.realtime.impl.kafka.PinotKafkaConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
+import com.linkedin.pinot.core.realtime.stream.MessageBatch;
+import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
+import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -158,7 +158,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final LLCRealtimeSegmentZKMetadata _segmentZKMetadata;
   private final TableConfig _tableConfig;
   private final RealtimeTableDataManager _realtimeTableDataManager;
-  private final KafkaMessageDecoder _messageDecoder;
+  private final StreamMessageDecoder _messageDecoder;
   private final int _segmentMaxRowCount;
   private final String _resourceDataDir;
   private final IndexLoadingConfig _indexLoadingConfig;
@@ -176,7 +176,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final SegmentVersion _segmentVersion;
   private final SegmentBuildTimeLeaseExtender _leaseExtender;
   private SegmentFileAndOffset _segmentFileAndOffset;
-  private PinotKafkaConsumerFactory _pinotKafkaConsumerFactory;
+  private PinotStreamConsumerFactory _pinotStreamConsumerFactory;
 
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
@@ -193,7 +193,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   final String _clientId;
   private final LLCSegmentName _segmentName;
   private final PlainFieldExtractor _fieldExtractor;
-  private PinotKafkaConsumer _consumerWrapper = null;
+  private PinotStreamConsumer _consumerWrapper = null;
   private final File _resourceTmpDir;
   private final String _tableName;
   private final List<String> _invertedIndexColumns;
@@ -208,7 +208,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
   private final long _consumeStartTime;
   private final long _startOffset;
-  private final KafkaStreamMetadata _kafkaStreamMetadata;
+  private final StreamMetadata _streamMetadata;
   private final String _kafkaBootstrapNodes;
 
   private long _lastLogTime = 0;
@@ -297,7 +297,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   protected boolean consumeLoop() throws Exception {
     _fieldExtractor.resetCounters();
     final long idlePipeSleepTimeMillis = 100;
-    final long maxIdleCountBeforeStatUpdate = (3 * 60 * 1000)/(idlePipeSleepTimeMillis + _kafkaStreamMetadata.getKafkaFetchTimeoutMillis());  // 3 minute count
+    final long maxIdleCountBeforeStatUpdate = (3 * 60 * 1000)/(idlePipeSleepTimeMillis + _streamMetadata.getKafkaFetchTimeoutMillis());  // 3 minute count
     long lastUpdatedOffset = _currentOffset;  // so that we always update the metric when we enter this method.
     long idleCount = 0;
     // At this point, we know that we can potentially move the offset, so the old saved segment file is not valid
@@ -312,7 +312,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       MessageBatch messageBatch = null;
       try {
         messageBatch = _consumerWrapper.fetchMessages(_currentOffset, _endOffset,
-            _kafkaStreamMetadata.getKafkaFetchTimeoutMillis());
+            _streamMetadata.getKafkaFetchTimeoutMillis());
         consecutiveErrorCount = 0;
       } catch (TimeoutException e) {
         handleTransientKafkaErrors(e);
@@ -420,7 +420,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 realtimeRowsDroppedMeter);
       }
 
-      _currentOffset = messagesAndOffsets.getNextKafkaMessageOffsetAtIndex(index);
+      _currentOffset = messagesAndOffsets.getNextStreamMessageOffsetAtIndex(index);
       _numRowsIndexed = _realtimeSegment.getNumDocsIndexed();
       _numRowsConsumed++;
       kafkaMessageCount++;
@@ -910,8 +910,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    _kafkaStreamMetadata = new KafkaStreamMetadata(indexingConfig.getStreamConfigs());
-    _pinotKafkaConsumerFactory = PinotKafkaConsumerFactory.create(_kafkaStreamMetadata);
+    _streamMetadata = new StreamMetadata(indexingConfig.getStreamConfigs());
+    _pinotStreamConsumerFactory = PinotStreamConsumerFactory.create(_streamMetadata);
     KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig = createStreamProviderConfig();
     kafkaStreamProviderConfig.init(tableConfig, instanceZKMetadata, schema);
     _kafkaBootstrapNodes = indexingConfig.getStreamConfigs()
@@ -990,7 +990,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setAggregateMetrics(indexingConfig.getAggregateMetrics());
 
     // Create message decoder
-    _messageDecoder = _pinotKafkaConsumerFactory.getDecoder(kafkaStreamProviderConfig);
+    _messageDecoder = _pinotStreamConsumerFactory.getDecoder(kafkaStreamProviderConfig);
     _clientId = _kafkaPartitionId + "-" + NetUtil.getHostnameOrAddress();
 
     // Create field extractor
@@ -1063,7 +1063,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
     }
     segmentLogger.info("Creating new Kafka consumer wrapper, reason: {}", reason);
-    _consumerWrapper = _pinotKafkaConsumerFactory.buildConsumer(_clientId, _kafkaPartitionId, _kafkaStreamMetadata);
+    _consumerWrapper = _pinotStreamConsumerFactory.buildConsumer(_clientId, _kafkaPartitionId, _streamMetadata);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

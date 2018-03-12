@@ -13,13 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.metadata.stream;
+package com.linkedin.pinot.core.realtime.stream;
 
-import java.util.Map;
+import nl.jqno.equalsverifier.EqualsVerifier;
+import nl.jqno.equalsverifier.Warning;
+import org.testng.annotations.Test;
 
 
-public interface StreamMetadata {
-
-  Map<String, String> toMap();
-
+/**
+ * Test for equals and hashCode for the various ZK metadata classes
+ *
+ */
+public class MetadataEqualsHashCodeTest {
+  @Test
+  public void testEqualsAndHashCode() {
+    EqualsVerifier.forClass(StreamMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
+        usingGetClass().verify();
+  }
 }

@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.yammer.metrics.core.Meter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +35,7 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   private static final Logger STATIC_LOGGER = LoggerFactory.getLogger(KafkaHighLevelConsumerStreamProvider.class);
 
   private KafkaHighLevelStreamProviderConfig streamProviderConfig;
-  private KafkaMessageDecoder decoder;
+  private StreamMessageDecoder decoder;
 
   private ConsumerConnector consumer;
   private ConsumerIterator<byte[], byte[]> kafkaIterator;

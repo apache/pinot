@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -43,7 +44,7 @@ import org.slf4j.LoggerFactory;
 
 
 @NotThreadSafe
-public class KafkaAvroMessageDecoder implements KafkaMessageDecoder<byte[]> {
+public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaAvroMessageDecoder.class);
 
   private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";

@@ -20,7 +20,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -340,14 +340,14 @@ public class PinotTableRestletResource {
     boolean verifyReplication = true;
 
     if (config.getTableType() == CommonConstants.Helix.TableType.REALTIME) {
-      KafkaStreamMetadata kafkaStreamMetadata;
+      StreamMetadata streamMetadata;
       try {
-        kafkaStreamMetadata = new KafkaStreamMetadata(config.getIndexingConfig().getStreamConfigs());
+        streamMetadata = new StreamMetadata(config.getIndexingConfig().getStreamConfigs());
       } catch (Exception e) {
         throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid tableIndexConfig or streamConfigs", e);
       }
-      verifyReplicasPerPartition = kafkaStreamMetadata.hasSimpleKafkaConsumerType();
-      verifyReplication = kafkaStreamMetadata.hasHighLevelKafkaConsumerType();
+      verifyReplicasPerPartition = streamMetadata.hasSimpleKafkaConsumerType();
+      verifyReplication = streamMetadata.hasHighLevelKafkaConsumerType();
     }
 
     if (verifyReplication) {
