@@ -161,7 +161,7 @@ public class DataFetcherTest {
     }
 
     int[] intValues = new int[length];
-    _dataFetcher.fetchIntValues(column, docIds, 0, length, intValues, 0);
+    _dataFetcher.fetchIntValues(column, docIds, length, intValues);
 
     for (int i = 0; i < length; i++) {
       Assert.assertEquals(intValues[i], _intMetricValues[docIds[i]], _errorMessage);
@@ -176,7 +176,7 @@ public class DataFetcherTest {
     }
 
     long[] longValues = new long[length];
-    _dataFetcher.fetchLongValues(column, docIds, 0, length, longValues, 0);
+    _dataFetcher.fetchLongValues(column, docIds, length, longValues);
 
     for (int i = 0; i < length; i++) {
       Assert.assertEquals(longValues[i], _longMetricValues[docIds[i]], _errorMessage);
@@ -191,7 +191,7 @@ public class DataFetcherTest {
     }
 
     float[] floatValues = new float[length];
-    _dataFetcher.fetchFloatValues(column, docIds, 0, length, floatValues, 0);
+    _dataFetcher.fetchFloatValues(column, docIds, length, floatValues);
 
     for (int i = 0; i < length; i++) {
       Assert.assertEquals(floatValues[i], _floatMetricValues[docIds[i]], _errorMessage);
@@ -206,7 +206,7 @@ public class DataFetcherTest {
     }
 
     double[] doubleValues = new double[length];
-    _dataFetcher.fetchDoubleValues(column, docIds, 0, length, doubleValues, 0);
+    _dataFetcher.fetchDoubleValues(column, docIds, length, doubleValues);
 
     for (int i = 0; i < length; i++) {
       Assert.assertEquals(doubleValues[i], _doubleMetricValues[docIds[i]], _errorMessage);
@@ -222,7 +222,7 @@ public class DataFetcherTest {
     }
 
     String[] stringValues = new String[length];
-    _dataFetcher.fetchStringValues(DIMENSION_NAME, docIds, 0, length, stringValues, 0);
+    _dataFetcher.fetchStringValues(DIMENSION_NAME, docIds, length, stringValues);
 
     for (int i = 0; i < length; i++) {
       Assert.assertEquals(stringValues[i], _dimensionValues[docIds[i]], _errorMessage);

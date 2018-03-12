@@ -109,6 +109,16 @@ public final class ColumnDataSource extends DataSource {
       }
 
       @Override
+      public int getNumDocs() {
+        return _numDocs;
+      }
+
+      @Override
+      public int getMaxNumMultiValues() {
+        return _maxNumMultiValues;
+      }
+
+      @Override
       public boolean hasInvertedIndex() {
         return _invertedIndex != null;
       }

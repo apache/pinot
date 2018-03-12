@@ -26,6 +26,10 @@ public interface DataSourceMetadata {
 
   boolean isSorted();
 
+  int getNumDocs();
+
+  int getMaxNumMultiValues();
+
   boolean hasInvertedIndex();
 
   boolean hasDictionary();

@@ -16,392 +16,331 @@
 package com.linkedin.pinot.core.common;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nonnull;
 
 
 /**
- * This class serves as a single/multi value column block level cache. Using this class can prevent fetching the same column
- * data multiple times. This class allocate resources on demand, and reuse them as much as possible to prevent garbage
- * collection.
+ * This class serves as a block level cache for column dictionary Ids and values. Using this class can prevent fetching
+ * data for the same column multiple times. This class allocate resources on demand, and reuse them as much as possible
+ * to prevent garbage collection.
  */
 @SuppressWarnings("Duplicates")
 public class DataBlockCache {
   private final DataFetcher _dataFetcher;
 
-  /** _columnXXLoaded must be cleared in initNewBlock */
+  // Mark whether data have been fetched, need to be cleared in initNewBlock()
   private final Set<String> _columnDictIdLoaded = new HashSet<>();
-  private final Set<String> _columnValueLoaded = new HashSet<>();
-  private final Set<String> _columnHashCodeLoaded = new HashSet<>();
-  private final Set<String> _columnStringLoaded = new HashSet<>();
+  private final Set<ColumnTypePair> _columnValueLoaded = new HashSet<>();
+  private final Set<String> _columnNumValuesLoaded = new HashSet<>();
 
-  /** _columnToXXsMap must be defined accordingly */
-  private final Map<String, int[]> _columnToDictIdsMap = new HashMap<>();
-  private final Map<String, Object> _columnToValuesMap = new HashMap<>();
-  private final Map<String, String[]> _columnToStringsMap = new HashMap<>();
-
-  private final Map<String, int[]> _columnToNumberOfEntriesMap = new HashMap<>();
-
-  private final Map<String, int[][]> _columnToDictIdsArrayMap = new HashMap<>();
-  private final Map<String, Object> _columnToValuesArrayMap = new HashMap<>();
-  private final Map<String, String[][]> _columnToStringsArrayMap = new HashMap<>();
-
-  private final Map<String, int[]> _columnToTempDictIdsMap = new HashMap<>();
+  // Buffer for data
+  private final Map<String, Object> _dictIdsMap = new HashMap<>();
+  private final Map<ColumnTypePair, Object> _valuesMap = new HashMap<>();
+  private final Map<String, int[]> _numValuesMap = new HashMap<>();
 
   private int[] _docIds;
-  private int _startPos;
   private int _length;
 
-  /**
-   * Constructor for SingleValueBlockCache.
-   *
-   * @param dataFetcher data fetcher associated with the index segment.
-   */
   public DataBlockCache(DataFetcher dataFetcher) {
     _dataFetcher = dataFetcher;
   }
 
   /**
-   * Init the block cache with block doc id array, start index and block length. This method should be called before
-   * fetching data for any specific block.
+   * Init the data block cache with document Ids for a new block. This method should be called before fetching data for
+   * any specific block.
    *
-   * @param docIds doc id array.
-   * @param startPos start position.
-   * @param length length.
+   * @param docIds Document Ids buffer
+   * @param length Number of document Ids
    */
-  public void initNewBlock(int[] docIds, int startPos, int length) {
+  public void initNewBlock(int[] docIds, int length) {
+    _docIds = docIds;
+    _length = length;
+
     _columnDictIdLoaded.clear();
     _columnValueLoaded.clear();
-    _columnHashCodeLoaded.clear();
-    _columnStringLoaded.clear();
-
-    _docIds = docIds;
-    _startPos = startPos;
-    _length = length;
+    _columnNumValuesLoaded.clear();
   }
 
   /**
-   * Get dictionary id array for a given column for the specific block initialized in the initNewBlock.
-   *
-   * @param column column name.
-   * @return dictionary id array associated with this column.
+   * SINGLE-VALUED COLUMN API
    */
-  public int[] getDictIdArrayForColumn(String column) {
-    int[] dictIds = _columnToDictIdsMap.get(column);
-    if (!_columnDictIdLoaded.contains(column)) {
+
+  /**
+   * Get the dictionary Ids for a single-valued column.
+   *
+   * @param column Column name
+   * @return Array of dictionary Ids
+   */
+  public int[] getDictIdsForSVColumn(String column) {
+    int[] dictIds = (int[]) _dictIdsMap.get(column);
+    if (_columnDictIdLoaded.add(column)) {
       if (dictIds == null) {
         dictIds = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-        _columnToDictIdsMap.put(column, dictIds);
+        _dictIdsMap.put(column, dictIds);
       }
-      _dataFetcher.fetchSingleDictIds(column, _docIds, _startPos, _length, dictIds, 0);
-      _columnDictIdLoaded.add(column);
+      _dataFetcher.fetchDictIds(column, _docIds, _length, dictIds);
     }
     return dictIds;
   }
 
   /**
-   * Get an array of array representation for dictionary ids for a given column for the
-   * specific block initialized in the initNewBlock.
+   * Get the int values for a single-valued column.
    *
-   * @param column column name.
-   * @return dictionary ids array associated with this column.
+   * @param column Column name
+   * @return Array of int values
    */
-  private int[][] getDictIdsArrayForColumn(String column) {
-    int[][] dictIdsArray = _columnToDictIdsArrayMap.get(column);
-    if (!_columnDictIdLoaded.contains(column)) {
-      if (dictIdsArray == null) {
-        dictIdsArray = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-        _columnToDictIdsArrayMap.put(column, dictIdsArray);
-      }
-      _dataFetcher.fetchMultiValueDictIds(column, _docIds, _startPos, _length, dictIdsArray, 0,
-          getTempDictIdArrayForColumn(column));
-      _columnDictIdLoaded.add(column);
-    }
-    return dictIdsArray;
-  }
-
-  private int[] getTempDictIdArrayForColumn(String column) {
-    if (!_columnToTempDictIdsMap.containsKey(column)) {
-      int maxNumberOfEntries = _dataFetcher.getMaxNumberOfEntriesForColumn(column);
-      int[] tempDictIdArray = new int[maxNumberOfEntries];
-      _columnToTempDictIdsMap.put(column, tempDictIdArray);
-    }
-    return _columnToTempDictIdsMap.get(column);
-  }
-
-  /**
-   * Get int value array for a given column for the specific block initialized in the initNewBlock.
-   *
-   * @param column column name.
-   * @return value array associated with this column.
-   */
-  public int[] getIntValueArrayForColumn(String column) {
-    String key = getKeyForColumnAndType(column, FieldSpec.DataType.INT);
-    int[] intValues = (int []) _columnToValuesMap.get(key);
-    if (!_columnValueLoaded.contains(key)) {
+  public int[] getIntValuesForSVColumn(String column) {
+    ColumnTypePair key = new ColumnTypePair(column, FieldSpec.DataType.INT);
+    int[] intValues = (int[]) _valuesMap.get(key);
+    if (_columnValueLoaded.add(key)) {
       if (intValues == null) {
         intValues = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-        _columnToValuesMap.put(key, intValues);
+        _valuesMap.put(key, intValues);
       }
-      _dataFetcher.fetchIntValues(column, _docIds, _startPos, _length, intValues, 0);
-      _columnValueLoaded.add(key);
+      _dataFetcher.fetchIntValues(column, _docIds, _length, intValues);
     }
     return intValues;
   }
 
   /**
-   * Get double value array for a given column for the specific block initialized in the initNewBlock.
+   * Get the long values for a single-valued column.
    *
-   * @param column column name.
-   * @return int values array associated with this column.
+   * @param column Column name
+   * @return Array of long values
    */
-  public int[][] getIntValuesArrayForColumn(String column) {
-    String key = getKeyForColumnAndType(column, FieldSpec.DataType.INT_ARRAY);
-    int[][] intValues = (int[][]) _columnToValuesArrayMap.get(key);
-
-    if (!_columnValueLoaded.contains(key)) {
-      if (intValues == null) {
-        intValues = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-        _columnToValuesArrayMap.put(key, intValues);
-      }
-
-      _dataFetcher.fetchIntValues(column, _docIds, _startPos, _length, intValues, 0);
-      _columnValueLoaded.add(key);
-    }
-    return intValues;
-  }
-
-  /**
-   * Get long value array for a given column for the specific block initialized in the initNewBlock.
-   *
-   * @param column column name.
-   * @return value array associated with this column.
-   */
-  public long[] getLongValueArrayForColumn(String column) {
-    String key = getKeyForColumnAndType(column, FieldSpec.DataType.LONG);
-    long[] longValues = (long []) _columnToValuesMap.get(key);
-    if (!_columnValueLoaded.contains(key)) {
+  public long[] getLongValuesForSVColumn(String column) {
+    ColumnTypePair key = new ColumnTypePair(column, FieldSpec.DataType.LONG);
+    long[] longValues = (long[]) _valuesMap.get(key);
+    if (_columnValueLoaded.add(key)) {
       if (longValues == null) {
         longValues = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-        _columnToValuesMap.put(key, longValues);
+        _valuesMap.put(key, longValues);
       }
-      _dataFetcher.fetchLongValues(column, _docIds, _startPos, _length, longValues, 0);
-      _columnValueLoaded.add(key);
+      _dataFetcher.fetchLongValues(column, _docIds, _length, longValues);
     }
     return longValues;
   }
 
   /**
-   * Get long value array for a given column for the specific block initialized in the initNewBlock.
+   * Get the float values for a single-valued column.
    *
-   * @param column column name.
-   * @return long values array associated with this column.
+   * @param column Column name
+   * @return Array of float values
    */
-  public long[][] getLongValuesArrayForColumn(String column) {
-    String key = getKeyForColumnAndType(column, FieldSpec.DataType.LONG_ARRAY);
-    long[][] longValues = (long[][]) _columnToValuesArrayMap.get(key);
-
-    if (!_columnValueLoaded.contains(key)) {
-      if (longValues == null) {
-        longValues = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-        _columnToValuesArrayMap.put(key, longValues);
-      }
-
-      _dataFetcher.fetchLongValues(column, _docIds, _startPos, _length, longValues, 0);
-      _columnValueLoaded.add(key);
-    }
-    return longValues;
-  }
-
-  /**
-   * Get long value array for a given column for the specific block initialized in the initNewBlock.
-   *
-   * @param column column name.
-   * @return value array associated with this column.
-   */
-  public float[] getFloatValueArrayForColumn(String column) {
-    String key = getKeyForColumnAndType(column, FieldSpec.DataType.FLOAT);
-    float[] floatValues = (float []) _columnToValuesMap.get(key);
-    if (!_columnValueLoaded.contains(key)) {
+  public float[] getFloatValuesForSVColumn(String column) {
+    ColumnTypePair key = new ColumnTypePair(column, FieldSpec.DataType.FLOAT);
+    float[] floatValues = (float[]) _valuesMap.get(key);
+    if (_columnValueLoaded.add(key)) {
       if (floatValues == null) {
         floatValues = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-        _columnToValuesMap.put(key, floatValues);
+        _valuesMap.put(key, floatValues);
       }
-      _dataFetcher.fetchFloatValues(column, _docIds, _startPos, _length, floatValues, 0);
-      _columnValueLoaded.add(key);
+      _dataFetcher.fetchFloatValues(column, _docIds, _length, floatValues);
     }
     return floatValues;
   }
 
   /**
-   * Get long value array for a given column for the specific block initialized in the initNewBlock.
+   * Get the double values for a single-valued column.
    *
-   * @param column column name.
-   * @return long values array associated with this column.
+   * @param column Column name
+   * @return Array of double values
    */
-  public float[][] getFloatValuesArrayForColumn(String column) {
-    String key = getKeyForColumnAndType(column, FieldSpec.DataType.FLOAT_ARRAY);
-    float[][] floatValues = (float[][]) _columnToValuesArrayMap.get(key);
-
-    if (!_columnValueLoaded.contains(key)) {
-      if (floatValues == null) {
-        floatValues = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-        _columnToValuesArrayMap.put(key, floatValues);
-      }
-
-      _dataFetcher.fetchFloatValues(column, _docIds, _startPos, _length, floatValues, 0);
-      _columnValueLoaded.add(key);
-    }
-    return floatValues;
-  }
-
-  /**
-   * Get double value array for a given column for the specific block initialized in the initNewBlock.
-   *
-   * @param column column name.
-   * @return value array associated with this column.
-   */
-  public double[] getDoubleValueArrayForColumn(String column) {
-    String key = getKeyForColumnAndType(column, FieldSpec.DataType.DOUBLE);
-    double[] doubleValues = (double []) _columnToValuesMap.get(key);
-    if (!_columnValueLoaded.contains(key)) {
+  public double[] getDoubleValuesForSVColumn(String column) {
+    ColumnTypePair key = new ColumnTypePair(column, FieldSpec.DataType.DOUBLE);
+    double[] doubleValues = (double[]) _valuesMap.get(key);
+    if (_columnValueLoaded.add(key)) {
       if (doubleValues == null) {
         doubleValues = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-        _columnToValuesMap.put(key, doubleValues);
+        _valuesMap.put(key, doubleValues);
       }
-      _dataFetcher.fetchDoubleValues(column, _docIds, _startPos, _length, doubleValues, 0);
-      _columnValueLoaded.add(key);
+      _dataFetcher.fetchDoubleValues(column, _docIds, _length, doubleValues);
     }
     return doubleValues;
   }
 
   /**
-   * Get double value array for a given column for the specific block initialized in the initNewBlock.
+   * Get the string values for a single-valued column.
    *
-   * @param column column name.
-   * @return double values array associated with this column.
+   * @param column Column name
+   * @return Array of string values
    */
-  public double[][] getDoubleValuesArrayForColumn(String column) {
-    String key = getKeyForColumnAndType(column, FieldSpec.DataType.DOUBLE_ARRAY);
-    double[][] doubleValuesArray = (double[][]) _columnToValuesArrayMap.get(key);
-
-    if (!_columnValueLoaded.contains(key)) {
-      if (doubleValuesArray == null) {
-        doubleValuesArray = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-        _columnToValuesArrayMap.put(key, doubleValuesArray);
-      }
-
-      _dataFetcher.fetchDoubleValues(column, _docIds, _startPos, _length, doubleValuesArray, 0);
-      _columnValueLoaded.add(key);
-    }
-    return doubleValuesArray;
-  }
-
-  /**
-   * Get hash code array for a given column for the specific block initialized in the initNewBlock.
-   *
-   * @param column column name.
-   * @return hash codes array associated with this column.
-   */
-  public int[] getNumberOfEntriesArrayForColumn(String column) {
-    int[] numberOfEntriesArray = _columnToNumberOfEntriesMap.get(column);
-    if (!_columnHashCodeLoaded.contains(column)) {
-      if (numberOfEntriesArray == null) {
-        numberOfEntriesArray = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-        _columnToNumberOfEntriesMap.put(column, numberOfEntriesArray);
-      }
-      int[][] dictIdsArray = getDictIdsArrayForColumn(column);
-      for (int pos = 0; pos < _length; ++pos) {
-        numberOfEntriesArray[pos] = dictIdsArray[pos].length;
-      }
-      _columnHashCodeLoaded.add(column);
-    }
-    return numberOfEntriesArray;
-  }
-
-  /**
-   * Get string value array for a given column for the specific block initialized in the initNewBlock.
-   *
-   * @param column column name.
-   * @return value array associated with this column.
-   */
-  public String[] getStringValueArrayForColumn(String column) {
-    String[] stringValues = _columnToStringsMap.get(column);
-    if (!_columnStringLoaded.contains(column)) {
+  public String[] getStringValuesForSVColumn(String column) {
+    ColumnTypePair key = new ColumnTypePair(column, FieldSpec.DataType.STRING);
+    String[] stringValues = (String[]) _valuesMap.get(key);
+    if (_columnValueLoaded.add(key)) {
       if (stringValues == null) {
         stringValues = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-        _columnToStringsMap.put(column, stringValues);
+        _valuesMap.put(key, stringValues);
       }
-      _dataFetcher.fetchStringValues(column, _docIds, _startPos, _length, stringValues, 0);
-      _columnStringLoaded.add(column);
+      _dataFetcher.fetchStringValues(column, _docIds, _length, stringValues);
     }
     return stringValues;
   }
 
   /**
-   * Get string value array for a given column for the specific block initialized in the initNewBlock.
-   *
-   * @param column column name.
-   * @return string values array associated with this column.
+   * MULTI-VALUED COLUMN API
    */
-  public String[][] getStringValuesArrayForColumn(String column) {
-    String[][] stringsArray = _columnToStringsArrayMap.get(column);
-    if (!_columnHashCodeLoaded.contains(column)) {
-      if (stringsArray == null) {
-        stringsArray = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-        _columnToStringsArrayMap.put(column, stringsArray);
+
+  /**
+   * Get the dictionary Ids for a multi-valued column.
+   *
+   * @param column Column name
+   * @return Array of dictionary Ids
+   */
+  public int[][] getDictIdsForMVColumn(String column) {
+    int[][] dictIds = (int[][]) _dictIdsMap.get(column);
+    if (_columnDictIdLoaded.add(column)) {
+      if (dictIds == null) {
+        dictIds = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        _dictIdsMap.put(column, dictIds);
       }
-
-      _dataFetcher.fetchStringValues(column, _docIds, _startPos, _length, stringsArray, 0);
-      _columnHashCodeLoaded.add(column);
+      _dataFetcher.fetchDictIds(column, _docIds, _length, dictIds);
     }
-    return stringsArray;
+    return dictIds;
   }
 
   /**
-   * Returns the data type of the specified column.
+   * Get the int values for a multi-valued column.
    *
-   * @param column Column for which to return the data type.
-   * @return Data type of the column.
+   * @param column Column name
+   * @return Array of int values
    */
-  public FieldSpec.DataType getDataType(String column) {
-    return _dataFetcher.getDataType(column);
+  public int[][] getIntValuesForMVColumn(String column) {
+    ColumnTypePair key = new ColumnTypePair(column, FieldSpec.DataType.INT);
+    int[][] intValues = (int[][]) _valuesMap.get(key);
+    if (_columnValueLoaded.add(key)) {
+      if (intValues == null) {
+        intValues = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        _valuesMap.put(key, intValues);
+      }
+      _dataFetcher.fetchIntValues(column, _docIds, _length, intValues);
+    }
+    return intValues;
   }
 
   /**
-   * Returns the block metadata for the given column.
+   * Get the long values for a multi-valued column.
    *
-   * @param column Column for which to get the metadata
-   * @return Metadata for the column
+   * @param column Column name
+   * @return Array of long values
    */
-  public BlockMetadata getMetadataFor(String column) {
-    return _dataFetcher.getBlockMetadataFor(column);
+  public long[][] getLongValuesForMVColumn(String column) {
+    ColumnTypePair key = new ColumnTypePair(column, FieldSpec.DataType.LONG);
+    long[][] longValues = (long[][]) _valuesMap.get(key);
+    if (_columnValueLoaded.add(key)) {
+      if (longValues == null) {
+        longValues = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        _valuesMap.put(key, longValues);
+      }
+      _dataFetcher.fetchLongValues(column, _docIds, _length, longValues);
+    }
+    return longValues;
   }
 
   /**
-   * Returns the data fetcher
+   * Get the float values for a multi-valued column.
    *
-   * @return Data fetcher
+   * @param column Column name
+   * @return Array of float values
    */
-  public DataFetcher getDataFetcher() {
-    return _dataFetcher;
+  public float[][] getFloatValuesForMVColumn(String column) {
+    ColumnTypePair key = new ColumnTypePair(column, FieldSpec.DataType.FLOAT);
+    float[][] floatValues = (float[][]) _valuesMap.get(key);
+    if (_columnValueLoaded.add(key)) {
+      if (floatValues == null) {
+        floatValues = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        _valuesMap.put(key, floatValues);
+      }
+      _dataFetcher.fetchFloatValues(column, _docIds, _length, floatValues);
+    }
+    return floatValues;
   }
 
   /**
-   * Helper method that generates a key for {@link #_columnToValuesMap} using column name and data type
-   * to be fetched for the column.
+   * Get the double values for a multi-valued column.
    *
-   * @param column Column Name
-   * @param dataType Data Type
-   * @return Key of column name and data type
+   * @param column Column name
+   * @return Array of double values
    */
-  private String getKeyForColumnAndType(String column, FieldSpec.DataType dataType) {
-    StringBuilder builder = new StringBuilder(column);
-    builder.append("_");
-    builder.append(dataType);
-    return builder.toString();
+  public double[][] getDoubleValuesForMVColumn(String column) {
+    ColumnTypePair key = new ColumnTypePair(column, FieldSpec.DataType.DOUBLE);
+    double[][] doubleValues = (double[][]) _valuesMap.get(key);
+    if (_columnValueLoaded.add(key)) {
+      if (doubleValues == null) {
+        doubleValues = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        _valuesMap.put(key, doubleValues);
+      }
+      _dataFetcher.fetchDoubleValues(column, _docIds, _length, doubleValues);
+    }
+    return doubleValues;
+  }
+
+  /**
+   * Get the string values for a multi-valued column.
+   *
+   * @param column Column name
+   * @return Array of string values
+   */
+  public String[][] getStringValuesForMVColumn(String column) {
+    ColumnTypePair key = new ColumnTypePair(column, FieldSpec.DataType.STRING);
+    String[][] stringValues = (String[][]) _valuesMap.get(key);
+    if (_columnValueLoaded.add(key)) {
+      if (stringValues == null) {
+        stringValues = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        _valuesMap.put(key, stringValues);
+      }
+      _dataFetcher.fetchStringValues(column, _docIds, _length, stringValues);
+    }
+    return stringValues;
+  }
+
+  /**
+   * Get the number of values for a multi-valued column.
+   *
+   * @param column Column name
+   * @return Array of number of values
+   */
+  public int[] getNumValuesForMVColumn(String column) {
+    int[] numValues = _numValuesMap.get(column);
+    if (_columnNumValuesLoaded.add(column)) {
+      if (numValues == null) {
+        numValues = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        _numValuesMap.put(column, numValues);
+      }
+      _dataFetcher.fetchNumValues(column, _docIds, _length, numValues);
+    }
+    return numValues;
+  }
+
+  /**
+   * Helper class to store pair of column name and data type.
+   */
+  private static class ColumnTypePair {
+    final String _column;
+    final FieldSpec.DataType _dataType;
+
+    ColumnTypePair(@Nonnull String column, @Nonnull FieldSpec.DataType dataType) {
+      _column = column;
+      _dataType = dataType;
+    }
+
+    @Override
+    public int hashCode() {
+      return EqualityUtils.hashCodeOf(_column.hashCode(), _dataType.hashCode());
+    }
+
+    @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
+    @Override
+    public boolean equals(Object obj) {
+      ColumnTypePair that = (ColumnTypePair) obj;
+      return _column.equals(that._column) && _dataType == that._dataType;
+    }
   }
 }

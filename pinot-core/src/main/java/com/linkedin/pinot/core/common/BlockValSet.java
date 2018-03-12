@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.common;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
+
 /**
  *
  *
@@ -162,7 +163,9 @@ public interface BlockValSet {
    * Get the dictionary ids for all docs of this block.
    * This version is for single-valued columns.
    */
-  int[] getDictionaryIds();
+  int[] getDictionaryIdsSV();
+
+  int[][] getDictionaryIdsMV();
 
   /**
    * Copies the dictionaryIds for the input range DocIds.
@@ -178,17 +181,6 @@ public interface BlockValSet {
    * TODO: Remove arguments from this api, as ProjectionBlock has all the required info.
    */
   void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos);
-
-  /**
-   * Fills dictionary id's of multi-valued column for the current doc id in the passed in array,
-   * and returns the total number of multi-values read.
-   * Caller responsible to ensure that the passed in array is large enough to store the result.
-   *
-   * @param docId Doc id for which to get the dictionary ids.
-   * @param outputDictIds int array where the resulting dictionary ids will be stored.
-   * @return Total number of multi-valued columns.
-   */
-  int getDictionaryIdsForDocId(int docId, int[] outputDictIds);
 
   /**
    * Returns an array containing number of MV entries for each docId in the BlockValSet.
