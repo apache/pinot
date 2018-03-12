@@ -1,0 +1,27 @@
+<div class="te-pill-selectors__wrapper">
+  {{!-- Date range selector --}}
+  <div class="te-pill-selectors__title">{{title}}</div>
+  <ul class="te-pill-selectors">
+    {{#each timeRangeOptions as |range|}}
+      <li class="te-pill-selectors__item {{if range.isActive "te-pill-selectors__item--active"}}" {{action "onRangeOptionClick" range}} data-value={{range.value}}>
+        {{range.name}}
+        {{#if (eq range.name "Custom")}}
+          : {{date-range-picker
+              class="te-pill-selectors__range-picker te-pill-selectors__range-picker--explore"
+              timePicker=false
+              timePicker24Hour=true
+              timePickerIncrement=timePickerIncrement
+              maxDate=maxTime
+              start=activeRangeStart
+              end=activeRangeEnd
+              ranges=predefinedRanges
+              showCustomRangeLabel=false
+              format=uiDateFormat
+              serverFormat=serverFormat
+              applyAction=(action "onRangeSelection")
+            }}
+        {{/if}}
+      </li>
+    {{/each}}
+  </ul>
+</div>

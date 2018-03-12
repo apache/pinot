@@ -1,32 +1,16 @@
 <div class="manage-alert-explore">
   {{#if (not isReplayPending)}}
-    <div class="te-pill-selectors">
-      {{!-- Date range selector --}}
-      <div class="te-pill-selectors__label">Showing</div>
-      <ul class="te-alert-page-hzlist">
-        {{#each timeRangeOptions as |range|}}
-          <li class="te-alert-page-hzlist__item {{if range.isActive "te-alert-page-hzlist__item--active"}}" {{action "onRangeOptionClick" range}}>
-            {{range.name}}
-            {{#if (eq range.name "Custom")}}
-              : {{date-range-picker
-                  class="te-pill-selectors__range-picker te-pill-selectors__range-picker--explore"
-                  timePicker=false
-                  timePicker24Hour=true
-                  timePickerIncrement=timePickerIncrement
-                  maxDate=maxTime
-                  start=activeRangeStart
-                  end=activeRangeEnd
-                  ranges=predefinedRanges
-                  showCustomRangeLabel=false
-                  format=uiDateFormat
-                  serverFormat="YYYY-MM-DD HH:mm"
-                  applyAction=(action "onRangeSelection")
-                }}
-            {{/if}}
-          </li>
-        {{/each}}
-      </ul>
-    </div>
+    {{!-- Date range selector --}}
+    {{range-pill-selectors
+      title="Showing"
+      maxTime=maxTime
+      uiDateFormat=uiDateFormat
+      activeRangeEnd=activeRangeEnd
+      activeRangeStart=activeRangeStart
+      timeRangeOptions=timeRangeOptions
+      timePickerIncrement=timePickerIncrement
+      selectAction=(action "onRangeSelection")
+    }}
 
     {{#if isPageLoadFailure}}
       {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
@@ -70,7 +54,7 @@
       <a class="te-pill-selectors__side-link te-pill-selectors__side-link--high" {{action "onClickReportAnomaly" this}}>Report missing anomaly</a>
 
       {{#if filteredAnomalies}}
-        <div class="te-pill-selectors">
+        <div class="te-pill-selectors__wrapper">
           {{!-- Dimension selector --}}
           {{#if alertHasDimensions}}
             <div class="te-form__select te-form__select--wider col-md-3">
@@ -157,7 +141,7 @@
 
       {{#if filteredAnomalies}}
         {{!-- Baseline type selector --}}
-        <div class="te-pill-selectors">
+        <div class="te-pill-selectors__wrapper">
           <div class="te-pill-selectors__label">Baseline</div>
           <ul class="te-alert-page-hzlist">
             {{#each baselineOptions as |baseline|}}

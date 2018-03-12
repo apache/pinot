@@ -13,6 +13,18 @@
   </div>
 {{else}}
   <div class="manage-alert-tune">
+
+    {{!-- Date range selector --}}
+    {{range-pill-selectors
+      title="Select Time Range"
+      uiDateFormat=uiDateFormat
+      activeRangeEnd=activeRangeEnd
+      activeRangeStart=activeRangeStart
+      timeRangeOptions=timeRangeOptions
+      timePickerIncrement=timePickerIncrement
+      selectAction=(action "onRangeSelection")
+    }}
+
     <div class="te-content-block">
       <h4 class="te-alert-page__subtitle">Alert Performance by Application Group</h4>
       <a class="te-pill-selectors__side-link te-pill-selectors__side-link--{{viewTotalsState}}" {{action (toggle "viewTotals" this)}}>View total values</a>

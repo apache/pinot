@@ -87,7 +87,6 @@ export default Controller.extend({
       checkReplayInterval: 2000, // 2 seconds
       selectedDimension: 'All Dimensions',
       selectedResolution: 'All Resolutions',
-      dateRangeToRender: [30, 10, 5],
       currentPage: 1,
       pageSize: 10
     });
@@ -305,17 +304,6 @@ export default Controller.extend({
   ),
 
   /**
-   * Placeholder for options for range field. Here we generate arbitrary date ranges from our config.
-   * @type {Array}
-   */
-  rangeOptionsExample: computed(
-    'dateRangeToRender',
-    function() {
-      return this.get('dateRangeToRender').map(this.renderDate);
-    }
-  ),
-
-  /**
    * Find the active baseline option name
    * @type {String}
    */
@@ -440,7 +428,7 @@ export default Controller.extend({
    * @param {String} activeKey - label for currently active time range
    * @return {undefined}
    */
-  newTimeRangeOptions(activeKey) {
+/*  newTimeRangeOptions(activeKey) {
     const timeRangeOptions = this.get('timeRangeOptions');
     const newOptions = timeRangeOptions.map((range) => {
       return {
@@ -457,7 +445,7 @@ export default Controller.extend({
 
     return newOptions;
   },
-
+*/
   /**
    * Send a POST request to the report anomaly API (2-step process)
    * http://go/te-ss-alert-flow-api
@@ -689,47 +677,21 @@ export default Controller.extend({
     },
 
     /**
-     * Handle display of selected anomaly time ranges (reload the model with new query params)
-     * @method onRangeOptionClick
-     * @param {Object} rangeOption - the selected range object
-     */
-    onRangeOptionClick(rangeOption) {
-      const rangeFormat = 'YYYY-MM-DD HH:mm';
-      const defaultEndDate = buildDateEod(1, 'day').valueOf();
-      const timeRangeOptions = this.get('timeRangeOptions');
-      const duration = rangeOption.value;
-      const startDate = moment(rangeOption.start).valueOf();
-      const endDate = moment(defaultEndDate).valueOf();
-
-      if (rangeOption.value !== 'custom') {
-        // Set date picker defaults to new start/end dates
-        this.setProperties({
-          activeRangeStart: moment(rangeOption.start).format(rangeFormat),
-          activeRangeEnd: moment(defaultEndDate).format(rangeFormat)
-        });
-        // Reset options and highlight selected one
-        timeRangeOptions.forEach(op => set(op, 'isActive', false));
-        set(rangeOption, 'isActive', true);
-        // Cache chosen time range
-        setDuration(duration, startDate, endDate);
-        // Reload model according to new timerange
-        this.transitionToRoute({ queryParams: { mode: 'explore', duration, startDate, endDate }});
-      }
-    },
-
-    /**
-     * Sets the new custom date range for anomaly coverage. Also caches it.
+     * Sets the new custom date range for anomaly coverage
      * @method onRangeSelection
-     * @param {String} start  - stringified start date
-     * @param {String} end    - stringified end date
+     * @param {Object} rangeOption - the user-selected time range to load
      */
-    onRangeSelection(start, end) {
-      const duration = 'custom';
+    onRangeSelection(rangeOption) {
+      const {
+        start,
+        end,
+        value: duration
+      } = rangeOption;
       const startDate = moment(start).valueOf();
       const endDate = moment(end).valueOf();
-      this.set('timeRangeOptions', this.newTimeRangeOptions(duration));
+      // Cache the new time range and update page with it
       setDuration(duration, startDate, endDate);
-      this.transitionToRoute({ queryParams: { mode: 'explore', duration, startDate, endDate }});
+      this.transitionToRoute({ queryParams: { duration, startDate, endDate }});
     },
 
     /**

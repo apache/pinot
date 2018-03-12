@@ -323,6 +323,8 @@ export function getDuration() {
 /**
  * Decides which time range to load as default (query params, default set, or locally cached)
  * @method prepareTimeRange
+ * @param {Object} queryParams - range-related properties in querystring
+ * @param {Object} defaultDurationObj - basic default time range setting
  * @return {Object}
  */
 export function prepareTimeRange(queryParams, defaultDurationObj) {

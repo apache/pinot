@@ -301,6 +301,95 @@ body {
 }
 
 .te-pill-selectors {
+  display: inline-block;
+  margin-left: 10px;
+  font-size: 15px;
+  padding: 0;
+
+  &__wrapper {
+    clear: left;
+    margin-top: 12px;
+  }
+
+  &__item {
+    display: inline-block;
+    margin-right: 7px;
+    list-style: none;
+    font-weight: 600;
+    color: app-shade(black, 5);
+    padding: 4px 12px;
+    border: 1px solid app-shade(black, 5);
+    border-radius: 15px;
+
+    &:hover {
+      cursor: pointer;
+    }
+
+    &--active {
+      background-color: $te-alerts-background;
+      border-color: $te-alerts-background;
+    }
+  }
+
+  &__range-picker {
+    display: inline-block;
+    color: app-shade(black, 7);
+    min-width: 250px;
+    margin: 0;
+
+    .daterangepicker-input {
+      background: none;
+      border: none;
+      box-shadow: none;
+      padding: 3px 5px;
+      height: auto;
+
+      &:hover {
+        cursor: pointer;
+      }
+    }
+  }
+
+  &__title {
+    margin: 15px 0 5px 0;
+    font-weight: 600;
+    color: app-shade(black, 7);
+    display: inline-block;
+  }
+
+  &__side-link {
+    font-size: 15px;
+    color: $te-link-blue;
+    font-weight: 600;
+    letter-spacing: .03em;
+    float: right;
+    margin: -15px 10px 0 0;
+    cursor: pointer;
+
+    &--high {
+      margin-top: -30px;
+    }
+
+    &--low {
+      margin-top: -5px;
+    }
+
+    &--active {
+      border-bottom: 1px dashed;
+    }
+
+    &--inactive {
+      color: app-shade(black, 3);
+    }
+
+    &:hover {
+      color: $te-link-blue;
+      text-decoration: none;
+    }
+  }
+}
+
+/*.te-pill-selectors {
   clear: left;
   margin-top: 12px;
 
@@ -360,7 +449,7 @@ body {
       text-decoration: none;
     }
   }
-}
+}*/
 
 .te-horizontal-cards {
   &--hidden {

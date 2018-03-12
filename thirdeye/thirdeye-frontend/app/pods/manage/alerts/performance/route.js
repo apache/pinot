@@ -3,18 +3,30 @@
  * @module self-serve/create/route
  * @exports alert create model
  */
-import { getWithDefault } from '@ember/object';
 
-import { isPresent } from '@ember/utils';
-import Route from '@ember/routing/route';
+import RSVP from 'rsvp';
 import fetch from 'fetch';
-import RSVP, { hash, allSettled } from 'rsvp';
-import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
+import moment from 'moment';
+import Route from '@ember/routing/route';
+import {
+  hash,
+  allSettled
+} from 'rsvp';
+import { getWithDefault } from '@ember/object';
+import {
+  checkStatus,
+  buildDateEod
+} from 'thirdeye-frontend/utils/utils';
+import { isPresent } from '@ember/utils';
+import {
+  setUpTimeRangeOptions,
+  prepareTimeRange
+} from 'thirdeye-frontend/utils/manage-alert-utils';
 
 /**
  * If true, this reduces the list of alerts per app to 2 for a quick demo.
  */
-const demoMode = false;
+const isDemoMode = false;
 
 /**
  * Mapping anomaly table column names to corresponding prop keys
@@ -30,16 +42,27 @@ const sortMap = {
 };
 
 /**
+ * Time range-related constants
+ */
+const displayDateFormat = 'YYYY-MM-DD HH:mm';
+const durationMap = { m:'month', d:'day', w:'week' };
+const defaultDurationObj = {
+  duration: '3m',
+  startDate: buildDateEod(3, 'month').valueOf(),
+  endDate: moment()
+};
+
+/**
  * Fetches all anomaly data for found anomalies - downloads all 'pages' of data from server
  * in order to handle sorting/filtering on the entire set locally. Start/end date are not used here.
  * @param {Array} anomalyIds - list of all found anomaly ids
  * @return {Ember.RSVP promise}
  */
-const fetchAppAnomalies = (alertList) => {
+const fetchAppAnomalies = (alertList, startDate, endDate) => {
   const alertPromises = [];
-  const startDate = buildDateEod(3, 'month').toISOString();
-  const endDate = buildDateEod(1, 'day').toISOString();
-  const tuneParams = `start=${startDate}&end=${endDate}`;
+  const filteredStartDate = moment(Number(startDate)).toISOString();
+  const filteredEndDate = moment(Number(endDate)).toISOString();
+  const tuneParams = `start=${filteredStartDate}&end=${filteredEndDate}`;
 
   alertList.forEach((alert) => {
     let { name, id } = alert;
@@ -69,7 +92,7 @@ const fillAppBuckets = (allApps, validGroups) => {
     let associatedGroups = validGroups.filter(group => group.application.toLowerCase().includes(app.application));
     if (associatedGroups.length) {
       let uniqueIds = Array.from(new Set([].concat(...associatedGroups.map(group => group.emailConfig.functionIds))));
-      if (demoMode) {
+      if (isDemoMode) {
         uniqueIds = uniqueIds.slice(0, 1);
       }
       if (uniqueIds.length) {
@@ -134,7 +157,28 @@ const calculateRate = (anomalies, subset) => {
   return Number(percentage.toFixed());
 };
 
+/**
+ * Setup for query param behavior
+ */
+const queryParamsConfig = {
+  refreshModel: true,
+  replace: true
+};
+
 export default Route.extend({
+  queryParams: {
+    duration: queryParamsConfig,
+    startDate: queryParamsConfig,
+    endDate: queryParamsConfig
+  },
+
+  beforeModel(transition) {
+    const { duration, startDate } = transition.queryParams;
+    // Default to 1 month of anomalies to show if no dates present in query params
+    if (!duration || !startDate) {
+      this.transitionTo({ queryParams: defaultDurationObj });
+    }
+  },
 
   actions: {
     /**
@@ -152,11 +196,21 @@ export default Route.extend({
    * @method model
    * @return {Object}
    */
-  model() {
+  model(transition) {
+    // Get duration data
+    const {
+      duration,
+      startDate,
+      endDate
+    } = transition;
+
     return RSVP.hash({
       // Fetch all alert group configurations
       configGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(res => res.json()),
-      applications: fetch('/thirdeye/entity/APPLICATION').then(res => res.json())
+      applications: fetch('/thirdeye/entity/APPLICATION').then(res => res.json()),
+      duration,
+      startDate,
+      endDate
     });
   },
 
@@ -166,18 +220,33 @@ export default Route.extend({
     const activeGroups = model.configGroups.filterBy('active');
     const groupsWithAppName = activeGroups.filter(group => isPresent(group.application));
     const groupsWithAlertId = groupsWithAppName.filter(group => group.emailConfig.functionIds.length > 0);
-    const idsByApplication = fillAppBuckets(model.applications, groupsWithAlertId);
+    const filteredGroups = isDemoMode ? groupsWithAlertId.slice(0, 3) : groupsWithAlertId;
+    const idsByApplication = fillAppBuckets(model.applications, filteredGroups);
     Object.assign(model, { idsByApplication });
   },
 
   setupController(controller, model) {
     this._super(controller, model);
 
+    const {
+      idsByApplication,
+      startDate,
+      endDate,
+      duration
+    } = model;
+
     // Display loading banner
-    controller.set('isDataLoading', true);
+    controller.setProperties({
+      timeRangeOptions: setUpTimeRangeOptions(['1m', '3m'], duration),
+      activeRangeStart: moment(Number(startDate)).format(displayDateFormat),
+      activeRangeEnd: moment(Number(endDate)).format(displayDateFormat),
+      uiDateFormat: "MMM D, YYYY hh:mm a",
+      timePickerIncrement: 5,
+      isDataLoading: true
+    })
 
     // Get perf data for each alert and assign it to the model
-    fetchAppAnomalies(model.idsByApplication)
+    fetchAppAnomalies(idsByApplication, startDate, endDate)
       .then((richFunctionObjects) => {
         // Catch any rejected promises
         if (isPromiseRejected(richFunctionObjects)) {
@@ -240,7 +309,7 @@ export default Route.extend({
 
           // Add perf data to application groups array
           newGroupArr.push({
-            name: demoMode ? `group ${count}` : group,
+            name: isDemoMode ? `group ${count}` : group,
             data: avgData,
             alerts: groupData.length
           });

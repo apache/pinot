@@ -276,34 +276,6 @@ export default Controller.extend({
   actions: {
 
     /**
-     * Trigger reload in model with new time range. Transition for 'custom' dates is handled by 'onRangeSelection'
-     * @method onRangeOptionClick
-     * @param {Object} rangeOption - the selected range object
-     */
-    onRangeOptionClick(rangeOption) {
-      const rangeFormat = 'YYYY-MM-DD HH:mm';
-      const defaultEndDate = buildDateEod(1, 'day').valueOf();
-      const timeRangeOptions = this.get('timeRangeOptions');
-      const duration = rangeOption.value;
-      const startDate = moment(rangeOption.start).valueOf();
-      const endDate = moment(defaultEndDate).valueOf();
-
-      if (rangeOption.value !== 'custom') {
-        // Set date picker defaults to new start/end dates
-        this.setProperties({
-          activeRangeStart: moment(rangeOption.start).format(rangeFormat),
-          activeRangeEnd: moment(defaultEndDate).format(rangeFormat)
-        });
-        // Reset options and highlight selected one
-        timeRangeOptions.forEach(op => set(op, 'isActive', false));
-        set(rangeOption, 'isActive', true);
-        setDuration(duration, startDate, endDate);
-        // Reload model according to new timerange
-        this.transitionToRoute({ queryParams: { mode: 'explore', duration, startDate, endDate }});
-      }
-    },
-
-    /**
      * This field will not accept empty input - default back to the original value
      * @method onChangeSeverityValue
      * @param {String} severity - the custom tuning severity input
@@ -328,20 +300,19 @@ export default Controller.extend({
     /**
      * Sets the new custom date range for anomaly coverage
      * @method onRangeSelection
-     * @param {String} start  - stringified start date
-     * @param {String} end    - stringified end date
+     * @param {Object} rangeOption - the user-selected time range to load
      */
-    onRangeSelection(start, end) {
-      const duration = 'custom';
+    onRangeSelection(rangeOption) {
+      const {
+        start,
+        end,
+        value: duration
+      } = rangeOption;
       const startDate = moment(start).valueOf();
       const endDate = moment(end).valueOf();
-      const timeRangeOptions = this.get('timeRangeOptions');
-      const currOption = timeRangeOptions.find(option => option.value === 'custom');
-      // Toggle time reange button states to highlight the current one
-      timeRangeOptions.forEach(op => set(op, 'isActive', false));
-      set(currOption, 'isActive', true);
+      // Cache the new time range and update page with it
       setDuration(duration, startDate, endDate);
-      this.transitionToRoute({ queryParams: { mode: 'explore', duration, startDate, endDate }});
+      this.transitionToRoute({ queryParams: { duration, startDate, endDate }});
     },
 
     /**
