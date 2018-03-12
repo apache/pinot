@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -147,7 +148,7 @@ public class TestAlertConfigManager {
     // Check if batch update works
     for (Long alertId : batchAlertConfigIdList) {
       AlertConfigDTO updatedAlert = alertConfigDAO.findById(alertId);
-      Assert.assertEquals(updatedAlert.isActive(), true);
+      Assert.assertTrue(updatedAlert.isActive());
     }
   }
 
@@ -158,16 +159,27 @@ public class TestAlertConfigManager {
     for (Long alertId : batchAlertConfigIdList) {
       Preconditions.checkState(alertConfigDAO.findById(alertId) != null);
     }
+    int expectedDeleteCount = batchAlertConfigIdList.size();
+
+    // Add an non-exist key, which should not increase delete count
+    Random random = new Random();
+    while (batchAlertConfigIdList.size() == expectedDeleteCount) {
+      long randomId = random.nextLong();
+      if (alertConfigDAO.findById(randomId) == null) {
+        batchAlertConfigIdList.add(randomId);
+      }
+    }
 
     // Delete by batch
-    alertConfigDAO.deleteByIds(batchAlertConfigIdList);
+    int deletedCount = alertConfigDAO.deleteByIds(batchAlertConfigIdList);
+    Assert.assertEquals(deletedCount, expectedDeleteCount);
     for (Long alertId : batchAlertConfigIdList) {
-      Assert.assertEquals(alertConfigDAO.findById(alertId), null);
+      Assert.assertNull(alertConfigDAO.findById(alertId));
     }
   }
 
   @Test (dependsOnMethods = "testBatchDeletion")
-  public void testInterruptedBatchUpdate() {
+  public void testBatchUpdateWithDuplicateName() {
     List<AlertConfigDTO> initAlertConfigs = createBatchAlertConfigs();
     List<Long> localBatchAlertConfigIdList = new ArrayList<>();
     // Add multiple alert config to DB
@@ -202,12 +214,47 @@ public class TestAlertConfigManager {
     AlertConfigDTO thirdAlert = alertConfigDAO.findById(localBatchAlertConfigIdList.get(2));
     Assert.assertEquals(thirdAlert.getName(), "3");
     Assert.assertEquals(alertConfigDAO.findByPredicate(Predicate.EQ("name", "3")).get(0), thirdAlert);
+
+    // Clean up
+    alertConfigDAO.deleteByIds(localBatchAlertConfigIdList);
   }
 
-  @Test (expectedExceptions = IllegalArgumentException.class)
+  @Test (dependsOnMethods = "testBatchUpdateWithDuplicateName")
   public void testBatchUpdateWithNullID() {
     List<AlertConfigDTO> initAlertConfigs = createBatchAlertConfigs();
-    alertConfigDAO.update(initAlertConfigs);
+    List<Long> localBatchAlertConfigIdList = new ArrayList<>();
+    // Add multiple alert config to DB
+    for (AlertConfigDTO alertConfig : initAlertConfigs) {
+      Long id = alertConfigDAO.save(alertConfig);
+      localBatchAlertConfigIdList.add(id);
+    }
+
+    // Update previously saved alert configs
+    List<AlertConfigDTO> readBackAlertConfigs = new ArrayList<>();
+    for (Long alertId : localBatchAlertConfigIdList) {
+      AlertConfigDTO readBackAlert = alertConfigDAO.findById(alertId);
+      // Activate everyone for future check
+      readBackAlert.setActive(true);
+      readBackAlertConfigs.add(readBackAlert);
+    }
+    AlertConfigDTO secondAlert = readBackAlertConfigs.get(1);
+    secondAlert.setId(null);
+    // Due to null alert name, only the first and third alert config will be updated
+    int affectedRows = alertConfigDAO.update(readBackAlertConfigs);
+    Assert.assertEquals(affectedRows, 2);
+
+    // Check if batch update works; index table is also checked using findByPredicate() method.
+    AlertConfigDTO firstAlert = alertConfigDAO.findById(localBatchAlertConfigIdList.get(0));
+    Assert.assertTrue(firstAlert.isActive());
+
+    secondAlert = alertConfigDAO.findById(localBatchAlertConfigIdList.get(1));
+    Assert.assertFalse(secondAlert.isActive());
+
+    AlertConfigDTO thirdAlert = alertConfigDAO.findById(localBatchAlertConfigIdList.get(2));
+    Assert.assertTrue(thirdAlert.isActive());
+
+    // Clean up
+    alertConfigDAO.deleteByIds(localBatchAlertConfigIdList);
   }
   /*
    * End of the section for the tests of AbstractManagerImpl and GenericPojoDao.

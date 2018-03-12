@@ -75,9 +75,6 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
   public int update(List<E> entities) {
     ArrayList<AbstractBean> beans = new ArrayList<>();
     for (E entity : entities) {
-      if (entity.getId() == null) {
-        throw new IllegalArgumentException(String.format("Need an ID to update the DB entity: %s", entity.toString()));
-      }
       beans.add(convertDTO2Bean(entity, beanClass));
     }
     return genericPojoDao.update(beans);
