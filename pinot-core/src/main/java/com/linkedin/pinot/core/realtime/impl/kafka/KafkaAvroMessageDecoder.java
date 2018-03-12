@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;

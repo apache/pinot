@@ -46,7 +46,7 @@ import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
-import com.linkedin.pinot.core.realtime.impl.kafka.StreamMessageDecoder;
+import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.linkedin.pinot.core.realtime.stream.MessageBatch;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;

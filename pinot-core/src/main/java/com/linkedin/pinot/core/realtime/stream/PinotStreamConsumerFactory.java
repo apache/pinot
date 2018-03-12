@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.realtime.stream;
 
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
-import com.linkedin.pinot.core.realtime.impl.kafka.StreamMessageDecoder;
 import javax.annotation.Nonnull;
 
 

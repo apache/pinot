@@ -33,7 +33,7 @@ import com.linkedin.pinot.controller.helix.ControllerTest;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.impl.kafka.AvroRecordToPinotRowGenerator;
-import com.linkedin.pinot.core.realtime.impl.kafka.StreamMessageDecoder;
+import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.linkedin.pinot.core.util.AvroUtils;
 import com.linkedin.pinot.minion.MinionStarter;
 import com.linkedin.pinot.minion.executor.PinotTaskExecutor;

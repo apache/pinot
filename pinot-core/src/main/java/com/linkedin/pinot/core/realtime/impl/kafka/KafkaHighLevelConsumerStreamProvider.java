@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.yammer.metrics.core.Meter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

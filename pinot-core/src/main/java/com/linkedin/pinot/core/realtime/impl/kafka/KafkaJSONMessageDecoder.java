@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import java.util.Arrays;
 import java.util.Map;
 import org.json.JSONArray;
