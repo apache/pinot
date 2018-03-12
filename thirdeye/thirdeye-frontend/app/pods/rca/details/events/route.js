@@ -11,7 +11,7 @@ export default Route.extend({
    */
   model(params, transition) {
     const redux = this.get('redux');
-    const { metricId } = transition.params['rca.details'];
+    const { metric_id } = transition.params['rca.details'];
     const {
       displayStart,
       displayEnd,
@@ -19,7 +19,7 @@ export default Route.extend({
       analysisEnd: end
     } = transition.queryParams;
 
-    if (!metricId) { return; }
+    if (!metric_id) { return; }
 
     redux.dispatch(Actions.fetchEvents(Number(start), Number(end)));
 

@@ -7,7 +7,7 @@ export default Route.extend({
   redux: service(),
   model(params, transition) {
     const redux = this.get('redux');
-    const { metricId } = transition.params['rca.details'];
+    const { metric_id } = transition.params['rca.details'];
     const {
       analysisStart: initStart,
       analysisEnd: initEnd
@@ -17,7 +17,7 @@ export default Route.extend({
       analysisEnd
     } = transition.queryParams;
 
-    if (!metricId) { return; }
+    if (!metric_id) { return; }
     const start = analysisStart || initStart;
     const end = analysisEnd || initEnd;
 

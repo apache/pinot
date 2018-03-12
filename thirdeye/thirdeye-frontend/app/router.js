@@ -7,7 +7,6 @@ const Router = EmberRouter.extend({
 });
 
 Router.map(function() {
-  this.route('example', { path: 'example/:id' });
   this.route('login');
   this.route('logout');
 

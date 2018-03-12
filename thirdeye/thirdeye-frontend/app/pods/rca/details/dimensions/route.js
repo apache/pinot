@@ -17,7 +17,7 @@ export default Route.extend({
 
   model(params, transition) {
     const redux = this.get('redux');
-    const { metricId } = transition.params['rca.details'];
+    const { metric_id } = transition.params['rca.details'];
     const {
       analysisStart: initStart,
       analysisEnd: initEnd
@@ -34,7 +34,7 @@ export default Route.extend({
     const start = analysisStart || initStart;
     const end = analysisEnd || initEnd;
 
-    if (!metricId) { return; }
+    if (!metric_id) { return; }
 
     redux.dispatch(Actions.loading());
     redux.dispatch(Actions.updateDates(
@@ -44,7 +44,7 @@ export default Route.extend({
 
     later(() => {
       redux.dispatch(Actions.updateDimension(dimension)).then(() => {
-        redux.dispatch(Actions.fetchDimensions(metricId));
+        redux.dispatch(Actions.fetchDimensions(metric_id));
       });
     });
 
