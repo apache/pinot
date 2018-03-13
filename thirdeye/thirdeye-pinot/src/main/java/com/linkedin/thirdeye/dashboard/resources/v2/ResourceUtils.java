@@ -2,7 +2,9 @@ package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
@@ -53,13 +55,24 @@ public class ResourceUtils {
    * Generates the external links (if any) for a given anomaly.
    *
    * @param mergedAnomaly anomaly dto
-   * @param metricConfigDAO metric config dao
+   * @param metricDAO metric config dao
+   * @param datasetDAO dataset config dao
    * @return map of external urls, keyed by link label
    */
-  public static Map<String, String> getExternalURLs(MergedAnomalyResultDTO mergedAnomaly, MetricConfigManager metricConfigDAO) {
+  public static Map<String, String> getExternalURLs(MergedAnomalyResultDTO mergedAnomaly, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) {
     String metric = mergedAnomaly.getMetric();
     String dataset = mergedAnomaly.getCollection();
-    MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metric, dataset);
+
+    MetricConfigDTO metricConfigDTO = metricDAO.findByMetricAndDataset(metric, dataset);
+    if (metricConfigDTO == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve metric '%s'", metric));
+    }
+
+    DatasetConfigDTO datasetConfigDTO = datasetDAO.findByDataset(metricConfigDTO.getDataset());
+    if (datasetConfigDTO == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve dataset '%s'", dataset));
+    }
+
     Map<String, String> urlTemplates = metricConfigDTO.getExtSourceLinkInfo();
     if (MapUtils.isEmpty(urlTemplates)) {
       return Collections.emptyMap();
@@ -67,6 +80,8 @@ public class ResourceUtils {
 
     // Construct context for substituting the keywords in URL template
     Map<String, String> context = new HashMap<>();
+    populatePreAggregation(datasetConfigDTO, context);
+
     // context for each pair of dimension name and value
     if (MapUtils.isNotEmpty(mergedAnomaly.getDimensions())) {
       for (Map.Entry<String, String> entry : mergedAnomaly.getDimensions().entrySet()) {
@@ -105,12 +120,18 @@ public class ResourceUtils {
    *
    * @param slice metric slice
    * @param metricDAO metric config dao
+   * @param datasetDAO dataset config dao
    * @return map of external urls, keyed by link label
    */
-  public static Map<String, String> getExternalURLs(MetricSlice slice, MetricConfigManager metricDAO) {
+  public static Map<String, String> getExternalURLs(MetricSlice slice, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) {
     MetricConfigDTO metricConfigDTO = metricDAO.findById(slice.getMetricId());
     if (metricConfigDTO == null) {
       throw new IllegalArgumentException(String.format("Could not resolve metric id %d", slice.getMetricId()));
+    }
+
+    DatasetConfigDTO datasetConfigDTO = datasetDAO.findByDataset(metricConfigDTO.getDataset());
+    if (datasetConfigDTO == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for metric id %d", metricConfigDTO.getDatasetConfig(), slice.getMetricId()));
     }
 
     Map<String, String> urlTemplates = metricConfigDTO.getExtSourceLinkInfo();
@@ -120,6 +141,8 @@ public class ResourceUtils {
 
     // NOTE: this cannot handle multiple values for the same key
     Map<String, String> context = new HashMap<>();
+    populatePreAggregation(datasetConfigDTO, context);
+
     for (Map.Entry<String, String> entry : slice.getFilters().entries()) {
       putEncoded(context, entry);
     }
@@ -148,6 +171,15 @@ public class ResourceUtils {
     }
 
     return output;
+  }
+
+  private static void populatePreAggregation(DatasetConfigDTO datasetConfigDTO, Map<String, String> context) {
+    // populate pre-aggregated keyword
+    if (!datasetConfigDTO.getPreAggregatedKeyword().isEmpty()) {
+      for (String dimName : datasetConfigDTO.getDimensions()) {
+        context.put(dimName, datasetConfigDTO.getPreAggregatedKeyword());
+      }
+    }
   }
 
   /**

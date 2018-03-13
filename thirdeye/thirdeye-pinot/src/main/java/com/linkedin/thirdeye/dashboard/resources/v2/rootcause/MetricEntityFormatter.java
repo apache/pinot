@@ -99,7 +99,7 @@ public class MetricEntityFormatter extends RootCauseEntityFormatter {
 
     TimeRangeEntity range = estimateTimeRange(e);
     MetricSlice slice = MetricSlice.from(metric.getId(), range.getStart(), range.getEnd(), e.getFilters());
-    Map<String, String> externalUrls = ResourceUtils.getExternalURLs(slice, this.metricDAO);
+    Map<String, String> externalUrls = ResourceUtils.getExternalURLs(slice, this.metricDAO, this.datasetDAO);
 
     attributes.putAll(ATTR_EXTERNAL_URLS, externalUrls.keySet());
     for (Map.Entry<String, String> entry : externalUrls.entrySet()) {
