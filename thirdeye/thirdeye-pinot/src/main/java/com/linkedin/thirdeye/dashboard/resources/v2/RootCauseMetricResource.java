@@ -27,7 +27,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.validation.constraints.NotNull;
@@ -108,39 +107,34 @@ public class RootCauseMetricResource {
   @GET
   @Path("/aggregate")
   @ApiOperation(value = "Returns an aggregate value for the specified metric and time range, and (optionally) offset.")
-  public double getAggregate(
-      @ApiParam(value = "metric urn", required = true)
-      @QueryParam("urn") @NotNull String urn,
-      @ApiParam(value = "start time (in millis)", required = true)
-      @QueryParam("start") @NotNull long start,
-      @ApiParam(value = "end time (in millis)", required = true)
-      @QueryParam("end") @NotNull long end,
-      @ApiParam(value = "offset identifier (e.g. \"current\", \"wo2w\")")
-      @QueryParam("offset") String offset,
-      @ApiParam(value = "timezone identifier (e.g. \"America/Los_Angeles\")")
-      @QueryParam("timezone") String timezone) throws Exception {
-      if (StringUtils.isBlank(offset)) {
-        offset = OFFSET_DEFAULT;
-      }
+  public double getAggregate(@ApiParam(value = "metric urn", required = true) @QueryParam("urn") @NotNull String urn,
+      @ApiParam(value = "start time (in millis)", required = true) @QueryParam("start") @NotNull long start,
+      @ApiParam(value = "end time (in millis)", required = true) @QueryParam("end") @NotNull long end,
+      @ApiParam(value = "offset identifier (e.g. \"current\", \"wo2w\")") @QueryParam("offset") String offset,
+      @ApiParam(value = "timezone identifier (e.g. \"America/Los_Angeles\")") @QueryParam("timezone") String timezone)
+      throws Exception {
+    if (StringUtils.isBlank(offset)) {
+      offset = OFFSET_DEFAULT;
+    }
 
-      if (StringUtils.isBlank(timezone)) {
-        timezone = TIMEZONE_DEFAULT;
-      }
+    if (StringUtils.isBlank(timezone)) {
+      timezone = TIMEZONE_DEFAULT;
+    }
 
-      MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end));
-      Baseline range = parseOffset(baseSlice, offset, timezone);
+    MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end));
+    Baseline range = parseOffset(baseSlice, offset, timezone);
 
-      List<MetricSlice> slices = range.scatter(baseSlice);
-      logSlices(baseSlice, slices);
+    List<MetricSlice> slices = range.scatter(baseSlice);
+    logSlices(baseSlice, slices);
 
-      Map<MetricSlice, DataFrame> data = fetchAggregates(slices);
+    Map<MetricSlice, DataFrame> data = fetchAggregates(slices);
 
-      DataFrame result = range.gather(baseSlice, data);
+    DataFrame result = range.gather(baseSlice, data);
 
-      if (result.isEmpty()) {
-        return Double.NaN;
-      }
-      return result.getDouble(COL_VALUE, 0);
+    if (result.isEmpty()) {
+      return Double.NaN;
+    }
+    return result.getDouble(COL_VALUE, 0);
   }
 
   /**
@@ -173,7 +167,8 @@ public class RootCauseMetricResource {
     List<MetricSlice> slices = new ArrayList<>();
     Map<String, MetricSlice> offsetToBaseSlice = new HashMap<>();
     Map<String, Baseline> offsetToRange = new HashMap<>();
-    for(String offset : offsets) {
+    for (String offset : offsets) {
+      // Put all metric slices together
       if (StringUtils.isBlank(offset)) {
         offset = OFFSET_DEFAULT;
       }
@@ -183,15 +178,20 @@ public class RootCauseMetricResource {
       }
       MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end));
       offsetToBaseSlice.put(offset, baseSlice);
+
       Baseline range = parseOffset(baseSlice, offset, timezone);
       offsetToRange.put(offset, range);
+
       List<MetricSlice> currentSlices = range.scatter(baseSlice);
+
       slices.addAll(currentSlices);
       logSlices(baseSlice, currentSlices);
     }
 
-      Map<MetricSlice, DataFrame> data = fetchAggregates(slices);
+    // Fetch all aggregates
+    Map<MetricSlice, DataFrame> data = fetchAggregates(slices);
 
+    // Pick the results
     for (String offset : offsets) {
       DataFrame result = offsetToRange.get(offset).gather(offsetToBaseSlice.get(offset), data);
       if (result.isEmpty()) {
