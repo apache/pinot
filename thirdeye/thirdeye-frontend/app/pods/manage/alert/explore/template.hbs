@@ -276,7 +276,9 @@
                  </td>
                  <td class="te-anomaly-table__cell">
                     <div class="te-anomaly-table__link-wrapper">
-                      <a target="_blank" class="te-anomaly-table__link" href="app/#/rootcause?anomalyId={{anomaly.anomalyId}}">Investigate</a>
+                      {{#link-to 'rootcause' (query-params anomalyId=anomaly.anomalyId) target="_blank" class="te-anomaly-table__link"}}
+                        Investigate
+                      {{/link-to}}
                     </div>
                  </td>
               </tr>
