@@ -88,7 +88,7 @@ public class ThirdEyeCacheRegistry {
       }
       // Query Cache
       Map<String, ThirdEyeDataSource> thirdEyeDataSourcesMap = DataSourcesLoader.getDataSourceMap(dataSources);
-      QueryCache queryCache = new QueryCache(thirdEyeDataSourcesMap, Executors.newFixedThreadPool(10));
+      QueryCache queryCache = new QueryCache(thirdEyeDataSourcesMap, Executors.newCachedThreadPool());
       ThirdEyeCacheRegistry.getInstance().registerQueryCache(queryCache);
 
       // Initialize connection to ThirdEye's anomaly and meta-data storage.

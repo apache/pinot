@@ -96,7 +96,7 @@ public class RootCauseResource {
     if(analysisEnd - analysisStart > ANALYSIS_RANGE_MAX)
       throw new IllegalArgumentException(String.format("Analysis range cannot be longer than %d", ANALYSIS_RANGE_MAX));
 
-    urns = parseUrnsParam(urns);
+    urns = ResourceUtils.parseListParams(urns);
     if(urns.isEmpty())
       throw new IllegalArgumentException("Must provide entity urns");
 
@@ -138,7 +138,7 @@ public class RootCauseResource {
       formatterDepth = DEFAULT_FORMATTER_DEPTH;
 
     // parse urns arg
-    urns = parseUrnsParam(urns);
+    urns = ResourceUtils.parseListParams(urns);
 
     // format input
     Set<Entity> input = new HashSet<>();
@@ -185,17 +185,4 @@ public class RootCauseResource {
     throw new IllegalArgumentException(String.format("No formatter for Entity '%s'", e.getUrn()));
   }
 
-  /**
-   * Support both multi-entity notations:
-   * <br/><b>(1) comma-delimited:</b> {@code "urns=thirdeye:metric:123,thirdeye:metric:124"}
-   * <br/><b>(2) multi-param</b> {@code "urns=thirdeye:metric:123&urns=thirdeye:metric:124"}
-   *
-   * @param urns urns param
-   * @return list of urns
-   */
-  private static List<String> parseUrnsParam(List<String> urns) {
-    if(urns.size() != 1)
-      return urns;
-    return Arrays.asList(urns.get(0).split(","));
-  }
 }
