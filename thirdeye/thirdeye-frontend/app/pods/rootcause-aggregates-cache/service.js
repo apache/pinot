@@ -56,13 +56,12 @@ export default Service.extend({
       return;
     }
 
-    let metricUrnToOffestAndUrn = {};
+    const metricUrnToOffestAndUrn = {};
     missing.forEach(urn => {
       const metricUrn = toMetricUrn(urn);
-      if (!(metricUrn in metricUrnToOffestAndUrn)) {
-        metricUrnToOffestAndUrn[metricUrn] = [];
-      }
-      metricUrnToOffestAndUrn[metricUrn].push([toAbsoluteUrn(urn, context.compareMode).split(':')[2].toLowerCase(), urn]);
+      const arrayName = metricUrnToOffestAndUrn[metricUrn] || [];
+      arrayName.push([toAbsoluteUrn(urn, context.compareMode).split(':')[2].toLowerCase(), urn]);
+      metricUrnToOffestAndUrn[metricUrn] = arrayName;
     });
 
     Object.keys(metricUrnToOffestAndUrn).forEach(
@@ -71,17 +70,25 @@ export default Service.extend({
         });
   },
 
-  _fetchRowSlice(metricUrn, context, metricUrnToOffestAndUrn){
-        const range = context.anomalyRange;
-        const offsets = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[0]);
-        const urns = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[1]);
-        const timezone = moment.tz.guess();
-        const url = `/rootcause/metric/aggregate/batch?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offsets=${offsets}&timezone=${timezone}`;
-        return fetch(url)
-        .then(checkStatus)
-        .then(res => this._extractAggregatesBatch(res, urns))
-        .then(res => this._complete(context, res))
-        .catch(error => this._handleError(urn, error));
+  /**
+   * Fetch the metric data for a row of the metric table
+   *
+   * @param {String} metricUrn Metric urn
+   * @param {Object} context Context
+   * @param {Object} metricUrnToOffestAndUrn Hash map from metric urn to offset and urn
+   * @returns {undefined}
+   */
+  _fetchRowSlice(metricUrn, context, metricUrnToOffestAndUrn) {
+    const [start, end] = context.anomalyRange;
+    const offsets = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[0]);
+    const urns = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[1]);
+    const timezone = moment.tz.guess();
+    const url = `/rootcause/metric/aggregate/batch?urn=${metricUrn}&start=${start}&end=${end}&offsets=${offsets}&timezone=${timezone}`;
+    return fetch(url)
+      .then(checkStatus)
+      .then(res => this._extractAggregatesBatch(res, urns))
+      .then(res => this._complete(context, res))
+      .catch(error => this._handleError(urn, error));
   },
 
   _extractAggregatesBatch(incoming, urns) {
@@ -89,6 +96,7 @@ export default Service.extend({
     for(var i = 0; i < urns.length; i++){
       aggregates[urns[i]] = incoming[i];
     }
+
     return aggregates;
   },
 
@@ -121,10 +129,10 @@ export default Service.extend({
     const timezone = moment.tz.guess();
     const url = `/rootcause/metric/aggregate?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&timezone=${timezone}`;
     return fetch(url)
-    .then(checkStatus)
-    .then(res => this._extractAggregates(res, urn))
-    .then(res => this._complete(context, res))
-    .catch(error => this._handleError(urn, error));
+      .then(checkStatus)
+      .then(res => this._extractAggregates(res, urn))
+      .then(res => this._complete(context, res))
+      .catch(error => this._handleError(urn, error));
   },
 
   _handleError(urn, error) {
