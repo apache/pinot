@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.hadoop;
 
+import com.linkedin.pinot.hadoop.job.SegmentConvertToCsvJob;
 import java.io.FileInputStream;
 import java.util.Arrays;
 import java.util.Properties;
@@ -32,7 +33,8 @@ public class PinotHadoopJobLauncher {
     SegmentTarPush,
     SegmentUriPush,
     SegmentCreationAndTarPush,
-    SegmentCreationAndUriPush
+    SegmentCreationAndUriPush,
+    SegmentConvertToCsv
   }
 
   private static final String USAGE = "usage: [job_type] [job.properties]";
@@ -42,6 +44,7 @@ public class PinotHadoopJobLauncher {
   private static final String SEGMENT_PUSH_URI_JOB_NAME = PinotHadoopJobType.SegmentUriPush.toString();
   private static final String SEGMENT_CREATION_AND_TAR_PUSH_JOB_NAME = PinotHadoopJobType.SegmentCreationAndTarPush.toString();
   private static final String SEGMENT_CREATION_AND_URI_PUSH_JOB_NAME = PinotHadoopJobType.SegmentCreationAndUriPush.toString();
+  private static final String SEGMENT_CONVERT_TO_CSV_JOB_NAME = PinotHadoopJobType.SegmentConvertToCsv.toString();
 
   private static void usage() {
     System.err.println(USAGE);
@@ -50,6 +53,10 @@ public class PinotHadoopJobLauncher {
 
   private static void kickOffPinotHadoopJob(PinotHadoopJobType jobType, Properties jobConf) throws Exception {
     switch (jobType) {
+      // TODO Add job type here
+      case SegmentConvertToCsv:
+        new SegmentConvertToCsvJob(SEGMENT_CONVERT_TO_CSV_JOB_NAME, jobConf).run();
+        break;
       case SegmentCreation:
         new SegmentCreationJob(SEGMENT_CREATION_JOB_NAME, jobConf).run();
         break;
