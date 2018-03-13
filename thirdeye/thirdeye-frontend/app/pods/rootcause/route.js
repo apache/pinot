@@ -8,7 +8,8 @@ import {
   toCurrentUrn,
   toBaselineUrn,
   filterPrefix,
-  dateFormatFull
+  dateFormatFull,
+  appendFilters
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
@@ -74,9 +75,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
   },
 
   model(params) {
-    const { metricId, anomalyId, sessionId } = params;
+    const { metricId, sessionId, anomalyId } = params;
 
-    let metricUrn, metricEntity, anomalyUrn, session, anomalyContext, anomalySessions;
+    let metricUrn, metricEntity, session, anomalyUrn, anomalyEntity, anomalySessions;
 
     if (metricId) {
       metricUrn = `thirdeye:metric:${metricId}`;
@@ -85,26 +86,23 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
     if (anomalyId) {
       anomalyUrn = `thirdeye:event:anomaly:${anomalyId}`;
+      anomalyEntity = fetch(`/rootcause/raw?framework=identity&urns=${anomalyUrn}`).then(checkStatus).then(res => res[0]).catch(() => {});
+      anomalySessions = fetch(`/session/query?anomalyId=${anomalyId}`).then(checkStatus).catch(() => {});
     }
 
     if (sessionId) {
       session = fetch(`/session/${sessionId}`).then(checkStatus).catch(() => {});
     }
 
-    if (anomalyUrn) {
-      anomalyContext = fetch(`/rootcause/raw?framework=anomalyContext&urns=${anomalyUrn}`).then(checkStatus).catch(() => {});
-      anomalySessions = fetch(`/session/query?anomalyId=${anomalyId}`).then(checkStatus).catch(() => {});
-    }
-
     return RSVP.hash({
       metricId,
-      metricEntity,
-      anomalyId,
-      sessionId,
       metricUrn,
-      anomalyUrn,
+      metricEntity,
+      sessionId,
       session,
-      anomalyContext,
+      anomalyId,
+      anomalyUrn,
+      anomalyEntity,
       anomalySessions
     });
   },
@@ -153,14 +151,14 @@ export default Route.extend(AuthenticatedRouteMixin, {
       compareMode,
       anomalyRangeStart,
       anomalyRangeEnd,
-      anomalyId,
       metricId,
+      metricUrn,
       metricEntity,
       sessionId,
-      metricUrn,
-      anomalyUrn,
       session,
-      anomalyContext
+      anomalyId,
+      anomalyUrn,
+      anomalyEntity
     } = model;
 
     const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
@@ -220,32 +218,31 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
     // anomaly-initialized context
     if (anomalyId && anomalyUrn) {
-      if (!_.isEmpty(anomalyContext)) {
-        const contextUrns = anomalyContext.map(e => e.urn);
+      if (!_.isEmpty(anomalyEntity)) {
+        const anomalyRange = [parseInt(anomalyEntity.start, 10), parseInt(anomalyEntity.end, 10)];
 
-        const metricUrns = filterPrefix(contextUrns, 'thirdeye:metric:');
-
-        const anomalyRangeUrns = filterPrefix(contextUrns, 'thirdeye:timerange:anomaly:');
-        const analysisRangeUrns = filterPrefix(contextUrns, 'thirdeye:timerange:analysis:');
-
-        // thirdeye:timerange:anomaly:{start}:{end}
-        const anomalyRange = _.slice(anomalyRangeUrns[0].split(':'), 3, 5).map(i => parseInt(i, 10));
-
-        // thirdeye:timerange:analysis:{start}:{end}
         // align to local end of day
-        const [rawStart, rawEnd] = _.slice(analysisRangeUrns[0].split(':'), 3, 5).map(i => parseInt(i, 10));
-        const analysisRange = [moment(rawStart).startOf('day').add(1, 'day').valueOf(), moment(rawEnd).endOf('day').valueOf()];
+        const analysisRange = [moment(anomalyRange[0]).startOf('day').add(-1, 'day').valueOf(), moment(anomalyRange[1]).startOf('day').add(1, 'day').valueOf()];
+
+        const anomalyDimNames = anomalyEntity.attributes['dimensions'] || [];
+        const anomalyFilters = anomalyDimNames.map(dimName => [dimName, anomalyEntity.attributes[dimName]]);
+
+        const anomalyMetricUrnRaw = `thirdeye:metric:${anomalyEntity.attributes['metricId'][0]}`;
+        const anomalyMetricUrn = appendFilters(anomalyMetricUrnRaw, anomalyFilters);
+
+        const anomalyFunctionUrnRaw = `frontend:anomalyfunction:${anomalyEntity.attributes['functionId'][0]}`;
+        const anomalyFunctionUrn = appendFilters(anomalyFunctionUrnRaw, anomalyFilters);
 
         context = {
-          urns: new Set([...metricUrns]),
+          urns: new Set([anomalyMetricUrn]),
           anomalyRange,
           analysisRange,
           granularity,
           compareMode,
-          anomalyUrns: new Set([...metricUrns, anomalyUrn])
+          anomalyUrns: new Set([anomalyUrn, anomalyMetricUrn, anomalyFunctionUrn])
         };
 
-        selectedUrns = new Set([...metricUrns, ...metricUrns.map(toCurrentUrn), ...metricUrns.map(toBaselineUrn), anomalyUrn]);
+        selectedUrns = new Set([anomalyUrn, anomalyMetricUrn, anomalyFunctionUrn]);
         sessionName = 'New Investigation of #' + anomalyId + ' (' + moment().format(dateFormatFull) + ')';
         setupMode = ROOTCAUSE_SETUP_MODE_SELECTED;
 

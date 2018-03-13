@@ -147,9 +147,9 @@ export default Component.extend({
       const { entities, timeseries, selectedUrns } =
         this.getProperties('entities', 'timeseries', 'selectedUrns');
 
-      return filterPrefix(selectedUrns, ['thirdeye:event:', 'frontend:metric:'])
+      return filterPrefix(selectedUrns, ['thirdeye:event:', 'frontend:metric:', 'frontend:anomalyfunction:'])
         .filter(urn => !hasPrefix(urn, 'thirdeye:event:') || entities[urn])
-        .filter(urn => !hasPrefix(urn, 'frontend:metric:') || timeseries[urn]);
+        .filter(urn => !hasPrefix(urn, ['frontend:metric:', 'frontend:anomalyfunction:']) || timeseries[urn]);
     }
   ),
 
@@ -192,8 +192,8 @@ export default Component.extend({
     'displayableUrns',
     'timeseriesMode',
     function () {
-      const { displayableUrns, timeseriesMode } =
-        this.getProperties('displayableUrns', 'timeseriesMode');
+      const { displayableUrns, timeseriesMode, context } =
+        this.getProperties('displayableUrns', 'timeseriesMode', 'context');
 
       if (timeseriesMode != TIMESERIES_MODE_SPLIT) {
         return {};
@@ -201,13 +201,24 @@ export default Component.extend({
 
       const splitSeries = {};
       const metricUrns = new Set(filterPrefix(displayableUrns, 'frontend:metric:'));
+      const anomalyFunctionUrns = new Set(filterPrefix(displayableUrns, 'frontend:anomalyfunction:'));
+
       const otherUrns = new Set([...displayableUrns].filter(urn => !metricUrns.has(urn)));
+      [...anomalyFunctionUrns].forEach(urn => otherUrns.delete(urn));
 
       filterPrefix(metricUrns, ['frontend:metric:current:']).forEach(urn => {
         const splitMetricUrns = [urn];
+        const metricUrn = toMetricUrn(urn);
         const baselineUrn = toBaselineUrn(urn);
+
+        // show related baseline
         if (metricUrns.has(baselineUrn)) {
           splitMetricUrns.push(baselineUrn);
+        }
+
+        // show related anomaly function baselines
+        if (context.anomalyUrns.has(metricUrn)) {
+          [...anomalyFunctionUrns].forEach(urn => splitMetricUrns.push(urn));
         }
 
         const splitUrns = new Set(splitMetricUrns.concat([...otherUrns]));
@@ -416,6 +427,17 @@ export default Component.extend({
         timestamps: timeseries[urn].timestamp,
         values: timeseries[urn].value,
         color: metricEntity ? 'light-' + metricEntity.color : 'none',
+        type: 'line',
+        axis: 'y'
+      };
+
+      return this._transformSeries(timeseriesMode, series);
+
+    } else if (hasPrefix(urn, 'frontend:anomalyfunction:')) {
+      const series = {
+        timestamps: timeseries[urn].timestamp,
+        values: timeseries[urn].value,
+        color: 'grey',
         type: 'line',
         axis: 'y'
       };

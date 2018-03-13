@@ -35,6 +35,7 @@ const ROOTCAUSE_SERVICE_ENTITIES = 'entities';
 const ROOTCAUSE_SERVICE_TIMESERIES = 'timeseries';
 const ROOTCAUSE_SERVICE_AGGREGATES = 'aggregates';
 const ROOTCAUSE_SERVICE_BREAKDOWNS = 'breakdowns';
+const ROOTCAUSE_SERVICE_ANOMALY_FUNCTIONS = 'anomalyFunctions';
 
 const ROOTCAUSE_SESSION_TIMER_INTERVAL = 300000;
 
@@ -82,6 +83,8 @@ export default Controller.extend({
   scoresService: service('rootcause-scores-cache'),
 
   sessionService: service('rootcause-session-datasource'),
+
+  anomalyFunctionService: service('rootcause-anomalyfunction-cache'),
 
   //
   // user details
@@ -237,20 +240,23 @@ export default Controller.extend({
    * services to refresh caches on-demand. Changes propagate throughout the application via the respective
    * computed properties ('entities', 'timeseries', 'aggregates', 'breakdowns')
    *
-   * entities:     rootcause search results, such as events and metrics
-   *               (typically displayed in event table, timeseries chart)
+   * entities:         rootcause search results, such as events and metrics
+   *                   (typically displayed in event table, timeseries chart)
    *
-   * timeseries:   time-ordered metric values for display in chart
-   *               (typically displayed in timeseries chart)
+   * timeseries:       time-ordered metric values for display in chart
+   *                   (typically displayed in timeseries chart)
    *
-   * aggregates:   metrics values summarized over multiple time windows (anomaly, baseline, ...)
-   *               (typically displayed in metrics table, anomaly header)
+   * aggregates:       metrics values summarized over multiple time windows (anomaly, baseline, ...)
+   *                   (typically displayed in metrics table, anomaly header)
    *
-   * breakdowns:   de-aggregated metric values over multiple time windows (anomaly, baseline, ...)
-   *               (typically displayed in dimension heatmap)
+   * breakdowns:       de-aggregated metric values over multiple time windows (anomaly, baseline, ...)
+   *                   (typically displayed in dimension heatmap)
    *
-   * scores:       entity scores as computed by backend pipelines (e.g. metric anomality score)
-   *               (typically displayed in metrics table)
+   * scores:           entity scores as computed by backend pipelines (e.g. metric anomality score)
+   *                   (typically displayed in metrics table)
+   *
+   * anomalyfunctions: anomaly function baselines for display in chart
+   *                   (typically displayed in timeseries chart)
    */
   _contextObserver: observer(
     'context',
@@ -258,8 +264,8 @@ export default Controller.extend({
     'selectedUrns',
     'activeTab',
     function () {
-      const { context, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, activeTab, setupMode } =
-        this.getProperties('context', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'activeTab', 'setupMode');
+      const { context, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, anomalyFunctionService, activeTab, setupMode } =
+        this.getProperties('context', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'anomalyFunctionService', 'activeTab', 'setupMode');
 
       if (!context || !selectedUrns) {
         return;
@@ -302,13 +308,15 @@ export default Controller.extend({
       const offsetUrns = [...aggregatesUrns]
         .map(urn => [].concat(offsets.map(offset => toOffsetUrn(urn, offset))))
         .reduce((agg, l) => agg.concat(l), []);
-
       aggregatesService.request(context, new Set(offsetUrns));
 
       // scores
       const scoresUrns = aggregatesUrns;
-
       scoresService.request(context, new Set(scoresUrns));
+
+      // anomaly function baselines
+      const anomalyFunctionUrns = filterPrefix(selectedUrns, 'frontend:anomalyfunction:');
+      anomalyFunctionService.request(context, new Set(anomalyFunctionUrns));
     }
   ),
 
@@ -354,9 +362,17 @@ export default Controller.extend({
   entities: reads('entitiesService.entities'),
 
   /**
-   * Subscribed timeseries cache
+   * Subscribed timeseries cache (metrics, anomaly baselines)
    */
-  timeseries: reads('timeseriesService.timeseries'),
+  timeseries: computed(
+    'timeseriesService.timeseries',
+    'anomalyFunctionService.timeseries',
+    function () {
+      const { timeseriesService, anomalyFunctionService } =
+        this.getProperties('timeseriesService', 'anomalyFunctionService');
+      return Object.assign({}, timeseriesService.timeseries, anomalyFunctionService.timeseries);
+    }
+  ),
 
   /**
    * Subscribed aggregates cache
@@ -461,6 +477,8 @@ export default Controller.extend({
 
   isLoadingScores: gt('scoresService.pending.size', 0),
 
+  isLoadingAnomalyFunctions: gt('anomalyFunctionService.pending.size', 0),
+
   loadingFrameworks: reads('entitiesService.pending'),
 
   //
@@ -478,12 +496,15 @@ export default Controller.extend({
 
   hasErrorsScores: gt('scoresService.errors.size', 0),
 
+  hasErrorsAnomalyFunctions: gt('scoresService.errors.size', 0),
+
   hasServiceErrors: or(
     'hasErrorsEntities',
     'hasErrorsTimeseries',
     'hasErrorsAggregates',
     'hasErrorsBreakdowns',
-    'hasErrorsScores'
+    'hasErrorsScores',
+    'hasErrorsAnomalyFunctions'
   ),
 
   //
@@ -947,8 +968,8 @@ export default Controller.extend({
      * Clears error logs of data services and/or route
      */
     clearErrors(type) {
-      const { entitiesService, timeseriesService, aggregatesService, breakdownsService } =
-        this.getProperties('entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService');
+      const { entitiesService, timeseriesService, aggregatesService, breakdownsService, anomalyFunctionService } =
+        this.getProperties('entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'anomalyFunctionService');
 
       switch(type) {
         case ROOTCAUSE_SERVICE_ENTITIES:
@@ -965,6 +986,10 @@ export default Controller.extend({
 
         case ROOTCAUSE_SERVICE_BREAKDOWNS:
           breakdownsService.clearErrors();
+          break;
+
+        case ROOTCAUSE_SERVICE_ANOMALY_FUNCTIONS:
+          anomalyFunctionService.clearErrors();
           break;
 
         case ROOTCAUSE_SERVICE_ROUTE:
