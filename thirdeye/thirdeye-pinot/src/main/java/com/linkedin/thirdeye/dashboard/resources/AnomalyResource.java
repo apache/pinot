@@ -509,9 +509,7 @@ public class AnomalyResource {
     if (!mode.equalsIgnoreCase("ONLINE")) {
       switch (anomalyFunctionSpec.getBucketUnit()) {
         case MINUTES:
-          if (Weeks.weeksBetween(startTime, endTime).getWeeks() < DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD.toStandardDuration().getStandardDays()/7) {
-            mode = "ONLINE";
-          }
+          mode = "ONLINE"; // There is no offline training in minute-level detection, use online in all cases
           break;
         case HOURS:
           if (Hours.hoursBetween(startTime, endTime).getHours() < DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD.toStandardDuration().getStandardHours()) {
