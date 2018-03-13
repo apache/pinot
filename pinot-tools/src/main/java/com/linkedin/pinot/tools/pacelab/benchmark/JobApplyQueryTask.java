@@ -24,6 +24,7 @@ import java.util.Properties;
 
 public class JobApplyQueryTask extends QueryTask {
     List<GenericRow> _jobTable;
+    List<GenericRow> _profileTable;
 
     public JobApplyQueryTask(Properties config, String[] queries, String dataDir, int testDuration) {
         setConfig(config);
@@ -34,6 +35,7 @@ public class JobApplyQueryTask extends QueryTask {
         try
         {
             _jobTable = eventTableGenerator.readJobTable();
+            _profileTable = eventTableGenerator.readProfileTable();
         }catch (Exception e)
         {
             e.printStackTrace();
@@ -65,6 +67,7 @@ public class JobApplyQueryTask extends QueryTask {
         //GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(profileTable);
 
         GenericRow randomJob = eventTableGenerator.getRandomGenericRow(_jobTable);
+        GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(_profileTable);
 
         String query = "";
         switch (queryId) {
@@ -73,14 +76,19 @@ public class JobApplyQueryTask extends QueryTask {
                 runQuery(query);
                 break;
             case 1:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomJob.getValue("ID"));
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomProfile.getValue("ID"));
                 runQuery(query);
                 break;
+
             case 2:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), groupByLimit);
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomJob.getValue("Company"), groupByLimit);
                 runQuery(query);
                 break;
             case 3:
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), groupByLimit);
+                runQuery(query);
+                break;
+            case 4:
                 query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), groupByLimit);
                 runQuery(query);
                 break;

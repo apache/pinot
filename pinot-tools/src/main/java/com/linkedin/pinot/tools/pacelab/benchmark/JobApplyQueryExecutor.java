@@ -26,8 +26,11 @@ public class JobApplyQueryExecutor extends QueryExecutor {
         String[] queries = {
                 "SELECT * FROM JobApply" +
                         " WHERE ApplyStartTime > %d AND ApplyStartTime < %d LIMIT %d",
-                "SELECT COUNT(*) FROM JobApply" +
-                         " WHERE ApplyStartTime > %d AND ApplyStartTime < %d AND JobID = '%s'",
+                "SELECT ApplicantProfileId, COUNT(*) FROM JobApply" +
+                        " WHERE ApplyStartTime > %d AND ApplyStartTime < %d AND ApplicantProfileId = '%s'",
+                "SELECT JobID, COUNT(*) FROM JobApply" +
+                         " WHERE ApplyStartTime > %d AND ApplyStartTime < %d AND JobCompany = '%s'" +
+                         " GROUP BY JobID LIMIT %d",
                 "SELECT JobCompany, COUNT(*), AVG(TimeSpent), AVG(JobSalary) FROM JobApply" +
                         " WHERE ApplyStartTime > %d AND ApplyStartTime < %d" +
                         " GROUP BY JobCompany LIMIT %d",
