@@ -3,7 +3,7 @@ package com.linkedin.thirdeye.dashboard.resources.v2;
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
-import com.linkedin.thirdeye.dashboard.resources.v2.userdashboard.AnomalySummary;
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalySummary;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
@@ -60,7 +60,9 @@ public class UserDashboardResource {
    *     "current" : 1213.0,
    *     "baseline" : 550.0,
    *     "feedback" : "NO_FEEDBACK",
+   *     "metricId" : 12346
    *     "metric" : "page_views",
+   *     "functionId" : 12347
    *     "functionName" : "page_views_monitoring"
    *     },
    *     ...
@@ -194,12 +196,14 @@ public class UserDashboardResource {
       summary.setEnd(anomaly.getEndTime());
       summary.setCurrent(anomaly.getAvgCurrentVal());
       summary.setBaseline(anomaly.getAvgBaselineVal());
+      summary.setMetricId(anomaly.getFunction().getMetricId());
       summary.setMetric(anomaly.getMetric());
       summary.setDimensions(anomaly.getDimensions());
 
       // TODO use alert filter if necessary
       summary.setSeverity(Math.abs(anomaly.getWeight()));
 
+      summary.setFunctionId(anomaly.getFunctionId());
       if (id2function.get(anomaly.getFunctionId()) != null) {
         summary.setFunctionName(id2function.get(anomaly.getFunctionId()).getFunctionName());
       }

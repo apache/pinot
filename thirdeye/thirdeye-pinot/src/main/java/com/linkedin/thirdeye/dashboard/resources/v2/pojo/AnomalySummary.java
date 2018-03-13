@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.dashboard.resources.v2.userdashboard;
+package com.linkedin.thirdeye.dashboard.resources.v2.pojo;
 
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import java.util.Map;
@@ -17,7 +17,9 @@ public class AnomalySummary {
   private double baseline;
   private AnomalyFeedbackType feedback;
   private String metric;
+  private long metricId;
   private String functionName;
+  private long functionId;
 
   public AnomalySummary() {
     // left blank
@@ -101,5 +103,21 @@ public class AnomalySummary {
 
   public void setFunctionName(String functionName) {
     this.functionName = functionName;
+  }
+
+  public long getMetricId() {
+    return metricId;
+  }
+
+  public void setMetricId(long metricId) {
+    this.metricId = metricId;
+  }
+
+  public long getFunctionId() {
+    return functionId;
+  }
+
+  public void setFunctionId(long functionId) {
+    this.functionId = functionId;
   }
 }
