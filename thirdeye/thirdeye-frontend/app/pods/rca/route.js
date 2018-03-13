@@ -9,11 +9,11 @@ export default Route.extend(AuthenticatedRouteMixin, {
       'rca.details': detailsParams = {}
     } = transition.params;
 
-    const { metricId = null } = detailsParams;
+    const { metric_id = null } = detailsParams;
 
-    if (!metricId) { return {}; }
+    if (!metric_id) { return {}; }
 
-    return fetch(`/data/metric/${metricId}`)
+    return fetch(`/data/metric/${metric_id}`)
       .then(res => res.json());
   },
 

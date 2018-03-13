@@ -50,7 +50,7 @@ export default Route.extend({
   },
 
   model(params) {
-    const { metricId: id } = params;
+    const { metric_id: id } = params;
     if (!id) { return; }
 
     return RSVP.hash({

@@ -7,12 +7,11 @@ const Router = EmberRouter.extend({
 });
 
 Router.map(function() {
-  this.route('example', { path: 'example/:id' });
   this.route('login');
   this.route('logout');
 
   this.route('manage', { path: '/manage' }, function() {
-    this.route('alert', { path: 'alert/:alertId' }, function() {
+    this.route('alert', { path: 'alert/:alert_id' }, function() {
       this.route('explore');
       this.route('tune');
       this.route('edit');
@@ -23,7 +22,7 @@ Router.map(function() {
   });
 
   this.route('rca', { path: '/rca' }, function() {
-    this.route('details', { path: '/:metricId' }, function () {
+    this.route('details', { path: '/:metric_id' }, function () {
       this.route('metrics');
       this.route('events');
       this.route('dimensions', function() {
@@ -35,7 +34,7 @@ Router.map(function() {
     this.route('create-alert');
     this.route('import-metric');
   });
-  this.route('screenshot', { path: 'screenshot/:anomalyId' });
+  this.route('screenshot', { path: 'screenshot/:anomaly_id' });
   this.route('rootcause');
   this.route('home');
 });

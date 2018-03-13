@@ -9,7 +9,7 @@ module.exports = function(environment) {
 
     modulePrefix: 'thirdeye-frontend',
 
-    environment: environment,
+    environment,
 
     podModulePrefix: 'thirdeye-frontend/pods',
 
@@ -63,12 +63,18 @@ module.exports = function(environment) {
 
     // Testem prefers this...
     ENV.locationType = 'none';
+    ENV.APP.autoboot = false;
 
     // keep test console output quieter
     ENV.APP.LOG_ACTIVE_GENERATION = false;
     ENV.APP.LOG_VIEW_LOOKUPS = false;
 
     ENV.APP.rootElement = '#ember-testing';
+    ENV['ember-cli-mirage'] = {
+      directory: 'app/mirage',
+      autostart: true,
+      enabled: true
+    };
   }
 
   if (environment === 'production') {}

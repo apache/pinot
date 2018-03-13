@@ -82,7 +82,7 @@ export default Component.extend({
    * @method bubbleModalInput
    */
   bubbleModalInput() {
-    this.sendAction('inputAction', this.get('reportAnomalyPayload'));
+    this.get('inputAction')(this.get('reportAnomalyPayload'));
   },
 
   actions: {

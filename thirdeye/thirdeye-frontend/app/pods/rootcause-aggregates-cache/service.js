@@ -18,6 +18,7 @@ export default Service.extend({
   errors: null, // Set({ urn, error })
 
   init() {
+    this._super(...arguments);
     this.setProperties({aggregates: {}, context: {}, pending: new Set(), errors: new Set() });
   },
 

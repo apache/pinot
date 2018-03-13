@@ -8,9 +8,9 @@ export default Route.extend({
   redux: service(),
 
   model(params, transition) {
-    const { metricId } = transition.params['rca.details'];
+    const { metric_id } = transition.params['rca.details'];
     const redux = this.get('redux');
-    if (!metricId) { return; }
+    if (!metric_id) { return; }
 
 
     const defaultQueryParams = {
@@ -18,7 +18,7 @@ export default Route.extend({
       endDate: moment().subtract(1, 'week').endOf('day'),
       granularity: 'DAYS',
       filters: JSON.stringify({}),
-      primaryMetricId: metricId
+      primaryMetricId: metric_id
     };
     const {
       analysisStart,

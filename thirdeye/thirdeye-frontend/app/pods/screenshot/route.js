@@ -5,7 +5,7 @@ import UnauthenticatedRouteMixin from 'ember-simple-auth/mixins/unauthenticated-
 
 export default Route.extend(UnauthenticatedRouteMixin, {
   model(params) {
-    const { anomalyId: id} = params;
+    const { anomaly_id: id} = params;
     const url = `/anomalies/search/anomalyIds/1/1/1?anomalyIds=${id}&functionName=`;
 
     return fetch(url).then(checkStatus);
