@@ -231,7 +231,7 @@ export default Controller.extend({
    * @return {RSVP.Promise} A new list of functions (alerts)
    */
   prepareFunctions(configGroup) {
-    const existingFunctionList = configGroup.emailConfig ? configGroup.emailConfig.functionIds : [];
+    const existingFunctionList = getWithDefault(this, 'configGroup.emailConfig.functionIds', []);
     const newFunctionList = [];
     let cnt = 0;
 

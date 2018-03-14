@@ -1,6 +1,7 @@
+import $ from 'jquery';
 import moment from 'moment';
 import { module, test } from 'qunit';
-import { later } from "@ember/runloop";
+import { run, later } from "@ember/runloop";
 import { setupRenderingTest } from 'ember-qunit';
 import { click, render } from '@ember/test-helpers';
 import hbs from 'htmlbars-inline-precompile';
@@ -19,53 +20,60 @@ module('Integration | Component | range pill selectors', function(hooks) {
   const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently across app to display custom date range
   const TODAY = moment().startOf('day').add(1, 'days');
   const TWO_WEEKS_AGO = moment().subtract(13, 'days').startOf('day');
-  const ACTIVE_RANGE_END = moment(END_DATE).format(DISPLAY_DATE_FORMAT);
-  const ACTIVE_RANGE_START = moment(START_DATE).format(DISPLAY_DATE_FORMAT);
-  const TIME_RANGE_OPTIONS = setUpTimeRangeOptions(['1m', '3m'], ACTIVE_DURATION); // using helper to generate these
   const PRESET_RANGES = {
     'Today': [moment(), TODAY],
     'Last 2 weeks': [TWO_WEEKS_AGO, TODAY]
   };
 
   test('Confirming that range-pill-selector component renders and dates are selected properly', async function(assert) {
-    // setUpTimeRangeOptions will generate an array such as this
-    // [ { name: "3 Months", value: "3m", start: Moment, isActive: true },
-    // { name: "Custom", value: "custom", start: null, isActive: false } ]
 
+    // Prepare to verify action
     this.set('onRangeSelection', (actual) => {
       let expected = {
-        start: TWO_WEEKS_AGO,
-        end: TODAY
+        isActive: true,
+        value: "custom",
+        name: "Custom",
+        end: moment(TODAY).endOf('day').format(DISPLAY_DATE_FORMAT),
+        start: moment(TWO_WEEKS_AGO).startOf('day').format(DISPLAY_DATE_FORMAT)
       };
       assert.deepEqual(actual, expected, 'selected start/end dates are passed to external action');
     });
 
-    // Template block usage:
+    // Prepare props for component
+    this.setProperties({
+      maxTime: MAXTIME,
+      uiDateFormat: UI_DATE_FORMAT,
+      activeRangeEnd: moment(END_DATE).format(DISPLAY_DATE_FORMAT),
+      activeRangeStart: moment(START_DATE).format(DISPLAY_DATE_FORMAT),
+      timeRangeOptions: setUpTimeRangeOptions(['1m', '3m'], ACTIVE_DURATION),
+      timePickerIncrement: TIME_PICKER_INCREMENT,
+      predefinedRanges: PRESET_RANGES
+    });
+
+    // Rendering the component
     await render(hbs`
       {{range-pill-selectors
         title="Testing range pills"
-        maxTime=MAXTIME
-        uiDateFormat=UI_DATE_FORMAT
-        activeRangeEnd=ACTIVE_RANGE_END
-        activeRangeStart=ACTIVE_RANGE_START
-        timeRangeOptions=TIME_RANGE_OPTIONS
-        timePickerIncrement=TIME_PICKER_INCREMENT
-        predefinedRanges=PRESET_RANGES
+        maxTime=maxTime
+        uiDateFormat=uiDateFormat
+        activeRangeEnd=activeRangeEnd
+        activeRangeStart=activeRangeStart
+        timeRangeOptions=timeRangeOptions
+        timePickerIncrement=timePickerIncrement
+        predefinedRanges=predefinedRanges
+        selectAction=(action onRangeSelection)
       }}
     `);
 
     const $rangePill = this.$(`${PILL_CLASS}__item`);
     const $rangeTitle = this.$(`${PILL_CLASS}__title`);
-    const $rangePickerModal = this.$('.daterangepicker');
     const $rangeInput = this.$('.daterangepicker-input');
-    const $rangePresets = this.$('.daterangepicker .ranges ul li');
-    const $customPill = this.$(`${PILL_CLASS}__item[data-value="custom"]`);
     const $firstPill = this.$(`${PILL_CLASS}__item[data-value="${ACTIVE_DURATION}"]`);
 
     // Testing initial display of time range pills
     assert.equal(
-      $firstPill.get(2).classList[1],
-      `${PILL_CLASS}__item--active`,
+      $firstPill.get(0).classList[1],
+      `te-pill-selectors__item--active`,
       'Pill selected as default is highlighted');
     assert.equal(
       $rangeTitle.get(0).innerText,
@@ -73,7 +81,7 @@ module('Integration | Component | range pill selectors', function(hooks) {
       'Title of range pills is correct');
     assert.equal(
       $rangePill.get(0).innerText,
-      'Last 30 days',
+      'Last 30 Days',
       'Label of first pill is correct');
     assert.equal(
       $rangePill.get(1).innerText,
@@ -85,15 +93,16 @@ module('Integration | Component | range pill selectors', function(hooks) {
       'Label of 3nd pill is correct');
     assert.equal(
       $rangeInput.val(),
-      `${ACTIVE_RANGE_START} - ${ACTIVE_RANGE_END}`,
-      'Date range is accurate');
+      `${moment(START_DATE).startOf('day').format(UI_DATE_FORMAT)} - ${moment(END_DATE).endOf('day').format(UI_DATE_FORMAT)}`,
+      'Date range displayed in date-range-picker input is accurate');
 
     // Clicking to activate date-range-picker modal
-    await click($rangeInput);
+    await run(() => $rangeInput.click());
+    const $rangePresets = $('.daterangepicker .ranges ul li');
 
     // Brief confirmation that modal ranges are displaying properly
     assert.equal(
-      $rangePickerModal.get(0).style.display,
+      $('.daterangepicker').get(0).style.display,
       'block',
       'Range picker modal is displayed');
     assert.equal(
@@ -106,16 +115,16 @@ module('Integration | Component | range pill selectors', function(hooks) {
       'Range picker preset #2 is good');
 
     // Click on one of the preset ranges
-    await click($rangePresets.get(1));
+    await run(() => $rangePresets.get(1).click());
 
     // Confirm that the custom pill gets highlighted and populated with selected dates
     assert.equal(
-      $customPill.get(2).classList[1],
-      `${PILL_CLASS}__item--active`,
+      this.$(`${PILL_CLASS}__item[data-value="custom"]`).get(0).classList[1],
+      `te-pill-selectors__item--active`,
       'Selected pill is highlighted');
     assert.equal(
-      $rangeInput.val(),
-      `${moment(TWO_WEEKS_AGO).format(DISPLAY_DATE_FORMAT)} - ${moment(TODAY).format(DISPLAY_DATE_FORMAT)}`,
+      this.$('.daterangepicker-input').val(),
+      `${moment(TWO_WEEKS_AGO).startOf('day').format(UI_DATE_FORMAT)} - ${moment(TODAY).endOf('day').format(UI_DATE_FORMAT)}`,
       'Date range for selected custom preset is accurate');
   });
 });

@@ -120,6 +120,9 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
 
 /**
  * Generates time range options for selection in the self-serve UI
+ * @example output
+ * [{ name: "3 Months", value: "3m", start: Moment, isActive: true },
+ *  { name: "Custom", value: "custom", start: null, isActive: false }]
  * @method setUpTimeRangeOptions
  * @param {Array} datesKeys - array of keys used to generate time ranges
  * @param {String} duration - the selected time span that is default

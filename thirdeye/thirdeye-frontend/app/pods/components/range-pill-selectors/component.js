@@ -16,6 +16,9 @@
     uiDateFormat=uiDateFormat
     selectAction=(action "onRangeSelection")
   }}
+ * NOTE - timeRangeOptions format:
+ * [ { name: "3 Months", value: "3m", start: Moment, isActive: true },
+ *   { name: "Custom", value: "custom", start: null, isActive: false } ]
  * @exports range-pill-selectors
  * @author smcclung
  */
@@ -25,7 +28,7 @@ import moment from 'moment';
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
 
 const RANGE_FORMAT = 'YYYY-MM-DD HH:mm';
-const DEFAULT_END_DATE = buildDateEod(1, 'day').valueOf();
+const DEFAULT_END_DATE = moment().startOf('day').add(1, 'days');
 
 export default Component.extend({
 
@@ -43,11 +46,9 @@ export default Component.extend({
    * A set of arbitrary time ranges to help user with quick selection in date-time-picker
    */
   predefinedRanges: {
-    'Today': [moment(), moment().startOf('day').add(1, 'days')],
-    'Last 3 days': [moment().subtract(2, 'days').startOf('day'), moment().startOf('day').add(1, 'days')],
-    'Last 7 days': [moment().subtract(6, 'days').startOf('day'), moment().startOf('day').add(1, 'days')],
-    'Last 14 days': [moment().subtract(13, 'days').startOf('day'), moment().startOf('day').add(1, 'days')],
-    'Last 28 days': [moment().subtract(27, 'days').startOf('day'), moment().startOf('day').add(1, 'days')]
+    'Today': [DEFAULT_END_DATE],
+    'Last 1 month': [moment().subtract(1, 'months').startOf('day'), DEFAULT_END_DATE],
+    'Last 2 months': [moment().subtract(2, 'months').startOf('day'), DEFAULT_END_DATE]
   },
 
   /**
