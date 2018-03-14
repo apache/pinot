@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.datalayer.dao;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
@@ -64,6 +65,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -79,7 +81,7 @@ import org.slf4j.LoggerFactory;
 public class GenericPojoDao {
   private static final Logger LOG = LoggerFactory.getLogger(GenericPojoDao.class);
   private static boolean IS_DEBUG = LOG.isDebugEnabled();
-  private static int MAX_RECORDS_TO_DELETED = 1000;
+  private static int MAX_BATCH_SIZE = 1000;
 
   static Map<Class<? extends AbstractBean>, PojoInfo> pojoInfoMap =
       new HashMap<Class<? extends AbstractBean>, GenericPojoDao.PojoInfo>();
@@ -173,7 +175,7 @@ public class GenericPojoDao {
     // TODO use injection
     ThirdEyePrincipal principal = ThirdEyeAuthFilter.getCurrentPrincipal();
     if (principal != null) {
-     return principal.getName();
+      return principal.getName();
     }
     return "no-auth-user";
   }
@@ -239,7 +241,82 @@ public class GenericPojoDao {
     }
   }
 
+  /**
+   * Update the list of pojos in batch mode. Every batch contains MAX_BATCH_SIZE of entries. By default, this
+   * method update the batch of entries in one transaction. If any entries cause an exception, this method
+   * will update the entries one-by-one (i.e., in separated transactions) and skip the one that causes exceptions.
+   *
+   * @param pojos the pojo to be updated, whose ID cannot be null; otherwise, it will be ignored.
+   *
+   * @return the number of rows that are affected.
+   */
+  public <E extends AbstractBean> int update(final List<E> pojos) {
+    if (CollectionUtils.isEmpty(pojos)) {
+      return 0;
+    }
+
+    long tStart = System.nanoTime();
+    String updateName = getCurrentPrincipal();
+    for (E pojo : pojos) {
+      pojo.setUpdatedBy(updateName);
+    }
+    try {
+      return runTask(new QueryTask<Integer>() {
+        @Override
+        public Integer handle(Connection connection) throws Exception {
+          if (CollectionUtils.isEmpty(pojos)) {
+            return 0;
+          }
+
+          int updateCounter = 0;
+          int minIdx = 0;
+          int maxIdx = MAX_BATCH_SIZE;
+          boolean isAutoCommit = connection.getAutoCommit();
+          // Ensure that transaction mode is enabled
+          connection.setAutoCommit(false);
+          while (minIdx < pojos.size()) {
+            List<E> subList = pojos.subList(minIdx, Math.min(maxIdx, pojos.size()));
+            try {
+              for (E pojo : subList) {
+                Preconditions.checkNotNull(pojo.getId());
+                addUpdateToConnection(pojo, Predicate.EQ("id", pojo.getId()), connection);
+              }
+              // Trigger commit() to ensure this batch of deletion is executed
+              connection.commit();
+              updateCounter += subList.size();
+            } catch (Exception e) {
+              // Error recovery: rollback previous changes.
+              connection.rollback();
+              // Unable to do batch because of exception; fall back to single row deletion mode.
+              for (final E pojo : subList) {
+                try {
+                  int updateRow = addUpdateToConnection(pojo, Predicate.EQ("id", pojo.getId()), connection);
+                  connection.commit();
+                  updateCounter += updateRow;
+                } catch (Exception e1) {
+                  connection.rollback();
+                  LOG.error("Exception while executing query task; skipping entity (id={})", pojo.getId(), e);
+                }
+              }
+            }
+            minIdx = maxIdx;
+            maxIdx = maxIdx + MAX_BATCH_SIZE;
+          }
+          // Restore the original state of connection's auto commit
+          connection.setAutoCommit(isAutoCommit);
+          return updateCounter;
+        }
+      }, 0);
+    } finally {
+      ThirdeyeMetricsUtil.dbWriteCallCounter.inc();
+      ThirdeyeMetricsUtil.dbWriteDurationCounter.inc(System.nanoTime() - tStart);
+    }
+  }
+
   public <E extends AbstractBean> int update(E pojo) {
+    if (pojo.getId() == null) {
+      throw new IllegalArgumentException(String.format("Need an ID to update the DB entity: %s", pojo.toString()));
+    }
     return update(pojo, Predicate.EQ("id", pojo.getId()));
   }
 
@@ -247,50 +324,55 @@ public class GenericPojoDao {
     long tStart = System.nanoTime();
     pojo.setUpdatedBy(getCurrentPrincipal());
     try {
-      //update base table
-      //update indexes
       return runTask(new QueryTask<Integer>() {
         @Override
         public Integer handle(Connection connection) throws Exception {
-          PojoInfo pojoInfo = pojoInfoMap.get(pojo.getClass());
-          String jsonVal = OBJECT_MAPPER.writeValueAsString(pojo);
-          ThirdeyeMetricsUtil.dbWriteByteCounter.inc(jsonVal.length());
-
-          AbstractJsonEntity genericJsonEntity = new GenericJsonEntity();
-          genericJsonEntity.setUpdateTime(new Timestamp(System.currentTimeMillis()));
-          genericJsonEntity.setJsonVal(jsonVal);
-          genericJsonEntity.setId(pojo.getId());
-          genericJsonEntity.setVersion(pojo.getVersion());
-          dumpTable(connection, GenericJsonEntity.class);
-          Set<String> fieldsToUpdate = Sets.newHashSet("jsonVal", "updateTime", "version");
-          int affectedRows;
-          try (PreparedStatement baseTableInsertStmt =
-              sqlQueryBuilder.createUpdateStatement(connection, genericJsonEntity, fieldsToUpdate, predicate)) {
-            affectedRows = baseTableInsertStmt.executeUpdate();
-          }
-          if (affectedRows == 1) {
-            if (pojoInfo.indexEntityClass != null) {
-              AbstractIndexEntity abstractIndexEntity = pojoInfo.indexEntityClass.newInstance();
-              MODEL_MAPPER.map(pojo, abstractIndexEntity);
-              abstractIndexEntity.setBaseId(pojo.getId());
-              abstractIndexEntity.setUpdateTime(new Timestamp(System.currentTimeMillis()));
-              //updates all columns in the index table by default
-              try (PreparedStatement indexTableInsertStatement =
-                  sqlQueryBuilder.createUpdateStatementForIndexTable(connection, abstractIndexEntity)) {
-                int numRowsUpdated = indexTableInsertStatement.executeUpdate();
-                LOG.debug("numRowsUpdated: {}", numRowsUpdated);
-                return numRowsUpdated;
-              }
-            }
-          }
-          return affectedRows;
+          return addUpdateToConnection(pojo, predicate, connection);
         }
-
       }, 0);
     } finally {
       ThirdeyeMetricsUtil.dbWriteCallCounter.inc();
       ThirdeyeMetricsUtil.dbWriteDurationCounter.inc(System.nanoTime() - tStart);
     }
+  }
+
+  private <E extends AbstractBean> int addUpdateToConnection(final E pojo, final Predicate predicate,
+      Connection connection) throws Exception {
+    //update base table
+    String jsonVal = OBJECT_MAPPER.writeValueAsString(pojo);
+    AbstractJsonEntity genericJsonEntity = new GenericJsonEntity();
+    genericJsonEntity.setUpdateTime(new Timestamp(System.currentTimeMillis()));
+    genericJsonEntity.setJsonVal(jsonVal);
+    genericJsonEntity.setId(pojo.getId());
+    genericJsonEntity.setVersion(pojo.getVersion());
+    dumpTable(connection, GenericJsonEntity.class);
+    Set<String> fieldsToUpdate = Sets.newHashSet("jsonVal", "updateTime", "version");
+    int affectedRows;
+    try (PreparedStatement baseTableInsertStmt =
+        sqlQueryBuilder.createUpdateStatement(connection, genericJsonEntity, fieldsToUpdate, predicate)) {
+      affectedRows = baseTableInsertStmt.executeUpdate();
+    }
+
+    //update indexes
+    if (affectedRows == 1) {
+      ThirdeyeMetricsUtil.dbWriteByteCounter.inc(jsonVal.length());
+      PojoInfo pojoInfo = pojoInfoMap.get(pojo.getClass());
+      if (pojoInfo.indexEntityClass != null) {
+        AbstractIndexEntity abstractIndexEntity = pojoInfo.indexEntityClass.newInstance();
+        MODEL_MAPPER.map(pojo, abstractIndexEntity);
+        abstractIndexEntity.setBaseId(pojo.getId());
+        abstractIndexEntity.setUpdateTime(new Timestamp(System.currentTimeMillis()));
+        //updates all columns in the index table by default
+        try (PreparedStatement indexTableInsertStatement =
+            sqlQueryBuilder.createUpdateStatementForIndexTable(connection, abstractIndexEntity)) {
+          int numRowsUpdated = indexTableInsertStatement.executeUpdate();
+          LOG.debug("numRowsUpdated: {}", numRowsUpdated);
+          return numRowsUpdated;
+        }
+      }
+    }
+
+    return affectedRows;
   }
 
   public <E extends AbstractBean> List<E> getAll(final Class<E> beanClass) {
@@ -586,41 +668,75 @@ public class GenericPojoDao {
       return runTask(new QueryTask<Integer>() {
         @Override
         public Integer handle(Connection connection) throws Exception {
-          PojoInfo pojoInfo = pojoInfoMap.get(pojoClass);
-          int totalBaseRowsDeleted = 0;
-          if (CollectionUtils.isNotEmpty(idsToDelete)) {
-            int minIdx = 0;
-            int maxIdx = MAX_RECORDS_TO_DELETED;
-            while (minIdx < idsToDelete.size()) {
-              List<Long> subList = idsToDelete.subList(minIdx, Math.min(maxIdx, idsToDelete.size()));
-              //delete the ids from both base table and index table
-              int indexRowsDeleted;
-              try (PreparedStatement statement = sqlQueryBuilder.createDeleteStatement(connection,
-                  pojoInfo.indexEntityClass, subList, true)) {
-                indexRowsDeleted = statement.executeUpdate();
-              }
-              int baseRowsDeleted;
-              try (PreparedStatement baseTableDeleteStatement = sqlQueryBuilder
-                  .createDeleteStatement(connection, GenericJsonEntity.class, subList, false)) {
-                baseRowsDeleted = baseTableDeleteStatement.executeUpdate();
-              }
-              assert (baseRowsDeleted == indexRowsDeleted);
+          if (CollectionUtils.isEmpty(idsToDelete)) {
+            return 0;
+          }
 
-              totalBaseRowsDeleted += baseRowsDeleted;
-              minIdx = Math.min(maxIdx, idsToDelete.size());
-              maxIdx += MAX_RECORDS_TO_DELETED;
+          boolean isAutoCommit = connection.getAutoCommit();
+          // Ensure that transaction mode is enabled
+          connection.setAutoCommit(false);
+          Class<? extends AbstractIndexEntity> indexEntityClass = pojoInfoMap.get(pojoClass).indexEntityClass;
+          int updateCounter = 0;
+          int minIdx = 0;
+          int maxIdx = MAX_BATCH_SIZE;
+          while (minIdx < idsToDelete.size()) {
+            List<Long> subList = idsToDelete.subList(minIdx, Math.min(maxIdx, idsToDelete.size()));
+            try {
+              int updatedBaseRow = addBatchDeletionToConnection(subList, indexEntityClass, connection);
               // Trigger commit() to ensure this batch of deletion is executed
-              if (!connection.getAutoCommit()) {
-                connection.commit();
+              connection.commit();
+              updateCounter += updatedBaseRow;
+            } catch (Exception e) {
+              // Error recovery: rollback previous changes.
+              connection.rollback();
+              // Unable to do batch because of exception; fall back to single row deletion mode.
+              for (final Long pojoId : subList) {
+                try {
+                  int updatedBaseRow =
+                      addBatchDeletionToConnection(Collections.singletonList(pojoId), indexEntityClass, connection);
+                  connection.commit();
+                  updateCounter += updatedBaseRow;
+                } catch (Exception e1) {
+                  connection.rollback();
+                  LOG.error("Exception while executing query task; skipping entity (id={})", pojoId, e);
+                }
               }
             }
+            minIdx = Math.min(maxIdx, idsToDelete.size());
+            maxIdx += MAX_BATCH_SIZE;
           }
-          return totalBaseRowsDeleted;
+          // Restore the original state of connection's auto commit
+          connection.setAutoCommit(isAutoCommit);
+          return updateCounter;
         }
       }, 0);
     } finally {
       ThirdeyeMetricsUtil.dbWriteCallCounter.inc();
       ThirdeyeMetricsUtil.dbWriteDurationCounter.inc(System.nanoTime() - tStart);
+    }
+  }
+
+  /**
+   * Delete the given ids from base table and index table.
+   *
+   * @param idsToDelete the IDs to be deleted
+   * @param indexEntityClass the index entity of the entities in the ID list; this method assumes that these entities
+   *                         to be deleted belong to the same index entity
+   * @param connection the connection to the database.
+   *
+   * @return the number of base rows that are deleted.
+   *
+   * @throws Exception any exception from DB.
+   */
+  private <E extends AbstractBean> int addBatchDeletionToConnection(List<Long> idsToDelete,
+      Class<? extends AbstractIndexEntity> indexEntityClass, Connection connection) throws Exception {
+    try (PreparedStatement statement = sqlQueryBuilder.createDeleteStatement(connection, indexEntityClass, idsToDelete,
+        true)) {
+      statement.executeUpdate();
+    }
+    try (PreparedStatement baseTableDeleteStatement = sqlQueryBuilder.createDeleteStatement(connection,
+        GenericJsonEntity.class, idsToDelete, false)) {
+      return baseTableDeleteStatement.executeUpdate();
     }
   }
 
@@ -635,13 +751,35 @@ public class GenericPojoDao {
   }
 
   <T> T runTask(QueryTask<T> task, T defaultReturnValue) {
-    try (Connection connection = getConnection()) {
+    Connection connection = null;
+    try {
+      connection = getConnection();
+      // Enable transaction
+      connection.setAutoCommit(false);
       T t = task.handle(connection);
+      // Commit this transaction
       connection.commit();
       return t;
     } catch (Exception e) {
       LOG.error("Exception while executing query task", e);
+      // Rollback transaction in case json table is updated but index table isn't due to any errors (duplicate key, etc.)
+      if (connection != null) {
+        try {
+          connection.rollback();
+        } catch (SQLException e1) {
+          LOG.error("Failed to rollback SQL execution", e);
+        }
+      }
       return defaultReturnValue;
+    } finally {
+      // Always close connection before leaving
+      if (connection != null) {
+        try {
+          connection.close();
+        } catch (SQLException e) {
+          LOG.error("Failed to close connection", e);
+        }
+      }
     }
   }
 

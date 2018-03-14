@@ -70,6 +70,16 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
     return genericPojoDao.update(bean);
   }
 
+  // Test is located at TestAlertConfigManager.testBatchUpdate()
+  @Override
+  public int update(List<E> entities) {
+    ArrayList<AbstractBean> beans = new ArrayList<>();
+    for (E entity : entities) {
+      beans.add(convertDTO2Bean(entity, beanClass));
+    }
+    return genericPojoDao.update(beans);
+  }
+
   public E findById(Long id) {
     AbstractBean abstractBean = genericPojoDao.get(id, beanClass);
     if (abstractBean != null) {
@@ -85,6 +95,7 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
     return genericPojoDao.delete(entity.getId(), beanClass);
   }
 
+  // Test is located at TestAlertConfigManager.testBatchDeletion()
   @Override
   public int deleteById(Long id) {
     return genericPojoDao.delete(id, beanClass);
