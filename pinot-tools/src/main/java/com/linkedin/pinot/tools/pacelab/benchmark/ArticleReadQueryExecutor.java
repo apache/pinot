@@ -19,7 +19,7 @@ import java.util.Properties;
 
 public class ArticleReadQueryExecutor extends QueryExecutor{
     private static ArticleReadQueryExecutor instance;
-    private final String CONFIG_FILE = "/pinot_benchmark/query_generator_config/ArticleReadConfig.properties";
+    private final String CONFIG_FILE = "pinot_benchmark/query_generator_config/ArticleReadConfig.properties";
     private static final String[] QUERIES = getQueries();
 
     private static String[] getQueries() {
@@ -28,12 +28,12 @@ public class ArticleReadQueryExecutor extends QueryExecutor{
                     " WHERE  ReadStartTime > %d AND ReadStartTime < %d LIMIT %d",
                 "SELECT COUNT(*) FROM ArticleRead" +
                     " WHERE ReadStartTime > %d AND ReadStartTime < %d AND ArticleID = '%s'",
-                "SELECT ArticleTopic, COUNT(*), AVG(TimeSpent), AVG(ReaderStrength) FROM ArticleReadd" +
+                "SELECT ArticleTopic, COUNT(*), AVG(TimeSpent), AVG(ReaderStrength) FROM ArticleRead" +
                     " WHERE ReadStartTime > %d AND ReadStartTime < %d" +
-                    " GROUP BY ArticleTopic LIMIT %d",
+                    " GROUP BY ArticleTopic ORDER BY COUNT(*) desc LIMIT %d",
                 "SELECT ArticleAuthor, ArticleTitle, ReaderStrength, COUNT(*) FROM ArticleRead" +
                     " WHERE ReadStartTime > %d AND ReadStartTime < %d" +
-                    " GROUP BY ArticleAuthor, ArticleTitle, ReaderStrength LIMIT %d"
+                    " GROUP BY ArticleAuthor, ArticleTitle, ReaderStrength ORDER BY COUNT(*) desc LIMIT %d"
         };
         return queries;
     }

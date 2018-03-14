@@ -66,6 +66,8 @@ public class CommonTools {
 
         int firstHour = zipfRandom.nextInt();
         int secondHour = zipfRandom.nextInt();
+
+        /*
         while(secondHour == firstHour)
         {
             secondHour = zipfRandom.nextInt();
@@ -85,6 +87,15 @@ public class CommonTools {
             queriedStartTime = maxProfileViewStartTime - firstHour*HourSecond;
             queriedEndTime = maxProfileViewStartTime - secondHour*HourSecond;
         }
+        return new LongRange(queriedStartTime,queriedEndTime);
+        */
+
+        long queriedStartTime;
+        long queriedEndTime;
+
+        queriedEndTime = maxProfileViewStartTime - firstHour*HourSecond;
+        queriedStartTime = queriedEndTime - secondHour*HourSecond;
+
         return new LongRange(queriedStartTime,queriedEndTime);
     }
 
