@@ -27,6 +27,9 @@ import java.util.Random;
 
 public class ProfileViewQueryTask extends QueryTask {
     List<GenericRow> _profileTable;
+    ZipfRandom _zipfRandom;
+    final static int HourSecond = 3600;
+
 
     public ProfileViewQueryTask(Properties config, String[] queries, String dataDir, int testDuration) {
         setConfig(config);
@@ -34,6 +37,14 @@ public class ProfileViewQueryTask extends QueryTask {
         setDataDir(dataDir);
         setTestDuration(testDuration);
         EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
+
+        long minProfileViewStartTime = Long.parseLong(config.getProperty("MinProfileViewStartTime"));
+        long maxProfileViewStartTime = Long.parseLong(config.getProperty("MaxProfileViewStartTime"));
+        double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
+
+        int hourCount = (int) Math.ceil((maxProfileViewStartTime-minProfileViewStartTime)/(HourSecond));
+        _zipfRandom = new ZipfRandom(zipfS,hourCount);
+
         try
         {
             _profileTable = eventTableGenerator.readProfileTable();
@@ -54,12 +65,24 @@ public class ProfileViewQueryTask extends QueryTask {
         Properties config = getConfig();
         String[] queries = getQueries();
 
+
         long minProfileViewStartTime = Long.parseLong(config.getProperty("MinProfileViewStartTime"));
         long maxProfileViewStartTime = Long.parseLong(config.getProperty("MaxProfileViewStartTime"));
+
+        /*
         double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
         //LongRange timeRange = CommonTools.getZipfRandomDailyTimeRange(minProfileViewStartTime,maxProfileViewStartTime,zipfS);
         LongRange timeRange = CommonTools.getZipfRandomHourlyTimeRange(minProfileViewStartTime,maxProfileViewStartTime,zipfS);
+        */
 
+        int firstHour = _zipfRandom.nextInt();
+        //int secondHour = _zipfRandom.nextInt();
+
+        //long queriedEndTime = maxApplyStartTime - firstHour*HourSecond;
+        long queriedEndTime = maxProfileViewStartTime;
+        long queriedStartTime = Math.max(minProfileViewStartTime,queriedEndTime - firstHour*HourSecond);
+
+        LongRange timeRange =  new LongRange(queriedStartTime,queriedEndTime);
 
         int selectLimit = CommonTools.getSelectLimt(config);
         int groupByLimit = Integer.parseInt(config.getProperty("GroupByLimit"));

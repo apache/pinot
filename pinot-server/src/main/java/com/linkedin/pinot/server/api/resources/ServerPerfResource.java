@@ -89,7 +89,7 @@ public class ServerPerfResource {
       double cpuModelA = Double.parseDouble(tableLoadModel[2]);
       double cpuModelB =  Double.parseDouble(tableLoadModel[3]);
       double cpuModelAlpha = Double.parseDouble(tableLoadModel[4]);
-      double lifeTimeInMonth =  Double.parseDouble(tableLoadModel[5]);
+      double lifeTimeInDay =  Double.parseDouble(tableLoadModel[5]);
       double timeScale =  Double.parseDouble(tableLoadModel[6]);
       double docScannedModelP1 = Double.parseDouble(tableLoadModel[7]);
       double docScannedModelP2 = Double.parseDouble(tableLoadModel[8]);
@@ -98,7 +98,7 @@ public class ServerPerfResource {
       //LOGGER.info("ReadingTableConfig: {}, {}, {}, {}, {}, {}, {}, {}, {}", tableName, avgDocCount, cpuModelA,cpuModelB,cpuModelAlpha,lifeTimeInMonth,timeScale,docScannedModelP1,docScannedModelP2,docScannedModelP3);
       //tableCPULoadFormulation.put(tableName, new CPULoadFormulation(avgDocCount,cpuModelA,alpha,b,lifeTime,timeScale));
 
-      tableCPULoadFormulation.put(tableName, new CPULoadFormulation(avgDocCount,cpuModelA,cpuModelB,cpuModelAlpha,lifeTimeInMonth,timeScale,docScannedModelP1,docScannedModelP2,docScannedModelP3));
+      tableCPULoadFormulation.put(tableName, new CPULoadFormulation(avgDocCount,cpuModelA,cpuModelB,cpuModelAlpha,lifeTimeInDay,timeScale,docScannedModelP1,docScannedModelP2,docScannedModelP3));
     }
 
 
@@ -178,27 +178,27 @@ public class ServerPerfResource {
     private double _cpuModelA = 0;
     private double _cpuModelB = 0;
     private double _cpuModelAlpha = 0;
-    private double _lifeTimeInMonth=0;
+    private double _lifeTimeInDay =0;
     private double _timeScale=0;
     private double _docScannedModelP1 = 0;
     private double _docScannedModelP2 = 0;
     private double _docScannedModelP3 = 0;
 
-    public CPULoadFormulation(double avgDocCount, double cpuModelA, double cpuModelAlpha, double cpuModelB, double lifeTimeInMonth, double timeScale) {
+    public CPULoadFormulation(double avgDocCount, double cpuModelA, double cpuModelAlpha, double cpuModelB, double lifeTimeInDay, double timeScale) {
       _avgDocCount = avgDocCount;
       _cpuModelA = cpuModelA;
       _cpuModelB = cpuModelB;
       _cpuModelAlpha = cpuModelAlpha;
-      _lifeTimeInMonth = lifeTimeInMonth;
+      _lifeTimeInDay = lifeTimeInDay;
       _timeScale = timeScale;
     }
 
-    public CPULoadFormulation(double avgDocCount, double cpuModelA, double cpuModelB, double cpuModelAlpha, double lifeTimeInMonth, double timeScale, double docScannedModelP1, double docScannedModelP2, double docScannedModelP3) {
+    public CPULoadFormulation(double avgDocCount, double cpuModelA, double cpuModelB, double cpuModelAlpha, double lifeTimeInDay, double timeScale, double docScannedModelP1, double docScannedModelP2, double docScannedModelP3) {
       _avgDocCount = avgDocCount;
       _cpuModelA = cpuModelA;
       _cpuModelB = cpuModelB;
       _cpuModelAlpha = cpuModelAlpha;
-      _lifeTimeInMonth = lifeTimeInMonth;
+      _lifeTimeInDay = lifeTimeInDay;
       _timeScale = timeScale;
 
       _docScannedModelP1 = docScannedModelP1;
@@ -209,9 +209,9 @@ public class ServerPerfResource {
 
     public double computeCPULoad(SegmentMetadata segmentMetadata) {
 
-      //LOGGER.info("ComputingLoadFor: {}, {}, {}, {}, {}, {}", _avgDocCount, _a, _alpha, _b, _lifeTimeInMonth, _timeScale);
+      //LOGGER.info("ComputingLoadFor: {}, {}, {}, {}, {}, {}", _avgDocCount, _a, _alpha, _b, _lifeTimeInDay, _timeScale);
 
-      double lifeTimeInScaleSeconds = (_lifeTimeInMonth * 30 * 24 * 3600)/_timeScale;
+      double lifeTimeInScaleSeconds = (_lifeTimeInDay * 24 * 3600)/_timeScale;
 
       double segmentMiddleTime = (segmentMetadata.getStartTime() + segmentMetadata.getEndTime()) / 2;
       double segmentAgeInScaleSeconds = ((System.currentTimeMillis()/1000) - segmentMiddleTime)/_timeScale;
@@ -246,12 +246,12 @@ public class ServerPerfResource {
 
     public double computeCPULoad(SegmentMetadata segmentMetadata, long maxTime) {
 
-      //LOGGER.info("ComputingLoadFor: {}, {}, {}, {}, {}, {}, {}, {}", _avgDocCount, _cpuModelA,_cpuModelB,_cpuModelAlpha,_lifeTimeInMonth,_timeScale,_docScannedModelP1,_docScannedModelP2,_docScannedModelP3);
+      //LOGGER.info("ComputingLoadFor: {}, {}, {}, {}, {}, {}, {}, {}", _avgDocCount, _cpuModelA,_cpuModelB,_cpuModelAlpha,_lifeTimeInDay,_timeScale,_docScannedModelP1,_docScannedModelP2,_docScannedModelP3);
 
-      double lifeTimeInScaleSeconds = (_lifeTimeInMonth * 30 * 24 * 3600)/_timeScale;
+      double lifeTimeInScaleSeconds = (_lifeTimeInDay * 24 * 3600)/_timeScale;
 
       double segmentMiddleTime = (segmentMetadata.getStartTime() + segmentMetadata.getEndTime()) / 2;
-      double segmentAgeInScaleSeconds = ( maxTime - segmentMiddleTime)/_timeScale;
+      double segmentAgeInScaleSeconds = (maxTime - segmentMiddleTime)/_timeScale;
 
       if(segmentAgeInScaleSeconds > lifeTimeInScaleSeconds) {
         return 0;
