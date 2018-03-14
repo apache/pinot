@@ -14,8 +14,17 @@
  * @author yyuen
  */
 
+import { reads, equal } from '@ember/object/computed';
+
 import Component from '@ember/component';
-import { get, set, getProperties, setProperties, computed, getWithDefault } from '@ember/object';
+import {
+  get,
+  set,
+  getProperties,
+  setProperties,
+  computed,
+  getWithDefault
+} from '@ember/object';
 import { inject as service } from '@ember/service';
 import { later } from '@ember/runloop';
 import fetch from 'fetch';
@@ -75,7 +84,7 @@ export default Component.extend({
   /**
    * current logged in user
    */
-  user: computed.reads('session.data.authenticated.name'),
+  user: reads('session.data.authenticated.name'),
 
   /**
    * passed primary metric attrs
@@ -91,7 +100,7 @@ export default Component.extend({
    * Determines if the mapping type is metric
    * @returns {Boolean}
    */
-  isMetricEntityType: computed.equal('selectedMappingType', 'metric'),
+  isMetricEntityType: equal('selectedMappingType', 'metric'),
 
   /**
    * Primary metric urn
