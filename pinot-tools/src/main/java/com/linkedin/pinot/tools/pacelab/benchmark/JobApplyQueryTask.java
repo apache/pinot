@@ -18,13 +18,17 @@ package com.linkedin.pinot.tools.pacelab.benchmark;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.tools.pacelab.benchmark.QueryTask;
 import org.apache.commons.lang.math.LongRange;
+import org.xerial.util.ZipfRandom;
 
 import java.util.List;
 import java.util.Properties;
 
+
 public class JobApplyQueryTask extends QueryTask {
     List<GenericRow> _jobTable;
     List<GenericRow> _profileTable;
+    ZipfRandom _zipfRandom;
+    final static int HourSecond = 3600;
 
     public JobApplyQueryTask(Properties config, String[] queries, String dataDir, int testDuration) {
         setConfig(config);
@@ -32,6 +36,15 @@ public class JobApplyQueryTask extends QueryTask {
         setDataDir(dataDir);
         setTestDuration(testDuration);
         EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
+
+        long minApplyStartTime= Long.parseLong(config.getProperty("MinApplyStartTime"));
+        long maxApplyStartTime = Long.parseLong(config.getProperty("MaxApplyStartTime"));
+
+        double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
+        int hourCount = (int) Math.ceil((maxApplyStartTime-minApplyStartTime)/(HourSecond));
+        _zipfRandom = new ZipfRandom(zipfS,hourCount);
+
+
         try
         {
             _jobTable = eventTableGenerator.readJobTable();
@@ -56,9 +69,17 @@ public class JobApplyQueryTask extends QueryTask {
         long minApplyStartTime= Long.parseLong(config.getProperty("MinApplyStartTime"));
         long maxApplyStartTime = Long.parseLong(config.getProperty("MaxApplyStartTime"));
 
-        double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
+        //double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
         //LongRange timeRange = CommonTools.getZipfRandomDailyTimeRange(minApplyStartTime,maxApplyStartTime,zipfS);
-        LongRange timeRange = CommonTools.getZipfRandomHourlyTimeRange(minApplyStartTime,maxApplyStartTime,zipfS);
+        //LongRange timeRange = CommonTools.getZipfRandomHourlyTimeRange(minApplyStartTime,maxApplyStartTime,zipfS);
+
+        int firstHour = _zipfRandom.nextInt();
+        int secondHour = _zipfRandom.nextInt();
+
+        long queriedEndTime = maxApplyStartTime - firstHour*HourSecond;
+        long queriedStartTime = Math.max(minApplyStartTime,queriedEndTime - secondHour*HourSecond);
+
+        LongRange timeRange =  new LongRange(queriedStartTime,queriedEndTime);
 
         int selectLimit = CommonTools.getSelectLimt(config);
         int groupByLimit = Integer.parseInt(config.getProperty("GroupByLimit"));

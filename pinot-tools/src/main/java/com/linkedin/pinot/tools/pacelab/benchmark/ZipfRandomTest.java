@@ -21,17 +21,24 @@ import org.xerial.util.ZipfRandom;
 public class ZipfRandomTest {
     public static void main(String[] args)
     {
-        ZipfRandom zipfRandom = new ZipfRandom(0.8, 100);
+
+
         int[] randomNumFreq = new int[101];
         for(int i=0;i<1000;i++)
         {
-            randomNumFreq[zipfRandom.nextInt()]++;
+            randomNumFreq[zipfWithinFunction()]++;
         }
 
         for(int i=1; i<101; i++)
         {
             System.out.println(randomNumFreq[i]);
         }
+    }
+
+    public static int zipfWithinFunction()
+    {
+        ZipfRandom zipfRandom = new ZipfRandom(0.8, 100);
+        return zipfRandom.nextInt();
 
     }
 }

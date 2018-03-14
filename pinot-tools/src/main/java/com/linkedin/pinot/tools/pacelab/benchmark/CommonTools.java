@@ -25,6 +25,7 @@ public class CommonTools {
     final static int DaySecond = 3600*24;
     final static int HourSecond = 3600;
 
+
     public static LongRange getZipfRandomDailyTimeRange(long minProfileViewStartTime, long maxProfileViewStartTime, double zipfS)
     {
 
