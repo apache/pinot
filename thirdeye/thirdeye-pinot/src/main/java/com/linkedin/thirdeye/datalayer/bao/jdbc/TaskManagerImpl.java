@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.Singleton;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -111,5 +112,26 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
   public List<TaskDTO> findByStatusNotIn(TaskStatus status) {
     Predicate statusPredicate = Predicate.NEQ("status", status.toString());
     return findByPredicate(statusPredicate);
+  }
+
+  @Override
+  public List<TaskDTO> findByStatusWithinDays(TaskStatus status, int days) {
+    DateTime activeDate = new DateTime().minusDays(days);
+    Timestamp activeTimestamp = new Timestamp(activeDate.getMillis());
+    Predicate statusPredicate = Predicate.EQ("status", status.toString());
+    Predicate timestampPredicate = Predicate.GE("createTime", activeTimestamp);
+    return findByPredicate(Predicate.AND(statusPredicate, timestampPredicate));
+  }
+
+  @Override
+  public List<TaskDTO> findTimeoutTasksWithinDays(int days, long maxTaskTime) {
+    DateTime activeDate = new DateTime().minusDays(days);
+    Timestamp activeTimestamp = new Timestamp(activeDate.getMillis());
+    DateTime timeoutDate = new DateTime().minus(maxTaskTime);
+    Timestamp timeoutTimestamp = new Timestamp(timeoutDate.getMillis());
+    Predicate statusPredicate = Predicate.EQ("status", TaskStatus.RUNNING.toString());
+    Predicate daysTimestampPredicate = Predicate.GE("createTime", activeTimestamp);
+    Predicate timeoutTimestampPredicate = Predicate.LT("updateTime", timeoutTimestamp);
+    return findByPredicate(Predicate.AND(statusPredicate, daysTimestampPredicate, timeoutTimestampPredicate));
   }
 }

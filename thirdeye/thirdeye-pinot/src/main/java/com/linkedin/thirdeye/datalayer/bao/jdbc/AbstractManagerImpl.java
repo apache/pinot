@@ -16,6 +16,7 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.convention.MatchingStrategies;
@@ -88,6 +89,19 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
     } else {
       return null;
     }
+  }
+
+  @Override
+  public List<E> findByIds(List<Long> ids) {
+    List<? extends AbstractBean> abstractBeans = genericPojoDao.get(ids, beanClass);
+    List<E> abstractDTOs = new ArrayList<>();
+    if (CollectionUtils.isNotEmpty(abstractBeans)) {
+      for (AbstractBean abstractBean : abstractBeans) {
+        E abstractDTO = (E) MODEL_MAPPER.map(abstractBean, dtoClass);
+        abstractDTOs.add(abstractDTO);
+      }
+    }
+    return abstractDTOs;
   }
 
   @Override

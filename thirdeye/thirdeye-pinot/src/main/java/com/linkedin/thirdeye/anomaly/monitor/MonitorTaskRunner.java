@@ -1,12 +1,5 @@
 package com.linkedin.thirdeye.anomaly.monitor;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
@@ -17,15 +10,26 @@ import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.collections.CollectionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class MonitorTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(MonitorJobRunner.class);
+  private static final long MAX_TASK_TIME = TimeUnit.MINUTES.toMillis(30);
 
   private DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   @Override
-  public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
+  public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) {
 
     MonitorTaskInfo monitorTaskInfo = (MonitorTaskInfo) taskInfo;
     MonitorType monitorType = monitorTaskInfo.getMonitorType();
@@ -42,21 +46,44 @@ public class MonitorTaskRunner implements TaskRunner {
   private void executeMonitorUpdate(MonitorTaskInfo monitorTaskInfo) {
     LOG.info("Execute monitor update {}", monitorTaskInfo);
     try {
+      // Find all jobs in SCHEDULED status
+      int jobRetentionDays = monitorTaskInfo.getDefaultRetentionDays();
+      Map<Long, JobDTO> scheduledJobs = findScheduledJobsWithinDays(jobRetentionDays);
 
-      // All jobs with status SCHEDULED
-      Set<Long> scheduledJobIds = findAllJobsWithStatusScheduled();
+      // Remove SCHEDULED jobs that has WAITING tasks
+      Set<Long> waitingJobs = findWaitingJobsWithinDays(jobRetentionDays);
+      scheduledJobs.keySet().removeAll(waitingJobs);
 
-      // All incomplete jobs with status SCHEDULED
-      Set<Long> incompleteScheduledJobIds = findIncompleteJobsWithStatusScheduled();
-
-      // All finished jobs with status SCHEDULED
-      scheduledJobIds.removeAll(incompleteScheduledJobIds);
-
-      if (!scheduledJobIds.isEmpty()) {
-        DAO_REGISTRY.getJobDAO().updateStatusAndJobEndTimeForJobIds(scheduledJobIds, JobStatus.COMPLETED, System.currentTimeMillis());
-        LOG.info("COMPLETED jobs {}", scheduledJobIds);
+      // Mark SCHEDULED jobs as TIMEOUT if it has any tasks that run for more than MAX_TASK_TIME or are marked as TIMEOUT
+      Set<Long> timeoutJobs = findTimeoutJobsWithinDays(jobRetentionDays);
+      if (!timeoutJobs.isEmpty()) {
+        List<JobDTO> jobsToUpdate = extractJobDTO(scheduledJobs, timeoutJobs);
+        if (!jobsToUpdate.isEmpty()) {
+          DAO_REGISTRY.getJobDAO().updateJobStatusAndEndTime(jobsToUpdate, JobStatus.TIMEOUT, System.currentTimeMillis());
+          scheduledJobs.keySet().removeAll(timeoutJobs);
+          LOG.info("TIMEOUT jobs {}", timeoutJobs);
+        }
       }
 
+      // Mark SCHEDULED jobs as FAILED if it has any tasks are marked as FAILED
+      Set<Long> failedJobs = findFailedJobsWithinDays(jobRetentionDays);
+      if (!failedJobs.isEmpty()) {
+        List<JobDTO> jobsToUpdate = extractJobDTO(scheduledJobs, failedJobs);
+        if (!jobsToUpdate.isEmpty()) {
+          DAO_REGISTRY.getJobDAO().updateJobStatusAndEndTime(jobsToUpdate, JobStatus.FAILED, System.currentTimeMillis());
+          scheduledJobs.keySet().removeAll(failedJobs);
+          LOG.info("FAILED jobs {}", timeoutJobs);
+        }
+      }
+
+      // Mark the remaining jobs as COMPLETED
+      if (!scheduledJobs.isEmpty()) {
+        List<JobDTO> jobsToUpdate = new ArrayList<>(scheduledJobs.values());
+        if (!jobsToUpdate.isEmpty()) {
+          DAO_REGISTRY.getJobDAO().updateJobStatusAndEndTime(jobsToUpdate, JobStatus.COMPLETED, System.currentTimeMillis());
+          LOG.info("COMPLETED jobs {}", scheduledJobs.keySet());
+        }
+      }
     } catch (Exception e) {
       LOG.error("Exception in monitor update task", e);
     }
@@ -122,26 +149,53 @@ public class MonitorTaskRunner implements TaskRunner {
     }
   }
 
-
-  private Set<Long> findAllJobsWithStatusScheduled() {
-    Set<Long> scheduledJobIds = new HashSet<>();
-    try {
-      List<JobDTO> scheduledJobs = DAO_REGISTRY.getJobDAO().findByStatus(JobStatus.SCHEDULED);
-      for (JobDTO job : scheduledJobs) {
-        scheduledJobIds.add(job.getId());
+  private Map<Long, JobDTO> findScheduledJobsWithinDays(int days) {
+    Map<Long, JobDTO> jobs = new HashMap<>();
+    List<JobDTO> jobList = DAO_REGISTRY.getJobDAO().findByStatusWithinDays(JobStatus.SCHEDULED, days);
+    if (CollectionUtils.isNotEmpty(jobList)) {
+      for (JobDTO jobDTO : jobList) {
+        jobs.put(jobDTO.getId(), jobDTO);
       }
-    } catch (Exception e) {
-      LOG.error("Exception in finding jobs with status scheduled", e);
     }
-    return scheduledJobIds;
+    return jobs;
   }
 
-  private Set<Long> findIncompleteJobsWithStatusScheduled() {
-    Set<Long> incompleteScheduledJobIds = new HashSet<>();
-    List<TaskDTO> incompleteTasks = DAO_REGISTRY.getTaskDAO().findByStatusNotIn(TaskStatus.COMPLETED);
-    for (TaskDTO task : incompleteTasks) {
-      incompleteScheduledJobIds.add(task.getJobId());
+  private Set<Long> findWaitingJobsWithinDays(int days) {
+    Set<Long> waitingJobIds = new HashSet<>();
+    List<TaskDTO> waitingTasks = DAO_REGISTRY.getTaskDAO().findByStatusWithinDays(TaskStatus.WAITING, days);
+    for (TaskDTO task : waitingTasks) {
+      waitingJobIds.add(task.getJobId());
     }
-    return incompleteScheduledJobIds;
+    return waitingJobIds;
+  }
+
+  private Set<Long> findTimeoutJobsWithinDays(int days) {
+    Set<Long> timeoutJobs = new HashSet<>();
+    List<TaskDTO> timeoutTasks = DAO_REGISTRY.getTaskDAO().findByStatusWithinDays(TaskStatus.TIMEOUT, days);
+    timeoutTasks.addAll(DAO_REGISTRY.getTaskDAO().findTimeoutTasksWithinDays(days, MAX_TASK_TIME));
+    for (TaskDTO task : timeoutTasks) {
+      timeoutJobs.add(task.getJobId());
+    }
+    return timeoutJobs;
+  }
+
+  private Set<Long> findFailedJobsWithinDays(int days) {
+    Set<Long> failedJobIds = new HashSet<>();
+    List<TaskDTO> failedTasks = DAO_REGISTRY.getTaskDAO().findByStatusWithinDays(TaskStatus.FAILED, days);
+    for (TaskDTO task : failedTasks) {
+      failedJobIds.add(task.getJobId());
+    }
+    return failedJobIds;
+  }
+
+  private List<JobDTO> extractJobDTO(Map<Long, JobDTO> allJobs, Set<Long> jobIdToExtract) {
+    List<JobDTO> jobsToUpdate = new ArrayList<>();
+    for (long jobId : jobIdToExtract) {
+      JobDTO jobDTO = allJobs.get(jobId);
+      if (jobDTO != null) {
+        jobsToUpdate.add(jobDTO);
+      }
+    }
+    return jobsToUpdate;
   }
 }

@@ -29,6 +29,11 @@ public abstract class AbstractMockManager<T extends AbstractDTO> implements Abst
   }
 
   @Override
+  public List<T> findByIds(List<Long> id) {
+    throw new AssertionError("not implemented");
+  }
+
+  @Override
   public int delete(T entity) {
     throw new AssertionError("not implemented");
   }

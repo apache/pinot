@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.datalayer.bao;
 
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import java.util.Arrays;
 import java.util.List;
 
 import org.testng.Assert;
@@ -9,7 +10,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.google.common.collect.Sets;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 
@@ -53,7 +53,8 @@ public class TestAnomalyJobManager {
   public void testUpdateStatusAndJobEndTime() {
     JobStatus status = JobStatus.COMPLETED;
     long jobEndTime = System.currentTimeMillis();
-    jobDAO.updateStatusAndJobEndTimeForJobIds(Sets.newHashSet(anomalyJobId1, anomalyJobId3), status, jobEndTime);
+    List<JobDTO> jobDTOs = jobDAO.findByIds(Arrays.asList(anomalyJobId1, anomalyJobId3));
+    jobDAO.updateJobStatusAndEndTime(jobDTOs, status, jobEndTime);
     JobDTO anomalyJob = jobDAO.findById(anomalyJobId1);
     Assert.assertEquals(anomalyJob.getStatus(), status);
     Assert.assertEquals(anomalyJob.getScheduleEndTime(), jobEndTime);
@@ -85,4 +86,24 @@ public class TestAnomalyJobManager {
     List<JobDTO> anomalyJobs = jobDAO.findByStatus(status);
     Assert.assertEquals(anomalyJobs.size(), 0);
   }
+
+  @Test(dependsOnMethods = {"testDeleteRecordsOlderThanDaysWithStatus"})
+  public void testFindByStatusWithinDays() throws InterruptedException {
+    anomalyJobId1 = jobDAO.save(DaoTestUtils.getTestJobSpec());
+    Assert.assertNotNull(anomalyJobId1);
+    anomalyJobId2 = jobDAO.save(DaoTestUtils.getTestJobSpec());
+    Assert.assertNotNull(anomalyJobId2);
+    anomalyJobId3 = jobDAO.save(DaoTestUtils.getTestJobSpec());
+    Assert.assertNotNull(anomalyJobId3);
+
+    Thread.sleep(100); // To ensure every job has been created more than 1 ms ago
+
+    List<JobDTO> jobsWithZeroDays = jobDAO.findByStatusWithinDays(JobStatus.SCHEDULED, 0);
+    Assert.assertEquals(jobsWithZeroDays.size(), 0);
+
+    List<JobDTO> jobsWithOneDays = jobDAO.findByStatusWithinDays(JobStatus.SCHEDULED, 1);
+    Assert.assertTrue(jobsWithOneDays.size() > 0);
+  }
+
+
 }

@@ -12,6 +12,10 @@ public interface TaskManager extends AbstractManager<TaskDTO>{
 
   List<TaskDTO> findByStatusNotIn(TaskStatus status);
 
+  List<TaskDTO> findByStatusWithinDays(TaskStatus status, int days);
+
+  List<TaskDTO> findTimeoutTasksWithinDays(int days, long maxTaskTime);
+
   List<TaskDTO> findByStatusOrderByCreateTime(TaskStatus status, int fetchSize, boolean asc);
 
   boolean updateStatusAndWorkerId(Long workerId, Long id, Set<TaskStatus> allowedOldStatus,
