@@ -17,12 +17,15 @@ package com.linkedin.pinot.tools.pacelab.benchmark;
 
 import com.linkedin.pinot.core.data.GenericRow;
 import org.apache.commons.lang.math.LongRange;
+import org.xerial.util.ZipfRandom;
 
 import java.util.List;
 import java.util.Properties;
 
 public class ArticleReadQueryTask extends QueryTask {
     List<GenericRow> _articleTable;
+    ZipfRandom _zipfRandom;
+    final static int HourSecond = 3600;
 
     public ArticleReadQueryTask(Properties config, String[] queries, String dataDir, int testDuration) {
         setConfig(config);
@@ -30,6 +33,15 @@ public class ArticleReadQueryTask extends QueryTask {
         setDataDir(dataDir);
         setTestDuration(testDuration);
         EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
+
+        long minReadStartTime = Long.parseLong(config.getProperty("MinReadStartTime"));
+        long maxReadStartTime = Long.parseLong(config.getProperty("MaxReadStartTime"));
+
+        double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
+        int hourCount = (int) Math.ceil((maxReadStartTime-minReadStartTime)/(HourSecond));
+        _zipfRandom = new ZipfRandom(zipfS,hourCount);
+
+
         try
         {
             _articleTable = eventTableGenerator.readArticleTable();
@@ -55,9 +67,21 @@ public class ArticleReadQueryTask extends QueryTask {
         long minReadStartTime = Long.parseLong(config.getProperty("MinReadStartTime"));
         long maxReadStartTime = Long.parseLong(config.getProperty("MaxReadStartTime"));
 
+        /*
         double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
         //LongRange timeRange = CommonTools.getZipfRandomDailyTimeRange(minReadStartTime,maxReadStartTime,zipfS);
         LongRange timeRange = CommonTools.getZipfRandomHourlyTimeRange(minReadStartTime,maxReadStartTime,zipfS);
+        */
+
+        int firstHour = _zipfRandom.nextInt();
+        //int secondHour = _zipfRandom.nextInt();
+
+        //long queriedEndTime = maxApplyStartTime - firstHour*HourSecond;
+        long queriedEndTime = maxReadStartTime;
+        long queriedStartTime = Math.max(minReadStartTime,queriedEndTime - firstHour*HourSecond);
+
+        LongRange timeRange =  new LongRange(queriedStartTime,queriedEndTime);
+
 
         int selectLimit = CommonTools.getSelectLimt(config);
         int groupByLimit = Integer.parseInt(config.getProperty("GroupByLimit"));
