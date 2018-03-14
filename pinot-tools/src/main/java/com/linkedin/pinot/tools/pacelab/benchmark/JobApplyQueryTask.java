@@ -76,7 +76,7 @@ public class JobApplyQueryTask extends QueryTask {
                 runQuery(query);
                 break;
             case 1:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomProfile.getValue("ID"));
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomProfile.getValue("ID"), selectLimit);
                 runQuery(query);
                 break;
 
