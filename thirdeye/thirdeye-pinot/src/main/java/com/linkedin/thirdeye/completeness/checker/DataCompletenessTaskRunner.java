@@ -176,9 +176,11 @@ public class DataCompletenessTaskRunner implements TaskRunner {
 
       LOG.info("Deleting {} entries older than {} i.e. {}",
           findAllByTimeOlderThan.size(), cleanupOlderThanMillis, new DateTime(cleanupOlderThanMillis));
+      List<Long> idsToDelete = new ArrayList<>();
       for (DataCompletenessConfigDTO config : findAllByTimeOlderThan) {
-        DAO_REGISTRY.getDataCompletenessConfigDAO().delete(config);
+        idsToDelete.add(config.getId());
       }
+      DAO_REGISTRY.getDataCompletenessConfigDAO().deleteByIds(idsToDelete);
 
       // find all entries older than LOOKBACK and still dataComplete=false, mark timedOut
       long timeOutOlderThanDuration = TimeUnit.MILLISECONDS.
@@ -189,12 +191,14 @@ public class DataCompletenessTaskRunner implements TaskRunner {
 
       LOG.info("Timing out {} entries older than {} i.e. {} and still not complete",
           findAllByTimeOlderThanAndStatus.size(), timeOutOlderThanMillis, new DateTime(timeOutOlderThanMillis));
+      List<DataCompletenessConfigDTO> configToUpdate = new ArrayList<>();
       for (DataCompletenessConfigDTO config : findAllByTimeOlderThanAndStatus) {
         if (!config.isTimedOut()) {
           config.setTimedOut(true);
-          DAO_REGISTRY.getDataCompletenessConfigDAO().update(config);
+          configToUpdate.add(config);
         }
       }
+      DAO_REGISTRY.getDataCompletenessConfigDAO().update(configToUpdate);
     } catch (Exception e) {
       LOG.error("Exception data completeness cleanup task", e);
     }

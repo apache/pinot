@@ -242,9 +242,9 @@ public class GenericPojoDao {
   }
 
   /**
-   * Update the list of pojos in batch mode. Every batch contains MAX_BATCH_SIZE of entries. By default, this
-   * method update the batch of entries in one transaction. If any entries cause an exception, this method
-   * will update the entries one-by-one (i.e., in separated transactions) and skip the one that causes exceptions.
+   * Update the list of pojos in transaction mode. Every transaction contains MAX_BATCH_SIZE of entries. By default,
+   * this method update the entries in one transaction. If any entries cause an exception, this method will
+   * update the entries one-by-one (i.e., in separated transactions) and skip the one that causes exceptions.
    *
    * @param pojos the pojo to be updated, whose ID cannot be null; otherwise, it will be ignored.
    *

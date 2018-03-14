@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.datalayer.bao;
 
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import java.util.Arrays;
 import java.util.List;
 
 import org.testng.Assert;
@@ -9,7 +10,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.google.common.collect.Sets;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 
@@ -53,7 +53,8 @@ public class TestAnomalyJobManager {
   public void testUpdateStatusAndJobEndTime() {
     JobStatus status = JobStatus.COMPLETED;
     long jobEndTime = System.currentTimeMillis();
-    jobDAO.updateStatusAndJobEndTimeForJobIds(Sets.newHashSet(anomalyJobId1, anomalyJobId3), status, jobEndTime);
+    List<JobDTO> jobDTOs = jobDAO.findByIds(Arrays.asList(anomalyJobId1, anomalyJobId3));
+    jobDAO.updateJobStatusAndEndTime(jobDTOs, status, jobEndTime);
     JobDTO anomalyJob = jobDAO.findById(anomalyJobId1);
     Assert.assertEquals(anomalyJob.getStatus(), status);
     Assert.assertEquals(anomalyJob.getScheduleEndTime(), jobEndTime);

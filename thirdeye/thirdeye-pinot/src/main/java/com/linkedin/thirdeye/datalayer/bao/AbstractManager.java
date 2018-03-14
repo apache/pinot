@@ -17,6 +17,8 @@ public interface AbstractManager<E extends AbstractDTO> {
 
   E findById(Long id);
 
+  List<E> findByIds(List<Long> id);
+
   int delete(E entity);
 
   int deleteById(Long id);

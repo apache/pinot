@@ -10,9 +10,7 @@ public class TaskConstants {
     ALERT2,
     MONITOR,
     DATA_COMPLETENESS,
-    CLASSIFICATION,
-    // TODO: deprecate NULL task type after old task are deleted from current (as of 4/4/2017) database
-    NULL // for backward compatibility
+    CLASSIFICATION
   }
 
   public enum TaskStatus {
