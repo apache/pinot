@@ -74,10 +74,11 @@ public class JobApplyQueryTask extends QueryTask {
         //LongRange timeRange = CommonTools.getZipfRandomHourlyTimeRange(minApplyStartTime,maxApplyStartTime,zipfS);
 
         int firstHour = _zipfRandom.nextInt();
-        int secondHour = _zipfRandom.nextInt();
+        //int secondHour = _zipfRandom.nextInt();
 
-        long queriedEndTime = maxApplyStartTime - firstHour*HourSecond;
-        long queriedStartTime = Math.max(minApplyStartTime,queriedEndTime - secondHour*HourSecond);
+        //long queriedEndTime = maxApplyStartTime - firstHour*HourSecond;
+        long queriedEndTime = maxApplyStartTime;
+        long queriedStartTime = Math.max(minApplyStartTime,queriedEndTime - firstHour*HourSecond);
 
         LongRange timeRange =  new LongRange(queriedStartTime,queriedEndTime);
 
