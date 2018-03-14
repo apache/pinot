@@ -8,8 +8,11 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import org.apache.commons.collections.MapUtils;
@@ -24,6 +27,26 @@ public class ResourceUtils {
 
   private ResourceUtils() {
     // left blank
+  }
+
+
+  /**
+   * Return a list of parameters.
+   * Support both multi-entity notations:
+   * <br/><b>(1) comma-delimited:</b> {@code "urns=thirdeye:metric:123,thirdeye:metric:124"}
+   * <br/><b>(2) multi-param</b> {@code "urns=thirdeye:metric:123&urns=thirdeye:metric:124"}
+   *
+   * @param params input of params
+   * @return list of params
+   */
+
+  public static List<String> parseListParams(List<String> params) {
+    if (params == null){
+      return new ArrayList<>();
+    }
+    if(params.size() != 1)
+      return params;
+    return Arrays.asList(params.get(0).split(","));
   }
 
   /**
@@ -166,4 +189,6 @@ public class ResourceUtils {
       context.put(MetricConfigBean.URL_TEMPLATE_END_TIME, String.valueOf(endTime));
     }
   }
+
+
 }

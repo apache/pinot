@@ -56,11 +56,60 @@ export default Service.extend({
       return;
     }
 
-    // metrics
+    const metricUrnToOffestAndUrn = {};
     missing.forEach(urn => {
-      return this._fetchSlice(urn, requestContext);
+      const metricUrn = toMetricUrn(urn);
+      const arrayName = metricUrnToOffestAndUrn[metricUrn] || [];
+      arrayName.push([toAbsoluteUrn(urn, context.compareMode).split(':')[2].toLowerCase(), urn]);
+      metricUrnToOffestAndUrn[metricUrn] = arrayName;
     });
+
+    Object.keys(metricUrnToOffestAndUrn).forEach(
+        metricUrn => {
+          return this._fetchRowSlice(metricUrn, requestContext, metricUrnToOffestAndUrn);
+        });
   },
+
+  /**
+   * Fetch the metric data for a row of the metric table
+   *
+   * @param {String} metricUrn Metric urn
+   * @param {Object} context Context
+   * @param {Object} metricUrnToOffestAndUrn Hash map from metric urn to offset and urn
+   * @returns {undefined}
+   */
+  async _fetchRowSlice(metricUrn, context, metricUrnToOffestAndUrn) {
+    const [start, end] = context.anomalyRange;
+    const offsets = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[0]);
+    const urns = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[1]);
+    const timezone = moment.tz.guess();
+    const url = `/rootcause/metric/aggregate/batch?urn=${metricUrn}&start=${start}&end=${end}&offsets=${offsets}&timezone=${timezone}`;
+
+    try{
+      const payload = await fetch(url);
+      let res = await checkStatus(payload);
+      res = await this._extractAggregatesBatch(res, urns);
+      return await this._complete(context, res);
+    } catch (error){
+      this._handleErrorBatch()
+    }
+  },
+
+  _handleErrorBatch(urns, error){
+    urns.forEach(function (urn) {
+      this._handleError(urn, error)
+    })
+  },
+
+  _extractAggregatesBatch(incoming, urns) {
+    const aggregates = {};
+    for(var i = 0; i < urns.length; i++){
+      aggregates[urns[i]] = incoming[i];
+    }
+
+    return aggregates;
+  },
+
 
   _complete(requestContext, incoming) {
     const { context, pending, aggregates } = this.getProperties('context', 'pending', 'aggregates');
@@ -88,7 +137,6 @@ export default Service.extend({
     const range = context.anomalyRange;
     const offset = toAbsoluteUrn(urn, context.compareMode).split(':')[2].toLowerCase();
     const timezone = moment.tz.guess();
-
     const url = `/rootcause/metric/aggregate?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&timezone=${timezone}`;
     return fetch(url)
       .then(checkStatus)
