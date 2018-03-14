@@ -78,7 +78,7 @@ public class FileUploadDownloadClient implements Closeable {
     }
   }
 
-  public static final int DEFAULT_SOCKET_TIMEOUT_MS = 3600 * 1000; // 1 hour
+  public static final int DEFAULT_SOCKET_TIMEOUT_MS = 600 * 1000; // 10 minutes
 
   private static final String HTTP = "http";
   private static final String HTTPS = "https";
