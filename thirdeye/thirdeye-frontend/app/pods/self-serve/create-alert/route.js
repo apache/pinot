@@ -9,7 +9,10 @@ import _ from 'lodash';
 import moment from 'moment';
 import Route from '@ember/routing/route';
 import { task, timeout } from 'ember-concurrency';
-import { selfServeApiCommon, selfServeApiOnboard } from 'thirdeye-frontend/utils/api/self-serve';
+import {
+  selfServeApiCommon,
+  selfServeApiOnboard
+} from 'thirdeye-frontend/utils/api/self-serve';
 import { postProps, checkStatus } from 'thirdeye-frontend/utils/utils';
 
 let onboardStartTime = {};
