@@ -61,13 +61,15 @@ public class CommonTools {
     public static LongRange getZipfRandomHourlyTimeRange(long minProfileViewStartTime, long maxProfileViewStartTime, double zipfS)
     {
 
+        Random rand = new Random(System.currentTimeMillis());
+
         int hourCount = (int) Math.ceil((maxProfileViewStartTime-minProfileViewStartTime)/(HourSecond));
         ZipfRandom zipfRandom = new ZipfRandom(zipfS,hourCount);
 
-        int firstHour = zipfRandom.nextInt();
-        int secondHour = zipfRandom.nextInt();
 
         /*
+        int firstHour = zipfRandom.nextInt();
+        int secondHour = zipfRandom.nextInt();
         while(secondHour == firstHour)
         {
             secondHour = zipfRandom.nextInt();
@@ -90,11 +92,24 @@ public class CommonTools {
         return new LongRange(queriedStartTime,queriedEndTime);
         */
 
+        /*
+        int firstHour = zipfRandom.nextInt();
+        int secondHour = zipfRandom.nextInt();
+        //Did not work properly
         long queriedStartTime;
         long queriedEndTime;
 
         queriedEndTime = maxProfileViewStartTime - firstHour*HourSecond;
         queriedStartTime = queriedEndTime - secondHour*HourSecond;
+        */
+
+        int firstHour = zipfRandom.nextInt();
+        int meanHourBack = 7*24;
+        int stdHourBack = 83 * 24;
+        double gussianNumber = rand.nextGaussian();
+        int hoursBack = Math.abs((int) (gussianNumber * stdHourBack + meanHourBack));
+        long queriedEndTime = maxProfileViewStartTime - firstHour*HourSecond;
+        long queriedStartTime = queriedEndTime - hoursBack*HourSecond;;
 
         return new LongRange(queriedStartTime,queriedEndTime);
     }
