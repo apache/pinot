@@ -78,17 +78,27 @@ export default Service.extend({
    * @param {Object} metricUrnToOffestAndUrn Hash map from metric urn to offset and urn
    * @returns {undefined}
    */
-  _fetchRowSlice(metricUrn, context, metricUrnToOffestAndUrn) {
+  async _fetchRowSlice(metricUrn, context, metricUrnToOffestAndUrn) {
     const [start, end] = context.anomalyRange;
     const offsets = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[0]);
     const urns = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[1]);
     const timezone = moment.tz.guess();
     const url = `/rootcause/metric/aggregate/batch?urn=${metricUrn}&start=${start}&end=${end}&offsets=${offsets}&timezone=${timezone}`;
-    return fetch(url)
-      .then(checkStatus)
-      .then(res => this._extractAggregatesBatch(res, urns))
-      .then(res => this._complete(context, res))
-      .catch(error => this._handleError(urn, error));
+
+    try{
+      const payload = await fetch(url);
+      let res = await checkStatus(payload);
+      res = await this._extractAggregatesBatch(res, urns);
+      return await this._complete(context, res);
+    } catch (error){
+      this._handleErrorBatch()
+    }
+  },
+
+  _handleErrorBatch(urns, error){
+    urns.forEach(function (urn) {
+      this._handleError(urn, error)
+    })
   },
 
   _extractAggregatesBatch(incoming, urns) {
