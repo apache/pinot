@@ -129,9 +129,9 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
     Timestamp activeTimestamp = new Timestamp(activeDate.getMillis());
     DateTime timeoutDate = new DateTime().minus(maxTaskTime);
     Timestamp timeoutTimestamp = new Timestamp(timeoutDate.getMillis());
-    Predicate statusPredicate = Predicate.EQ("status", TaskStatus.RUNNING);
+    Predicate statusPredicate = Predicate.EQ("status", TaskStatus.RUNNING.toString());
     Predicate daysTimestampPredicate = Predicate.GE("createTime", activeTimestamp);
-    Predicate timeoutTimestampPredicate = Predicate.LT("createTime", timeoutTimestamp);
+    Predicate timeoutTimestampPredicate = Predicate.LT("updateTime", timeoutTimestamp);
     return findByPredicate(Predicate.AND(statusPredicate, daysTimestampPredicate, timeoutTimestampPredicate));
   }
 }

@@ -86,4 +86,24 @@ public class TestAnomalyJobManager {
     List<JobDTO> anomalyJobs = jobDAO.findByStatus(status);
     Assert.assertEquals(anomalyJobs.size(), 0);
   }
+
+  @Test(dependsOnMethods = {"testDeleteRecordsOlderThanDaysWithStatus"})
+  public void testFindByStatusWithinDays() throws InterruptedException {
+    anomalyJobId1 = jobDAO.save(DaoTestUtils.getTestJobSpec());
+    Assert.assertNotNull(anomalyJobId1);
+    anomalyJobId2 = jobDAO.save(DaoTestUtils.getTestJobSpec());
+    Assert.assertNotNull(anomalyJobId2);
+    anomalyJobId3 = jobDAO.save(DaoTestUtils.getTestJobSpec());
+    Assert.assertNotNull(anomalyJobId3);
+
+    Thread.sleep(100); // To ensure every job has been created more than 1 ms ago
+
+    List<JobDTO> jobsWithZeroDays = jobDAO.findByStatusWithinDays(JobStatus.SCHEDULED, 0);
+    Assert.assertEquals(jobsWithZeroDays.size(), 0);
+
+    List<JobDTO> jobsWithOneDays = jobDAO.findByStatusWithinDays(JobStatus.SCHEDULED, 1);
+    Assert.assertTrue(jobsWithOneDays.size() > 0);
+  }
+
+
 }

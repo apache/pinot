@@ -60,6 +60,7 @@ public class MonitorTaskRunner implements TaskRunner {
         List<JobDTO> jobsToUpdate = extractJobDTO(scheduledJobs, timeoutJobs);
         if (!jobsToUpdate.isEmpty()) {
           DAO_REGISTRY.getJobDAO().updateJobStatusAndEndTime(jobsToUpdate, JobStatus.TIMEOUT, System.currentTimeMillis());
+          scheduledJobs.keySet().removeAll(timeoutJobs);
           LOG.info("TIMEOUT jobs {}", timeoutJobs);
         }
       }
@@ -70,6 +71,7 @@ public class MonitorTaskRunner implements TaskRunner {
         List<JobDTO> jobsToUpdate = extractJobDTO(scheduledJobs, failedJobs);
         if (!jobsToUpdate.isEmpty()) {
           DAO_REGISTRY.getJobDAO().updateJobStatusAndEndTime(jobsToUpdate, JobStatus.FAILED, System.currentTimeMillis());
+          scheduledJobs.keySet().removeAll(failedJobs);
           LOG.info("FAILED jobs {}", timeoutJobs);
         }
       }
@@ -192,7 +194,6 @@ public class MonitorTaskRunner implements TaskRunner {
       JobDTO jobDTO = allJobs.get(jobId);
       if (jobDTO != null) {
         jobsToUpdate.add(jobDTO);
-        allJobs.remove(jobId);
       }
     }
     return jobsToUpdate;
