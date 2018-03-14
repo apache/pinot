@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.predicate;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.common.predicate.InPredicate;
 import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.operator.filter.predicate.InPredicateEvaluatorFactory;
@@ -30,8 +29,9 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.lang.RandomStringUtils;
@@ -58,22 +58,21 @@ public class NoDictionaryInPredicateEvaluatorTest {
 
   @Test
   public void testIntPredicateEvaluators() {
-    String[] stringValues = new String[NUM_PREDICATE_VALUES];
+    List<String> stringValues = new ArrayList<>(NUM_PREDICATE_VALUES);
     IntSet valueSet = new IntOpenHashSet();
 
     for (int i = 0; i < 100; i++) {
       int value = _random.nextInt();
-      stringValues[i] = Integer.toString(value);
+      stringValues.add(Integer.toString(value));
       valueSet.add(value);
     }
 
     InPredicate inPredicate =
-        new InPredicate(COLUMN_NAME, Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
+        new InPredicate(COLUMN_NAME, stringValues);
     PredicateEvaluator inPredicateEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.INT);
 
-    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME,
-        Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
+    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME, stringValues);
     PredicateEvaluator notInPredicateEvaluator =
         NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.INT);
 
@@ -91,29 +90,28 @@ public class NoDictionaryInPredicateEvaluatorTest {
     int[] multiValues = new int[NUM_MULTI_VALUES];
     PredicateEvaluatorTestUtils.fillRandom(multiValues);
     multiValues[_random.nextInt(NUM_MULTI_VALUES)] =
-        Integer.parseInt(stringValues[_random.nextInt(NUM_PREDICATE_VALUES)]);
+        Integer.parseInt(stringValues.get(_random.nextInt(NUM_PREDICATE_VALUES)));
     Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
     Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
   }
 
   @Test
   public void testLongPredicateEvaluators() {
-    String[] stringValues = new String[NUM_PREDICATE_VALUES];
+    List<String> stringValues = new ArrayList<>(NUM_PREDICATE_VALUES);
     LongSet valueSet = new LongOpenHashSet();
 
     for (int i = 0; i < 100; i++) {
       long value = _random.nextLong();
-      stringValues[i] = Long.toString(value);
+      stringValues.add(Long.toString(value));
       valueSet.add(value);
     }
 
     InPredicate inPredicate =
-        new InPredicate(COLUMN_NAME, Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
+        new InPredicate(COLUMN_NAME, stringValues);
     PredicateEvaluator inPredicateEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.LONG);
 
-    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME,
-        Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
+    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME, stringValues);
     PredicateEvaluator notInPredicateEvaluator =
         NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.LONG);
 
@@ -131,7 +129,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
     long[] multiValues = new long[NUM_MULTI_VALUES];
     PredicateEvaluatorTestUtils.fillRandom(multiValues);
     multiValues[_random.nextInt(NUM_MULTI_VALUES)] =
-        Long.parseLong(stringValues[_random.nextInt(NUM_PREDICATE_VALUES)]);
+        Long.parseLong(stringValues.get(_random.nextInt(NUM_PREDICATE_VALUES)));
 
     Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
     Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
@@ -139,22 +137,21 @@ public class NoDictionaryInPredicateEvaluatorTest {
 
   @Test
   public void testFloatPredicateEvaluators() {
-    String[] stringValues = new String[NUM_PREDICATE_VALUES];
+    List<String> stringValues = new ArrayList<>(NUM_PREDICATE_VALUES);
     FloatSet valueSet = new FloatOpenHashSet();
 
     for (int i = 0; i < 100; i++) {
       float value = _random.nextFloat();
-      stringValues[i] = Float.toString(value);
+      stringValues.add(Float.toString(value));
       valueSet.add(value);
     }
 
     InPredicate inPredicate =
-        new InPredicate(COLUMN_NAME, Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
+        new InPredicate(COLUMN_NAME, stringValues);
     PredicateEvaluator inPredicateEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.FLOAT);
 
-    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME,
-        Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
+    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME, stringValues);
     PredicateEvaluator notInPredicateEvaluator =
         NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.FLOAT);
 
@@ -172,7 +169,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
     float[] multiValues = new float[NUM_MULTI_VALUES];
     PredicateEvaluatorTestUtils.fillRandom(multiValues);
     multiValues[_random.nextInt(NUM_MULTI_VALUES)] =
-        Float.parseFloat(stringValues[_random.nextInt(NUM_PREDICATE_VALUES)]);
+        Float.parseFloat(stringValues.get(_random.nextInt(NUM_PREDICATE_VALUES)));
 
     Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
     Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
@@ -180,22 +177,21 @@ public class NoDictionaryInPredicateEvaluatorTest {
 
   @Test
   public void testDoublePredicateEvaluators() {
-    String[] stringValues = new String[NUM_PREDICATE_VALUES];
+    List<String> stringValues = new ArrayList<>(NUM_PREDICATE_VALUES);
     DoubleSet valueSet = new DoubleOpenHashSet();
 
     for (int i = 0; i < 100; i++) {
       double value = _random.nextDouble();
-      stringValues[i] = Double.toString(value);
+      stringValues.add(Double.toString(value));
       valueSet.add(value);
     }
 
     InPredicate inPredicate =
-        new InPredicate(COLUMN_NAME, Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
+        new InPredicate(COLUMN_NAME, stringValues);
     PredicateEvaluator inPredicateEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.DOUBLE);
 
-    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME,
-        Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
+    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME, stringValues);
     PredicateEvaluator notInPredicateEvaluator =
         NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.DOUBLE);
 
@@ -213,7 +209,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
     double[] multiValues = new double[NUM_MULTI_VALUES];
     PredicateEvaluatorTestUtils.fillRandom(multiValues);
     multiValues[_random.nextInt(NUM_MULTI_VALUES)] =
-        Double.parseDouble(stringValues[_random.nextInt(NUM_PREDICATE_VALUES)]);
+        Double.parseDouble(stringValues.get(_random.nextInt(NUM_PREDICATE_VALUES)));
 
     Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
     Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
@@ -221,21 +217,21 @@ public class NoDictionaryInPredicateEvaluatorTest {
 
   @Test
   public void testStringPredicateEvaluators() {
-    String[] stringValues = new String[NUM_PREDICATE_VALUES];
+    List<String> stringValues = new ArrayList<>(NUM_PREDICATE_VALUES);
     Set<String> valueSet = new HashSet<>();
 
     for (int i = 0; i < 100; i++) {
-      stringValues[i] = RandomStringUtils.random(MAX_STRING_LENGTH).replace("\t", "");
-      valueSet.add(stringValues[i]);
+      String value = RandomStringUtils.random(MAX_STRING_LENGTH);
+      stringValues.add(value);
+      valueSet.add(value);
     }
 
     InPredicate inPredicate =
-        new InPredicate(COLUMN_NAME, Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
+        new InPredicate(COLUMN_NAME, stringValues);
     PredicateEvaluator inPredicateEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.STRING);
 
-    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME,
-        Collections.singletonList(StringUtil.join(InPredicate.DELIMITER, stringValues)));
+    NotInPredicate notInPredicate = new NotInPredicate(COLUMN_NAME, stringValues);
     PredicateEvaluator notInPredicateEvaluator =
         NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator(notInPredicate, FieldSpec.DataType.STRING);
 
@@ -252,7 +248,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
 
     String[] multiValues = new String[NUM_MULTI_VALUES];
     PredicateEvaluatorTestUtils.fillRandom(multiValues, MAX_STRING_LENGTH);
-    multiValues[_random.nextInt(NUM_MULTI_VALUES)] = stringValues[_random.nextInt(NUM_PREDICATE_VALUES)];
+    multiValues[_random.nextInt(NUM_MULTI_VALUES)] = stringValues.get(_random.nextInt(NUM_PREDICATE_VALUES));
 
     Assert.assertTrue(inPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));
     Assert.assertFalse(notInPredicateEvaluator.applyMV(multiValues, NUM_MULTI_VALUES));

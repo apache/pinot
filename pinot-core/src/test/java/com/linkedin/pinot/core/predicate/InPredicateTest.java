@@ -58,8 +58,8 @@ public class InPredicateTest {
     String[] expectedValues = new String[]{"abc", "xyz", "123"};
     Arrays.sort(expectedValues); /* InPredicateAstNode sorts the predicate values. */
 
-    /* Test split case */
-    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query, true /*splitInClause*/);
+    /* Ensure that predicates are returned as separate strings, and not one concatenation of all strings. */
+    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
     FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
     BaseInPredicate predicate = (BaseInPredicate) Predicate.newPredicate(filterQueryTree);
     String[] actualValues = predicate.getValues();
@@ -67,18 +67,6 @@ public class InPredicateTest {
 
     Assert.assertEquals(actualValues, expectedValues);
     Assert.assertTrue(EqualityUtils.isEqualIgnoreOrder(filterQueryTree.getValue(), Arrays.asList(expectedValues)));
-
-    /* Test join case */
-    brokerRequest = compiler.compileToBrokerRequest(query, false /*splitInClause*/);
-    filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-    predicate = (BaseInPredicate) Predicate.newPredicate(filterQueryTree);
-    actualValues = predicate.getValues();
-    Arrays.sort(actualValues);
-
-    Assert.assertEquals(actualValues, expectedValues);
-    actualValues = filterQueryTree.getValue().get(0).split(InPredicate.DELIMITER);
-    Arrays.sort(actualValues);
-    Assert.assertEquals(actualValues, expectedValues);
   }
 }
 
