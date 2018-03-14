@@ -59,9 +59,9 @@ export default Service.extend({
     const metricUrnToOffestAndUrn = {};
     missing.forEach(urn => {
       const metricUrn = toMetricUrn(urn);
-      const arrayName = metricUrnToOffestAndUrn[metricUrn] || [];
-      arrayName.push([toAbsoluteUrn(urn, context.compareMode).split(':')[2].toLowerCase(), urn]);
-      metricUrnToOffestAndUrn[metricUrn] = arrayName;
+      const offsetsAndUrns = metricUrnToOffestAndUrn[metricUrn] || [];
+      offsetsAndUrns.push([toAbsoluteUrn(urn, requestContext.compareMode).split(':')[2].toLowerCase(), urn]);
+      metricUrnToOffestAndUrn[metricUrn] = offsetsAndUrns;
     });
 
     Object.keys(metricUrnToOffestAndUrn).forEach(
