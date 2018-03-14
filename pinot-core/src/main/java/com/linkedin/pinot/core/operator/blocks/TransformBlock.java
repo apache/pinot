@@ -15,25 +15,28 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import java.util.Map;
+import javax.annotation.Nonnull;
 
 
 /**
- * Transform Block holds blocks of transformed columns. In absence of transforms,
- * it servers as a pass-through to projection block.
+ * Transform Block holds blocks of transformed columns.
+ * <p>In absence of transforms, it servers as a pass-through to projection block.
  */
 public class TransformBlock implements Block {
-  private final Map<String, BlockValSet> _transformBlockValSetMap;
-  private ProjectionBlock _projectionBlock;
+  private final ProjectionBlock _projectionBlock;
+  private final Map<TransformExpressionTree, BlockValSet> _blockValSetMap;
 
-  public TransformBlock(ProjectionBlock projectionBlock, Map<String, BlockValSet> transformBlockValSetMap) {
+  public TransformBlock(@Nonnull ProjectionBlock projectionBlock,
+      @Nonnull Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
     _projectionBlock = projectionBlock;
-    _transformBlockValSetMap = transformBlockValSetMap;
+    _blockValSetMap = blockValSetMap;
   }
 
   @Override
@@ -53,22 +56,23 @@ public class TransformBlock implements Block {
 
   @Override
   public BlockMetadata getMetadata() {
-    return _projectionBlock.getMetadata();
+    throw new UnsupportedOperationException();
   }
 
   public BlockValSet getBlockValueSet(String column) {
-    BlockValSet transformBlockValSet = (_transformBlockValSetMap != null) ? _transformBlockValSetMap.get(column) : null;
-    return (transformBlockValSet != null) ? transformBlockValSet : _projectionBlock.getBlockValueSet(column);
+    return _blockValSetMap.get(TransformExpressionTree.compileToExpressionTree(column));
   }
 
+  // TODO: metadata should be fetched from Operator instead of block
+  // TODO: Need to support dictionary for transformed block
   public BlockMetadata getBlockMetadata(String column) {
-    BlockValSet transformBlockValSet = (_transformBlockValSetMap != null) ? _transformBlockValSetMap.get(column) : null;
-    return (transformBlockValSet != null) ? new BlockMetadataImpl(transformBlockValSet.getNumDocs(), true, 0,
-        transformBlockValSet.getValueType(), null) : _projectionBlock.getMetadata(column);
-  }
-
-  public DocIdSetBlock getDocIdSetBlock() {
-    return _projectionBlock.getDocIdSetBlock();
+    Block block = _projectionBlock.getBlock(column);
+    if (block != null) {
+      return block.getMetadata();
+    } else {
+      BlockValSet blockValueSet = getBlockValueSet(column);
+      return new BlockMetadataImpl(blockValueSet.getNumDocs(), true, 0, blockValueSet.getValueType(), null);
+    }
   }
 
   public int getNumDocs() {

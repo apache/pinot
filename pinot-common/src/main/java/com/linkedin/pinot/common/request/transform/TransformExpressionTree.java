@@ -15,57 +15,59 @@
  */
 package com.linkedin.pinot.common.request.transform;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.pql.parsers.pql2.ast.AstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.LiteralAstNode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import javax.annotation.Nonnull;
 
 
 /**
  * Class for representing expression trees for transforms.
- * <p> - A TransformExpressionTree node has either transform function or a column name, or a literal.</p>
- * <p> - Leaf nodes either have column name or literal, whereas non-leaf nodes have transform function.</p>
- * <p> - Transform function in non-leaf nodes is applied to its children nodes. </p>
+ * <ul>
+ *   <li>A TransformExpressionTree node has either transform function or a column name, or a literal.</li>
+ *   <li>Leaf nodes either have column name or literal, whereas non-leaf nodes have transform function.</li>
+ *   <li>Transform function in non-leaf nodes is applied to its children nodes.</li>
+ * </ul>
  */
 public class TransformExpressionTree {
+  private static final Pql2Compiler COMPILER = new Pql2Compiler();
+
+  public static TransformExpressionTree compileToExpressionTree(String expression) {
+    return COMPILER.compileToExpressionTree(expression);
+  }
 
   // Enum for expression represented by the tree.
   public enum ExpressionType {
-    FUNCTION,
-    IDENTIFIER,
-    LITERAL
+    FUNCTION, IDENTIFIER, LITERAL
   }
 
-  private final String _expression;
-  private final String _transformName;
   private final ExpressionType _expressionType;
-  private List<TransformExpressionTree> _children;
+  private final String _value;
+  private final List<TransformExpressionTree> _children;
 
-  /**
-   * Constructor for the class
-   * @param root Root AstNode for the tree
-   */
   public TransformExpressionTree(AstNode root) {
-    _children = null;
-
     if (root instanceof FunctionCallAstNode) {
-      FunctionCallAstNode functionCallAstNode = (FunctionCallAstNode) root;
-      _expression = functionCallAstNode.getExpression();
       _expressionType = ExpressionType.FUNCTION;
-      _transformName = functionCallAstNode.getName();
-
+      _value = ((FunctionCallAstNode) root).getName();
+      _children = new ArrayList<>();
+      for (AstNode child : root.getChildren()) {
+        _children.add(new TransformExpressionTree(child));
+      }
     } else if (root instanceof IdentifierAstNode) {
-      _expression = ((IdentifierAstNode) root).getName();
       _expressionType = ExpressionType.IDENTIFIER;
-      _transformName = null;
-
+      _value = ((IdentifierAstNode) root).getName();
+      _children = null;
     } else if (root instanceof LiteralAstNode) {
       _expressionType = ExpressionType.LITERAL;
-      _expression = ((LiteralAstNode) root).getValueAsString();
-      _transformName = null;
-
+      _value = ((LiteralAstNode) root).getValueAsString();
+      _children = null;
     } else {
       throw new IllegalArgumentException(
           "Illegal AstNode type for TransformExpressionTree: " + root.getClass().getName());
@@ -73,66 +75,35 @@ public class TransformExpressionTree {
   }
 
   /**
-   * Given the root node for AST tree, builds the expression tree, and returns
-   * the root node of the expression tree.
-   *
-   * @param rootNode Root Node of AST tree
-   * @return Root node of the Expression tree
-   */
-  public static TransformExpressionTree buildTree(AstNode rootNode) {
-    TransformExpressionTree expressionTree;
-
-    if (!rootNode.hasChildren()) {
-      return new TransformExpressionTree(rootNode);
-    } else {
-      expressionTree = new TransformExpressionTree(rootNode);
-      expressionTree._children = new ArrayList<>();
-
-      for (AstNode child : rootNode.getChildren()) {
-        expressionTree._children.add(buildTree(child));
-      }
-    }
-    return expressionTree;
-  }
-
-  /**
-   * Getter for the expression string.
-   *
-   * @return Expression string name
-   */
-  @Override
-  public String toString() {
-    return _expression;
-  }
-
-  /**
-   * Getter for transform function name.
-   * @return transform function name
-   */
-  public String getTransformName() {
-    return _transformName;
-  }
-
-
-  /**
-   * Getter for children of current node.
-   * @return children of current node
-   */
-  public List<TransformExpressionTree> getChildren() {
-    return _children;
-  }
-
-  /**
-   * Returns the Expression type, which can be one of the following:
+   * Returns the expression type of the node, which can be one of the following:
    * <ul>
    *   <li> {@link ExpressionType#FUNCTION}</li>
    *   <li> {@link ExpressionType#IDENTIFIER}</li>
    *   <li> {@link ExpressionType#LITERAL}</li>
    * </ul>
-   * @return Expression type.
+   *
+   * @return Expression type
    */
   public ExpressionType getExpressionType() {
     return _expressionType;
+  }
+
+  /**
+   * Returns the value of the node.
+   *
+   * @return Function name for FUNCTION; column name for IDENTIFIER; string value for LITERAL
+   */
+  public String getValue() {
+    return _value;
+  }
+
+  /**
+   * Returns the children of the node.
+   *
+   * @return List of children
+   */
+  public List<TransformExpressionTree> getChildren() {
+    return _children;
   }
 
   /**
@@ -141,26 +112,63 @@ public class TransformExpressionTree {
    * @return True if tress represents column, false otherwise.
    */
   public boolean isColumn() {
-    return (_expressionType == ExpressionType.IDENTIFIER);
+    return _expressionType == ExpressionType.IDENTIFIER;
   }
 
   /**
-   * Returns a list of columns from the leaf nodes of the tree.
-   * Caller passes a list where columns are stored and returned.
+   * Add all columns to the passed in column set.
    *
    * @param columns Output columns
    */
-  public void getColumns(List<String> columns) {
-
-    if (_children == null || _children.isEmpty()) {
-      if (_expressionType == ExpressionType.IDENTIFIER) {
-        columns.add(_expression);
+  public void getColumns(@Nonnull Set<String> columns) {
+    if (_expressionType == ExpressionType.IDENTIFIER) {
+      columns.add(_value);
+    } else if (_children != null) {
+      for (TransformExpressionTree child : _children) {
+        child.getColumns(columns);
       }
-      return;
     }
+  }
 
-    for (TransformExpressionTree child : _children) {
-      child.getColumns(columns);
+  @Override
+  public int hashCode() {
+    return EqualityUtils.hashCodeOf(EqualityUtils.hashCodeOf(_expressionType.hashCode(), _value), _children);
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (obj instanceof TransformExpressionTree) {
+      TransformExpressionTree that = (TransformExpressionTree) obj;
+      return _expressionType == that._expressionType && _value.equals(that._value) && Objects.equals(_children,
+          that._children);
+    }
+    return false;
+  }
+
+  @Override
+  public String toString() {
+    switch (_expressionType) {
+      case FUNCTION:
+        StringBuilder builder = new StringBuilder(_value).append('(');
+        int numChildren = _children.size();
+        for (int i = 0; i < numChildren; i++) {
+          builder.append(_children.get(i).toString());
+          if (i != numChildren - 1) {
+            builder.append(',');
+          } else {
+            builder.append(')');
+          }
+        }
+        return builder.toString();
+      case IDENTIFIER:
+        return _value;
+      case LITERAL:
+        return "\'" + _value + "\'";
+      default:
+        throw new IllegalStateException();
     }
   }
 }

@@ -16,10 +16,6 @@
 package com.linkedin.pinot.query.transform;
 
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
-import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
-import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
-import com.linkedin.pinot.pql.parsers.pql2.ast.AstNode;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -29,37 +25,73 @@ import org.testng.annotations.Test;
  * Unit test for {@link TransformExpressionTree} class.
  */
 public class TransformExpressionTreeTest {
+  private static final String STANDARD_EXPRESSION = "foo(bar('a',foobar(b,'c','123')),d)";
+  private static final TransformExpressionTree STANDARD_EXPRESSION_TREE =
+      TransformExpressionTree.compileToExpressionTree(STANDARD_EXPRESSION);
 
-  /**
-   * This test validates an expression tree built by {@link TransformExpressionTree#buildTree(AstNode)}
-   */
   @Test
-  public void test() {
-    TransformFunctionFactory.init(
-        new String[]{TransformFunctionFactoryTest.foo.class.getName(), TransformFunctionFactoryTest.bar.class.getName()});
-    Pql2Compiler compiler = new Pql2Compiler();
+  public void testConstructor() {
+    Assert.assertEquals(STANDARD_EXPRESSION_TREE.toString(), STANDARD_EXPRESSION);
 
-    String expression = "foo(bar('a', foo(b, 'c', d)), e)";
-    TransformExpressionTree expressionTree = compiler.compileToExpressionTree(expression);
+    Assert.assertEquals(STANDARD_EXPRESSION_TREE.getExpressionType(), TransformExpressionTree.ExpressionType.FUNCTION);
+    Assert.assertEquals(STANDARD_EXPRESSION_TREE.getValue(), "foo");
 
-    TransformFunction rootTransform = TransformFunctionFactory.get(expressionTree.getTransformName());
-    Assert.assertEquals(rootTransform.getName(), "foo");
+    List<TransformExpressionTree> fooChildren = STANDARD_EXPRESSION_TREE.getChildren();
+    Assert.assertEquals(fooChildren.size(), 2);
+    TransformExpressionTree fooChild0 = fooChildren.get(0);
+    Assert.assertEquals(fooChild0.getExpressionType(), TransformExpressionTree.ExpressionType.FUNCTION);
+    Assert.assertEquals(fooChild0.getValue(), "bar");
+    TransformExpressionTree fooChild1 = fooChildren.get(1);
+    Assert.assertEquals(fooChild1.getExpressionType(), TransformExpressionTree.ExpressionType.IDENTIFIER);
+    Assert.assertEquals(fooChild1.getValue(), "d");
+    Assert.assertNull(fooChild1.getChildren());
 
-    List<TransformExpressionTree> firstChildren = expressionTree.getChildren();
-    Assert.assertEquals(firstChildren.size(), 2);
+    List<TransformExpressionTree> barChildren = fooChild0.getChildren();
+    Assert.assertEquals(barChildren.size(), 2);
+    TransformExpressionTree barChild0 = barChildren.get(0);
+    Assert.assertEquals(barChild0.getExpressionType(), TransformExpressionTree.ExpressionType.LITERAL);
+    Assert.assertEquals(barChild0.getValue(), "a");
+    Assert.assertNull(barChild0.getChildren());
+    TransformExpressionTree barChild1 = barChildren.get(1);
+    Assert.assertEquals(barChild1.getExpressionType(), TransformExpressionTree.ExpressionType.FUNCTION);
+    Assert.assertEquals(barChild1.getValue(), "foobar");
 
-    TransformExpressionTree firstChild = firstChildren.get(0);
-    Assert.assertEquals(firstChild.getTransformName(), "bar");
-    Assert.assertEquals(firstChildren.get(1).toString(), "e");
+    List<TransformExpressionTree> foobarChildren = barChild1.getChildren();
+    Assert.assertEquals(foobarChildren.size(), 3);
+    TransformExpressionTree foobarChild0 = foobarChildren.get(0);
+    Assert.assertEquals(foobarChild0.getExpressionType(), TransformExpressionTree.ExpressionType.IDENTIFIER);
+    Assert.assertEquals(foobarChild0.getValue(), "b");
+    Assert.assertNull(foobarChild0.getChildren());
+    TransformExpressionTree foobarChild1 = foobarChildren.get(1);
+    Assert.assertEquals(foobarChild1.getExpressionType(), TransformExpressionTree.ExpressionType.LITERAL);
+    Assert.assertEquals(foobarChild1.getValue(), "c");
+    Assert.assertNull(foobarChild1.getChildren());
+    TransformExpressionTree foobarChild2 = foobarChildren.get(2);
+    Assert.assertEquals(foobarChild2.getExpressionType(), TransformExpressionTree.ExpressionType.LITERAL);
+    Assert.assertEquals(foobarChild2.getValue(), "123");
+    Assert.assertNull(foobarChild2.getChildren());
+  }
 
-    List<TransformExpressionTree> secondChildren = firstChild.getChildren();
-    Assert.assertEquals(secondChildren.size(), 2);
-    Assert.assertEquals(secondChildren.get(0).toString(), "a");
-    Assert.assertEquals(secondChildren.get(1).getTransformName(), "foo");
+  @Test
+  public void testWhiteSpace() {
+    String expression = "  \t  foo\t  ( bar   ('a'\t ,foobar(    b,   'c'  \t, '123')  )   ,d  )\t";
+    Assert.assertTrue(equalsWithStandardExpressionTree(TransformExpressionTree.compileToExpressionTree(expression)));
 
-    List<TransformExpressionTree> thirdChildren = secondChildren.get(1).getChildren();
-    Assert.assertEquals(thirdChildren.get(0).toString(), "b");
-    Assert.assertEquals(thirdChildren.get(1).toString(), "c");
-    Assert.assertEquals(thirdChildren.get(2).toString(), "d");
+    expression = "foo(bar(' a',foobar(b,'c','123')),d)";
+    Assert.assertFalse(equalsWithStandardExpressionTree(TransformExpressionTree.compileToExpressionTree(expression)));
+
+    expression = "foo(bar('a',foobar(b,'c\t','123')),d)";
+    Assert.assertFalse(equalsWithStandardExpressionTree(TransformExpressionTree.compileToExpressionTree(expression)));
+  }
+
+  @Test
+  public void testQuoteOnLiteral() {
+    String expression = "foo(bar('a',foobar(b,'c',123)),d)";
+    Assert.assertTrue(equalsWithStandardExpressionTree(TransformExpressionTree.compileToExpressionTree(expression)));
+  }
+
+  private static boolean equalsWithStandardExpressionTree(TransformExpressionTree expressionTree) {
+    return expressionTree.hashCode() == STANDARD_EXPRESSION_TREE.hashCode() && expressionTree.equals(
+        STANDARD_EXPRESSION_TREE) && expressionTree.toString().equals(STANDARD_EXPRESSION);
   }
 }

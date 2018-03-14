@@ -41,14 +41,15 @@ import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFact
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,8 +79,7 @@ public class TransformExpressionOperatorTest {
   private double[][] _values;
 
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setup() throws Exception {
     TransformFunctionFactory.init(
         new String[]{AdditionTransform.class.getName(), SubtractionTransform.class.getName(), MultiplicationTransform.class.getName(), DivisionTransform.class.getName()});
 
@@ -92,14 +92,12 @@ public class TransformExpressionOperatorTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(new File(SEGMENT_DIR_NAME));
   }
 
   @Test
   public void test() {
-
     for (Map.Entry<String, TestTransform> entry : _transformMap.entrySet()) {
       String expression = entry.getKey();
       TestTransform xform = entry.getValue();
@@ -117,19 +115,15 @@ public class TransformExpressionOperatorTest {
    * @return Result of evaluation
    */
   private double[] evaluateExpression(String expression) {
-
     Operator filterOperator = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalDocs());
     final BReusableFilteredDocIdSetOperator docIdSetOperator =
         new BReusableFilteredDocIdSetOperator(filterOperator, _indexSegment.getSegmentMetadata().getTotalDocs(),
             NUM_ROWS);
     final Map<String, BaseOperator> dataSourceMap = buildDataSourceMap(_indexSegment.getSegmentMetadata().getSchema());
-
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
-    Pql2Compiler compiler = new Pql2Compiler();
-    List<TransformExpressionTree> expressionTrees = new ArrayList<>(1);
-    expressionTrees.add(compiler.compileToExpressionTree(expression));
-
+    Set<TransformExpressionTree> expressionTrees =
+        Collections.singleton(TransformExpressionTree.compileToExpressionTree(expression));
     TransformExpressionOperator transformOperator =
         new TransformExpressionOperator(projectionOperator, expressionTrees);
     TransformBlock transformBlock = transformOperator.nextBlock();
@@ -147,8 +141,7 @@ public class TransformExpressionOperatorTest {
    * @return Schema built for the segment
    * @throws Exception
    */
-  private Schema buildSegment(String segmentDirName, String segmentName, Schema schema)
-      throws Exception {
+  private Schema buildSegment(String segmentDirName, String segmentName, Schema schema) throws Exception {
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
     config.setOutDir(segmentDirName);

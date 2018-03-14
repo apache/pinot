@@ -28,13 +28,13 @@ import com.linkedin.pinot.common.request.HavingFilterQueryMap;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.commons.lang3.StringUtils;
 
@@ -44,7 +44,6 @@ public class RequestUtils {
   }
 
   private static final String USE_STAR_TREE_KEY = "useStarTree";
-  private static final Pql2Compiler PQL2_COMPILER = new Pql2Compiler();
 
   /**
    * Generates thrift compliant filterQuery and populate it in the broker request
@@ -52,7 +51,7 @@ public class RequestUtils {
    * @param request
    */
   public static void generateFilterFromTree(FilterQueryTree filterQueryTree, BrokerRequest request) {
-    Map<Integer, FilterQuery> filterQueryMap = new HashMap<Integer, FilterQuery>();
+    Map<Integer, FilterQuery> filterQueryMap = new HashMap<>();
     MutableInt currentId = new MutableInt(0);
     FilterQuery root = traverseFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap, currentId);
     filterQueryMap.put(root.getId(), root);
@@ -63,7 +62,7 @@ public class RequestUtils {
   }
 
   public static void generateFilterFromTree(HavingQueryTree filterQueryTree, BrokerRequest request) {
-    Map<Integer, HavingFilterQuery> filterQueryMap = new HashMap<Integer, HavingFilterQuery>();
+    Map<Integer, HavingFilterQuery> filterQueryMap = new HashMap<>();
     MutableInt currentId = new MutableInt(0);
     HavingFilterQuery root = traverseHavingFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap, currentId);
     filterQueryMap.put(root.getId(), root);
@@ -78,7 +77,7 @@ public class RequestUtils {
     int currentNodeId = currentId.intValue();
     currentId.increment();
 
-    final List<Integer> f = new ArrayList<Integer>();
+    final List<Integer> f = new ArrayList<>();
     if (null != tree.getChildren()) {
       for (final FilterQueryTree c : tree.getChildren()) {
         int childNodeId = currentId.intValue();
@@ -104,7 +103,7 @@ public class RequestUtils {
     int currentNodeId = currentId.intValue();
     currentId.increment();
 
-    final List<Integer> filterIds = new ArrayList<Integer>();
+    final List<Integer> filterIds = new ArrayList<>();
     if (null != tree.getChildren()) {
       for (final HavingQueryTree child : tree.getChildren()) {
         int childNodeId = currentId.intValue();
@@ -148,41 +147,29 @@ public class RequestUtils {
 
     List<FilterQueryTree> c = null;
     if (null != children && !children.isEmpty()) {
-      c = new ArrayList<FilterQueryTree>();
+      c = new ArrayList<>();
       for (final Integer i : children) {
         final FilterQueryTree t = buildFilterQuery(i, queryMap);
         c.add(t);
       }
     }
 
-    FilterQueryTree q2 = new FilterQueryTree(q.getColumn(), q.getValue(), q.getOperator(), c);
-    return q2;
+    return new FilterQueryTree(q.getColumn(), q.getValue(), q.getOperator(), c);
   }
 
   /**
-   * Helper method to extract all column names from group-by columns and expressions.
-   * <p>We have this method because group-by columns might be passed from columns (old behavior) or expressions (UDF).
-   * TODO: revisit and check if we can unify them.
+   * Helper method to extract all column names from group-by expressions.
    */
-  public static Set<String> getAllGroupByColumns(GroupBy groupBy) {
+  public static Set<String> getAllGroupByColumns(@Nullable GroupBy groupBy) {
     Set<String> allGroupByColumns = new HashSet<>();
 
     if (groupBy != null) {
-      List<String> groupByColumns = groupBy.getColumns();
-      if (groupByColumns != null) {
-        allGroupByColumns.addAll(groupByColumns);
-      }
-
-      List<String> groupByExpressions = groupBy.getExpressions();
-      if (groupByExpressions != null) {
-        for (String expression : groupByExpressions) {
-          TransformExpressionTree expressionTree = PQL2_COMPILER.compileToExpressionTree(expression);
-          List<String> columns = new ArrayList<>();
-          expressionTree.getColumns(columns);
-          allGroupByColumns.addAll(columns);
-        }
+      for (String expression : groupBy.getExpressions()) {
+        TransformExpressionTree expressionTree = TransformExpressionTree.compileToExpressionTree(expression);
+        expressionTree.getColumns(allGroupByColumns);
       }
     }
+
     return allGroupByColumns;
   }
 

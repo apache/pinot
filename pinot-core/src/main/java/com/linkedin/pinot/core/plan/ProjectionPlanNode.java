@@ -15,17 +15,15 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -40,7 +38,7 @@ public class ProjectionPlanNode implements PlanNode {
   private final DocIdSetPlanNode _docIdSetPlanNode;
   private MProjectionOperator _projectionOperator = null;
 
-  public ProjectionPlanNode(IndexSegment indexSegment, String[] columns, DocIdSetPlanNode docIdSetPlanNode) {
+  public ProjectionPlanNode(IndexSegment indexSegment, Set<String> columns, DocIdSetPlanNode docIdSetPlanNode) {
     _docIdSetPlanNode = docIdSetPlanNode;
     for (String column : columns) {
       _dataSourcePlanNodeMap.put(column, new ColumnarDataSourcePlanNode(indexSegment, column));
@@ -48,7 +46,7 @@ public class ProjectionPlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() {
+  public MProjectionOperator run() {
     long start = System.currentTimeMillis();
     if (_projectionOperator == null) {
       Map<String, BaseOperator> dataSourceMap = new HashMap<>();

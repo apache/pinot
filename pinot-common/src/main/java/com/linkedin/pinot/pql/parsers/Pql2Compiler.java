@@ -18,7 +18,6 @@ package com.linkedin.pinot.pql.parsers;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.pql.parsers.pql2.ast.AstNode;
-
 import com.linkedin.pinot.pql.parsers.pql2.ast.BaseAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.BetweenPredicateAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.ComparisonPredicateAstNode;
@@ -130,8 +129,7 @@ public class Pql2Compiler implements AbstractCompiler {
     Pql2AstListener listener = new Pql2AstListener(expression, _splitInClause);
     walker.walk(listener, parseTree);
 
-    final AstNode rootNode = listener.getRootNode();
-    return TransformExpressionTree.buildTree(rootNode);
+    return new TransformExpressionTree(listener.getRootNode());
   }
 
   private void validateHavingClause(AstNode rootNode) {
