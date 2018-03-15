@@ -4,7 +4,6 @@
  * @exports alert create model
  */
 
-import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
@@ -26,7 +25,7 @@ import {
 /**
  * If true, this reduces the list of alerts per app to 2 for a quick demo.
  */
-const isDemoMode = false;
+const isDemoMode = true;
 
 /**
  * Mapping anomaly table column names to corresponding prop keys
@@ -204,7 +203,7 @@ export default Route.extend({
       endDate
     } = transition;
 
-    return RSVP.hash({
+    return hash({
       // Fetch all alert group configurations
       configGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(res => res.json()),
       applications: fetch('/thirdeye/entity/APPLICATION').then(res => res.json()),

@@ -32,6 +32,8 @@ const DEFAULT_END_DATE = moment().startOf('day').add(1, 'days');
 
 export default Component.extend({
 
+  classNames: ['range-pill-selectors'],
+
   /**
    * Properties we expect to receive for the date-range-picker
    */
@@ -65,17 +67,11 @@ export default Component.extend({
       return {
         name: range.name,
         value: range.value,
-        isActive: false,
+        isActive: range.value === activeKey,
         start,
         end
       };
     });
-
-    // Activate the last clicked option
-    const foundRangeOption = newOptions.find((range) => range.value === activeKey);
-    if (foundRangeOption) {
-      foundRangeOption.isActive = true;
-    }
 
     return newOptions;
   },
@@ -85,7 +81,7 @@ export default Component.extend({
      * Invokes the passed selectAction closure action
      */
     selectAction(rangeObj) {
-      const action = this.attrs.selectAction;
+      const action = this.get('selectAction');
       if (action) {
         return action(rangeObj);
       }
