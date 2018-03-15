@@ -1,5 +1,4 @@
 import moment from 'moment';
-
 export default function(server) {
   /**
    * Get request for rootcause page
@@ -138,12 +137,14 @@ export default function(server) {
    */
   server.get('/rootcause/metric/aggregate', () => {});
   server.get('/rootcause/metric/breakdown', () => {});
+  server.get('rootcause/metric/aggregate/batch', () => {});
   server.get('/rootcause/metric/timeseries', () => {
     return {
       timestamp: [moment().valueOf()],
       value: [1]
     };
   });
+
 
   /**
    * TODO: Once API is finalized, have this call return something meaningful
