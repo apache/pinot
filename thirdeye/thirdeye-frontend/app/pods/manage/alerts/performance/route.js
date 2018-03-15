@@ -242,7 +242,7 @@ export default Route.extend({
       uiDateFormat: "MMM D, YYYY hh:mm a",
       timePickerIncrement: 5,
       isDataLoading: true
-    })
+    });
 
     // Get perf data for each alert and assign it to the model
     fetchAppAnomalies(idsByApplication, startDate, endDate)

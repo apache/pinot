@@ -1,10 +1,9 @@
-import { getWithDefault } from '@ember/object';
-import _ from 'lodash';
 import moment from 'moment';
 import { isPresent } from "@ember/utils";
+import { getWithDefault } from '@ember/object';
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
-import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import { getFormatedDuration } from 'thirdeye-frontend/utils/anomaly';
+import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 
 /**
  * Handles types and defaults returned from eval/projected endpoints
@@ -65,23 +64,15 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
   // Loop over all anomalies to configure display settings
   anomalies.forEach((anomaly) => {
     let dimensionList = [];
-    const startMoment = moment(anomaly.anomalyStart);
-    const endMoment = moment(anomaly.anomalyEnd);
-    const anomalyDuration = moment.duration(endMoment.diff(startMoment));
-    const days = anomalyDuration.get("days");
-    const hours = anomalyDuration.get("hours");
-    const minutes = anomalyDuration.get("minutes");
+    // Extract current anomaly's score from array of all scores
     const score = resolvedScores.length ? resolvedScores.find(score => score.id === anomaly.anomalyId).score : null;
-
     // Set up anomaly change rate display
     const changeRate = (anomaly.current && anomaly.baseline) ? floatToPercent((anomaly.current - anomaly.baseline) / anomaly.baseline) : 0;
     const isNullChangeRate = Number.isNaN(Number(changeRate));
-
     // Set 'not reviewed' label
     if (!anomaly.anomalyFeedback) {
       anomaly.anomalyFeedback = 'Not reviewed yet';
     }
-
     // Add missing properties
     Object.assign(anomaly, {
       changeRate,
@@ -96,7 +87,6 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
       showResponseSaved: false,
       showResponseFailed: false
     });
-
     // Create a list of all available dimensions for toggling. Also massage dimension property.
     if (anomaly.anomalyFunctionDimension) {
       let dimensionObj = JSON.parse(anomaly.anomalyFunctionDimension);
@@ -110,10 +100,8 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
       let dimensionString = dimensionStrArr.join(' & ');
       Object.assign(anomaly, { dimensionList, dimensionString });
     }
-
     newAnomalies.push(anomaly);
   });
-
   // List most recent anomalies first
   return newAnomalies.sortBy('anomalyStart').reverse();
 }
