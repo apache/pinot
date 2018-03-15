@@ -39,17 +39,14 @@ import java.io.OutputStreamWriter;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
-import java.sql.Timestamp;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.tools.ClusterStateVerifier;
+import org.apache.helix.tools.ClusterVerifiers.StrictMatchExternalViewVerifier;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -308,49 +305,26 @@ public class PerfBenchmarkDriver {
   public static void waitForExternalViewUpdate(String zkAddress, final String clusterName, long timeoutInMilliseconds) {
     final ZKHelixAdmin helixAdmin = new ZKHelixAdmin(zkAddress);
 
-    /* Use one of these three classes instead of deprecated ClusterStateVerifier.
-    BestPossibleExternalViewVerifier
-    StrictMatchExternalViewVerifier
-    ClusterLiveNodesVerifier
-    */
-
-    org.apache.helix.tools.ClusterVerifiers.ClusterStateVerifier.Verifier customVerifier = new org.apache.helix.tools.ClusterVerifiers.ClusterStateVerifier.Verifier() {
-
-      @Override
-      public boolean verify() {
-        List<String> resourcesInCluster = helixAdmin.getResourcesInCluster(clusterName);
-        LOGGER.info("Waiting for the cluster to be set up and indexes to be loaded on the servers" + new Timestamp(
-            System.currentTimeMillis()));
-        for (String resourceName : resourcesInCluster) {
-          // Only check table resources and broker resource
-          if (!TableNameBuilder.isTableResource(resourceName) && !resourceName.equals(
-              CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
-            continue;
-          }
-
-          IdealState idealState = helixAdmin.getResourceIdealState(clusterName, resourceName);
-          ExternalView externalView = helixAdmin.getResourceExternalView(clusterName, resourceName);
-          if (idealState == null || externalView == null) {
-            return false;
-          }
-          Set<String> partitionSet = idealState.getPartitionSet();
-          for (String partition : partitionSet) {
-            Map<String, String> instanceStateMapIS = idealState.getInstanceStateMap(partition);
-            Map<String, String> instanceStateMapEV = externalView.getStateMap(partition);
-            if (instanceStateMapIS == null || instanceStateMapEV == null) {
-              return false;
-            }
-            if (!instanceStateMapIS.equals(instanceStateMapEV)) {
-              return false;
-            }
-          }
-        }
-        LOGGER.info("Cluster is ready to serve queries");
-        return true;
+    List<String> allResourcesInCluster = helixAdmin.getResourcesInCluster(clusterName);
+    Set<String> tableAndBrokerResources = new HashSet<>();
+    for (String resourceName : allResourcesInCluster) {
+      // Only check table resources and broker resource
+      if (!TableNameBuilder.isTableResource(resourceName) && !resourceName.equals(
+          CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
+        continue;
       }
-    };
+      tableAndBrokerResources.add(resourceName);
+    }
 
-    ClusterStateVerifier.verifyByPolling(customVerifier, timeoutInMilliseconds);
+    StrictMatchExternalViewVerifier verifier = new StrictMatchExternalViewVerifier.Builder(clusterName)
+        .setZkAddr(zkAddress)
+        .setResources(tableAndBrokerResources)
+        .build();
+
+    boolean success = verifier.verify(timeoutInMilliseconds);
+    if (success) {
+      LOGGER.info("Cluster is ready to serve queries");
+    }
   }
 
   private void postQueries()
