@@ -139,6 +139,7 @@ public class ServerPerfResource {
           if(!tableCPULoadFormulation.containsKey(tableName))
           {
             LOGGER.error("Table {} does not have an entry in {}", tableName, TableCPULoadConfigFilePath);
+            continue;
           }
           double segmentLoad = tableCPULoadFormulation.get(tableName).computeCPULoad(segment.getSegmentMetadata(),1519948890);
           serverPerfMetrics.segmentCPULoad += segmentLoad;
