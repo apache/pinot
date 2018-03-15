@@ -142,7 +142,7 @@ public class ServerPerfResource {
           }
           double segmentLoad = tableCPULoadFormulation.get(tableName).computeCPULoad(segment.getSegmentMetadata(),1519948890);
           serverPerfMetrics.segmentCPULoad += segmentLoad;
-          LOGGER.info("SegmentLoadIsComputed: Time:{}, TableName:{}, SegmentName{}, SegmentLoad{}", System.currentTimeMillis(), tableDataManager.getTableName(), segment.getSegmentMetadata().getName(), segmentLoad);
+          LOGGER.info("SegmentLoadIsComputed: Time:{}, TableName:{}, SegmentName{}, SegmentLoad:{}", System.currentTimeMillis(), tableDataManager.getTableName(), segment.getSegmentMetadata().getName(), segmentLoad);
 
           serverPerfMetrics.segmentTimeInfo.get(tableIndex).add(segment.getSegmentMetadata().getStartTime());
           serverPerfMetrics.segmentTimeInfo.get(tableIndex).add(segment.getSegmentMetadata().getEndTime());
