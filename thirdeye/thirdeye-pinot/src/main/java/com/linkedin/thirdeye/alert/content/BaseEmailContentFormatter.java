@@ -11,7 +11,6 @@ import com.linkedin.thirdeye.anomaly.alert.util.DataReportHelper;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
-import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventFilter;
 import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.anomaly.events.HolidayEventProvider;
@@ -53,7 +52,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TimeZone;
-import java.util.regex.Pattern;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.mail.HtmlEmail;
 import org.joda.time.DateTime;
@@ -99,7 +97,6 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
   protected Period preEventCrawlOffset;
   protected Period postEventCrawlOffset;
   protected String imgPath = null;
-  protected EventDataProviderManager EVENT_DATA_PROVIDER;
   protected EmailContentFormatterConfiguration emailContentFormatterConfiguration;
 
 
@@ -120,8 +117,6 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       this.postEventCrawlOffset = Period.parse(properties.getProperty(POST_EVENT_CRAWL_OFFSET));
     }
     this.emailContentFormatterConfiguration = configuration;
-    EVENT_DATA_PROVIDER = EventDataProviderManager.getInstance();
-    EVENT_DATA_PROVIDER.registerEventDataProvider(EventType.HOLIDAY.toString(), new HolidayEventProvider());
   }
 
   @Override
@@ -492,12 +487,9 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     eventFilter.setMetricName(metricName);
     eventFilter.setServiceName(serviceName);
     eventFilter.setTargetDimensionMap(targetDimensions);
-
-    EventDataProviderManager eventDataProviderManager = EventDataProviderManager.getInstance();
     eventFilter.setEventType(eventType.toString());
 
-    relatedEvents.addAll(eventDataProviderManager.getEvents(eventFilter));
-    return relatedEvents;
+    return new HolidayEventProvider().getEvents(eventFilter);
   }
 
   /**
