@@ -65,12 +65,13 @@ export default Component.extend({
 
     // Generate a fresh new range opitons array - all inactive
     const newOptions = timeRangeOptions.map((range) => {
+      const { name, value } = range;
       return {
-        name: range.name,
-        value: range.value,
-        isActive: range.value === activeKey,
+        name,
+        value,
         start,
-        end
+        end,
+        isActive: value === activeKey
       };
     });
 
