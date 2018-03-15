@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
+import com.linkedin.pinot.minion.executor.BaseSegmentConversionExecutor;
 import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
 import com.linkedin.pinot.minion.executor.TaskExecutorRegistry;
 import com.linkedin.pinot.minion.metrics.MinionMeter;
@@ -112,6 +113,8 @@ public class MinionStarter {
     SegmentFetcherFactory.getInstance()
         .init(_config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
 
+    // Need to do this before we start receiving state transitions.
+    BaseSegmentConversionExecutor.init(_config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     // Join the Helix cluster
     LOGGER.info("Joining the Helix cluster");
     _helixManager.getStateMachineEngine()
