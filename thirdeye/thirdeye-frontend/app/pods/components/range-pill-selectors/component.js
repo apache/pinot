@@ -6,6 +6,7 @@
  * @property {Date} activeRangeStart - default start date for range picker
  * @property {Date} activeRangeEnd - default end date for range picker
  * @property {String} uiDateFormat - date format specified by parent route (often specific to metric granularity)
+ * @property {Action} selectAction - closure action from parent
  * @example
   {{range-pill-selectors
     timeRangeOptions=timeRangeOptions
