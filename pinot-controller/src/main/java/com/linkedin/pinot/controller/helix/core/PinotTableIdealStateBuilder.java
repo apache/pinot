@@ -205,6 +205,7 @@ public class PinotTableIdealStateBuilder {
       idealState = buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName, nReplicas);
       create = true;
     }
+    // TODO Delete all lines below, and call into PinotLLCRealtimeSegmentManager.getInstance().setupNewTable();
     LOGGER.info("Assigning partitions to instances for simple consumer for table {}", realtimeTableName);
     final StreamMetadata kafkaMetadata = new StreamMetadata(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
     final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();

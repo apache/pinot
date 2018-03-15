@@ -65,7 +65,7 @@ public class HelixHelper {
    */
   // TODO: since updater always update ideal state in place, it should return boolean indicating whether the ideal state get changed.
   public static void updateIdealState(final HelixManager helixManager, final String resourceName,
-      final Function<IdealState, IdealState> updater, RetryPolicy policy) {
+      final Function<IdealState, IdealState> updater, RetryPolicy policy, final boolean noChangeOk) {
     try {
       policy.attempt(new Callable<Boolean>() {
         @Override
@@ -118,7 +118,11 @@ public class HelixHelper {
               return false;
             }
           } else {
-            LOGGER.warn("Idempotent or null ideal state update for resource {}, skipping update.", resourceName);
+            if (noChangeOk) {
+              LOGGER.info("Idempotent or null ideal state update for resource {}, skipping update.", resourceName);
+            } else {
+              LOGGER.warn("Idempotent or null ideal state update for resource {}, skipping update.", resourceName);
+            }
             return true;
           }
         }
@@ -126,6 +130,11 @@ public class HelixHelper {
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while updating ideal state for resource: " + resourceName, e);
     }
+  }
+
+  public static void updateIdealState(final HelixManager helixManager, final String resourceName,
+      final Function<IdealState, IdealState> updater, RetryPolicy policy) {
+    updateIdealState(helixManager, resourceName, updater, policy, false);
   }
 
   /**

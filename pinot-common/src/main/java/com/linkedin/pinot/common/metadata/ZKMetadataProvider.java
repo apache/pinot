@@ -323,6 +323,30 @@ public class ZKMetadataProvider {
     return resultList;
   }
 
+  public static List<LLCRealtimeSegmentZKMetadata> getLLCRealtimeSegmentZKMetadataListForTable(
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
+    List<LLCRealtimeSegmentZKMetadata> resultList = new ArrayList<>();
+    if (propertyStore == null) {
+      return resultList;
+    }
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(resourceName);
+    if (propertyStore.exists(constructPropertyStorePathForResource(realtimeTableName), AccessOption.PERSISTENT)) {
+      List<ZNRecord> znRecordList =
+          propertyStore.getChildren(constructPropertyStorePathForResource(realtimeTableName), null,
+              AccessOption.PERSISTENT);
+      if (znRecordList != null) {
+        for (ZNRecord record : znRecordList) {
+          RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = new RealtimeSegmentZKMetadata(record);
+          if (SegmentName.isHighLevelConsumerSegmentName(realtimeSegmentZKMetadata.getSegmentName())) {
+            continue;
+          }
+          resultList.add(new LLCRealtimeSegmentZKMetadata(record));
+        }
+      }
+    }
+    return resultList;
+  }
+
   public static void setClusterTenantIsolationEnabled(ZkHelixPropertyStore<ZNRecord> propertyStore, boolean isSingleTenantCluster) {
     final ZNRecord znRecord;
     final String path = constructPropertyStorePathForControllerConfig(CLUSTER_TENANT_ISOLATION_ENABLED_KEY);

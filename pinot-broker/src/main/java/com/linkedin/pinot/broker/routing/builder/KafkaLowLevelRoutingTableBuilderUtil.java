@@ -30,12 +30,6 @@ import org.apache.helix.model.ExternalView;
 public class KafkaLowLevelRoutingTableBuilderUtil {
 
   /**
-   * Compute the table of a sorted list of segments grouped by Kafka partition.
-   *
-   * @param externalView helix external view.
-   * @return map of Kafka partition to sorted set of segment names.
-   */
-  /**
    * Compute the map of allowed 'consuming' segments for each partition.
    *
    * @param externalView helix external view
