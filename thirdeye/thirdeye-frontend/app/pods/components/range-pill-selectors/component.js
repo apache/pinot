@@ -57,7 +57,7 @@ export default Component.extend({
    * Reset all time range options and activate the selected one
    * @method newTimeRangeOptions
    * @param {String} activeKey - label for currently active time range
-   * @return {undefined}
+   * @return {Array}
    */
   newTimeRangeOptions(activeKey, start, end) {
     const timeRangeOptions = this.get('timeRangeOptions');

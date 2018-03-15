@@ -25,7 +25,7 @@ import {
 /**
  * If true, this reduces the list of alerts per app to 2 for a quick demo.
  */
-const isDemoMode = true;
+const isDemoMode = false;
 
 /**
  * Mapping anomaly table column names to corresponding prop keys
