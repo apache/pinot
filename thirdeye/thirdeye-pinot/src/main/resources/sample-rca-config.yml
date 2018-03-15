@@ -1,6 +1,3 @@
-eventDataProviders:
-    # insert event providers here
-
 frameworks:
     ###########################################################################
     # Default RCA framework, all inclusive

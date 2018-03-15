@@ -3,8 +3,6 @@ package com.linkedin.thirdeye.rootcause.impl;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.events.EventDataProviderLoader;
-import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.anomaly.events.HistoricalAnomalyEventProvider;
 import com.linkedin.thirdeye.anomaly.events.HolidayEventProvider;
@@ -138,15 +136,10 @@ public class RCAFrameworkRunner {
 
     ThirdEyeCacheRegistry.initializeCaches(thirdEyeConfig);
 
-    EventDataProviderManager eventProvider = EventDataProviderManager.getInstance();
-    eventProvider.registerEventDataProvider(EventType.HOLIDAY.toString(), new HolidayEventProvider());
-    eventProvider.registerEventDataProvider(EventType.HISTORICAL_ANOMALY.toString(), new HistoricalAnomalyEventProvider());
-
     // ************************************************************************
     // Framework setup
     // ************************************************************************
     File rcaConfig = new File(cmd.getOptionValue(CLI_ROOTCAUSE_CONFIG));
-    EventDataProviderLoader.registerEventDataProvidersFromConfig(rcaConfig, eventProvider);
     List<Pipeline> pipelines = RCAFrameworkLoader.getPipelinesFromConfig(rcaConfig, cmd.getOptionValue(CLI_FRAMEWORK));
 
     // Executor

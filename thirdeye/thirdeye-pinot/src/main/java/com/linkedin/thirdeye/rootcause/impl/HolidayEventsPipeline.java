@@ -1,9 +1,10 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
-import com.linkedin.thirdeye.anomaly.events.EventFilter;
 import com.linkedin.thirdeye.anomaly.events.EventType;
+import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import com.linkedin.thirdeye.datalayer.util.Predicate;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.MaxScoreSet;
 import com.linkedin.thirdeye.rootcause.Pipeline;
@@ -48,10 +49,10 @@ public class HolidayEventsPipeline extends Pipeline {
   private static final String PROP_STRATEGY = "strategy";
   private static final String PROP_STRATEGY_DEFAULT = StrategyType.COMPOUND.toString();
 
-  private static final long OVERFETCH = TimeUnit.DAYS.toMillis(1);
+  private static final long OVERFETCH = TimeUnit.DAYS.toMillis(2);
 
   private final StrategyType strategy;
-  private final EventDataProviderManager eventDataProvider;
+  private final EventManager eventDAO;
   private final int k;
 
   /**
@@ -59,12 +60,12 @@ public class HolidayEventsPipeline extends Pipeline {
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
-   * @param eventDataProvider event data provider manager
+   * @param eventDAO event DAO
    * @param strategy scoring strategy
    */
-  public HolidayEventsPipeline(String outputName, Set<String> inputNames, EventDataProviderManager eventDataProvider, StrategyType strategy, int k) {
+  public HolidayEventsPipeline(String outputName, Set<String> inputNames, EventManager eventDAO, StrategyType strategy, int k) {
     super(outputName, inputNames);
-    this.eventDataProvider = eventDataProvider;
+    this.eventDAO = eventDAO;
     this.strategy = strategy;
     this.k = k;
   }
@@ -78,7 +79,7 @@ public class HolidayEventsPipeline extends Pipeline {
    */
   public HolidayEventsPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
     super(outputName, inputNames);
-    this.eventDataProvider = EventDataProviderManager.getInstance();
+    this.eventDAO = DAORegistry.getInstance().getEventDAO();
     this.strategy = StrategyType.valueOf(MapUtils.getString(properties, PROP_STRATEGY, PROP_STRATEGY_DEFAULT));
     this.k = MapUtils.getInteger(properties, PROP_K, PROP_K_DEFAULT);
   }
@@ -111,12 +112,12 @@ public class HolidayEventsPipeline extends Pipeline {
   }
 
   private List<EventDTO> getHolidayEvents(long start, long end) {
-    EventFilter filter = new EventFilter();
-    filter.setEventType(EventType.HOLIDAY.toString());
-    // overfetch to allow for timezone discrepancies
-    filter.setStartTime(start - OVERFETCH);
-    filter.setEndTime(end + OVERFETCH);
-    return eventDataProvider.getEvents(filter);
+    return this.eventDAO.findByPredicate(Predicate.AND(
+        Predicate.GE("startTime", start - OVERFETCH),
+        Predicate.LT("endTime", start + OVERFETCH),
+        Predicate.EQ("eventType", EventType.HOLIDAY)
+    ));
+
   }
 
   /* **************************************************************************
