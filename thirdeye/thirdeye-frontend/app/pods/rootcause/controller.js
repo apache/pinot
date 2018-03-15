@@ -283,6 +283,10 @@ export default Controller.extend({
       // timeseries
       timeseriesService.request(context, selectedUrns);
 
+      // anomaly function baselines
+      const anomalyFunctionUrns = filterPrefix(selectedUrns, 'frontend:anomalyfunction:');
+      anomalyFunctionService.request(context, new Set(anomalyFunctionUrns));
+
       // breakdowns
       if (activeTab === ROOTCAUSE_TAB_DIMENSIONS) {
         const metricUrns = new Set(filterPrefix(context.urns, 'thirdeye:metric:'));
@@ -291,32 +295,30 @@ export default Controller.extend({
         breakdownsService.request(context, new Set(currentUrns.concat(baselineUrns)));
       }
 
-      // aggregates
-      const aggregatesUrns = new Set();
+      // related metrics
+      const relatedMetricUrns = new Set();
 
       if (activeTab === ROOTCAUSE_TAB_METRICS) {
         // cache may be stale, fetch directly from service
         const entities = this.get('entitiesService.entities');
-        filterPrefix(Object.keys(entities), 'thirdeye:metric:').forEach(urn => aggregatesUrns.add(urn));
+        filterPrefix(Object.keys(entities), 'thirdeye:metric:').forEach(urn => relatedMetricUrns.add(urn));
       }
 
       if (context.anomalyUrns.size > 0) {
-        filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => aggregatesUrns.add(urn));
+        filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => relatedMetricUrns.add(urn));
       }
 
+      // scores
+      const scoresUrns = relatedMetricUrns;
+      scoresService.request(context, new Set(scoresUrns));
+
+      // aggregates
       const offsets = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
-      const offsetUrns = [...aggregatesUrns]
+      const offsetUrns = [...relatedMetricUrns]
         .map(urn => [].concat(offsets.map(offset => toOffsetUrn(urn, offset))))
         .reduce((agg, l) => agg.concat(l), []);
       aggregatesService.request(context, new Set(offsetUrns));
 
-      // scores
-      const scoresUrns = aggregatesUrns;
-      scoresService.request(context, new Set(scoresUrns));
-
-      // anomaly function baselines
-      const anomalyFunctionUrns = filterPrefix(selectedUrns, 'frontend:anomalyfunction:');
-      anomalyFunctionService.request(context, new Set(anomalyFunctionUrns));
     }
   ),
 
