@@ -271,64 +271,6 @@ body {
       margin: 0;
     }
   }
-}
-
-.te-alert-page-hzlist {
-    display: inline-block;
-    margin-left: 10px;
-    font-size: 15px;
-    padding: 0;
-
-  &__item {
-    display: inline-block;
-    margin-right: 7px;
-    list-style: none;
-    font-weight: 600;
-    color: app-shade(black, 5);
-    padding: 4px 12px;
-    border: 1px solid app-shade(black, 5);
-    border-radius: 15px;
-
-    &:hover {
-      cursor: pointer;
-    }
-
-    &--active {
-      background-color: $te-alerts-background;
-      border-color: $te-alerts-background;
-    }
-  }
-}
-
-.te-pill-selectors {
-  clear: left;
-  margin-top: 12px;
-
-  &__range-picker {
-    display: inline-block;
-    color: app-shade(black, 7);
-    min-width: 250px;
-    margin: 0;
-
-    .daterangepicker-input {
-      background: none;
-      border: none;
-      box-shadow: none;
-      padding: 3px 5px;
-      height: auto;
-
-      &:hover {
-        cursor: pointer;
-      }
-    }
-  }
-
-  &__label {
-    margin: 15px 0 5px 0;
-    font-weight: 600;
-    color: app-shade(black, 7);
-    display: inline-block;
-  }
 
   &__side-link {
     font-size: 15px;

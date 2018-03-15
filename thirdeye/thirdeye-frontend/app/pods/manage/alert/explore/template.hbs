@@ -1,32 +1,16 @@
 <div class="manage-alert-explore">
   {{#if (not isReplayPending)}}
-    <div class="te-pill-selectors">
-      {{!-- Date range selector --}}
-      <div class="te-pill-selectors__label">Showing</div>
-      <ul class="te-alert-page-hzlist">
-        {{#each timeRangeOptions as |range|}}
-          <li class="te-alert-page-hzlist__item {{if range.isActive "te-alert-page-hzlist__item--active"}}" {{action "onRangeOptionClick" range}}>
-            {{range.name}}
-            {{#if (eq range.name "Custom")}}
-              : {{date-range-picker
-                  class="te-pill-selectors__range-picker te-pill-selectors__range-picker--explore"
-                  timePicker=false
-                  timePicker24Hour=true
-                  timePickerIncrement=timePickerIncrement
-                  maxDate=maxTime
-                  start=activeRangeStart
-                  end=activeRangeEnd
-                  ranges=predefinedRanges
-                  showCustomRangeLabel=false
-                  format=uiDateFormat
-                  serverFormat="YYYY-MM-DD HH:mm"
-                  applyAction=(action "onRangeSelection")
-                }}
-            {{/if}}
-          </li>
-        {{/each}}
-      </ul>
-    </div>
+    {{!-- Date range selector --}}
+    {{range-pill-selectors
+      title="Showing"
+      maxTime=maxTime
+      uiDateFormat=uiDateFormat
+      activeRangeEnd=activeRangeEnd
+      activeRangeStart=activeRangeStart
+      timeRangeOptions=timeRangeOptions
+      timePickerIncrement=timePickerIncrement
+      selectAction=(action "onRangeSelection")
+    }}
 
     {{#if isPageLoadFailure}}
       {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
@@ -37,7 +21,7 @@
     <div class="te-horizontal-cards te-content-block">
       <h4 class="te-self-serve__block-title">Alert Performance</h4>
       <p class="te-self-serve__block-subtext te-self-serve__block-subtext--narrow">All estimated performance numbers are based on reviewed anomalies.</p>
-      <a class="te-pill-selectors__side-link" {{action "onClickTuneSensitivity" this}}>
+      <a class="te-self-serve__side-link" {{action "onClickTuneSensitivity" this}}>
         <i class="glyphicon glyphicon-cog te-icon__inline-link"></i> Customize sensitivity
       </a>
       <div class="te-horizontal-cards__container">
@@ -67,44 +51,42 @@
 
     <div class="te-content-block">
       <h4 class="te-self-serve__block-title">Anomalies over time ({{#if anomaliesLoaded}}{{filteredAnomalies.length}}{{else}}...loading anomalies{{/if}})</h4>
-      <a class="te-pill-selectors__side-link te-pill-selectors__side-link--high" {{action "onClickReportAnomaly" this}}>Report missing anomaly</a>
+      <a class="te-self-serve__side-link te-self-serve__side-link--high" {{action "onClickReportAnomaly" this}}>Report missing anomaly</a>
 
       {{#if filteredAnomalies}}
-        <div class="te-pill-selectors">
-          {{!-- Dimension selector --}}
-          {{#if alertHasDimensions}}
-            <div class="te-form__select te-form__select--wider col-md-3">
-              {{#power-select
-                triggerId="select-dimension"
-                triggerClass="te-form__select"
-                options=dimensionOptions
-                searchEnabled=false
-                matchTriggerWidth=true
-                matchContentWidth=true
-                selected=selectedDimension
-                onchange=(action "onSelectDimension")
-                as |dimension|
-              }}
-                {{dimension}}
-              {{/power-select}}
-            </div>
-          {{/if}}
-          {{!-- Resolution selector --}}
-          <div class="te-pill-selectors__range-picker col-md-3">
+        {{!-- Dimension selector --}}
+        {{#if alertHasDimensions}}
+          <div class="te-form__select te-form__select--wider col-md-3">
             {{#power-select
-              triggerId="select-resolution"
+              triggerId="select-dimension"
               triggerClass="te-form__select"
-              options=resolutionOptions
+              options=dimensionOptions
               searchEnabled=false
               matchTriggerWidth=true
               matchContentWidth=true
-              selected=selectedResolution
-              onchange=(action "onSelectResolution")
-              as |resolution|
+              selected=selectedDimension
+              onchange=(action "onSelectDimension")
+              as |dimension|
             }}
-              {{resolution}}
+              {{dimension}}
             {{/power-select}}
           </div>
+        {{/if}}
+        {{!-- Resolution selector --}}
+        <div class="col-md-3">
+          {{#power-select
+            triggerId="select-resolution"
+            triggerClass="te-form__select"
+            options=resolutionOptions
+            searchEnabled=false
+            matchTriggerWidth=true
+            matchContentWidth=true
+            selected=selectedResolution
+            onchange=(action "onSelectResolution")
+            as |resolution|
+          }}
+            {{resolution}}
+          {{/power-select}}
         </div>
       {{/if}}
 
@@ -157,16 +139,11 @@
 
       {{#if filteredAnomalies}}
         {{!-- Baseline type selector --}}
-        <div class="te-pill-selectors">
-          <div class="te-pill-selectors__label">Baseline</div>
-          <ul class="te-alert-page-hzlist">
-            {{#each baselineOptions as |baseline|}}
-              <li class="te-alert-page-hzlist__item {{if baseline.isActive "te-alert-page-hzlist__item--active"}}" {{action "onBaselineOptionClick" baseline}}>
-                {{baseline.name}}
-              </li>
-            {{/each}}
-          </ul>
-        </div>
+        {{range-pill-selectors
+          title="Baseline"
+          timeRangeOptions=baselineOptions
+          selectAction=(action "onBaselineOptionClick")
+        }}
       {{/if}}
 
       {{!-- Alert anomaly table --}}

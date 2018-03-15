@@ -1,32 +1,15 @@
 <div class="manage-alert-tune">
-
-  <div class="te-pill-selectors">
-    {{!-- Date range selector --}}
-    <div class="te-pill-selectors__label">Showing</div>
-    <ul class="te-alert-page-hzlist">
-      {{#each timeRangeOptions as |range|}}
-        <li class="te-alert-page-hzlist__item {{if range.isActive "te-alert-page-hzlist__item--active"}}" {{action "onRangeOptionClick" range}}>
-          {{range.name}}
-          {{#if (eq range.name "Custom")}}
-            : {{date-range-picker
-              class="te-pill-selectors__range-picker"
-              timePicker=false
-              timePicker24Hour=true
-              timePickerIncrement=timePickerIncrement
-              maxDate=today
-              start=activeRangeStart
-              end=activeRangeEnd
-              ranges=predefinedRanges
-              showCustomRangeLabel=false
-              format=uiDateFormat
-              serverFormat="YYYY-MM-DD HH:mm"
-              applyAction=(action "onRangeSelection")
-            }}
-          {{/if}}
-        </li>
-      {{/each}}
-    </ul>
-  </div>
+  {{!-- Date range selector --}}
+  {{range-pill-selectors
+    title="Showing"
+    maxTime=maxTime
+    uiDateFormat=uiDateFormat
+    activeRangeEnd=activeRangeEnd
+    activeRangeStart=activeRangeStart
+    timeRangeOptions=timeRangeOptions
+    timePickerIncrement=timePickerIncrement
+    selectAction=(action "onRangeSelection")
+  }}
 
   <div class="te-content-block">
     <fieldset class="te-form__section te-form__section--first te-form__section--slim row">

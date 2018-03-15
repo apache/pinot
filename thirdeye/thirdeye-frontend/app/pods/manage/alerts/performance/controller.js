@@ -1,6 +1,8 @@
 import _ from 'lodash';
+import moment from 'moment';
 import { computed, set } from '@ember/object';
 import Controller from '@ember/controller';
+import { setDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Controller.extend({
 
@@ -55,6 +57,25 @@ export default Controller.extend({
   ),
 
   actions: {
+
+    /**
+     * Sets the new custom date range for anomaly coverage
+     * @method onRangeSelection
+     * @param {Object} rangeOption - the user-selected time range to load
+     */
+    onRangeSelection(rangeOption) {
+      const {
+        start,
+        end,
+        value: duration
+      } = rangeOption;
+      const startDate = moment(start).valueOf();
+      const endDate = moment(end).valueOf();
+      // Cache the new time range and update page with it
+      setDuration(duration, startDate, endDate);
+      this.transitionToRoute({ queryParams: { duration, startDate, endDate }});
+    },
+
     /**
      * Handle sorting for each sortable table column
      * @param {String} sortKey  - stringified start date
