@@ -39,11 +39,12 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,8 +95,7 @@ public class DefaultAggregationExecutorTest {
    * @throws Exception
    */
   @BeforeSuite
-  void init()
-      throws Exception {
+  void init() throws Exception {
 
     _random = new Random(System.currentTimeMillis());
     _docIdSet = new int[NUM_ROWS];
@@ -127,8 +127,10 @@ public class DefaultAggregationExecutorTest {
   @Test
   void testAggregation() {
     Map<String, BaseOperator> dataSourceMap = new HashMap<>();
+    Set<TransformExpressionTree> expressionTrees = new HashSet<>();
     for (String column : _indexSegment.getColumnNames()) {
       dataSourceMap.put(column, _indexSegment.getDataSource(column));
+      expressionTrees.add(TransformExpressionTree.compileToExpressionTree(column));
     }
     int totalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
     MatchEntireSegmentOperator matchEntireSegmentOperator = new MatchEntireSegmentOperator(totalRawDocs);
@@ -136,8 +138,8 @@ public class DefaultAggregationExecutorTest {
         new BReusableFilteredDocIdSetOperator(matchEntireSegmentOperator, totalRawDocs, 10000);
     MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
     TransformExpressionOperator transformOperator =
-        new TransformExpressionOperator(projectionOperator, Collections.<TransformExpressionTree>emptyList());
-    TransformBlock transformBlock = (TransformBlock) transformOperator.nextBlock();
+        new TransformExpressionOperator(projectionOperator, expressionTrees);
+    TransformBlock transformBlock = transformOperator.nextBlock();
     int numAggFuncs = _aggregationInfoList.size();
     AggregationFunctionContext[] aggrFuncContextArray = new AggregationFunctionContext[numAggFuncs];
     AggregationFunctionInitializer aggFuncInitializer =
@@ -185,8 +187,7 @@ public class DefaultAggregationExecutorTest {
    *
    * @throws Exception
    */
-  private void setupSegment()
-      throws Exception {
+  private void setupSegment() throws Exception {
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
     }

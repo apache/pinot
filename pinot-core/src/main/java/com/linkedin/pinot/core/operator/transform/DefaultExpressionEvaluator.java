@@ -25,6 +25,7 @@ import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFact
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nonnull;
 
 
@@ -32,14 +33,13 @@ import javax.annotation.Nonnull;
  * Class for evaluating transform expression.
  */
 public class DefaultExpressionEvaluator implements TransformExpressionEvaluator {
-
-  private final List<TransformExpressionTree> _expressionTrees;
+  private final Set<TransformExpressionTree> _expressionTrees;
 
   /**
    * Constructor for the class.
    * @param expressionTrees List of expression trees to evaluate
    */
-  public DefaultExpressionEvaluator(@Nonnull List<TransformExpressionTree> expressionTrees) {
+  public DefaultExpressionEvaluator(@Nonnull Set<TransformExpressionTree> expressionTrees) {
     _expressionTrees = expressionTrees;
   }
 
@@ -49,13 +49,12 @@ public class DefaultExpressionEvaluator implements TransformExpressionEvaluator 
    * @param projectionBlock Projection block to evaluate the expression for.
    */
   @Override
-  public Map<String, BlockValSet> evaluate(ProjectionBlock projectionBlock) {
-    Map<String, BlockValSet> resultsMap = new HashMap<>(_expressionTrees.size());
-
+  public Map<TransformExpressionTree, BlockValSet> evaluate(ProjectionBlock projectionBlock) {
+    // Evaluate each expression once
+    Map<TransformExpressionTree, BlockValSet> resultsMap = new HashMap<>(_expressionTrees.size());
     for (TransformExpressionTree expressionTree : _expressionTrees) {
-      // Enough to evaluate an expression once.
-      if (!resultsMap.containsKey(expressionTree.toString())) {
-        resultsMap.put(expressionTree.toString(), evaluateExpression(projectionBlock, expressionTree));
+      if (!resultsMap.containsKey(expressionTree)) {
+        resultsMap.put(expressionTree, evaluateExpression(projectionBlock, expressionTree));
       }
     }
     return resultsMap;
@@ -69,31 +68,22 @@ public class DefaultExpressionEvaluator implements TransformExpressionEvaluator 
    * @param expressionTree Expression tree to evaluate
    * @return Result of the expression transform
    */
-  private BlockValSet evaluateExpression(ProjectionBlock projectionBlock,
-      TransformExpressionTree expressionTree) {
-    TransformFunction function = getTransformFunction(expressionTree.getTransformName());
-
+  private BlockValSet evaluateExpression(ProjectionBlock projectionBlock, TransformExpressionTree expressionTree) {
     int numDocs = projectionBlock.getNumDocs();
-    String expressionString = expressionTree.toString();
     TransformExpressionTree.ExpressionType expressionType = expressionTree.getExpressionType();
-
     switch (expressionType) {
       case FUNCTION:
         List<TransformExpressionTree> children = expressionTree.getChildren();
         int numChildren = children.size();
         BlockValSet[] transformArgs = new BlockValSet[numChildren];
-
         for (int i = 0; i < numChildren; i++) {
           transformArgs[i] = evaluateExpression(projectionBlock, children.get(i));
         }
-        return new TransformBlockValSet(function, numDocs, transformArgs);
-
+        return new TransformBlockValSet(getTransformFunction(expressionTree.getValue()), numDocs, transformArgs);
       case IDENTIFIER:
-        return projectionBlock.getBlockValueSet(expressionString);
-
+        return projectionBlock.getBlockValueSet(expressionTree.getValue());
       case LITERAL:
-        return new ConstantBlockValSet(expressionString, numDocs);
-
+        return new ConstantBlockValSet(expressionTree.getValue(), numDocs);
       default:
         throw new IllegalArgumentException("Illegal expression type in expression evaluator: " + expressionType);
     }
@@ -105,7 +95,7 @@ public class DefaultExpressionEvaluator implements TransformExpressionEvaluator 
    * @param transformName Name of transform function
    * @return Instance of transform function
    */
-  private TransformFunction getTransformFunction(String transformName) {
-    return (transformName != null) ? TransformFunctionFactory.get(transformName) : null;
+  private TransformFunction getTransformFunction(@Nonnull String transformName) {
+    return TransformFunctionFactory.get(transformName);
   }
 }

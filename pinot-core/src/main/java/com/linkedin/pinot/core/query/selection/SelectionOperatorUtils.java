@@ -103,7 +103,7 @@ public class SelectionOperatorUtils {
    * @return all related columns.
    */
   @Nonnull
-  public static String[] extractSelectionRelatedColumns(@Nonnull Selection selection,
+  public static Set<String> extractSelectionRelatedColumns(@Nonnull Selection selection,
       @Nonnull IndexSegment indexSegment) {
     Set<String> selectionColumns = new HashSet<>(getSelectionColumns(selection.getSelectionColumns(), indexSegment));
     if (selection.getSelectionSortSequence() != null) {
@@ -111,7 +111,7 @@ public class SelectionOperatorUtils {
         selectionColumns.add(selectionSort.getColumn());
       }
     }
-    return selectionColumns.toArray(new String[selectionColumns.size()]);
+    return selectionColumns;
   }
 
   /**

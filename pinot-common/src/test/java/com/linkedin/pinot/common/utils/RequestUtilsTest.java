@@ -15,12 +15,14 @@
  */
 package com.linkedin.pinot.common.utils;
 
-import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -32,63 +34,34 @@ import org.testng.annotations.Test;
  */
 public class RequestUtilsTest {
   @Test(dataProvider = "getAllGroupByColumnsDataProvider")
-  public void testGetAllGroupByColumns(GroupBy groupBy, List<String> expectedColumns) {
-    List<String> allGroupByColumns = Lists.newArrayList(RequestUtils.getAllGroupByColumns(groupBy));
-    Collections.sort(allGroupByColumns);
-    Assert.assertEquals(allGroupByColumns, expectedColumns);
+  public void testGetAllGroupByColumns(GroupBy groupBy, Set<String> expectedColumns) {
+    Assert.assertEquals(RequestUtils.getAllGroupByColumns(groupBy), expectedColumns);
   }
 
   @DataProvider(name = "getAllGroupByColumnsDataProvider")
   public Object[][] getAllGroupByColumnsDataProvider() {
     List<Object[]> entries = new ArrayList<>();
-    GroupBy groupBy = null;
 
-    entries.add(new Object[]{
-        groupBy, Lists.newArrayList()
-      });
+    entries.add(new Object[]{null, Collections.emptySet()});
 
-    groupBy = new GroupBy();
-    groupBy.setColumns(Lists.newArrayList("country"));
-    entries.add(new Object[]{
-      groupBy, Lists.newArrayList("country")
-    });
+    GroupBy groupBy = new GroupBy();
+    groupBy.setExpressions(Collections.singletonList("timeConvert(time, 'HOURS', 'DAYS')"));
+    entries.add(new Object[]{groupBy, Collections.singleton("time")});
 
     groupBy = new GroupBy();
-    groupBy.setColumns(Lists.newArrayList("country", "food"));
-    entries.add(new Object[]{
-      groupBy, Lists.newArrayList("country", "food")
-    });
+    groupBy.setExpressions(
+        Arrays.asList("timeConvert(time, 'HOURS', 'DAYS')", "dateTimeConvert(date, 'HOURS', 'DAYS')"));
+    entries.add(new Object[]{groupBy, new HashSet<>(Arrays.asList("date", "time"))});
 
     groupBy = new GroupBy();
-    groupBy.setExpressions(Lists.newArrayList("timeConvert(time, 'HOURS', 'DAYS')"));
-    entries.add(new Object[]{
-      groupBy, Lists.newArrayList("time")
-    });
+    groupBy.setExpressions(Arrays.asList("country", "timeConvert(time, 'HOURS', 'DAYS')"));
+    entries.add(new Object[]{groupBy, new HashSet<>(Arrays.asList("country", "time"))});
 
     groupBy = new GroupBy();
-    groupBy.setExpressions(Lists.newArrayList("timeConvert(time, 'HOURS', 'DAYS')", "dateTimeConvert(date, 'HOURS', 'DAYS')"));
-    entries.add(new Object[]{
-      groupBy, Lists.newArrayList("date", "time")
-    });
-
-    groupBy = new GroupBy();
-    groupBy.setColumns(Lists.newArrayList("country"));
-    groupBy.setExpressions(Lists.newArrayList("timeConvert(time, 'HOURS', 'DAYS')"));
-    entries.add(new Object[]{
-      groupBy, Lists.newArrayList("country", "time")
-    });
-
-    groupBy = new GroupBy();
-    groupBy.setColumns(Lists.newArrayList("country", "time"));
-    groupBy.setExpressions(Lists.newArrayList("timeConvert(time, 'HOURS', 'DAYS')", "dateTimeConvert(date, 'HOURS', 'DAYS')"));
-    entries.add(new Object[]{
-      groupBy, Lists.newArrayList("country", "date", "time")
-    });
-
-    groupBy = new GroupBy();
-    entries.add(new Object[]{
-      groupBy, Lists.newArrayList()
-    });
+    groupBy.setExpressions(
+        Arrays.asList("country", "timeConvert(time, 'HOURS', 'DAYS')", "dateTimeConvert(date, 'HOURS', 'DAYS')",
+            "time"));
+    entries.add(new Object[]{groupBy, new HashSet<>(Arrays.asList("country", "time", "date"))});
 
     return entries.toArray(new Object[entries.size()][]);
   }

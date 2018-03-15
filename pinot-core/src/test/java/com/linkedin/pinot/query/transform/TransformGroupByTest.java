@@ -20,32 +20,23 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
-import com.linkedin.pinot.core.operator.BaseOperator;
-import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.operator.query.AggregationGroupByOperator;
-import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
 import com.linkedin.pinot.core.operator.transform.function.TimeConversionTransform;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
-import com.linkedin.pinot.core.plan.AggregationFunctionInitializer;
+import com.linkedin.pinot.core.plan.AggregationGroupByPlanNode;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
-import com.linkedin.pinot.core.plan.TransformPlanNode;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
+import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -55,12 +46,10 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -184,40 +173,10 @@ public class TransformGroupByTest {
    * @return Group by result
    */
   private AggregationGroupByResult executeGroupByQuery(IndexSegment indexSegment, String query) {
-    Operator filterOperator = new MatchEntireSegmentOperator(indexSegment.getSegmentMetadata().getTotalDocs());
-    final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(filterOperator, indexSegment.getSegmentMetadata().getTotalDocs(),
-            NUM_ROWS);
-
-    final Map<String, BaseOperator> dataSourceMap = buildDataSourceMap(indexSegment.getSegmentMetadata().getSchema());
-    final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
-
-    Pql2Compiler compiler = new Pql2Compiler();
-    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
-
-    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
-    int numAggFunctions = aggregationsInfo.size();
-
-    AggregationFunctionContext[] aggrFuncContextArray = new AggregationFunctionContext[numAggFunctions];
-    AggregationFunctionInitializer aggFuncInitializer =
-        new AggregationFunctionInitializer(indexSegment.getSegmentMetadata());
-    for (int i = 0; i < numAggFunctions; i++) {
-      AggregationInfo aggregationInfo = aggregationsInfo.get(i);
-      aggrFuncContextArray[i] = AggregationFunctionContext.instantiate(aggregationInfo);
-      aggrFuncContextArray[i].getAggregationFunction().accept(aggFuncInitializer);
-    }
-
-    GroupBy groupBy = brokerRequest.getGroupBy();
-    Set<String> expressions = new HashSet<>(groupBy.getExpressions());
-
-    TransformExpressionOperator transformOperator = new TransformExpressionOperator(projectionOperator,
-        TransformPlanNode.buildTransformExpressionTrees(expressions));
-
-    AggregationGroupByOperator groupByOperator =
-        new AggregationGroupByOperator(aggrFuncContextArray, groupBy, 10_000, Integer.MAX_VALUE, transformOperator,
-            NUM_ROWS);
-
-    IntermediateResultsBlock block = (IntermediateResultsBlock) groupByOperator.nextBlock();
+    BrokerRequest brokerRequest = new Pql2Compiler().compileToBrokerRequest(query);
+    AggregationGroupByOperator groupByOperator = new AggregationGroupByPlanNode(indexSegment, brokerRequest,
+        InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY, Integer.MAX_VALUE).run();
+    IntermediateResultsBlock block = groupByOperator.nextBlock();
     return block.getAggregationGroupByResult();
   }
 
@@ -289,20 +248,6 @@ public class TransformGroupByTest {
     TimeFieldSpec timeFieldSpec = new TimeFieldSpec(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS);
     schema.addField(timeFieldSpec);
     return schema;
-  }
-
-  /**
-   * Helper method to build data source map for all the metric columns.
-   *
-   * @param schema Schema for the index segment
-   * @return Map of metric name to its data source.
-   */
-  private Map<String, BaseOperator> buildDataSourceMap(Schema schema) {
-    final Map<String, BaseOperator> dataSourceMap = new HashMap<>();
-    for (String metricName : schema.getColumnNames()) {
-      dataSourceMap.put(metricName, _indexSegment.getDataSource(metricName));
-    }
-    return dataSourceMap;
   }
 
   /**

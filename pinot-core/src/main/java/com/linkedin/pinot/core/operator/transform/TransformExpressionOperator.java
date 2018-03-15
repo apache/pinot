@@ -15,16 +15,14 @@
  */
 package com.linkedin.pinot.core.operator.transform;
 
-import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
-import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
-import java.util.List;
-import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nonnull;
 
 
 /**
@@ -34,20 +32,18 @@ public class TransformExpressionOperator extends BaseOperator<TransformBlock> {
   private static final String OPERATOR_NAME = "TransformExpressionOperator";
 
   private final MProjectionOperator _projectionOperator;
-  TransformExpressionEvaluator _expressionEvaluator;
+  private final TransformExpressionEvaluator _expressionEvaluator;
 
   /**
    * Constructor for the class
    *
    * @param projectionOperator Projection operator
-   * @param expressionTrees Expression tree to evaluate
+   * @param expressionTrees Set of expression trees to evaluate
    */
-  public TransformExpressionOperator(MProjectionOperator projectionOperator,
-      List<TransformExpressionTree> expressionTrees) {
-    Preconditions.checkArgument((projectionOperator != null));
-
+  public TransformExpressionOperator(@Nonnull MProjectionOperator projectionOperator,
+      @Nonnull Set<TransformExpressionTree> expressionTrees) {
     _projectionOperator = projectionOperator;
-    _expressionEvaluator = (expressionTrees != null) ? new DefaultExpressionEvaluator(expressionTrees) : null;
+    _expressionEvaluator = new DefaultExpressionEvaluator(expressionTrees);
   }
 
   @Override
@@ -55,12 +51,9 @@ public class TransformExpressionOperator extends BaseOperator<TransformBlock> {
     ProjectionBlock projectionBlock = _projectionOperator.nextBlock();
     if (projectionBlock == null) {
       return null;
+    } else {
+      return new TransformBlock(projectionBlock, _expressionEvaluator.evaluate(projectionBlock));
     }
-
-    Map<String, BlockValSet> expressionResults =
-        (_expressionEvaluator != null) ? _expressionEvaluator.evaluate(projectionBlock) : null;
-
-    return new TransformBlock(projectionBlock, expressionResults);
   }
 
   @Override

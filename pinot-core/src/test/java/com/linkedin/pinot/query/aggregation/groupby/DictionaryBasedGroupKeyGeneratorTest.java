@@ -18,9 +18,9 @@ package com.linkedin.pinot.query.aggregation.groupby;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataBlockCache;
 import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.common.DataSource;
@@ -32,6 +32,7 @@ import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
+import com.linkedin.pinot.core.operator.transform.DefaultExpressionEvaluator;
 import com.linkedin.pinot.core.query.aggregation.groupby.DictionaryBasedGroupKeyGenerator;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -128,11 +129,13 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     // Get a data fetcher for the index segment.
     Map<String, BaseOperator> dataSourceMap = new HashMap<>();
     Map<String, Block> blockMap = new HashMap<>();
+    Set<TransformExpressionTree> expressionTrees = new HashSet<>();
 
     for (String column : indexSegment.getColumnNames()) {
       DataSource dataSource = indexSegment.getDataSource(column);
       dataSourceMap.put(column, dataSource);
       blockMap.put(column, dataSource.nextBlock());
+      expressionTrees.add(TransformExpressionTree.compileToExpressionTree(column));
     }
 
     // Generate a random test doc id set.
@@ -146,7 +149,8 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     DataFetcher dataFetcher = new DataFetcher(dataSourceMap);
     DocIdSetBlock docIdSetBlock = new DocIdSetBlock(_testDocIdSet, _testDocIdSet.length);
     ProjectionBlock projectionBlock = new ProjectionBlock(blockMap, new DataBlockCache(dataFetcher), docIdSetBlock);
-    _transformBlock = new TransformBlock(projectionBlock, new HashMap<String, BlockValSet>());
+    _transformBlock =
+        new TransformBlock(projectionBlock, new DefaultExpressionEvaluator(expressionTrees).evaluate(projectionBlock));
   }
 
   @Test

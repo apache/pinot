@@ -77,8 +77,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
   private IndexSegment _indexSegment;
 
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setup() throws Exception {
     _recordReader = buildSegment();
 
     // Load the segment.
@@ -98,8 +97,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
    * @throws Exception
    */
   @Test
-  public void testSingleColumnGroupKeyGenerator()
-      throws Exception {
+  public void testSingleColumnGroupKeyGenerator() throws Exception {
     for (int i = 0; i < COLUMN_NAMES.length; i++) {
       testGroupKeyGenerator(new String[]{COLUMN_NAMES[i]}, new FieldSpec.DataType[]{DATA_TYPES[i]});
     }
@@ -119,30 +117,33 @@ public class NoDictionaryGroupKeyGeneratorTest {
    * Tests multi-column group key generator when at least one column as dictionary, and others don't.
    */
   @Test
-  public void testMultiColumnHybridGroupKeyGenerator()
-      throws Exception {
+  public void testMultiColumnHybridGroupKeyGenerator() throws Exception {
     for (int i = 0; i < NO_DICT_COLUMN_NAMES.length; i++) {
       testGroupKeyGenerator(new String[]{NO_DICT_COLUMN_NAMES[i], STRING_DICT_COLUMN},
           new FieldSpec.DataType[]{DATA_TYPES[i], FieldSpec.DataType.STRING});
     }
   }
 
-  private void testGroupKeyGenerator(String[] groupByColumns, FieldSpec.DataType[] dataTypes)
-      throws Exception {
+  private void testGroupKeyGenerator(String[] groupByColumns, FieldSpec.DataType[] dataTypes) throws Exception {
     // Build the projection operator.
     MatchEntireSegmentOperator matchEntireSegmentOperator = new MatchEntireSegmentOperator(NUM_ROWS);
     BReusableFilteredDocIdSetOperator docIdSetOperator =
         new BReusableFilteredDocIdSetOperator(matchEntireSegmentOperator, NUM_ROWS, 10000);
     MProjectionOperator projectionOperator = new MProjectionOperator(_dataSourceMap, docIdSetOperator);
+
+    Set<TransformExpressionTree> expressionTrees = new HashSet<>(groupByColumns.length);
+    for (String column : groupByColumns) {
+      expressionTrees.add(TransformExpressionTree.compileToExpressionTree(column));
+    }
     TransformExpressionOperator transformOperator =
-        new TransformExpressionOperator(projectionOperator, new ArrayList<TransformExpressionTree>());
+        new TransformExpressionOperator(projectionOperator, expressionTrees);
 
     // Iterator over all projection blocks and generate group keys.
     TransformBlock transformBlock;
     int[] docIdToGroupKeys = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
 
     GroupKeyGenerator groupKeyGenerator = null;
-    while ((transformBlock = (TransformBlock) transformOperator.nextBlock()) != null) {
+    while ((transformBlock = transformOperator.nextBlock()) != null) {
       if (groupKeyGenerator == null) {
         // Build the group key generator.
         groupKeyGenerator =
@@ -174,8 +175,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
    * @return Set of unique group keys.
    * @throws Exception
    */
-  private Set<String> getExpectedGroupKeys(RecordReader recordReader, String[] groupByColumns)
-      throws Exception {
+  private Set<String> getExpectedGroupKeys(RecordReader recordReader, String[] groupByColumns) throws Exception {
     Set<String> groupKeys = new HashSet<>();
     StringBuilder stringBuilder = new StringBuilder();
 
@@ -208,8 +208,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
    *
    * @throws Exception
    */
-  private RecordReader buildSegment()
-      throws Exception {
+  private RecordReader buildSegment() throws Exception {
     Schema schema = new Schema();
 
     for (int i = 0; i < COLUMN_NAMES.length; i++) {

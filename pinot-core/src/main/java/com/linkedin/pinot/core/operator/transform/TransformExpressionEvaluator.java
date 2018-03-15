@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.transform;
 
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import java.util.Map;
@@ -27,9 +28,10 @@ import java.util.Map;
 public interface TransformExpressionEvaluator {
 
   /**
-   * Evaluates a list of expressions on a given set of docIds.
-   * @param projectionBlock Projection block for which to evaluate the expression for.
-   * @return Map containing result for each transform expression.
+   * Evaluates a set of expression trees on a given block of data.
+   *
+   * @param projectionBlock Projection block for which to evaluate the expression trees for
+   * @return Map from expression tree to the result after evaluation
    */
-  Map<String, BlockValSet> evaluate(ProjectionBlock projectionBlock);
+  Map<TransformExpressionTree, BlockValSet> evaluate(ProjectionBlock projectionBlock);
 }
