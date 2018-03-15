@@ -61,6 +61,8 @@ public class SegmentConvertToCsvJob extends Configured {
   public SegmentConvertToCsvJob(String jobName, Properties properties) throws Exception {
     super(new Configuration());
     getConf().set("mapreduce.job.user.classpath.first", "true");
+    getConf().set("mapreduce.map.memory.mb", "49152");
+    getConf().set("mapreduce.map.java.opts", "-Xmx36864m");
     _jobName = jobName;
     _properties = properties;
 
