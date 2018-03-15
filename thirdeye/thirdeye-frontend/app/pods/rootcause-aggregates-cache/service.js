@@ -62,11 +62,37 @@ export default Service.extend({
       offsetsAndUrns.push([toAbsoluteUrn(urn, requestContext.compareMode).split(':')[2].toLowerCase(), urn]);
       metricUrnToOffestAndUrn[metricUrn] = offsetsAndUrns;
     });
-
-    Object.keys(metricUrnToOffestAndUrn).forEach(
+    const metricUrns = Object.keys(metricUrnToOffestAndUrn);
+    metricUrns.forEach(
       metricUrn => {
-        return this._fetchRowSlice(metricUrn, requestContext, metricUrnToOffestAndUrn);
+        return this._cacheRowSlice(metricUrn, requestContext, metricUrnToOffestAndUrn);
       });
+    metricUrns.forEach(
+        metricUrn => {
+          return this._fetchRowSlice(metricUrn, requestContext, metricUrnToOffestAndUrn);
+        });
+  },
+
+
+  /**
+   * Fetch the metric data for a row of the metric table
+   *
+   * @param {String} metricUrn Metric urn
+   * @param {Object} context Context
+   * @param {Object} metricUrnToOffestAndUrn Hash map from metric urn to offset and urn
+   * @returns {undefined}
+   */
+  async _cacheRowSlice(metricUrn, context, metricUrnToOffestAndUrn) {
+    const [start, end] = context.anomalyRange;
+    const offsets = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[0]);
+    const timezone = moment.tz.guess();
+    const url = `/rootcause/metric/aggregate/cache?urn=${metricUrn}&start=${start}&end=${end}&offsets=${offsets}&timezone=${timezone}`;
+
+    try{
+      fetch(url);
+    } catch (error){
+      // left blank
+    }
   },
 
   /**
@@ -90,14 +116,12 @@ export default Service.extend({
       res = await this._extractAggregatesBatch(res, urns);
       return await this._complete(context, res);
     } catch (error){
-      this._handleErrorBatch();
+      this._handleErrorBatch(urns, error)
     }
   },
 
   _handleErrorBatch(urns, error){
-    urns.forEach(function (urn) {
-      this._handleError(urn, error);
-    });
+    urns.forEach(urn => this._handleError(urn, error))
   },
 
   _extractAggregatesBatch(incoming, urns) {
