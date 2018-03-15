@@ -80,6 +80,7 @@
   },
   "private": true,
   "dependencies": {
+    "base-64": "^0.1.0",
     "bower": "^1.8.0",
     "dom-to-image": "^2.6.0",
     "ember-cli-clipboard": "^0.8.1",

@@ -4,6 +4,7 @@ import { reads, gt, or } from '@ember/object/computed';
 import { inject as service } from '@ember/service';
 import Controller from '@ember/controller';
 import domtoimage from 'npm:dom-to-image';
+import base64 from 'npm:base-64';
 import fileSaver from 'npm:file-saver';
 import $ from 'jquery';
 
@@ -92,7 +93,7 @@ export default Controller.extend({
   //
   username: reads('authService.data.authenticated.name'),
 
-  clipBoardData: 'png blob yo',
+  clipBoardData: null,
 
   //
   // user selection
@@ -981,8 +982,17 @@ export default Controller.extend({
 
     onShareGraph() {
       const blob = domtoimage.toBlob(document.getElementById('download-graph-anchor')).then((blob) => {
-        var url = URL.createObjectURL(blob);
-        this.set('clipBoardData', url);
+        var url = null;
+        // URL.createObjectURL(blob);
+        var reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onloadend = () => {
+          let base64data = reader.result;
+          url = base64data;
+          const source = `data:image/bmp;base64,data:image/png;base64,${url}`;
+          this.set('clipBoardData', source);
+          console.log('done');
+        };
         // mailto:username@example.com?subject=Subject&body=message%20goes%20here
       });
       // fileSaver.saveAs(blob, 'graph.png');
