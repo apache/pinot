@@ -52,7 +52,6 @@ export default Service.extend({
     this.setProperties({ context: _.cloneDeep(requestContext), aggregates: newAggregates, pending: newPending });
 
     if (_.isEmpty(missing)) {
-      // console.log('rootcauseAggregatesService: request: all metrics up-to-date. ignoring.');
       return;
     }
 
@@ -65,9 +64,9 @@ export default Service.extend({
     });
 
     Object.keys(metricUrnToOffestAndUrn).forEach(
-        metricUrn => {
-          return this._fetchRowSlice(metricUrn, requestContext, metricUrnToOffestAndUrn);
-        });
+      metricUrn => {
+        return this._fetchRowSlice(metricUrn, requestContext, metricUrnToOffestAndUrn);
+      });
   },
 
   /**
@@ -91,14 +90,14 @@ export default Service.extend({
       res = await this._extractAggregatesBatch(res, urns);
       return await this._complete(context, res);
     } catch (error){
-      this._handleErrorBatch()
+      this._handleErrorBatch();
     }
   },
 
   _handleErrorBatch(urns, error){
     urns.forEach(function (urn) {
-      this._handleError(urn, error)
-    })
+      this._handleError(urn, error);
+    });
   },
 
   _extractAggregatesBatch(incoming, urns) {
