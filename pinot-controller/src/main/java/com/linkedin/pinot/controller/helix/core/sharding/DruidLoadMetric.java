@@ -56,8 +56,7 @@ public class DruidLoadMetric implements ServerLoadMetric {
         // constant cost-multiplier for segments of the same datsource
         // Robin: A data source is the Druid equivalent of a database table.
         // Hence to give more cost for segment of same table, we have a constant cost multiplier.
-        final double multiplier = segmentATableName.equals(segmentBTableName) ? 2.0 : 1.0;
-
+        final double multiplier = segmentBTableName.contains(segmentATableName) ? 2.0 : 1.0;
         return INV_LAMBDA_SQUARE * intervalCost(t1, start, end) * multiplier;
     }
 
@@ -145,7 +144,6 @@ public class DruidLoadMetric implements ServerLoadMetric {
             final double exy1 = Math.exp(x1 - y1);
             final double ey0 = Math.exp(0f - y0);
             final double ey1 = Math.exp(0f - y1);
-
             return (ey1 - ey0) - (exy1 - exy0);
         }
     }
@@ -163,6 +161,9 @@ public class DruidLoadMetric implements ServerLoadMetric {
                 Long segmentBEnd = timeList.get(j+1);
                 computedCost += computeJointSegmentsCost(segmentAStartTime,segmentAEndTime,segmentATableName,
                         segmentBStart,segmentBEnd,tableNameList.get(i));
+//                LOGGER.error("Seg A table: "+segmentATableName+" ,Seg A Start Time: "+segmentAStartTime+" ,Seg A End Time: "+
+//                        segmentAEndTime+" ,Seg B table: "+tableNameList.get(i)+" ,Seg B Start Time: "+segmentBStart+" ,Seg B End Time: "+segmentBEnd+
+//                        " , cost: "+computedCost);
             }
 
         }
@@ -175,12 +176,21 @@ public class DruidLoadMetric implements ServerLoadMetric {
 
         ServerPerfMetricsReader serverPerfMetricsReader = new ServerPerfMetricsReader(_executor, _connectionManager, helixResourceManager);
         ServerSegmentInfo serverSegmentInfo = serverPerfMetricsReader.getServerPerfMetrics(instance, true, 5000);
-
+        if(serverSegmentInfo == null){
+            LOGGER.error("Error: ServerSegmentInfo is NULL, returning cost as 0");
+            return 0;
+        }
 
         //fetch list
         List<String> tableNameList = serverSegmentInfo.getTableList();
         List<List<Long>> segmentTimeList = serverSegmentInfo.getSegmentTimeInfo();
 
+        if(tableNameList == null || segmentTimeList == null ||
+                tableNameList.size() == 0 || segmentTimeList.size() == 0){
+            LOGGER.error("Error: TableNameList / SegmentsTimeList is NULL, returning cost as 0");
+            return 0;
+        }
+       // LOGGER.error("********************************************************************************************************");
         //LOGGER.info("TableListFor: instance:{}, list:{}", instance,tableNameList.toString());
 
         //for(int i=0;i<segmentTimeList.size();i++)
@@ -198,6 +208,7 @@ public class DruidLoadMetric implements ServerLoadMetric {
 
         double segmentPlaceCost = computeSegmentPlacementCost(tableNameList,segmentTimeList,segmentAStart,segmentAEnd,segmentMetadata.getTableName());
         LOGGER.info("DruidVsPACE: instance: {}, DruidCost: {}, PACECost: {}", instance, segmentPlaceCost, serverSegmentInfo.getSegmentCPULoad());
+       // LOGGER.error("********************************************************************************************************");
         return segmentPlaceCost;
     }
 
