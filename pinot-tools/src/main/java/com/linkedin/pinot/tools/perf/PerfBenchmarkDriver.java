@@ -309,11 +309,10 @@ public class PerfBenchmarkDriver {
     Set<String> tableAndBrokerResources = new HashSet<>();
     for (String resourceName : allResourcesInCluster) {
       // Only check table resources and broker resource
-      if (!TableNameBuilder.isTableResource(resourceName) && !resourceName.equals(
+      if (TableNameBuilder.isTableResource(resourceName) || resourceName.equals(
           CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
-        continue;
+        tableAndBrokerResources.add(resourceName);
       }
-      tableAndBrokerResources.add(resourceName);
     }
 
     StrictMatchExternalViewVerifier verifier = new StrictMatchExternalViewVerifier.Builder(clusterName)
