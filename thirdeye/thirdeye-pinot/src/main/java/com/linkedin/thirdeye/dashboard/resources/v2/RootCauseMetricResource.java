@@ -138,7 +138,7 @@ public class RootCauseMetricResource {
   }
 
   /**
-   * Returns a list of aggregate value for the specified metric and time range, and (optionally) a list of offset.
+   * Caches aggregates value for the specified metric and time range, and (optionally) a list of offset.
    * Aligns time stamps if necessary and returns NaN if no data is available for the given time range.
    *
    * @param urn metric urn
@@ -149,12 +149,11 @@ public class RootCauseMetricResource {
    *
    * @see RootCauseMetricResource#parseOffset(MetricSlice, String, String) supported offsets
    *
-   * @return aggregate value, or NaN if data not available
    * @throws Exception on catch-all execution failure
    */
   @GET
   @Path("/aggregate/cache")
-  @ApiOperation(value = "Returns a list of aggregate value for the specified metric and time range, and (optionally) offset.")
+  @ApiOperation(value = "Caches a list of aggregate value for the specified metric and time range, and (optionally) offset.")
   public void cacheAggregatesBatch(
       @ApiParam(value = "metric urn", required = true) @QueryParam("urn") @NotNull String urn,
       @ApiParam(value = "start time (in millis)", required = true) @QueryParam("start") @NotNull long start,
