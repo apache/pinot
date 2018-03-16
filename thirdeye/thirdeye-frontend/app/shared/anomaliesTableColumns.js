@@ -29,6 +29,7 @@ export default [
   },
   {
     propertyName: 'feedback',
+    component: 'custom/anomalies-table/resolution',
     title: 'Resolution',
     className: 'anomalies-table__column',
     disableFiltering: true

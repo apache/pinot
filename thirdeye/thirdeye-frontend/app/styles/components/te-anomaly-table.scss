@@ -111,8 +111,15 @@
 
   &__select {
     display: inline-block;
-    margin-right: 30px;
     width: 180px;
+
+    &--margin-right {
+      margin-right: 30px;
+    }
+
+    &--margin-left {
+      margin-left: 5px;
+    }
   }
 
   &__link-wrapper {
@@ -140,6 +147,17 @@
       position: absolute;
       font-size: 20px;
       margin: 14px 0 0 -26px;
+    }
+
+    &--status-no-margin {
+      -webkit-animation: fadeinout 4s linear forwards;
+      animation: fadeinout 4s linear forwards;
+      font-size: 20px;
+    }
+
+    &--hidden {
+      visibility: hidden;
+      font-size: 20px;
     }
 
     &--small {

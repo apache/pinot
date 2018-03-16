@@ -1,6 +1,58 @@
-import moment from 'moment';
 import { isPresent } from '@ember/utils';
+import moment from 'moment';
 import _ from 'lodash';
+import {
+  checkStatus,
+  postProps
+} from 'thirdeye-frontend/utils/utils';
+import fetch from 'fetch';
+import { getAnomalyDataUrl } from 'thirdeye-frontend/utils/api/anomaly';
+
+/**
+ * Response type options for anomalies
+ */
+export const anomalyResponseObj = [
+  { name: 'Not reviewed yet',
+    value: 'NO_FEEDBACK',
+    status: 'Not Resolved'
+  },
+  { name: 'True anomaly',
+    value: 'ANOMALY',
+    status: 'Confirmed Anomaly'
+  },
+  { name: 'False alarm',
+    value: 'NOT_ANOMALY',
+    status: 'False Alarm'
+  },
+  { name: 'Confirmed - New Trend',
+    value: 'ANOMALY_NEW_TREND',
+    status: 'New Trend'
+  }
+];
+
+/**
+ * Update feedback status on any anomaly
+ * @method updateAnomalyFeedback
+ * @param {Number} anomalyId - the id of the anomaly to update
+ * @param {String} feedbackType - key for feedback type
+ * @return {Ember.RSVP.Promise}
+ */
+export function updateAnomalyFeedback(anomalyId, feedbackType) {
+  const url = `/anomalies/updateFeedback/${anomalyId}`;
+  const data = { feedbackType, comment: '' };
+  return fetch(url, postProps(data)).then((res) => checkStatus(res, 'post'));
+}
+
+/**
+ * Fetch a single anomaly record for verification
+ * @method verifyAnomalyFeedback
+ * @param {Number} anomalyId
+ * @return {undefined}
+ */
+export function verifyAnomalyFeedback(anomalyId) {
+  const anomalyUrl = getAnomalyDataUrl() + anomalyId;
+  return fetch(anomalyUrl).then(checkStatus);
+}
 
 /**
  * Formats anomaly duration property for display on the table
@@ -37,6 +89,10 @@ export function pluralizeTime(time, unit) {
 }
 
 export default {
+  anomalyResponseObj,
+  getAnomalyDataUrl,
+  updateAnomalyFeedback,
   getFormatedDuration,
+  verifyAnomalyFeedback,
   pluralizeTime
 };

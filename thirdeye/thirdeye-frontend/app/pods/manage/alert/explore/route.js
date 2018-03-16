@@ -26,6 +26,8 @@ import {
   buildMetricDataUrl,
   extractSeverity
 } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { anomalyResponseObj } from 'thirdeye-frontend/utils/anomaly';
+import { getAnomalyDataUrl } from 'thirdeye-frontend/utils/api/anomaly';
 
 /**
  * Shorthand for setting date defaults
@@ -54,28 +56,6 @@ const defaultDurationObj = {
   startDate: buildDateEod(3, 'month').valueOf(),
   endDate: moment()
 };
-
-/**
- * Response type options for anomalies
- */
-const anomalyResponseObj = [
-  { name: 'Not reviewed yet',
-    value: 'NO_FEEDBACK',
-    status: 'Not Resolved'
-  },
-  { name: 'True anomaly',
-    value: 'ANOMALY',
-    status: 'Confirmed Anomaly'
-  },
-  { name: 'False alarm',
-    value: 'NOT_ANOMALY',
-    status: 'False Alarm'
-  },
-  { name: 'Confirmed - New Trend',
-    value: 'ANOMALY_NEW_TREND',
-    status: 'New Trend'
-  }
-];
 
 /**
  * Build WoW array from basic options
@@ -229,7 +209,7 @@ export default Route.extend({
 
     // Load endpoints for projected metrics. TODO: consolidate into CP if duplicating this logic
     const qsParams = `start=${baseStart.utc().format(dateFormat)}&end=${baseEnd.utc().format(dateFormat)}&useNotified=true`;
-    const anomalyDataUrl = `/anomalies/search/anomalyIds/${startStamp}/${endStamp}/1?anomalyIds=`;
+    const anomalyDataUrl = getAnomalyDataUrl(startStamp, endStamp);
     const metricsUrl = `/data/autocomplete/metric?name=${dataset}::${metricName}`;
     const anomaliesUrl = `/dashboard/anomaly-function/${alertId}/anomalies?${qsParams}`;
 
@@ -303,7 +283,6 @@ export default Route.extend({
       DEFAULT_SEVERITY,
       anomalyDataUrl,
       baselineOptions,
-      anomalyResponseObj,
       alertEvalMetrics,
       anomaliesLoaded: false,
       isMetricDataInvalid: false,
@@ -462,7 +441,7 @@ export default Route.extend({
     // Process anomaly records to make them template-ready
     const anomalyData = yield enhanceAnomalies(rawAnomalies, severityScores);
     // Prepare de-duped power-select option array for anomaly feedback
-    resolutionOptions.push(...new Set(anomalyData.map(record => record.anomalyFeedback)));
+    //resolutionOptions.push(...new Set(anomalyData.map(record => record.anomalyFeedback)));
     // Populate dimensions power-select options if dimensions exist
     if (hasDimensions) {
       dimensionOptions.push(...new Set(anomalyData.map(anomaly => anomaly.dimensionString)));
