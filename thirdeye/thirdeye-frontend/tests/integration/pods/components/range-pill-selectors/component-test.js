@@ -1,16 +1,16 @@
 import $ from 'jquery';
 import moment from 'moment';
 import { module, test } from 'qunit';
-import { run, later } from "@ember/runloop";
+import { run } from "@ember/runloop";
 import { setupRenderingTest } from 'ember-qunit';
-import { click, render } from '@ember/test-helpers';
+import { render } from '@ember/test-helpers';
 import hbs from 'htmlbars-inline-precompile';
 import { setUpTimeRangeOptions } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 module('Integration | Component | range pill selectors', function(hooks) {
   setupRenderingTest(hooks);
 
-  const PILL_CLASS = '.te-pill-selectors';
+  const PILL_CLASS = '.range-pill-selectors';
   const MAXTIME = 1520863199999; // tells us how much data is available for the selected metric
   const START_DATE = 1513151999999; // arbitrary start date in milliseconds
   const END_DATE = 1520873345292; // arbitrary end date in milliseconds
@@ -73,7 +73,7 @@ module('Integration | Component | range pill selectors', function(hooks) {
     // Testing initial display of time range pills
     assert.equal(
       $firstPill.get(0).classList[1],
-      `te-pill-selectors__item--active`,
+      `range-pill-selectors__item--active`,
       'Pill selected as default is highlighted');
     assert.equal(
       $rangeTitle.get(0).innerText,
@@ -98,11 +98,11 @@ module('Integration | Component | range pill selectors', function(hooks) {
 
     // Clicking to activate date-range-picker modal
     await run(() => $rangeInput.click());
-    const $rangePresets = $('.daterangepicker .ranges ul li');
+    const $rangePresets = $('.daterangepicker.show-calendar .ranges ul li');
 
     // Brief confirmation that modal ranges are displaying properly
     assert.equal(
-      $('.daterangepicker').get(0).style.display,
+      $('.daterangepicker.show-calendar').get(0).style.display,
       'block',
       'Range picker modal is displayed');
     assert.equal(
@@ -120,7 +120,7 @@ module('Integration | Component | range pill selectors', function(hooks) {
     // Confirm that the custom pill gets highlighted and populated with selected dates
     assert.equal(
       this.$(`${PILL_CLASS}__item[data-value="custom"]`).get(0).classList[1],
-      `te-pill-selectors__item--active`,
+      `range-pill-selectors__item--active`,
       'Selected pill is highlighted');
     assert.equal(
       this.$('.daterangepicker-input').val(),
