@@ -55,7 +55,7 @@ public class TransformExpressionTree {
   public TransformExpressionTree(AstNode root) {
     if (root instanceof FunctionCallAstNode) {
       _expressionType = ExpressionType.FUNCTION;
-      _value = ((FunctionCallAstNode) root).getName();
+      _value = ((FunctionCallAstNode) root).getName().toLowerCase();
       _children = new ArrayList<>();
       for (AstNode child : root.getChildren()) {
         _children.add(new TransformExpressionTree(child));
