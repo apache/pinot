@@ -138,6 +138,54 @@ public class RootCauseMetricResource {
   }
 
   /**
+   * Caches a list of aggregate value for the specified metric and time range, and (optionally) a list of offset.
+   * Aligns time stamps if necessary and returns NaN if no data is available for the given time range.
+   *
+   * @param urn metric urn
+   * @param start start time (in millis)
+   * @param end end time (in millis)
+   * @param offsets A list of offset identifier (e.g. "current", "wo2w")
+   * @param timezone timezone identifier (e.g. "America/Los_Angeles")
+   *
+   * @see RootCauseMetricResource#parseOffset(MetricSlice, String, String) supported offsets
+   *
+   * @throws Exception on catch-all execution failure
+   */
+  @GET
+  @Path("/aggregate/cache")
+  @ApiOperation(value = "Caches a list of aggregate value for the specified metric and time range, and (optionally) offset.")
+  public void cacheAggregatesBatch(
+      @ApiParam(value = "metric urn", required = true) @QueryParam("urn") @NotNull String urn,
+      @ApiParam(value = "start time (in millis)", required = true) @QueryParam("start") @NotNull long start,
+      @ApiParam(value = "end time (in millis)", required = true) @QueryParam("end") @NotNull long end,
+      @ApiParam(value = "A list of offset identifier separated by comma (e.g. \"current\", \"wo2w\")") @QueryParam("offsets") List<String> offsets,
+      @ApiParam(value = "timezone identifier (e.g. \"America/Los_Angeles\")") @QueryParam("timezone") String timezone)
+      throws Exception {
+    offsets = ResourceUtils.parseListParams(offsets);
+    List<MetricSlice> slices = new ArrayList<>();
+    for (String offset : offsets) {
+      // Put all metric slices together
+      if (StringUtils.isBlank(offset)) {
+        offset = OFFSET_DEFAULT;
+      }
+
+      if (StringUtils.isBlank(timezone)) {
+        timezone = TIMEZONE_DEFAULT;
+      }
+      MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end));
+
+      Baseline range = parseOffset(baseSlice, offset, timezone);
+
+      List<MetricSlice> currentSlices = range.scatter(baseSlice);
+
+      slices.addAll(currentSlices);
+      logSlices(baseSlice, currentSlices);
+    }
+    requestAggregates(slices);
+  }
+
+
+  /**
    * Returns a list of aggregate value for the specified metric and time range, and (optionally) a list of offset.
    * Aligns time stamps if necessary and returns NaN if no data is available for the given time range.
    *
@@ -370,16 +418,7 @@ public class RootCauseMetricResource {
    * @throws Exception on catch-all execution failure
    */
   private Map<MetricSlice, DataFrame> fetchAggregates(List<MetricSlice> slices) throws Exception {
-    Map<MetricSlice, Future<Double>> futures = new HashMap<>();
-
-    for (final MetricSlice slice : slices) {
-      futures.put(slice, this.executor.submit(new Callable<Double>() {
-        @Override
-        public Double call() throws Exception {
-          return RootCauseMetricResource.this.aggregationLoader.loadAggregate(slice);
-        }
-      }));
-    }
+    Map<MetricSlice, Future<Double>> futures = requestAggregates(slices);
 
     Map<MetricSlice, DataFrame> output = new HashMap<>();
     for (Map.Entry<MetricSlice, Future<Double>> entry : futures.entrySet()) {
@@ -392,6 +431,20 @@ public class RootCauseMetricResource {
     }
 
     return output;
+  }
+
+  private Map<MetricSlice, Future<Double>> requestAggregates(List<MetricSlice> slices) throws Exception {
+    Map<MetricSlice, Future<Double>> futures = new HashMap<>();
+
+    for (final MetricSlice slice : slices) {
+      futures.put(slice, this.executor.submit(new Callable<Double>() {
+        @Override
+        public Double call() throws Exception {
+          return RootCauseMetricResource.this.aggregationLoader.loadAggregate(slice);
+        }
+      }));
+    }
+    return futures;
   }
 
   /**
