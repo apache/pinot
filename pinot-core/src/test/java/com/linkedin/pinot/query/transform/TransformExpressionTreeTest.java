@@ -88,6 +88,14 @@ public class TransformExpressionTreeTest {
   public void testQuoteOnLiteral() {
     String expression = "foo(bar('a',foobar(b,'c',123)),d)";
     Assert.assertTrue(equalsWithStandardExpressionTree(TransformExpressionTree.compileToExpressionTree(expression)));
+    expression = "foo(bar(\"a\",foobar(b,\"c\",\"123\")),d)";
+    Assert.assertTrue(equalsWithStandardExpressionTree(TransformExpressionTree.compileToExpressionTree(expression)));
+  }
+
+  @Test
+  public void testUpperCase() {
+    String expression = "foO(bAr('a',FOoBar(b,'c',123)),d)";
+    Assert.assertTrue(equalsWithStandardExpressionTree(TransformExpressionTree.compileToExpressionTree(expression)));
   }
 
   private static boolean equalsWithStandardExpressionTree(TransformExpressionTree expressionTree) {
