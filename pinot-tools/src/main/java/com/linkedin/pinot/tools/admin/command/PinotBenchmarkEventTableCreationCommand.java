@@ -30,7 +30,9 @@ import java.util.Random;
 
 public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCommand implements Command {
     private static final Logger LOGGER = LoggerFactory.getLogger(CreateSegmentCommand.class);
-    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_100_days_of_2017_2018.properties";
+    //final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_100_days_of_2017_2018.properties";
+
+    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_feb_2018.properties";
     final String _tableConfig = "pinot_benchmark/event_data_config/event_table_config.properties";
     private final int _minimumRecordCount = 2000;
     @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Directory containing the data.")
@@ -46,8 +48,12 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
     private int _numRecords = 10000;
     private int[] _numRecordList = {80000, 90000, 100000, 110000, 120000, 130000, 140000, 150000};
     private double[] _numRecordRatio = {1, 0.6, 0.5, 0.3};
-    private int[] _meanDocCount = {30000, 15000, 10000, 20000};
-    private int[] _standardDeviation = {1000, 4000, 2000, 3000};
+    //private int[] _meanDocCount = {30000, 15000, 10000, 20000};
+    //private int[] _standardDeviation = {1000, 4000, 2000, 3000};
+    private int[] _meanDocCount = {30000, 15000, 100000, 200000};
+    private int[] _standardDeviation = {1000, 4000, 25000, 50000};
+
+
     private int[] _varianceList = {5000, 10000, 15000, 20000,25000};
     private int _varianceListSize = 5;
 
@@ -72,7 +78,7 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
     public boolean execute() throws Exception {
 
 
-        /*
+
         ClassLoader classLoader = PinotBenchmarkEventTableCreationCommand.class.getClassLoader();
         String timeIntervalConfigPath = EventTableGenerator.getFileFromResourceUrl(classLoader.getResource(_timeIntervalConfig));
         List <String> timeIntervals = FileUtils.readLines(new File(timeIntervalConfigPath));
@@ -101,15 +107,15 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
             }
 
             EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir, outDir);
-            eventTableGenerator.generateProfileViewTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[0]);
-            eventTableGenerator.generateAdClickTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[1]);
+            //eventTableGenerator.generateProfileViewTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[0]);
+            //eventTableGenerator.generateAdClickTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[1]);
             eventTableGenerator.generateArticleReadTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[2]);
             eventTableGenerator.generateJobApplyTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[3]);
 
         }
-        */
 
-        createVaryigSizeProfileView();
+
+        //createVaryigSizeProfileView();
 
         return true;
     }

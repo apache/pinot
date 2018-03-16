@@ -40,8 +40,12 @@ public class PinotBenchmarkSegmentCreationCommand extends AbstractBaseAdminComma
     @Option(name = "-overwrite", required = false, usage = "Overwrite existing output directory.")
     private boolean _overwrite = false;
 
-    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_100_days_of_2017_2018.properties";
-    final String _tableNameFile = "pinot_benchmark/event_data_config/event_table_config.properties";
+    //final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_100_days_of_2017_2018.properties";
+    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_feb_2018.properties";
+
+
+    //final String _tableNameFile = "pinot_benchmark/event_data_config/event_table_config.properties";
+    final String _tableNameFile = "pinot_benchmark/event_data_config/event_table_JA_AR_config.properties";
 
     private int[] _varianceList = {5000, 10000, 15000, 20000,25000};
     private int _varianceListSize = 5;
@@ -66,7 +70,7 @@ public class PinotBenchmarkSegmentCreationCommand extends AbstractBaseAdminComma
     @Override
     public boolean execute() throws Exception {
 
-        /*
+
         ClassLoader classLoader = PinotBenchmarkSegmentCreationCommand.class.getClassLoader();
         String tableNameFilePath = EventTableGenerator.getFileFromResourceUrl(classLoader.getResource(_tableNameFile));
         List<String> tablesInfo = FileUtils.readLines(new File(tableNameFilePath));
@@ -100,8 +104,8 @@ public class PinotBenchmarkSegmentCreationCommand extends AbstractBaseAdminComma
                 createSegmentCommand.execute();
             }
         }
-        */
-        createVaryigSizeProfileView();
+
+        //createVaryigSizeProfileView();
 
         return true;
     }
