@@ -104,7 +104,7 @@ export default Service.extend({
     const [ start, end ] = context.anomalyRange;
     const offsets = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[0]);
     const urns = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[1]);
-    const timezone = moment.tz.guess();
+    const timezone = this.getProperties('timezone');
     const url = `/rootcause/metric/aggregate/batch?urn=${metricUrn}&start=${start}&end=${end}&offsets=${offsets}&timezone=${timezone}`;
 
     try {
