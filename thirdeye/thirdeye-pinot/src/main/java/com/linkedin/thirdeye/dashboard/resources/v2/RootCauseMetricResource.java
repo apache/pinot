@@ -138,7 +138,7 @@ public class RootCauseMetricResource {
   }
 
   /**
-   * Caches aggregates value for the specified metric and time range, and (optionally) a list of offset.
+   * Caches a list of aggregate value for the specified metric and time range, and (optionally) a list of offset.
    * Aligns time stamps if necessary and returns NaN if no data is available for the given time range.
    *
    * @param urn metric urn

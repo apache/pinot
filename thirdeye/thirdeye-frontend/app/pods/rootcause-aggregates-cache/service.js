@@ -75,7 +75,7 @@ export default Service.extend({
 
 
   /**
-   * Fetch the metric data for a row of the metric table
+   * Caches the metric data for a row of the metric table
    *
    * @param {String} metricUrn Metric urn
    * @param {Object} context Context
