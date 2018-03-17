@@ -95,7 +95,7 @@ export default Service.extend({
     const endDateTime = moment(context.analysisRange[1]).utc().format();
     const dimensionJsonString = encodeURI(JSON.stringify(this._toFilterMapCustom(toFilters(urn))));
 
-    const url = `/dashboard/anomaly-function/${functionId}/baseline?start=${startDateTime}&end=${endDateTime}&dimension=${dimensionJsonString}`;
+    const url = `/dashboard/anomaly-function/${functionId}/baseline?start=${startDateTime}&end=${endDateTime}&dimension=${dimensionJsonString}&mode=offline`;
     return fetch(url)
       .then(checkStatus)
       .then(res => this._extractTimeseries(res, urn))
