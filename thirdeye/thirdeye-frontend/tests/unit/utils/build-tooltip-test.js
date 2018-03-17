@@ -1,20 +1,20 @@
 import BuildTooltip from 'thirdeye-frontend/utils/build-tooltip';
 import { module, test } from 'qunit';
 
-module('Unit | Utility | build-tooltip');
+module('Unit | Utility | build-tooltip', function() {
+  test('it builds', function(assert) {
+    const hash = {
+      entities: {},
+      timeseries: {},
+      hoverUrns: [''],
+      hoverTimeStamp: {}
+    };
 
-test('it builds', function(assert) {
-  const hash = {
-    entities: {},
-    timeseries: {},
-    hoverUrns: [''],
-    hoverTimeStamp: {}
-  };
+    const tooltip = new BuildTooltip();
+    const tooltipTemplate = tooltip.compute(hash).toString();
 
-  const tooltip = new BuildTooltip();
-  const tooltipTemplate = tooltip.compute(hash).toString();
-
-  assert.ok(
-    tooltipTemplate.includes('<div class="te-tooltip">'),
-    'The tooltip should be created correctly');
+    assert.ok(
+      tooltipTemplate.includes('<div class="te-tooltip">'),
+      'The tooltip should be created correctly');
+  });
 });
