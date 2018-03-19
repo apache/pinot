@@ -112,16 +112,16 @@ public class DefaultAggregationLoader implements AggregationLoader {
 
     LOG.info("Summarizing metric id {} with {} filters", metricId, slice.getFilters().size());
 
+    final long maxTime = this.maxTimeCache.get(dataset.getDataset());
+    if (slice.getStart() > maxTime) {
+      return Double.NaN;
+    }
+
     RequestContainer rc = DataFrameUtils.makeAggregateRequest(slice, Collections.<String>emptyList(), "ref", this.metricDAO, this.datasetDAO);
     ThirdEyeResponse res = this.cache.getQueryResult(rc.getRequest());
     DataFrame df = DataFrameUtils.evaluateResponse(res, rc);
 
     if (df.isEmpty() || df.get(COL_VALUE).isNull(0)) {
-      return Double.NaN;
-    }
-
-    final long maxTime = this.maxTimeCache.get(dataset.getDataset());
-    if (slice.getStart() > maxTime) {
       return Double.NaN;
     }
 

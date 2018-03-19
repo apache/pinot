@@ -9,6 +9,8 @@ import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.dataframe.util.TimeSeriesRequestContainer;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
@@ -18,10 +20,8 @@ import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
-import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
-import com.linkedin.thirdeye.rootcause.timeseries.BaselineOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -117,8 +117,8 @@ public class MetricAnalysisPipeline2 extends Pipeline {
     TimeRangeEntity anomalyRange = TimeRangeEntity.getTimeRangeAnomaly(context);
     TimeRangeEntity baselineRange = TimeRangeEntity.getTimeRangeBaseline(context);
 
-    Baseline rangeCurrent = BaselineOffset.fromOffset(0);
-    Baseline rangeBaseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, 4, 0);
+    BaselineAggregate rangeCurrent = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Collections.singletonList(0L), false);
+    BaselineAggregate rangeBaseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, 4, 0, false);
 
     Map<MetricEntity, MetricSlice> trainingSet = new HashMap<>();
     Map<MetricEntity, MetricSlice> testSet = new HashMap<>();
@@ -232,10 +232,12 @@ public class MetricAnalysisPipeline2 extends Pipeline {
         MetricSlice sliceTest = testSet.get(me);
         MetricSlice sliceTrain = trainingSet.get(me);
 
-        DataFrame testCurrent = rangeCurrent.gather(sliceTest, data);
-        DataFrame testBaseline = rangeBaseline.gather(sliceTest, data);
-        DataFrame trainingCurrent = rangeCurrent.gather(sliceTrain, data);
-        DataFrame trainingBaseline = rangeBaseline.gather(sliceTrain, data);
+        boolean isDailyData = this.isDailyData(sliceTest.getMetricId());
+
+        DataFrame testCurrent = rangeCurrent.withDailyData(isDailyData).gather(sliceTest, data);
+        DataFrame testBaseline = rangeBaseline.withDailyData(isDailyData).gather(sliceTest, data);
+        DataFrame trainingCurrent = rangeCurrent.withDailyData(isDailyData).gather(sliceTrain, data);
+        DataFrame trainingBaseline = rangeBaseline.withDailyData(isDailyData).gather(sliceTrain, data);
 
 //        LOG.info("Preparing training and test data for metric '{}'", me.getUrn());
 //        DataFrame trainingBaseline = extractTimeRange(timeseries, trainingBaselineStart, trainingBaselineEnd);
@@ -286,6 +288,20 @@ public class MetricAnalysisPipeline2 extends Pipeline {
       }
     });
     LOG.info("Fetching {} slices:\n{}", slices.size(), StringUtils.join(slices, "\n"));
+  }
+
+  private boolean isDailyData(long metricId) {
+    MetricConfigDTO metric  = this.metricDAO.findById(metricId);
+    if (metric == null) {
+      return false;
+    }
+
+    DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
+    if (dataset == null) {
+      return false;
+    }
+
+    return TimeUnit.DAYS.equals(dataset.bucketTimeGranularity().getUnit());
   }
 
   private DataFrame diffTimeseries(DataFrame current, DataFrame baseline) {

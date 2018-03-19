@@ -31,7 +31,6 @@ import com.linkedin.thirdeye.dashboard.resources.OnboardDatasetMetricResource;
 import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
 import com.linkedin.thirdeye.dashboard.resources.SummaryResource;
 import com.linkedin.thirdeye.dashboard.resources.ThirdEyeResource;
-import com.linkedin.thirdeye.dashboard.resources.v2.AggregationResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.AuthResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.ConfigResource;
@@ -129,12 +128,11 @@ public class ThirdEyeDashboardApplication
 
     AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
     AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
-    EmailResource emailResource = new EmailResource(config);
 
     env.jersey().register(new DashboardResource());
     env.jersey().register(new CacheResource());
     env.jersey().register(new AnomalyResource(anomalyFunctionFactory, alertFilterFactory));
-    env.jersey().register(emailResource);
+    env.jersey().register(new EmailResource(config));
     env.jersey().register(new EntityManagerResource(config));
     env.jersey().register(new MetricConfigResource());
     env.jersey().register(new DatasetConfigResource());
@@ -150,12 +148,11 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new ConfigResource(DAO_REGISTRY.getConfigDAO()));
     env.jersey().register(new FunctionOnboardingResource());
     env.jersey().register(new CustomizedEventResource(DAO_REGISTRY.getEventDAO()));
+    env.jersey().register(new TimeSeriesResource());
 
     TimeSeriesLoader timeSeriesLoader = new DefaultTimeSeriesLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache());
     AggregationLoader aggregationLoader = new DefaultAggregationLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
     env.jersey().register(new RootCauseSessionResource(DAO_REGISTRY.getRootcauseSessionDAO(), new ObjectMapper()));
-    env.jersey().register(new TimeSeriesResource(Executors.newCachedThreadPool(), timeSeriesLoader));
-    env.jersey().register(new AggregationResource(Executors.newCachedThreadPool(), aggregationLoader));
     env.jersey().register(new RootCauseMetricResource(Executors.newCachedThreadPool(), aggregationLoader, timeSeriesLoader, DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO()));
 
     if (config.getOnboardingHost() != null) {
