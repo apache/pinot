@@ -107,7 +107,9 @@ public class StorageQuotaChecker {
     TableSizeReader.SegmentSizeDetails sizeDetails = tableSubtypeSize.segments.get(segmentName);
     long existingSegmentSizeBytes = sizeDetails != null ?  sizeDetails.estimatedSizeInBytes : 0;
 
-    _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE, existingSegmentSizeBytes);
+    // Since tableNameWithType comes with the table type(OFFLINE), thus we guarantee that
+    // tableSubtypeSize.estimatedSizeInBytes is the offline table size.
+    _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE, tableSubtypeSize.estimatedSizeInBytes);
 
     long estimatedFinalSizeBytes = tableSubtypeSize.estimatedSizeInBytes - existingSegmentSizeBytes + incomingSegmentSizeBytes;
     if (estimatedFinalSizeBytes <= allowedStorageBytes) {
