@@ -19,16 +19,17 @@ package com.linkedin.pinot.controller.helix.core.rebalance;
 import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.OfflineTagConfig;
-import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.RealtimeTagConfig;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentGenerator;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -86,6 +87,11 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
     PartitionAssignment newPartitionAssignment = new PartitionAssignment(tableConfig.getTableName());
 
     if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
+      StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+      if (streamMetadata.hasHighLevelKafkaConsumerType()) {
+        return newPartitionAssignment;
+      }
+
       LOGGER.info("Rebalancing stream partition assignment for table {}", tableConfig.getTableName());
 
       boolean includeConsuming =
@@ -158,8 +164,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
     boolean dryRun = rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN, DEFAULT_DRY_RUN);
     if (!dryRun) {
       LOGGER.info("Updating ideal state for table {}", tableNameWithType);
-      rebalanceAndUpdateIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig,
-          newPartitionAssignment);
+      rebalanceAndUpdateIdealState(tableConfig, targetNumReplicas, rebalanceUserConfig, newPartitionAssignment);
     } else {
       LOGGER.info("Dry run. Skip writing ideal state");
       rebalanceIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig, newPartitionAssignment);
@@ -167,20 +172,22 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
     return idealState;
   }
 
-  private void rebalanceAndUpdateIdealState(final IdealState rebalanceIdealState, final TableConfig tableConfig,
-      final int targetNumReplicas, final Configuration rebalanceUserConfig,
-      final PartitionAssignment newPartitionAssignment) {
+  /**
+   * Rebalances the ideal state object and also updates it
+   * @param tableConfig
+   * @param targetNumReplicas
+   * @param rebalanceUserConfig
+   * @param newPartitionAssignment
+   */
+  private void rebalanceAndUpdateIdealState(final TableConfig tableConfig, final int targetNumReplicas,
+      final Configuration rebalanceUserConfig, final PartitionAssignment newPartitionAssignment) {
 
     final Function<IdealState, IdealState> updaterFunction = new Function<IdealState, IdealState>() {
       @Nullable
       @Override
       public IdealState apply(@Nullable IdealState idealState) {
-        rebalanceIdealState(rebalanceIdealState, tableConfig, targetNumReplicas, rebalanceUserConfig,
+        rebalanceIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig,
             newPartitionAssignment);
-        Map<String, Map<String, String>> mapFields = rebalanceIdealState.getRecord().getMapFields();
-        for (Map.Entry<String, Map<String, String>> entry : mapFields.entrySet()) {
-          idealState.setInstanceStateMap(entry.getKey(), entry.getValue());
-        }
         idealState.setReplicas(Integer.toString(targetNumReplicas));
         return idealState;
       }
@@ -189,6 +196,14 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
         RetryPolicies.exponentialBackoffRetryPolicy(5, 1000, 2.0f));
   }
 
+  /**
+   * Rebalances ideal state object without updating it
+   * @param idealState
+   * @param tableConfig
+   * @param targetNumReplicas
+   * @param rebalanceUserConfig
+   * @param newPartitionAssignment
+   */
   private void rebalanceIdealState(IdealState idealState, TableConfig tableConfig, int targetNumReplicas,
       Configuration rebalanceUserConfig, PartitionAssignment newPartitionAssignment) {
     // if realtime and includeConsuming, then rebalance consuming segments
