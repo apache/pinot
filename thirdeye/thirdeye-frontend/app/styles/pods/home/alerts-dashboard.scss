@@ -7,3 +7,10 @@
     width: 200px;
   }
 }
+
+.anomalies-table {
+  &__column-cell {
+    display: flex;
+    align-items: center;
+  }
+}

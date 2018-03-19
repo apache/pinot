@@ -27,6 +27,7 @@ import {
   setDuration
 } from 'thirdeye-frontend/utils/manage-alert-utils';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
+import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
 
 export default Controller.extend({
   /**
@@ -399,30 +400,6 @@ export default Controller.extend({
   }),
 
   /**
-   * Update feedback status on any anomaly
-   * @method updateAnomalyFeedback
-   * @param {Number} anomalyId - the id of the anomaly to update
-   * @param {String} feedbackType - key for feedback type
-   * @return {Ember.RSVP.Promise}
-   */
-  updateAnomalyFeedback(anomalyId, feedbackType) {
-    const url = `/anomalies/updateFeedback/${anomalyId}`;
-    const data = { feedbackType, comment: '' };
-    return fetch(url, postProps(data)).then((res) => checkStatus(res, 'post'));
-  },
-
-  /**
-   * Fetch a single anomaly record for verification
-   * @method verifyAnomalyFeedback
-   * @param {Number} anomalyId
-   * @return {undefined}
-   */
-  verifyAnomalyFeedback(anomalyId) {
-    const anomalyUrl = this.get('anomalyDataUrl') + anomalyId;
-    return fetch(anomalyUrl).then(checkStatus);
-  },
-
-  /**
    * Send a POST request to the report anomaly API (2-step process)
    * http://go/te-ss-alert-flow-api
    * @method reportAnomaly
@@ -504,29 +481,30 @@ export default Controller.extend({
      * @param {String} selectedResponse - user-selected anomaly feedback option
      * @param {Object} inputObj - the selection object
      */
-    onChangeAnomalyResponse(anomalyRecord, selectedResponse, inputObj) {
-      const responseObj = this.get('anomalyResponseObj').find(res => res.name === selectedResponse);
+     onChangeAnomalyResponse: async function(anomalyRecord, selectedResponse, inputObj) {
+      const responseObj = anomalyUtil.anomalyResponseObj.find(res => res.name === selectedResponse);
       set(inputObj, 'selected', selectedResponse);
-
-      // Save anomaly feedback
-      this.updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value)
-        .then((res) => {
-          // We make a call to ensure our new response got saved
-          this.verifyAnomalyFeedback(anomalyRecord.anomalyId, responseObj.status)
-            .then((res) => {
-              const filterMap = res.searchFilters ? res.searchFilters.statusFilterMap : null;
-              if (filterMap && filterMap.hasOwnProperty(responseObj.status)) {
-                set(anomalyRecord, 'anomalyFeedback', selectedResponse);
-                set(anomalyRecord, 'showResponseSaved', true);
-              } else {
-                return Promise.reject(new Error('Response not saved'));
-              }
-            }); // verifyAnomalyFeedback
-        }) // updateAnomalyFeedback
-        .catch((err) => {
-          set(anomalyRecord, 'showResponseFailed', true);
-          set(anomalyRecord, 'showResponseSaved', false);
+      let res;
+      try {
+        // Save anomaly feedback
+        res = await anomalyUtil.updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value)
+        // We make a call to ensure our new response got saved
+        res = await anomalyUtil.verifyAnomalyFeedback(anomalyRecord.anomalyId, responseObj.status)
+        const filterMap = getWithDefault(res, 'searchFilters.statusFilterMap', null);
+        if (filterMap && filterMap.hasOwnProperty(responseObj.status)) {
+          setProperties(anomalyRecord, {
+            anomalyFeedback: selectedResponse,
+            showResponseSaved: true
+          });
+        } else {
+          return Promise.reject(new Error('Response not saved'));
+        }
+      } catch (err) {
+        setProperties(anomalyRecord, {
+          showResponseFailed: true,
+          showResponseSaved: false
         });
+      }
     },
 
     /**
@@ -669,6 +647,7 @@ export default Controller.extend({
       setDuration(duration, startDate, endDate);
       this.transitionToRoute({ queryParams: { duration, startDate, endDate }});
     },
+
 
     /**
      * Load tuning sub-route and properly toggle alert nav button
