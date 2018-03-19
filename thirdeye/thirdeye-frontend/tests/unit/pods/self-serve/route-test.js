@@ -1,11 +1,11 @@
-import { moduleFor, test } from 'ember-qunit';
+import { module, test } from 'qunit';
+import { setupTest } from 'ember-qunit';
 
-moduleFor('route:self-serve', 'Unit | Route | self serve', {
-  // Specify the other units that are required for this test.
-  needs: ['service:session']
-});
+module('Unit | Route | self serve', function(hooks) {
+  setupTest(hooks);
 
-test('it exists', function(assert) {
-  let route = this.subject();
-  assert.ok(route);
+  test('it exists', function(assert) {
+    let route = this.owner.lookup('route:self-serve');
+    assert.ok(route);
+  });
 });

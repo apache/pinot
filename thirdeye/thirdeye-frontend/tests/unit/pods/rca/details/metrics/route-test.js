@@ -1,11 +1,11 @@
-import { moduleFor, test } from 'ember-qunit';
+import { module, test } from 'qunit';
+import { setupTest } from 'ember-qunit';
 
-moduleFor('route:rca/details/metrics', 'Unit | Route | rca/details/metrics', {
-  // Specify the other units that are required for this test.
-  needs: ['service:redux']
-});
+module('Unit | Route | rca/details/metrics', function(hooks) {
+  setupTest(hooks);
 
-test('it exists', function(assert) {
-  let route = this.subject();
-  assert.ok(route);
+  test('it exists', function(assert) {
+    let route = this.owner.lookup('route:rca/details/metrics');
+    assert.ok(route);
+  });
 });
