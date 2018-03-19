@@ -279,6 +279,10 @@ public class PinotSegmentUploadRestletResource {
     File tempTarredSegmentFile = null;
     File tempSegmentDir = null;
 
+    if (headers != null) {
+      LOGGER.info("Got HTTP Request headers {}", headers.getRequestHeaders());
+    }
+
     try {
       FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
       String tempSegmentName = "tmp-" + System.nanoTime();
