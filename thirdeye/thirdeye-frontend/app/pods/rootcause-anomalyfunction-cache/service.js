@@ -93,7 +93,7 @@ export default Service.extend({
     const functionId = urn.split(':')[2];
     const startDateTime = moment(context.analysisRange[0]).utc().format();
     const endDateTime = moment(context.analysisRange[1]).utc().format();
-    const dimensionJsonString = encodeURI(JSON.stringify(this._toFilterMapCustom(toFilters(urn))));
+    const dimensionJsonString = encodeURIComponent(JSON.stringify(this._toFilterMapCustom(toFilters(urn))));
 
     const url = `/dashboard/anomaly-function/${functionId}/baseline?start=${startDateTime}&end=${endDateTime}&dimension=${dimensionJsonString}&mode=offline`;
     return fetch(url)
