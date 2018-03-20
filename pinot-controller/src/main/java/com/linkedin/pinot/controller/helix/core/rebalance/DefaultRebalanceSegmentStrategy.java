@@ -164,7 +164,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
     boolean dryRun = rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN, DEFAULT_DRY_RUN);
     if (!dryRun) {
       LOGGER.info("Updating ideal state for table {}", tableNameWithType);
-      rebalanceAndUpdateIdealState(tableConfig, targetNumReplicas, rebalanceUserConfig, newPartitionAssignment);
+      rebalanceAndUpdateIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig, newPartitionAssignment);
     } else {
       LOGGER.info("Dry run. Skip writing ideal state");
       rebalanceIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig, newPartitionAssignment);
@@ -174,13 +174,15 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
 
   /**
    * Rebalances the ideal state object and also updates it
+   * @param rebalanceIdealState
    * @param tableConfig
    * @param targetNumReplicas
    * @param rebalanceUserConfig
    * @param newPartitionAssignment
    */
-  private void rebalanceAndUpdateIdealState(final TableConfig tableConfig, final int targetNumReplicas,
-      final Configuration rebalanceUserConfig, final PartitionAssignment newPartitionAssignment) {
+  private void rebalanceAndUpdateIdealState(final IdealState rebalanceIdealState, final TableConfig tableConfig,
+      final int targetNumReplicas, final Configuration rebalanceUserConfig,
+      final PartitionAssignment newPartitionAssignment) {
 
     final Function<IdealState, IdealState> updaterFunction = new Function<IdealState, IdealState>() {
       @Nullable
@@ -189,6 +191,10 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
         rebalanceIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig,
             newPartitionAssignment);
         idealState.setReplicas(Integer.toString(targetNumReplicas));
+        for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+          rebalanceIdealState.setInstanceStateMap(entry.getKey(), entry.getValue());
+        }
+        rebalanceIdealState.setReplicas(Integer.toString(targetNumReplicas));
         return idealState;
       }
     };
