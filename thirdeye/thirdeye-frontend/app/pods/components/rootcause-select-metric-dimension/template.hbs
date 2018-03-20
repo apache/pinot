@@ -15,21 +15,23 @@
     }}
   </div>
   <div class="col-xs-7">
-    <label class="te-label te-label--small" for="select-filters">
-      Filter by
-      <span>
-        <i class="glyphicon glyphicon-question-sign"></i>
-        {{#tooltip-on-element class="te-tooltip"}}
-          You can add additional filters to the analyzed metric if you are investigating a subset of the data, for example "countryCode::us". The available filters depend on the data set. You can also select filters in the "Dimensions" tab.
-        {{/tooltip-on-element}}
-      </span>
-    </label>
+    {{#if selectedUrn}}
+      <label class="te-label te-label--small" for="select-filters">
+        Filter by
+        <span>
+          <i class="glyphicon glyphicon-question-sign"></i>
+          {{#tooltip-on-element class="te-tooltip"}}
+            You can add additional filters to the analyzed metric if you are investigating a subset of the data, for example "countryCode::us". The available filters depend on the data set. You can also select filters in the "Dimensions" tab.
+          {{/tooltip-on-element}}
+        </span>
+      </label>
 
-    {{filter-select
-      selected=filters
-      options=filterOptions
-      triggerId="select-filters"
-      onChange=(action "onFilters")
-    }}
+      {{filter-select
+        selected=filters
+        options=filterOptions
+        triggerId="select-filters"
+        onChange=(action "onFilters")
+      }}
+    {{/if}}
   </div>
 </div>
