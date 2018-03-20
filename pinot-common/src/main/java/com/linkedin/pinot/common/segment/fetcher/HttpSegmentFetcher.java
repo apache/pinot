@@ -16,7 +16,6 @@
 package com.linkedin.pinot.common.segment.fetcher;
 
 import com.linkedin.pinot.common.exception.HttpErrorStatusException;
-import com.linkedin.pinot.common.exception.PermanentDownloadException;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import java.io.File;
@@ -68,7 +67,7 @@ public class HttpSegmentFetcher implements SegmentFetcher {
           } else {
             // Permanent exception
             _logger.error("Caught permanent exception while downloading file from: {}, won't retry", uri, e);
-            throw new PermanentDownloadException(e.getMessage());
+            throw e;
           }
         } catch (Exception e) {
           _logger.warn("Caught temporary exception while downloading file from: {}, will retry", uri, e);
