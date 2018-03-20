@@ -20,6 +20,8 @@ import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.exception.HttpErrorStatusException;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
+import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.SimpleHttpResponse;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
@@ -35,6 +37,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import javax.annotation.Nonnull;
+import javax.net.ssl.SSLContext;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
@@ -58,6 +62,17 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
   private static final int DEFAULT_MAX_NUM_ATTEMPTS = 5;
   private static final long DEFAULT_INITIAL_RETRY_DELAY_MS = 1000L; // 1 second
   private static final float DEFAULT_RETRY_SCALE_FACTOR = 2f;
+  private static final String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "enabled";
+  private static final String HTTPS_PROTOCOL = "https";
+
+  private static SSLContext _sslContext;
+
+  public static void init(Configuration uploaderConfig) {
+    Configuration httpsConfig = uploaderConfig.subset(HTTPS_PROTOCOL);
+    if (httpsConfig.getBoolean(CONFIG_OF_CONTROLLER_HTTPS_ENABLED, false)) {
+      _sslContext = new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
+    }
+  }
 
   /**
    * Convert the segment based on the given {@link PinotTaskConfig}.
@@ -149,7 +164,7 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       RetryPolicy retryPolicy =
           RetryPolicies.exponentialBackoffRetryPolicy(maxNumAttempts, initialRetryDelayMs, retryScaleFactor);
 
-      try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      try (FileUploadDownloadClient fileUploadDownloadClient = constructFileUploadDownloadClient()) {
         retryPolicy.attempt(new Callable<Boolean>() {
           @Override
           public Boolean call() throws Exception {
@@ -182,6 +197,14 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableName, segmentName);
     } finally {
       FileUtils.deleteQuietly(tempDataDir);
+    }
+  }
+
+  private FileUploadDownloadClient constructFileUploadDownloadClient() {
+    if (_sslContext != null) {
+      return new FileUploadDownloadClient(_sslContext);
+    } else {
+      return new FileUploadDownloadClient();
     }
   }
 }
