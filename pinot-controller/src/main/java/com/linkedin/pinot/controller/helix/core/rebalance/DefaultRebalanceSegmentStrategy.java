@@ -84,11 +84,13 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
   @Override
   public PartitionAssignment rebalancePartitionAssignment(IdealState idealState, TableConfig tableConfig,
       Configuration rebalanceUserConfig) {
-    PartitionAssignment newPartitionAssignment = new PartitionAssignment(tableConfig.getTableName());
+    String tableNameWithType = tableConfig.getTableName();
+    PartitionAssignment newPartitionAssignment = new PartitionAssignment(tableNameWithType);
 
     if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
       StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
       if (streamMetadata.hasHighLevelKafkaConsumerType()) {
+        LOGGER.info("Table {} uses HLC and will have no partition assignment", tableNameWithType);
         return newPartitionAssignment;
       }
 
@@ -97,8 +99,6 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
       boolean includeConsuming =
           rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.INCLUDE_CONSUMING, DEFAULT_INCLUDE_CONSUMING);
       if (includeConsuming) {
-
-        String tableNameWithType = tableConfig.getTableName();
 
         StreamPartitionAssignmentGenerator streamPartitionAssignmentGenerator =
             new StreamPartitionAssignmentGenerator(_propertyStore);
