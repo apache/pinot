@@ -280,7 +280,8 @@ public class PinotSegmentUploadRestletResource {
     File tempSegmentDir = null;
 
     if (headers != null) {
-      LOGGER.info("Got HTTP Request headers {}", headers.getRequestHeaders());
+      LOGGER.info("HTTP Header {} is {}", CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER, headers.getRequestHeader(CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER));
+      LOGGER.info("HTTP Header {} is {}", CommonConstants.Controller.TABLE_NAME_HTTP_HEADER, headers.getRequestHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER));
     }
 
     try {
