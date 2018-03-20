@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang.ObjectUtils;
@@ -30,8 +31,10 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   private Long createdTime;
   private boolean notified;
 
-  //TODO: deprecate raw anomaly list and message
   private String message;
+  // TODO: Remove raw anomaly id list after old merged anomalies are cleaned up
+  @Deprecated
+  private List<Long> rawAnomalyIdList;
 
 
   public Long getFunctionId() {
@@ -152,6 +155,18 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
 
   public void setMessage(String message) {
     this.message = message;
+  }
+
+  // TODO: Remove this method after old merged anomalies are cleaned up
+  @Deprecated
+  public List<Long> getRawAnomalyIdList() {
+    return rawAnomalyIdList;
+  }
+
+  // TODO: Remove this method after old merged anomalies are cleaned up
+  @Deprecated
+  public void setRawAnomalyIdList(List<Long> rawAnomalyIdList) {
+    this.rawAnomalyIdList = rawAnomalyIdList;
   }
 
   public double getImpactToGlobal() {
