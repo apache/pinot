@@ -66,7 +66,7 @@ public class HolidayEventsLoader implements Runnable {
     try {
       HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
     } catch (Exception e) {
-      LOG.error("Can't create http transport with google api.");
+      LOG.error("Can't create http transport with google api.", e);
     }
   }
 
@@ -125,7 +125,7 @@ public class HolidayEventsLoader implements Runnable {
       try {
         events.addAll(this.getCalendarEvents(calendar));
       } catch (Exception e) {
-        // left blank
+        LOG.error("{} Fetch holiday events failed.", calendar);
       }
     }
     return events;

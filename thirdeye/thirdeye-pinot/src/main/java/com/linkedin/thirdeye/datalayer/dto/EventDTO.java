@@ -8,7 +8,7 @@ public class EventDTO extends EventBean {
 
   @Override
   public int hashCode() {
-    return com.google.common.base.Objects.hashCode(getName(), getStartTime(), getEndTime(), getEventType());
+    return Objects.hash(getName(), getStartTime(), getEndTime(), getEventType());
   }
 
   @Override

@@ -4,22 +4,22 @@ import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskDriverConfiguration;
 import com.linkedin.thirdeye.auto.onboard.AutoOnboardConfiguration;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
+import java.util.Collections;
 import java.util.List;
 
 
 public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
+
+  private boolean alert = false;
+  private boolean autoload = false;
+  private boolean classifier = false;
+  private boolean dataCompleteness = false;
+  private boolean detectionOnboard = false;
   private boolean holidayEventsLoader = false;
+  private boolean monitor = false;
+  private boolean pinotProxy = false;
   private boolean scheduler = false;
   private boolean worker = false;
-  private boolean monitor = false;
-  private boolean alert = false;
-  @Deprecated
-  private boolean merger = false;
-  private boolean autoload = false;
-  private boolean dataCompleteness = false;
-  private boolean classifier = false;
-  private boolean pinotProxy = false;
-  private boolean detectionOnboard = false;
 
   private long id;
   private String dashboardHost;
@@ -30,7 +30,7 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private String failureFromAddress;
   private String failureToAddress;
   private String keyPath;
-  private List<String> calendars;
+  private List<String> calendars = Collections.emptyList();
 
   public String getKeyPath() {
     return keyPath;
@@ -130,14 +130,6 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public SmtpConfiguration getSmtpConfiguration() {
     return smtpConfiguration;
-  }
-
-  public boolean isMerger() {
-    return merger;
-  }
-
-  public void setMerger(boolean merger) {
-    this.merger = merger;
   }
 
   public boolean isAutoload() {
