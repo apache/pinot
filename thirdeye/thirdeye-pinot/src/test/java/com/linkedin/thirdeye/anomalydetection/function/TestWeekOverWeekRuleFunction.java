@@ -255,7 +255,6 @@ public class TestWeekOverWeekRuleFunction {
     MergedAnomalyResultDTO mergedAnomaly = new MergedAnomalyResultDTO();
     mergedAnomaly.setStartTime(expectedRawAnomalies.get(0).getStartTime());
     mergedAnomaly.setEndTime(expectedRawAnomalies.get(1).getEndTime());
-    mergedAnomaly.setAnomalyResults(expectedRawAnomalies);
 
     function.updateMergedAnomalyInfo(anomalyDetectionContext, mergedAnomaly);
 
@@ -293,11 +292,7 @@ public class TestWeekOverWeekRuleFunction {
     Assert.assertEquals(mergedAnomaly.getAvgBaselineVal(), avgBaseline, EPSILON);
 
     // Test Score; score is the average of all raw anomalies' score
-    double expectedScore = 0d;
-    for (RawAnomalyResultDTO rawAnomaly : expectedRawAnomalies) {
-      expectedScore += rawAnomaly.getScore();
-    }
-    expectedScore /= expectedRawAnomalies.size();
+    double expectedScore = Math.abs(expectedWeight);
     Assert.assertEquals(mergedAnomaly.getScore(), expectedScore, EPSILON);
   }
 

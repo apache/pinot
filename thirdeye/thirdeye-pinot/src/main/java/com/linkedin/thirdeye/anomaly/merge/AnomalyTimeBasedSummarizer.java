@@ -102,10 +102,6 @@ public abstract class AnomalyTimeBasedSummarizer {
           if (currentResult.getEndTime() > mergedAnomaly.getEndTime()) {
             mergedAnomaly.setEndTime(currentResult.getEndTime());
           }
-          if (!mergedAnomaly.getAnomalyResults().contains(currentResult)) {
-            mergedAnomaly.getAnomalyResults().add(currentResult);
-            currentResult.setMerged(true);
-          }
         }
       }
 
@@ -117,13 +113,7 @@ public abstract class AnomalyTimeBasedSummarizer {
     return mergedAnomalies;
   }
 
-
-  private static void populateMergedResult(MergedAnomalyResultDTO mergedAnomaly,
-      RawAnomalyResultDTO currentResult) {
-    if (!mergedAnomaly.getAnomalyResults().contains(currentResult)) {
-      mergedAnomaly.getAnomalyResults().add(currentResult);
-      currentResult.setMerged(true);
-    }
+  private static void populateMergedResult(MergedAnomalyResultDTO mergedAnomaly, RawAnomalyResultDTO currentResult) {
     // only set collection, keep metric, dimensions and function null
     mergedAnomaly.setCollection(currentResult.getCollection());
     mergedAnomaly.setMetric(currentResult.getMetric());

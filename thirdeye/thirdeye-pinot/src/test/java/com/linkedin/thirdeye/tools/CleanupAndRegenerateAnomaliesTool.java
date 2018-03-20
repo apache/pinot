@@ -6,7 +6,6 @@ import com.linkedin.thirdeye.anomaly.utils.DetectionResourceHttpUtils;
 import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import java.io.File;
@@ -39,11 +38,7 @@ public class CleanupAndRegenerateAnomaliesTool {
   private String monitoringWindowEndTime;
   private List<Long> functionIds;
 
-  private int rawAnomaliesDeleted = 0;
-  private int mergedAnomaliesDeleted = 0;
-
   private AnomalyFunctionManager anomalyFunctionDAO;
-  private RawAnomalyResultManager rawResultDAO;
   private MergedAnomalyResultManager mergedResultDAO;
   private DetectionResourceHttpUtils detectionResourceHttpUtils;
 
@@ -61,8 +56,6 @@ public class CleanupAndRegenerateAnomaliesTool {
     DaoProviderUtil.init(persistenceFile);
     anomalyFunctionDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl.class);
-    rawResultDAO = DaoProviderUtil
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl.class);
     mergedResultDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl.class);
   }
@@ -124,7 +117,7 @@ public class CleanupAndRegenerateAnomaliesTool {
           functionId, anomalyFunction.getCollection(), anomalyFunction.getMetric());
 
       // Clean up merged and raw anomaly of functionID
-      OnboardResource onboardResource = new OnboardResource(anomalyFunctionDAO, mergedResultDAO, rawResultDAO);
+      OnboardResource onboardResource = new OnboardResource(anomalyFunctionDAO, mergedResultDAO);
       onboardResource.deleteExistingAnomalies(functionId, startTime, endTime);
     }
   }

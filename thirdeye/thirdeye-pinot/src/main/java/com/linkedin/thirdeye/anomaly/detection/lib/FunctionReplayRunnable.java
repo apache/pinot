@@ -8,7 +8,6 @@ import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import java.util.ArrayList;
@@ -26,7 +25,6 @@ public class FunctionReplayRunnable implements Runnable {
   private DetectionJobScheduler detectionJobScheduler;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
   private AnomalyFunctionManager anomalyFunctionDAO;
-  private RawAnomalyResultManager rawAnomalyResultDAO;
   private AutotuneMethodType autotuneMethodType;
   private AutotuneConfigManager autotuneConfigDAO;
   private PerformanceEvaluationMethod performanceEvaluationMethod;
@@ -42,12 +40,10 @@ public class FunctionReplayRunnable implements Runnable {
   private long lastClonedFunctionId;
 
   public FunctionReplayRunnable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
-      MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
-      AutotuneConfigManager autotuneConfigDAO){
+      MergedAnomalyResultManager mergedAnomalyResultDAO, AutotuneConfigManager autotuneConfigDAO) {
     this.detectionJobScheduler = detectionJobScheduler;
     this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
     this.anomalyFunctionDAO = anomalyFunctionDAO;
-    this.rawAnomalyResultDAO = rawAnomalyResultDAO;
     this.autotuneConfigDAO = autotuneConfigDAO;
     setSpeedUp(true);
     setForceBackfill(true);
@@ -55,11 +51,10 @@ public class FunctionReplayRunnable implements Runnable {
   }
 
   public FunctionReplayRunnable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
-      MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
-      AutotuneConfigManager autotuneConfigDAO, Map<String, String> tuningParameter,
-      long tuningFunctionId, DateTime replayStart, DateTime replayEnd, double goal, long functionAutotuneConfigId,
-      boolean isForceBackfill, boolean selfKill) {
-    this(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO, autotuneConfigDAO);
+      MergedAnomalyResultManager mergedAnomalyResultDAO, AutotuneConfigManager autotuneConfigDAO,
+      Map<String, String> tuningParameter, long tuningFunctionId, DateTime replayStart, DateTime replayEnd, double goal,
+      long functionAutotuneConfigId, boolean isForceBackfill, boolean selfKill) {
+    this(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO, autotuneConfigDAO);
     setTuningFunctionId(tuningFunctionId);
     setReplayStart(replayStart);
     setReplayEnd(replayEnd);
@@ -71,12 +66,10 @@ public class FunctionReplayRunnable implements Runnable {
     setSelfKill(selfKill);
   }
 
-
   public FunctionReplayRunnable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
-      MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
-      Map<String, String> tuningParameter, long tuningFunctionId, DateTime replayStart, DateTime replayEnd,
-      boolean selfKill) {
-    this(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO, null);
+      MergedAnomalyResultManager mergedAnomalyResultDAO, Map<String, String> tuningParameter, long tuningFunctionId,
+      DateTime replayStart, DateTime replayEnd, boolean selfKill) {
+    this(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO, null);
     setTuningFunctionId(tuningFunctionId);
     setReplayStart(replayStart);
     setReplayEnd(replayEnd);
@@ -110,8 +103,7 @@ public class FunctionReplayRunnable implements Runnable {
   public void run() {
     long currentTime = System.currentTimeMillis();
     long clonedFunctionId = 0l;
-    OnboardResource
-        onboardResource = new OnboardResource(anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO);
+    OnboardResource onboardResource = new OnboardResource(anomalyFunctionDAO, mergedAnomalyResultDAO);
     StringBuilder functionName = new StringBuilder("clone");
     for (Map.Entry<String, String> entry : tuningParameter.entrySet()) {
       functionName.append("_");

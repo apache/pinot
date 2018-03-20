@@ -62,11 +62,9 @@ public class TestMergedAnomalyResultManager{
 
     AnomalyMergeConfig mergeConfig = new AnomalyMergeConfig();
 
-    List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
-        .mergeAnomalies(rawResults, mergeConfig);
+    List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer.mergeAnomalies(rawResults, mergeConfig);
     Assert.assertEquals(mergedResults.get(0).getStartTime(), (long) result.getStartTime());
     Assert.assertEquals(mergedResults.get(0).getEndTime(), (long) result.getEndTime());
-    Assert.assertEquals(mergedResults.get(0).getAnomalyResults().get(0), result);
 
     // Let's persist the merged result
     mergedResults.get(0).setDimensions(result.getDimensions());
@@ -77,13 +75,11 @@ public class TestMergedAnomalyResultManager{
 
     // verify the merged result
     MergedAnomalyResultDTO mergedResultById = mergedAnomalyResultDAO.findById(mergedResult.getId());
-    Assert.assertEquals(mergedResultById.getAnomalyResults(), rawResults);
-    Assert.assertEquals(mergedResultById.getAnomalyResults().get(0).getId(), anomalyResultId);
     Assert.assertEquals(mergedResultById.getDimensions(), result.getDimensions());
 
     List<MergedAnomalyResultDTO> mergedResultsByMetricDimensionsTime = mergedAnomalyResultDAO
         .findByCollectionMetricDimensionsTime(mergedResult.getCollection(), mergedResult.getMetric(),
-            mergedResult.getDimensions().toString(), 0, System.currentTimeMillis(), true);
+            mergedResult.getDimensions().toString(), 0, System.currentTimeMillis());
 
     Assert.assertEquals(mergedResultsByMetricDimensionsTime.get(0), mergedResult);
   }
@@ -100,7 +96,7 @@ public class TestMergedAnomalyResultManager{
 
     //verify feedback
     MergedAnomalyResultDTO mergedResult1 = mergedAnomalyResultDAO.findById(mergedResult.getId());
-    Assert.assertEquals(mergedResult1.getAnomalyResults().get(0).getId(), anomalyResultId);
+//    Assert.assertEquals(mergedResult1.getAnomalyResults().get(0).getId(), anomalyResultId);
     Assert.assertEquals(mergedResult1.getFeedback().getFeedbackType(), AnomalyFeedbackType.ANOMALY);
   }
 }

@@ -59,18 +59,6 @@ public class DAORegistry {
     return INSTANCE;
   }
 
-  /**
-   * **USE FOR TESTING ONLY**
-   * Return a DAO registry for testing purpose, which may be performed in arbitrary order and
-   * hence need independent registry for each test.
-   *
-   * @return an independent DAO registry to the global singleton registry.
-   */
-  public static DAORegistry getTestInstance() {
-    return new DAORegistry();
-  }
-
-
 
   /**
    * internal constructor.

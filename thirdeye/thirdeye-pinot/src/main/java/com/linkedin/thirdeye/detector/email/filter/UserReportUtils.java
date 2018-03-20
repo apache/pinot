@@ -1,11 +1,8 @@
 package com.linkedin.thirdeye.detector.email.filter;
 
-import com.google.common.collect.HashMultimap;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
-import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.Collections;
 import java.util.Comparator;
@@ -24,7 +21,7 @@ public class UserReportUtils {
   public static Boolean isUserReportAnomalyIsQualified(AlertFilter alertFilter,
       MergedAnomalyResultDTO userReportAnomaly) {
     MergedAnomalyResultManager mergedAnomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
-    List<MergedAnomalyResultDTO> systemAnomalies = mergedAnomalyDAO.findByFunctionId(userReportAnomaly.getFunction().getId(), false);
+    List<MergedAnomalyResultDTO> systemAnomalies = mergedAnomalyDAO.findByFunctionId(userReportAnomaly.getFunction().getId());
     long startTime = userReportAnomaly.getStartTime();
     long endTime = userReportAnomaly.getEndTime();
     long qualifiedRegion = 0;

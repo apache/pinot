@@ -20,11 +20,11 @@ public class HistoricalAnomalyEventProvider implements EventDataProvider<EventDT
     List<EventDTO> events = new ArrayList<>();
     if (eventFilter.getMetricName() == null) {
       mergedAnomalies =
-          mergedAnomalyDAO.findByTime(eventFilter.getStartTime(), eventFilter.getStartTime(), false);
+          mergedAnomalyDAO.findByTime(eventFilter.getStartTime(), eventFilter.getStartTime());
     } else {
       mergedAnomalies = mergedAnomalyDAO
           .findByMetricTime(eventFilter.getMetricName(), eventFilter.getStartTime(),
-              eventFilter.getStartTime(), false);
+              eventFilter.getStartTime());
     }
 
     if (mergedAnomalies != null) {

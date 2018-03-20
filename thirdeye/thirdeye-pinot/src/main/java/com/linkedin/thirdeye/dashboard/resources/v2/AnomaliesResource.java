@@ -60,7 +60,6 @@ import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDataCompare;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
@@ -79,7 +78,6 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
@@ -240,9 +238,9 @@ public class AnomaliesResource {
       @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly
       ) throws Exception {
 
-    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findNotifiedByTime(startTime, endTime, false);
-    AnomaliesWrapper
-        anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, searchFiltersJSON, pageNumber, filterOnly);
+    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByTime(startTime, endTime);
+    AnomaliesWrapper anomaliesWrapper =
+        constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, searchFiltersJSON, pageNumber, filterOnly);
     return anomaliesWrapper;
   }
 
@@ -428,7 +426,6 @@ public class AnomaliesResource {
     anomaly.setMetric(anomalyFunction.getTopicMetric());
     anomaly.setCollection(anomalyFunction.getCollection());
     anomaly.setProperties(Collections.<String, String>emptyMap());
-    anomaly.setAnomalyResults(Collections.<RawAnomalyResultDTO>emptyList());
 
     if (mergedAnomalyResultDAO.save(anomaly) == null) {
       throw new IllegalArgumentException(String.format("Could not store user reported anomaly: '%s'", anomaly));
@@ -467,7 +464,7 @@ public class AnomaliesResource {
       dimension = new DimensionMap(dimensionMapJSONString);
     }
     // fetch anomalies
-    List<MergedAnomalyResultDTO> anomalies = mergedAnomalyResultDAO.findByFunctionId(functionId, false);
+    List<MergedAnomalyResultDTO> anomalies = mergedAnomalyResultDAO.findByFunctionId(functionId);
 
     // apply feedback
     for (MergedAnomalyResultDTO anomaly : anomalies) {
@@ -502,7 +499,7 @@ public class AnomaliesResource {
     String dataset = metricConfig.getDataset();
     String metric = metricConfig.getName();
     List<MergedAnomalyResultDTO> mergedAnomalies =
-        mergedAnomalyResultDAO.findByCollectionMetricTime(dataset, metric, startTime, endTime, false);
+        mergedAnomalyResultDAO.findByCollectionMetricTime(dataset, metric, startTime, endTime);
     try {
       mergedAnomalies = AlertFilterHelper.applyFiltrationRule(mergedAnomalies, alertFilterFactory);
     } catch (Exception e) {

@@ -43,10 +43,8 @@ import com.linkedin.thirdeye.datalayer.util.Predicate;
 import java.io.File;
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -136,7 +134,7 @@ public class RunAdhocDatabaseQueriesTool {
     Predicate predicate = Predicate.EQ("functionId", id);
     // Delete merged anomaly that is associated with the specified anomaly function
     LOG.info("Deleting {} merged anomalies of function {}.", mergedResultDAO.findIdsByPredicate(predicate).size(), id);
-    List<MergedAnomalyResultDTO> mergedAnomalyResults = mergedResultDAO.findByFunctionId(id, false);
+    List<MergedAnomalyResultDTO> mergedAnomalyResults = mergedResultDAO.findByFunctionId(id);
     for (MergedAnomalyResultDTO mergedAnomalyResult : mergedAnomalyResults) {
       // Delete feedback of this merged anomaly
       if (mergedAnomalyResult.getFeedback() != null) {
@@ -393,7 +391,7 @@ public class RunAdhocDatabaseQueriesTool {
     long windowStart = windowEnd - duration;
 
     List<MergedAnomalyResultDTO> mergedAnomalyResults =
-        mergedResultDAO.findByCollectionTime(dataset, windowStart, windowEnd, false);
+        mergedResultDAO.findByCollectionTime(dataset, windowStart, windowEnd);
     LOG.info("{} anomalies to update for dataset {}", mergedAnomalyResults.size(), dataset);
     for (MergedAnomalyResultDTO mergedAnomalyResult : mergedAnomalyResults) {
       if (mergedAnomalyResult.isNotified()) {

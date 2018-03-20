@@ -156,7 +156,6 @@ public class TestMinMaxThresholdFunction {
     MergedAnomalyResultDTO mergedAnomaly = new MergedAnomalyResultDTO();
     mergedAnomaly.setStartTime(expectedRawAnomalies.get(0).getStartTime());
     mergedAnomaly.setEndTime(expectedRawAnomalies.get(1).getEndTime());
-    mergedAnomaly.setAnomalyResults(expectedRawAnomalies);
 
     function.updateMergedAnomalyInfo(anomalyDetectionContext, mergedAnomaly);
 

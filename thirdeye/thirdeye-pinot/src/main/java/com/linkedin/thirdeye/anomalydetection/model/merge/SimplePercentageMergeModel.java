@@ -35,8 +35,7 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
    * @param anomalyToUpdated the anomaly of which the information is updated.
    */
   @Override
-  public void update(AnomalyDetectionContext anomalyDetectionContext,
-      MergedAnomalyResultDTO anomalyToUpdated) {
+  public void update(AnomalyDetectionContext anomalyDetectionContext, MergedAnomalyResultDTO anomalyToUpdated) {
     String mainMetric =
         anomalyDetectionContext.getAnomalyDetectionFunction().getSpec().getTopicMetric();
 
@@ -79,27 +78,13 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
       weight = (avgCurrent - avgBaseline) / avgBaseline;
       avgCurrent /= count;
       avgBaseline /= count;
-    } else {
-      weight = 0d;
-    }
-
-    // Average score of raw anomalies
-    List<RawAnomalyResultDTO> rawAnomalyResultDTOs = anomalyToUpdated.getAnomalyResults();
-    double score = 0d;
-    if (CollectionUtils.isNotEmpty(rawAnomalyResultDTOs)) {
-      for (RawAnomalyResultDTO rawAnomaly : rawAnomalyResultDTOs) {
-        score += rawAnomaly.getScore();
-      }
-      score /= rawAnomalyResultDTOs.size();
-    } else {
-      score = anomalyToUpdated.getScore();
     }
 
     anomalyToUpdated.setWeight(weight);
-    anomalyToUpdated.setScore(score);
+    anomalyToUpdated.setScore(Math.abs(weight));
     anomalyToUpdated.setAvgCurrentVal(avgCurrent);
     anomalyToUpdated.setAvgBaselineVal(avgBaseline);
     anomalyToUpdated.setMessage(
-        String.format(DEFAULT_MESSAGE_TEMPLATE, weight * 100, avgCurrent, avgBaseline, score));
+        String.format(DEFAULT_MESSAGE_TEMPLATE, weight * 100, avgCurrent, avgBaseline, Math.abs(weight)));
   }
 }

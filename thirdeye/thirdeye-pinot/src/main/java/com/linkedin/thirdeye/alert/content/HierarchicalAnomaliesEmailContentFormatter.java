@@ -113,8 +113,6 @@ public class HierarchicalAnomaliesEmailContentFormatter extends BaseEmailContent
    * @return
    */
   private AnomalyReportEntity generateAnomalyReportEntity(MergedAnomalyResultDTO anomaly, String dashboardHost) {
-    RawAnomalyResultDTO latestRawAnomaly = getLatestRawAnomalyResult(anomaly);
-
     AnomalyFeedback feedback = anomaly.getFeedback();
 
     String feedbackVal = getFeedbackValue(feedback);
@@ -145,10 +143,6 @@ public class HierarchicalAnomaliesEmailContentFormatter extends BaseEmailContent
           null, null, targetDimensions));
     }
 
-    if (useLatestAnomaly && latestRawAnomaly != null) {
-      anomalyReport.setCurrentVal(ThirdEyeUtils.getRoundedValue(latestRawAnomaly.getAvgCurrentVal()));
-      anomalyReport.setBaselineVal(ThirdEyeUtils.getRoundedValue(latestRawAnomaly.getAvgBaselineVal()));
-    }
     return anomalyReport;
   }
 

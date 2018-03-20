@@ -16,7 +16,6 @@ import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
 
 import javax.validation.constraints.NotNull;
-import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -52,7 +51,6 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -60,7 +58,6 @@ import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
-import com.linkedin.thirdeye.util.SeverityComputationUtil;
 
 import static com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO.*;
 
@@ -71,7 +68,6 @@ public class DetectionJobResource {
   private final DetectionJobScheduler detectionJobScheduler;
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
-  private final RawAnomalyResultManager rawAnomalyResultDAO;
   private final AutotuneConfigManager autotuneConfigDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private final AlertFilterAutotuneFactory alertFilterAutotuneFactory;
@@ -101,7 +97,6 @@ public class DetectionJobResource {
     this.detectionJobScheduler = detectionJobScheduler;
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
-    this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     this.autotuneConfigDAO = DAO_REGISTRY.getAutotuneConfigDAO();
     this.alertFilterAutotuneFactory = alertFilterAutotuneFactory;
     this.alertFilterFactory = alertFilterFactory;
@@ -193,7 +188,7 @@ public class DetectionJobResource {
       return Response.status(Status.BAD_REQUEST).entity("Replay job error with job status: {}" + jobStatus).build();
     } else {
       numReplayedAnomalies =
-          mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, id, false).size();
+          mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, id).size();
       LOG.info("Replay completed with {} anomalies generated.", numReplayedAnomalies);
     }
 
@@ -452,7 +447,7 @@ public class DetectionJobResource {
         return Response.status(Response.Status.NO_CONTENT).entity("Detection job failed").build();
       } else {
         List<MergedAnomalyResultDTO> mergedAnomalies =
-            mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(0, analysisTime.getMillis(), id, true);
+            mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(0, analysisTime.getMillis(), id);
         for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
           anomalyIds.add(mergedAnomaly.getId());
         }
@@ -477,7 +472,7 @@ public class DetectionJobResource {
     StringTokenizer ends = new StringTokenizer(holidayEnds, ",");
     MergedAnomalyResultManager anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     List<MergedAnomalyResultDTO> totalAnomalies =
-        anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, functionId, true);
+        anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, functionId);
     int origSize = totalAnomalies.size();
     long start;
     long end;
@@ -485,7 +480,7 @@ public class DetectionJobResource {
       start = ISODateTimeFormat.dateTimeParser().parseDateTime(starts.nextToken()).getMillis();
       end = ISODateTimeFormat.dateTimeParser().parseDateTime(ends.nextToken()).getMillis();
       List<MergedAnomalyResultDTO> holidayMergedAnomalies =
-          anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(start, end, functionId, true);
+          anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(start, end, functionId);
       totalAnomalies.removeAll(holidayMergedAnomalies);
     }
     if (starts.hasMoreElements() || ends.hasMoreElements()) {
@@ -892,7 +887,7 @@ public class DetectionJobResource {
       LOG.info("Running backfill replay with parameter configuration: {}" + config.toString());
       FunctionReplayRunnable backfillRunnable =
           new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO,
-              rawAnomalyResultDAO, autotuneConfigDAO);
+              autotuneConfigDAO);
       backfillRunnable.setTuningFunctionId(functionId);
       backfillRunnable.setFunctionAutotuneConfigId(targetDTO.getId());
       backfillRunnable.setReplayStart(replayStart);
@@ -1135,7 +1130,7 @@ public class DetectionJobResource {
     long functionId = target.getFunctionId();
     // Fetch anomalies within the time range
     List<MergedAnomalyResultDTO> mergedResults =
-        mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, functionId, false);
+        mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, functionId);
     // Initiate alert filter to BaseAlertFilter
     Map<String, String> tunedParams = target.getConfiguration();
     BaseAlertFilter alertFilter = alertFilterFactory.fromSpec(tunedParams);

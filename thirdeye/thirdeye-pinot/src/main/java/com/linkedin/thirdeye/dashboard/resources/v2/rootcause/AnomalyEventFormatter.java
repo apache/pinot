@@ -58,7 +58,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
   public RootCauseEventEntity format(EventEntity entity) {
     AnomalyEventEntity e = (AnomalyEventEntity) entity;
 
-    MergedAnomalyResultDTO anomaly = this.anomalyDAO.findById(e.getId(), false);
+    MergedAnomalyResultDTO anomaly = this.anomalyDAO.findById(e.getId());
     AnomalyFunctionDTO function = anomaly.getFunction();
     MetricConfigDTO metric = this.getMetricFromFunction(function);
 
