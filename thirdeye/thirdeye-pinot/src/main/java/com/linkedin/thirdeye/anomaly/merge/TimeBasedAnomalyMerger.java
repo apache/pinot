@@ -91,7 +91,8 @@ public class TimeBasedAnomalyMerger {
     try {
       BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(functionSpec);
       mergeConfig.setMergeablePropertyKeys(anomalyFunction.getMergeablePropertyKeys());
-      LOG.info("Created anomaly function for class: {}, set mergeable keys as: {}", anomalyFunction.getClass(), anomalyFunction.getMergeablePropertyKeys());
+      LOG.info("Created anomaly function for class: {}, set mergeable keys as: {}", anomalyFunction.getClass(),
+          anomalyFunction.getMergeablePropertyKeys());
     } catch (Exception e) {
       LOG.warn("Unsuccessfully create anomaly function from anomalyFunctionFactory, {}", e.getMessage());
     }
@@ -113,12 +114,12 @@ public class TimeBasedAnomalyMerger {
   }
 
   private ListMultimap<DimensionMap, MergedAnomalyResultDTO> dimensionalShuffleAndUnifyMerge(AnomalyFunctionDTO function,
-      AnomalyMergeConfig mergeConfig, ListMultimap<DimensionMap, RawAnomalyResultDTO> dimensionsResultMap) {
+      AnomalyMergeConfig mergeConfig, ListMultimap<DimensionMap, RawAnomalyResultDTO> unmergedAnomalies) {
 
     ListMultimap<DimensionMap, MergedAnomalyResultDTO> mergedAnomalies = ArrayListMultimap.create();
 
-    for (DimensionMap dimensionMap : dimensionsResultMap.keySet()) {
-      List<RawAnomalyResultDTO> unmergedResultsByDimensions = dimensionsResultMap.get(dimensionMap);
+    for (DimensionMap dimensionMap : unmergedAnomalies.keySet()) {
+      List<RawAnomalyResultDTO> unmergedResultsByDimensions = unmergedAnomalies.get(dimensionMap);
       long anomalyWindowStart = Long.MAX_VALUE;
       long anomalyWindowEnd = Long.MIN_VALUE;
       for (RawAnomalyResultDTO unmergedResultsByDimension : unmergedResultsByDimensions) {
@@ -159,7 +160,8 @@ public class TimeBasedAnomalyMerger {
       AnomalyFunctionDTO function = mergedResult.getFunction();
       LOG.warn(
           "Unable to compute merged weight and the average weight of raw anomalies is used. Dataset: {}, Topic Metric: {}, Function: {}, Time:{} - {}, Exception: {}",
-          function.getCollection(), function.getTopicMetric(), function.getFunctionName(), new DateTime(mergedResult.getStartTime()), new DateTime(mergedResult.getEndTime()), e);
+          function.getCollection(), function.getTopicMetric(), function.getFunctionName(),
+          new DateTime(mergedResult.getStartTime()), new DateTime(mergedResult.getEndTime()), e);
     }
   }
 
@@ -227,8 +229,8 @@ public class TimeBasedAnomalyMerger {
    * @param mergedAnomalygit
    *      The instance of merged anomaly
    */
-  public static double computeImpactToGlobalMetric(MetricTimeSeries globalMetricTimeSerise, MetricTimeSeries subMetricTimeSeries,
-      MergedAnomalyResultDTO mergedAnomaly) {
+  public static double computeImpactToGlobalMetric(MetricTimeSeries globalMetricTimeSerise,
+      MetricTimeSeries subMetricTimeSeries, MergedAnomalyResultDTO mergedAnomaly) {
     double impactToTotal = NULL_DOUBLE;
     if (globalMetricTimeSerise == null || globalMetricTimeSerise.getTimeWindowSet().isEmpty()) {
       return impactToTotal;
