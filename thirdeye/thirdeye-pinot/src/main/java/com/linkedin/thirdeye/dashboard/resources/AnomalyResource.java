@@ -473,7 +473,7 @@ public class AnomalyResource {
    *      the Map that maps dimension string to the AnomalyTimelinesView
    * @throws Exception
    */
-  private static final Period DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD = Weeks.THREE.toPeriod();
+  private static final Period DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD = Weeks.weeks(4).toPeriod();
   @GET
   @Path(value = "/anomaly-function/{id}/baseline")
   @Produces(MediaType.APPLICATION_JSON)
@@ -513,12 +513,12 @@ public class AnomalyResource {
           break;
         case HOURS:
           if (Hours.hoursBetween(startTime, endTime).getHours() < DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD.toStandardDuration().getStandardHours()) {
-            startTime = endTime.minus(DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD);
+            startTime = startTime.minus(DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD);
           }
           break;
         case DAYS:
           if (Days.daysBetween(startTime, endTime).getDays() < DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD.toStandardDuration().getStandardDays()) {
-            startTime = endTime.minus(DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD);
+            startTime = startTime.minus(DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD);
           }
           break;
       }
