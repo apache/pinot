@@ -11,19 +11,21 @@
   </div>
 {{/if}}
 
-{{rootcause-header
-  sessionId=sessionId
-  sessionName=sessionName
-  sessionText=sessionText
-  sessionOwner=sessionOwner
-  sessionModified=sessionModified
-  sessionUpdatedBy=sessionUpdatedBy
-  sessionUpdatedTime=sessionUpdatedTime
-  canSave=sessionCanSave
-  canCopy=sessionCanCopy
-  onChange=(action "onSessionChange")
-  onSave=(action "onSessionSave")
-  onCopy=(action "onSessionCopy")}}
+{{#if selectedUrns.size}}
+  {{rootcause-header
+    sessionId=sessionId
+    sessionName=sessionName
+    sessionText=sessionText
+    sessionOwner=sessionOwner
+    sessionModified=sessionModified
+    sessionUpdatedBy=sessionUpdatedBy
+    sessionUpdatedTime=sessionUpdatedTime
+    canSave=sessionCanSave
+    canCopy=sessionCanCopy
+    onChange=(action "onSessionChange")
+    onSave=(action "onSessionSave")
+    onCopy=(action "onSessionCopy")}}
+{{/if}}
 
 <div class="container">
   {{#if context.anomalyUrns.size}}
@@ -49,48 +51,41 @@
     </div>
     <div class="card-container__body--padding-md card-container__body--flush-bottom">
       {{#if selectedUrns.size}}
-          <div class="rootcause-wrapper">
-            {{rootcause-legend
-              entities=entities
-              selectedUrns=selectedUrns
-              invisibleUrns=invisibleUrns
-              onVisibility=(action "onVisibility")
-              onSelection=(action "onSelection")
-              onMouseEnter=(action "onLegendHover")
-              onMouseLeave=(action "onLegendHover")
-            }}
-            <div class="rootcause-wrapper__chart">
-              <div class="row rootcause-wrapper__toolbar">
-                {{rootcause-chart-toolbar
-                  context=context
-                  timeseriesMode=timeseriesMode
-                  onContext=(action "onContext")
-                  onChart=(action "onChart")
-                }}
-              </div>
-              {{#if isLoadingTimeseries}}
-                <div class="spinner-wrapper spinner-wrapper--card">
-                  {{ember-spinner}}
-                </div>
-              {{/if}}
-              {{rootcause-chart
-                entities=entities
-                selectedUrns=chartSelectedUrns
-                timeseries=timeseries
-                timeseriesMode=timeseriesMode
-                focusedUrn=focusedUrn
+        <div class="rootcause-wrapper">
+          {{rootcause-legend
+            entities=entities
+            selectedUrns=selectedUrns
+            invisibleUrns=invisibleUrns
+            onVisibility=(action "onVisibility")
+            onSelection=(action "onSelection")
+            onMouseEnter=(action "onLegendHover")
+            onMouseLeave=(action "onLegendHover")
+          }}
+          <div class="rootcause-wrapper__chart">
+            <div class="row rootcause-wrapper__toolbar">
+              {{rootcause-chart-toolbar
                 context=context
-                onHover=(action "chartOnHover")
+                timeseriesMode=timeseriesMode
+                onContext=(action "onContext")
+                onChart=(action "onChart")
               }}
             </div>
+            {{#if isLoadingTimeseries}}
+              <div class="spinner-wrapper spinner-wrapper--card">
+                {{ember-spinner}}
+              </div>
+            {{/if}}
+            {{rootcause-chart
+              entities=entities
+              selectedUrns=chartSelectedUrns
+              timeseries=timeseries
+              timeseriesMode=timeseriesMode
+              focusedUrn=focusedUrn
+              context=context
+              onHover=(action "chartOnHover")
+            }}
           </div>
-      {{else}}
-        <div class="card-container card-container--md card-container--flush-top">
-          {{rootcause-placeholder
-            message="Please select a metric and click on '+ add to chart' below. The root cause graph will load here."
-            iconClass="glyphicon glyphicon-equalizer"}}
         </div>
-      {{/if}}
         <div class="row rootcause-compare">
           {{rootcause-select-comparison-range
             range=context.anomalyRange
@@ -98,6 +93,13 @@
             onChange=(action "onComparisonChange")
           }}
         </div>
+      {{else}}
+        <div class="card-container card-container--md card-container--flush-top">
+          {{rootcause-placeholder
+            message="Please select a metric and click on '+ add to chart' below. The root cause graph will load here."
+            iconClass="glyphicon glyphicon-equalizer"}}
+        </div>
+      {{/if}}
     </div>
 
     {{#if hasServiceErrors}}
@@ -139,14 +141,16 @@
           }}
         </div>
         <div class="col-xs-2">
-          <a class="thirdeye-link thirdeye-link--settings" {{action "onPrimarySelection"}}>
-            + add to chart
-            {{#tooltip-on-element
-              class="te-tooltip"
-              isShown=metricUrn}}
-              Click here to load metric
-            {{/tooltip-on-element}}
-          </a>
+          {{#if context.urns.size}}
+            <a class="thirdeye-link thirdeye-link--settings" {{action "onPrimarySelection"}}>
+              + add to chart
+              {{#tooltip-on-element
+                class="te-tooltip"
+                isShown=metricUrn}}
+                Click here to load metric
+              {{/tooltip-on-element}}
+            </a>
+          {{/if}}
         </div>
       </div>
       <div class="card-container__row card-container__row--flex row">
@@ -210,7 +214,7 @@
                   <span class="te-tooltip-wrapper">
                     <i class="glyphicon glyphicon-question-sign">
                       {{#tooltip-on-element class="te-tooltip"}}
-                        Can't find your metric? Click here to add a new metric mapping.  
+                        Can't find your metric? Click here to add a new metric mapping.
                       {{/tooltip-on-element}}
                     </i>
                   </span>
