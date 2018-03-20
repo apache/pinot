@@ -3,10 +3,10 @@
     <p class="te-title">{{defaultApplication.application}}</p>
     <div class="application-header__dropdown">
       {{#power-select
-      options=model.applications
-      selected=defaultApplication
-      onchange=(action "selectApplication")
-      as |app|}}
+        options=model.applications
+        selected=defaultApplication
+        onchange=(action "selectApplication")
+        as |app|}}
         {{app.application}}
       {{/power-select}}
     </div>
