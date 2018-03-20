@@ -372,30 +372,6 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
   }
 
   /**
-   * Find the latest raw anomaly from a merged anomaly
-   * @param anomaly
-   * @return
-   */
-  public static RawAnomalyResultDTO getLatestRawAnomalyResult(MergedAnomalyResultDTO anomaly) {
-    List<RawAnomalyResultDTO> rawResults = anomaly.getAnomalyResults();
-    if (rawResults == null || rawResults.isEmpty()) {
-      return null;
-    }
-    long latestAnomalyTime = 0l;
-    RawAnomalyResultDTO latestAnomaly = null;
-    if (rawResults == null || rawResults.isEmpty()) {
-      return latestAnomaly;
-    }
-    for (RawAnomalyResultDTO rawResult : rawResults) {
-      if (rawResult.getStartTime() > latestAnomalyTime) {
-        latestAnomalyTime = rawResult.getStartTime();
-        latestAnomaly = rawResult;
-      }
-    }
-    return latestAnomaly;
-  }
-
-  /**
    * Taking advantage of event data provider, extract the events around the given start and end time
    * @param eventTypes the list of event types
    * @param start the start time of the event, preEventCrawlOffset is added before the given date time

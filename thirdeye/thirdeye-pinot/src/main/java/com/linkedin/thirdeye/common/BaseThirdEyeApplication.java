@@ -6,14 +6,12 @@ import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AutotuneConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 
@@ -29,7 +27,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected final Logger LOG = LoggerFactory.getLogger(this.getClass());
 
   protected AnomalyFunctionManager anomalyFunctionDAO;
-  protected RawAnomalyResultManager rawAnomalyResultDAO;
   protected JobManager jobDAO;
   protected MergedAnomalyResultManager mergedAnomalyResultDAO;
   protected DatasetConfigManager datasetConfigDAO;
@@ -43,7 +40,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     LOG.info("Loading persistence config from [{}]", persistenceConfig);
     DaoProviderUtil.init(new File(persistenceConfig));
     anomalyFunctionDAO = DaoProviderUtil.getInstance(AnomalyFunctionManagerImpl.class);
-    rawAnomalyResultDAO = DaoProviderUtil.getInstance(RawAnomalyResultManagerImpl.class);
     jobDAO = DaoProviderUtil.getInstance(JobManagerImpl.class);
     mergedAnomalyResultDAO = DaoProviderUtil.getInstance(MergedAnomalyResultManagerImpl.class);
     datasetConfigDAO = DaoProviderUtil.getInstance(DatasetConfigManagerImpl.class);

@@ -113,7 +113,6 @@ public class DetectionTaskRunner implements TaskRunner {
     anomalyDetectionInputContextBuilder = anomalyDetectionInputContextBuilder
         .setFunction(anomalyFunctionSpec)
         .fetchTimeSeriesData(windowStart, windowEnd)
-        .fetchExistingRawAnomalies(windowStart, windowEnd)
         .fetchExistingMergedAnomalies(windowStart, windowEnd, true)
         .fetchScalingFactors(windowStart, windowEnd);
     if (anomalyFunctionSpec.isToCalculateGlobalMetric()) {
@@ -151,18 +150,12 @@ public class DetectionTaskRunner implements TaskRunner {
 
     // TODO: Change to DataSink
     AnomalyDetectionOutputContext adOutputContext = new AnomalyDetectionOutputContext();
-    adOutputContext.setRawAnomalies(resultRawAnomalies);
     adOutputContext.setMergedAnomalies(resultMergedAnomalies);
     storeData(adOutputContext);
   }
 
   private void storeData(AnomalyDetectionOutputContext anomalyDetectionOutputContext) {
-    RawAnomalyResultManager rawAnomalyDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     MergedAnomalyResultManager mergedAmomalyDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
-
-    for (RawAnomalyResultDTO rawAnomalyResultDTO : anomalyDetectionOutputContext.getRawAnomalies().values()) {
-      rawAnomalyDAO.save(rawAnomalyResultDTO);
-    }
 
     for (MergedAnomalyResultDTO mergedAnomalyResultDTO : anomalyDetectionOutputContext.getMergedAnomalies().values()) {
       mergedAmomalyDAO.update(mergedAnomalyResultDTO);
@@ -199,7 +192,11 @@ public class DetectionTaskRunner implements TaskRunner {
       resultRawAnomalies.putAll(dimensionMap, resultsOfAnEntry);
     }
 
-    LOG.info("{} anomalies found in total", anomalyCounter);
+    if (anomalyCounter != 0) {
+      LOG.info("{} anomalies found in total", anomalyCounter);
+    } else {
+      LOG.info("No anomlay is found");
+    }
     return resultRawAnomalies;
   }
 
@@ -256,20 +253,15 @@ public class DetectionTaskRunner implements TaskRunner {
       LOG.error("Could not compute for {}", dimensionMap, e);
     }
 
-    // Remove detected anomalies that have existed in database
+    // Clean up duplicate and overlapped raw anomalies
     if (CollectionUtils.isNotEmpty(resultsOfAnEntry)) {
-      List<RawAnomalyResultDTO> existingRawAnomaliesOfAnEntry =
-          anomalyDetectionInputContext.getExistingRawAnomalies().get(dimensionMap);
-      resultsOfAnEntry = removeFromExistingRawAnomalies(resultsOfAnEntry, existingRawAnomaliesOfAnEntry);
+      resultsOfAnEntry = cleanUpDuplicateRawAnomalies(resultsOfAnEntry);
     }
+    // Remove detected anomalies that have existed in database
     if (CollectionUtils.isNotEmpty(resultsOfAnEntry)) {
       List<MergedAnomalyResultDTO> existingMergedAnomalies =
           retainExistingMergedAnomalies(windowStart.getMillis(), windowEnd.getMillis(), knownMergedAnomaliesOfAnEntry);
       resultsOfAnEntry = removeFromExistingMergedAnomalies(resultsOfAnEntry, existingMergedAnomalies);
-    }
-    // Clean up duplicate and overlapped raw anomalies
-    if (CollectionUtils.isNotEmpty(resultsOfAnEntry)) {
-      resultsOfAnEntry = cleanUpDuplicateRawAnomalies(resultsOfAnEntry);
     }
 
     return resultsOfAnEntry;

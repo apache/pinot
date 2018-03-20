@@ -126,8 +126,7 @@ public class GroupedAnomalyResultsManagerImpl extends AbstractManagerImpl<Groupe
       List<MergedAnomalyResultBean> list =
           genericPojoDao.get(groupedAnomalyResultsBean.getAnomalyResultsId(), MergedAnomalyResultBean.class);
       MergedAnomalyResultManager mergedAnomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
-      List<MergedAnomalyResultDTO> mergedAnomalyResults =
-          mergedAnomalyDAO.convertMergedAnomalyBean2DTO(list, true);
+      List<MergedAnomalyResultDTO> mergedAnomalyResults = mergedAnomalyDAO.convertMergedAnomalyBean2DTO(list);
       groupedAnomalyResultsDTO.setAnomalyResults(mergedAnomalyResults);
     }
 

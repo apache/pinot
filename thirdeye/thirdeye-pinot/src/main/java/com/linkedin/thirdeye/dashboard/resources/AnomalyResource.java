@@ -23,7 +23,6 @@ import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -92,7 +91,6 @@ public class AnomalyResource {
 
   private AnomalyFunctionManager anomalyFunctionDAO;
   private MergedAnomalyResultManager anomalyMergedResultDAO;
-  private RawAnomalyResultManager rawAnomalyResultDAO;
   private AlertConfigManager emailConfigurationDAO;
   private MetricConfigManager metricConfigDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
@@ -107,7 +105,6 @@ public class AnomalyResource {
 
   public AnomalyResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
-    this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.emailConfigurationDAO = DAO_REGISTRY.getAlertConfigDAO();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
@@ -173,15 +170,14 @@ public class AnomalyResource {
         if (StringUtils.isNotBlank(exploredDimensions)) {
           anomalyResults =
               anomalyMergedResultDAO.findByCollectionMetricDimensionsTime(dataset, metric, exploredDimensions,
-                  startTime.getMillis(), endTime.getMillis(), loadRawAnomalies);
+                  startTime.getMillis(), endTime.getMillis());
         } else {
           anomalyResults = anomalyMergedResultDAO.findByCollectionMetricTime(dataset, metric, startTime.getMillis(),
-              endTime.getMillis(), loadRawAnomalies);
+              endTime.getMillis());
         }
       } else {
         anomalyResults =
-            anomalyMergedResultDAO.findByCollectionTime(dataset, startTime.getMillis(), endTime.getMillis(),
-                loadRawAnomalies);
+            anomalyMergedResultDAO.findByCollectionTime(dataset, startTime.getMillis(), endTime.getMillis());
       }
     } catch (Exception e) {
       LOG.error("Exception in fetching anomalies", e);
@@ -404,8 +400,7 @@ public class AnomalyResource {
 
     // clone anomaly function and its anomaly results if requested
     if (isCloneFunction) {
-      OnboardResource onboardResource =
-          new OnboardResource(anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO);
+      OnboardResource onboardResource = new OnboardResource(anomalyFunctionDAO, mergedAnomalyResultDAO);
       long cloneId;
       String tag = "clone";
       try {
@@ -596,7 +591,7 @@ public class AnomalyResource {
     Interval timeSeriesInterval = observed.getTimeSeriesInterval();
     List<MergedAnomalyResultDTO> mergedAnomalyResults =
         mergedAnomalyResultDAO.findOverlappingByFunctionIdDimensions(anomalyFunctionSpec.getId(),
-            timeSeriesInterval.getStartMillis(), timeSeriesInterval.getEndMillis(), dimensionMap.toString(), true);
+            timeSeriesInterval.getStartMillis(), timeSeriesInterval.getEndMillis(), dimensionMap.toString());
 
     for (MergedAnomalyResultDTO mergedAnomalyResult : mergedAnomalyResults) {
       if (mergedAnomalyResult.getDimensions().equals(dimensionMap)) {
@@ -640,30 +635,16 @@ public class AnomalyResource {
           continue;
         }
 
-        // Strategy 2: override the timeseries by the current and baseline values inside raw anomaly
-        if (mergedAnomalyResult.getAnomalyResults().size() > 0) {
-          for (RawAnomalyResultDTO rawAnomalyResult : mergedAnomalyResult.getAnomalyResults()) {
-            if (!observed.hasTimestamp(rawAnomalyResult.getStartTime())) {
-              // if the observed value in the timeseries is not removed, use the original observed value
-              observed.set(rawAnomalyResult.getStartTime(), rawAnomalyResult.getAvgCurrentVal());
-            }
-            if (!expected.hasTimestamp(rawAnomalyResult.getStartTime())) {
-              // if the expected value in the timeserie is not removed, use the original expected value
-              expected.set(rawAnomalyResult.getStartTime(), rawAnomalyResult.getAvgBaselineVal());
-            }
+        // Strategy 2: use the merged anomaly information for all missing points
+        for (long start = mergedAnomalyResult.getStartTime(); start < mergedAnomalyResult.getEndTime();
+            start += bucketMillis) {
+          if (!observed.hasTimestamp(mergedAnomalyResult.getStartTime())) {
+            // if the observed value in the timeseries is not removed, use the original observed value
+            observed.set(start, mergedAnomalyResult.getAvgCurrentVal());
           }
-        } else {
-          // Strategy 3: use the merged anomaly information for all missing points
-          for (long start = mergedAnomalyResult.getStartTime(); start < mergedAnomalyResult.getEndTime();
-              start += bucketMillis) {
-            if (!observed.hasTimestamp(mergedAnomalyResult.getStartTime())) {
-              // if the observed value in the timeseries is not removed, use the original observed value
-              observed.set(start, mergedAnomalyResult.getAvgCurrentVal());
-            }
-            if (!expected.hasTimestamp(mergedAnomalyResult.getStartTime())) {
-              // if the expected value in the timeserie is not removed, use the original expected value
-              expected.set(start, mergedAnomalyResult.getAvgBaselineVal());
-            }
+          if (!expected.hasTimestamp(mergedAnomalyResult.getStartTime())) {
+            // if the expected value in the timeserie is not removed, use the original expected value
+            expected.set(start, mergedAnomalyResult.getAvgBaselineVal());
           }
         }
       }
@@ -733,7 +714,7 @@ public class AnomalyResource {
    * true if there are labeled anomalies detected by the function
    */
   private boolean containsLabeledAnomalies(long functionId) {
-    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByFunctionId(functionId, true);
+    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByFunctionId(functionId);
 
     for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
       AnomalyFeedback feedback = mergedAnomaly.getFeedback();
@@ -754,7 +735,6 @@ public class AnomalyResource {
    * @param functionId id of the anomaly function
    * @param startTimeIso The start time of the monitoring window
    * @param endTimeIso The start time of the monitoring window
-   * @param anomalyType type of anomaly: "raw" or "merged"
    * @param applyAlertFiler can choose apply alert filter when query merged anomaly results
    * @return list of anomalyIds (Long)
    */
@@ -762,7 +742,7 @@ public class AnomalyResource {
   @Path("anomaly-function/{id}/anomalies")
   @ApiOperation("Show the content of merged anomalies whose start time is located in the given time ranges")
   public List<Long> getAnomaliesByFunctionId(@PathParam("id") Long functionId, @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso, @QueryParam("type") @DefaultValue("merged") String anomalyType,
+      @QueryParam("end") String endTimeIso,
       @QueryParam("apply-alert-filter") @DefaultValue("false") boolean applyAlertFiler,
       @QueryParam("useNotified") @DefaultValue("false") boolean useNotified) {
 
@@ -782,35 +762,28 @@ public class AnomalyResource {
           "Unable to parse strings, " + startTimeIso + " and " + endTimeIso + ", in ISO DateTime format", e);
     }
 
-    LOG.info("Retrieving {} anomaly results for function {} in the time range: {} -- {}", anomalyType, functionId,
-        startTimeIso, endTimeIso);
+    LOG.info("Retrieving anomaly results for function {} in the time range: {} -- {}", functionId, startTimeIso,
+        endTimeIso);
 
     ArrayList<Long> anomalyIdList = new ArrayList<>();
-    if (anomalyType.equals("raw")) {
-      List<RawAnomalyResultDTO> rawDTO = rawAnomalyResultDAO.findAllByTimeAndFunctionId(startTime, endTime, functionId);
-      for (RawAnomalyResultDTO dto : rawDTO) {
-        anomalyIdList.add(dto.getId());
-      }
-    } else if (anomalyType.equals("merged")) {
-      List<MergedAnomalyResultDTO> mergedResults =
-          mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, functionId, true);
+    List<MergedAnomalyResultDTO> mergedResults =
+        mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, functionId);
 
-      // apply alert filter
-      if (applyAlertFiler) {
-        try {
-          mergedResults = AlertFilterHelper.applyFiltrationRule(mergedResults, alertFilterFactory);
-        } catch (Exception e) {
-          LOG.warn("Failed to apply alert filters on {} anomalies for function id:{}, start:{}, end:{}, exception:{}",
-              anomalyType, functionId, startTimeIso, endTimeIso, e);
-        }
+    // apply alert filter
+    if (applyAlertFiler) {
+      try {
+        mergedResults = AlertFilterHelper.applyFiltrationRule(mergedResults, alertFilterFactory);
+      } catch (Exception e) {
+        LOG.warn("Failed to apply alert filters on anomalies of function id:{}, start:{}, end:{}.",
+            functionId, startTimeIso, endTimeIso, e);
       }
+    }
 
-      for (MergedAnomalyResultDTO mergedAnomaly : mergedResults) {
-        // if use notified flag, only keep anomalies isNotified == true
-        if ( (useNotified && mergedAnomaly.isNotified()) || !useNotified
-            || AnomalyResultSource.USER_LABELED_ANOMALY.equals(mergedAnomaly.getAnomalyResultSource())) {
-          anomalyIdList.add(mergedAnomaly.getId());
-        }
+    for (MergedAnomalyResultDTO mergedAnomaly : mergedResults) {
+      // if use notified flag, only keep anomalies isNotified == true
+      if ((useNotified && mergedAnomaly.isNotified()) || !useNotified
+          || AnomalyResultSource.USER_LABELED_ANOMALY.equals(mergedAnomaly.getAnomalyResultSource())) {
+        anomalyIdList.add(mergedAnomaly.getId());
       }
     }
 
@@ -873,15 +846,8 @@ public class AnomalyResource {
       emailConfigurationDAO.update(emailConfiguration);
     }
 
-    // raw result mapping
-    List<RawAnomalyResultDTO> rawResults =
-        rawAnomalyResultDAO.findAllByTimeAndFunctionId(0, System.currentTimeMillis(), id);
-    for (RawAnomalyResultDTO result : rawResults) {
-      rawAnomalyResultDAO.delete(result);
-    }
-
     // merged anomaly mapping
-    List<MergedAnomalyResultDTO> mergedResults = anomalyMergedResultDAO.findByFunctionId(id, true);
+    List<MergedAnomalyResultDTO> mergedResults = anomalyMergedResultDAO.findByFunctionId(id);
     for (MergedAnomalyResultDTO result : mergedResults) {
       anomalyMergedResultDAO.delete(result);
     }

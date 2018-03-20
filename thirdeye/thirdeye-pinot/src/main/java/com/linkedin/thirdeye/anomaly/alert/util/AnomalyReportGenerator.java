@@ -79,7 +79,7 @@ public class AnomalyReportGenerator {
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     for (String collection : collections) {
       anomalies
-          .addAll(anomalyResultManager.findByCollectionTime(collection, startTime, endTime, false));
+          .addAll(anomalyResultManager.findByCollectionTime(collection, startTime, endTime));
     }
     return anomalies;
   }
@@ -92,8 +92,7 @@ public class AnomalyReportGenerator {
       List<MetricConfigDTO> metricConfigDTOList = metricConfigManager.findByMetricName(metric);
       for (MetricConfigDTO metricConfigDTO : metricConfigDTOList) {
         List<MergedAnomalyResultDTO> results = anomalyResultManager
-            .findByCollectionMetricTime(metricConfigDTO.getDataset(), metric, startTime, endTime,
-                false);
+            .findByCollectionMetricTime(metricConfigDTO.getDataset(), metric, startTime, endTime);
         LOG.info("Found {} result for metric {}", results.size(), metric);
         anomalies.addAll(results);
       }
@@ -107,7 +106,7 @@ public class AnomalyReportGenerator {
     LOG.info("fetching anomalies for functions : " + functions);
     for (long function : functions) {
       List<MergedAnomalyResultDTO> results = anomalyResultManager.
-          findByStartTimeInRangeAndFunctionId(startTime, endTime, function, false);
+          findByStartTimeInRangeAndFunctionId(startTime, endTime, function);
       LOG.info("Found {} result for function {}", results.size(), function);
       anomalies.addAll(results);
     }

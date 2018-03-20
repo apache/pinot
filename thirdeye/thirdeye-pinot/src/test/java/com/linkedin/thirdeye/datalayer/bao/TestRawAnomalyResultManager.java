@@ -12,7 +12,7 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
-public class TestAnomalyResultManager {
+public class TestRawAnomalyResultManager {
 
   RawAnomalyResultDTO anomalyResult;
   AnomalyFunctionDTO spec = DaoTestUtils.getTestFunctionSpec("metric", "dataset");

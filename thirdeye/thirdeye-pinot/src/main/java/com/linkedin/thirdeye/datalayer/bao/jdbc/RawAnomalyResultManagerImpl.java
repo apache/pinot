@@ -5,8 +5,6 @@ import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
 import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
-import java.util.List;
 
 @Singleton
 public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyResultDTO>
@@ -68,36 +66,5 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
     } else {
       return null;
     }
-  }
-
-  public List<RawAnomalyResultDTO> findAllByTimeAndFunctionId(long startTime, long endTime,
-      long functionId) {
-    Predicate startTimePredicate;
-    startTimePredicate =
-        Predicate.AND(Predicate.GE("startTime", startTime), Predicate.LE("startTime", endTime));
-    Predicate endTimeTimePredicate;
-    endTimeTimePredicate =
-        Predicate.AND(Predicate.GE("endTime", startTime), Predicate.LE("endTime", endTime));;
-    Predicate functionIdPredicate = Predicate.EQ("functionId", functionId);
-    Predicate finalPredicate =
-        Predicate.AND(functionIdPredicate, Predicate.OR(endTimeTimePredicate, startTimePredicate));
-    return findByPredicate(finalPredicate);
-  }
-
-  public List<RawAnomalyResultDTO> findUnmergedByFunctionId(Long functionId) {
-    //    "select r from RawAnomalyResultDTO r where r.function.id = :functionId and r.merged=false "
-    //        + "and r.dataMissing=:dataMissing";
-
-    Predicate predicate = Predicate.AND(//
-        Predicate.EQ("functionId", functionId), //
-        Predicate.EQ("merged", false), //
-        Predicate.EQ("dataMissing", false) //
-    );
-    return findByPredicate(predicate);
-  }
-
-  public List<RawAnomalyResultDTO> findByFunctionId(Long functionId) {
-    Predicate predicate = Predicate.EQ("functionId", functionId);
-    return findByPredicate(predicate);
   }
 }

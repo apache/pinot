@@ -31,8 +31,9 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   private Long createdTime;
   private boolean notified;
 
-  //TODO: deprecate raw anomaly list and message
   private String message;
+  // TODO: Remove raw anomaly id list after old merged anomalies are cleaned up
+  @Deprecated
   private List<Long> rawAnomalyIdList;
 
 
@@ -156,10 +157,14 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
     this.message = message;
   }
 
+  // TODO: Remove this method after old merged anomalies are cleaned up
+  @Deprecated
   public List<Long> getRawAnomalyIdList() {
     return rawAnomalyIdList;
   }
 
+  // TODO: Remove this method after old merged anomalies are cleaned up
+  @Deprecated
   public void setRawAnomalyIdList(List<Long> rawAnomalyIdList) {
     this.rawAnomalyIdList = rawAnomalyIdList;
   }

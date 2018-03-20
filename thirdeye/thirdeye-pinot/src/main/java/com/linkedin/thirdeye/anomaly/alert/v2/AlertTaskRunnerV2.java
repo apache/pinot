@@ -167,7 +167,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       long lastNotifiedAnomaly = emailConfig.getAnomalyWatermark();
       for (Long functionId : functionIds) {
         List<MergedAnomalyResultDTO> resultsForFunction =
-            anomalyMergedResultDAO.findByFunctionIdAndIdGreaterThan(functionId, lastNotifiedAnomaly, false);
+            anomalyMergedResultDAO.findByFunctionIdAndIdGreaterThan(functionId, lastNotifiedAnomaly);
         if (CollectionUtils.isNotEmpty(resultsForFunction)) {
           mergedAnomaliesAllResults.addAll(resultsForFunction);
         }
@@ -175,7 +175,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         // these anomalies are the ones that did not qualify filtration rule and got modified.
         // We should add these again so that these could be included in email if qualified through filtration rule
         List<MergedAnomalyResultDTO> filteredAnomalies = anomalyMergedResultDAO.findUnNotifiedByFunctionIdAndIdLesserThanAndEndTimeGreaterThanLastOneDay(functionId,
-                lastNotifiedAnomaly, false);
+                lastNotifiedAnomaly);
         if (CollectionUtils.isNotEmpty(filteredAnomalies)) {
           mergedAnomaliesAllResults.addAll(filteredAnomalies);
         }

@@ -13,7 +13,6 @@ import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.MetricExpression;
 import com.linkedin.thirdeye.datasource.ResponseParserUtils;
@@ -264,25 +263,6 @@ public class AnomalyDetectionInputContextBuilder {
 
     return this;
   }
-  /**
-   * Fetech existing RawAnomalyResults in the monitoring window
-   * @param windowStart
-   * the start time of the monitoring window
-   * @param windowEnd
-   * the end time of the monitoring window
-   * @return
-   */
-  public AnomalyDetectionInputContextBuilder fetchExistingRawAnomalies(DateTime windowStart, DateTime windowEnd) {
-    // We always find existing raw anomalies to prevent duplicate raw anomalies are generated
-    List<RawAnomalyResultDTO> existingRawAnomalies = getExistingRawAnomalies(anomalyFunctionSpec.getId(), windowStart.getMillis(), windowEnd.getMillis());
-    ArrayListMultimap<DimensionMap, RawAnomalyResultDTO> dimensionNamesToKnownRawAnomalies = ArrayListMultimap.create();
-    for (RawAnomalyResultDTO existingRawAnomaly : existingRawAnomalies) {
-      dimensionNamesToKnownRawAnomalies.put(existingRawAnomaly.getDimensions(), existingRawAnomaly);
-    }
-    this.anomalyDetectionInputContext.setExistingRawAnomalies(dimensionNamesToKnownRawAnomalies);
-
-    return this;
-  }
 
   /**
    * Fetch existing MergedAnomalyResults in the training window
@@ -357,25 +337,6 @@ public class AnomalyDetectionInputContextBuilder {
   }
 
   /**
-   * Returns existing raw anomalies in the given monitoring window
-   * @param functionId the id of the anomaly function
-   * @param monitoringWindowStart inclusive
-   * @param monitoringWindowEnd inclusive but it doesn't matter
-   *
-   * @return known raw anomalies in the given window
-   */
-  private List<RawAnomalyResultDTO> getExistingRawAnomalies(long functionId, long monitoringWindowStart,
-      long monitoringWindowEnd) {
-    List<RawAnomalyResultDTO> results = new ArrayList<>();
-    try {
-      results.addAll(DAO_REGISTRY.getRawAnomalyResultDAO().findAllByTimeAndFunctionId(monitoringWindowStart, monitoringWindowEnd, functionId));
-    } catch (Exception e) {
-      LOG.error("Exception in getting existing anomalies", e);
-    }
-    return results;
-  }
-
-  /**
    * Returns all known merged anomalies of the function id that are needed for anomaly detection, i.e., the merged
    * anomalies that overlap with the monitoring window and baseline windows.
    *
@@ -391,7 +352,7 @@ public class AnomalyDetectionInputContextBuilder {
       try {
         results.addAll(
             DAO_REGISTRY.getMergedAnomalyResultDAO().findOverlappingByFunctionId(functionId, startEndTimeRange.getFirst(),
-                startEndTimeRange.getSecond(), loadRawAnomalies));
+                startEndTimeRange.getSecond()));
       } catch (Exception e) {
         LOG.error("Exception in getting merged anomalies", e);
       }
@@ -417,7 +378,7 @@ public class AnomalyDetectionInputContextBuilder {
       try {
         results.addAll(
             DAO_REGISTRY.getMergedAnomalyResultDAO().findOverlappingByFunctionIdDimensions(functionId,
-                startEndTimeRange.getFirst(), startEndTimeRange.getSecond(), dimensions.toString(), true));
+                startEndTimeRange.getFirst(), startEndTimeRange.getSecond(), dimensions.toString()));
       } catch (Exception e) {
         LOG.error("Exception in getting merged anomalies", e);
       }

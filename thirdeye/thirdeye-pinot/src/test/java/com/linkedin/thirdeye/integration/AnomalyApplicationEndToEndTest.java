@@ -27,7 +27,6 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
@@ -338,13 +337,8 @@ public class AnomalyApplicationEndToEndTest {
     }
     Assert.assertTrue(completedCount > 0);
 
-    // Raw anomalies of the same function and dimensions should have been merged by the worker, so we
-    // check if any raw anomalies present, whose existence means the worker fails the synchronous merge.
-    List<RawAnomalyResultDTO> rawAnomalies = daoRegistry.getRawAnomalyResultDAO().findUnmergedByFunctionId(functionId);
-    Assert.assertTrue(rawAnomalies.size() == 0);
-
     // check merged anomalies
-    List<MergedAnomalyResultDTO> mergedAnomalies = daoRegistry.getMergedAnomalyResultDAO().findByFunctionId(functionId, true);
+    List<MergedAnomalyResultDTO> mergedAnomalies = daoRegistry.getMergedAnomalyResultDAO().findByFunctionId(functionId);
     Assert.assertTrue(mergedAnomalies.size() > 0);
 
     // THE FOLLOWING TEST MAY FAIL OCCASIONALLY DUE TO MACHINE COMPUTATION POWER
