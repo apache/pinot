@@ -260,6 +260,8 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.controller.segment.fetcher";
     public static final String HOST_HTTP_HEADER = "Pinot-Controller-Host";
     public static final String VERSION_HTTP_HEADER = "Pinot-Controller-Version";
+    public static final String SEGMENT_NAME_HTTP_HEADER = "Pinot-Segment-Name";
+    public static final String TABLE_NAME_HTTP_HEADER = "Pinot-Table-Name";
   }
 
   public static class Minion {

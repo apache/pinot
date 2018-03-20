@@ -279,6 +279,14 @@ public class PinotSegmentUploadRestletResource {
     File tempTarredSegmentFile = null;
     File tempSegmentDir = null;
 
+    if (headers != null) {
+      // TODO: Add these headers into open source hadoop jobs
+      LOGGER.info("HTTP Header {} is {}", CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER,
+          headers.getRequestHeader(CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER));
+      LOGGER.info("HTTP Header {} is {}", CommonConstants.Controller.TABLE_NAME_HTTP_HEADER,
+          headers.getRequestHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER));
+    }
+
     try {
       FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
       String tempSegmentName = "tmp-" + System.nanoTime();
