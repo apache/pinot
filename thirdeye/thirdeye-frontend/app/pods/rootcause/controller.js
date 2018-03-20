@@ -369,10 +369,31 @@ export default Controller.extend({
   timeseries: computed(
     'timeseriesService.timeseries',
     'anomalyFunctionService.timeseries',
+    'context',
+    'invisibleUrns',
     function () {
-      const { timeseriesService, anomalyFunctionService } =
-        this.getProperties('timeseriesService', 'anomalyFunctionService');
-      return Object.assign({}, timeseriesService.timeseries, anomalyFunctionService.timeseries);
+      const { timeseriesService, anomalyFunctionService, context, invisibleUrns } =
+        this.getProperties('timeseriesService', 'anomalyFunctionService', 'context', 'invisibleUrns');
+
+      const timeseries = Object.assign({}, timeseriesService.timeseries);
+
+      const anomalyFunctionUrns = filterPrefix(context.anomalyUrns, 'frontend:anomalyfunction:');
+
+      if (_.isEmpty(anomalyFunctionUrns)) {
+        return timeseries;
+      }
+
+      // NOTE: only supports a single anomaly function baseline
+      const anomalyFunctionUrn = anomalyFunctionUrns[0];
+
+      if (!invisibleUrns.has(anomalyFunctionUrn)) {
+        filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => {
+          console.log('replacing baseline timeseries');
+          timeseries[toBaselineUrn(urn)] = anomalyFunctionService.timeseries[anomalyFunctionUrn];
+        });
+      }
+
+      return timeseries;
     }
   ),
 

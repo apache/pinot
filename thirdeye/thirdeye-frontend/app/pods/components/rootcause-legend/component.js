@@ -29,7 +29,7 @@ export default Component.extend({
       const { selectedUrns } = this.getProperties('selectedUrns');
       return filterPrefix(selectedUrns, 'frontend:anomalyfunction:')
         .reduce((agg, urn) => {
-          agg[urn] = 'Anomaly Detection Baseline';
+          agg[urn] = 'Show Detection Baseline';
           return agg;
         }, {});
     }

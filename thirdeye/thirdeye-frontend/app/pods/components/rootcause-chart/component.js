@@ -433,17 +433,6 @@ export default Component.extend({
 
       return this._transformSeries(timeseriesMode, series);
 
-    } else if (hasPrefix(urn, 'frontend:anomalyfunction:')) {
-      const series = {
-        timestamps: timeseries[urn].timestamp,
-        values: timeseries[urn].value,
-        color: 'grey',
-        type: 'line',
-        axis: 'y'
-      };
-
-      return this._transformSeries(timeseriesMode, series);
-
     } else if (hasPrefix(urn, 'thirdeye:event:')) {
       const val = _eventValues[urn];
       const endRange = context.analysisRange[1];
