@@ -20,6 +20,7 @@ import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.pinot.resources.PinotDataSourceResource;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import com.linkedin.thirdeye.rootcause.impl.HolidayEventsLoader;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
@@ -46,6 +47,7 @@ public class ThirdEyeAnomalyApplication
   private ClassificationJobScheduler classificationJobScheduler = null;
   private DetectionOnboardServiceExecutor detectionOnboardServiceExecutor = null;
   private EmailResource emailResource = null;
+  private HolidayEventsLoader holidayEventsLoader= null;
 
   public static void main(final String[] args) throws Exception {
 
@@ -122,6 +124,10 @@ public class ThirdEyeAnomalyApplication
         if (config.isAutoload()) {
           autoOnboardService = new AutoOnboardService(config);
           autoOnboardService.start();
+        }
+        if (config.isHolidayEventsLoader()) {
+          holidayEventsLoader = new HolidayEventsLoader(config);
+          holidayEventsLoader.start();
         }
         if (config.isDataCompleteness()) {
           dataCompletenessScheduler = new DataCompletenessScheduler();

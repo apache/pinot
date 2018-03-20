@@ -59,6 +59,7 @@
     <glassfish.hk2.utils.version>2.5.0-b34</glassfish.hk2.utils.version>
     <kafka.clients.version>0.10.2.1</kafka.clients.version>
     <swagger.version>0.7.0</swagger.version>
+    <calendar-api.version>v3-rev300-1.23.0</calendar-api.version>
   </properties>
 
   <build>
@@ -389,6 +390,12 @@
         <groupId>io.federecio</groupId>
         <artifactId>dropwizard-swagger</artifactId>
         <version>${swagger.version}</version>
+      </dependency>
+      <!-- Google Calendar API -->
+      <dependency>
+        <groupId>com.google.apis</groupId>
+        <artifactId>google-api-services-calendar</artifactId>
+        <version>${calendar-api.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

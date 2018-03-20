@@ -4,8 +4,11 @@ import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskDriverConfiguration;
 import com.linkedin.thirdeye.auto.onboard.AutoOnboardConfiguration;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
+import java.util.List;
+
 
 public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
+  private boolean holidayEventsLoader = false;
   private boolean scheduler = false;
   private boolean worker = false;
   private boolean monitor = false;
@@ -26,6 +29,32 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private TaskDriverConfiguration taskDriverConfiguration = new TaskDriverConfiguration();
   private String failureFromAddress;
   private String failureToAddress;
+  private String keyPath;
+  private List<String> calendars;
+
+  public String getKeyPath() {
+    return keyPath;
+  }
+
+  public void setKeyPath(String keyPath) {
+    this.keyPath = keyPath;
+  }
+
+  public List<String> getCalendars() {
+    return calendars;
+  }
+
+  public void setCalendars(List<String> calendars) {
+    this.calendars = calendars;
+  }
+
+  public boolean isHolidayEventsLoader() {
+    return holidayEventsLoader;
+  }
+
+  public void setHolidayEventsLoader(boolean holidayEventsLoader) {
+    this.holidayEventsLoader = holidayEventsLoader;
+  }
 
   public String getDashboardHost() {
     return dashboardHost;
@@ -74,8 +103,6 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   public void setMonitorConfiguration(MonitorConfiguration monitorConfiguration) {
     this.monitorConfiguration = monitorConfiguration;
   }
-
-
 
   public AutoOnboardConfiguration getAutoOnboardConfiguration() {
     return autoOnboardConfiguration;
@@ -172,5 +199,4 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   public void setFailureToAddress(String failureToAddress) {
     this.failureToAddress = failureToAddress;
   }
-
 }

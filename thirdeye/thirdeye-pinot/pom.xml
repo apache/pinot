@@ -237,6 +237,12 @@
       <groupId>io.federecio</groupId>
       <artifactId>dropwizard-swagger</artifactId>
     </dependency>
+
+    <!-- Google Calendar API -->
+    <dependency>
+      <groupId>com.google.apis</groupId>
+      <artifactId>google-api-services-calendar</artifactId>
+    </dependency>
   </dependencies>
 
   <build>
