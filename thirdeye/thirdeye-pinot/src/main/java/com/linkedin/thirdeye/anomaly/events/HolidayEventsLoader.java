@@ -84,8 +84,8 @@ public class HolidayEventsLoader implements Runnable {
     }
 
     /**
-     * targetDimesionMap will hold metadata of the event. for example:
-     * countryCode --> {US, CA, ...}
+     * Gets name.
+     *
      * @return the name
      */
     public String getName() {
