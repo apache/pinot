@@ -22,6 +22,7 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean worker = false;
 
   private long id;
+  private long holidayRange;
   private String dashboardHost;
   private SmtpConfiguration smtpConfiguration;
   private MonitorConfiguration monitorConfiguration = new MonitorConfiguration();
@@ -31,6 +32,14 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private String failureToAddress;
   private String keyPath;
   private List<String> calendars = Collections.emptyList();
+
+  public long getHolidayRange() {
+    return holidayRange;
+  }
+
+  public void setHolidayRange(long holidayRange) {
+    this.holidayRange = holidayRange;
+  }
 
   public String getKeyPath() {
     return keyPath;

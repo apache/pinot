@@ -16,6 +16,7 @@ import com.linkedin.thirdeye.common.ThirdEyeSwaggerBundle;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
 import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
 import com.linkedin.thirdeye.dashboard.resources.EmailResource;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.pinot.resources.PinotDataSourceResource;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
@@ -126,7 +127,7 @@ public class ThirdEyeAnomalyApplication
           autoOnboardService.start();
         }
         if (config.isHolidayEventsLoader()) {
-          holidayEventsLoader = new HolidayEventsLoader(config);
+          holidayEventsLoader = new HolidayEventsLoader(config, DAORegistry.getInstance().getEventDAO());
           holidayEventsLoader.start();
         }
         if (config.isDataCompleteness()) {
