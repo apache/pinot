@@ -39,12 +39,18 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
     return result;
   }
 
+  /**
+   * Get the list of anomaly functions under the given application
+   * @param application name of the application
+   * @return return the list of anomaly functions under the application
+   */
   @Override
   public List<AnomalyFunctionDTO> findAllByApplication(String application) {
     if (StringUtils.isBlank(application)) {
       throw new IllegalArgumentException("application is null or empty");
     }
 
+    // get the list of function ids from the alert config under the application
     Set<Long> applicationFunctionIds = new HashSet<>();
     List<AlertConfigBean> alerts =
         genericPojoDao.get(Predicate.EQ("application", application), AlertConfigBean.class);
@@ -52,6 +58,7 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
       applicationFunctionIds.addAll(alert.getEmailConfig().getFunctionIds());
     }
 
+    // Get the anomaly function dto from the function id fetched ahead
     List<AnomalyFunctionBean> applicationAnomalyFunctionBeans = genericPojoDao
         .get(new ArrayList<Long>(applicationFunctionIds), AnomalyFunctionBean.class);
     List<AnomalyFunctionDTO> applicationAnomalyFunctions = new ArrayList<>();
