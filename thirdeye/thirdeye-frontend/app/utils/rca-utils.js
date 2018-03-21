@@ -319,7 +319,7 @@ function makeUrnTail(parts, baseLen) {
  * @returns {boolean}
  */
 export function hasPrefix(urn, prefixes) {
-  return !_.isEmpty(makeIterable(prefixes).filter(pre => urn.startsWith(pre)));
+  return urn && !_.isEmpty(makeIterable(prefixes).filter(pre => urn.startsWith(pre)));
 }
 
 /**

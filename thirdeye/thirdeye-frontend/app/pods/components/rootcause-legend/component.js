@@ -123,7 +123,7 @@ export default Component.extend({
      * @returns undefined
      */
     onMouseEnter(urn) {
-      this.attrs.onMouseEnter(urn);
+      this.attrs.onMouseEnter([urn]);
     },
 
     /**
@@ -131,7 +131,7 @@ export default Component.extend({
      * @returns undefined
      */
     onMouseLeave(){
-      this.attrs.onMouseLeave(null);
+      this.attrs.onMouseLeave([]);
     },
 
 

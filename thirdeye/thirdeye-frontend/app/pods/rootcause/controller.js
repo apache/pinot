@@ -6,6 +6,7 @@ import Controller from '@ember/controller';
 import {
   filterObject,
   filterPrefix,
+  hasPrefix,
   toBaselineUrn,
   toCurrentUrn,
   toOffsetUrn,
@@ -147,10 +148,10 @@ export default Controller.extend({
   timeseriesMode: null,
 
   /**
-   * urn of the currently focused entity in the legend component
+   * urns of the currently focused entities in the legend component
    * @type {string}
    */
-  focusedUrn: null,
+  focusedUrns: null,
 
   /**
    * toggle for running _setupForMetric() on selection of the first metric
@@ -388,7 +389,6 @@ export default Controller.extend({
 
       if (!invisibleUrns.has(anomalyFunctionUrn)) {
         filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => {
-          console.log('replacing baseline timeseries');
           timeseries[toBaselineUrn(urn)] = anomalyFunctionService.timeseries[anomalyFunctionUrn];
         });
       }
@@ -756,12 +756,33 @@ export default Controller.extend({
     },
 
     /**
-     * Closure action passed into the legend component
-     * to handle the hover interactivity
-     * @param {String} urn
+     * Closure action passed into the legend component to handle the hover interactivity.
+     * Rewrites urns to highlight appropriate chart elements.
+     *
+     * @param {Array} urns
      */
-    onLegendHover(urn) {
-      this.set('focusedUrn', urn);
+    onLegendHover(urns) {
+      const { context } = this.getProperties('context');
+
+      let focusUrns = new Set(urns);
+
+      filterPrefix(focusUrns, 'frontend:anomalyfunction:').forEach(urn => {
+        const anomalyMetricUrns = filterPrefix(context.anomalyUrns, 'thirdeye:metric:');
+
+        if (!_.isEmpty(anomalyMetricUrns)) {
+          // NOTE: only supports single anomaly function baseline
+          const anomalyMetricUrn = anomalyMetricUrns[0];
+          focusUrns.add(toCurrentUrn(anomalyMetricUrn));
+          focusUrns.add(toBaselineUrn(anomalyMetricUrn));
+        }
+      });
+
+      filterPrefix(focusUrns, 'thirdeye:metric:').forEach(urn => {
+        focusUrns.add(toCurrentUrn(urn));
+        focusUrns.add(toBaselineUrn(urn));
+      });
+
+      this.set('focusedUrns', focusUrns);
     },
 
     /**

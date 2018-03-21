@@ -24,10 +24,10 @@ export default Component.extend({
   },
 
   /**
-   * Id of the entity to focus
-   * @type {String}
+   * Ids of the entity to focus
+   * @type {Set}
    */
-  focusedId: null,
+  focusedIds: new Set(),
 
   /**
    * default height property for the chart
@@ -96,7 +96,7 @@ export default Component.extend({
     const cache = this.get('_seriesCache') || {};
     const series = this.get('series') || {};
     const colorMapping = this.get('colorMapping');
-    const { axis, legend, tooltip, focusedId } = this.getProperties('axis', 'legend', 'tooltip', 'focusedId');
+    const { axis, legend, tooltip, focusedIds } = this.getProperties('axis', 'legend', 'tooltip', 'focusedIds');
 
     const seriesKeys = Object.keys(series).sort();
 
@@ -138,7 +138,7 @@ export default Component.extend({
     const axes = {};
     loadKeys.filter(sid => 'axis' in series[sid]).forEach(sid => axes[sid] = series[sid].axis);
 
-    const config = { unload, xs, columns, types, regions, tooltip, focusedId, colors, axis, axes, legend };
+    const config = { unload, xs, columns, types, regions, tooltip, focusedIds, colors, axis, axes, legend };
     return config;
   },
 
@@ -160,11 +160,11 @@ export default Component.extend({
   /**
    * Updates the focused entity on the chart
    */
-  _updateFocusedEntity: function() {
-    const id = this.get('focusedId');
+  _updateFocusedIds: function() {
+    const ids = this.get('focusedIds');
 
-    if (id) {
-      this._focus(id);
+    if (!_.isEmpty(ids)) {
+      this._focus([...ids]);
     } else {
       this._revert();
     }
@@ -201,7 +201,7 @@ export default Component.extend({
     const series = this.get('series') || {};
     const cache = this.get('cache') || {};
 
-    this._updateFocusedEntity();
+    this._updateFocusedIds();
 
     if (!_.isEqual(series, cache)) {
       debounce(this, this._updateChart, 300);
@@ -224,7 +224,7 @@ export default Component.extend({
     config.axis = diffConfig.axis;
     config.regions = diffConfig.regions;
     config.tooltip = diffConfig.tooltip;
-    config.focusedId = diffConfig.focusedId;
+    config.focusedIds = diffConfig.focusedIds;
     config.legend = diffConfig.legend;
     config.subchart = this.get('subchart');
     config.zoom = this.get('zoom');

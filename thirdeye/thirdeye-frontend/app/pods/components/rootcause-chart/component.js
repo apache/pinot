@@ -35,19 +35,17 @@ export default Component.extend({
   classNames: ['rootcause-chart'],
 
   /**
-   * id of the entity to be focused on the chart
-   * @type {String}
+   * urns of the entities to be focused on the chart
+   * @type {Set}
    */
-  focusedUrn: null,
+  focusedUrns: new Set(),
 
   /**
    * Translate an urn into a chart id
-   * @returns {String|null}
+   * @returns {Set}
    */
-  focusedId: computed('focusedUrn', function() {
-    const urn = this.get('focusedUrn');
-
-    return this._urnToChartId(urn);
+  focusedIds: computed('focusedUrns', function() {
+    return this.get('focusedUrns');
   }),
 
   init() {
@@ -527,23 +525,4 @@ export default Component.extend({
       return outputUrns;
     }
   },
-
-  /**
-   * Converts an urn into a id that's readable
-   * by the c3-library .focus method
-   * @param {String} urn focused entity's urn
-   * @private
-   */
-  _urnToChartId(urn) {
-    if (!urn) return;
-
-    if (urn.includes('metric')) {
-      var [, metric, id, ...filters] = urn.split(':');
-      urn = ['frontend', metric, 'current', id].join(':');
-      if (filters.length) {
-        urn += `:${filters.join(':')}`;
-      }
-    }
-    return urn;
-  }
 });
