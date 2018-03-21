@@ -2,7 +2,7 @@
   {
     "column" : "ID",
     "range" : false,
-    "cardinality" : 100000,
+    "cardinality" : 500000,
     "fieldRole" : "ID",
     "minLength" : 16,
     "maxLength" : 64
@@ -18,7 +18,7 @@
   {
     "column" : "Url",
     "range" : false,
-    "cardinality" : 100000,
+    "cardinality" : 500000,
     "minLength" : 32,
     "maxLength" : 256
   },
@@ -32,28 +32,28 @@
   {
     "column" : "Location",
     "range" : false,
-    "cardinality" : 5000,
+    "cardinality" : 20000,
     "minLength" : 32,
     "maxLength" : 256
   },
   {
     "column" : "Abstract",
     "range" : false,
-    "cardinality" : 100000,
+    "cardinality" : 500000,
     "minLength" : 256,
     "maxLength" : 512
   },
   {
     "column" : "Skills",
     "range" : false,
-    "cardinality" : 1000,
+    "cardinality" : 5000,
     "minLength" : 256,
     "maxLength" : 512
   },
   {
     "column" : "Company",
     "range" : false,
-    "cardinality" : 5000,
+    "cardinality" : 50000,
     "minLength" : 16,
     "maxLength" : 32
   }

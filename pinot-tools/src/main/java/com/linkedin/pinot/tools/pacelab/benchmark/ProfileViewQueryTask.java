@@ -29,7 +29,7 @@ public class ProfileViewQueryTask extends QueryTask {
     List<GenericRow> _profileTable;
     ZipfRandom _zipfRandom;
     final static int HourSecond = 3600;
-
+    Random _profileIndexGenerator;
 
     public ProfileViewQueryTask(Properties config, String[] queries, String dataDir, int testDuration) {
         setConfig(config);
@@ -45,6 +45,7 @@ public class ProfileViewQueryTask extends QueryTask {
         int hourCount = (int) Math.ceil((maxProfileViewStartTime-minProfileViewStartTime)/(HourSecond));
         _zipfRandom = new ZipfRandom(zipfS,hourCount);
 
+        _profileIndexGenerator = new Random(System.currentTimeMillis());
         try
         {
             _profileTable = eventTableGenerator.readProfileTable();
@@ -88,11 +89,11 @@ public class ProfileViewQueryTask extends QueryTask {
         int groupByLimit = Integer.parseInt(config.getProperty("GroupByLimit"));
 
 
-        GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(_profileTable);
+        GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(_profileTable, _profileIndexGenerator);
         String query = "";
         switch (queryId) {
             case 0:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), selectLimit);
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong());
                 runQuery(query);
                 break;
             case 1:

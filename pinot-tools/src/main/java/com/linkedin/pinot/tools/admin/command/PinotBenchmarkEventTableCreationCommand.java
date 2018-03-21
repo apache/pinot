@@ -51,7 +51,7 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
     @Option(name = "-numRecords", required = false, metaVar = "<int>", usage = "Number of records to generate.")
     private int _numRecords = 10000;
     private int[] _numRecordList = {80000, 90000, 100000, 110000, 120000, 130000, 140000, 150000};
-    private double[] _numRecordRatio = {1, 0.6, 0.5, 0.3};
+    //private double[] _numRecordRatio = {1, 0.6, 0.5, 0.3};
     //private int[] _meanDocCount = {30000, 15000, 10000, 20000};
     //private int[] _standardDeviation = {1000, 4000, 2000, 3000};
     private int[] _meanDocCount = {30000, 15000, 100000, 200000};
@@ -111,8 +111,8 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
             }
 
             EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir, outDir);
-            //eventTableGenerator.generateProfileViewTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[0]);
-            //eventTableGenerator.generateAdClickTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[1]);
+            eventTableGenerator.generateProfileViewTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[0]);
+            eventTableGenerator.generateAdClickTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[1]);
             eventTableGenerator.generateArticleReadTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[2]);
             eventTableGenerator.generateJobApplyTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[3]);
 

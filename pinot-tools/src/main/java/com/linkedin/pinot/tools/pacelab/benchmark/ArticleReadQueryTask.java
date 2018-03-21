@@ -21,11 +21,13 @@ import org.xerial.util.ZipfRandom;
 
 import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 
 public class ArticleReadQueryTask extends QueryTask {
     List<GenericRow> _articleTable;
     ZipfRandom _zipfRandom;
     final static int HourSecond = 3600;
+    Random _articleIndexGenerator;
 
     public ArticleReadQueryTask(Properties config, String[] queries, String dataDir, int testDuration) {
         setConfig(config);
@@ -41,6 +43,7 @@ public class ArticleReadQueryTask extends QueryTask {
         int hourCount = (int) Math.ceil((maxReadStartTime-minReadStartTime)/(HourSecond));
         _zipfRandom = new ZipfRandom(zipfS,hourCount);
 
+        _articleIndexGenerator = new Random(System.currentTimeMillis());
 
         try
         {
@@ -89,12 +92,12 @@ public class ArticleReadQueryTask extends QueryTask {
         //List<GenericRow> profileTable = eventTableGenerator.readProfileTable();
         //GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(profileTable);
 
-        GenericRow randomArticle = eventTableGenerator.getRandomGenericRow(_articleTable);
+        GenericRow randomArticle = eventTableGenerator.getRandomGenericRow(_articleTable,_articleIndexGenerator);
 
         String query = "";
         switch (queryId) {
             case 0:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), selectLimit);
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong());
                 runQuery(query);
                 break;
             case 1:

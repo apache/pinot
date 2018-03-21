@@ -2,7 +2,7 @@
   {
     "column" : "ID",
     "range" : false,
-    "cardinality" : 100000,
+    "cardinality" : 1000000,
     "fieldRole" : "ID",
     "minLength" : 16,
     "maxLength" : 64
@@ -16,7 +16,7 @@
   {
     "column" : "Headline",
     "range" : false,
-    "cardinality" : 50000,
+    "cardinality" : 100000,
     "minLength" : 32,
     "maxLength" : 512
   },
@@ -30,7 +30,7 @@
   {
     "column" : "WorkPlace",
     "range" : false,
-    "cardinality" : 5000,
+    "cardinality" : 20000,
     "minLength" : 16,
     "maxLength" : 32
   },

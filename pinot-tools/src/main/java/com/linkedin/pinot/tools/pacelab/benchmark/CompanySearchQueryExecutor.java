@@ -25,8 +25,8 @@ public class CompanySearchQueryExecutor extends QueryExecutor{
 
     private static String[] getQueries() {
         String[] queries = {
-                "SELECT * FROM CompanySearchAppearance" +
-                        " WHERE SearchTime > %d AND SearchTime < %d LIMIT %d",
+                "SELECT COUNT(*) FROM CompanySearchAppearance" +
+                        " WHERE SearchTime > %d AND SearchTime < %d",
                 "SELECT COUNT(*) FROM CompanySearchAppearance" +
                         " WHERE SearchTime > %d AND SearchTime < %d AND ViewedProfileId = '%s'",
                 "SELECT CompanyDomain,COUNT(*), AVG(TimeSpent) FROM CompanySearchAppearance" +

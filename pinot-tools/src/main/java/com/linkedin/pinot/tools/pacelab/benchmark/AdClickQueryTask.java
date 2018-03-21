@@ -18,13 +18,17 @@ package com.linkedin.pinot.tools.pacelab.benchmark;
 import com.linkedin.pinot.core.data.GenericRow;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.lang.math.LongRange;
+import org.xerial.util.ZipfRandom;
 
 import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 
 public class AdClickQueryTask extends QueryTask {
     List<GenericRow> _adTable;
-
+    ZipfRandom _zipfRandom;
+    final static int HourSecond = 3600;
+    Random _adIndexGenerator;
 
     public AdClickQueryTask(Properties config, String[] queries, String dataDir, int testDuration) {
         setConfig(config);
@@ -32,6 +36,16 @@ public class AdClickQueryTask extends QueryTask {
         setDataDir(dataDir);
         setTestDuration(testDuration);
         EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
+
+        long minClickTime = Long.parseLong(config.getProperty("MinClickTime"));
+        long maxClickTime = Long.parseLong(config.getProperty("MaxClickTime"));
+
+        double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
+
+        int hourCount = (int) Math.ceil((maxClickTime-minClickTime)/(HourSecond));
+        _zipfRandom = new ZipfRandom(zipfS,hourCount);
+
+        _adIndexGenerator =  new Random(System.currentTimeMillis());
         try
         {
             _adTable = eventTableGenerator.readAdTable();
@@ -56,9 +70,21 @@ public class AdClickQueryTask extends QueryTask {
         long minClickTime = Long.parseLong(config.getProperty("MinClickTime"));
         long maxClickTime = Long.parseLong(config.getProperty("MaxClickTime"));
 
+        /*
         double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
         //LongRange timeRange = CommonTools.getZipfRandomDailyTimeRange(minClickTime,maxClickTime,zipfS);
         LongRange timeRange = CommonTools.getZipfRandomHourlyTimeRange(minClickTime,maxClickTime,zipfS);
+        */
+
+        int firstHour = _zipfRandom.nextInt();
+        //int secondHour = _zipfRandom.nextInt();
+
+        //long queriedEndTime = maxApplyStartTime - firstHour*HourSecond;
+        long queriedEndTime = maxClickTime;
+        long queriedStartTime = Math.max(minClickTime,queriedEndTime - firstHour*HourSecond);
+
+        LongRange timeRange =  new LongRange(queriedStartTime,queriedEndTime);
+
 
         int selectLimit = CommonTools.getSelectLimt(config);
         int groupByLimit = Integer.parseInt(config.getProperty("GroupByLimit"));
@@ -67,12 +93,12 @@ public class AdClickQueryTask extends QueryTask {
         //GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(profileTable);
 
 
-        GenericRow randomAd = eventTableGenerator.getRandomGenericRow(_adTable);
+        GenericRow randomAd = eventTableGenerator.getRandomGenericRow(_adTable,_adIndexGenerator);
 
         String query = "";
         switch (queryId) {
             case 0:
-                query = String.format(queries[queryId], timeRange.getMaximumLong(), timeRange.getMaximumLong(), selectLimit);
+                query = String.format(queries[queryId], timeRange.getMaximumLong(), timeRange.getMaximumLong());
                 runQuery(query);
                 break;
             case 1:

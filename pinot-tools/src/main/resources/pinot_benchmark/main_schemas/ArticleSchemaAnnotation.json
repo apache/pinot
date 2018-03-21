@@ -38,7 +38,7 @@
   {
     "column" : "Company",
     "range" : false,
-    "cardinality" : 5000,
+    "cardinality" : 50000,
     "minLength" : 16,
     "maxLength" : 32
   },

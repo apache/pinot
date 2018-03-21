@@ -24,8 +24,8 @@ public class AdClickQueryExecutor extends QueryExecutor{
 
     private static String[] getQueries() {
         String[] queries = {
-                "SELECT * FROM AdClick" +
-                        " WHERE ClickTime > %d AND ClickTime < %d LIMIT %d",
+                "SELECT COUNT(*) FROM AdClick" +
+                        " WHERE ClickTime > %d AND ClickTime < %d",
                 "SELECT COUNT(*) FROM AdClick" +
                         " WHERE ClickTime > %d AND ClickTime < %d AND AdID = '%s'" ,
                 "SELECT AdCampaign, COUNT(*), AVG(ViewerStrength), MIN(ViewerStrength), MAX(ViewerStrength) FROM AdClick" +

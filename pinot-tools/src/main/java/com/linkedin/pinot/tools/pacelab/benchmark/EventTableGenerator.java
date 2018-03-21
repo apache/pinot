@@ -38,6 +38,7 @@ import org.codehaus.jackson.type.TypeReference;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.xerial.util.ZipfRandom;
 
 import javax.annotation.Nonnull;
 import java.io.File;
@@ -307,17 +308,20 @@ public class EventTableGenerator {
         DataFileWriter<GenericData.Record> recordWriter = createRecordWriter(profileViewSchemaFile,avroFile);
 
         //org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(profileViewSchemaFile))).toString());
+        Random viewerProfileIndexGenerator = new Random(System.currentTimeMillis());
+        ZipfRandom viewedProfileIndexGenerator = new ZipfRandom(0.5,profileTable.size());
 
         org.apache.avro.Schema schemaJSON = AvroWriter.getAvroSchema(Schema.fromFile(new File(profileViewSchemaFile)));
 
         for(int i=0;i<numRecords;i++)
         {
             final GenericData.Record outRecord = new GenericData.Record(schemaJSON);
-            GenericRow viewerProfile = getRandomGenericRow(profileTable);
-            GenericRow viewedProfile = getRandomGenericRow(profileTable);
+            GenericRow viewerProfile = getRandomGenericRow(profileTable, viewerProfileIndexGenerator);
+            //GenericRow viewedProfile = getRandomGenericRow(profileTable);
+            GenericRow viewedProfile = getRandomGenericRow(profileTable,  viewedProfileIndexGenerator);
             while(viewedProfile == viewerProfile)
             {
-                viewedProfile = getRandomGenericRow(profileTable);
+                viewedProfile = getRandomGenericRow(profileTable, viewedProfileIndexGenerator);
             }
 
             outRecord.put("ViewStartTime", eventTimeGenerator.next());
@@ -363,12 +367,16 @@ public class EventTableGenerator {
         //org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(adClickSchemaFile))).toString());
         org.apache.avro.Schema schemaJSON = AvroWriter.getAvroSchema(Schema.fromFile(new File(adClickSchemaFile)));
 
+        ZipfRandom clickedAdIndexGenerator = new ZipfRandom(0.2, adTable.size());
+        Random viewerProfileIndexGenerator = new Random(System.currentTimeMillis());
+
         for(int i=0;i<numRecords;i++)
         {
             final GenericData.Record outRecord = new GenericData.Record(schemaJSON);
 
-            GenericRow viewerProfile = getRandomGenericRow(profileTable);
-            GenericRow adInfo = getRandomGenericRow(adTable);
+            GenericRow viewerProfile = getRandomGenericRow(profileTable,viewerProfileIndexGenerator);
+            //GenericRow adInfo = getRandomGenericRow(adTable);
+            GenericRow adInfo = getRandomGenericRow(adTable, clickedAdIndexGenerator);
 
             outRecord.put("ClickTime", eventTimeGenerator.next());
             outRecord.put("ViewerStrength", viewerProfile.getValue("Strength"));
@@ -414,13 +422,16 @@ public class EventTableGenerator {
         //org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(jobApplySchemaFile))).toString());
         org.apache.avro.Schema schemaJSON = AvroWriter.getAvroSchema(Schema.fromFile(new File(jobApplySchemaFile)));
 
+        ZipfRandom appliedJobIndexGenerator = new ZipfRandom(0.4,jobTable.size());
+        Random applicantProfileIndexGenerator = new Random(System.currentTimeMillis());
 
         for(int i=0;i<numRecords;i++)
         {
             final GenericData.Record outRecord = new GenericData.Record(schemaJSON);
 
-            GenericRow applicantProfile = getRandomGenericRow(profileTable);
-            GenericRow jobInfo = getRandomGenericRow(jobTable);
+            GenericRow applicantProfile = getRandomGenericRow(profileTable, applicantProfileIndexGenerator);
+            //GenericRow jobInfo = getRandomGenericRow(jobTable);
+            GenericRow jobInfo = getRandomGenericRow(jobTable, appliedJobIndexGenerator);
 
             outRecord.put("ApplyStartTime", eventTimeGenerator.next());
             outRecord.put("TimeSpent", timeSpentGenerator.next());
@@ -466,13 +477,16 @@ public class EventTableGenerator {
         //org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(articleReadSchemaFile))).toString());
         org.apache.avro.Schema schemaJSON = AvroWriter.getAvroSchema(Schema.fromFile(new File(articleReadSchemaFile)));
 
+        ZipfRandom readArticleIndexGenerator = new ZipfRandom(0.3, articleTable.size());
+        Random readerProfileIndexGenerator = new Random(System.currentTimeMillis());
 
         for(int i=0;i<numRecords;i++)
         {
             final GenericData.Record outRecord = new GenericData.Record(schemaJSON);
 
-            GenericRow readerProfile = getRandomGenericRow(profileTable);
-            GenericRow articleInfo = getRandomGenericRow(articleTable);
+            GenericRow readerProfile = getRandomGenericRow(profileTable, readerProfileIndexGenerator);
+            //GenericRow articleInfo = getRandomGenericRow(articleTable);
+            GenericRow articleInfo = getRandomGenericRow(articleTable, readArticleIndexGenerator);
 
             outRecord.put("ReadStartTime", eventTimeGenerator.next());
             outRecord.put("TimeSpent", timeSpentGenerator.next());
@@ -518,12 +532,18 @@ public class EventTableGenerator {
 
         //org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(companySearchAppearanceSchemaFile))).toString());
 		org.apache.avro.Schema schemaJSON = AvroWriter.getAvroSchema(Schema.fromFile(new File(companySearchAppearanceSchemaFile)));
+
+		ZipfRandom searchedProfileIndexGenerator = new ZipfRandom(0.1, profileTable.size());
+        Random companyIndexGenerator = new Random(System.currentTimeMillis());
+
         for(int i=0;i<numRecords;i++)
         {
             final GenericData.Record outRecord = new GenericData.Record(schemaJSON);
 
-            GenericRow searchedProfile = getRandomGenericRow(profileTable);
-            GenericRow companyInfo = getRandomGenericRow(companyTable);
+            //GenericRow searchedProfile = getRandomGenericRow(profileTable);
+            GenericRow searchedProfile = getRandomGenericRow(profileTable, searchedProfileIndexGenerator);
+
+            GenericRow companyInfo = getRandomGenericRow(companyTable,companyIndexGenerator);
 
             outRecord.put("SearchTime", eventTimeGenerator.next());
             outRecord.put("TimeSpent", timeSpentGenerator.next());
@@ -557,12 +577,17 @@ public class EventTableGenerator {
             return "NO";
     }
 
-    public GenericRow getRandomGenericRow(List<GenericRow> rowList)
+    public GenericRow getRandomGenericRow(List<GenericRow> rowList, Random randGen)
     {
         int size = rowList.size();
-        Random randGen = new Random(System.currentTimeMillis());
         int index = randGen.nextInt(size);
         return rowList.get(index);
+    }
+
+    public GenericRow getRandomGenericRow(List<GenericRow> rowList, ZipfRandom indexDistribution)
+    {
+        int index = indexDistribution.nextInt();
+        return rowList.get(index-1);
     }
 
     public JSONObject getJSONSchema(Schema schema) throws JSONException {

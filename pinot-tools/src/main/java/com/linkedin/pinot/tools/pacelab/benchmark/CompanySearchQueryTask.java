@@ -17,11 +17,17 @@ package com.linkedin.pinot.tools.pacelab.benchmark;
 
 import com.linkedin.pinot.core.data.GenericRow;
 import org.apache.commons.lang.math.LongRange;
+import org.xerial.util.ZipfRandom;
 
 import java.util.List;
 import java.util.Properties;
+import java.util.Random;
+
 public class CompanySearchQueryTask extends QueryTask{
     List<GenericRow> _companyTable;
+    ZipfRandom _zipfRandom;
+    final static int HourSecond = 3600;
+    Random _companyIndexGenerator;
 
     public CompanySearchQueryTask(Properties config, String[] queries, String dataDir, int testDuration) {
         setConfig(config);
@@ -29,6 +35,17 @@ public class CompanySearchQueryTask extends QueryTask{
         setDataDir(dataDir);
         setTestDuration(testDuration);
         EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
+
+        long minSearchStartTime= Long.parseLong(config.getProperty("MinSearchStartTime"));
+        long maxSearchStartTime = Long.parseLong(config.getProperty("MaxSearchStartTime"));
+
+        double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
+
+        int hourCount = (int) Math.ceil((maxSearchStartTime-minSearchStartTime)/(HourSecond));
+        _zipfRandom = new ZipfRandom(zipfS,hourCount);
+
+        _companyIndexGenerator = new Random(System.currentTimeMillis());
+
         try
         {
             _companyTable = eventTableGenerator.readCompanyTable();
@@ -49,21 +66,33 @@ public class CompanySearchQueryTask extends QueryTask{
         Properties config = getConfig();
         String[] queries = getQueries();
 
-        long minApplyStartTime= Long.parseLong(config.getProperty("MinSearchStartTime"));
-        long maxApplyStartTime = Long.parseLong(config.getProperty("MaxSearchStartTime"));
+        long minSearchStartTime= Long.parseLong(config.getProperty("MinSearchStartTime"));
+        long maxSearchStartTime = Long.parseLong(config.getProperty("MaxSearchStartTime"));
 
+        /*
         double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
         LongRange timeRange = CommonTools.getZipfRandomTimeRange(minApplyStartTime,maxApplyStartTime,zipfS);
+        */
+
+        int firstHour = _zipfRandom.nextInt();
+        //int secondHour = _zipfRandom.nextInt();
+
+        //long queriedEndTime = maxApplyStartTime - firstHour*HourSecond;
+        long queriedEndTime = maxSearchStartTime;
+        long queriedStartTime = Math.max(minSearchStartTime,queriedEndTime - firstHour*HourSecond);
+
+        LongRange timeRange =  new LongRange(queriedStartTime,queriedEndTime);
+
 
         int selectLimit = CommonTools.getSelectLimt(config);
         int groupByLimit = Integer.parseInt(config.getProperty("GroupByLimit"));
 
-        GenericRow randomCompany = eventTableGenerator.getRandomGenericRow(_companyTable);
+        GenericRow randomCompany = eventTableGenerator.getRandomGenericRow(_companyTable, _companyIndexGenerator);
 
         String query = "";
         switch (queryId) {
             case 0:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), selectLimit);
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong());
                 runQuery(query);
                 break;
             case 1:

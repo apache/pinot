@@ -24,8 +24,8 @@ public class JobApplyQueryExecutor extends QueryExecutor {
 
     private static String[] getQueries() {
         String[] queries = {
-                "SELECT * FROM JobApply" +
-                        " WHERE ApplyStartTime > %d AND ApplyStartTime < %d LIMIT %d",
+                "SELECT COUNT(*) FROM JobApply" +
+                        " WHERE ApplyStartTime > %d AND ApplyStartTime < %d",
                 "SELECT * FROM JobApply" +
                         " WHERE ApplyStartTime > %d AND ApplyStartTime < %d AND ApplicantProfileId = '%s' LIMIT %d",
                 "SELECT JobID, COUNT(*) FROM JobApply" +

@@ -22,6 +22,7 @@ import org.xerial.util.ZipfRandom;
 
 import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 
 
 public class JobApplyQueryTask extends QueryTask {
@@ -29,6 +30,9 @@ public class JobApplyQueryTask extends QueryTask {
     List<GenericRow> _profileTable;
     ZipfRandom _zipfRandom;
     final static int HourSecond = 3600;
+
+    Random _jobIndexGenerator;
+    Random _profileIndexGenerator;
 
     public JobApplyQueryTask(Properties config, String[] queries, String dataDir, int testDuration) {
         setConfig(config);
@@ -44,6 +48,8 @@ public class JobApplyQueryTask extends QueryTask {
         int hourCount = (int) Math.ceil((maxApplyStartTime-minApplyStartTime)/(HourSecond));
         _zipfRandom = new ZipfRandom(zipfS,hourCount);
 
+        _jobIndexGenerator = new Random(System.currentTimeMillis());
+        _profileIndexGenerator = new Random(System.currentTimeMillis());
 
         try
         {
@@ -88,13 +94,13 @@ public class JobApplyQueryTask extends QueryTask {
         //List<GenericRow> profileTable = eventTableGenerator.readProfileTable();
         //GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(profileTable);
 
-        GenericRow randomJob = eventTableGenerator.getRandomGenericRow(_jobTable);
-        GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(_profileTable);
+        GenericRow randomJob = eventTableGenerator.getRandomGenericRow(_jobTable, _jobIndexGenerator);
+        GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(_profileTable, _profileIndexGenerator);
 
         String query = "";
         switch (queryId) {
             case 0:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), selectLimit);
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong());
                 runQuery(query);
                 break;
             case 1:
