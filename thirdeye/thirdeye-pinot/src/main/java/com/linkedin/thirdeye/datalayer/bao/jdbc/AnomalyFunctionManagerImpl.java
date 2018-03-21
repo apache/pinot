@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.Singleton;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -12,6 +14,8 @@ import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
+import org.apache.commons.lang.StringUtils;
+
 
 @Singleton
 public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunctionDTO>
@@ -33,6 +37,29 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
       result.add(dto);
     }
     return result;
+  }
+
+  @Override
+  public List<AnomalyFunctionDTO> findAllByApplication(String application) {
+    if (StringUtils.isBlank(application)) {
+      throw new IllegalArgumentException("application is null or empty");
+    }
+
+    Set<Long> applicationFunctionIds = new HashSet<>();
+    List<AlertConfigBean> alerts =
+        genericPojoDao.get(Predicate.EQ("application", application), AlertConfigBean.class);
+    for (AlertConfigBean alert : alerts) {
+      applicationFunctionIds.addAll(alert.getEmailConfig().getFunctionIds());
+    }
+
+    List<AnomalyFunctionBean> applicationAnomalyFunctionBeans = genericPojoDao
+        .get(new ArrayList<Long>(applicationFunctionIds), AnomalyFunctionBean.class);
+    List<AnomalyFunctionDTO> applicationAnomalyFunctions = new ArrayList<>();
+    for (AnomalyFunctionBean abstractBean : applicationAnomalyFunctionBeans) {
+      AnomalyFunctionDTO dto = MODEL_MAPPER.map(abstractBean, AnomalyFunctionDTO.class);
+      applicationAnomalyFunctions.add(dto);
+    }
+    return applicationAnomalyFunctions;
   }
 
   @Override

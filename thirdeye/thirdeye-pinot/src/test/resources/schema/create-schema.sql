@@ -160,12 +160,14 @@ create index override_config_base_id_idx ON override_config_index(base_id);
 create table if not exists alert_config_index (
     active boolean,
     name varchar(500) not null,
+    application VARCHAR(500) not null,
     base_id bigint(20) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
     version int(10),
     CONSTRAINT uc_alert_name UNIQUE (name)
 ) ENGINE=InnoDB;
+create index alert_confix_application_idx on alert_config_index(application);
 create index alert_confix_name_idx on alert_config_index(name);
 create index alert_config_base_id_idx ON alert_config_index(base_id);
 

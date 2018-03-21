@@ -1,7 +1,10 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import java.util.Arrays;
 import java.util.List;
 
 import org.testng.Assert;
@@ -55,6 +58,20 @@ public class TestAnomalyFunctionManager {
   public void testFindAllByCollection() {
     List<AnomalyFunctionDTO> functions = anomalyFunctionDAO.findAllByCollection(collection);
     Assert.assertEquals(functions.size(), 1);
+  }
+
+  @Test(dependsOnMethods = {"testCreate"})
+  public void testFindAllByApplication() {
+    AlertConfigDTO alertConfigDTO = new AlertConfigDTO();
+    alertConfigDTO.setName("test");
+    alertConfigDTO.setApplication("test");
+    EmailConfig emailConfig = new EmailConfig();
+    emailConfig.setFunctionIds(Arrays.asList(anomalyFunctionId));
+    alertConfigDTO.setEmailConfig(emailConfig);
+    DAORegistry.getInstance().getAlertConfigDAO().save(alertConfigDTO);
+
+    List<AnomalyFunctionDTO> applicationAnomalyFunctions = anomalyFunctionDAO.findAllByApplication("test");
+    Assert.assertEquals(applicationAnomalyFunctions.size(), 1);
   }
 
   @Test(dependsOnMethods = {"testFindAllByCollection"})

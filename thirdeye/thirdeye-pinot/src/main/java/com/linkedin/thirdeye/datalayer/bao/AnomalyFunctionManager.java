@@ -9,6 +9,8 @@ public interface AnomalyFunctionManager extends AbstractManager<AnomalyFunctionD
 
   List<AnomalyFunctionDTO> findAllByCollection(String collection);
 
+  List<AnomalyFunctionDTO> findAllByApplication(String application);
+
   List<String> findDistinctTopicMetricsByCollection(String collection);
 
   List<AnomalyFunctionDTO> findAllActiveFunctions();
