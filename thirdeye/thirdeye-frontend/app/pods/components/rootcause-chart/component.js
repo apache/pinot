@@ -1,4 +1,5 @@
 import { computed } from '@ember/object';
+import { equal } from '@ember/object/computed';
 import Component from '@ember/component';
 import moment from 'moment';
 import d3 from 'd3';
@@ -145,9 +146,9 @@ export default Component.extend({
       const { entities, timeseries, selectedUrns } =
         this.getProperties('entities', 'timeseries', 'selectedUrns');
 
-      return filterPrefix(selectedUrns, ['thirdeye:event:', 'frontend:metric:', 'frontend:anomalyfunction:'])
+      return filterPrefix(selectedUrns, ['thirdeye:event:', 'frontend:metric:'])
         .filter(urn => !hasPrefix(urn, 'thirdeye:event:') || entities[urn])
-        .filter(urn => !hasPrefix(urn, ['frontend:metric:', 'frontend:anomalyfunction:']) || timeseries[urn]);
+        .filter(urn => !hasPrefix(urn, 'frontend:metric:') || timeseries[urn]);
     }
   ),
 
@@ -164,7 +165,7 @@ export default Component.extend({
       const { timeseries, timeseriesMode, displayableUrns } =
         this.getProperties('timeseries', 'timeseriesMode', 'displayableUrns');
 
-      if (timeseriesMode == TIMESERIES_MODE_SPLIT) {
+      if (timeseriesMode === TIMESERIES_MODE_SPLIT) {
         return {};
       }
 
@@ -190,33 +191,25 @@ export default Component.extend({
     'displayableUrns',
     'timeseriesMode',
     function () {
-      const { displayableUrns, timeseriesMode, context } =
-        this.getProperties('displayableUrns', 'timeseriesMode', 'context');
+      const { displayableUrns, timeseriesMode } =
+        this.getProperties('displayableUrns', 'timeseriesMode');
 
-      if (timeseriesMode != TIMESERIES_MODE_SPLIT) {
+      if (timeseriesMode !== TIMESERIES_MODE_SPLIT) {
         return {};
       }
 
       const splitSeries = {};
       const metricUrns = new Set(filterPrefix(displayableUrns, 'frontend:metric:'));
-      const anomalyFunctionUrns = new Set(filterPrefix(displayableUrns, 'frontend:anomalyfunction:'));
 
       const otherUrns = new Set([...displayableUrns].filter(urn => !metricUrns.has(urn)));
-      [...anomalyFunctionUrns].forEach(urn => otherUrns.delete(urn));
 
-      filterPrefix(metricUrns, ['frontend:metric:current:']).forEach(urn => {
+      filterPrefix(metricUrns, 'frontend:metric:current:').forEach(urn => {
         const splitMetricUrns = [urn];
-        const metricUrn = toMetricUrn(urn);
         const baselineUrn = toBaselineUrn(urn);
 
         // show related baseline
         if (metricUrns.has(baselineUrn)) {
           splitMetricUrns.push(baselineUrn);
-        }
-
-        // show related anomaly function baselines
-        if (context.anomalyUrns.has(metricUrn)) {
-          [...anomalyFunctionUrns].forEach(urn => splitMetricUrns.push(urn));
         }
 
         const splitUrns = new Set(splitMetricUrns.concat([...otherUrns]));
@@ -239,7 +232,7 @@ export default Component.extend({
       const { entities, displayableUrns, timeseriesMode } =
         this.getProperties('entities', 'displayableUrns', 'timeseriesMode');
 
-      if (timeseriesMode != TIMESERIES_MODE_SPLIT) {
+      if (timeseriesMode !== TIMESERIES_MODE_SPLIT) {
         return {};
       }
 
@@ -261,7 +254,7 @@ export default Component.extend({
       const { entities, displayableUrns, timeseriesMode } =
         this.getProperties('entities', 'displayableUrns', 'timeseriesMode');
 
-      if (timeseriesMode != TIMESERIES_MODE_SPLIT) {
+      if (timeseriesMode !== TIMESERIES_MODE_SPLIT) {
         return {};
       }
 
@@ -276,12 +269,7 @@ export default Component.extend({
   /**
    * Split view indicator
    */
-  isSplit: computed(
-    'timeseriesMode',
-    function () {
-      return this.get('timeseriesMode') == TIMESERIES_MODE_SPLIT;
-    }
-  ),
+  isSplit: equal('timeseriesMode', TIMESERIES_MODE_SPLIT),
 
   //
   // helpers
