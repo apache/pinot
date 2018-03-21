@@ -1,0 +1,23 @@
+{
+  "tableName": "CompanySearchAppearance",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "timeColumnName": "SearchTime",
+    "timeType": "SECONDS",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "CompanySearchAppearanceSchema",
+    "replication": "1"
+  },
+  "tenants": {
+  },
+  "tableIndexConfig": {
+    "loadMode": "HEAP",
+    "invertedIndexColumns": [],
+    "lazyLoad"  : "true"
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

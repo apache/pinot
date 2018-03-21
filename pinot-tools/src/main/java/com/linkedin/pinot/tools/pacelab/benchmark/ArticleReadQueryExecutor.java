@@ -19,7 +19,8 @@ import java.util.Properties;
 
 public class ArticleReadQueryExecutor extends QueryExecutor{
     private static ArticleReadQueryExecutor instance;
-    private final String CONFIG_FILE = "pinot_benchmark/query_generator_config/ArticleReadConfig.properties";
+
+    private final String CONFIG_FILE = "ArticleReadConfig.properties";
     private static final String[] QUERIES = getQueries();
 
     private static String[] getQueries() {

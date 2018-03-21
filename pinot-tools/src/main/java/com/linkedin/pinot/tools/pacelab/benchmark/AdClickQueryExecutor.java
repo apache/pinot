@@ -19,7 +19,7 @@ import java.util.Properties;
 
 public class AdClickQueryExecutor extends QueryExecutor{
     private static AdClickQueryExecutor instance;
-    private final String CONFIG_FILE = "pinot_benchmark/query_generator_config/AdClickConfig.properties";
+    private final String CONFIG_FILE = "AdClickConfig.properties";
     private static final String[] QUERIES = getQueries();
 
     private static String[] getQueries() {

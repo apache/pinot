@@ -1,0 +1,14 @@
+[
+  {
+    "column" : "SearchTime",
+    "range" : true,
+    "rangeStart" : 1483228800,
+    "rangeEnd"   : 1508873892
+  },
+  {
+    "column" : "TimeSpent",
+    "range" : true,
+    "rangeStart" : 1,
+    "rangeEnd"   : 1800
+  }
+]

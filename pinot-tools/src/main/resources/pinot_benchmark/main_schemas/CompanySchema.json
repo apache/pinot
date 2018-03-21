@@ -1,0 +1,42 @@
+{
+  "metricFieldSpecs": [
+    {
+      "singleValueField" : true,
+      "dataType": "INT",
+      "name" : "FollowerCount"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "INT",
+      "name" : "CompanySize"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name" : "ID"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name" : "Url"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "Name"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "Location"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "Domain"
+    }
+  ],
+  "schemaName": "CompanySchema"
+}

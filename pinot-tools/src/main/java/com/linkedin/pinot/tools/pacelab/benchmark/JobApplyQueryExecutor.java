@@ -19,7 +19,7 @@ import java.util.Properties;
 
 public class JobApplyQueryExecutor extends QueryExecutor {
     private static JobApplyQueryExecutor instance;
-    private final String CONFIG_FILE = "pinot_benchmark/query_generator_config/JobApplyConfig.properties";
+    private final String CONFIG_FILE = "JobApplyConfig.properties";
     private static final String[] QUERIES = getQueries();
 
     private static String[] getQueries() {

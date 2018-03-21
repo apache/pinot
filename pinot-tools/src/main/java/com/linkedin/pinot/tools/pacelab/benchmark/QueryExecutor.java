@@ -17,6 +17,7 @@ package com.linkedin.pinot.tools.pacelab.benchmark;
 
 import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
 
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,14 +27,36 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
+class MyProperties extends Properties{
+    ReentrantLock lock;
+    MyProperties(ReentrantLock plock){
+        lock = plock;
+    }
+    public String getProperty(String key) {
+        while(lock.isLocked()) {
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        return super.getProperty(key);
+
+
+    }
+
+}
 public abstract class QueryExecutor {
     protected Properties config;
     protected PostQueryCommand postQueryCommand;
     protected int _testDuration;
     protected String _dataDir;
     List<ExecutorService> _threadPool;
-
+    public static final String defaultPath = "pinot_benchmark/query_generator_config/";
+    ReentrantLock lock = new ReentrantLock();
     public static QueryExecutor getInstance(){
         return null;
     }
@@ -45,6 +68,7 @@ public abstract class QueryExecutor {
         queryExecutors.add(JobApplyQueryExecutor.getInstance());
         //queryExecutors.add(AdClickQueryExecutor.getInstance());
         queryExecutors.add(ArticleReadQueryExecutor.getInstance());
+        //queryExecutors.add(CompanySearchQueryExecutor.getInstance());
 
         return queryExecutors;
     }
@@ -70,18 +94,48 @@ public abstract class QueryExecutor {
     }
 
     public void loadConfig() {
-        String configFile = getConfigFile();
-        config = new Properties();
+        String configFile = getPathOfConfigFile();
+        if(config==null){
+            config = new MyProperties(lock);
+        }
+
         try {
-            InputStream in = QueryExecutor.class.getClassLoader().getResourceAsStream(configFile);
+            InputStream in = new FileInputStream(configFile);
+            lock.lock();
+            config.clear();
+            //InputStream in = QueryExecutor.class.getClassLoader().getResourceAsStream(configFile);
             config.load(in);
         } catch (FileNotFoundException e) {
-            System.out.println("FileNotFoundException");
+            System.out.println("FileNotFoundException, Path should be PINOT_HOME/pinot_benchmark/query_generator_config/");
             e.printStackTrace();
         } catch (IOException e) {
             System.out.println("IOException");
             e.printStackTrace();
+        }finally {
+            lock.unlock();
         }
+    }
+
+    public String getPathOfConfigFile(){
+        String prop = defaultPath+getConfigFile();
+        //String prop = getConfigFile();
+        String config;
+        String propDir = System.getenv("PINOT_HOME");
+        if(propDir==null){
+            //TODO We can load config from class loader also as default config to handle null pointer exception
+            System.out.println("Environment variable is null. Check PINOT_HOME environment variable");
+            return null;
+        }
+        if(propDir.endsWith("/"))
+        {
+            config = propDir + prop;
+        }
+        else
+        {
+            config = propDir + "/" + prop;
+        }
+
+        return config;
     }
 
     public void setPostQueryCommand(PostQueryCommand postQueryCommand) {

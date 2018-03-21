@@ -1,0 +1,69 @@
+{
+  "metricFieldSpecs": [
+    {
+      "singleValueField" : true,
+      "dataType": "INT",
+      "name" : "TimeSpent"
+    },
+    {
+      "singleValueField": true,
+      "dataType": "INT",
+      "name": "ViewedProfileStrength"
+    },
+    {
+      "singleValueField": true,
+      "dataType": "INT",
+      "name": "CompanySize"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name" : "CompanyId"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "CompanyName"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "CompanyDomain"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "CompanyURL"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name" : "ViewedProfileId"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "ViewedProfileWorkPlace"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "ViewedProfileHeadline"
+    },
+    {
+      "singleValueField" : true,
+      "dataType": "STRING",
+      "name": "ViewedProfilePosition"
+    }
+  ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "SECONDS",
+      "dataType": "LONG",
+      "name": "SearchTime"
+    }
+  },
+  "schemaName": "CompanySearchAppearanceSchema"
+}

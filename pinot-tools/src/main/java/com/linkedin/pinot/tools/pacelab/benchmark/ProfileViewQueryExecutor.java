@@ -19,7 +19,7 @@ import java.util.Properties;
 
 public class ProfileViewQueryExecutor extends QueryExecutor{
     private static ProfileViewQueryExecutor instance;
-    private final String CONFIG_FILE = "pinot_benchmark/query_generator_config/ProfileViewConfig.properties";
+    private final String CONFIG_FILE = "ProfileViewConfig.properties";
     private static final String[] QUERIES = getQueries();
 
     private static String[] getQueries() {
