@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.rootcause.impl;
+package com.linkedin.thirdeye.anomaly.events;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
@@ -11,7 +11,6 @@ import com.google.api.services.calendar.CalendarScopes;
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.Events;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
@@ -264,21 +263,21 @@ public class HolidayEventsLoader implements Runnable {
       if (!existingHolidayEventToCountryCodes.containsKey(holidayEvent)) {
         existingHolidayEventToCountryCodes.put(holidayEvent, new HashSet<String>());
       }
-      if (existingEventDTO.getTargetDimensionMap() != null) {
+      if (existingEventDTO.getTargetDimensionMap() != null
+          && existingEventDTO.getTargetDimensionMap().get("countryCode") != null) {
         existingHolidayEventToCountryCodes.get(holidayEvent)
             .addAll(existingEventDTO.getTargetDimensionMap().get("countryCode"));
       }
       existingHolidayEventToEventDTO.put(holidayEvent, existingEventDTO);
     }
 
-    // Join the country code with existing events
     for (Map.Entry<HolidayEvent, Set<String>> entry : newHolidayEventToCountryCodes.entrySet()) {
       HolidayEvent newHolidayEvent = entry.getKey();
       Set<String> newCountryCodes = entry.getValue();
 
       if (existingHolidayEventToCountryCodes.containsKey(newHolidayEvent)) {
         if (existingHolidayEventToCountryCodes.get(newHolidayEvent).addAll(newCountryCodes)) {
-          // If the holiday is already exist and the country codes are different, merge the new country codes and update the database
+          // If the holiday is already exist and the country codes are different, merge with new country codes and update the database
           Map<String, List<String>> targetDimensionMap = new HashMap<>();
           targetDimensionMap.put("countryCode", new ArrayList<>(newCountryCodes));
 
@@ -287,7 +286,7 @@ public class HolidayEventsLoader implements Runnable {
           eventDAO.update(eventDTO);
         }
       } else {
-        // If the holiday is not exist, insert to the database
+        // If the holiday is not exist, insert it into the database
         EventDTO eventDTO = new EventDTO();
         eventDTO.setName(entry.getKey().getName());
         eventDTO.setEventType(entry.getKey().getEventType());
