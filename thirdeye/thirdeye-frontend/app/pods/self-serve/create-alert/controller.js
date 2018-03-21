@@ -313,13 +313,7 @@ export default Controller.extend({
           }
         }
       }).catch((error) => {
-        // The request failed. No graph to render.
-        this.clearAll();
-        this.setProperties({
-          isMetricDataLoading: false,
-          isMetricDataInvalid: true,
-          selectMetricErrMsg: error
-        });
+        this.set('selectMetricErrMsg', error);
       });
   },
 

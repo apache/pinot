@@ -2,7 +2,7 @@
 <main class="alert-create card-container card-container--padded te-form">
   <fieldset class="te-form__section te-form__section--first row">
     <div class="col-xs-12">
-      <legend class="te-form__section-title">Pick a metric to alert</legend>
+      <legend class="te-form__section-title">Select a metric to monitor</legend>
     </div>
     <div class="col-xs-12 col-sm-8">
       <div class="te-page__right te-page__right--inside">
@@ -42,7 +42,7 @@
         placeholder="Select a Granularity"
         searchPlaceholder="Type to filter..."
         triggerId="select-granularity"
-        triggerClass="te-form__select"
+        triggerClass="te-form__select te-form__select--granularity"
         disabled=isGranularitySelectDisabled
         as |granularity|
       }}
@@ -52,7 +52,7 @@
 
     <div class="col-xs-6">
       <label for="select-dimension" class="control-label te-label te-label--taller">
-        Create alert for each dimension values in: (optional)
+        Create an alert for each dimension value in: (optional)
         <span>
           <i class="glyphicon glyphicon-question-sign"></i>
           {{#tooltip-on-element class="te-tooltip"}}
@@ -352,7 +352,7 @@
     {{/if}}
 
     {{!-- Field: new alert group recipient emails --}}
-    <div class="col-xs-12">
+    <div class="col-xs-12 te-form__section-config">
       <label for="config-group" class="control-label te-label te-label--taller">
         Recipients in subscription group <span class="stronger">{{selectedConfigGroup.name}}</span>:
         <div class="te-form__sub-label"><span class="te-form__sub-label--strong">{{if selectedGroupRecipients selectedGroupRecipients "No recipients yet"}}</span></div>
