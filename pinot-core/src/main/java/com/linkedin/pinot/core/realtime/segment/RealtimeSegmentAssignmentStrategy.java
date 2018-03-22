@@ -10,6 +10,12 @@ import java.util.Map;
  */
 public interface RealtimeSegmentAssignmentStrategy {
 
+  /**
+   * Given list of segments and a partition assignment, assigns the segments onto instances
+   * @param newSegments
+   * @param partitionAssignment
+   * @return
+   */
   Map<String, List<String>> assign(List<String> newSegments, PartitionAssignment partitionAssignment);
 
 }
