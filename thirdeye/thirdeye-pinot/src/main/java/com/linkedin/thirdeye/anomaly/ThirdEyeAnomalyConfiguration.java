@@ -22,7 +22,7 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private long id;
   private String dashboardHost;
   private SmtpConfiguration smtpConfiguration;
-  private HolidayEventsLoaderConfiguration holidayEventsLoaderConfiguration;
+  private HolidayEventsLoaderConfiguration holidayEventsLoaderConfiguration = new HolidayEventsLoaderConfiguration();
   private MonitorConfiguration monitorConfiguration = new MonitorConfiguration();
   private AutoOnboardConfiguration autoOnboardConfiguration = new AutoOnboardConfiguration();
   private TaskDriverConfiguration taskDriverConfiguration = new TaskDriverConfiguration();
