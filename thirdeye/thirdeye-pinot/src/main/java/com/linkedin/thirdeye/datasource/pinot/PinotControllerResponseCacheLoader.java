@@ -15,6 +15,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkClient;
@@ -38,6 +39,8 @@ public class PinotControllerResponseCacheLoader extends PinotResponseCacheLoader
   private Connection[] connections;
 
   private static final String BROKER_PREFIX = "Broker_";
+
+  private final AtomicInteger activeConnections = new AtomicInteger();
 
   /**
    * Constructs a empty {@link PinotControllerResponseCacheLoader}. Please use init() to setup the connection of the
@@ -107,20 +110,22 @@ public class PinotControllerResponseCacheLoader extends PinotResponseCacheLoader
   public ThirdEyeResultSetGroup load(PinotQuery pinotQuery) throws Exception {
     try {
       Connection connection = getConnection();
-      synchronized (connection) {
-        long start = System.currentTimeMillis();
+      try {
+        synchronized (connection) {
+          int activeConnections = this.activeConnections.incrementAndGet();
 
-        ResultSetGroup resultSetGroup =
-            connection.execute(pinotQuery.getTableName(), pinotQuery.getPql());
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Query:{}  response:{}", pinotQuery.getPql(), format(resultSetGroup));
+          long start = System.currentTimeMillis();
+          ResultSetGroup resultSetGroup = connection.execute(pinotQuery.getTableName(), pinotQuery.getPql());
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Query:{}  response:{}", pinotQuery.getPql(), format(resultSetGroup));
+          }
+          long end = System.currentTimeMillis();
+          LOG.info("Query:{}  took:{} ms  connections:{}", pinotQuery.getPql(), (end - start), activeConnections);
+
+          return ThirdEyeResultSetGroup.fromPinotResultSetGroup(resultSetGroup);
         }
-        long end = System.currentTimeMillis();
-        LOG.info("Query:{}  took:{} ms", pinotQuery.getPql(), (end - start));
-
-        ThirdEyeResultSetGroup thirdEyeResultSetGroup =
-            ThirdEyeResultSetGroup.fromPinotResultSetGroup(resultSetGroup);
-        return thirdEyeResultSetGroup;
+      } finally {
+        this.activeConnections.decrementAndGet();
       }
     } catch (PinotClientException cause) {
       LOG.error("Error when running pql:" + pinotQuery.getPql(), cause);

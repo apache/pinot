@@ -13,13 +13,19 @@ import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class DefaultAggregationLoader implements AggregationLoader {
   private static Logger LOG = LoggerFactory.getLogger(DefaultAggregationLoader.class);
+
+  private static final long TIMEOUT = 60000;
 
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
@@ -56,10 +62,25 @@ public class DefaultAggregationLoader implements AggregationLoader {
         .builder(COL_DIMENSION_NAME + ":STRING", COL_DIMENSION_VALUE + ":STRING", COL_VALUE + ":DOUBLE").build()
         .setIndex(COL_DIMENSION_NAME, COL_DIMENSION_VALUE);
 
-    List<DataFrame> results = new ArrayList<>();
+    Map<String, RequestContainer> requests = new HashMap<>();
+    Map<String, Future<ThirdEyeResponse>> responses = new HashMap<>();
+
+    // submit requests
     for (String dimension : dimensions) {
       RequestContainer rc = DataFrameUtils.makeAggregateRequest(slice, Collections.singletonList(dimension), "ref", this.metricDAO, this.datasetDAO);
-      ThirdEyeResponse res = this.cache.getQueryResult(rc.getRequest());
+      Future<ThirdEyeResponse> res = this.cache.getQueryResultAsync(rc.getRequest());
+
+      requests.put(dimension, rc);
+      responses.put(dimension, res);
+    }
+
+    // collect responses
+    final long deadline = System.currentTimeMillis() + TIMEOUT;
+
+    List<DataFrame> results = new ArrayList<>();
+    for (String dimension : dimensions) {
+      RequestContainer rc = requests.get(dimension);
+      ThirdEyeResponse res = responses.get(dimension).get(makeTimeout(deadline), TimeUnit.MILLISECONDS);
       DataFrame dfRaw = DataFrameUtils.evaluateResponse(res, rc);
       DataFrame dfResult = new DataFrame()
           .addSeries(COL_DIMENSION_NAME, StringSeries.fillValues(dfRaw.size(), dimension))
@@ -102,5 +123,9 @@ public class DefaultAggregationLoader implements AggregationLoader {
     }
 
     return df.getDoubles(COL_VALUE).doubleValue();
+  }
+
+  private static long makeTimeout(long deadline) {
+    return Math.max(deadline - System.currentTimeMillis(), 0);
   }
 }
