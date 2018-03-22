@@ -7,7 +7,6 @@ import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalySummary;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
@@ -36,13 +35,10 @@ import javax.ws.rs.core.MediaType;
 public class UserDashboardResource {
   private final MergedAnomalyResultManager anomalyDAO;
   private final AnomalyFunctionManager functionDAO;
-  private final AlertConfigManager alertDAO;
 
-  public UserDashboardResource(MergedAnomalyResultManager anomalyDAO, AnomalyFunctionManager functionDAO,
-      AlertConfigManager alertDAO) {
+  public UserDashboardResource(MergedAnomalyResultManager anomalyDAO, AnomalyFunctionManager functionDAO) {
     this.anomalyDAO = anomalyDAO;
     this.functionDAO = functionDAO;
-    this.alertDAO = alertDAO;
   }
 
   /**
@@ -105,9 +101,9 @@ public class UserDashboardResource {
     // application (indirect)
     Set<Long> applicationFunctionIds = new HashSet<>();
     if (application != null) {
-      List<AlertConfigDTO> alerts = this.alertDAO.findByPredicate(Predicate.EQ("application", application));
-      for (AlertConfigDTO alert : alerts) {
-        applicationFunctionIds.addAll(alert.getEmailConfig().getFunctionIds());
+      List<AnomalyFunctionDTO> functions = this.functionDAO.findAllByApplication(application);
+      for (AnomalyFunctionDTO function : functions) {
+        applicationFunctionIds.add(function.getId());
       }
     }
 
