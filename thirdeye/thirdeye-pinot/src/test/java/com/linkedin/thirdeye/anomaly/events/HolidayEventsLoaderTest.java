@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly.events;
 
 import com.linkedin.thirdeye.anomaly.HolidayEventsLoaderConfiguration;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -77,14 +78,29 @@ public class HolidayEventsLoaderTest {
   public void testMergeWithExistingHolidays() {
     holidayEventsLoader.mergeWithExistingHolidays(holidayNameToHolidayEvent, eventsDAO.findAll());
     List<EventDTO> holidays = eventsDAO.findAll();
+    Map<String, List<EventDTO>> eventNameToEventDto = new HashMap<>();
     for (EventDTO holiday : holidays) {
-      Assert.assertNotEquals(holiday.getName(), "Disappeared festival");
+      String holidayName = holiday.getName();
+      if (!eventNameToEventDto.containsKey(holidayName)) {
+        eventNameToEventDto.put(holidayName, new ArrayList<EventDTO>());
+      }
+      eventNameToEventDto.get(holidayName).add(holiday);
     }
-    Assert.assertEquals(holidays.get(0).getName(), "Some festival");
-    Assert.assertEquals(holidays.get(0).getTargetDimensionMap().get("countryCode"), Collections.singletonList("uk"));
-    Assert.assertEquals(holidays.get(1).getName(), "Some festival");
-    Assert.assertEquals(holidays.get(1).getTargetDimensionMap().get("countryCode"), Arrays.asList("cn", "us"));
-    Assert.assertEquals(holidays.get(2).getName(), "Some special day");
-    Assert.assertEquals(holidays.get(2).getTargetDimensionMap().get("countryCode"), Collections.singletonList("us"));
+    Assert.assertFalse(eventNameToEventDto.containsKey("Disappeared festival"));
+    Assert.assertTrue(eventNameToEventDto.containsKey("Some special day"));
+    Assert.assertEquals(eventNameToEventDto.get("Some special day").size(), 1);
+    Assert.assertEquals(eventNameToEventDto.get("Some special day").get(0).getTargetDimensionMap().get("countryCode"),
+        Collections.singletonList("us"));
+    Assert.assertTrue(eventNameToEventDto.containsKey("Some festival"));
+    List<EventDTO> festivalEvents = eventNameToEventDto.get("Some festival");
+
+    Assert.assertEquals(festivalEvents.size(), 2);
+    Assert.assertTrue(
+        festivalEvents.get(0).getTargetDimensionMap().get("countryCode").equals(Collections.singletonList("uk"))
+            && new HashSet<>(festivalEvents.get(1).getTargetDimensionMap().get("countryCode")).equals(
+            new HashSet<>(Arrays.asList("us", "cn")))
+            || festivalEvents.get(1).getTargetDimensionMap().get("countryCode").equals(Collections.singletonList("uk"))
+            && new HashSet<>(festivalEvents.get(0).getTargetDimensionMap().get("countryCode")).equals(
+            new HashSet<>(Arrays.asList("us", "cn"))));
   }
 }
