@@ -162,25 +162,27 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
 
     // update if not dryRun
     boolean dryRun = rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN, DEFAULT_DRY_RUN);
+    IdealState newIdealState;
     if (!dryRun) {
       LOGGER.info("Updating ideal state for table {}", tableNameWithType);
-      rebalanceAndUpdateIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig, newPartitionAssignment);
+      newIdealState = rebalanceAndUpdateIdealState(tableConfig, targetNumReplicas, rebalanceUserConfig,
+          newPartitionAssignment);
     } else {
       LOGGER.info("Dry run. Skip writing ideal state");
-      rebalanceIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig, newPartitionAssignment);
+      newIdealState = rebalanceIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig,
+          newPartitionAssignment);
     }
-    return idealState;
+    return newIdealState;
   }
 
   /**
    * Rebalances the ideal state object and also updates it
-   * @param rebalanceIdealState
    * @param tableConfig
    * @param targetNumReplicas
    * @param rebalanceUserConfig
    * @param newPartitionAssignment
    */
-  private void rebalanceAndUpdateIdealState(final IdealState rebalanceIdealState, final TableConfig tableConfig,
+  private IdealState rebalanceAndUpdateIdealState(final TableConfig tableConfig,
       final int targetNumReplicas, final Configuration rebalanceUserConfig,
       final PartitionAssignment newPartitionAssignment) {
 
@@ -188,18 +190,13 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
       @Nullable
       @Override
       public IdealState apply(@Nullable IdealState idealState) {
-        rebalanceIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig,
+        return rebalanceIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig,
             newPartitionAssignment);
-        idealState.setReplicas(Integer.toString(targetNumReplicas));
-        for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
-          rebalanceIdealState.setInstanceStateMap(entry.getKey(), entry.getValue());
-        }
-        rebalanceIdealState.setReplicas(Integer.toString(targetNumReplicas));
-        return idealState;
       }
     };
     HelixHelper.updateIdealState(_helixManager, tableConfig.getTableName(), updaterFunction,
         RetryPolicies.exponentialBackoffRetryPolicy(5, 1000, 2.0f));
+    return  _helixAdmin.getResourceIdealState(_helixClusterName, tableConfig.getTableName());
   }
 
   /**
@@ -210,7 +207,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
    * @param rebalanceUserConfig
    * @param newPartitionAssignment
    */
-  private void rebalanceIdealState(IdealState idealState, TableConfig tableConfig, int targetNumReplicas,
+  private IdealState rebalanceIdealState(IdealState idealState, TableConfig tableConfig, int targetNumReplicas,
       Configuration rebalanceUserConfig, PartitionAssignment newPartitionAssignment) {
     // if realtime and includeConsuming, then rebalance consuming segments
     if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
@@ -222,6 +219,8 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
     }
     // always rebalance serving segments
     rebalanceServingSegments(idealState, tableConfig, targetNumReplicas);
+    idealState.setReplicas(Integer.toString(targetNumReplicas));
+    return idealState;
   }
 
   /**
@@ -336,7 +335,6 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
         idealState.setInstanceStateMap(entry.getKey(), entry.getValue());
       }
     }
-    idealState.setReplicas(Integer.toString(targetNumReplicas));
     return idealState;
   }
 
