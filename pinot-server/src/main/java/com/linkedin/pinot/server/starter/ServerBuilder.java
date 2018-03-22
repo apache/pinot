@@ -19,7 +19,7 @@ import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
-import com.linkedin.pinot.core.operator.transform.TransformUtils;
+import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.core.query.scheduler.QuerySchedulerFactory;
@@ -27,8 +27,9 @@ import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.transport.netty.NettyServer;
 import com.linkedin.pinot.transport.netty.NettyTCPServer;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
@@ -69,9 +70,19 @@ public class ServerBuilder {
     _serverMetrics.initializeGlobalMeters();
   }
 
+  @SuppressWarnings("unchecked")
   private void initTransformFunctions() {
-    TransformFunctionFactory.init(
-        ArrayUtils.addAll(TransformUtils.getBuiltInTransform(), _serverConf.getTransformFunctions()));
+    Set<Class<TransformFunction>> transformFunctionClasses = new HashSet<>();
+    for (String transformFunctionClassName : _serverConf.getTransformFunctions()) {
+      Class<TransformFunction> transformFunctionClass;
+      try {
+        transformFunctionClass = (Class<TransformFunction>) Class.forName(transformFunctionClassName);
+      } catch (ClassNotFoundException e) {
+        throw new RuntimeException("Failed to find transform function class of name: " + transformFunctionClassName);
+      }
+      transformFunctionClasses.add(transformFunctionClass);
+    }
+    TransformFunctionFactory.init(transformFunctionClasses);
   }
 
   public ServerMetrics getServerMetrics() {

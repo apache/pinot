@@ -16,9 +16,11 @@
 package com.linkedin.pinot.core.query.aggregation.groupby;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.BlockMetadata;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
+import com.linkedin.pinot.core.operator.transform.TransformOperator;
 import com.linkedin.pinot.core.query.aggregation.groupby.utils.ValueToIdMap;
 import com.linkedin.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -39,36 +41,30 @@ import javax.annotation.Nonnull;
  * 2. Add support for trimming group-by results.
  */
 public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerator {
-
-  private String[] _groupByColumns;
-  private Map<FixedIntArray, Integer> _groupKeyMap;
-  private int _numGroupKeys = 0;
-  private boolean[] _hasDictionary;
-
+  private final TransformExpressionTree[] _groupByExpressions;
+  private final int _numGroupByExpressions;
+  private FieldSpec.DataType[] _dataTypes;
   private Dictionary[] _dictionaries;
   private ValueToIdMap[] _onTheFlyDictionaries;
+  private final Map<FixedIntArray, Integer> _groupKeyMap = new HashMap<>();
+  private int _numGroupKeys = 0;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param groupByColumns Columns for which to generate group-by keys
-   */
-  public NoDictionaryMultiColumnGroupKeyGenerator(TransformBlock transformBlock, String[] groupByColumns) {
-    _groupByColumns = groupByColumns;
-    _groupKeyMap = new HashMap<>();
+  public NoDictionaryMultiColumnGroupKeyGenerator(@Nonnull TransformOperator transformOperator,
+      TransformExpressionTree[] groupByExpressions) {
+    _groupByExpressions = groupByExpressions;
+    _numGroupByExpressions = groupByExpressions.length;
+    _dataTypes = new FieldSpec.DataType[_numGroupByExpressions];
+    _dictionaries = new Dictionary[_numGroupByExpressions];
+    _onTheFlyDictionaries = new ValueToIdMap[_numGroupByExpressions];
 
-    _hasDictionary = new boolean[groupByColumns.length];
-    _dictionaries = new Dictionary[groupByColumns.length];
-    _onTheFlyDictionaries = new ValueToIdMap[groupByColumns.length];
-
-    for (int i = 0; i < groupByColumns.length; i++) {
-      BlockMetadata blockMetadata = transformBlock.getBlockMetadata(groupByColumns[i]);
-      if (blockMetadata.hasDictionary()) {
-        _dictionaries[i] = blockMetadata.getDictionary();
-        _hasDictionary[i] = true;
+    for (int i = 0; i < _numGroupByExpressions; i++) {
+      TransformExpressionTree groupByExpression = groupByExpressions[i];
+      DataSourceMetadata metadata = transformOperator.getDataSourceMetadata(groupByExpression);
+      _dataTypes[i] = metadata.getDataType();
+      if (metadata.hasDictionary()) {
+        _dictionaries[i] = transformOperator.getDictionary(groupByExpression);
       } else {
-        _onTheFlyDictionaries[i] = ValueToIdMapFactory.get(blockMetadata.getDataType());
-        _hasDictionary[i] = false;
+        _onTheFlyDictionaries[i] = ValueToIdMapFactory.get(_dataTypes[i]);
       }
     }
   }
@@ -80,78 +76,58 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   }
 
   @Override
-  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[] docIdToGroupKey) {
-    int numGroupByColumns = _groupByColumns.length;
+  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[] groupKeys) {
     int numDocs = transformBlock.getNumDocs();
-
-    Object[] values = new Object[numGroupByColumns];
-    boolean[] hasDictionary = new boolean[numGroupByColumns];
-    FieldSpec.DataType[] dataTypes = new FieldSpec.DataType[numGroupByColumns];
-
-    for (int i = 0; i < numGroupByColumns; i++) {
-      BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByColumns[i]);
-      dataTypes[i] = blockValSet.getValueType();
-      BlockMetadata blockMetadata = transformBlock.getBlockMetadata(_groupByColumns[i]);
-
-      if (blockMetadata.hasDictionary()) {
-        hasDictionary[i] = true;
+    Object[] values = new Object[_numGroupByExpressions];
+    for (int i = 0; i < _numGroupByExpressions; i++) {
+      BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByExpressions[i]);
+      if (_dictionaries[i] != null) {
         values[i] = blockValSet.getDictionaryIdsSV();
       } else {
-        hasDictionary[i] = false;
-        values[i] = getValuesFromBlockValSet(blockValSet, dataTypes[i]);
+        values[i] = getValuesFromBlockValSet(blockValSet, _dataTypes[i]);
       }
     }
 
     for (int i = 0; i < numDocs; i++) {
-      int[] keys = new int[numGroupByColumns];
-
-      for (int j = 0; j < numGroupByColumns; j++) {
-
-        if (hasDictionary[j]) {
+      int[] keys = new int[_numGroupByExpressions];
+      for (int j = 0; j < _numGroupByExpressions; j++) {
+        if (_dictionaries[j] != null) {
           int[] dictIds = (int[]) values[j];
           keys[j] = dictIds[i];
         } else {
-          // BlockValSet.getDoubleValuesSV() always returns double currently, as all aggregation functions assume
-          // data type to be double.
-
-          switch (dataTypes[j]) {
+          FieldSpec.DataType dataType = _dataTypes[j];
+          switch (dataType) {
             case INT:
               int[] intValues = (int[]) values[j];
               keys[j] = _onTheFlyDictionaries[j].put(intValues[i]);
               break;
-
             case LONG:
               long[] longValues = (long[]) values[j];
               keys[j] = _onTheFlyDictionaries[j].put(longValues[i]);
               break;
-
             case FLOAT:
               float[] floatValues = (float[]) values[j];
               keys[j] = _onTheFlyDictionaries[j].put(floatValues[i]);
               break;
-
             case DOUBLE:
               double[] doubleValues = (double[]) values[j];
               keys[j] = _onTheFlyDictionaries[j].put(doubleValues[i]);
               break;
-
             case STRING:
               String[] stringValues = (String[]) values[j];
               keys[j] = _onTheFlyDictionaries[j].put(stringValues[i]);
               break;
-
             default:
-              throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + dataTypes[j]);
+              throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + dataType);
           }
         }
       }
-
-      docIdToGroupKey[i] = getGroupIdForKey(new FixedIntArray(keys));
+      groupKeys[i] = getGroupIdForKey(new FixedIntArray(keys));
     }
   }
 
   @Override
-  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[][] docIdToGroupKeys) {
+  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[][] groupKeys) {
     // TODO: Support generating keys for multi-valued columns.
     throw new UnsupportedOperationException("Operation not supported");
   }
@@ -225,7 +201,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       String key;
       int dictId = keys[i];
 
-      if (_hasDictionary[i]) {
+      if (_dictionaries[i] != null) {
         key = _dictionaries[i].get(dictId).toString();
       } else {
         key = _onTheFlyDictionaries[i].getString(dictId);

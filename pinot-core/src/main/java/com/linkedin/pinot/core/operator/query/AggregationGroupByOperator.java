@@ -40,6 +40,7 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
   private final int _numGroupsLimit;
   private final TransformOperator _transformOperator;
   private final long _numTotalRawDocs;
+
   private ExecutionStatistics _executionStatistics;
 
   public AggregationGroupByOperator(@Nonnull AggregationFunctionContext[] functionContexts,
@@ -60,14 +61,12 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor =
         new DefaultGroupByExecutor(_functionContexts, _groupBy, _maxInitialResultHolderCapacity,
-            _numGroupsLimit);
-    groupByExecutor.init();
+            _numGroupsLimit, _transformOperator);
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       numDocsScanned += transformBlock.getNumDocs();
       groupByExecutor.process(transformBlock);
     }
-    groupByExecutor.finish();
     AggregationGroupByResult groupByResult = groupByExecutor.getResult();
 
     // Gather execution statistics

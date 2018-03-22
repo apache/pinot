@@ -15,89 +15,104 @@
  */
 package com.linkedin.pinot.core.operator.transform.function;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nonnull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Factory class for transformation functions.
  */
 public class TransformFunctionFactory {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TransformFunctionFactory.class);
-
-  private static final Map<String, Class<TransformFunction>> TRANSFORM_FUNCTION_MAP = new HashMap<>();
-  private static boolean _inited = false;
-
-  /**
-   * Private constructor, to prevent instantiation.
-   */
   private TransformFunctionFactory() {
-
   }
 
-  /**
-   * This method builds the transform factory containing functions
-   * specified in the server configuration. Throws {@link RuntimeException} if it has
-   * already been initialized. Method is synchronized (as opposed to concurrent), as it is
-   * expected to be called only once, during start-up.
-   *
-   * @param transformFunctions Array of transform function names
-   */
-  @SuppressWarnings("unchecked")
-  public static synchronized void init(@Nonnull String[] transformFunctions) {
-    // Already initialized, nothing to be done.
-    if (_inited) {
-      return;
-    }
+  private static final Map<String, Class<? extends TransformFunction>> TRANSFORM_FUNCTION_MAP =
+      new HashMap<String, Class<? extends TransformFunction>>() {
+        {
+          // NOTE: add all built-in transform functions here
+          put(AdditionTransformFunction.FUNCTION_NAME.toLowerCase(), AdditionTransformFunction.class);
+          put(SubtractionTransformFunction.FUNCTION_NAME.toLowerCase(), SubtractionTransformFunction.class);
+          put(MultiplicationTransformFunction.FUNCTION_NAME.toLowerCase(), MultiplicationTransformFunction.class);
+          put(DivisionTransformFunction.FUNCTION_NAME.toLowerCase(), DivisionTransformFunction.class);
+          put(TimeConversionTransformFunction.FUNCTION_NAME.toLowerCase(), TimeConversionTransformFunction.class);
+          put(DateTimeConversionTransformFunction.FUNCTION_NAME.toLowerCase(),
+              DateTimeConversionTransformFunction.class);
+          put(ValueInTransformFunction.FUNCTION_NAME.toLowerCase(), ValueInTransformFunction.class);
+        }
+      };
 
-    for (String functionName : transformFunctions) {
+  /**
+   * Initializes the factory with a set of transform function classes.
+   * <p>Should be called only once before calling {@link #get(TransformExpressionTree, Map)}.
+   *
+   * @param transformFunctionClasses Set of transform function classes
+   */
+  public static void init(@Nonnull Set<Class<TransformFunction>> transformFunctionClasses) {
+    for (Class<TransformFunction> transformFunctionClass : transformFunctionClasses) {
+      TransformFunction transformFunction;
       try {
-
-        Class<TransformFunction> functionClass = (Class<TransformFunction>) Class.forName(functionName);
-        TransformFunction transformFunction = functionClass.newInstance();
-        TRANSFORM_FUNCTION_MAP.put(transformFunction.getName().toLowerCase(), functionClass);
-      } catch (ClassNotFoundException e) {
-        LOGGER.error("Could not find class for transform function '{}'", functionName, e);
-      } catch (InstantiationException e) {
-        LOGGER.error("Could not instantiate class for transform function '{}", functionName, e);
-      } catch (IllegalAccessException e) {
-        LOGGER.error("Could not access members of class for transform function '{}", functionName, e);
+        transformFunction = transformFunctionClass.newInstance();
+      } catch (InstantiationException | IllegalAccessException e) {
+        throw new RuntimeException(
+            "Caught exception while instantiating transform function from class: " + transformFunctionClass.toString(),
+            e);
       }
+      String transformFunctionName = transformFunction.getName().toLowerCase();
+      if (TRANSFORM_FUNCTION_MAP.containsKey(transformFunctionName)) {
+        throw new IllegalArgumentException("Transform function: " + transformFunctionName + " already exists");
+      }
+      TRANSFORM_FUNCTION_MAP.put(transformFunctionName, transformFunctionClass);
     }
-
-    _inited = true;
   }
 
   /**
-   * Returns an instance of TransformFunction for the given name. Returns null if
-   * function name was not found.
+   * Returns an instance of transform function for the given expression.
    *
-   * @param functionName Transform function name
-   * @return TransformFunction for the given functionName
+   * @param expression Transform expression
+   * @param dataSourceMap Map from column name to column data source
+   * @return Transform function
    */
-  public static TransformFunction get(@Nonnull String functionName) {
-    Preconditions.checkState(_inited, "TransformFunctionFactory not initialized.");
-    Class<TransformFunction> transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName.toLowerCase());
-    if (transformFunctionClass == null) {
-      return null;
+  public static TransformFunction get(@Nonnull TransformExpressionTree expression,
+      @Nonnull Map<String, DataSource> dataSourceMap) {
+    TransformFunction transformFunction;
+    switch (expression.getExpressionType()) {
+      case FUNCTION:
+        String functionName = expression.getValue();
+        Class<? extends TransformFunction> transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName);
+        if (transformFunctionClass == null) {
+          throw new BadQueryRequestException("Unsupported transform function: " + functionName);
+        }
+        try {
+          transformFunction = transformFunctionClass.newInstance();
+        } catch (InstantiationException | IllegalAccessException e) {
+          throw new RuntimeException("Caught exception while instantiating transform function: " + functionName, e);
+        }
+        List<TransformExpressionTree> children = expression.getChildren();
+        List<TransformFunction> arguments = new ArrayList<>(children.size());
+        for (TransformExpressionTree child : children) {
+          arguments.add(TransformFunctionFactory.get(child, dataSourceMap));
+        }
+        try {
+          transformFunction.init(arguments, dataSourceMap);
+        } catch (Exception e) {
+          throw new BadQueryRequestException(
+              "Caught exception while initializing transform function: " + transformFunction.getName(), e);
+        }
+        return transformFunction;
+      case IDENTIFIER:
+        String columnName = expression.getValue();
+        return new IdentifierTransformFunction(columnName, dataSourceMap.get(columnName));
+      case LITERAL:
+        return new LiteralTransformFunction(expression.getValue());
+      default:
+        throw new IllegalStateException();
     }
-
-    TransformFunction transformFunction = null;
-    try {
-      transformFunction = transformFunctionClass.newInstance();
-    } catch (InstantiationException e) {
-      LOGGER.error("Could not instantiate class for transform function '{}", functionName, e);
-      Utils.rethrowException(e);
-    } catch (IllegalAccessException e) {
-      LOGGER.error("Could not access members of class for transform function '{}", functionName, e);
-      Utils.rethrowException(e);
-    }
-
-    return transformFunction;
   }
 }

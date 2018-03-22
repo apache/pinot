@@ -16,8 +16,10 @@
 package com.linkedin.pinot.core.query.aggregation.groupby;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
+import com.linkedin.pinot.core.operator.transform.TransformOperator;
 import it.unimi.dsi.fastutil.doubles.Double2IntMap;
 import it.unimi.dsi.fastutil.doubles.Double2IntOpenHashMap;
 import it.unimi.dsi.fastutil.floats.Float2IntMap;
@@ -39,19 +41,16 @@ import javax.annotation.Nonnull;
  *
  */
 public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenerator {
-
-  private final String _groupByColumn;
+  private final TransformExpressionTree _groupByExpression;
+  private final FieldSpec.DataType _dataType;
   private final Map _groupKeyMap;
   private int _numGroupKeys = 0;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param groupByColumn Column for which to generate group-by keys
-   */
-  public NoDictionarySingleColumnGroupKeyGenerator(String groupByColumn, FieldSpec.DataType dataType) {
-    _groupByColumn = groupByColumn;
-    _groupKeyMap = createGroupKeyMap(dataType);
+  public NoDictionarySingleColumnGroupKeyGenerator(@Nonnull TransformOperator transformOperator,
+      @Nonnull TransformExpressionTree groupByExpression) {
+    _groupByExpression = groupByExpression;
+    _dataType = transformOperator.getDataSourceMetadata(_groupByExpression).getDataType();
+    _groupKeyMap = createGroupKeyMap(_dataType);
   }
 
   @Override
@@ -61,49 +60,43 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   @Override
-  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[] docIdToGroupKey) {
-    BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByColumn);
-    FieldSpec.DataType dataType = blockValSet.getValueType();
+  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[] groupKeys) {
+    BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByExpression);
     int numDocs = transformBlock.getNumDocs();
 
-    switch (dataType) {
+    switch (_dataType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
         for (int i = 0; i < numDocs; i++) {
-          docIdToGroupKey[i] = getKeyForValue(intValues[i]);
+          groupKeys[i] = getKeyForValue(intValues[i]);
         }
         break;
-
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
         for (int i = 0; i < numDocs; i++) {
-          docIdToGroupKey[i] = getKeyForValue(longValues[i]);
+          groupKeys[i] = getKeyForValue(longValues[i]);
         }
         break;
-
       case FLOAT:
         float[] floatValues = blockValSet.getFloatValuesSV();
         for (int i = 0; i < numDocs; i++) {
-          docIdToGroupKey[i] = getKeyForValue(floatValues[i]);
+          groupKeys[i] = getKeyForValue(floatValues[i]);
         }
         break;
-
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
         for (int i = 0; i < numDocs; i++) {
-          docIdToGroupKey[i] = getKeyForValue(doubleValues[i]);
+          groupKeys[i] = getKeyForValue(doubleValues[i]);
         }
         break;
-
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < numDocs; i++) {
-          docIdToGroupKey[i] = getKeyForValue(stringValues[i]);
+          groupKeys[i] = getKeyForValue(stringValues[i]);
         }
         break;
-
       default:
-        throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + dataType);
+        throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + _dataType);
     }
   }
 
@@ -154,7 +147,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   @Override
-  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[][] docIdToGroupKeys) {
+  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[][] groupKeys) {
     // TODO: Support generating keys for multi-valued columns.
     throw new UnsupportedOperationException("Operation not supported");
   }
