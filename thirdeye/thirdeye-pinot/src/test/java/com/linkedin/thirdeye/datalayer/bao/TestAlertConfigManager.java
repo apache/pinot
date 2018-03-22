@@ -39,6 +39,7 @@ public class TestAlertConfigManager {
     AlertConfigDTO request = new AlertConfigDTO();
     request.setActive(true);
     request.setName("my alert config");
+    request.setApplication("test");
     alertConfigid = alertConfigDAO.save(request);
     Assert.assertTrue(alertConfigid > 0);
   }
@@ -54,6 +55,7 @@ public class TestAlertConfigManager {
     AlertConfigDTO dto = new AlertConfigDTO();
     dto.setActive(true);
     dto.setName("my alert config");
+    dto.setApplication("test");
     dto.setAnomalyFeedConfig(DaoTestUtils.getTestAnomalyFeedConfig());
     long dtoId = alertConfigDAO.save(dto);
     AlertConfigDTO newDto = alertConfigDAO.findById(dtoId);
@@ -95,6 +97,7 @@ public class TestAlertConfigManager {
   private AlertConfigDTO createAlertConfig(String name) {
     AlertConfigDTO alertConfigDTO = new AlertConfigDTO();
     alertConfigDTO.setName(name);
+    alertConfigDTO.setApplication("test");
     return alertConfigDTO;
   }
 

@@ -81,6 +81,7 @@ public class DaoTestUtils {
     AlertConfigDTO alertConfigDTO = new AlertConfigDTO();
     alertConfigDTO.setName(name);
     alertConfigDTO.setActive(true);
+    alertConfigDTO.setApplication("test");
     alertConfigDTO.setFromAddress("te@linkedin.com");
     alertConfigDTO.setRecipients("anomaly@linedin.com");
     alertConfigDTO.setCronExpression("0/10 * * * * ?");
