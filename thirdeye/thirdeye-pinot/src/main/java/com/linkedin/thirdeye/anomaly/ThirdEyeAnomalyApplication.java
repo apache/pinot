@@ -127,7 +127,9 @@ public class ThirdEyeAnomalyApplication
           autoOnboardService.start();
         }
         if (config.isHolidayEventsLoader()) {
-          holidayEventsLoader = new HolidayEventsLoader(config, DAORegistry.getInstance().getEventDAO());
+          holidayEventsLoader =
+              new HolidayEventsLoader(config.getHolidayEventsLoaderConfiguration(), config.getCalendarApiKeyPath(),
+                  DAORegistry.getInstance().getEventDAO());
           holidayEventsLoader.start();
         }
         if (config.isDataCompleteness()) {

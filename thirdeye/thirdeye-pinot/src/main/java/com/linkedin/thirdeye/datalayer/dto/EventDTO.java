@@ -4,6 +4,5 @@ import com.linkedin.thirdeye.datalayer.pojo.EventBean;
 
 
 public class EventDTO extends EventBean {
-
-
+  
 }

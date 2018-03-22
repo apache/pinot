@@ -9,11 +9,10 @@ import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.CalendarScopes;
 import com.google.api.services.calendar.model.Event;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import com.linkedin.thirdeye.anomaly.HolidayEventsLoaderConfiguration;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,7 +35,7 @@ import org.slf4j.LoggerFactory;
  */
 public class HolidayEventsLoader implements Runnable {
 
-  private class HolidayEvent {
+  static class HolidayEvent {
     /**
      * The Name.
      */
@@ -162,25 +161,29 @@ public class HolidayEventsLoader implements Runnable {
   /**
    * Instantiates a new Holiday events loader.
    *
-   * @param configuration the configuration
+   * @param holidayEventsLoaderConfiguration the configuration
+   * @param calendarApiKeyPath the calendar api key path
+   * @param eventDAO the event dao
    */
-  public HolidayEventsLoader(ThirdEyeAnomalyConfiguration configuration) {
-    holidayRange = configuration.getHolidayRange();
-    calendarList = configuration.getCalendars();
-    keyPath = configuration.getRootDir() + configuration.getKeyPath();
+  public HolidayEventsLoader(HolidayEventsLoaderConfiguration holidayEventsLoaderConfiguration,
+      String calendarApiKeyPath, EventManager eventDAO) {
+    this.holidayRange = holidayEventsLoaderConfiguration.getHolidayRange();
+    this.calendarList = holidayEventsLoaderConfiguration.getCalendars();
+    this.keyPath = calendarApiKeyPath;
+    this.eventDAO = eventDAO;
     scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
   }
 
   /** List of google holiday calendar ids */
-  private static List<String> calendarList;
+  private List<String> calendarList;
 
-  /** Api private key path */
-  private static String keyPath;
+  /** Calendar Api private key path */
+  private String keyPath;
   private ScheduledExecutorService scheduledExecutorService;
   private TimeGranularity runFrequency = new TimeGranularity(7, TimeUnit.DAYS);
 
-  /** To calculate the upper bound for an holiday's start time. In milliseconds */
-  private static long holidayRange;
+  /** Time range to calculate the upper bound for an holiday's start time. In milliseconds */
+  private long holidayRange;
 
   private static final Logger LOG = LoggerFactory.getLogger(HolidayEventsLoader.class);
 
@@ -203,8 +206,7 @@ public class HolidayEventsLoader implements Runnable {
     }
   }
 
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-  private static final EventManager eventDAO = DAO_REGISTRY.getEventDAO();
+  private final EventManager eventDAO;
 
   /**
    * Start.
@@ -228,11 +230,21 @@ public class HolidayEventsLoader implements Runnable {
     long end = start + holidayRange;
 
     List<Event> newHolidays = getAllHolidays(start, end);
+    Map<HolidayEvent, Set<String>> newHolidayEventToCountryCodes = aggregateCountryCodesGroupByHolidays(newHolidays);
 
+    Map<String, List<EventDTO>> holidayNameToHolidayEvent = getHolidayNameToEventDtoMap(newHolidayEventToCountryCodes);
+
+    // Get the existing holidays within the time range from the database
+    List<EventDTO> existingEvents = eventDAO.findEventsBetweenTimeRange(EventType.HOLIDAY.toString(), start, end);
+
+    mergeWithExistingHolidays(holidayNameToHolidayEvent, existingEvents);
+  }
+
+  private Map<HolidayEvent, Set<String>> aggregateCountryCodesGroupByHolidays(List<Event> newHolidays) {
     // A map from new holiday to a set of country codes that has the holiday
     Map<HolidayEvent, Set<String>> newHolidayEventToCountryCodes = new HashMap<>();
 
-    // Convert Google Event Type to holiday events and build the country code list
+    // Convert Google Event Type to holiday events and aggregates the country code list
     for (Event holiday : newHolidays) {
       HolidayEvent holidayEvent =
           new HolidayEvent(holiday.getSummary(), EventType.HOLIDAY.toString(), holiday.getStart().getDate().getValue(),
@@ -246,7 +258,11 @@ public class HolidayEventsLoader implements Runnable {
         newHolidayEventToCountryCodes.get(holidayEvent).add(countryCode);
       }
     }
+    return newHolidayEventToCountryCodes;
+  }
 
+  Map<String, List<EventDTO>> getHolidayNameToEventDtoMap(
+      Map<HolidayEvent, Set<String>> newHolidayEventToCountryCodes) {
     Map<String, List<EventDTO>> holidayNameToHolidayEvent = new HashMap<>();
 
     // Convert Holiday Events to EventDTOs.
@@ -270,24 +286,24 @@ public class HolidayEventsLoader implements Runnable {
       }
       holidayNameToHolidayEvent.get(holidayName).add(eventDTO);
     }
+    return holidayNameToHolidayEvent;
+  }
 
-    // Get the existing holidays in the time range
-    List<EventDTO> existingEvents = eventDAO.findEventsBetweenTimeRange(EventType.HOLIDAY.toString(), start, end);
-
+  void mergeWithExistingHolidays(Map<String, List<EventDTO>> holidayNameToHolidayEvent, List<EventDTO> existingEvents) {
     for (EventDTO existingEvent : existingEvents) {
       String holidayName = existingEvent.getName();
       if (!holidayNameToHolidayEvent.containsKey(holidayName)) {
         // If a event disappears, delete the event
         eventDAO.delete(existingEvent);
       } else {
-        // If a event disappears, update the existing event
+        // If an existing event shows up again, overwrite with new time and country code.
         List<EventDTO> eventList = holidayNameToHolidayEvent.get(holidayName);
         EventDTO newEvent = eventList.remove(eventList.size() - 1);
 
         existingEvent.setStartTime(newEvent.getStartTime());
         existingEvent.setEndTime(newEvent.getEndTime());
         existingEvent.setTargetDimensionMap(newEvent.getTargetDimensionMap());
-        eventDAO.save(existingEvent);
+        eventDAO.update(existingEvent);
 
         if (eventList.isEmpty()) {
           holidayNameToHolidayEvent.remove(holidayName);
@@ -295,7 +311,7 @@ public class HolidayEventsLoader implements Runnable {
       }
     }
 
-    // Add new events into the database
+    // Add all remaining new events into the database
     for (List<EventDTO> eventDTOList : holidayNameToHolidayEvent.values()) {
       for (EventDTO eventDTO : eventDTOList) {
         eventDAO.save(eventDTO);

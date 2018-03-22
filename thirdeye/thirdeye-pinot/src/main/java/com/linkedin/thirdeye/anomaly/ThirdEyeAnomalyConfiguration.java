@@ -4,8 +4,6 @@ import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskDriverConfiguration;
 import com.linkedin.thirdeye.auto.onboard.AutoOnboardConfiguration;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import java.util.Collections;
-import java.util.List;
 
 
 public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
@@ -22,39 +20,22 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean worker = false;
 
   private long id;
-  private long holidayRange;
   private String dashboardHost;
   private SmtpConfiguration smtpConfiguration;
+  private HolidayEventsLoaderConfiguration holidayEventsLoaderConfiguration;
   private MonitorConfiguration monitorConfiguration = new MonitorConfiguration();
   private AutoOnboardConfiguration autoOnboardConfiguration = new AutoOnboardConfiguration();
   private TaskDriverConfiguration taskDriverConfiguration = new TaskDriverConfiguration();
   private String failureFromAddress;
   private String failureToAddress;
-  private String keyPath;
-  private List<String> calendars = Collections.emptyList();
 
-  public long getHolidayRange() {
-    return holidayRange;
+
+  public HolidayEventsLoaderConfiguration getHolidayEventsLoaderConfiguration() {
+    return holidayEventsLoaderConfiguration;
   }
 
-  public void setHolidayRange(long holidayRange) {
-    this.holidayRange = holidayRange;
-  }
-
-  public String getKeyPath() {
-    return keyPath;
-  }
-
-  public void setKeyPath(String keyPath) {
-    this.keyPath = keyPath;
-  }
-
-  public List<String> getCalendars() {
-    return calendars;
-  }
-
-  public void setCalendars(List<String> calendars) {
-    this.calendars = calendars;
+  public void setHolidayEventsLoaderConfiguration(HolidayEventsLoaderConfiguration holidayEventsLoaderConfiguration) {
+    this.holidayEventsLoaderConfiguration = holidayEventsLoaderConfiguration;
   }
 
   public boolean isHolidayEventsLoader() {
