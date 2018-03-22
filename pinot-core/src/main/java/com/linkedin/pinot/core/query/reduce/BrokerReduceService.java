@@ -206,7 +206,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           if (brokerMetrics != null && (!brokerResponseNative.getAggregationResults().isEmpty())) {
             // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
             // Thus, we can just emit the one from the 1st result.
-            brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.GROUP_BY_SIZE,
+            brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.GROUP_BY_SIZE,
                 brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size());
           }
         }
