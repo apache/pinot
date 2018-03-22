@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomalydetection.function;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.model.data.DataModel;
 import com.linkedin.thirdeye.anomalydetection.model.data.NoopDataModel;
@@ -20,7 +21,6 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -75,8 +75,7 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
   }
 
   @Override
-  public List<RawAnomalyResultDTO> analyze(AnomalyDetectionContext anomalyDetectionContext)
-      throws Exception {
+  public List<AnomalyResult> analyze(AnomalyDetectionContext anomalyDetectionContext) {
     if (!checkPrecondition(anomalyDetectionContext)) {
       LOGGER.error("The precondition of anomaly detection context does not hold: please make sure"
           + "the observed time series and anomaly function are not null.");
@@ -246,9 +245,8 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
   }
 
   @Override
-  public List<RawAnomalyResultDTO> analyze(DimensionMap exploredDimensions, MetricTimeSeries timeSeries,
-      DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies)
-      throws Exception {
+  public List<AnomalyResult> analyze(DimensionMap exploredDimensions, MetricTimeSeries timeSeries,
+      DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies) {
     AnomalyDetectionContext anomalyDetectionContext = BackwardAnomalyFunctionUtils
         .buildAnomalyDetectionContext(this, timeSeries, spec.getTopicMetric(), exploredDimensions,
             spec.getBucketSize(), spec.getBucketUnit(), windowStart, windowEnd, knownAnomalies);

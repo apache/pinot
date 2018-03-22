@@ -9,17 +9,16 @@ import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.anomalydetection.datafilter.DataFilter;
 import com.linkedin.thirdeye.anomalydetection.datafilter.DataFilterFactory;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
@@ -120,7 +119,7 @@ public class DetectionTaskRunner implements TaskRunner {
     }
     AnomalyDetectionInputContext adContext = anomalyDetectionInputContextBuilder.build();
 
-    ListMultimap<DimensionMap, RawAnomalyResultDTO> resultRawAnomalies = dimensionalShuffleAndUnifyAnalyze(windowStart, windowEnd, adContext);
+    ListMultimap<DimensionMap, AnomalyResult> resultRawAnomalies = dimensionalShuffleAndUnifyAnalyze(windowStart, windowEnd, adContext);
     detectionTaskSuccessCounter.inc();
 
     // If the current job is a backfill (adhoc) detection job, set notified flag to true so the merged anomalies do not
@@ -135,11 +134,6 @@ public class DetectionTaskRunner implements TaskRunner {
     TimeBasedAnomalyMerger timeBasedAnomalyMerger = new TimeBasedAnomalyMerger(anomalyFunctionFactory);
     ListMultimap<DimensionMap, MergedAnomalyResultDTO> resultMergedAnomalies =
       timeBasedAnomalyMerger.mergeAnomalies(anomalyFunctionSpec, resultRawAnomalies);
-
-    // Set anomaly source on raw anomaly results
-    for (RawAnomalyResultDTO rawAnomaly : resultRawAnomalies.values()) {
-      rawAnomaly.setAnomalyResultSource(anomalyResultSource);
-    }
 
     // Set anomaly source on merged anomaly results
     for (MergedAnomalyResultDTO mergedAnomaly : resultMergedAnomalies.values()) {
@@ -162,10 +156,10 @@ public class DetectionTaskRunner implements TaskRunner {
     }
   }
 
-  private ListMultimap<DimensionMap, RawAnomalyResultDTO> dimensionalShuffleAndUnifyAnalyze(DateTime windowStart, DateTime windowEnd,
-      AnomalyDetectionInputContext anomalyDetectionInputContext) {
+  private ListMultimap<DimensionMap, AnomalyResult> dimensionalShuffleAndUnifyAnalyze(DateTime windowStart,
+      DateTime windowEnd, AnomalyDetectionInputContext anomalyDetectionInputContext) {
     int anomalyCounter = 0;
-    ListMultimap<DimensionMap, RawAnomalyResultDTO> resultRawAnomalies = ArrayListMultimap.create();
+    ListMultimap<DimensionMap, AnomalyResult> resultRawAnomalies = ArrayListMultimap.create();
 
     DataFilter dataFilter = DataFilterFactory.fromSpec(anomalyFunctionSpec.getDataFilter());
     for (DimensionMap dimensionMap : anomalyDetectionInputContext.getDimensionMapMetricTimeSeriesMap().keySet()) {
@@ -181,10 +175,11 @@ public class DetectionTaskRunner implements TaskRunner {
         continue;
       }
 
-      List<RawAnomalyResultDTO> resultsOfAnEntry = runAnalyze(windowStart, windowEnd, anomalyDetectionInputContext, dimensionMap);
+      List<AnomalyResult> resultsOfAnEntry =
+          runAnalyze(windowStart, windowEnd, anomalyDetectionInputContext, dimensionMap);
 
       // Set raw anomalies' properties
-      handleResults(resultsOfAnEntry);
+      normalizeRawResults(resultsOfAnEntry);
 
       LOG.info("Dimension {} has {} anomalies in window {} to {}", dimensionMap, resultsOfAnEntry.size(),
           windowStart, windowEnd);
@@ -200,10 +195,10 @@ public class DetectionTaskRunner implements TaskRunner {
     return resultRawAnomalies;
   }
 
-  private List<RawAnomalyResultDTO> runAnalyze(DateTime windowStart, DateTime windowEnd,
+  private List<AnomalyResult> runAnalyze(DateTime windowStart, DateTime windowEnd,
       AnomalyDetectionInputContext anomalyDetectionInputContext, DimensionMap dimensionMap) {
 
-    List<RawAnomalyResultDTO> resultsOfAnEntry = Collections.emptyList();
+    List<AnomalyResult> resultsOfAnEntry = Collections.emptyList();
 
     String metricName = anomalyFunction.getSpec().getTopicMetric();
     MetricTimeSeries metricTimeSeries = anomalyDetectionInputContext.getDimensionMapMetricTimeSeriesMap().get(dimensionMap);
@@ -318,52 +313,23 @@ public class DetectionTaskRunner implements TaskRunner {
    * @param existingAnomalies
    * @return
    */
-  private List<RawAnomalyResultDTO> removeFromExistingMergedAnomalies(List<RawAnomalyResultDTO> rawAnomalies,
+  private List<AnomalyResult> removeFromExistingMergedAnomalies(List<AnomalyResult> rawAnomalies,
       List<MergedAnomalyResultDTO> existingAnomalies) {
     if (CollectionUtils.isEmpty(rawAnomalies) || CollectionUtils.isEmpty(existingAnomalies)) {
       return rawAnomalies;
     }
-    List<RawAnomalyResultDTO> newRawAnomalies = new ArrayList<>();
+    List<AnomalyResult> newRawAnomalies = new ArrayList<>();
 
-    for (RawAnomalyResultDTO rawAnomaly : rawAnomalies) {
+    for (AnomalyResult rawAnomaly : rawAnomalies) {
       boolean isContained = false;
       for (MergedAnomalyResultDTO existingAnomaly : existingAnomalies) {
         if (Long.compare(existingAnomaly.getStartTime(), rawAnomaly.getStartTime()) <= 0
-            && rawAnomaly.getEndTime().compareTo(existingAnomaly.getEndTime()) <= 0) {
+            && Long.compare(rawAnomaly.getEndTime(), existingAnomaly.getEndTime()) <= 0) {
           isContained = true;
           break;
         }
       }
       if (!isContained) {
-        newRawAnomalies.add(rawAnomaly);
-      }
-    }
-
-    return newRawAnomalies;
-  }
-
-  /**
-   * Given a list of raw anomalies, this method returns a list of raw anomalies that are not contained in any existing
-   * raw anomalies.
-   *
-   * @param rawAnomalies
-   * @param existingRawAnomalies
-   * @return
-   */
-  private List<RawAnomalyResultDTO> removeFromExistingRawAnomalies(List<RawAnomalyResultDTO> rawAnomalies,
-      List<RawAnomalyResultDTO> existingRawAnomalies) {
-    List<RawAnomalyResultDTO> newRawAnomalies = new ArrayList<>();
-
-    for (RawAnomalyResultDTO rawAnomaly : rawAnomalies) {
-      boolean matched = false;
-      for (RawAnomalyResultDTO existingAnomaly : existingRawAnomalies) {
-        if (existingAnomaly.getStartTime().compareTo(rawAnomaly.getStartTime()) <= 0
-            && rawAnomaly.getEndTime().compareTo(existingAnomaly.getEndTime()) <= 0) {
-          matched = true;
-          break;
-        }
-      }
-      if (!matched) {
         newRawAnomalies.add(rawAnomaly);
       }
     }
@@ -378,15 +344,15 @@ public class DetectionTaskRunner implements TaskRunner {
    *
    * @return a list of raw anomalies that are not duplicated.
    */
-  public static List<RawAnomalyResultDTO> cleanUpDuplicateRawAnomalies(List<RawAnomalyResultDTO> rawAnomalies) {
+  public static List<AnomalyResult> cleanUpDuplicateRawAnomalies(List<AnomalyResult> rawAnomalies) {
     if (rawAnomalies.size() < 2) {
       return rawAnomalies;
     } else {
       // Sort raw anomalies by their start time (in acending order) and
       // then window size (in decending order)
-      Collections.sort(rawAnomalies, new Comparator<RawAnomalyResultDTO>() {
+      Collections.sort(rawAnomalies, new Comparator<AnomalyResult>() {
         @Override
-        public int compare(RawAnomalyResultDTO o1, RawAnomalyResultDTO o2) {
+        public int compare(AnomalyResult o1, AnomalyResult o2) {
           if (o1.getStartTime() == o2.getStartTime()) {
             long anomaly1Range = o1.getEndTime() - o1.getStartTime();
             long anomaly2Range = o2.getEndTime() - o2.getStartTime();
@@ -397,15 +363,15 @@ public class DetectionTaskRunner implements TaskRunner {
         }
       });
 
-      List<RawAnomalyResultDTO> cleanedUpRawAnomalies = new ArrayList<>();
+      List<AnomalyResult> cleanedUpRawAnomalies = new ArrayList<>();
       cleanedUpRawAnomalies.add(rawAnomalies.get(0));
       for (int suspect = 1; suspect < rawAnomalies.size(); suspect++) {
-        RawAnomalyResultDTO rawAnomaly = rawAnomalies.get(suspect);
+        AnomalyResult rawAnomaly = rawAnomalies.get(suspect);
         boolean duplicated = false;
         for (int idxToCompare = 0; idxToCompare < suspect; ++idxToCompare) {
-          RawAnomalyResultDTO rawAnomalyToCompare = rawAnomalies.get(idxToCompare);
-          if (rawAnomalyToCompare.getStartTime().compareTo(rawAnomaly.getStartTime()) <= 0
-              && rawAnomaly.getEndTime().compareTo(rawAnomalyToCompare.getEndTime()) <= 0) {
+          AnomalyResult rawAnomalyToCompare = rawAnomalies.get(idxToCompare);
+          if (Long.compare(rawAnomalyToCompare.getStartTime(), rawAnomaly.getStartTime()) <= 0
+              && Long.compare(rawAnomaly.getEndTime(), rawAnomalyToCompare.getEndTime()) <= 0) {
             duplicated = true;
             break;
           }
@@ -418,18 +384,18 @@ public class DetectionTaskRunner implements TaskRunner {
     }
   }
 
-  private void handleResults(List<RawAnomalyResultDTO> results) {
-    for (RawAnomalyResultDTO result : results) {
+  /**
+   * Makes sure score and weight of anomaly results are valid numbers.
+   *
+   * @param results the anomalies to be checked.
+   */
+  private void normalizeRawResults(List<AnomalyResult> results) {
+    for (AnomalyResult result : results) {
       try {
-        // Properties that always come from the function spec
-        AnomalyFunctionDTO spec = anomalyFunction.getSpec();
-        // make sure score and weight are valid numbers
         result.setScore(normalize(result.getScore()));
         result.setWeight(normalize(result.getWeight()));
-        result.setFunction(spec);
-        result.setJobId(jobExecutionId);
       } catch (Exception e) {
-        LOG.error("Exception in saving anomaly result : " + result.toString(), e);
+        LOG.error("Exception when populating anomaly result : {}", result.toString(), e);
       }
     }
   }

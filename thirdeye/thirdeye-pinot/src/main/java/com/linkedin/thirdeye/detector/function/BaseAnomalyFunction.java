@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detector.function;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.TimeGranularity;
@@ -9,7 +10,6 @@ import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -66,7 +66,7 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
   }
 
   @Override
-  public List<RawAnomalyResultDTO> offlineAnalyze(DimensionMap exploredDimensions, MetricTimeSeries timeSeries,
+  public List<AnomalyResult> offlineAnalyze(DimensionMap exploredDimensions, MetricTimeSeries timeSeries,
       DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies) throws Exception {
     return Collections.emptyList();
   }

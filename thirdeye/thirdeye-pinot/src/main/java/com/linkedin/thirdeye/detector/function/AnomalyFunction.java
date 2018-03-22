@@ -2,17 +2,15 @@ package com.linkedin.thirdeye.detector.function;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-
-import java.util.List;
-import org.joda.time.DateTime;
-
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.util.AnomalyOffset;
+import java.util.List;
+import org.joda.time.DateTime;
 
 public interface AnomalyFunction {
   /** Initializes this function with its configuration, call before analyze */
@@ -47,7 +45,7 @@ public interface AnomalyFunction {
    * @return
    *         A list of anomalies that were not previously known.
    */
-  List<RawAnomalyResultDTO> analyze(DimensionMap exploredDimensions, MetricTimeSeries timeSeries,
+  List<AnomalyResult> analyze(DimensionMap exploredDimensions, MetricTimeSeries timeSeries,
       DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies)
       throws Exception;
   /**
@@ -66,7 +64,7 @@ public interface AnomalyFunction {
    *         A list of anomalies that were not previously known.
    */
 
-  List<RawAnomalyResultDTO> offlineAnalyze(DimensionMap exploredDimensions, MetricTimeSeries timeSeries,
+  List<AnomalyResult> offlineAnalyze(DimensionMap exploredDimensions, MetricTimeSeries timeSeries,
       DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies)
       throws Exception;
 

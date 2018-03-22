@@ -23,6 +23,7 @@ import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskInfo;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -340,6 +341,16 @@ public class AnomalyApplicationEndToEndTest {
     // check merged anomalies
     List<MergedAnomalyResultDTO> mergedAnomalies = daoRegistry.getMergedAnomalyResultDAO().findByFunctionId(functionId);
     Assert.assertTrue(mergedAnomalies.size() > 0);
+    AnomalyFunctionDTO functionSpec = daoRegistry.getAnomalyFunctionDAO().findById(functionId);
+    for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
+      Assert.assertEquals(mergedAnomaly.getFunction(), functionSpec);
+      Assert.assertEquals(mergedAnomaly.getCollection(), functionSpec.getCollection());
+      Assert.assertEquals(mergedAnomaly.getMetric(), functionSpec.getTopicMetric());
+      Assert.assertNotNull(mergedAnomaly.getAnomalyResultSource());
+      Assert.assertNotNull(mergedAnomaly.getDimensions());
+      Assert.assertNotNull(mergedAnomaly.getProperties());
+      Assert.assertNull(mergedAnomaly.getFeedback());
+    }
 
     // THE FOLLOWING TEST MAY FAIL OCCASIONALLY DUE TO MACHINE COMPUTATION POWER
     // check for job status COMPLETED

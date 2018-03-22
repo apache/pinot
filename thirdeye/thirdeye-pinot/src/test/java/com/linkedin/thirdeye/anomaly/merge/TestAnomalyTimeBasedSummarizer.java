@@ -1,8 +1,9 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
+import com.linkedin.thirdeye.anomalydetection.context.RawAnomalyResult;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.util.JodaDateTimeUtils;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -16,12 +17,13 @@ public class TestAnomalyTimeBasedSummarizer {
   public void testMergeAnomalies(){
     AnomalyFunctionDTO anomalyFunction = new AnomalyFunctionDTO();
     anomalyFunction.setCollection("test");
+    anomalyFunction.setTopicMetric("metric");
     // anomaly merge config initialization
     AnomalyMergeConfig anomalyMergeConfig = new AnomalyMergeConfig();
     anomalyMergeConfig.setSequentialAllowedGap(TimeUnit.MINUTES.toMillis(30)); // merge anomalies apart 30 minutes
     anomalyMergeConfig.setMaxMergeDurationLength(TimeUnit.DAYS.toMillis(2)); // break anomaly longer than 1 days 23 hours
     anomalyMergeConfig.setMergeStrategy(AnomalyMergeStrategy.FUNCTION_DIMENSIONS);
-    anomalyMergeConfig.setMergeablePropertyKeys(Collections.EMPTY_LIST);
+    anomalyMergeConfig.setMergeablePropertyKeys(Collections.<String>emptyList());
 
     // Target Merged Anomaly
     MergedAnomalyResultDTO mergedAnomaly = new MergedAnomalyResultDTO();
@@ -30,13 +32,11 @@ public class TestAnomalyTimeBasedSummarizer {
     mergedAnomaly.setStartTime(JodaDateTimeUtils.toDateTime("2017-07-04T00:00:00Z").getMillis());
     mergedAnomaly.setEndTime(JodaDateTimeUtils.toDateTime("2017-07-04T23:59:59Z").getMillis());
 
-    List<RawAnomalyResultDTO> rawAnomalyResults = new ArrayList<>();
-    RawAnomalyResultDTO rawAnomalyResult1 = new RawAnomalyResultDTO();
-    rawAnomalyResult1.setFunction(anomalyFunction);
+    List<AnomalyResult> rawAnomalyResults = new ArrayList<>();
+    AnomalyResult rawAnomalyResult1 = new RawAnomalyResult();
     rawAnomalyResult1.setStartTime(JodaDateTimeUtils.toDateTime("2017-07-05T00:00:00Z").getMillis());
     rawAnomalyResult1.setEndTime(JodaDateTimeUtils.toDateTime("2017-07-05T23:59:59Z").getMillis());
-    RawAnomalyResultDTO rawAnomalyResult2 = new RawAnomalyResultDTO();
-    rawAnomalyResult2.setFunction(anomalyFunction);
+    AnomalyResult rawAnomalyResult2 = new RawAnomalyResult();
     rawAnomalyResult2.setStartTime(JodaDateTimeUtils.toDateTime("2017-07-06T00:00:00Z").getMillis());
     rawAnomalyResult2.setEndTime(JodaDateTimeUtils.toDateTime("2017-07-06T23:59:59Z").getMillis());
     rawAnomalyResults.add(rawAnomalyResult1);

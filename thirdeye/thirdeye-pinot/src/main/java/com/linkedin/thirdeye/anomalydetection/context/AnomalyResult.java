@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomalydetection.context;
 
+import com.linkedin.thirdeye.api.DimensionMap;
 import java.util.Map;
 
 public interface AnomalyResult {
@@ -26,6 +27,18 @@ public interface AnomalyResult {
    * @return end time in millis, exclusive.
    */
   long getEndTime();
+
+  /**
+   * Sets the dimension of this anomaly.
+   * @param dimensionMap the dimension information.
+   */
+  void setDimensions(DimensionMap dimensionMap);
+
+  /**
+   * Gets the dimension of this anomaly.
+   * @return the dimension information of this anomaly.
+   */
+  DimensionMap getDimensions();
 
   /**
    * Set score (e.g., confidence level) of this anomaly.

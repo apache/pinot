@@ -19,10 +19,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import javax.validation.Validation;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.Period;
 import org.slf4j.Logger;
@@ -417,6 +419,22 @@ public abstract class ThirdEyeUtils {
       }
     }
     return dataSource;
+  }
+
+  /**
+   * Converts a Properties, which is a Map<Object, Object>, to a Map<String, String>.
+   *
+   * @param properties the properties to be converted
+   * @return the map of the properties.
+   */
+  public static Map<String, String> propertiesToStringMap(Properties properties) {
+    Map<String, String> map = new HashMap<>();
+    if (MapUtils.isNotEmpty(properties)) {
+      for (String propertyKey : properties.stringPropertyNames()) {
+        map.put(propertyKey, properties.getProperty(propertyKey));
+      }
+    }
+    return map;
   }
 
   /**

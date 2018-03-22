@@ -1,12 +1,13 @@
 package com.linkedin.thirdeye.anomalydetection.model.detection;
 
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
+import com.linkedin.thirdeye.anomalydetection.context.RawAnomalyResult;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.ExpectedTimeSeriesPredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
 import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
-import java.text.NumberFormat;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
 import java.util.List;
 import org.joda.time.Interval;
@@ -19,11 +20,9 @@ public class SimpleThresholdDetectionModel extends AbstractDetectionModel {
   public static final String CHANGE_THRESHOLD = "changeThreshold";
   public static final String AVERAGE_VOLUME_THRESHOLD = "averageVolumeThreshold";
 
-  public static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f, threshold : %s";
-
   @Override
-  public List<RawAnomalyResultDTO> detect(String metricName, AnomalyDetectionContext anomalyDetectionContext) {
-    List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
+  public List<AnomalyResult> detect(String metricName, AnomalyDetectionContext anomalyDetectionContext) {
+    List<AnomalyResult> anomalyResults = new ArrayList<>();
 
     // Get thresholds
     double changeThreshold = Double.valueOf(getProperties().getProperty(CHANGE_THRESHOLD));
@@ -74,21 +73,16 @@ public class SimpleThresholdDetectionModel extends AbstractDetectionModel {
       double baselineValue = expectedTimeSeries.get(expectedTimestamp);
       double currentValue = currentTimeSeries.get(currentTimestamp);
       if (isAnomaly(currentValue, baselineValue, changeThreshold)) {
-        RawAnomalyResultDTO anomalyResult = new RawAnomalyResultDTO();
+        AnomalyResult anomalyResult = new RawAnomalyResult();
         anomalyResult.setDimensions(dimensionMap);
-        anomalyResult.setProperties(getProperties().toString());
+        anomalyResult.setProperties(ThirdEyeUtils.propertiesToStringMap(getProperties()));
         anomalyResult.setStartTime(currentTimestamp);
         anomalyResult.setEndTime(currentTimestamp + bucketSizeInMillis); // point-in-time
         anomalyResult.setScore(averageValue);
         anomalyResult.setWeight(calculateChange(currentValue, baselineValue));
         anomalyResult.setAvgCurrentVal(currentValue);
         anomalyResult.setAvgBaselineVal(baselineValue);
-        String message = getAnomalyResultMessage(changeThreshold, currentValue, baselineValue);
-        anomalyResult.setMessage(message);
         anomalyResults.add(anomalyResult);
-        if (currentValue == 0.0 || baselineValue == 0.0) {
-          anomalyResult.setDataMissing(true);
-        }
       }
     }
 
@@ -107,15 +101,5 @@ public class SimpleThresholdDetectionModel extends AbstractDetectionModel {
 
   private double calculateChange(double currentValue, double expectedValue) {
     return (currentValue - expectedValue) / expectedValue;
-  }
-
-  private String getAnomalyResultMessage(double threshold, double currentValue, double baselineValue) {
-    double change = calculateChange(currentValue, baselineValue);
-    NumberFormat percentInstance = NumberFormat.getPercentInstance();
-    percentInstance.setMaximumFractionDigits(2);
-    String thresholdPercent = percentInstance.format(threshold);
-    String message = String
-        .format(DEFAULT_MESSAGE_TEMPLATE, change * 100, currentValue, baselineValue, thresholdPercent);
-    return message;
   }
 }

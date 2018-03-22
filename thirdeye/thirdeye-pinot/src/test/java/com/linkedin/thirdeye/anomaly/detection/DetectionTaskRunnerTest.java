@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
+import com.linkedin.thirdeye.anomalydetection.context.RawAnomalyResult;
 import java.util.ArrayList;
 import java.util.List;
 import org.testng.Assert;
@@ -10,19 +11,19 @@ public class DetectionTaskRunnerTest {
 
   @Test
   public void testSimpleDuplicateRawAnomalies() {
-    List<RawAnomalyResultDTO> anomalyList = new ArrayList<>();
+    List<AnomalyResult> anomalyList = new ArrayList<>();
 
-    RawAnomalyResultDTO anomaly = new RawAnomalyResultDTO();
+    AnomalyResult anomaly = new RawAnomalyResult();
     anomaly.setStartTime(1L);
     anomaly.setEndTime(2L);
     anomalyList.add(anomaly);
 
-    RawAnomalyResultDTO duplicate = new RawAnomalyResultDTO();
+    AnomalyResult duplicate = new RawAnomalyResult();
     duplicate.setStartTime(1L);
     duplicate.setEndTime(2L);
     anomalyList.add(duplicate);
 
-    List<RawAnomalyResultDTO> expectedAnomalyList = new ArrayList<>();
+    List<AnomalyResult> expectedAnomalyList = new ArrayList<>();
     expectedAnomalyList.add(anomaly);
 
     anomalyList = DetectionTaskRunner.cleanUpDuplicateRawAnomalies(anomalyList);
@@ -31,19 +32,19 @@ public class DetectionTaskRunnerTest {
 
   @Test
   public void testOverlappedRawAnomalies() {
-    List<RawAnomalyResultDTO> anomalyList = new ArrayList<>();
+    List<AnomalyResult> anomalyList = new ArrayList<>();
 
-    RawAnomalyResultDTO anomaly1 = new RawAnomalyResultDTO();
+    AnomalyResult anomaly1 = new RawAnomalyResult();
     anomaly1.setStartTime(1L);
     anomaly1.setEndTime(2L);
     anomalyList.add(anomaly1);
 
-    RawAnomalyResultDTO anomaly2 = new RawAnomalyResultDTO();
+    AnomalyResult anomaly2 = new RawAnomalyResult();
     anomaly2.setStartTime(1L);
     anomaly2.setEndTime(3L);
     anomalyList.add(anomaly2);
 
-    List<RawAnomalyResultDTO> expectedAnomalyList = new ArrayList<>();
+    List<AnomalyResult> expectedAnomalyList = new ArrayList<>();
     expectedAnomalyList.add(anomaly2);
 
     anomalyList = DetectionTaskRunner.cleanUpDuplicateRawAnomalies(anomalyList);
@@ -52,14 +53,14 @@ public class DetectionTaskRunnerTest {
 
   @Test
   public void testSingleRawAnomalyList() {
-    List<RawAnomalyResultDTO> anomalyList = new ArrayList<>();
+    List<AnomalyResult> anomalyList = new ArrayList<>();
 
-    RawAnomalyResultDTO anomaly = new RawAnomalyResultDTO();
+    AnomalyResult anomaly = new RawAnomalyResult();
     anomaly.setStartTime(1L);
     anomaly.setEndTime(2L);
     anomalyList.add(anomaly);
 
-    List<RawAnomalyResultDTO> expectedAnomalyList = new ArrayList<>();
+    List<AnomalyResult> expectedAnomalyList = new ArrayList<>();
     expectedAnomalyList.add(anomaly);
 
     anomalyList = DetectionTaskRunner.cleanUpDuplicateRawAnomalies(anomalyList);
@@ -68,24 +69,24 @@ public class DetectionTaskRunnerTest {
 
   @Test
   public void testNoDuplicationRawAnomalies() {
-    List<RawAnomalyResultDTO> anomalyList = new ArrayList<>();
+    List<AnomalyResult> anomalyList = new ArrayList<>();
 
-    RawAnomalyResultDTO anomaly1 = new RawAnomalyResultDTO();
+    AnomalyResult anomaly1 = new RawAnomalyResult();
     anomaly1.setStartTime(1L);
     anomaly1.setEndTime(2L);
     anomalyList.add(anomaly1);
 
-    RawAnomalyResultDTO anomaly2 = new RawAnomalyResultDTO();
+    AnomalyResult anomaly2 = new RawAnomalyResult();
     anomaly2.setStartTime(2L);
     anomaly2.setEndTime(4L);
     anomalyList.add(anomaly2);
 
-    RawAnomalyResultDTO anomaly3 = new RawAnomalyResultDTO();
+    AnomalyResult anomaly3 = new RawAnomalyResult();
     anomaly3.setStartTime(3L);
     anomaly3.setEndTime(5L);
     anomalyList.add(anomaly3);
 
-    List<RawAnomalyResultDTO> expectedAnomalyList = new ArrayList<>();
+    List<AnomalyResult> expectedAnomalyList = new ArrayList<>();
     expectedAnomalyList.add(anomaly1);
     expectedAnomalyList.add(anomaly2);
     expectedAnomalyList.add(anomaly3);

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import org.testng.Assert;
@@ -39,7 +40,7 @@ public class TestRawAnomalyResultManager {
     Assert.assertNotNull(spec);
 
     // create anomaly result
-    anomalyResult = DaoTestUtils.getAnomalyResult();
+    anomalyResult = getRawoAnomalyDTO();
 
     anomalyResult.setFunction(spec);
     rawAnomalyResultDAO.save(anomalyResult);
@@ -68,6 +69,18 @@ public class TestRawAnomalyResultManager {
 
     rawAnomalyResultDAO.deleteById(anomalyResult.getId());
     anomalyFunctionDAO.deleteById(functionSpec.getId());
+  }
+
+  public RawAnomalyResultDTO getRawoAnomalyDTO() {
+    RawAnomalyResultDTO anomalyResult = new RawAnomalyResultDTO();
+    anomalyResult.setScore(1.1);
+    anomalyResult.setStartTime(System.currentTimeMillis());
+    anomalyResult.setEndTime(System.currentTimeMillis());
+    anomalyResult.setWeight(10.1);
+    DimensionMap dimensionMap = new DimensionMap();
+    dimensionMap.put("dimensionName", "dimensionValue");
+    anomalyResult.setDimensions(dimensionMap);
+    return anomalyResult;
   }
 
 }
