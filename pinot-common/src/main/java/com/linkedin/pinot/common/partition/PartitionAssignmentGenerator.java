@@ -38,6 +38,7 @@ import org.apache.helix.model.IdealState;
  */
 public class PartitionAssignmentGenerator {
 
+  // TODO: this needs to come from tenant config
   private static final int MAX_NUM_SERVERS = 10;
 
   private HelixManager _helixManager;
