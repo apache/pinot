@@ -3,6 +3,7 @@ import alertConfig from 'thirdeye-frontend/mocks/alertConfig';
 import entityApplication from 'thirdeye-frontend/mocks/entityApplication';
 import metric from 'thirdeye-frontend/mocks/metric';
 import timeseriesCompare from 'thirdeye-frontend/mocks/timeseriesCompare';
+import { filters, dimensions, granularities } from 'thirdeye-frontend/mocks/metricPeripherals';
 import { onboardJobStatus, onboardJobCreate } from 'thirdeye-frontend/mocks/detectionOnboard';
 import rootcause from './endpoints/rootcause';
 import auth from './endpoints/auth';
@@ -136,24 +137,21 @@ export default function() {
    * Returns metric granularity.
    */
   this.get(`/data/agg/granularity/metric/${metric[0].id}`, () => {
-    return [ "5_MINUTES", "HOURS", "DAYS" ];
+    return granularities;
   });
 
   /**
    * Returns available filters on this metric
    */
   this.get(`/data/autocomplete/filters/metric/${metric[0].id}`, () => {
-    return {
-      "container" : [ "container1", "container2" ],
-      "fabric" : [ "prod-xyz1", "prod-xyz2", "prod-xyz3" ]
-    };
+    return filters;
   });
 
   /**
    * Returns available dimensions for this metric
    */
   this.get(`/data/autocomplete/dimensions/metric/${metric[0].id}`, () => {
-    return [ "All", "fabric", "container", "host" ];
+    return dimensions;
   });
 
   /**
