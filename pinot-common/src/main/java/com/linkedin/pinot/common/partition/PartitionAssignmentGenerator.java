@@ -25,10 +25,8 @@ import com.linkedin.pinot.common.utils.LLCSegmentName;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
 
@@ -50,7 +48,7 @@ public class PartitionAssignmentGenerator {
   /**
    * Gets partition assignment of a table by reading the segment assignment in ideal state
    */
-  protected PartitionAssignment getPartitionAssignmentFromIdealState(TableConfig tableConfig, IdealState idealState) {
+  public PartitionAssignment getPartitionAssignmentFromIdealState(TableConfig tableConfig, IdealState idealState) {
     String tableNameWithType = tableConfig.getTableName();
 
     // read all segments
@@ -80,28 +78,6 @@ public class PartitionAssignmentGenerator {
     return partitionAssignment;
   }
 
-  /**
-   * Generates partition assignment for given table, using the tagged hosts
-   */
-  public PartitionAssignment regeneratePartitionAssignment(TableConfig tableConfig, IdealState idealState) {
-
-    // read all segments
-    Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
-
-    // get all partitions
-    Set<String> partitionsSet = new HashSet<>();
-    for (Map.Entry<String, Map<String, String>> entry : mapFields.entrySet()) {
-      String segmentName = entry.getKey();
-      if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
-        LLCSegmentName llcSegmentName = new LLCSegmentName(entry.getKey());
-        String partitionId = String.valueOf(llcSegmentName.getPartitionId());
-        partitionsSet.add(partitionId);
-      }
-    }
-    List<String> partitions = Lists.newArrayList(partitionsSet);
-
-    return generatePartitionAssignment(tableConfig, partitions);
-  }
 
   /**
    * Generates partition assignment for given table, using tagged hosts and num partitions
@@ -112,10 +88,6 @@ public class PartitionAssignmentGenerator {
     for (int i = 0; i < numPartitions; i++) {
       partitions.add(String.valueOf(i));
     }
-    return generatePartitionAssignment(tableConfig, partitions);
-  }
-
-  private PartitionAssignment generatePartitionAssignment(TableConfig tableConfig, List<String> partitions) {
 
     String tableNameWithType = tableConfig.getTableName();
     int numReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
