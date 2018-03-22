@@ -53,7 +53,6 @@ public class PinotHadoopJobLauncher {
 
   private static void kickOffPinotHadoopJob(PinotHadoopJobType jobType, Properties jobConf) throws Exception {
     switch (jobType) {
-      // TODO Add job type here
       case SegmentConvertToCsv:
         new SegmentConvertToCsvJob(SEGMENT_CONVERT_TO_CSV_JOB_NAME, jobConf).run();
         break;

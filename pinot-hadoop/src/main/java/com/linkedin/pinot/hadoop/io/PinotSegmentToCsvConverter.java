@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.hadoop.job;
+package com.linkedin.pinot.hadoop.io;
 
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
@@ -24,18 +24,17 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang.StringUtils;
 
-
 /**
  * The <code>PinotSegmentToCsvConverter</code> class is the tool to convert Pinot segment to CSV format.
  */
-public class PinotSegmentToCsvConverterHadoop {
+public class PinotSegmentToCsvConverter {
   private final String _segmentDir;
   private final String _outputFile;
   private final char _delimiter;
   private final char _listDelimiter;
   private final boolean _withHeader;
 
-  public PinotSegmentToCsvConverterHadoop(String segmentDir, String outputFile, char delimiter, char listDelimiter,
+  public PinotSegmentToCsvConverter(String segmentDir, String outputFile, char delimiter, char listDelimiter,
       boolean withHeader) {
     _segmentDir = segmentDir;
     _outputFile = outputFile;
@@ -66,11 +65,7 @@ public class PinotSegmentToCsvConverterHadoop {
           if (value instanceof Object[]) {
             record.add(StringUtils.join((Object[]) value, _listDelimiter));
           } else {
-            String newValue = value.toString();
-            if ("daysSinceEpoch".equals(field)) {
-              newValue = Long.toString(Long.parseLong(newValue) * 86400000);
-            }
-            record.add(newValue);
+            record.add(value.toString());
           }
         }
 
@@ -79,4 +74,5 @@ public class PinotSegmentToCsvConverterHadoop {
       }
     }
   }
+
 }

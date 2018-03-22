@@ -16,7 +16,6 @@
 package com.linkedin.pinot.hadoop.job;
 
 import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.hadoop.job.mapper.HadoopSegmentConversionMapReduceJob;
 import java.io.File;
 import java.io.IOException;
@@ -43,18 +42,14 @@ import org.slf4j.LoggerFactory;
 
 public class SegmentConvertToCsvJob extends Configured {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentConvertToCsvJob.class);
   private static final String PATH_TO_DEPS_JAR = "path.to.deps.jar";
   private static final String TEMP = "temp";
-  private static final String PATH_TO_SCHEMA = "path.to.schema";
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentConvertToCsvJob.class);
 
   private final String _jobName;
   private final Properties _properties;
-
   private final String _inputSegmentDir;
   private final String _stagingDir;
-  private final Schema _dataSchema;
   private final String _depsJarPath;
   private final String _outputDir;
 
@@ -67,7 +62,6 @@ public class SegmentConvertToCsvJob extends Configured {
     _properties = properties;
 
     _inputSegmentDir = _properties.getProperty(JobConfigConstants.PATH_TO_INPUT);
-    String schemaFilePath = _properties.getProperty(PATH_TO_SCHEMA);
     _outputDir = getOutputDir();
     _stagingDir = new File(_outputDir, TEMP).getAbsolutePath();
     _depsJarPath = _properties.getProperty(PATH_TO_DEPS_JAR, null);
@@ -78,26 +72,11 @@ public class SegmentConvertToCsvJob extends Configured {
     LOGGER.info("path.to.input: {}", _inputSegmentDir);
     LOGGER.info("path.to.deps.jar: {}", _depsJarPath);
     LOGGER.info("path.to.output: {}", _outputDir);
-    LOGGER.info("path.to.schema: {}", schemaFilePath);
-    if (schemaFilePath != null) {
-      _dataSchema = Schema.fromFile(new File(schemaFilePath));
-    } else {
-      _dataSchema = null;
-    }
-    LOGGER.info("schema: {}", _dataSchema);
     LOGGER.info("*********************************************************************");
   }
 
   protected String getOutputDir() {
     return _properties.getProperty(JobConfigConstants.PATH_TO_OUTPUT);
-  }
-
-  protected String getInputDir() {
-    return _inputSegmentDir;
-  }
-
-  protected void setOutputPath(Configuration configuration) {
-
   }
 
   public void run() throws Exception {
@@ -129,13 +108,12 @@ public class SegmentConvertToCsvJob extends Configured {
       throw new RuntimeException("No input files " + inputPathPattern);
     }
 
-    // TODO Adjust output filename
-    for (int seqId = 0; seqId < inputDataFiles.size(); ++seqId) {
-      FileStatus file = inputDataFiles.get(seqId);
+    for (FileStatus file : inputDataFiles) {
       String name = file.getPath().getName();
       String completeFilePath = " " + file.getPath().toString() + " " + name;
-      Path newOutPutFile = new Path((_stagingDir + "/input/" +
-          file.getPath().toString().replace('.', '_').replace('/', '_').replace(':', '_') + ".csv"));
+      Path newOutPutFile = new Path(
+          (_stagingDir + "/input/" + file.getPath().toString().replace('.', '_').replace('/', '_').replace(':', '_')
+              + ".csv"));
       FSDataOutputStream stream = fs.create(newOutPutFile);
       stream.writeUTF(completeFilePath);
       stream.flush();
@@ -143,12 +121,9 @@ public class SegmentConvertToCsvJob extends Configured {
     }
 
     Job job = Job.getInstance(getConf());
-
     setAdditionalJobProperties(job);
-
     job.setJarByClass(SegmentConvertToCsvJob.class);
     job.setJobName(_jobName);
-
     setMapperClass(job);
 
     if (System.getenv("HADOOP_TOKEN_FILE_LOCATION") != null) {
@@ -165,12 +140,8 @@ public class SegmentConvertToCsvJob extends Configured {
     FileOutputFormat.setOutputPath(job, new Path(_stagingDir + "/output/"));
 
     job.getConfiguration().setInt(JobContext.NUM_MAPS, inputDataFiles.size());
-    if (_dataSchema != null) {
-      job.getConfiguration().set("data.schema", _dataSchema.toString());
-    }
-    setOutputPath(job.getConfiguration());
-
     job.setNumReduceTasks(0);
+
     for (Object key : _properties.keySet()) {
       job.getConfiguration().set(key.toString(), _properties.getProperty(key.toString()));
     }
@@ -194,22 +165,14 @@ public class SegmentConvertToCsvJob extends Configured {
   }
 
   protected void setAdditionalJobProperties(Job job) throws Exception {
-
   }
 
   protected void moveToOutputDirectory(FileSystem fs) throws Exception {
-//    LOGGER.info("Moving Segment Tar files from {} to: {}", _stagingDir + "/output/segmentTar", _outputDir);
-//    FileStatus[] segmentArr = fs.listStatus(new Path(_stagingDir + "/output/segmentTar"));
-//    for (FileStatus segment : segmentArr) {
-//      fs.rename(segment.getPath(), new Path(_outputDir, segment.getPath().getName()));
-//    }
   }
 
   protected Job setMapperClass(Job job) {
-    // TODO Set proper mapper class
     job.setMapperClass(HadoopSegmentConversionMapReduceJob.HadoopSegmentConversionMapper.class);
     return job;
-
   }
 
   private void addDepsJarToDistributedCache(Path path, Job job) throws IOException {
@@ -230,7 +193,6 @@ public class SegmentConvertToCsvJob extends Configured {
   }
 
   private ArrayList<FileStatus> getDataFilesFromPath(FileSystem fs, Path inBaseDir) throws IOException {
-    // TODO Change this to take the pinot segment files
     ArrayList<FileStatus> dataFileStatusList = new ArrayList<FileStatus>();
     FileStatus[] fileStatusArr = fs.listStatus(inBaseDir);
     for (FileStatus fileStatus : fileStatusArr) {
@@ -238,26 +200,11 @@ public class SegmentConvertToCsvJob extends Configured {
         LOGGER.info("Trying to add all the data files from directory: {}", fileStatus.getPath());
         dataFileStatusList.addAll(getDataFilesFromPath(fs, fileStatus.getPath()));
       } else {
-
         // Add pinot segment files.
         LOGGER.info("Adding tar files: {}", fileStatus.getPath());
         dataFileStatusList.add(fileStatus);
-
-        /*if (fileName.endsWith(".avro")) {
-          LOGGER.info("Adding avro files: {}", fileStatus.getPath());
-          dataFileStatusList.add(fileStatus);
-        }
-        if (fileName.endsWith(".csv")) {
-          LOGGER.info("Adding csv files: {}", fileStatus.getPath());
-          dataFileStatusList.add(fileStatus);
-        }
-        if (fileName.endsWith(".json")) {
-          LOGGER.info("Adding json files: {}", fileStatus.getPath());
-          dataFileStatusList.add(fileStatus);
-        }*/
       }
     }
     return dataFileStatusList;
   }
-
 }
