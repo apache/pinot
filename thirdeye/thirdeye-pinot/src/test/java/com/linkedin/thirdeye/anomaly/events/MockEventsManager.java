@@ -42,10 +42,10 @@ public class MockEventsManager extends AbstractManagerImpl<EventDTO> implements 
     for (EventDTO eventDTO : entities) {
       if (eventDTO.getId().equals(entity.getId())) {
         eventDTO = entity;
-        return 0;
+        return 1;
       }
     }
-    return -1;
+    return 0;
   }
 
   @Override
@@ -53,10 +53,10 @@ public class MockEventsManager extends AbstractManagerImpl<EventDTO> implements 
     for (EventDTO eventDTO : entities) {
       if (eventDTO.getId().equals(entity.getId())) {
         entities.remove(eventDTO);
-        return 0;
+        return 1;
       }
     }
-    return -1;
+    return 0;
   }
 
   @Override

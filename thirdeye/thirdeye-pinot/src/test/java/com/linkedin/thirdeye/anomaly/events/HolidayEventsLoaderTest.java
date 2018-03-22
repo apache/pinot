@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -30,7 +31,7 @@ public class HolidayEventsLoaderTest {
   public void BeforeMethod() {
     HolidayEventsLoaderConfiguration holidayEventsLoaderConfiguration = new HolidayEventsLoaderConfiguration();
     holidayEventsLoaderConfiguration.setCalendars(Arrays.asList("US_HOLIDAY", "CHINA_HOLIDAY"));
-    holidayEventsLoaderConfiguration.setHolidayRange(2592000000L);
+    holidayEventsLoaderConfiguration.setholidayLoadRange(2592000000L);
     EventDTO eventDTO = new EventDTO();
     EventDTO anotherEventDTO = new EventDTO();
     eventDTO.setName("Some festival");
@@ -95,12 +96,16 @@ public class HolidayEventsLoaderTest {
     List<EventDTO> festivalEvents = eventNameToEventDto.get("Some festival");
 
     Assert.assertEquals(festivalEvents.size(), 2);
-    Assert.assertTrue(
-        festivalEvents.get(0).getTargetDimensionMap().get("countryCode").equals(Collections.singletonList("uk"))
-            && new HashSet<>(festivalEvents.get(1).getTargetDimensionMap().get("countryCode")).equals(
-            new HashSet<>(Arrays.asList("us", "cn")))
-            || festivalEvents.get(1).getTargetDimensionMap().get("countryCode").equals(Collections.singletonList("uk"))
-            && new HashSet<>(festivalEvents.get(0).getTargetDimensionMap().get("countryCode")).equals(
-            new HashSet<>(Arrays.asList("us", "cn"))));
+
+    Collections.sort(festivalEvents, new Comparator<EventDTO>() {
+      @Override
+      public int compare(EventDTO o1, EventDTO o2) {
+        return o1.getTargetDimensionMap().get("countryCode").size() - o2.getTargetDimensionMap().get("countryCode").size();
+      }
+    });
+
+    Assert.assertTrue(festivalEvents.get(0).getTargetDimensionMap().get("countryCode").equals(Collections.singletonList("uk"))
+        && new HashSet<>(festivalEvents.get(1).getTargetDimensionMap().get("countryCode")).equals(
+        new HashSet<>(Arrays.asList("us", "cn"))));
   }
 }

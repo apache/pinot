@@ -167,10 +167,11 @@ public class HolidayEventsLoader implements Runnable {
    */
   public HolidayEventsLoader(HolidayEventsLoaderConfiguration holidayEventsLoaderConfiguration,
       String calendarApiKeyPath, EventManager eventDAO) {
-    this.holidayRange = holidayEventsLoaderConfiguration.getHolidayRange();
+    this.holidayLoadRange = holidayEventsLoaderConfiguration.getHolidayLoadRange();
     this.calendarList = holidayEventsLoaderConfiguration.getCalendars();
     this.keyPath = calendarApiKeyPath;
     this.eventDAO = eventDAO;
+    this.runFrequency = new TimeGranularity(holidayEventsLoaderConfiguration.getRunFrequency(), TimeUnit.DAYS);
     scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
   }
 
@@ -180,10 +181,10 @@ public class HolidayEventsLoader implements Runnable {
   /** Calendar Api private key path */
   private String keyPath;
   private ScheduledExecutorService scheduledExecutorService;
-  private TimeGranularity runFrequency = new TimeGranularity(7, TimeUnit.DAYS);
+  private TimeGranularity runFrequency;
 
   /** Time range to calculate the upper bound for an holiday's start time. In milliseconds */
-  private long holidayRange;
+  private long holidayLoadRange;
 
   private static final Logger LOG = LoggerFactory.getLogger(HolidayEventsLoader.class);
 
@@ -227,7 +228,7 @@ public class HolidayEventsLoader implements Runnable {
    */
   public void run() {
     long start = System.currentTimeMillis();
-    long end = start + holidayRange;
+    long end = start + holidayLoadRange;
 
     List<Event> newHolidays = getAllHolidays(start, end);
     Map<HolidayEvent, Set<String>> newHolidayEventToCountryCodes = aggregateCountryCodesGroupByHolidays(newHolidays);

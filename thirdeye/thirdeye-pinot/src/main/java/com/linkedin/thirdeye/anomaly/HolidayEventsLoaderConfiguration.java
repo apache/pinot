@@ -10,30 +10,52 @@ import java.util.List;
 public class HolidayEventsLoaderConfiguration {
 
   /** Specify the time range used to calculate the upper bound for an holiday's start time. In milliseconds */
-  private long holidayRange;
+  private long holidayLoadRange;
 
   /** The list of calendar to fetch holidays from */
   private List<String> calendars = Collections.emptyList();
 
+  /** Run frequency of holiday events loader (Days) */
+  private int runFrequency;
+
   /**
-   * Gets holiday range.
+   * Gets run frequency.
    *
-   * @return the holiday range
+   * @return the run frequency
    */
-  public long getHolidayRange() {
-    return holidayRange;
+  public int getRunFrequency() {
+    return runFrequency;
   }
 
   /**
-   * Sets holiday range.
+   * Sets run frequency.
    *
-   * @param holidayRange the holiday range
+   * @param runFrequency the run frequency
    */
-  public void setHolidayRange(long holidayRange) {
-    this.holidayRange = holidayRange;
+  public void setRunFrequency(int runFrequency) {
+    this.runFrequency = runFrequency;
   }
 
   /**
+   * Gets holiday load range.
+   *
+   * @return the holiday load range
+   */
+  public long getHolidayLoadRange() {
+    return holidayLoadRange;
+  }
+
+  /**
+   * Sets holiday load range.
+   *
+   * @param holidayLoadRange the holiday load range
+   */
+  public void setHolidayLoadRange(long holidayLoadRange) {
+    this.holidayLoadRange = holidayLoadRange;
+  }
+
+  /**
+
    * Gets calendars.
    *
    * @return the calendars
