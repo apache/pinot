@@ -1,13 +1,14 @@
 import Route from '@ember/routing/route';
 import applicationAnomalies from 'thirdeye-frontend/mirage/fixtures/applicationAnomalies';
 import anomalyPerformance from 'thirdeye-frontend/mirage/fixtures/anomalyPerformance';
-import { humanizeFloat, humanizeChange } from 'thirdeye-frontend/utils/utils';
+import { humanizeFloat, humanizeChange, checkStatus } from 'thirdeye-frontend/utils/utils';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import columns from 'thirdeye-frontend/shared/anomaliesTableColumns';
 import fetch from 'fetch';
 import { hash } from 'rsvp';
 import { getFormatedDuration } from 'thirdeye-frontend/utils/anomaly';
 import moment from 'moment';
+import { setProperties } from '@ember/object';
 
 export default Route.extend({
   /**
@@ -55,20 +56,24 @@ export default Route.extend({
       anomalyMapping[metricName][functionName].push(anomaly);
 
       // Format current and baseline numbers, so numbers in the millions+ don't overflow
-      anomaly.current = humanizeFloat(anomaly.current);
-      anomaly.baseline = humanizeFloat(anomaly.baseline);
+      setProperties(anomaly, {
+        'current': humanizeFloat(anomaly.current),
+        'baseline': humanizeFloat(anomaly.baseline)
+      });
 
       // Calculate change
       const changeFloat = (current - baseline) / baseline;
-      anomaly.change = floatToPercent(changeFloat);
-      anomaly.humanizedChange = humanizeChange(changeFloat);
-      anomaly.duration = getFormatedDuration(anomaly.start, anomaly.end);
+      setProperties(anomaly, {
+        'change': floatToPercent(changeFloat),
+        'humanizedChange': humanizeChange(changeFloat),
+        'duration': getFormatedDuration(anomaly.start, anomaly.end)
+      });
     });
 
     return hash({
       anomalyMapping,
       anomalyPerformance,
-      applications: fetch('/thirdeye/entity/APPLICATION').then(res => res.json())
+      applications: fetch('/thirdeye/entity/APPLICATION').then(checkStatus)
     });
   },
 
@@ -112,5 +117,21 @@ export default Route.extend({
       alertList: this.getAlerts(),
       defaultApplication: model.applications[0]
     });
-  }
+  },
+
+  //actions: {
+    /**
+    * Catch error from the Model hook if it returns a promise that rejects
+    * (for instance the server returned an error, the user isn't logged in, etc.)
+    * @method error
+    * @example: from Model hook `return RSVP.reject("FAIL");` will invoke the error action
+    TODO: Make this more of a addon for most route.
+    Disable this error action for now.
+    */
+    // error(error, transition) {
+    //   if (error) {
+    //     return this.transitionTo('error');
+    //   }
+    // }
+  //}
 });
