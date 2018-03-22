@@ -2,13 +2,13 @@
   {
     "column" : "ApplyStartTime",
     "range" : true,
-    "rangeStart" : 1483228800,
-    "rangeEnd"   : 1508873892
+    "rangeStart" : 1512086400,
+    "rangeEnd"   : 1522540800
   },
   {
     "column" : "TimeSpent",
     "range" : true,
-    "rangeStart" : 1,
-    "rangeEnd"   : 1800
+    "rangeStart" : 10,
+    "rangeEnd"   : 3600
   }
 ]

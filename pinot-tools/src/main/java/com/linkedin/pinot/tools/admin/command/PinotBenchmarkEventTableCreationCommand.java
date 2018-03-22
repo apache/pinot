@@ -31,8 +31,10 @@ import java.util.Random;
 public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCommand implements Command {
     private static final Logger LOGGER = LoggerFactory.getLogger(CreateSegmentCommand.class);
     //final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_100_days_of_2017_2018.properties";
+    //final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_feb_2018.properties";
 
-    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_feb_2018.properties";
+    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_5_tables_120_days_of_2017_2018.properties";
+
     final String _tableConfig = "pinot_benchmark/event_data_config/event_table_config.properties";
     private final int _minimumRecordCount = 2000;
     @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Directory containing the data.")
@@ -54,8 +56,8 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
     //private double[] _numRecordRatio = {1, 0.6, 0.5, 0.3};
     //private int[] _meanDocCount = {30000, 15000, 10000, 20000};
     //private int[] _standardDeviation = {1000, 4000, 2000, 3000};
-    private int[] _meanDocCount = {30000, 15000, 100000, 200000};
-    private int[] _standardDeviation = {1000, 4000, 25000, 50000};
+    private int[] _meanDocCount = {40000, 15000, 5000, 20000,1000};
+    private int[] _standardDeviation = {4000, 1500, 500, 2000,100};
 
 
     private int[] _varianceList = {5000, 10000, 15000, 20000,25000};
@@ -88,10 +90,11 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
         List <String> timeIntervals = FileUtils.readLines(new File(timeIntervalConfigPath));
         //BufferedReader br = new BufferedReader(new FileReader(trained_cost_file));
         Random rand = new Random(System.currentTimeMillis());
-        int[] everyRoundRecordCount = new int[4];
+        int[] everyRoundRecordCount = new int[5];
 
 
-        for (int i = 1; i < timeIntervals.size(); i++) {
+        //for (int i = 1; i < timeIntervals.size(); i++) {
+        for (int i = 1; i < 2; i++) {
             String[] timeIntervalInfo = timeIntervals.get(i).split(",");
             String outDir = _outDir + "/" + timeIntervalInfo[0];
             File outDirFile = new File(outDir);
@@ -101,7 +104,7 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
             long timeIntervalEnd = Long.parseLong(timeIntervalInfo[2]);
 
 
-            for (int j = 0; j < 4; j++) {
+            for (int j = 0; j < 5; j++) {
                 double gussianNumber = rand.nextGaussian();
                 everyRoundRecordCount[j] = (int) (gussianNumber * _standardDeviation[j] + _meanDocCount[j]);
 
@@ -115,7 +118,7 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
             eventTableGenerator.generateAdClickTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[1]);
             eventTableGenerator.generateArticleReadTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[2]);
             eventTableGenerator.generateJobApplyTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[3]);
-
+            eventTableGenerator.generateCompanySearchTable(timeIntervalStart,timeIntervalEnd, everyRoundRecordCount[4]);
         }
 
 

@@ -31,7 +31,7 @@
   {
     "column" : "CompanySize",
     "range" : true,
-    "cardinality" : 1000,
+    "cardinality" : 5000,
     "rangeStart" : 10,
     "rangeEnd"   : 200000
   },
@@ -46,8 +46,8 @@
     "column" : "FollowerCount",
     "range" : true,
     "cardinality" : 10000,
-    "rangeStart" : 10,
-    "rangeEnd"   : 500000
+    "rangeStart" : 100,
+    "rangeEnd"   : 100000
   }
 
 ]

@@ -46,10 +46,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 import java.net.URL;
 
@@ -477,7 +474,7 @@ public class EventTableGenerator {
         //org.apache.avro.Schema schemaJSON = org.apache.avro.Schema.parse(getJSONSchema(Schema.fromFile(new File(articleReadSchemaFile))).toString());
         org.apache.avro.Schema schemaJSON = AvroWriter.getAvroSchema(Schema.fromFile(new File(articleReadSchemaFile)));
 
-        ZipfRandom readArticleIndexGenerator = new ZipfRandom(0.3, articleTable.size());
+        ZipfRandom articleIndexGenerator = new ZipfRandom(0.3, articleTable.size());
         Random readerProfileIndexGenerator = new Random(System.currentTimeMillis());
 
         for(int i=0;i<numRecords;i++)
@@ -486,7 +483,7 @@ public class EventTableGenerator {
 
             GenericRow readerProfile = getRandomGenericRow(profileTable, readerProfileIndexGenerator);
             //GenericRow articleInfo = getRandomGenericRow(articleTable);
-            GenericRow articleInfo = getRandomGenericRow(articleTable, readArticleIndexGenerator);
+            GenericRow articleInfo = getRandomGenericRow(articleTable, articleIndexGenerator);
 
             outRecord.put("ReadStartTime", eventTimeGenerator.next());
             outRecord.put("TimeSpent", timeSpentGenerator.next());
@@ -535,30 +532,47 @@ public class EventTableGenerator {
 
 		ZipfRandom searchedProfileIndexGenerator = new ZipfRandom(0.1, profileTable.size());
         Random companyIndexGenerator = new Random(System.currentTimeMillis());
+        Random searchSizeDistribution = new Random(System.currentTimeMillis());
 
         for(int i=0;i<numRecords;i++)
         {
             final GenericData.Record outRecord = new GenericData.Record(schemaJSON);
-
-            //GenericRow searchedProfile = getRandomGenericRow(profileTable);
-            GenericRow searchedProfile = getRandomGenericRow(profileTable, searchedProfileIndexGenerator);
-
             GenericRow companyInfo = getRandomGenericRow(companyTable,companyIndexGenerator);
 
-            outRecord.put("SearchTime", eventTimeGenerator.next());
-            outRecord.put("TimeSpent", timeSpentGenerator.next());
-            outRecord.put("CompanyId", companyInfo.getValue("ID"));
-            outRecord.put("CompanyName", companyInfo.getValue("Name"));
-            outRecord.put("CompanyDomain", companyInfo.getValue("Domain"));
-            outRecord.put("CompanyURL", companyInfo.getValue("Url"));
-            outRecord.put("CompanySize", companyInfo.getValue("CompanySize"));
-            outRecord.put("ViewedProfileId", searchedProfile.getValue("ID"));
-            outRecord.put("ViewedProfileWorkPlace", searchedProfile.getValue("WorkPlace"));
-            outRecord.put("ViewedProfileHeadline", searchedProfile.getValue("Headline"));
-            outRecord.put("ViewedProfilePosition", searchedProfile.getValue("Position"));
-            outRecord.put("ViewedProfileStrength", searchedProfile.getValue("Strength"));
+            double gussianNumber = searchSizeDistribution.nextGaussian();
+            int searchSize = (int) (gussianNumber * 10 + 50);
 
-            recordWriter.append(outRecord);
+            if (searchSize < 0) {
+                searchSize = 10;
+            }
+            Map<String, Boolean> searchedProfileID = new HashMap <>();
+
+            for(int j=0;j<searchSize;j++)
+            {
+                //GenericRow searchedProfile = getRandomGenericRow(profileTable);
+                GenericRow searchedProfile = getRandomGenericRow(profileTable, searchedProfileIndexGenerator);
+                while(searchedProfileID.containsKey(searchedProfile.getValue("ID").toString()))
+                {
+                    searchedProfile = getRandomGenericRow(profileTable, searchedProfileIndexGenerator);
+                }
+                searchedProfileID.put(searchedProfile.getValue("ID").toString(), true);
+
+                outRecord.put("SearchTime", eventTimeGenerator.next());
+                outRecord.put("TimeSpent", timeSpentGenerator.next());
+                outRecord.put("CompanyId", companyInfo.getValue("ID"));
+                outRecord.put("CompanyName", companyInfo.getValue("Name"));
+                outRecord.put("CompanyDomain", companyInfo.getValue("Domain"));
+                outRecord.put("CompanyURL", companyInfo.getValue("Url"));
+                outRecord.put("CompanySize", companyInfo.getValue("CompanySize"));
+                outRecord.put("ViewedProfileId", searchedProfile.getValue("ID"));
+                outRecord.put("ViewedProfileWorkPlace", searchedProfile.getValue("WorkPlace"));
+                outRecord.put("ViewedProfileHeadline", searchedProfile.getValue("Headline"));
+                outRecord.put("ViewedProfilePosition", searchedProfile.getValue("Position"));
+                outRecord.put("ViewedProfileStrength", searchedProfile.getValue("Strength"));
+
+                recordWriter.append(outRecord);
+            }
+
         }
 
         recordWriter.close();

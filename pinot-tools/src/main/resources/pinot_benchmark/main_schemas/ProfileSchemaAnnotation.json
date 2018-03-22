@@ -16,7 +16,7 @@
   {
     "column" : "Headline",
     "range" : false,
-    "cardinality" : 100000,
+    "cardinality" : 250000,
     "minLength" : 32,
     "maxLength" : 512
   },
@@ -30,7 +30,7 @@
   {
     "column" : "WorkPlace",
     "range" : false,
-    "cardinality" : 20000,
+    "cardinality" : 50000,
     "minLength" : 16,
     "maxLength" : 32
   },

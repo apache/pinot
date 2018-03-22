@@ -2,13 +2,13 @@
   {
     "column" : "ViewStartTime",
     "range" : true,
-    "rangeStart" : 1483228800,
-    "rangeEnd"   : 1485907200
+    "rangeStart" : 1512086400,
+    "rangeEnd"   : 1522540800
   },
   {
     "column" : "ReviewTime",
     "range" : true,
     "rangeStart" : 1,
-    "rangeEnd"   : 1800
+    "rangeEnd"   : 600
   }
 ]

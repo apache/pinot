@@ -20,33 +20,37 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.TimeZone;
 
 public class CreateTimeIntervals {
     public static void main(String args[])
     {
-        long startTime = 1512172801;
-        int segmentCount = 120;
+        long startTime = 1512086400;
+        int segmentCount = 121;
         SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
+        sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
         SimpleDateFormat sdf2 = new SimpleDateFormat("ddMMyyyy");
+        sdf2.setTimeZone(TimeZone.getTimeZone("GMT"));
 
         for(int i=0;i<segmentCount;i++)
         {
             //String folderName = "Day-" + (i+1);
             Date date = new Date(startTime*1000);
             String folderName = "Date-"+ sdf.format(date);
+
             long intStartTime= startTime;
             long intEndTime = intStartTime + 24*3600;
 
-            startTime = intEndTime +1;
-            Integer segNames[] = new Integer[4];
+            startTime = intEndTime;
+            Integer segNames[] = new Integer[5];
 
             int dateDigit = Integer.parseInt(sdf2.format(date));
-            for(int j=1;j<=4;j++)
+            for(int j=1;j<=5;j++)
             {
                 segNames[j-1]=j*100000000 + dateDigit;
             }
 
-            System.out.println(folderName + "," + intStartTime + "," + intEndTime + "," + segNames[0] + "," + segNames[1] + "," + segNames[2] + "," + segNames[3]);
+            System.out.println(folderName + "," + intStartTime + "," + intEndTime + "," + segNames[0] + "," + segNames[1] + "," + segNames[2] + "," + segNames[3] + "," + segNames[4]);
         }
 
 

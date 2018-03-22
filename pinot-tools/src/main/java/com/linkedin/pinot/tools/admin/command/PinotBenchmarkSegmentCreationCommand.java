@@ -41,11 +41,12 @@ public class PinotBenchmarkSegmentCreationCommand extends AbstractBaseAdminComma
     private boolean _overwrite = false;
 
     //final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_100_days_of_2017_2018.properties";
-    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_feb_2018.properties";
+    //final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_feb_2018.properties";
 
+    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_5_tables_120_days_of_2017_2018.properties";
 
-    //final String _tableNameFile = "pinot_benchmark/event_data_config/event_table_config.properties";
-    final String _tableNameFile = "pinot_benchmark/event_data_config/event_table_JA_AR_config.properties";
+    final String _tableNameFile = "pinot_benchmark/event_data_config/event_table_config.properties";
+    //final String _tableNameFile = "pinot_benchmark/event_data_config/event_table_JA_AR_config.properties";
 
     private int[] _varianceList = {5000, 10000, 15000, 20000,25000};
     private int _varianceListSize = 5;
@@ -86,7 +87,8 @@ public class PinotBenchmarkSegmentCreationCommand extends AbstractBaseAdminComma
             String tableSegmentsDir = _outDir+"/"+tableInfoRecord[0];
             createOutDir(tableSegmentsDir);
 
-            for(int j=1;j<configLines.size();j++)
+            //for(int j=1;j<configLines.size();j++)
+            for(int j=1;j<2;j++)
             {
                 String[] evenDataInfo = configLines.get(j).split(",");
 
@@ -102,6 +104,7 @@ public class PinotBenchmarkSegmentCreationCommand extends AbstractBaseAdminComma
                 createSegmentCommand.setOverwrite(_overwrite);
                 createSegmentCommand.setSegmentName(evenDataInfo[i+2]);
                 createSegmentCommand.execute();
+                //createSegmentCommand.setSegmentName(evenDataInfo[i+4]);
             }
         }
 
