@@ -19,6 +19,7 @@ import com.linkedin.thirdeye.dashboard.resources.AdminResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyResource;
 import com.linkedin.thirdeye.dashboard.resources.AutoOnboardResource;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
+import com.linkedin.thirdeye.dashboard.resources.CustomizedEventResource;
 import com.linkedin.thirdeye.dashboard.resources.DashboardResource;
 import com.linkedin.thirdeye.dashboard.resources.DatasetConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
@@ -148,6 +149,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new AutoOnboardResource(config));
     env.jersey().register(new ConfigResource(DAO_REGISTRY.getConfigDAO()));
     env.jersey().register(new FunctionOnboardingResource());
+    env.jersey().register(new CustomizedEventResource(DAO_REGISTRY.getEventDAO()));
 
     TimeSeriesLoader timeSeriesLoader = new DefaultTimeSeriesLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache());
     AggregationLoader aggregationLoader = new DefaultAggregationLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache());
