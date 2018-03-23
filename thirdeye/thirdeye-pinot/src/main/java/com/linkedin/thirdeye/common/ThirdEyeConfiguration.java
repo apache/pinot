@@ -110,6 +110,10 @@ public class ThirdEyeConfiguration extends Configuration {
     return getRootDir() + "/detector-config/anomaly-functions/anomalyClassifier.properties";
   }
 
+  public String getCalendarApiKeyPath(){
+    return getRootDir() + "/holiday-loader-key.json";
+  }
+
   public void setSmtpConfiguration(SmtpConfiguration smtpConfiguration) {
     this.smtpConfiguration = smtpConfiguration;
   }
