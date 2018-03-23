@@ -27,6 +27,32 @@ export const selfServeConst = {
 };
 
 /**
+ * General root-cause element selectors
+ */
+export const rootCauseConst = {
+  PLACEHOLDER: '.rootcause-placeholder',
+  TABS: '.rootcause-tabs',
+  LABEL: '.rootcause-legend__label',
+  SELECTED_METRIC: '.rootcause-select-metric-dimension',
+  ROOTCAUSE_HEADER: 'rootcause-header',
+  HEADER: '.rootcause-header__major',
+  LAST_SAVED: '.rootcause-header__last-updated-info',
+  COMMENT_TEXT: '.rootcause-header--textarea',
+  BASELINE: '#select-compare-mode',
+  EXPAND_ANOMALY_BTN: '.rootcause-anomaly__icon a',
+  ANOMALY_TITLE: '.rootcause-anomaly__title',
+  ANOMALY_VALUE: '.rootcause-anomaly__props-value',
+  ANOMALY_STATUS: '.ember-radio-button.checked',
+  SAVE_BTN: '.te-button',
+  METRICS_TABLE: '.rootcause-metrics',
+  HEATMAP_DROPDOWN: '#select-heatmap-mode',
+  SELECTED_HEATMAP_MODE: '.ember-power-select-selected-item',
+  EVENTS_FILTER_BAR: '.filter-bar',
+  EVENTS_TABLE: '.events-table',
+  RCA_TOGGLE: '.rootcause-to-legacy-toggle'
+};
+
+/**
  * Converts list options to comma-separated string
  */
 export const optionsToString = ($optionList) => {
@@ -35,5 +61,6 @@ export const optionsToString = ($optionList) => {
 
 export default {
   selfServeConst,
+  rootCauseConst,
   optionsToString
 };

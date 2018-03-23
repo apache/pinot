@@ -91,7 +91,11 @@ export default function(server) {
       analysisRangeStart : 1511856000000,
       analysisRangeEnd : 1512460799999,
       created : 1517363257776,
-      updated : 1517363257776
+      updated : 1517363257776,
+      contextUrns: [ "thirdeye:metric:1" ],
+      anomalyUrns: [ ],
+      selectedUrns: [ "thirdeye:metric:1", "frontend:metric:baseline:1", "frontend:metric:current:1" ],
+      permissions: "READ_WRITE"
     };
   });
 
