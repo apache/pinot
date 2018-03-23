@@ -22,13 +22,19 @@ import static com.linkedin.thirdeye.detector.email.filter.UserReportUtils.*;
  * 2) Alert Filter evaluation: calculate performance of alert filter on a list of anomalies
  */
 public class PrecisionRecallEvaluator {
-
   /**
    * Using this constructor, PrecisionRecallEvaluator will be relying on anomalies' "notified" flag
    * in order to get the performance of whole anomaly detection system
+   * Note that, if the alertFilterFactor is set, the evaluator uses the alert filter set for the anomaly.
    * @param anomalies The list of anomalies to be evaluated
+   * @param alertFilterFactory the instance of alert filter factory
    */
-  public PrecisionRecallEvaluator(List<MergedAnomalyResultDTO> anomalies) {
+  public PrecisionRecallEvaluator(List<MergedAnomalyResultDTO> anomalies, AlertFilterFactory alertFilterFactory) {
+    if (alertFilterFactory != null) {
+      this.alertFilterFactory = alertFilterFactory;
+      this.useAlertFilterOnAnomaly = true;
+      this.isProjected = true;
+    }
     init(anomalies);
   }
 
@@ -44,15 +50,17 @@ public class PrecisionRecallEvaluator {
     init(anomalies);
   }
 
-  private AlertFilter alertFilter;
+  protected AlertFilter alertFilter;
+  protected boolean useAlertFilterOnAnomaly = false;
+  protected AlertFilterFactory alertFilterFactory;
 
-  private int notifiedTrueAnomaly; // Anomaly is labeled as true and is notified
-  private int notifiedTrueAnomalyNewTrend; // Anomaly is labeled as TRUE_NEW_TREND and is notified
-  private int notifiedFalseAlarm;  // Anomaly is labeled as false and is notified
-  private int notifiedNotLabeled;  // Anomaly is notified, but not labeled
-  private int userReportTrueAnomaly; // Anomaly is user reported: true anomaly that was not sent out
-  private int userReportTrueAnomalyNewTrend; // Anomaly is user reported: true anomaly new trend that was not sent out
-  private boolean isProjected = false;
+  protected int notifiedTrueAnomaly; // Anomaly is labeled as true and is notified
+  protected int notifiedTrueAnomalyNewTrend; // Anomaly is labeled as TRUE_NEW_TREND and is notified
+  protected int notifiedFalseAlarm;  // Anomaly is labeled as false and is notified
+  protected int notifiedNotLabeled;  // Anomaly is notified, but not labeled
+  protected int userReportTrueAnomaly; // Anomaly is user reported: true anomaly that was not sent out
+  protected int userReportTrueAnomalyNewTrend; // Anomaly is user reported: true anomaly new trend that was not sent out
+  protected boolean isProjected = false;
   // isProjected to indicate if calculating system performance or alert filter's projected performance
 
   public static final String PRECISION = "precision";
@@ -158,6 +166,11 @@ public class PrecisionRecallEvaluator {
     }
 
     for (MergedAnomalyResultDTO anomaly : anomalies) {
+      AlertFilter alertFilterOfAnomaly = this.alertFilter;
+      if (useAlertFilterOnAnomaly) {
+        alertFilterOfAnomaly = this.alertFilterFactory.fromSpec(anomaly.getFunction().getAlertFilter());
+      }
+
       AnomalyFeedback feedback = anomaly.getFeedback();
       boolean isLabeledTrueAnomaly = false;
       boolean isLabeledTrueAnomalyNewTrend = false;
@@ -178,7 +191,7 @@ public class PrecisionRecallEvaluator {
             userReportTrueAnomalyNewTrend++;
           }
         } else {
-          if (isUserReportAnomalyIsQualified(this.alertFilter, anomaly)) {
+          if (isUserReportAnomalyIsQualified(alertFilterOfAnomaly, anomaly)) {
             notifiedTrueAnomaly++;
           } else {
             userReportTrueAnomaly++;
@@ -187,7 +200,7 @@ public class PrecisionRecallEvaluator {
       } else {
         // if system detected anomaly, if using projected evaluation, skip those true anomalies that are not notified
         // since these anomalies are originally unsent, but reverted the feedback based on user report
-        boolean isNotified = isProjected ? alertFilter.isQualified(anomaly) : anomaly.isNotified();
+        boolean isNotified = isProjected ? alertFilterOfAnomaly.isQualified(anomaly) : anomaly.isNotified();
 
         if (isNotified) {
           if (feedback == null || feedback.getFeedbackType() == null) {
