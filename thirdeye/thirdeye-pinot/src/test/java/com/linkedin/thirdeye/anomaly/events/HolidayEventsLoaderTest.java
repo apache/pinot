@@ -31,7 +31,7 @@ public class HolidayEventsLoaderTest {
   public void BeforeMethod() {
     HolidayEventsLoaderConfiguration holidayEventsLoaderConfiguration = new HolidayEventsLoaderConfiguration();
     holidayEventsLoaderConfiguration.setCalendars(Arrays.asList("US_HOLIDAY", "CHINA_HOLIDAY"));
-    holidayEventsLoaderConfiguration.setholidayLoadRange(2592000000L);
+    holidayEventsLoaderConfiguration.setHolidayLoadRange(2592000000L);
     EventDTO eventDTO = new EventDTO();
     EventDTO anotherEventDTO = new EventDTO();
     eventDTO.setName("Some festival");
