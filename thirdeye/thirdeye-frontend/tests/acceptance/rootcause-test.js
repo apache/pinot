@@ -1,7 +1,7 @@
 import { module, test } from 'qunit';
 import { setupApplicationTest } from 'ember-qunit';
 import { visit, fillIn, click, currentURL } from '@ember/test-helpers';
-import { rootCauseConst as rcEl } from 'thirdeye-frontend/tests/test-const';
+import { rootCauseConst as rcEl } from 'thirdeye-frontend/tests/utils/constants';
 import $ from 'jquery';
 
 module('Acceptance | rootcause', async function(hooks) {

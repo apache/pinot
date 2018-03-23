@@ -1,7 +1,7 @@
 import $ from 'jquery';
 import { module, test } from 'qunit';
 import { setupApplicationTest } from 'ember-qunit';
-import { selfServeConst, optionsToString } from 'thirdeye-frontend/tests/test-const';
+import { selfServeConst, optionsToString } from 'thirdeye-frontend/tests/utils/constants';
 import { visit, fillIn, click, currentURL, triggerKeyEvent } from '@ember/test-helpers';
 import { filters, dimensions, granularities } from 'thirdeye-frontend/mocks/metricPeripherals';
 import { selectChoose, clickTrigger } from 'thirdeye-frontend/tests/helpers/ember-power-select';
