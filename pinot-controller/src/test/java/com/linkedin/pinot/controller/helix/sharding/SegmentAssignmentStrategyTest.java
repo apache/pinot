@@ -56,6 +56,7 @@ public class SegmentAssignmentStrategyTest {
   private final static String HELIX_CLUSTER_NAME = "TestSegmentAssignmentStrategyHelix";
   private final static String TABLE_NAME_BALANCED = "testResourceBalanced";
   private final static String TABLE_NAME_RANDOM = "testResourceRandom";
+  private final static String TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT = "testReplicaGroupPartitionAssignment";
   private final static String TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP = "testTableLevelReplicaGroup";
   private final static String TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP = "testPartitionLevelReplicaGroup";
 
@@ -202,6 +203,59 @@ public class SegmentAssignmentStrategyTest {
   }
 
   @Test
+  public void testReplicaGroupPartitionAssignment() throws Exception {
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT);
+
+    // Adding a table without replica group
+    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(
+        TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT)
+        .setSegmentAssignmentStrategy("RandomAssignmentStrategy")
+        .setNumReplicas(NUM_REPLICA)
+        .build();
+    _pinotHelixResourceManager.addTable(tableConfig);
+
+    // Check that partition assignment does not exist
+    ReplicaGroupPartitionAssignment partitionAssignment =
+        _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
+
+    Assert.assertTrue(partitionAssignment == null);
+
+    // Update table config with replica group config
+    int numInstancesPerPartition = 5;
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig();
+    replicaGroupStrategyConfig.setNumInstancesPerPartition(numInstancesPerPartition);
+    replicaGroupStrategyConfig.setMirrorAssignmentAcrossReplicaGroups(true);
+
+    TableConfig replicaGroupTableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(
+        TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT)
+        .setNumReplicas(NUM_REPLICA)
+        .setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy")
+        .build();
+
+    replicaGroupTableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
+
+    // Check that the replica group partition assignment is created
+    _pinotHelixResourceManager.setExistingTableConfig(replicaGroupTableConfig, tableNameWithType, CommonConstants.Helix.TableType.OFFLINE);
+    partitionAssignment = _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
+    Assert.assertTrue(partitionAssignment != null);
+
+    // After table deletion, check that the replica group partition assignment is deleted
+    _pinotHelixResourceManager.deleteOfflineTable(tableNameWithType);
+    partitionAssignment = _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
+    Assert.assertTrue(partitionAssignment == null);
+
+    // Create a table with replica group
+    _pinotHelixResourceManager.addTable(replicaGroupTableConfig);
+    partitionAssignment = _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
+    Assert.assertTrue(partitionAssignment != null);
+
+    // Check that the replica group partition assignment is deleted
+    _pinotHelixResourceManager.deleteOfflineTable(tableNameWithType);
+    partitionAssignment = _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
+    Assert.assertTrue(partitionAssignment == null);
+  }
+
+  @Test
   public void testTableLevelAndMirroringReplicaGroupSegmentAssignmentStrategy() throws Exception {
     // Create the configuration for segment assignment strategy.
     int numInstancesPerPartition = 5;
@@ -337,8 +391,7 @@ public class SegmentAssignmentStrategyTest {
     // Check that each replica group for a partition contains all segments that belong to the partition.
     for (int partition = 0; partition < totalPartitionNumber; partition++) {
       for (int group = 0; group < NUM_REPLICA; group++) {
-        List<String> serversInReplicaGroup =
-            partitionAssignment.getInstancesfromReplicaGroup(partition, group);
+        List<String> serversInReplicaGroup = partitionAssignment.getInstancesfromReplicaGroup(partition, group);
         List<String> segmentsInReplicaGroup = new ArrayList<>();
         for (String server : serversInReplicaGroup) {
           Set<String> segmentsInServer = serverToSegments.get(server);
