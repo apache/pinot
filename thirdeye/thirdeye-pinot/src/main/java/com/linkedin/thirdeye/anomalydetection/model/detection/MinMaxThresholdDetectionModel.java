@@ -1,22 +1,23 @@
 package com.linkedin.thirdeye.anomalydetection.model.detection;
 
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
+import com.linkedin.thirdeye.anomalydetection.context.RawAnomalyResult;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
 import java.util.List;
 import org.joda.time.Interval;
 
 public class MinMaxThresholdDetectionModel extends AbstractDetectionModel {
-  public static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, min : %.2f, max : %.2f";
   public static final String MIN_VAL = "min";
   public static final String MAX_VAL = "max";
 
   @Override
-  public List<RawAnomalyResultDTO> detect(String metricName,
+  public List<AnomalyResult> detect(String metricName,
       AnomalyDetectionContext anomalyDetectionContext) {
-    List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
+    List<AnomalyResult> anomalyResults = new ArrayList<>();
 
     // Get min / max props
     Double min = null;
@@ -49,20 +50,14 @@ public class MinMaxThresholdDetectionModel extends AbstractDetectionModel {
       double deviationFromThreshold = getDeviationFromThreshold(value, min, max);
 
       if (deviationFromThreshold != 0) {
-        RawAnomalyResultDTO anomalyResult = new RawAnomalyResultDTO();
-        anomalyResult.setProperties(properties.toString());
+        AnomalyResult anomalyResult = new RawAnomalyResult();
+        anomalyResult.setProperties(ThirdEyeUtils.propertiesToStringMap(getProperties()));
         anomalyResult.setStartTime(timeBucket);
         anomalyResult.setEndTime(timeBucket + bucketMillis); // point-in-time
         anomalyResult.setDimensions(dimensionMap);
         anomalyResult.setScore(averageValue);
         anomalyResult.setWeight(deviationFromThreshold); // higher change, higher the severity
         anomalyResult.setAvgCurrentVal(value);
-        String message =
-            String.format(DEFAULT_MESSAGE_TEMPLATE, deviationFromThreshold, value, min, max);
-        anomalyResult.setMessage(message);
-        if (value == 0.0) {
-          anomalyResult.setDataMissing(true);
-        }
         anomalyResults.add(anomalyResult);
       }
     }

@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.anomalydetection.function;
 
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
+import com.linkedin.thirdeye.anomalydetection.context.RawAnomalyResult;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeriesKey;
 import com.linkedin.thirdeye.anomalydetection.model.detection.SimpleThresholdDetectionModel;
@@ -9,7 +11,6 @@ import com.linkedin.thirdeye.anomalydetection.model.transform.TotalCountThreshol
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -114,7 +115,7 @@ public class TestWeekOverWeekRuleFunction {
     anomalyDetectionContext.setBaselines(mainMetric, singleBaseline);
     anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
 
-    List<RawAnomalyResultDTO> rawAnomalyResults = function.analyze(anomalyDetectionContext);
+    List<AnomalyResult> rawAnomalyResults = function.analyze(anomalyDetectionContext);
     compareWoWRawAnomalies(rawAnomalyResults);
 
     // Test data model
@@ -132,15 +133,15 @@ public class TestWeekOverWeekRuleFunction {
       Properties properties, TimeSeriesKey timeSeriesKey, long bucketSizeInMs,
       TimeSeries observedTimeSeries, List<TimeSeries> baselines) throws Exception {
     // Expected RawAnomalies without smoothing
-    List<RawAnomalyResultDTO> expectedRawAnomalies = new ArrayList<>();
-    RawAnomalyResultDTO rawAnomaly1 = new RawAnomalyResultDTO();
+    List<AnomalyResult> expectedRawAnomalies = new ArrayList<>();
+    AnomalyResult rawAnomaly1 = new RawAnomalyResult();
     rawAnomaly1.setStartTime(observedStartTime + bucketMillis * 2);
     rawAnomaly1.setEndTime(observedStartTime + bucketMillis * 3);
     rawAnomaly1.setWeight(0.3d);
     rawAnomaly1.setScore(15d);
     expectedRawAnomalies.add(rawAnomaly1);
 
-    RawAnomalyResultDTO rawAnomaly2 = new RawAnomalyResultDTO();
+    AnomalyResult rawAnomaly2 = new RawAnomalyResult();
     rawAnomaly2.setStartTime(observedStartTime + bucketMillis * 3);
     rawAnomaly2.setEndTime(observedStartTime + bucketMillis * 4);
     rawAnomaly2.setWeight(0.22727272727272727);
@@ -166,9 +167,8 @@ public class TestWeekOverWeekRuleFunction {
     anomalyDetectionContext.setBaselines(mainMetric, baselines);
     anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
 
-    List<RawAnomalyResultDTO> rawAnomalyResults = function.analyze(anomalyDetectionContext);
+    List<AnomalyResult> rawAnomalyResults = function.analyze(anomalyDetectionContext);
     compareWo2WAvgRawAnomalies(rawAnomalyResults);
-
 
     // Test data model
     List<Interval> expectedDataRanges = new ArrayList<>();
@@ -207,7 +207,7 @@ public class TestWeekOverWeekRuleFunction {
     anomalyDetectionContext.setBaselines(mainMetric, baselines);
     anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
 
-    List<RawAnomalyResultDTO> rawAnomalyResults = function.analyze(anomalyDetectionContext);
+    List<AnomalyResult> rawAnomalyResults = function.analyze(anomalyDetectionContext);
     // The transformed observed time series is resized from 5 to 3 due to moving average algorithm
     Assert.assertEquals(anomalyDetectionContext.getTransformedCurrent(mainMetric).size(), 3);
     // No anomalies after smoothing the time series
@@ -218,15 +218,15 @@ public class TestWeekOverWeekRuleFunction {
       Properties properties, TimeSeriesKey timeSeriesKey, long bucketSizeInMs,
       TimeSeries observedTimeSeries, List<TimeSeries> baselines) throws Exception {
     // Expected RawAnomalies without smoothing
-    List<RawAnomalyResultDTO> expectedRawAnomalies = new ArrayList<>();
-    RawAnomalyResultDTO rawAnomaly1 = new RawAnomalyResultDTO();
+    List<AnomalyResult> expectedRawAnomalies = new ArrayList<>();
+    AnomalyResult rawAnomaly1 = new RawAnomalyResult();
     rawAnomaly1.setStartTime(observedStartTime + bucketMillis * 2);
     rawAnomaly1.setEndTime(observedStartTime + bucketMillis * 3);
     rawAnomaly1.setWeight(0.3d);
     rawAnomaly1.setScore(15d);
     expectedRawAnomalies.add(rawAnomaly1);
 
-    RawAnomalyResultDTO rawAnomaly2 = new RawAnomalyResultDTO();
+    AnomalyResult rawAnomaly2 = new RawAnomalyResult();
     rawAnomaly2.setStartTime(observedStartTime + bucketMillis * 3);
     rawAnomaly2.setEndTime(observedStartTime + bucketMillis * 4);
     rawAnomaly2.setWeight(0.22727272727272727);
@@ -336,7 +336,7 @@ public class TestWeekOverWeekRuleFunction {
     anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
     anomalyDetectionContext.setCurrent(totalCountTimeSeriesName, totalCountTimeSeries);
 
-    List<RawAnomalyResultDTO> rawAnomalyResults = function.analyze(anomalyDetectionContext);
+    List<AnomalyResult> rawAnomalyResults = function.analyze(anomalyDetectionContext);
     // No anomalies after smoothing the time series
     Assert.assertEquals(rawAnomalyResults.size(), 0);
 
@@ -399,17 +399,17 @@ public class TestWeekOverWeekRuleFunction {
     return "";
   }
 
-  private void compareWo2WAvgRawAnomalies(List<RawAnomalyResultDTO> actualAnomalyResults) {
+  private void compareWo2WAvgRawAnomalies(List<AnomalyResult> actualAnomalyResults) {
     // Expecting the same anomaly result from analyzeWo2WAvg
-    List<RawAnomalyResultDTO> expectedRawAnomalies = new ArrayList<>();
-    RawAnomalyResultDTO rawAnomaly1 = new RawAnomalyResultDTO();
+    List<AnomalyResult> expectedRawAnomalies = new ArrayList<>();
+    AnomalyResult rawAnomaly1 = new RawAnomalyResult();
     rawAnomaly1.setStartTime(observedStartTime + bucketMillis * 2);
     rawAnomaly1.setEndTime(observedStartTime + bucketMillis * 3);
     rawAnomaly1.setWeight(0.3d);
     rawAnomaly1.setScore(15d);
     expectedRawAnomalies.add(rawAnomaly1);
 
-    RawAnomalyResultDTO rawAnomaly2 = new RawAnomalyResultDTO();
+    AnomalyResult rawAnomaly2 = new RawAnomalyResult();
     rawAnomaly2.setStartTime(observedStartTime + bucketMillis * 3);
     rawAnomaly2.setEndTime(observedStartTime + bucketMillis * 4);
     rawAnomaly2.setWeight(0.22727272727272727);
@@ -419,17 +419,17 @@ public class TestWeekOverWeekRuleFunction {
     compareActualAndExpectedRawAnomalies(actualAnomalyResults, expectedRawAnomalies);
   }
 
-  private void compareWoWRawAnomalies(List<RawAnomalyResultDTO> actualAnomalyResults) {
+  private void compareWoWRawAnomalies(List<AnomalyResult> actualAnomalyResults) {
     // Expected RawAnomalies of WoW without smoothing
-    List<RawAnomalyResultDTO> expectedRawAnomalies = new ArrayList<>();
-    RawAnomalyResultDTO rawAnomaly1 = new RawAnomalyResultDTO();
+    List<AnomalyResult> expectedRawAnomalies = new ArrayList<>();
+    AnomalyResult rawAnomaly1 = new RawAnomalyResult();
     rawAnomaly1.setStartTime(observedStartTime + bucketMillis);
     rawAnomaly1.setEndTime(observedStartTime + bucketMillis * 2);
     rawAnomaly1.setWeight(-0.25d);
     rawAnomaly1.setScore(15d);
     expectedRawAnomalies.add(rawAnomaly1);
 
-    RawAnomalyResultDTO rawAnomaly2 = new RawAnomalyResultDTO();
+    AnomalyResult rawAnomaly2 = new RawAnomalyResult();
     rawAnomaly2.setStartTime(observedStartTime + bucketMillis * 4);
     rawAnomaly2.setEndTime(observedStartTime + bucketMillis * 5);
     rawAnomaly2.setWeight(-0.2857142857d);
@@ -439,12 +439,12 @@ public class TestWeekOverWeekRuleFunction {
     compareActualAndExpectedRawAnomalies(actualAnomalyResults, expectedRawAnomalies);
   }
 
-  private void compareActualAndExpectedRawAnomalies(List<RawAnomalyResultDTO> actualAnomalyResults,
-      List<RawAnomalyResultDTO> expectedRawAnomalies) {
+  private void compareActualAndExpectedRawAnomalies(List<AnomalyResult> actualAnomalyResults,
+      List<AnomalyResult> expectedRawAnomalies) {
     Assert.assertEquals(actualAnomalyResults.size(), expectedRawAnomalies.size());
     for (int i = 0; i < actualAnomalyResults.size(); ++i) {
-      RawAnomalyResultDTO actualAnomaly = actualAnomalyResults.get(i);
-      RawAnomalyResultDTO expectedAnomaly = actualAnomalyResults.get(i);
+      AnomalyResult actualAnomaly = actualAnomalyResults.get(i);
+      AnomalyResult expectedAnomaly = actualAnomalyResults.get(i);
       Assert.assertEquals(actualAnomaly.getWeight(), expectedAnomaly.getWeight(), EPSILON);
       Assert.assertEquals(actualAnomaly.getScore(), expectedAnomaly.getScore(), EPSILON);
     }

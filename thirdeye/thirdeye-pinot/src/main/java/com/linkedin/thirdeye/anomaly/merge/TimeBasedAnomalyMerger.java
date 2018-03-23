@@ -4,23 +4,21 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
+import com.linkedin.thirdeye.anomalydetection.context.RawAnomalyResult;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
-
-import java.util.HashMap;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
@@ -73,7 +71,7 @@ public class TimeBasedAnomalyMerger {
    * @return the number of merged anomalies after merging
    */
   public ListMultimap<DimensionMap, MergedAnomalyResultDTO> mergeAnomalies(AnomalyFunctionDTO functionSpec,
-      ListMultimap<DimensionMap, RawAnomalyResultDTO> unmergedAnomalies) {
+      ListMultimap<DimensionMap, AnomalyResult> unmergedAnomalies) {
 
     int rawAnomaliesCount = 0;
     for (DimensionMap dimensionMap : unmergedAnomalies.keySet()) {
@@ -114,15 +112,15 @@ public class TimeBasedAnomalyMerger {
   }
 
   private ListMultimap<DimensionMap, MergedAnomalyResultDTO> dimensionalShuffleAndUnifyMerge(AnomalyFunctionDTO function,
-      AnomalyMergeConfig mergeConfig, ListMultimap<DimensionMap, RawAnomalyResultDTO> unmergedAnomalies) {
+      AnomalyMergeConfig mergeConfig, ListMultimap<DimensionMap, AnomalyResult> unmergedAnomalies) {
 
     ListMultimap<DimensionMap, MergedAnomalyResultDTO> mergedAnomalies = ArrayListMultimap.create();
 
     for (DimensionMap dimensionMap : unmergedAnomalies.keySet()) {
-      List<RawAnomalyResultDTO> unmergedResultsByDimensions = unmergedAnomalies.get(dimensionMap);
+      List<AnomalyResult> unmergedResultsByDimensions = unmergedAnomalies.get(dimensionMap);
       long anomalyWindowStart = Long.MAX_VALUE;
       long anomalyWindowEnd = Long.MIN_VALUE;
-      for (RawAnomalyResultDTO unmergedResultsByDimension : unmergedResultsByDimensions) {
+      for (AnomalyResult unmergedResultsByDimension : unmergedResultsByDimensions) {
         anomalyWindowStart = Math.min(anomalyWindowStart, unmergedResultsByDimension.getStartTime());
         anomalyWindowEnd = Math.max(anomalyWindowEnd, unmergedResultsByDimension.getEndTime());
       }
@@ -136,12 +134,13 @@ public class TimeBasedAnomalyMerger {
           mergedResultDAO.findLatestOverlapByFunctionIdDimensions(function.getId(), dimensionMap.toString(),
               anomalyWindowStart - mergeConfig.getSequentialAllowedGap(), anomalyWindowEnd);
 
-      List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
-          .mergeAnomalies(latestOverlappedMergedResult, unmergedResultsByDimensions,
+      List<MergedAnomalyResultDTO> mergedResults =
+          AnomalyTimeBasedSummarizer.mergeAnomalies(latestOverlappedMergedResult, unmergedResultsByDimensions,
               mergeConfig);
       for (MergedAnomalyResultDTO mergedResult : mergedResults) {
         mergedResult.setFunction(function);
-        mergedResult.setDimensions(dimensionMap);
+        mergedResult.setCollection(function.getCollection());
+        mergedResult.setMetric(function.getTopicMetric());
       }
       LOG.info(
           "Merging [{}] raw anomalies into [{}] merged anomalies for function id : [{}] and dimensions : [{}]",

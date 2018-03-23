@@ -2,13 +2,19 @@ package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.Singleton;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
+import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 @Singleton
-public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyResultDTO>
-    implements RawAnomalyResultManager {
+public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyResultDTO> implements RawAnomalyResultManager {
+  private static final Logger LOG = LoggerFactory.getLogger(RawAnomalyResultManagerImpl.class);
 
   public RawAnomalyResultManagerImpl() {
     super(RawAnomalyResultDTO.class, RawAnomalyResultBean.class);
@@ -66,5 +72,26 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
     } else {
       return null;
     }
+  }
+
+  private RawAnomalyResultDTO createRawAnomalyDTOFromBean(RawAnomalyResultBean rawAnomalyResultBean) {
+    RawAnomalyResultDTO rawAnomalyResultDTO;
+    rawAnomalyResultDTO = MODEL_MAPPER.map(rawAnomalyResultBean, RawAnomalyResultDTO.class);
+    if (rawAnomalyResultBean.getFunctionId() != null) {
+      AnomalyFunctionBean anomalyFunctionBean =
+          genericPojoDao.get(rawAnomalyResultBean.getFunctionId(), AnomalyFunctionBean.class);
+      if (anomalyFunctionBean == null) {
+        LOG.error("this anomaly function bean should not be null");
+      }
+      AnomalyFunctionDTO anomalyFunctionDTO = MODEL_MAPPER.map(anomalyFunctionBean, AnomalyFunctionDTO.class);
+      rawAnomalyResultDTO.setFunction(anomalyFunctionDTO);
+    }
+    if (rawAnomalyResultBean.getAnomalyFeedbackId() != null) {
+      AnomalyFeedbackBean anomalyFeedbackBean =
+          genericPojoDao.get(rawAnomalyResultBean.getAnomalyFeedbackId(), AnomalyFeedbackBean.class);
+      AnomalyFeedbackDTO anomalyFeedbackDTO = MODEL_MAPPER.map(anomalyFeedbackBean, AnomalyFeedbackDTO.class);
+      rawAnomalyResultDTO.setFeedback(anomalyFeedbackDTO);
+    }
+    return rawAnomalyResultDTO;
   }
 }

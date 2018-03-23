@@ -4,13 +4,7 @@ import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.datalayer.bao.AbstractManager;
 import com.linkedin.thirdeye.datalayer.dao.GenericPojoDao;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AbstractBean;
-import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
-import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
-import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -20,12 +14,8 @@ import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.convention.MatchingStrategies;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public abstract class AbstractManagerImpl<E extends AbstractDTO> implements AbstractManager<E> {
-  private static final Logger LOG = LoggerFactory.getLogger(AbstractManagerImpl.class);
-
   protected static final ModelMapper MODEL_MAPPER = new ModelMapper();
 
   static {
@@ -168,31 +158,6 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
       result.add((E) convertBean2DTO(bean, dtoClass));
     }
     return result;
-  }
-
-  @Deprecated
-  protected RawAnomalyResultDTO createRawAnomalyDTOFromBean(
-      RawAnomalyResultBean rawAnomalyResultBean) {
-    RawAnomalyResultDTO rawAnomalyResultDTO;
-    rawAnomalyResultDTO = MODEL_MAPPER.map(rawAnomalyResultBean, RawAnomalyResultDTO.class);
-    if (rawAnomalyResultBean.getFunctionId() != null) {
-      AnomalyFunctionBean anomalyFunctionBean =
-          genericPojoDao.get(rawAnomalyResultBean.getFunctionId(), AnomalyFunctionBean.class);
-      if (anomalyFunctionBean == null) {
-        LOG.error("this anomaly function bean should not be null");
-      }
-      AnomalyFunctionDTO anomalyFunctionDTO =
-          MODEL_MAPPER.map(anomalyFunctionBean, AnomalyFunctionDTO.class);
-      rawAnomalyResultDTO.setFunction(anomalyFunctionDTO);
-    }
-    if (rawAnomalyResultBean.getAnomalyFeedbackId() != null) {
-      AnomalyFeedbackBean anomalyFeedbackBean = genericPojoDao
-          .get(rawAnomalyResultBean.getAnomalyFeedbackId(), AnomalyFeedbackBean.class);
-      AnomalyFeedbackDTO anomalyFeedbackDTO =
-          MODEL_MAPPER.map(anomalyFeedbackBean, AnomalyFeedbackDTO.class);
-      rawAnomalyResultDTO.setFeedback(anomalyFeedbackDTO);
-    }
-    return rawAnomalyResultDTO;
   }
 
   protected <T extends AbstractDTO> T convertBean2DTO(AbstractBean entity, Class<T> dtoClass) {

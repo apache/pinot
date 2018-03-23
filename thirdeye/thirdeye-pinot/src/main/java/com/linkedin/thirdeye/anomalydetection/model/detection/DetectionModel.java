@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.anomalydetection.model.detection;
 
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import java.util.List;
 import java.util.Properties;
 
@@ -26,5 +26,5 @@ public interface DetectionModel {
    *                                additional parameters (e.g., sigma) for anomaly detection.
    * @return list of raw anomalies.
    */
-  List<RawAnomalyResultDTO> detect(String metricName, AnomalyDetectionContext anomalyDetectionContext);
+  List<AnomalyResult> detect(String metricName, AnomalyDetectionContext anomalyDetectionContext);
 }

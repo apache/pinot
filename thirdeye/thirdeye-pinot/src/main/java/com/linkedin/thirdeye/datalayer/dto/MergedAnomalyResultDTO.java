@@ -13,6 +13,27 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements A
 
   private AnomalyFunctionDTO function;
 
+  public MergedAnomalyResultDTO() {
+    setCreatedTime(System.currentTimeMillis());
+  }
+
+  public MergedAnomalyResultDTO(AnomalyResult anomalyResult) {
+    setCreatedTime(System.currentTimeMillis());
+    populateFrom(anomalyResult);
+  }
+
+  public void populateFrom(AnomalyResult anomalyResult) {
+    setStartTime(anomalyResult.getStartTime());
+    setEndTime(anomalyResult.getEndTime());
+    setDimensions(anomalyResult.getDimensions());
+    setScore(anomalyResult.getScore());
+    setWeight(anomalyResult.getWeight());
+    setAvgCurrentVal(anomalyResult.getAvgCurrentVal());
+    setAvgBaselineVal(anomalyResult.getAvgBaselineVal());
+    setFeedback(anomalyResult.getFeedback());
+    setProperties(anomalyResult.getProperties());
+  }
+
   @Override
   public void setFeedback(AnomalyFeedback anomalyFeedback) {
     if (anomalyFeedback == null) {

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
@@ -16,23 +17,19 @@ import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
 public class TestMergedAnomalyResultManager{
-  MergedAnomalyResultDTO mergedResult = null;
-  Long anomalyResultId;
-  AnomalyFunctionDTO function = DaoTestUtils.getTestFunctionSpec("metric", "dataset");
+  private MergedAnomalyResultDTO mergedResult = null;
+  private AnomalyFunctionDTO function = DaoTestUtils.getTestFunctionSpec("metric", "dataset");
 
   private DAOTestBase testDAOProvider;
   private AnomalyFunctionManager anomalyFunctionDAO;
-  private RawAnomalyResultManager rawAnomalyResultDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
     DAORegistry daoRegistry = DAORegistry.getInstance();
     anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
-    rawAnomalyResultDAO = daoRegistry.getRawAnomalyResultDAO();
     mergedAnomalyResultDAO = daoRegistry.getMergedAnomalyResultDAO();
   }
 
@@ -43,31 +40,27 @@ public class TestMergedAnomalyResultManager{
 
   @Test
   public void testMergedResultCRUD() {
-    anomalyFunctionDAO.save(function);
+    long functionId = anomalyFunctionDAO.save(function);
     Assert.assertNotNull(function.getId());
 
     // create anomaly result
-    RawAnomalyResultDTO result = DaoTestUtils.getAnomalyResult();
-    result.setFunction(function);
-    rawAnomalyResultDAO.save(result);
-
-    RawAnomalyResultDTO resultRet = rawAnomalyResultDAO.findById(result.getId());
-    Assert.assertEquals(resultRet.getFunction(), function);
-
-    anomalyResultId = result.getId();
+    AnomalyResult rawAnomaly = DaoTestUtils.getAnomalyResult();
 
     // Let's create merged result
-    List<RawAnomalyResultDTO> rawResults = new ArrayList<>();
-    rawResults.add(result);
+    List<AnomalyResult> rawResults = new ArrayList<>();
+    rawResults.add(rawAnomaly);
 
     AnomalyMergeConfig mergeConfig = new AnomalyMergeConfig();
 
     List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer.mergeAnomalies(rawResults, mergeConfig);
-    Assert.assertEquals(mergedResults.get(0).getStartTime(), (long) result.getStartTime());
-    Assert.assertEquals(mergedResults.get(0).getEndTime(), (long) result.getEndTime());
+    Assert.assertEquals(mergedResults.get(0).getStartTime(), rawAnomaly.getStartTime());
+    Assert.assertEquals(mergedResults.get(0).getEndTime(), rawAnomaly.getEndTime());
 
     // Let's persist the merged result
-    mergedResults.get(0).setDimensions(result.getDimensions());
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+    mergedResults.get(0).setFunction(anomalyFunction);
+    mergedResults.get(0).setCollection(anomalyFunction.getCollection());
+    mergedResults.get(0).setMetric(anomalyFunction.getTopicMetric());
 
     mergedAnomalyResultDAO.save(mergedResults.get(0));
     mergedResult = mergedResults.get(0);
@@ -75,7 +68,7 @@ public class TestMergedAnomalyResultManager{
 
     // verify the merged result
     MergedAnomalyResultDTO mergedResultById = mergedAnomalyResultDAO.findById(mergedResult.getId());
-    Assert.assertEquals(mergedResultById.getDimensions(), result.getDimensions());
+    Assert.assertEquals(mergedResultById.getDimensions(), rawAnomaly.getDimensions());
 
     List<MergedAnomalyResultDTO> mergedResultsByMetricDimensionsTime = mergedAnomalyResultDAO
         .findByCollectionMetricDimensionsTime(mergedResult.getCollection(), mergedResult.getMetric(),
@@ -96,7 +89,6 @@ public class TestMergedAnomalyResultManager{
 
     //verify feedback
     MergedAnomalyResultDTO mergedResult1 = mergedAnomalyResultDAO.findById(mergedResult.getId());
-//    Assert.assertEquals(mergedResult1.getAnomalyResults().get(0).getId(), anomalyResultId);
     Assert.assertEquals(mergedResult1.getFeedback().getFeedbackType(), AnomalyFeedbackType.ANOMALY);
   }
 }

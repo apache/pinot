@@ -1,13 +1,14 @@
 package com.linkedin.thirdeye.anomalydetection.function;
 
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
+import com.linkedin.thirdeye.anomalydetection.context.RawAnomalyResult;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeriesKey;
 import com.linkedin.thirdeye.anomalydetection.model.detection.MinMaxThresholdDetectionModel;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -75,25 +76,25 @@ public class TestMinMaxThresholdFunction {
     anomalyDetectionContext.setCurrent(mainMetric, observedTimeSeries);
     anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
 
-    List<RawAnomalyResultDTO> actualAnomalyResults = function.analyze(anomalyDetectionContext);
+    List<AnomalyResult> actualAnomalyResults = function.analyze(anomalyDetectionContext);
 
     // Expected RawAnomalies of WoW without smoothing
-    List<RawAnomalyResultDTO> expectedRawAnomalies = new ArrayList<>();
-    RawAnomalyResultDTO rawAnomaly1 = new RawAnomalyResultDTO();
+    List<AnomalyResult> expectedRawAnomalies = new ArrayList<>();
+    AnomalyResult rawAnomaly1 = new RawAnomalyResult();
     rawAnomaly1.setStartTime(observedStartTime);
     rawAnomaly1.setEndTime(observedStartTime + bucketMillis);
     rawAnomaly1.setWeight(-0.166666d);
     rawAnomaly1.setScore(13.6d);
     expectedRawAnomalies.add(rawAnomaly1);
 
-    RawAnomalyResultDTO rawAnomaly2 = new RawAnomalyResultDTO();
+    AnomalyResult rawAnomaly2 = new RawAnomalyResult();
     rawAnomaly2.setStartTime(observedStartTime + bucketMillis * 3);
     rawAnomaly2.setEndTime(observedStartTime + bucketMillis * 4);
     rawAnomaly2.setWeight(0.1d);
     rawAnomaly2.setScore(13.6d);
     expectedRawAnomalies.add(rawAnomaly2);
 
-    RawAnomalyResultDTO rawAnomaly3 = new RawAnomalyResultDTO();
+    AnomalyResult rawAnomaly3 = new RawAnomalyResult();
     rawAnomaly3.setStartTime(observedStartTime + bucketMillis * 4);
     rawAnomaly3.setEndTime(observedStartTime + bucketMillis * 5);
     rawAnomaly3.setWeight(-0.33333d);
@@ -102,8 +103,8 @@ public class TestMinMaxThresholdFunction {
 
     Assert.assertEquals(actualAnomalyResults.size(), expectedRawAnomalies.size());
     for (int i = 0; i < actualAnomalyResults.size(); ++i) {
-      RawAnomalyResultDTO actualAnomaly = actualAnomalyResults.get(i);
-      RawAnomalyResultDTO expectedAnomaly = actualAnomalyResults.get(i);
+      AnomalyResult actualAnomaly = actualAnomalyResults.get(i);
+      AnomalyResult expectedAnomaly = actualAnomalyResults.get(i);
       Assert.assertEquals(actualAnomaly.getWeight(), expectedAnomaly.getWeight(), EPSILON);
       Assert.assertEquals(actualAnomaly.getScore(), expectedAnomaly.getScore(), EPSILON);
     }
@@ -137,16 +138,16 @@ public class TestMinMaxThresholdFunction {
     anomalyDetectionContext.setCurrent(mainMetric, observedTimeSeries);
     anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
 
-    List<RawAnomalyResultDTO> expectedRawAnomalies = new ArrayList<>();
+    List<AnomalyResult> expectedRawAnomalies = new ArrayList<>();
 
-    RawAnomalyResultDTO rawAnomaly1 = new RawAnomalyResultDTO();
+    AnomalyResult rawAnomaly1 = new RawAnomalyResult();
     rawAnomaly1.setStartTime(observedStartTime + bucketMillis * 3);
     rawAnomaly1.setEndTime(observedStartTime + bucketMillis * 4);
     rawAnomaly1.setWeight(0.1d);
     rawAnomaly1.setScore(13.6d);
     expectedRawAnomalies.add(rawAnomaly1);
 
-    RawAnomalyResultDTO rawAnomaly2 = new RawAnomalyResultDTO();
+    AnomalyResult rawAnomaly2 = new RawAnomalyResult();
     rawAnomaly2.setStartTime(observedStartTime + bucketMillis * 4);
     rawAnomaly2.setEndTime(observedStartTime + bucketMillis * 5);
     rawAnomaly2.setWeight(-0.33333d);

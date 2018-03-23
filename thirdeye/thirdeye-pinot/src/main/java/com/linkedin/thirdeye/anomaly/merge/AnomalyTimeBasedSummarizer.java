@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
-import com.linkedin.thirdeye.anomalydetection.AnomalyDetectionUtils;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -12,12 +12,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
 
 
 /**
- * Given list of {@link RawAnomalyResultDTO} and merge parameters, this utility performs time based merge
+ * Given list of {@link AnomalyResult} and merge parameters, this utility performs time based merge
  */
 public abstract class AnomalyTimeBasedSummarizer {
   private final static Logger LOG = LoggerFactory.getLogger(AnomalyTimeBasedSummarizer.class);
@@ -31,7 +30,7 @@ public abstract class AnomalyTimeBasedSummarizer {
    * @param mergeConfig : the configurations for merging, i.e. maxMergedDurationMillis, sequentialAllowedGap, mergeablePropertyKeys
    * @return
    */
-  public static List<MergedAnomalyResultDTO> mergeAnomalies(List<RawAnomalyResultDTO> anomalies, AnomalyMergeConfig mergeConfig) {
+  public static List<MergedAnomalyResultDTO> mergeAnomalies(List<AnomalyResult> anomalies, AnomalyMergeConfig mergeConfig) {
     return mergeAnomalies(null, anomalies, mergeConfig);
   }
 
@@ -42,16 +41,16 @@ public abstract class AnomalyTimeBasedSummarizer {
    * @return
    */
   public static List<MergedAnomalyResultDTO> mergeAnomalies(MergedAnomalyResultDTO mergedAnomaly,
-      List<RawAnomalyResultDTO> anomalies, AnomalyMergeConfig mergeConfig) {
+      List<AnomalyResult> anomalies, AnomalyMergeConfig mergeConfig) {
 
     long maxMergedDurationMillis = mergeConfig.getMaxMergeDurationLength();
     long sequentialAllowedGap = mergeConfig.getSequentialAllowedGap();
     List<String> mergeablePropertyKeys = mergeConfig.getMergeablePropertyKeys();
 
     // sort anomalies in natural order of start time
-    Collections.sort(anomalies, new Comparator<RawAnomalyResultDTO>() {
+    Collections.sort(anomalies, new Comparator<AnomalyResult>() {
       @Override
-      public int compare(RawAnomalyResultDTO o1, RawAnomalyResultDTO o2) {
+      public int compare(AnomalyResult o1, AnomalyResult o2) {
         return (int) ((o1.getStartTime() - o2.getStartTime()) / 1000);
       }
     });
@@ -70,14 +69,12 @@ public abstract class AnomalyTimeBasedSummarizer {
     List<MergedAnomalyResultDTO> mergedAnomalies = new ArrayList<>();
 
     for (int i = 0; i < anomalies.size(); i++) {
-      RawAnomalyResultDTO currentResult = anomalies.get(i);
+      AnomalyResult currentResult = anomalies.get(i);
       if (mergedAnomaly == null || currentResult.getEndTime() < mergedAnomaly.getStartTime()) {
-        mergedAnomaly = new MergedAnomalyResultDTO();
-        populateMergedResult(mergedAnomaly, currentResult);
+        mergedAnomaly = new MergedAnomalyResultDTO(currentResult);
       } else {
         // compare current with merged and decide whether to merge the current result or create a new one
-        MergedAnomalyResultDTO currAnomaly = new MergedAnomalyResultDTO();
-        populateMergedResult(currAnomaly, currentResult);
+        MergedAnomalyResultDTO currAnomaly = new MergedAnomalyResultDTO(currentResult);
         // if the merging is applying sequential gap and current anomaly has gap time larger than sequentialAllowedGap
         // or the duration of the anomaly to be merged is longer than the maxMergedDurationMillis
         // or current anomaly is not equal on mergeable keys with mergedAnomaly
@@ -112,18 +109,6 @@ public abstract class AnomalyTimeBasedSummarizer {
     LOG.info("merging [{}] raw anomalies", anomalies.size());
     return mergedAnomalies;
   }
-
-  private static void populateMergedResult(MergedAnomalyResultDTO mergedAnomaly, RawAnomalyResultDTO currentResult) {
-    // only set collection, keep metric, dimensions and function null
-    mergedAnomaly.setCollection(currentResult.getCollection());
-    mergedAnomaly.setMetric(currentResult.getMetric());
-    mergedAnomaly.setStartTime(currentResult.getStartTime());
-    mergedAnomaly.setEndTime(currentResult.getEndTime());
-    mergedAnomaly.setCreatedTime(System.currentTimeMillis());
-    // populate current result's property as well, will be used to identify if two anomalies can be merged by comparing their mergeable keys
-    mergedAnomaly.setProperties(AnomalyDetectionUtils.decodeCompactedPropertyStringToMap(currentResult.getProperties()));
-  }
-
 
   /**
    * Given property keys from anomaly function, comparing if two anomalies have same property on the mergeable keys when doing anomaly detection
