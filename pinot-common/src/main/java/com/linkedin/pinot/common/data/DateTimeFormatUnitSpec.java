@@ -18,6 +18,8 @@ package com.linkedin.pinot.common.data;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.EnumUtils;
+import org.joda.time.DurationFieldType;
+import org.joda.time.chrono.ISOChronology;
 
 
 public class DateTimeFormatUnitSpec {
@@ -26,14 +28,55 @@ public class DateTimeFormatUnitSpec {
    * Time unit enum with range from MILLISECONDS to YEARS
    */
   public enum DateTimeTransformUnit {
-    YEARS,
-    MONTHS,
-    WEEKS,
-    DAYS,
-    HOURS,
-    MINUTES,
-    SECONDS,
-    MILLISECONDS;
+    MILLISECONDS {
+      @Override
+      public long fromMillis(long millisSinceEpoch) {
+        return millisSinceEpoch;
+      }
+    }, SECONDS {
+      @Override
+      public long fromMillis(long millisSinceEpoch) {
+        return TimeUnit.MILLISECONDS.toSeconds(millisSinceEpoch);
+      }
+    }, MINUTES {
+      @Override
+      public long fromMillis(long millisSinceEpoch) {
+        return TimeUnit.MILLISECONDS.toMinutes(millisSinceEpoch);
+      }
+    }, HOURS {
+      @Override
+      public long fromMillis(long millisSinceEpoch) {
+        return TimeUnit.MILLISECONDS.toHours(millisSinceEpoch);
+      }
+    }, DAYS {
+      @Override
+      public long fromMillis(long millisSinceEpoch) {
+        return TimeUnit.MILLISECONDS.toDays(millisSinceEpoch);
+      }
+    }, WEEKS {
+      @Override
+      public long fromMillis(long millisSinceEpoch) {
+        return DurationFieldType.weeks().getField(ISOChronology.getInstanceUTC()).getDifference(millisSinceEpoch, 0L);
+      }
+    }, MONTHS {
+      @Override
+      public long fromMillis(long millisSinceEpoch) {
+        return DurationFieldType.months().getField(ISOChronology.getInstanceUTC()).getDifference(millisSinceEpoch, 0L);
+      }
+    }, YEARS {
+      @Override
+      public long fromMillis(long millisSinceEpoch) {
+        return DurationFieldType.years().getField(ISOChronology.getInstanceUTC()).getDifference(millisSinceEpoch, 0L);
+      }
+    };
+
+    /**
+     * Convert the given millisecond since epoch into the desired time unit.
+     *
+     * @param millisSinceEpoch Millisecond since epoch
+     * @return Time since epoch of desired time unit
+     */
+    public abstract long fromMillis(long millisSinceEpoch);
   }
 
   private TimeUnit _timeUnit = null;
@@ -78,8 +121,8 @@ public class DateTimeFormatUnitSpec {
 
     DateTimeFormatUnitSpec that = (DateTimeFormatUnitSpec) o;
 
-    return EqualityUtils.isEqual(_timeUnit, that._timeUnit) &&
-        EqualityUtils.isEqual(_dateTimeTransformUnit, that._dateTimeTransformUnit);
+    return EqualityUtils.isEqual(_timeUnit, that._timeUnit) && EqualityUtils.isEqual(_dateTimeTransformUnit,
+        that._dateTimeTransformUnit);
   }
 
   @Override

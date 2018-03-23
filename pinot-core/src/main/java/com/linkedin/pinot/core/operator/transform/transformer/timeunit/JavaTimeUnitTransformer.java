@@ -13,25 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.operator.transform.function.time.converter;
+package com.linkedin.pinot.core.operator.transform.transformer.timeunit;
 
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 
 
 /**
- * Implementation of {@link TimeUnitConverter} for handling time units defined in {@link TimeUnit}.
+ * Implementation of {@link TimeUnitTransformer} to handle time units defined in {@link TimeUnit}.
  */
-public class JavaTimeUnitConverter implements TimeUnitConverter {
-  private final TimeUnit _timeUnit;
+public class JavaTimeUnitTransformer implements TimeUnitTransformer {
+  private final TimeUnit _inputTimeUnit;
+  private final TimeUnit _outputTimeUnit;
 
-  public JavaTimeUnitConverter(String timeUnitName) {
-    _timeUnit = TimeUnit.valueOf(timeUnitName);
+  public JavaTimeUnitTransformer(@Nonnull TimeUnit inputTimeUnit, @Nonnull TimeUnit outputTimeUnit) {
+    _inputTimeUnit = inputTimeUnit;
+    _outputTimeUnit = outputTimeUnit;
   }
 
   @Override
-  public void convert(long[] inputTime, TimeUnit inputTimeUnit, int length, long[] outputTime) {
+  public void transform(@Nonnull long[] input, @Nonnull long[] output, int length) {
     for (int i = 0; i < length; i++) {
-      outputTime[i] = _timeUnit.convert(inputTime[i], inputTimeUnit);
+      output[i] = _outputTimeUnit.convert(input[i], _inputTimeUnit);
     }
   }
 }

@@ -13,27 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.datetime.convertor;
+package com.linkedin.pinot.core.operator.transform.transformer.datetime;
 
 import com.linkedin.pinot.common.data.DateTimeFormatSpec;
 import com.linkedin.pinot.common.data.DateTimeGranularitySpec;
+import javax.annotation.Nonnull;
+
 
 /**
- * Convertor to convert and bucket a datetime value from an sdf format to an epoch format
+ * Date time transformer to transform and bucket date time values from a simple date format to another simple date
+ * format.
  */
-public class SDFToEpochConvertor extends DateTimeConvertor {
+public class SDFToSDFTransformer extends BaseDateTimeTransformer<String[], String[]> {
 
-  public SDFToEpochConvertor(DateTimeFormatSpec inputFormat, DateTimeFormatSpec outputFormat,
+  public SDFToSDFTransformer(DateTimeFormatSpec inputFormat, DateTimeFormatSpec outputFormat,
       DateTimeGranularitySpec outputGranularity) {
     super(inputFormat, outputFormat, outputGranularity);
   }
 
   @Override
-  public Long convert(Object dateTimeValue) {
-    Long dateTimeColumnValueMS = convertSDFToMillis(dateTimeValue);
-    Long bucketedDateTimevalueMS = bucketDateTimeValueMS(dateTimeColumnValueMS);
-    Long dateTimeValueConverted = convertMillisToEpoch(bucketedDateTimevalueMS);
-    return dateTimeValueConverted;
+  public void transform(@Nonnull String[] input, @Nonnull String[] output, int length) {
+    for (int i = 0; i < length; i++) {
+      // NOTE: No need to bucket time because it's implicit in the output simple date format
+      output[i] = transformMillisToSDF(transformSDFToMillis(input[i]));
+    }
   }
-
 }

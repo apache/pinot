@@ -13,25 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.operator.transform.function.time.converter;
+package com.linkedin.pinot.core.operator.transform.transformer.timeunit;
 
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 
 
-/**
- * Interface for converting from {@link TimeUnit} into other time units either in {@link TimeUnit}
- * or custom defined.
- */
-public interface TimeUnitConverter {
+public class TimeUnitTransformerFactory {
+  private TimeUnitTransformerFactory() {
+  }
 
-  /**
-   * This method converts an array of input times from the specified {@link TimeUnit} into
-   * implementation's timeUnit.
-   *
-   * @param inputTime Input times
-   * @param inputTimeUnit Time unit for the input
-   * @param length Length of input array to process
-   * @param outputTime Array where output is to be stored.
-   */
-  void convert(long[] inputTime, TimeUnit inputTimeUnit, int length, long[] outputTime);
+  public static TimeUnitTransformer getTimeUnitTransformer(@Nonnull TimeUnit inputTimeUnit,
+      @Nonnull String outputTimeUnitName) {
+    outputTimeUnitName = outputTimeUnitName.toUpperCase();
+    try {
+      return new JavaTimeUnitTransformer(inputTimeUnit, TimeUnit.valueOf(outputTimeUnitName));
+    } catch (Exception e) {
+      return new CustomTimeUnitTransformer(inputTimeUnit, outputTimeUnitName);
+    }
+  }
 }
