@@ -531,7 +531,6 @@ public class AnomaliesResource {
     for (int i = 0; i < dataSeries.size(); i++) {
         list.add(dataSeries.get(i).toString());
     }
-    LOG.info("List {}", list);
     return list;
   }
 
@@ -547,7 +546,6 @@ public class AnomaliesResource {
     for (int i = 0; i < timeBucket.size(); i++) {
       list.add(timeSeriesDateFormatter.print(timeBucket.get(i).getCurrentStart()));
     }
-    LOG.info("List {}", list);
     return list;
   }
 
