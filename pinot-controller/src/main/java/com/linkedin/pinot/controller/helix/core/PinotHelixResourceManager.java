@@ -1082,19 +1082,8 @@ public class PinotHelixResourceManager {
         _propertyStore.create(ZKMetadataProvider.constructPropertyStorePathForResource(offlineTableName),
             new ZNRecord(offlineTableName), AccessOption.PERSISTENT);
 
-        // If the segment assignment strategy is using replica groups, build the mapping table and
-        // store to property store.
-        String assignmentStrategy = segmentsConfig.getSegmentAssignmentStrategy();
-        if (assignmentStrategy != null && SegmentAssignmentStrategyEnum.valueOf(assignmentStrategy)
-            == SegmentAssignmentStrategyEnum.ReplicaGroupSegmentAssignmentStrategy) {
-          ReplicaGroupPartitionAssignmentGenerator partitionAssignmentGenerator =
-              new ReplicaGroupPartitionAssignmentGenerator(_propertyStore);
-          List<String> servers = getServerInstancesForTable(offlineTableName, TableType.OFFLINE);
-          ReplicaGroupPartitionAssignment partitionAssignment =
-              partitionAssignmentGenerator.buildReplicaGroupPartitionAssignment(offlineTableName, tableConfig, servers);
-          partitionAssignmentGenerator.writeReplicaGroupPartitionAssignment(partitionAssignment);
-        }
-
+        // Update replica group partition assignment to the property store if applicable
+        updateReplicaGroupPartitionAssignment(tableConfig);
         break;
       case REALTIME:
         final String realtimeTableName = tableConfig.getTableName();
@@ -1124,6 +1113,34 @@ public class PinotHelixResourceManager {
     }
 
     handleBrokerResource(tableNameWithType, brokersForTenant);
+  }
+
+  /**
+   * Update replica group partition assignment in the property store
+   *
+   * @param tableConfig a table config
+   */
+  private void updateReplicaGroupPartitionAssignment(TableConfig tableConfig) {
+    String tableNameWithType = tableConfig.getTableName();
+    String assignmentStrategy = tableConfig.getValidationConfig().getSegmentAssignmentStrategy();
+    // We create replica group partition assignment and write to property store if new table config
+    // has the replica group config.
+    if (assignmentStrategy != null && SegmentAssignmentStrategyEnum.valueOf(assignmentStrategy)
+        == SegmentAssignmentStrategyEnum.ReplicaGroupSegmentAssignmentStrategy) {
+      ReplicaGroupPartitionAssignmentGenerator partitionAssignmentGenerator =
+          new ReplicaGroupPartitionAssignmentGenerator(_propertyStore);
+
+      // Create the new replica group partition assignment if there is none in the property store.
+      // This will create the replica group partition assignment and write to the property store in 2 cases:
+      // 1. when we create the table with replica group segment assignment
+      // 2. when we update the table config with replica group segment assignment from another assignment strategy
+      if (partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType) == null) {
+        List<String> servers = getServerInstancesForTable(tableNameWithType, TableType.OFFLINE);
+        ReplicaGroupPartitionAssignment partitionAssignment =
+            partitionAssignmentGenerator.buildReplicaGroupPartitionAssignment(tableNameWithType, tableConfig, servers);
+        partitionAssignmentGenerator.writeReplicaGroupPartitionAssignment(partitionAssignment);
+      }
+    }
   }
 
   public static class InvalidTableConfigException extends RuntimeException {
@@ -1214,6 +1231,9 @@ public class PinotHelixResourceManager {
       ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType, TableConfig.toZnRecord(config));
       ensureRealtimeClusterIsSetUp(config, tableNameWithType, config.getIndexingConfig());
     } else if (type == TableType.OFFLINE) {
+      // Update replica group partition assignment to the property store if applicable
+      updateReplicaGroupPartitionAssignment(config);
+
       ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithType, TableConfig.toZnRecord(config));
       IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
       final String configReplication = config.getValidationConfig().getReplication();
@@ -1301,6 +1321,9 @@ public class PinotHelixResourceManager {
 
     // Remove table config
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, offlineTableName);
+
+    // Remove replica group partition assignment
+    ZKMetadataProvider.removeInstancePartitionAssignmentFromPropertyStore(_propertyStore, offlineTableName);
   }
 
   public void deleteRealtimeTable(String tableName) {
