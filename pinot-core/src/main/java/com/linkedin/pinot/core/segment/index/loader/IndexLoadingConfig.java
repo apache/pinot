@@ -23,8 +23,10 @@ import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -39,7 +41,8 @@ public class IndexLoadingConfig {
   private ReadMode _readMode = ReadMode.DEFAULT_MODE;
   private List<String> _sortedColumns = Collections.emptyList();
   private Set<String> _invertedIndexColumns = new HashSet<>();
-  private Set<String> _noDictionaryColumns = new HashSet<>();
+  private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
+  private Map<String, String> _noDictionaryConfig = new HashMap<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
   private SegmentVersion _segmentVersion;
   // This value will remain true only when the empty constructor is invoked.
@@ -76,6 +79,11 @@ public class IndexLoadingConfig {
     List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
     if (noDictionaryColumns != null) {
       _noDictionaryColumns.addAll(noDictionaryColumns);
+    }
+
+    Map<String, String> noDictionaryConfig = indexingConfig.getnoDictionaryConfig();
+    if (noDictionaryConfig != null) {
+      _noDictionaryConfig.putAll(noDictionaryConfig);
     }
 
     List<String> onHeapDictionaryColumns = indexingConfig.getOnHeapDictionaryColumns();
@@ -163,6 +171,11 @@ public class IndexLoadingConfig {
   @Nonnull
   public Set<String> getNoDictionaryColumns() {
     return _noDictionaryColumns;
+  }
+
+  @Nonnull
+  public Map<String, String> getnoDictionaryConfig() {
+    return _noDictionaryConfig;
   }
 
   @Nonnull
