@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources.v2.aggregation;
 
+import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
@@ -30,11 +31,13 @@ public class DefaultAggregationLoader implements AggregationLoader {
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
   private final QueryCache cache;
+  private final LoadingCache<String, Long> maxTimeCache;
 
-  public DefaultAggregationLoader(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache cache) {
+  public DefaultAggregationLoader(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, QueryCache cache, LoadingCache<String, Long> maxTimeCache) {
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
     this.cache = cache;
+    this.maxTimeCache = maxTimeCache;
   }
 
   @Override
@@ -117,7 +120,7 @@ public class DefaultAggregationLoader implements AggregationLoader {
       return Double.NaN;
     }
 
-    final long maxTime = this.cache.getDataSource(dataset.getDataSource()).getMaxDataTime(dataset.getDataset());
+    final long maxTime = this.maxTimeCache.get(dataset.getDataset());
     if (slice.getStart() > maxTime) {
       return Double.NaN;
     }
