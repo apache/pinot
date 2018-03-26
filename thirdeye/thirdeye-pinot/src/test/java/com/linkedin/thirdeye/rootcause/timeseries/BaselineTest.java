@@ -95,7 +95,7 @@ public class BaselineTest {
 
   @Test
   public void testBaselineAggregateFrom() {
-    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Arrays.asList(-1200L, -4500L));
+    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Arrays.asList(-1200L, -4500L), false);
 
     List<MetricSlice> slices = baseline.scatter(BASE_SLICE);
     Assert.assertEquals(slices.size(), 2);
@@ -109,7 +109,7 @@ public class BaselineTest {
 
   @Test
   public void testBaselineAggregateCompute() {
-    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Arrays.asList(-1200L, -4500L));
+    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Arrays.asList(-1200L, -4500L), false);
 
     Map<MetricSlice, DataFrame> data = new HashMap<>();
     data.put(BASE_SLICE.withStart(13800).withEnd(15800),
@@ -133,7 +133,7 @@ public class BaselineTest {
 
   @Test
   public void testBaselineAggregateComputeMultiIndex() {
-    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Arrays.asList(-1200L, -4500L));
+    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Arrays.asList(-1200L, -4500L), false);
 
     Map<MetricSlice, DataFrame> data = new HashMap<>();
     data.put(BASE_SLICE.withStart(13800).withEnd(15800),
@@ -160,7 +160,7 @@ public class BaselineTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testBaselineAggregateComputeInvalidSlice() {
-    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Arrays.asList(-1200L, -4500L));
+    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Arrays.asList(-1200L, -4500L), false);
     baseline.gather(BASE_SLICE, Collections.singletonMap(
         BASE_SLICE.withStart(13999), new DataFrame()
     ));

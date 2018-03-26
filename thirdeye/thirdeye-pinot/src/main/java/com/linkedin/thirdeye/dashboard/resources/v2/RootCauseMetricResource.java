@@ -36,6 +36,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang.StringUtils;
+import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
@@ -121,7 +122,7 @@ public class RootCauseMetricResource {
       timezone = TIMEZONE_DEFAULT;
     }
 
-    MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end));
+    MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end), timezone);
     Baseline range = parseOffset(baseSlice, offset, timezone);
 
     List<MetricSlice> slices = range.scatter(baseSlice);
@@ -136,54 +137,6 @@ public class RootCauseMetricResource {
     }
     return result.getDouble(COL_VALUE, 0);
   }
-
-  /**
-   * Caches a list of aggregate value for the specified metric and time range, and (optionally) a list of offset.
-   * Aligns time stamps if necessary and returns NaN if no data is available for the given time range.
-   *
-   * @param urn metric urn
-   * @param start start time (in millis)
-   * @param end end time (in millis)
-   * @param offsets A list of offset identifier (e.g. "current", "wo2w")
-   * @param timezone timezone identifier (e.g. "America/Los_Angeles")
-   *
-   * @see RootCauseMetricResource#parseOffset(MetricSlice, String, String) supported offsets
-   *
-   * @throws Exception on catch-all execution failure
-   */
-  @GET
-  @Path("/aggregate/cache")
-  @ApiOperation(value = "Caches a list of aggregate value for the specified metric and time range, and (optionally) offset.")
-  public void cacheAggregatesBatch(
-      @ApiParam(value = "metric urn", required = true) @QueryParam("urn") @NotNull String urn,
-      @ApiParam(value = "start time (in millis)", required = true) @QueryParam("start") @NotNull long start,
-      @ApiParam(value = "end time (in millis)", required = true) @QueryParam("end") @NotNull long end,
-      @ApiParam(value = "A list of offset identifier separated by comma (e.g. \"current\", \"wo2w\")") @QueryParam("offsets") List<String> offsets,
-      @ApiParam(value = "timezone identifier (e.g. \"America/Los_Angeles\")") @QueryParam("timezone") String timezone)
-      throws Exception {
-    offsets = ResourceUtils.parseListParams(offsets);
-    List<MetricSlice> slices = new ArrayList<>();
-    for (String offset : offsets) {
-      // Put all metric slices together
-      if (StringUtils.isBlank(offset)) {
-        offset = OFFSET_DEFAULT;
-      }
-
-      if (StringUtils.isBlank(timezone)) {
-        timezone = TIMEZONE_DEFAULT;
-      }
-      MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end));
-
-      Baseline range = parseOffset(baseSlice, offset, timezone);
-
-      List<MetricSlice> currentSlices = range.scatter(baseSlice);
-
-      slices.addAll(currentSlices);
-      logSlices(baseSlice, currentSlices);
-    }
-    requestAggregates(slices);
-  }
-
 
   /**
    * Returns a list of aggregate value for the specified metric and time range, and (optionally) a list of offset.
@@ -211,8 +164,10 @@ public class RootCauseMetricResource {
       @ApiParam(value = "timezone identifier (e.g. \"America/Los_Angeles\")") @QueryParam("timezone") String timezone)
       throws Exception {
     List<Double> aggregateValues = new ArrayList<>();
+
     offsets = ResourceUtils.parseListParams(offsets);
     List<MetricSlice> slices = new ArrayList<>();
+
     Map<String, MetricSlice> offsetToBaseSlice = new HashMap<>();
     Map<String, Baseline> offsetToRange = new HashMap<>();
     for (String offset : offsets) {
@@ -224,7 +179,8 @@ public class RootCauseMetricResource {
       if (StringUtils.isBlank(timezone)) {
         timezone = TIMEZONE_DEFAULT;
       }
-      MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end));
+
+      MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end), timezone);
       offsetToBaseSlice.put(offset, baseSlice);
 
       Baseline range = parseOffset(baseSlice, offset, timezone);
@@ -297,7 +253,7 @@ public class RootCauseMetricResource {
       throw new IllegalArgumentException("rollup not implemented yet");
     }
 
-    MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end));
+    MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end), timezone);
     Baseline range = parseOffset(baseSlice, offset, timezone);
 
     List<MetricSlice> slices = range.scatter(baseSlice);
@@ -357,7 +313,7 @@ public class RootCauseMetricResource {
     }
 
     TimeGranularity granularity = TimeGranularity.fromString(granularityString);
-    MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end, granularity));
+    MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end, granularity), timezone);
     Baseline range = parseOffset(baseSlice, offset, timezone);
 
     List<MetricSlice> slices = new ArrayList<>(range.scatter(baseSlice));
@@ -418,7 +374,16 @@ public class RootCauseMetricResource {
    * @throws Exception on catch-all execution failure
    */
   private Map<MetricSlice, DataFrame> fetchAggregates(List<MetricSlice> slices) throws Exception {
-    Map<MetricSlice, Future<Double>> futures = requestAggregates(slices);
+    Map<MetricSlice, Future<Double>> futures = new HashMap<>();
+
+    for (final MetricSlice slice : slices) {
+      futures.put(slice, this.executor.submit(new Callable<Double>() {
+        @Override
+        public Double call() throws Exception {
+          return RootCauseMetricResource.this.aggregationLoader.loadAggregate(slice);
+        }
+      }));
+    }
 
     Map<MetricSlice, DataFrame> output = new HashMap<>();
     for (Map.Entry<MetricSlice, Future<Double>> entry : futures.entrySet()) {
@@ -431,20 +396,6 @@ public class RootCauseMetricResource {
     }
 
     return output;
-  }
-
-  private Map<MetricSlice, Future<Double>> requestAggregates(List<MetricSlice> slices) throws Exception {
-    Map<MetricSlice, Future<Double>> futures = new HashMap<>();
-
-    for (final MetricSlice slice : slices) {
-      futures.put(slice, this.executor.submit(new Callable<Double>() {
-        @Override
-        public Double call() throws Exception {
-          return RootCauseMetricResource.this.aggregationLoader.loadAggregate(slice);
-        }
-      }));
-    }
-    return futures;
   }
 
   /**
@@ -528,8 +479,9 @@ public class RootCauseMetricResource {
    * @return Baseline instance
    * @throws IllegalArgumentException if the offset cannot be parsed
    */
-  private static Baseline parseOffset(MetricSlice baseSlice, String offset, String timezone) {
+  private Baseline parseOffset(MetricSlice baseSlice, String offset, String timezone) {
     long timestamp = baseSlice.getStart();
+    boolean isDailyData = this.isDailyData(baseSlice);
 
     Matcher mCurrent = PATTERN_CURRENT.matcher(offset);
     if (mCurrent.find()) {
@@ -538,41 +490,40 @@ public class RootCauseMetricResource {
 
     Matcher mWeekOverWeek = PATTERN_WEEK_OVER_WEEK.matcher(offset);
     if (mWeekOverWeek.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEAN, 1, Integer.valueOf(mWeekOverWeek.group(1)), timestamp, timezone);
+      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.SUM, 1, Integer.valueOf(mWeekOverWeek.group(1)), timestamp, timezone, isDailyData);
     }
 
     Matcher mMean = PATTERN_MEAN.matcher(offset);
     if (mMean.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEAN, Integer.valueOf(mMean.group(1)), 1, timestamp, timezone);
+      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEAN, Integer.valueOf(mMean.group(1)), 1, timestamp, timezone, isDailyData);
     }
 
     Matcher mMedian = PATTERN_MEDIAN.matcher(offset);
     if (mMedian.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, Integer.valueOf(mMedian.group(1)), 1, timestamp, timezone);
+      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, Integer.valueOf(mMedian.group(1)), 1, timestamp, timezone, isDailyData);
     }
 
     Matcher mMin = PATTERN_MIN.matcher(offset);
     if (mMin.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MIN, Integer.valueOf(mMin.group(1)), 1, timestamp, timezone);
+      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MIN, Integer.valueOf(mMin.group(1)), 1, timestamp, timezone, isDailyData);
     }
 
     Matcher mMax = PATTERN_MAX.matcher(offset);
     if (mMax.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MAX, Integer.valueOf(mMax.group(1)), 1, timestamp, timezone);
+      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MAX, Integer.valueOf(mMax.group(1)), 1, timestamp, timezone, isDailyData);
     }
 
     throw new IllegalArgumentException(String.format("Unknown offset '%s'", offset));
   }
 
   /**
-   * Aligns a metric slice based on its granularity, or the datset granularity.
+   * Aligns a metric slice based on its granularity, or the dataset granularity.
    *
    * @param slice metric slice
    * @return aligned metric slice
-   * @throws Exception if the referenced metric or dataset cannot be found
    */
   // TODO refactor as util. similar to dataframe utils
-  private MetricSlice alignSlice(MetricSlice slice) throws Exception {
+  private MetricSlice alignSlice(MetricSlice slice, String timezone) {
     MetricConfigDTO metric = this.metricDAO.findById(slice.getMetricId());
     if (metric == null) {
       throw new IllegalArgumentException(String.format("Could not resolve metric id %d", slice.getMetricId()));
@@ -588,11 +539,32 @@ public class RootCauseMetricResource {
       granularity = slice.getGranularity();
     }
 
+    // align to time buckets and request time zone
+    long offset = DateTimeZone.forID(timezone).getOffset(slice.getStart());
     long timeGranularity = granularity.toMillis();
-    long start = (slice.getStart() / timeGranularity) * timeGranularity;
-    long end = ((slice.getEnd() + timeGranularity - 1) / timeGranularity) * timeGranularity;
+    long start = ((slice.getStart() + offset) / timeGranularity) * timeGranularity - offset;
+    long end = ((slice.getEnd() + offset + timeGranularity - 1) / timeGranularity) * timeGranularity - offset;
 
     return slice.withStart(start).withEnd(end).withGranularity(granularity);
+  }
+
+  /**
+   * Returns {@code true} if the slice references a dataset with daily time granularity
+   * @param slice metric slice
+   * @return {@code true} is daily time series, {@code false} otherwise
+   */
+  private boolean isDailyData(MetricSlice slice) {
+    MetricConfigDTO metric  = this.metricDAO.findById(slice.getMetricId());
+    if (metric == null) {
+      return false;
+    }
+
+    DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
+    if (dataset == null) {
+      return false;
+    }
+
+    return TimeUnit.DAYS.equals(dataset.bucketTimeGranularity().getUnit());
   }
 
   private MetricSlice makeSlice(String urn, long start, long end) {

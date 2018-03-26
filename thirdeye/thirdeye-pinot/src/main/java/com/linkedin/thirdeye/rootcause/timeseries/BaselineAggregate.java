@@ -24,10 +24,24 @@ import org.joda.time.DateTimeZone;
 public class BaselineAggregate implements Baseline {
   private final BaselineAggregateType type;
   private final List<Long> offsets;
+  private final boolean isDailyData;
 
-  private BaselineAggregate(BaselineAggregateType type, List<Long> offsets) {
+  private BaselineAggregate(BaselineAggregateType type, List<Long> offsets, boolean isDailyData) {
     this.type = type;
     this.offsets = offsets;
+    this.isDailyData = isDailyData;
+  }
+
+  public BaselineAggregate withType(BaselineAggregateType type) {
+    return new BaselineAggregate(type, this.offsets, this.isDailyData);
+  }
+
+  public BaselineAggregate withOffsets(List<Long> offsets) {
+    return new BaselineAggregate(this.type, offsets, this.isDailyData);
+  }
+
+  public BaselineAggregate withDailyData(boolean isDailyData) {
+    return new BaselineAggregate(this.type, this.offsets, isDailyData);
   }
 
   @Override
@@ -59,9 +73,6 @@ public class BaselineAggregate implements Baseline {
     Map<MetricSlice, DataFrame> filtered = this.filter(slice, data);
 
     // probe for daily data
-    DataFrame someData = data.values().iterator().next();
-    final boolean isDailyData = isDailyData(someData);
-
     LongSeries timestamps = makeTimestamps(slice, data);
     Set<Long> timestampSet = new HashSet<>(timestamps.toList());
 
@@ -85,7 +96,7 @@ public class BaselineAggregate implements Baseline {
       df.renameSeries(COL_VALUE, colName);
 
       if (isDailyData) {
-        df = heuristicDSTCorrection(df, timestampSet);
+        df = applyDSTCorrection(df, timestampSet);
       }
 
       if (!isInitialized) {
@@ -127,10 +138,11 @@ public class BaselineAggregate implements Baseline {
    *
    * @param type aggregation type
    * @param offsets time offsets
+   * @param isDailyData daily time series flag
    * @return BaselineAggregate with given type and offsets
    */
-  public static BaselineAggregate fromOffsets(BaselineAggregateType type, List<Long> offsets) {
-    return new BaselineAggregate(type, offsets);
+  public static BaselineAggregate fromOffsets(BaselineAggregateType type, List<Long> offsets, boolean isDailyData) {
+    return new BaselineAggregate(type, offsets, isDailyData);
   }
 
   /**
@@ -143,9 +155,10 @@ public class BaselineAggregate implements Baseline {
    * @param type aggregation type
    * @param numWeeks number of consecutive weeks
    * @param offsetWeeks lag for starting consecutive weeks
+   * @param isDailyData daily time series flag
    * @return BaselineAggregate with given type and weekly offsets
    */
-  public static BaselineAggregate fromWeekOverWeek(BaselineAggregateType type, int numWeeks, int offsetWeeks) {
+  public static BaselineAggregate fromWeekOverWeek(BaselineAggregateType type, int numWeeks, int offsetWeeks, boolean isDailyData) {
     List<Long> offsets = new ArrayList<>();
 
     for (int i = 0; i < numWeeks; i++) {
@@ -153,7 +166,7 @@ public class BaselineAggregate implements Baseline {
       offsets.add(offset);
     }
 
-    return new BaselineAggregate(type, offsets);
+    return new BaselineAggregate(type, offsets, isDailyData);
   }
 
   /**
@@ -163,7 +176,7 @@ public class BaselineAggregate implements Baseline {
    * <br/><b>NOTE:</b> As offsets are pre-computed, the DST correction will produce incorrect offsets
    * if used to scatter a slice that does not start at {@code timestamp}.
    *
-   * @see BaselineAggregate#fromWeekOverWeek(BaselineAggregateType, int, int)
+   * @see BaselineAggregate#fromWeekOverWeek(BaselineAggregateType, int, int, boolean)
    * @see BaselineAggregateType
    *
    * @param type aggregation type
@@ -171,9 +184,10 @@ public class BaselineAggregate implements Baseline {
    * @param offsetWeeks lag for starting consecutive weeks
    * @param timestamp assumed slice start timestamp
    * @param timezone time zone (long form)
+   * @param isDailyData daily time series flag
    * @return BaselineAggregate with given type and weekly offsets corrected for DST
    */
-  public static BaselineAggregate fromWeekOverWeek(BaselineAggregateType type, int numWeeks, int offsetWeeks, long timestamp, String timezone) {
+  public static BaselineAggregate fromWeekOverWeek(BaselineAggregateType type, int numWeeks, int offsetWeeks, long timestamp, String timezone, boolean isDailyData) {
     DateTime baseDate = new DateTime(timestamp, DateTimeZone.forID(timezone));
 
     List<Long> offsets = new ArrayList<>();
@@ -183,7 +197,7 @@ public class BaselineAggregate implements Baseline {
       offsets.add(offset);
     }
 
-    return new BaselineAggregate(type, offsets);
+    return new BaselineAggregate(type, offsets, isDailyData);
   }
 
   /**
@@ -194,14 +208,12 @@ public class BaselineAggregate implements Baseline {
    * @param data timeseries data
    * @return timestamp series
    */
-  private static LongSeries makeTimestamps(MetricSlice slice, Map<MetricSlice, DataFrame> data) {
+  private LongSeries makeTimestamps(MetricSlice slice, Map<MetricSlice, DataFrame> data) {
     if (data.containsKey(slice)) {
       return data.get(slice).dropNull().getLongs(COL_TIME);
     }
 
-    DataFrame someData = data.values().iterator().next();
-
-    if (isDailyData(someData)) {
+    if (this.isDailyData) {
       // construct daily timestamps
       return BaselineUtil.makeTimestamps(slice.withGranularity(new TimeGranularity(1, TimeUnit.DAYS)));
     } else {
@@ -218,8 +230,8 @@ public class BaselineAggregate implements Baseline {
    * @param timestamps set of acceptable timestamps
    * @return aligned data series
    */
-  private static DataFrame heuristicDSTCorrection(DataFrame data, final Set<Long> timestamps) {
-    if (!isDailyData(data)) {
+  private DataFrame applyDSTCorrection(DataFrame data, final Set<Long> timestamps) {
+    if (!this.isDailyData) {
       return data;
     }
 
@@ -236,24 +248,5 @@ public class BaselineAggregate implements Baseline {
         }, COL_TIME)
         .dropNull()
         .sortedBy(COL_TIME);
-  }
-
-  /**
-   * Probes the input data series for daily time intervals.
-   *
-   * @param data data series
-   * @return {@code true} if found to be daily, {@code false} otherwise
-   */
-  private static boolean isDailyData(DataFrame data) {
-    if (data.size() <= 1) {
-      // not timeseries
-      return false;
-    }
-
-    LongSeries diffTimestamps = data.dropNull().getLongs(COL_TIME);
-    LongSeries diff = diffTimestamps.subtract(diffTimestamps.shift(1)).dropNull();
-    long medianDiff = diff.median().longValue();
-
-    return (medianDiff == TimeUnit.DAYS.toMillis(1));
   }
 }
