@@ -47,6 +47,11 @@ public class IndexingConfigTest {
     json.put("keyThatIsUnknown", "randomValue");
     json.put("aggregateMetrics", "true");
 
+    JSONObject noDictConfig = new JSONObject();
+    noDictConfig.put("a", "SNAPPY");
+    noDictConfig.put("b", "PASS_THROUGH");
+    json.put("noDictionaryConfig", noDictConfig);
+
     ObjectMapper mapper = new ObjectMapper();
     JsonNode jsonNode = mapper.readTree(json.toString());
     IndexingConfig indexingConfig = mapper.readValue(jsonNode, IndexingConfig.class);
@@ -63,6 +68,12 @@ public class IndexingConfigTest {
     Assert.assertEquals("d", sortedIndexColumns.get(0));
     Assert.assertEquals("e", sortedIndexColumns.get(1));
     Assert.assertEquals("f", sortedIndexColumns.get(2));
+
+    // Test for noDictionaryConfig.
+    Map<String, String> noDictConfigMap = indexingConfig.getnoDictionaryConfig();
+    Assert.assertEquals(noDictConfigMap.size(), 2);
+    Assert.assertEquals(noDictConfig.get("a"), "SNAPPY");
+    Assert.assertEquals(noDictConfig.get("b"), "PASS_THROUGH");
 
     List<String> actualOnHeapDictionaryColumns = indexingConfig.getOnHeapDictionaryColumns();
     Assert.assertEquals(actualOnHeapDictionaryColumns.size(), expectedOnHeapDictionaryColumns.length);

@@ -39,7 +39,8 @@ public class IndexingConfig {
   private StreamConsumptionConfig _streamConsumptionConfig;
   private String _segmentFormatVersion;
   private String _columnMinMaxValueGeneratorMode;
-  private List<String> _noDictionaryColumns;
+  private List<String> _noDictionaryColumns; // TODO: replace this with noDictionaryConfig.
+  private Map<String, String> _noDictionaryConfig;
   private List<String> _onHeapDictionaryColumns;
   private StarTreeIndexSpec _starTreeIndexSpec;
   private SegmentPartitionConfig _segmentPartitionConfig;
@@ -113,12 +114,20 @@ public class IndexingConfig {
     return _noDictionaryColumns;
   }
 
+  public Map<String, String> getnoDictionaryConfig() {
+    return _noDictionaryConfig;
+  }
+
   public List<String> getOnHeapDictionaryColumns() {
     return _onHeapDictionaryColumns;
   }
 
   public void setNoDictionaryColumns(List<String> noDictionaryColumns) {
     _noDictionaryColumns = noDictionaryColumns;
+  }
+
+  public void setnoDictionaryConfig(Map<String, String> noDictionaryConfig) {
+    _noDictionaryConfig = noDictionaryConfig;
   }
 
   public void setOnHeapDictionaryColumns(List<String> onHeapDictionaryColumns) {
@@ -201,6 +210,7 @@ public class IndexingConfig {
         EqualityUtils.isEqual(_segmentFormatVersion, that._segmentFormatVersion) &&
         EqualityUtils.isEqual(_columnMinMaxValueGeneratorMode, that._columnMinMaxValueGeneratorMode) &&
         EqualityUtils.isEqual(_noDictionaryColumns, that._noDictionaryColumns) &&
+        EqualityUtils.isEqual(_noDictionaryConfig, that._noDictionaryConfig) &&
         EqualityUtils.isEqual(_onHeapDictionaryColumns, that._onHeapDictionaryColumns) &&
         EqualityUtils.isEqual(_starTreeIndexSpec, that._starTreeIndexSpec) &&
         EqualityUtils.isEqual(_segmentPartitionConfig, that._segmentPartitionConfig);
@@ -216,6 +226,7 @@ public class IndexingConfig {
     result = EqualityUtils.hashCodeOf(result, _segmentFormatVersion);
     result = EqualityUtils.hashCodeOf(result, _columnMinMaxValueGeneratorMode);
     result = EqualityUtils.hashCodeOf(result, _noDictionaryColumns);
+    result = EqualityUtils.hashCodeOf(result, _noDictionaryConfig);
     result = EqualityUtils.hashCodeOf(result, _onHeapDictionaryColumns);
     result = EqualityUtils.hashCodeOf(result, _starTreeIndexSpec);
     result = EqualityUtils.hashCodeOf(result, _segmentPartitionConfig);
