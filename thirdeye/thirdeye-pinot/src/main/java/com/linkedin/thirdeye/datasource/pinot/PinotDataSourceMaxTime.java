@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datasource.pinot;
 
+import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -8,6 +9,7 @@ import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.Period;
@@ -49,8 +51,18 @@ public class PinotDataSourceMaxTime {
       String maxTimePql = String.format(COLLECTION_MAX_TIME_QUERY_TEMPLATE, timeSpec.getColumnName(), tableName,
           timeSpec.getColumnName(), prevMaxDataTime);
       PinotQuery maxTimePinotQuery = new PinotQuery(maxTimePql, tableName);
-      pinotThirdEyeDataSource.refreshPQL(maxTimePinotQuery);
-      ThirdEyeResultSetGroup resultSetGroup = pinotThirdEyeDataSource.executePQL(maxTimePinotQuery);
+
+      ThirdEyeResultSetGroup resultSetGroup;
+      final long tStart = System.nanoTime();
+      try {
+        pinotThirdEyeDataSource.refreshPQL(maxTimePinotQuery);
+        resultSetGroup = pinotThirdEyeDataSource.executePQL(maxTimePinotQuery);
+        ThirdeyeMetricsUtil.logRequestSuccess(this.pinotThirdEyeDataSource.getName(), dataset, "[maxTime]", tStart, System.nanoTime());
+      } catch (ExecutionException e) {
+        ThirdeyeMetricsUtil.logRequestFailure(this.pinotThirdEyeDataSource.getName(), dataset, "[maxTime]", tStart, System.nanoTime(), e);
+        throw e;
+      }
+
       if (resultSetGroup.size() == 0 || resultSetGroup.get(0).getRowCount() == 0) {
         LOGGER.error("Failed to get latest max time for dataset {} with PQL: {}", tableName, maxTimePinotQuery.getPql());
         this.collectionToPrevMaxDataTimeMap.remove(dataset);
