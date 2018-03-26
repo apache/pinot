@@ -690,6 +690,8 @@ public class DetectionJobResource {
 
   /**
    * Evaluate the performance based on the given list of anomaly results and the alert filter spec
+   * The projected performance is based on if the anomaly qualified based on the current/given alert filter; if false,
+   * it uses the isNotified flag directly.
    * @param alertFilterSpec the parameters of alert filter
    * @param anomalyResults the list of anomaly results
    * @param isProjected Boolean to indicate is to return projected performance for current alert filter.
@@ -706,7 +708,7 @@ public class DetectionJobResource {
       evaluator = new PrecisionRecallEvaluator(alertFilter, anomalyResults);
 
       LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall:{}",
-          alertFilter.getClass().toString(), evaluator.getWeightedPrecision(), evaluator.getRecall());
+          alertFilter.getClass().getSimpleName(), evaluator.getWeightedPrecision(), evaluator.getRecall());
     } else {
       evaluator = new PrecisionRecallEvaluator(anomalyResults);
     }
@@ -716,6 +718,8 @@ public class DetectionJobResource {
 
   /**
    * Evaluate the performance based on the given list of anomaly results and the alert filter spec
+   * The projected performance is based on if the anomaly qualified based on the current/given alert filter; if false,
+   * it uses the isNotified flag directly.
    * @param alertFilterSpec the parameters of alert filter
    * @param anomalyFunctions the list of anomaly functions
    * @param startTime the start time of the evaluation
@@ -745,6 +749,8 @@ public class DetectionJobResource {
 
   /**
    * The endpoint to evaluate system performance. The evaluation will be based on sent and non sent anomalies
+   * The projected performance is based on if the anomaly qualified based on the current/given alert filter; if false,
+   * it uses the isNotified flag directly.
    * @param id: function ID
    * @param startTimeIso: startTime of merged anomaly ex: 2016-5-23T00:00:00Z
    * @param endTimeIso: endTime of merged anomaly ex: 2016-5-23T00:00:00Z
@@ -773,6 +779,18 @@ public class DetectionJobResource {
     return numberMapToResponse(evaluatorValues);
   }
 
+  /**
+   * The endpoint to evaluate system performance. The evaluation will be based on sent and non sent anomalies
+   * The projected performance is based on if the anomaly qualified based on the current/given alert filter; if false,
+   * it uses the isNotified flag directly.
+   * @param id: alert config ID
+   * @param startTimeIso: startTime of merged anomaly ex: 2016-5-23T00:00:00Z
+   * @param endTimeIso: endTime of merged anomaly ex: 2016-5-23T00:00:00Z
+   * @param isProjected: Boolean to indicate is to return projected performance for current alert filter.
+   *                   If "true", return projected performance for current alert filter
+   * @return feedback summary, precision and recall as json object
+   * @throws Exception when data has no positive label or model has no positive prediction
+   */
   @GET
   @Path("/eval/alert/{alertConfigId}")
   public Response evaluateAlertFilterByAlertConfigId(@PathParam("alertConfigId") @NotNull long id,
@@ -805,7 +823,18 @@ public class DetectionJobResource {
     return numberMapToResponse(evaluatorValues);
   }
 
-
+  /**
+   * The endpoint to evaluate system performance. The evaluation will be based on sent and non sent anomalies
+   * The projected performance is based on if the anomaly qualified based on the current/given alert filter; if false,
+   * it uses the isNotified flag directly.
+   * @param name: application name
+   * @param startTimeIso: startTime of merged anomaly ex: 2016-5-23T00:00:00Z
+   * @param endTimeIso: endTime of merged anomaly ex: 2016-5-23T00:00:00Z
+   * @param isProjected: Boolean to indicate is to return projected performance for current alert filter.
+   *                   If "true", return projected performance for current alert filter
+   * @return feedback summary, precision and recall as json object
+   * @throws Exception when data has no positive label or model has no positive prediction
+   */
   @GET
   @Path("/eval/application/{applicationName}")
   public Response evaluateAlertFilterByApplicationName(@PathParam("applicationName") @NotNull String name,
@@ -860,6 +889,11 @@ public class DetectionJobResource {
     return numberMapToResponse(evaluatorValues);
   }
 
+  /**
+   * Generate the response from the evaluator output
+   * @param evaluatorValues the output of percision recall evaluator
+   * @return a HTTP response
+   */
   private Response numberMapToResponse(Map<String, Number> evaluatorValues) {
     try {
       String propertiesJson = OBJECT_MAPPER.writeValueAsString(evaluatorValues);
