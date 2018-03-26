@@ -13,27 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.datetime.convertor;
+package com.linkedin.pinot.core.operator.transform.transformer.datetime;
 
 import com.linkedin.pinot.common.data.DateTimeFormatSpec;
 import com.linkedin.pinot.common.data.DateTimeGranularitySpec;
+import javax.annotation.Nonnull;
+
 
 /**
- * Convertor to convert and bucket a datetime value from an epoch format to an epoch format
+ * Date time transformer to transform and bucket date time values from an epoch format to another epoch format.
  */
-public class EpochToEpochConvertor extends DateTimeConvertor {
+public class EpochToEpochTransformer extends BaseDateTimeTransformer<long[], long[]> {
 
-  public EpochToEpochConvertor(DateTimeFormatSpec inputFormat, DateTimeFormatSpec outputFormat,
+  public EpochToEpochTransformer(DateTimeFormatSpec inputFormat, DateTimeFormatSpec outputFormat,
       DateTimeGranularitySpec outputGranularity) {
     super(inputFormat, outputFormat, outputGranularity);
   }
 
   @Override
-  public Long convert(Object dateTimeValue) {
-    Long dateTimeColumnValueMS = convertEpochToMillis(dateTimeValue);
-    Long bucketedDateTimevalueMS = bucketDateTimeValueMS(dateTimeColumnValueMS);
-    Long dateTimeValueConverted = convertMillisToEpoch(bucketedDateTimevalueMS);
-    return dateTimeValueConverted;
+  public void transform(@Nonnull long[] input, @Nonnull long[] output, int length) {
+    for (int i = 0; i < length; i++) {
+      output[i] = transformMillisToEpoch(transformToOutputGranularity(transformEpochToMillis(input[i])));
+    }
   }
-
 }

@@ -15,20 +15,20 @@
  */
 package com.linkedin.pinot.core.operator.transform.function;
 
-import java.lang.reflect.Array;
-
-import javax.annotation.concurrent.NotThreadSafe;
-
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.DateTimeFieldSpec;
-import com.linkedin.pinot.common.data.DateTimeFormatSpec;
-import com.linkedin.pinot.common.data.DateTimeGranularitySpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.datetime.convertor.DateTimeConvertor;
-import com.linkedin.pinot.common.datetime.convertor.DateTimeConvertorFactory;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.operator.transform.transformer.datetime.BaseDateTimeTransformer;
+import com.linkedin.pinot.core.operator.transform.transformer.datetime.DateTimeTransformerFactory;
+import com.linkedin.pinot.core.operator.transform.transformer.datetime.EpochToEpochTransformer;
+import com.linkedin.pinot.core.operator.transform.transformer.datetime.EpochToSDFTransformer;
+import com.linkedin.pinot.core.operator.transform.transformer.datetime.SDFToEpochTransformer;
+import com.linkedin.pinot.core.operator.transform.transformer.datetime.SDFToSDFTransformer;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
+import javax.annotation.concurrent.NotThreadSafe;
+
 
 /**
  * This class implements the date time conversion transform.
@@ -64,8 +64,12 @@ import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 @NotThreadSafe
 public class DateTimeConversionTransform implements TransformFunction {
   private static final String TRANSFORM_NAME = "dateTimeConvert";
-  private long[] _output = null;
 
+  private long[] _longOutput;
+  private String[] _stringOutput;
+  private DataType _outputType;
+
+  @SuppressWarnings("unchecked")
   @Override
   public <T> T transform(int length, BlockValSet... input) {
     Preconditions.checkArgument(input.length == 4, TRANSFORM_NAME + " expects four arguments");
@@ -77,42 +81,46 @@ public class DateTimeConversionTransform implements TransformFunction {
     String[] outputDateTimeGranularity = input[3].getStringValuesSV();
     String outputGranularity = outputDateTimeGranularity[0];
 
-    DateTimeConvertor dateTimeConvertor =
-        DateTimeConvertorFactory.getDateTimeConvertorFromFormats(inputFormat, outputFormat, outputGranularity);
-
-    if (_output == null || _output.length < length) {
-      _output = new long[Math.max(length, DocIdSetPlanNode.MAX_DOC_PER_CALL)];
+    BaseDateTimeTransformer dateTimeTransformer =
+        DateTimeTransformerFactory.getDateTimeTransformer(inputFormat, outputFormat, outputGranularity);
+    if (dateTimeTransformer instanceof EpochToEpochTransformer) {
+      if (_longOutput == null) {
+        _longOutput = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        _outputType = DataType.LONG;
+      }
+      ((EpochToEpochTransformer) dateTimeTransformer).transform(input[0].getLongValuesSV(), _longOutput, length);
+      return (T) _longOutput;
+    } else if (dateTimeTransformer instanceof EpochToSDFTransformer) {
+      if (_stringOutput == null) {
+        _stringOutput = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        _outputType = DataType.STRING;
+      }
+      ((EpochToSDFTransformer) dateTimeTransformer).transform(input[0].getLongValuesSV(), _stringOutput, length);
+      return (T) _stringOutput;
+    } else if (dateTimeTransformer instanceof SDFToEpochTransformer) {
+      if (_longOutput == null) {
+        _longOutput = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        _outputType = DataType.LONG;
+      }
+      ((SDFToEpochTransformer) dateTimeTransformer).transform(input[0].getStringValuesSV(), _longOutput, length);
+      return (T) _longOutput;
+    } else {
+      if (_stringOutput == null) {
+        _stringOutput = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        _outputType = DataType.STRING;
+      }
+      ((SDFToSDFTransformer) dateTimeTransformer).transform(input[0].getStringValuesSV(), _stringOutput, length);
+      return (T) _stringOutput;
     }
-
-    DataType valueType = input[0].getValueType();
-    Object inputValues = null;
-    switch (valueType) {
-    case STRING:
-      inputValues = input[0].getStringValuesSV();
-      break;
-    case INT:
-      inputValues = input[0].getIntValuesSV();
-      break;
-    case LONG:
-    default:
-      inputValues = input[0].getLongValuesSV();
-      break;
-    }
-
-    for (int i = 0; i < Array.getLength(inputValues); i++) {
-      _output[i] = dateTimeConvertor.convert(Array.get(inputValues, i));
-    }
-    return (T) _output;
   }
 
   @Override
   public FieldSpec.DataType getOutputType() {
-    return FieldSpec.DataType.LONG;
+    return _outputType;
   }
 
   @Override
   public String getName() {
     return TRANSFORM_NAME;
   }
-
 }

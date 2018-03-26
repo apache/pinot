@@ -18,8 +18,8 @@ package com.linkedin.pinot.core.operator.transform.function;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.operator.transform.function.time.converter.TimeConverterFactory;
-import com.linkedin.pinot.core.operator.transform.function.time.converter.TimeUnitConverter;
+import com.linkedin.pinot.core.operator.transform.transformer.timeunit.TimeUnitTransformer;
+import com.linkedin.pinot.core.operator.transform.transformer.timeunit.TimeUnitTransformerFactory;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
 import java.util.concurrent.TimeUnit;
@@ -61,12 +61,13 @@ public class TimeConversionTransform implements TransformFunction {
         outputTimeUnits.length >= length);
 
     TimeUnit inputTimeUnit = getTimeUnit(inputTimeUnits[0]);
-    TimeUnitConverter converter = TimeConverterFactory.getTimeConverter(outputTimeUnits[0]);
+    TimeUnitTransformer timeUnitTransformer =
+        TimeUnitTransformerFactory.getTimeUnitTransformer(inputTimeUnit, outputTimeUnits[0]);
 
     if (_output == null || _output.length < length) {
       _output = new long[Math.max(length, DocIdSetPlanNode.MAX_DOC_PER_CALL)];
     }
-    converter.convert(inputTime, inputTimeUnit, length, _output);
+    timeUnitTransformer.transform(inputTime, _output, length);
     return (T) _output;
   }
 

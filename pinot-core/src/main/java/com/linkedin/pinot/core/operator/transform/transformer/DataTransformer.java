@@ -13,23 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.operator.transform.function.time.converter;
+package com.linkedin.pinot.core.operator.transform.transformer;
 
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.EnumUtils;
+import javax.annotation.Nonnull;
 
 
-public class TimeConverterFactory {
-  private TimeConverterFactory() {
+/**
+ * Interface for data transformer to batch transform array of input values and store the results into the output array.
+ *
+ * @param <I> Type of input array
+ * @param <O> Type of output array
+ */
+public interface DataTransformer<I, O> {
 
-  }
-
-  public static TimeUnitConverter getTimeConverter(String timeUnitName) {
-    String name = timeUnitName.toUpperCase();
-    if (EnumUtils.isValidEnum(TimeUnit.class, name)) {
-      return new JavaTimeUnitConverter(name);
-    } else {
-      return new CustomTimeUnitConverter(name);
-    }
-  }
+  /**
+   * Transforms array of input values and store the results into the output array.
+   *
+   * @param input Input array
+   * @param output Output array
+   * @param length Number of values to transform
+   */
+  void transform(@Nonnull I input, @Nonnull O output, int length);
 }
