@@ -708,7 +708,7 @@ public class DetectionJobResource {
       LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall:{}",
           alertFilter.getClass().toString(), evaluator.getWeightedPrecision(), evaluator.getRecall());
     } else {
-      evaluator = new PrecisionRecallEvaluator(anomalyResults, null);
+      evaluator = new PrecisionRecallEvaluator(anomalyResults);
     }
 
     return evaluator.toNumberMap();

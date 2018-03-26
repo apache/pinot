@@ -25,16 +25,24 @@ public class PrecisionRecallEvaluator {
   /**
    * Using this constructor, PrecisionRecallEvaluator will be relying on anomalies' "notified" flag
    * in order to get the performance of whole anomaly detection system
-   * Note that, if the alertFilterFactor is set, the evaluator uses the alert filter set for the anomaly.
+   * @param anomalies The list of anomalies to be evaluated
+   */
+  public PrecisionRecallEvaluator(List<MergedAnomalyResultDTO> anomalies) {
+    init(anomalies);
+  }
+
+  /**
+   * Using this constructor, PrecisionRecallEvaluator will be relying on the alert filter used for the anomalies
    * @param anomalies The list of anomalies to be evaluated
    * @param alertFilterFactory the instance of alert filter factory
    */
   public PrecisionRecallEvaluator(List<MergedAnomalyResultDTO> anomalies, AlertFilterFactory alertFilterFactory) {
-    if (alertFilterFactory != null) {
-      this.alertFilterFactory = alertFilterFactory;
-      this.useAlertFilterOnAnomaly = true;
-      this.isProjected = true;
+    if (alertFilterFactory == null) {
+      throw new NullPointerException("Alert filter factory cannot be null");
     }
+    this.alertFilterFactory = alertFilterFactory;
+    this.useAlertFilterOnAnomaly = true;
+    this.isProjected = true;
     init(anomalies);
   }
 
@@ -161,14 +169,13 @@ public class PrecisionRecallEvaluator {
     this.userReportTrueAnomaly = 0;
     this.userReportTrueAnomalyNewTrend = 0;
 
-    if (anomalies == null || anomalies.isEmpty()) {
-      return;
-    }
-
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       AlertFilter alertFilterOfAnomaly = this.alertFilter;
       if (useAlertFilterOnAnomaly) {
         alertFilterOfAnomaly = this.alertFilterFactory.fromSpec(anomaly.getFunction().getAlertFilter());
+      }
+      if (alertFilterOfAnomaly == null) {
+        alertFilterOfAnomaly = new DummyAlertFilter();
       }
 
       AnomalyFeedback feedback = anomaly.getFeedback();
