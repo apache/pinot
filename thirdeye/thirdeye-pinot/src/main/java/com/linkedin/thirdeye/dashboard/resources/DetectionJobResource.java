@@ -3,15 +3,20 @@ package com.linkedin.thirdeye.dashboard.resources;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
+import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
 import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
 
@@ -68,6 +73,7 @@ public class DetectionJobResource {
   private final DetectionJobScheduler detectionJobScheduler;
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
+  private final AlertConfigManager alertConfigDAO;
   private final AutotuneConfigManager autotuneConfigDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private final AlertFilterAutotuneFactory alertFilterAutotuneFactory;
@@ -98,6 +104,7 @@ public class DetectionJobResource {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.autotuneConfigDAO = DAO_REGISTRY.getAutotuneConfigDAO();
+    this.alertConfigDAO = DAO_REGISTRY.getAlertConfigDAO();
     this.alertFilterAutotuneFactory = alertFilterAutotuneFactory;
     this.alertFilterFactory = alertFilterFactory;
   }
@@ -682,7 +689,68 @@ public class DetectionJobResource {
   }
 
   /**
+   * Evaluate the performance based on the given list of anomaly results and the alert filter spec
+   * The projected performance is based on if the anomaly qualified based on the current/given alert filter; if false,
+   * it uses the isNotified flag directly.
+   * @param alertFilterSpec the parameters of alert filter
+   * @param anomalyResults the list of anomaly results
+   * @param isProjected Boolean to indicate is to return projected performance for current alert filter.
+   *                   If "true", return projected performance for current alert filter
+   * @return feedback summary, precision and recall as Number map
+   */
+  public Map<String, Number> performanceEvaluation(Map<String, String> alertFilterSpec,
+      List<MergedAnomalyResultDTO> anomalyResults, boolean isProjected) {
+    PrecisionRecallEvaluator evaluator;
+    if (Boolean.valueOf(isProjected)) {
+      // create alert filter and evaluator
+      AlertFilter alertFilter = alertFilterFactory.fromSpec(alertFilterSpec);
+      //evaluate current alert filter (calculate current precision and recall)
+      evaluator = new PrecisionRecallEvaluator(alertFilter, anomalyResults);
+
+      LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall:{}",
+          alertFilter.getClass().getSimpleName(), evaluator.getWeightedPrecision(), evaluator.getRecall());
+    } else {
+      evaluator = new PrecisionRecallEvaluator(anomalyResults);
+    }
+
+    return evaluator.toNumberMap();
+  }
+
+  /**
+   * Evaluate the performance based on the given list of anomaly results and the alert filter spec
+   * The projected performance is based on if the anomaly qualified based on the current/given alert filter; if false,
+   * it uses the isNotified flag directly.
+   * @param alertFilterSpec the parameters of alert filter
+   * @param anomalyFunctions the list of anomaly functions
+   * @param startTime the start time of the evaluation
+   * @param endTime  the end time of the evaluation
+   * @param isProjected Boolean to indicate is to return projected performance for current alert filter.
+   *                   If "true", return projected performance for current alert filter
+   * @return feedback summary, precision and recall as Number map
+   */
+  public Map<String, Number> performanceEvaluation(Map<String, String> alertFilterSpec,
+      List<AnomalyFunctionDTO> anomalyFunctions, DateTime startTime, DateTime endTime, boolean isProjected) {
+    if (anomalyFunctions == null || anomalyFunctions.size() == 0) {
+      return Collections.emptyMap();
+    }
+    Set<MergedAnomalyResultDTO> mergedAnomalyResults = new HashSet<>();
+    for (AnomalyFunctionDTO function : anomalyFunctions) {
+      mergedAnomalyResults.addAll(mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime.getMillis(),
+          endTime.getMillis(), function.getId()));
+    }
+    if (alertFilterSpec != null || !isProjected) {
+      return performanceEvaluation(alertFilterSpec, new ArrayList<>(mergedAnomalyResults), isProjected);
+    } else {
+      PrecisionRecallEvaluator evaluator =
+          new PrecisionRecallEvaluator(new ArrayList<>(mergedAnomalyResults), alertFilterFactory);
+      return evaluator.toNumberMap();
+    }
+  }
+
+  /**
    * The endpoint to evaluate system performance. The evaluation will be based on sent and non sent anomalies
+   * The projected performance is based on if the anomaly qualified based on the current/given alert filter; if false,
+   * it uses the isNotified flag directly.
    * @param id: function ID
    * @param startTimeIso: startTime of merged anomaly ex: 2016-5-23T00:00:00Z
    * @param endTimeIso: endTime of merged anomaly ex: 2016-5-23T00:00:00Z
@@ -695,7 +763,7 @@ public class DetectionJobResource {
   @Path("/eval/filter/{functionId}")
   public Response evaluateAlertFilterByFunctionId(@PathParam("functionId") long id,
       @QueryParam("start") @NotNull String startTimeIso, @QueryParam("end") @NotNull String endTimeIso,
-      @QueryParam("isProjected") @DefaultValue("false") String isProjected,
+      @QueryParam("isProjected") @DefaultValue("false") boolean isProjected,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
       @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
 
@@ -707,27 +775,89 @@ public class DetectionJobResource {
     List<MergedAnomalyResultDTO> anomalyResultDTOS =
         getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds);
 
-    PrecisionRecallEvaluator evaluator;
-    if (Boolean.valueOf(isProjected)) {
-      // create alert filter and evaluator
-      AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
-      //evaluate current alert filter (calculate current precision and recall)
-      evaluator = new PrecisionRecallEvaluator(alertFilter, anomalyResultDTOS);
+    Map<String, Number> evaluatorValues = performanceEvaluation(anomalyFunctionSpec.getAlertFilter(), anomalyResultDTOS, isProjected);
+    return numberMapToResponse(evaluatorValues);
+  }
 
-      LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall:{}",
-          alertFilter.getClass().toString(), evaluator.getWeightedPrecision(), evaluator.getRecall());
-    } else {
-      evaluator = new PrecisionRecallEvaluator(anomalyResultDTOS);
+  /**
+   * The endpoint to evaluate system performance. The evaluation will be based on sent and non sent anomalies
+   * The projected performance is based on if the anomaly qualified based on the current/given alert filter; if false,
+   * it uses the isNotified flag directly.
+   * @param id: alert config ID
+   * @param startTimeIso: startTime of merged anomaly ex: 2016-5-23T00:00:00Z
+   * @param endTimeIso: endTime of merged anomaly ex: 2016-5-23T00:00:00Z
+   * @param isProjected: Boolean to indicate is to return projected performance for current alert filter.
+   *                   If "true", return projected performance for current alert filter
+   * @return feedback summary, precision and recall as json object
+   * @throws Exception when data has no positive label or model has no positive prediction
+   */
+  @GET
+  @Path("/eval/alert/{alertConfigId}")
+  public Response evaluateAlertFilterByAlertConfigId(@PathParam("alertConfigId") @NotNull long id,
+      @QueryParam("start") @NotNull String startTimeIso, @QueryParam("end") @NotNull String endTimeIso,
+      @QueryParam("isProjected") @DefaultValue("false") boolean isProjected,
+      @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
+      @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
+    AlertConfigDTO alertConfigDTO = alertConfigDAO.findById(id);
+
+    if (alertConfigDTO == null) {
+      return Response.status(Status.BAD_REQUEST).entity("Cannot find alert config id " + id + " in db").build();
+    }
+    if (alertConfigDTO.getEmailConfig() == null) {
+      return Response.status(Status.NO_CONTENT).entity(Collections.emptyMap()).build();
     }
 
-    Map<String, Number> evaluatorValues = evaluator.toNumberMap();
-    try {
-      String propertiesJson = OBJECT_MAPPER.writeValueAsString(evaluatorValues);
-      return Response.ok(propertiesJson).build();
-    } catch (JsonProcessingException e) {
-      LOG.error("Failed to covert evaluator values to a Json String. Property: {}.", evaluatorValues.toString(), e);
-      return Response.serverError().build();
+    DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
+    DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
+
+    // get the list of anomaly functions under the alert config
+    List<Long> anomalyFunctionIds = alertConfigDTO.getEmailConfig().getFunctionIds();
+    List<AnomalyFunctionDTO> anomalyFunctions = new ArrayList<>();
+    for (Long functionId : anomalyFunctionIds) {
+      AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+      if (anomalyFunction != null) {
+        anomalyFunctions.add(anomalyFunction);
+      }
     }
+    Map<String, Number> evaluatorValues = performanceEvaluation(null, anomalyFunctions, startTime, endTime, true);
+    return numberMapToResponse(evaluatorValues);
+  }
+
+  /**
+   * The endpoint to evaluate system performance. The evaluation will be based on sent and non sent anomalies
+   * The projected performance is based on if the anomaly qualified based on the current/given alert filter; if false,
+   * it uses the isNotified flag directly.
+   * @param name: application name
+   * @param startTimeIso: startTime of merged anomaly ex: 2016-5-23T00:00:00Z
+   * @param endTimeIso: endTime of merged anomaly ex: 2016-5-23T00:00:00Z
+   * @param isProjected: Boolean to indicate is to return projected performance for current alert filter.
+   *                   If "true", return projected performance for current alert filter
+   * @return feedback summary, precision and recall as json object
+   * @throws Exception when data has no positive label or model has no positive prediction
+   */
+  @GET
+  @Path("/eval/application/{applicationName}")
+  public Response evaluateAlertFilterByApplicationName(@PathParam("applicationName") @NotNull String name,
+      @QueryParam("start") @NotNull String startTimeIso, @QueryParam("end") @NotNull String endTimeIso,
+      @QueryParam("isProjected") @DefaultValue("false") boolean isProjected,
+      @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
+      @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds) {
+    List<ApplicationDTO> applications = DAO_REGISTRY.getApplicationDAO().findByName(name);
+
+    if (applications == null || applications.size() == 0) {
+      return Response.status(Status.BAD_REQUEST).entity("Cannot find application name " + name + " in db").build();
+    }
+    if (applications.size() != 1) {
+      return Response.status(Status.BAD_REQUEST).entity("More than one applications with the similar name, " + name).build();
+    }
+
+    DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
+    DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
+
+    // get the list of anomaly functions under the alert config
+    List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAllByApplication(name);
+    Map<String, Number> evaluatorValues = performanceEvaluation(null, anomalyFunctions, startTime, endTime, true);
+    return numberMapToResponse(evaluatorValues);
   }
 
   /**
@@ -755,11 +885,16 @@ public class DetectionJobResource {
     List<MergedAnomalyResultDTO> anomalyResultDTOS =
         getMergedAnomaliesRemoveHolidays(functionId, startTime, endTime, holidayStarts, holidayEnds);
 
-    Map<String, String> alertFilterParams = target.getConfiguration();
-    AlertFilter alertFilter = alertFilterFactory.fromSpec(alertFilterParams);
-    PrecisionRecallEvaluator evaluator = new PrecisionRecallEvaluator(alertFilter, anomalyResultDTOS);
+    Map<String, Number> evaluatorValues = performanceEvaluation(target.getConfiguration(), anomalyResultDTOS, true);
+    return numberMapToResponse(evaluatorValues);
+  }
 
-    Map<String, Number> evaluatorValues = evaluator.toNumberMap();
+  /**
+   * Generate the response from the evaluator output
+   * @param evaluatorValues the output of percision recall evaluator
+   * @return a HTTP response
+   */
+  private Response numberMapToResponse(Map<String, Number> evaluatorValues) {
     try {
       String propertiesJson = OBJECT_MAPPER.writeValueAsString(evaluatorValues);
       return Response.ok(propertiesJson).build();
@@ -767,6 +902,7 @@ public class DetectionJobResource {
       LOG.error("Failed to covert evaluator values to a Json String. Property: {}.", evaluatorValues.toString(), e);
       return Response.serverError().build();
     }
+
   }
 
   /**
