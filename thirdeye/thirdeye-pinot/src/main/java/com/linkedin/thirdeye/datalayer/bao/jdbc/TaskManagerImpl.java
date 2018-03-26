@@ -87,11 +87,12 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
 
   @Override
   public void updateStatusAndTaskEndTime(Long id, TaskStatus oldStatus, TaskStatus newStatus,
-      Long taskEndTime) {
+      Long taskEndTime, String message) {
     TaskDTO task = findById(id);
     if (task.getStatus().equals(oldStatus)) {
       task.setStatus(newStatus);
       task.setEndTime(taskEndTime);
+      task.setMessage(message);
       save(task);
     }
   }

@@ -16,10 +16,14 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -29,12 +33,14 @@ import org.slf4j.LoggerFactory;
 public class TimeBasedAnomalyMerger {
   private final static Logger LOG = LoggerFactory.getLogger(TimeBasedAnomalyMerger.class);
   private final static Double NULL_DOUBLE = Double.NaN;
-  private final static double NORMALIZATION_FACTOR = 1000; // to prevent from double overflow
 
   private final MergedAnomalyResultManager mergedResultDAO;
   private final AnomalyFunctionFactory anomalyFunctionFactory;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+
+  private static final double MERGE_ANOMALY_ERROR_THRESHOLD = 0.1; // 10%
+  private static final int MAX_ERROR_MESSAGE_WORD_COUNT = 10_000; // 10k bytes
 
   private final static AnomalyMergeConfig DEFAULT_TIME_BASED_MERGE_CONFIG;
   static {
@@ -71,7 +77,7 @@ public class TimeBasedAnomalyMerger {
    * @return the number of merged anomalies after merging
    */
   public ListMultimap<DimensionMap, MergedAnomalyResultDTO> mergeAnomalies(AnomalyFunctionDTO functionSpec,
-      ListMultimap<DimensionMap, AnomalyResult> unmergedAnomalies) {
+      ListMultimap<DimensionMap, AnomalyResult> unmergedAnomalies) throws Exception {
 
     int rawAnomaliesCount = 0;
     for (DimensionMap dimensionMap : unmergedAnomalies.keySet()) {
@@ -92,7 +98,9 @@ public class TimeBasedAnomalyMerger {
       LOG.info("Created anomaly function for class: {}, set mergeable keys as: {}", anomalyFunction.getClass(),
           anomalyFunction.getMergeablePropertyKeys());
     } catch (Exception e) {
-      LOG.warn("Unsuccessfully create anomaly function from anomalyFunctionFactory, {}", e.getMessage());
+      String message = String.format("Unable to create anomaly function %s from anomalyFunctionFactory.", functionSpec);
+      LOG.error(message, e);
+      throw new Exception(message, e);
     }
 
 
@@ -102,9 +110,31 @@ public class TimeBasedAnomalyMerger {
       ListMultimap<DimensionMap, MergedAnomalyResultDTO> mergedAnomalies =
           dimensionalShuffleAndUnifyMerge(functionSpec, mergeConfig, unmergedAnomalies);
 
+      List<Exception> exceptions = new ArrayList<>();
       // Update information of merged anomalies
-      for (MergedAnomalyResultDTO mergedAnomalyResultDTO : mergedAnomalies.values()) {
-        updateMergedAnomalyInfo(mergedAnomalyResultDTO, mergeConfig);
+      for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies.values()) {
+        try {
+          computeMergedAnomalyInfo(mergedAnomaly, mergeConfig);
+        } catch (Exception e) {
+          AnomalyFunctionDTO function = mergedAnomaly.getFunction();
+          String functionName = Long.toString(mergedAnomaly.getFunctionId());
+          if (function != null) {
+            functionName = function.getFunctionName();
+          }
+
+          String message = String.format(
+              "Failed to update merged anomaly info. Dataset: %s, Metric: %s, Function: %s, Time:%s - %s.",
+              mergedAnomaly.getCollection(), mergedAnomaly.getMetric(), function.getFunctionName(),
+              new DateTime(mergedAnomaly.getStartTime()), new DateTime(mergedAnomaly.getEndTime()));
+          LOG.warn(message, e);
+          exceptions.add(new Exception(message, e));
+
+          if (Double.compare((double) exceptions.size() / (double) mergedAnomalies.values().size(),
+              MERGE_ANOMALY_ERROR_THRESHOLD) >= 0) {
+            String exceptionMessage = ThirdEyeUtils.exceptionsToString(exceptions, MAX_ERROR_MESSAGE_WORD_COUNT);
+            throw new Exception(exceptionMessage);
+          }
+        }
       }
 
       return mergedAnomalies;
@@ -149,23 +179,6 @@ public class TimeBasedAnomalyMerger {
     }
 
     return mergedAnomalies;
-  }
-
-  private void updateMergedAnomalyInfo(MergedAnomalyResultDTO mergedResult, AnomalyMergeConfig mergeConfig) {
-    // recompute weight using anomaly function specific method
-    try {
-      computeMergedAnomalyInfo(mergedResult, mergeConfig);
-    } catch (Exception e) {
-      AnomalyFunctionDTO function = mergedResult.getFunction();
-      LOG.warn(
-          "Unable to compute merged weight and the average weight of raw anomalies is used. Dataset: {}, Topic Metric: {}, Function: {}, Time:{} - {}, Exception: {}",
-          function.getCollection(), function.getTopicMetric(), function.getFunctionName(),
-          new DateTime(mergedResult.getStartTime()), new DateTime(mergedResult.getEndTime()), e);
-    }
-  }
-
-  private static double getNormalizedBucketSize(double secondsInABucket) {
-    return secondsInABucket / NORMALIZATION_FACTOR;
   }
 
   /**

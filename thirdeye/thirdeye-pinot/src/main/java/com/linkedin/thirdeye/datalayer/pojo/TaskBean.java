@@ -20,7 +20,10 @@ public class TaskBean extends AbstractBean {
   private TaskStatus status;
   private long startTime;
   private long endTime;
+  // A JSON string of the task info such as anomaly function, monitoring windows, etc.
   private String taskInfo;
+  // The task results, which could contain the error messages of tasks' execution.
+  private String message;
   private Timestamp lastModified;
 
   public Long getWorkerId() {
@@ -75,10 +78,17 @@ public class TaskBean extends AbstractBean {
     return taskType;
   }
 
+  public String getMessage() {
+    return message;
+  }
+
+  public void setMessage(String message) {
+    this.message = message;
+  }
+
   public void setTaskType(TaskType taskType) {
     this.taskType = taskType;
   }
-
 
   public Timestamp getLastModified() {
     return lastModified;
@@ -95,6 +105,7 @@ public class TaskBean extends AbstractBean {
   public void setJobId(Long jobId) {
     this.jobId = jobId;
   }
+
 
   @Override
   public boolean equals(Object o) {

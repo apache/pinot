@@ -1,13 +1,9 @@
 package com.linkedin.thirdeye.util;
 
-
+import java.util.ArrayList;
+import java.util.List;
 import org.testng.Assert;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ListMultimap;
-import com.google.common.collect.Multimap;
 
 @Test
 public class ThirdEyeUtilsTest {
@@ -139,6 +135,26 @@ public class ThirdEyeUtilsTest {
     Assert.assertEquals(ThirdEyeUtils.getRoundedValue(Double.NaN), Double.toString(Double.NaN));
     Assert.assertEquals(ThirdEyeUtils.getRoundedValue(Double.POSITIVE_INFINITY), Double.toString(Double.POSITIVE_INFINITY));
     Assert.assertEquals(ThirdEyeUtils.getRoundedValue(Double.NEGATIVE_INFINITY), Double.toString(Double.NEGATIVE_INFINITY));
+  }
+
+  @Test
+  public void testExceptionToStringUnlimited() {
+    List<Exception> exceptions = new ArrayList<>();
+    exceptions.add(new Exception("e1"));
+    exceptions.add(new Exception("e2"));
+    exceptions.add(new Exception("e3"));
+    String errorMessage = ThirdEyeUtils.exceptionsToString(exceptions, 0);
+    Assert.assertTrue(errorMessage.contains("e3"));
+  }
+
+  @Test
+  public void testExceptionToStringLimited() {
+    List<Exception> exceptions = new ArrayList<>();
+    exceptions.add(new Exception("e1"));
+    exceptions.add(new Exception("e2"));
+    exceptions.add(new Exception("e3"));
+    String errorMessage = ThirdEyeUtils.exceptionsToString(exceptions, 100);
+    Assert.assertFalse(errorMessage.contains("e3"));
   }
 
 }

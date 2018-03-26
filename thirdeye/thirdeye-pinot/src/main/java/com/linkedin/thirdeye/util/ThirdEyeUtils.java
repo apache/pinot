@@ -24,8 +24,10 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import javax.validation.Validation;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -435,6 +437,32 @@ public abstract class ThirdEyeUtils {
       }
     }
     return map;
+  }
+
+  /**
+   * Prints messages and stack traces of the given list of exceptions in a string.
+   *
+   * @param exceptions the list of exceptions to be printed.
+   * @param maxWordCount the length limitation of the string; set to 0 to remove the limitation.
+   *
+   * @return the string that contains the messages and stack traces of the given exceptions.
+   */
+  public static String exceptionsToString(List<Exception> exceptions, int maxWordCount) {
+    String message = "";
+    if (CollectionUtils.isNotEmpty(exceptions)) {
+      StringBuilder sb = new StringBuilder();
+      for (Exception exception : exceptions) {
+        sb.append(exception.getMessage()).append("\n").append(ExceptionUtils.getStackTrace(exception));
+        if (maxWordCount > 0 && sb.length() > maxWordCount) {
+          message = sb.toString().substring(0, maxWordCount) + "\n...";
+          break;
+        }
+      }
+      if (message.equals("")) {
+        message = sb.toString();
+      }
+    }
+    return message;
   }
 
   /**

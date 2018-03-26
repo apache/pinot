@@ -91,10 +91,11 @@ public class TestAnomalyTaskManager {
     TaskStatus oldStatus = TaskStatus.RUNNING;
     TaskStatus newStatus = TaskStatus.COMPLETED;
     long taskEndTime = System.currentTimeMillis();
-    taskDAO.updateStatusAndTaskEndTime(anomalyTaskId1, oldStatus, newStatus, taskEndTime);
+    taskDAO.updateStatusAndTaskEndTime(anomalyTaskId1, oldStatus, newStatus, taskEndTime, "testMessage");
     TaskDTO anomalyTask = taskDAO.findById(anomalyTaskId1);
     Assert.assertEquals(anomalyTask.getStatus(), newStatus);
     Assert.assertEquals(anomalyTask.getEndTime(), taskEndTime);
+    Assert.assertEquals(anomalyTask.getMessage(), "testMessage");
   }
 
   @Test(dependsOnMethods = {"testUpdateStatusAndTaskEndTime"})

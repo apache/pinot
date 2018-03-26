@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -14,6 +15,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +35,7 @@ public class TaskDriver {
 
   private ExecutorService taskExecutorService;
 
-  private final TaskManager anomalyTaskDAO;
+  private final TaskManager taskDAO;
   private TaskContext taskContext;
   private long workerId;
   private final Set<TaskStatus> allowedOldTaskStatus = new HashSet<>();
@@ -46,7 +48,7 @@ public class TaskDriver {
       AnomalyClassifierFactory anomalyClassifierFactory) {
     driverConfiguration = thirdEyeAnomalyConfiguration.getTaskDriverConfiguration();
     workerId = thirdEyeAnomalyConfiguration.getId();
-    anomalyTaskDAO = DAO_REGISTRY.getTaskDAO();
+    taskDAO = DAO_REGISTRY.getTaskDAO();
     taskExecutorService = Executors.newFixedThreadPool(driverConfiguration.getMaxParallelTasks());
     taskContext = new TaskContext();
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
@@ -80,12 +82,13 @@ public class TaskDriver {
                 List<TaskResult> taskResults = taskRunner.execute(taskInfo, taskContext);
                 LOG.info("Thread {} : DONE Executing task: {}", Thread.currentThread().getId(), anomalyTaskSpec.getId());
                 // update status to COMPLETED
-                TaskDriver.this.updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.COMPLETED);
+                updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.COMPLETED, "");
               } catch (Exception e) {
                 LOG.error("Exception in electing and executing task", e);
                 try {
                   // update task status failed
-                  TaskDriver.this.updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.FAILED);
+                  updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.FAILED,
+                      ExceptionUtils.getMessage(e) + "\n" + ExceptionUtils.getStackTrace(e));
                 } catch (Exception e1) {
                   LOG.error("Error in updating failed status", e1);
                 }
@@ -117,7 +120,7 @@ public class TaskDriver {
       boolean hasFetchError = false;
       try {
         boolean orderAscending = System.currentTimeMillis() % 2 == 0;
-        anomalyTasks = anomalyTaskDAO
+        anomalyTasks = taskDAO
             .findByStatusOrderByCreateTime(TaskStatus.WAITING, driverConfiguration.getTaskFetchSizeCap(),
                 orderAscending);
       } catch (Exception e) {
@@ -134,7 +137,7 @@ public class TaskDriver {
 
           boolean success = false;
           try {
-            success = anomalyTaskDAO
+            success = taskDAO
                 .updateStatusAndWorkerId(workerId, anomalyTaskSpec.getId(), allowedOldTaskStatus,
                     TaskStatus.RUNNING, anomalyTaskSpec.getVersion());
             LOG.info("Thread {} : Trying to acquire task id [{}], success status: [{}] with version [{}]",
@@ -173,12 +176,10 @@ public class TaskDriver {
     return null;
   }
 
-  private void updateStatusAndTaskEndTime(long taskId, TaskStatus oldStatus, TaskStatus newStatus)
-      throws Exception {
+  private void updateStatusAndTaskEndTime(long taskId, TaskStatus oldStatus, TaskStatus newStatus, String message) {
     LOG.info("Thread {} : Starting updateStatus for task id {}", Thread.currentThread().getId(), taskId);
     try {
-      anomalyTaskDAO
-          .updateStatusAndTaskEndTime(taskId, oldStatus, newStatus, System.currentTimeMillis());
+      taskDAO.updateStatusAndTaskEndTime(taskId, oldStatus, newStatus, System.currentTimeMillis(), message);
       LOG.info("Thread {} : Updated status {}", Thread.currentThread().getId(), newStatus);
     } catch (Exception e) {
       LOG.error("Exception in updating status and task end time", e);

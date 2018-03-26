@@ -25,14 +25,19 @@ import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
 
+import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.NullArgumentException;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +52,9 @@ public class DetectionTaskRunner implements TaskRunner {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   public static final String BACKFILL_PREFIX = "adhoc_";
+
+  private static final double DIMENSION_ERROR_THRESHOLD = 0.1; // 10%
+  private static final int MAX_ERROR_MESSAGE_WORD_COUNT = 10_000; // 10k bytes
 
   private List<DateTime> windowStarts;
   private List<DateTime> windowEnds;
@@ -157,12 +165,14 @@ public class DetectionTaskRunner implements TaskRunner {
   }
 
   private ListMultimap<DimensionMap, AnomalyResult> dimensionalShuffleAndUnifyAnalyze(DateTime windowStart,
-      DateTime windowEnd, AnomalyDetectionInputContext anomalyDetectionInputContext) {
+      DateTime windowEnd, AnomalyDetectionInputContext anomalyDetectionInputContext) throws Exception {
     int anomalyCounter = 0;
     ListMultimap<DimensionMap, AnomalyResult> resultRawAnomalies = ArrayListMultimap.create();
 
+    List<Exception> exceptions = new ArrayList<>();
     DataFilter dataFilter = DataFilterFactory.fromSpec(anomalyFunctionSpec.getDataFilter());
-    for (DimensionMap dimensionMap : anomalyDetectionInputContext.getDimensionMapMetricTimeSeriesMap().keySet()) {
+    Set<DimensionMap> dimensions = anomalyDetectionInputContext.getDimensionMapMetricTimeSeriesMap().keySet();
+    for (DimensionMap dimensionMap : dimensions) {
       if (Thread.interrupted()) {
         throw new IllegalStateException("Thread interrupted. Aborting.");
       }
@@ -175,8 +185,20 @@ public class DetectionTaskRunner implements TaskRunner {
         continue;
       }
 
-      List<AnomalyResult> resultsOfAnEntry =
-          runAnalyze(windowStart, windowEnd, anomalyDetectionInputContext, dimensionMap);
+      List<AnomalyResult> resultsOfAnEntry = Collections.emptyList();
+      try {
+        resultsOfAnEntry = runAnalyze(windowStart, windowEnd, anomalyDetectionInputContext, dimensionMap);
+      } catch (Exception e) {
+        String message = String.format("Unable to detection anomaly for dimension: %s, function id: %d", dimensionMap,
+            anomalyFunctionSpec.getId());
+        LOG.error(message, e);
+        exceptions.add(new Exception(message, e));
+
+        if (Double.compare((double) exceptions.size() / (double) dimensions.size(), DIMENSION_ERROR_THRESHOLD) >= 0) {
+          String errorMessage = ThirdEyeUtils.exceptionsToString(exceptions, MAX_ERROR_MESSAGE_WORD_COUNT);
+          throw new Exception(errorMessage);
+        }
+      }
 
       // Set raw anomalies' properties
       normalizeRawResults(resultsOfAnEntry);
@@ -196,7 +218,7 @@ public class DetectionTaskRunner implements TaskRunner {
   }
 
   private List<AnomalyResult> runAnalyze(DateTime windowStart, DateTime windowEnd,
-      AnomalyDetectionInputContext anomalyDetectionInputContext, DimensionMap dimensionMap) {
+      AnomalyDetectionInputContext anomalyDetectionInputContext, DimensionMap dimensionMap) throws Exception {
 
     List<AnomalyResult> resultsOfAnEntry = Collections.emptyList();
 
@@ -227,25 +249,20 @@ public class DetectionTaskRunner implements TaskRunner {
 
     AnomalyUtils.logAnomaliesOverlapWithWindow(windowStart, windowEnd, historyMergedAnomalies);
 
-    try {
-      // Run algorithm
-      // Scaling time series according to the scaling factor
-      List<ScalingFactor> scalingFactors = anomalyDetectionInputContext.getScalingFactors();
-      if (CollectionUtils.isNotEmpty(scalingFactors)) {
-        Properties properties = anomalyFunction.getProperties();
-        MetricTransfer.rescaleMetric(metricTimeSeries, windowStart.getMillis(), scalingFactors,
-            metricName, properties);
-      }
+    // Scaling time series according to the scaling factor
+    List<ScalingFactor> scalingFactors = anomalyDetectionInputContext.getScalingFactors();
+    if (CollectionUtils.isNotEmpty(scalingFactors)) {
+      Properties properties = anomalyFunction.getProperties();
+      MetricTransfer.rescaleMetric(metricTimeSeries, windowStart.getMillis(), scalingFactors, metricName, properties);
+    }
 
-      if(isOffline) {
-        resultsOfAnEntry = anomalyFunction
-            .offlineAnalyze(dimensionMap, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);
-      } else {
-        resultsOfAnEntry =
-            anomalyFunction.analyze(dimensionMap, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);
-      }
-    } catch (Exception e) {
-      LOG.error("Could not compute for {}", dimensionMap, e);
+    // Run detection algorithm
+    if (isOffline) {
+      resultsOfAnEntry = anomalyFunction.offlineAnalyze(dimensionMap, metricTimeSeries, windowStart, windowEnd,
+          historyMergedAnomalies);
+    } else {
+      resultsOfAnEntry =
+          anomalyFunction.analyze(dimensionMap, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);
     }
 
     // Clean up duplicate and overlapped raw anomalies
@@ -390,12 +407,16 @@ public class DetectionTaskRunner implements TaskRunner {
    * @param results the anomalies to be checked.
    */
   private void normalizeRawResults(List<AnomalyResult> results) {
-    for (AnomalyResult result : results) {
-      try {
-        result.setScore(normalize(result.getScore()));
-        result.setWeight(normalize(result.getWeight()));
-      } catch (Exception e) {
-        LOG.error("Exception when populating anomaly result : {}", result.toString(), e);
+    if (CollectionUtils.isNotEmpty(results)) {
+      for (AnomalyResult result : results) {
+        try {
+          result.setScore(normalize(result.getScore()));
+          result.setWeight(normalize(result.getWeight()));
+          result.setAvgCurrentVal(normalize(result.getAvgCurrentVal()));
+          result.setAvgBaselineVal(normalize(result.getAvgBaselineVal()));
+        } catch (Exception e) {
+          LOG.warn("Exception when normalizing anomaly result : {}.", result.toString(), e);
+        }
       }
     }
   }
