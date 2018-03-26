@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.cache.CacheBuilder;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomaly.onboard.FunctionOnboardingResource;
+import com.linkedin.thirdeye.anomaly.utils.RequestStatisticsLogger;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.auth.AuthCookieSerializer;
 import com.linkedin.thirdeye.auth.Credentials;
 import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
@@ -57,6 +59,7 @@ import io.dropwizard.auth.Authenticator;
 import io.dropwizard.auth.CachingAuthenticator;
 import io.dropwizard.bundles.redirect.PathRedirect;
 import io.dropwizard.bundles.redirect.RedirectBundle;
+import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.dropwizard.views.ViewBundle;
@@ -85,6 +88,8 @@ import org.slf4j.LoggerFactory;
 public class ThirdEyeDashboardApplication
     extends BaseThirdEyeApplication<ThirdEyeDashboardConfiguration> {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDashboardApplication.class);
+
+  private RequestStatisticsLogger requestStatisticsLogger;
 
   @Override
   public String getName() {
@@ -214,6 +219,21 @@ public class ThirdEyeDashboardApplication
       // auth resource
       env.jersey().register(new AuthResource(authenticator, serializer, authConfig.getCookieTTL() * 1000));
     }
+
+    env.lifecycle().manage(new Managed() {
+      @Override
+      public void start() throws Exception {
+        requestStatisticsLogger = new RequestStatisticsLogger(new TimeGranularity(15, TimeUnit.MINUTES));
+        requestStatisticsLogger.start();
+      }
+
+      @Override
+      public void stop() throws Exception {
+        if (requestStatisticsLogger != null) {
+          requestStatisticsLogger.shutdown();
+        }
+      }
+    });
   }
 
   private static RootCauseResource makeRootCauseResource(ThirdEyeDashboardConfiguration config) throws Exception {
