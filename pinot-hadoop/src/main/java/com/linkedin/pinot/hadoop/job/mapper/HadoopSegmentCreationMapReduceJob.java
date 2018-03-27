@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.hadoop.job.mapper;
 
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
@@ -22,6 +23,7 @@ import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.ThriftRecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfigUtils;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.hadoop.job.JobConfigConstants;
 
@@ -33,6 +35,8 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,16 +66,12 @@ public class HadoopSegmentCreationMapReduceJob {
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
-
-
       _currentHdfsWorkDir = FileOutputFormat.getWorkOutputPath(context);
       _currentDiskWorkDir = "pinot_hadoop_tmp";
 
       // Temporary HDFS path for local machine
       _localHdfsSegmentTarPath =  _currentHdfsWorkDir + "/segmentTar";
       _localDiskSegmentTarPath = _currentDiskWorkDir + "/segmentsTar";
-
-
 
       new File(_localDiskSegmentTarPath).mkdirs();
 
@@ -183,10 +183,25 @@ public class HadoopSegmentCreationMapReduceJob {
 
     }
 
+    protected TableConfig getTableConfig() {
+      String tableConfigString = _properties.get("table.config", null);
+      try {
+        return TableConfig.fromJSONConfig(new JSONObject(tableConfigString));
+      } catch (Exception e) {
+        LOGGER.warn("Table config not deserialized.");
+      }
+      return null;
+    }
+
     protected String createSegment(String dataFilePath, Schema schema, Integer seqId, Path hdfsDataPath, File dataPath, FileSystem fs) throws Exception {
       LOGGER.info("Data schema is : {}", schema);
-      SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
-      segmentGeneratorConfig.setTableName(_tableName);
+      TableConfig tableConfig = getTableConfig();
+      SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig();
+      setSegmentNameGenerator(segmentGeneratorConfig, seqId, hdfsDataPath, dataPath);
+      if (tableConfig != null) {
+        segmentGeneratorConfig = SegmentGeneratorConfigUtils.fromTableConfig(tableConfig);
+      }
+      segmentGeneratorConfig.setSchema(schema);
       setSegmentNameGenerator(segmentGeneratorConfig, seqId, hdfsDataPath, dataPath);
 
       segmentGeneratorConfig.setInputFilePath(new File(dataPath, hdfsDataPath.getName()).getAbsolutePath());
@@ -194,7 +209,7 @@ public class HadoopSegmentCreationMapReduceJob {
       FileFormat fileFormat = getFileFormat(dataFilePath);
       segmentGeneratorConfig.setFormat(fileFormat);
       segmentGeneratorConfig.setOnHeap(true);
-      
+
       if (null != _postfix) {
         segmentGeneratorConfig.setSegmentNamePostfix(String.format("%s-%s", _postfix, seqId));
       } else {

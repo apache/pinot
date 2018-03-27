@@ -16,7 +16,7 @@
 package com.linkedin.pinot.index.readerwriter;
 
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
+import com.linkedin.pinot.common.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 import com.linkedin.pinot.core.io.writer.impl.v1.FixedByteChunkSingleValueWriter;

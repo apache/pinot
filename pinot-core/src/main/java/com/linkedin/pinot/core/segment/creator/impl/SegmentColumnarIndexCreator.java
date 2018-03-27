@@ -25,7 +25,7 @@ import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.partition.PartitionFunction;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
+import com.linkedin.pinot.common.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;

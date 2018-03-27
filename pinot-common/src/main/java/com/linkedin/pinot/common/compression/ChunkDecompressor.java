@@ -13,26 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.io.compression;
+package com.linkedin.pinot.common.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 
 /**
- * Interface to compress a chunk of data.
+ * Interface to decompress a chunk of data.
  */
-public interface ChunkCompressor {
+public interface ChunkDecompressor {
 
   /**
-   * This method compresses the given data. The output compressed ByteBuffer is returned ready for read.
+   * This method decompresses chunk of data that was compressed using {@link ChunkCompressor}.
+   * Assumes that size of output ByteBuffer is large enough to de-compress the input.
    *
-   * @param inUncompressed Input data to be compressed.
-   * @param outCompressed Output compressed data.
-   * @return Size of the compressed output data.
-   *
+   * @param inCompressed Compressed data
+   * @param outDecompressed ByteBuffer where the decompressed data is put.
+   * @return Size of decompressed data.
    * @throws IOException
    */
-  int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
+  int decompress(ByteBuffer inCompressed, ByteBuffer outDecompressed)
       throws IOException;
 }

@@ -13,22 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.io.compression;
+package com.linkedin.pinot.common.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 
 /**
- * A pass-through implementation of {@link ChunkDecompressor}, that simply returns the input data without
- * performing any de-compression. This is useful for cases where cost of de-compression out-weighs the benefits
- * of compression.
+ * A pass-through implementation of {@link ChunkCompressor}, that simply returns the input uncompressed data
+ * with performing any compression. This is useful in cases where cost of de-compression out-weighs benefit of
+ * compression.
  */
-public class PassThroughDecompressor implements ChunkDecompressor {
+public class PassThroughCompressor implements ChunkCompressor {
+
   @Override
-  public int decompress(ByteBuffer inCompressed, ByteBuffer outDecompressed)
+  public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
       throws IOException {
-    outDecompressed.put(inCompressed);
-    return inCompressed.limit();
+    outCompressed.put(inUncompressed);
+
+    // Make the output ByteBuffer read for read.
+    outCompressed.flip();
+    return outCompressed.limit();
   }
 }

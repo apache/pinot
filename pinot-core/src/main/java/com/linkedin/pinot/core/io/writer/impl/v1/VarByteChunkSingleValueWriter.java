@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.io.writer.impl.v1;
 
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
+import com.linkedin.pinot.common.compression.ChunkCompressorFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;

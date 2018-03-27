@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.lang.reflect.Field;
@@ -40,7 +41,7 @@ public class IndexingConfig {
   private String _segmentFormatVersion;
   private String _columnMinMaxValueGeneratorMode;
   private List<String> _noDictionaryColumns; // TODO: replace this with noDictionaryConfig.
-  private Map<String, String> _noDictionaryConfig;
+  private Map<String, ChunkCompressorFactory.CompressionType> _noDictionaryConfig;
   private List<String> _onHeapDictionaryColumns;
   private StarTreeIndexSpec _starTreeIndexSpec;
   private SegmentPartitionConfig _segmentPartitionConfig;
@@ -114,7 +115,7 @@ public class IndexingConfig {
     return _noDictionaryColumns;
   }
 
-  public Map<String, String> getnoDictionaryConfig() {
+  public Map<String, ChunkCompressorFactory.CompressionType> getnoDictionaryConfig() {
     return _noDictionaryConfig;
   }
 
@@ -126,7 +127,7 @@ public class IndexingConfig {
     _noDictionaryColumns = noDictionaryColumns;
   }
 
-  public void setnoDictionaryConfig(Map<String, String> noDictionaryConfig) {
+  public void setnoDictionaryConfig(Map<String, ChunkCompressorFactory.CompressionType> noDictionaryConfig) {
     _noDictionaryConfig = noDictionaryConfig;
   }
 

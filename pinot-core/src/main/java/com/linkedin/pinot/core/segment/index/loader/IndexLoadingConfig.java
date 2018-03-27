@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.segment.index.loader;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.linkedin.pinot.common.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -42,7 +43,7 @@ public class IndexLoadingConfig {
   private List<String> _sortedColumns = Collections.emptyList();
   private Set<String> _invertedIndexColumns = new HashSet<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
-  private Map<String, String> _noDictionaryConfig = new HashMap<>();
+  private Map<String, ChunkCompressorFactory.CompressionType> _noDictionaryConfig = new HashMap<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
   private SegmentVersion _segmentVersion;
   // This value will remain true only when the empty constructor is invoked.
@@ -81,7 +82,7 @@ public class IndexLoadingConfig {
       _noDictionaryColumns.addAll(noDictionaryColumns);
     }
 
-    Map<String, String> noDictionaryConfig = indexingConfig.getnoDictionaryConfig();
+    Map<String, ChunkCompressorFactory.CompressionType> noDictionaryConfig = indexingConfig.getnoDictionaryConfig();
     if (noDictionaryConfig != null) {
       _noDictionaryConfig.putAll(noDictionaryConfig);
     }
@@ -174,7 +175,7 @@ public class IndexLoadingConfig {
   }
 
   @Nonnull
-  public Map<String, String> getnoDictionaryConfig() {
+  public Map<String, ChunkCompressorFactory.CompressionType> getnoDictionaryConfig() {
     return _noDictionaryConfig;
   }
 

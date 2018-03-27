@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.fwd;
 
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
+import com.linkedin.pinot.common.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.io.writer.impl.v1.FixedByteChunkSingleValueWriter;
 import com.linkedin.pinot.core.segment.creator.BaseSingleValueRawIndexCreator;

@@ -13,26 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.io.compression;
+package com.linkedin.pinot.common.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.xerial.snappy.Snappy;
 
 
 /**
- * A pass-through implementation of {@link ChunkCompressor}, that simply returns the input uncompressed data
- * with performing any compression. This is useful in cases where cost of de-compression out-weighs benefit of
- * compression.
+ * Implementation of {@link ChunkCompressor} using Snappy.
  */
-public class PassThroughCompressor implements ChunkCompressor {
+public class SnappyCompressor implements ChunkCompressor {
 
   @Override
-  public int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
+  public int compress(ByteBuffer inDecompressed, ByteBuffer outCompressed)
       throws IOException {
-    outCompressed.put(inUncompressed);
-
-    // Make the output ByteBuffer read for read.
-    outCompressed.flip();
-    return outCompressed.limit();
+    return Snappy.compress(inDecompressed, outCompressed);
   }
 }

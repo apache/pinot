@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import java.io.IOException;
 import java.util.Arrays;
@@ -70,7 +71,7 @@ public class IndexingConfigTest {
     Assert.assertEquals("f", sortedIndexColumns.get(2));
 
     // Test for noDictionaryConfig.
-    Map<String, String> noDictConfigMap = indexingConfig.getnoDictionaryConfig();
+    Map<String, ChunkCompressorFactory.CompressionType> noDictConfigMap = indexingConfig.getnoDictionaryConfig();
     Assert.assertEquals(noDictConfigMap.size(), 2);
     Assert.assertEquals(noDictConfig.get("a"), "SNAPPY");
     Assert.assertEquals(noDictConfig.get("b"), "PASS_THROUGH");

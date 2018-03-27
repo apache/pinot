@@ -13,21 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.io.compression;
+package com.linkedin.pinot.common.compression;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import org.xerial.snappy.Snappy;
 
 
 /**
- * Implementation of {@link ChunkCompressor} using Snappy.
+ * Interface to compress a chunk of data.
  */
-public class SnappyCompressor implements ChunkCompressor {
+public interface ChunkCompressor {
 
-  @Override
-  public int compress(ByteBuffer inDecompressed, ByteBuffer outCompressed)
-      throws IOException {
-    return Snappy.compress(inDecompressed, outCompressed);
-  }
+  /**
+   * This method compresses the given data. The output compressed ByteBuffer is returned ready for read.
+   *
+   * @param inUncompressed Input data to be compressed.
+   * @param outCompressed Output compressed data.
+   * @return Size of the compressed output data.
+   *
+   * @throws IOException
+   */
+  int compress(ByteBuffer inUncompressed, ByteBuffer outCompressed)
+      throws IOException;
 }
