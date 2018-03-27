@@ -35,37 +35,37 @@ public class RequestStatisticsFormatter {
 
     builder.append("Request count:\n");
     builder.append(String.format(FORMAT_LONG, "total", stats.requestsTotal));
-    builder.append("datasource:\n");
+    builder.append(String.format("datasource (%d):\n", stats.requestsPerDatasource.size()));
     builder.append(format(stats.requestsPerDatasource, COMP_LONG, FORMAT_LONG));
-    builder.append("dataset:\n");
+    builder.append(String.format("dataset (%d):\n", stats.requestsPerDataset.size()));
     builder.append(format(stats.requestsPerDataset, COMP_LONG, FORMAT_LONG));
-    builder.append("metric:\n");
+    builder.append(String.format("metric (%d):\n", stats.requestsPerMetric.size()));
     builder.append(format(stats.requestsPerMetric, COMP_LONG, FORMAT_LONG));
-    builder.append("principal:\n");
+    builder.append(String.format("principal (%d):\n", stats.requestsPerPrincipal.size()));
     builder.append(format(stats.requestsPerPrincipal, COMP_LONG, FORMAT_LONG));
 
     builder.append('\n');
-    builder.append("Average duration (ms):\n");
+    builder.append("Average duration (in millis):\n");
     builder.append(String.format(FORMAT_DURATION, "total", stats.durationTotal / (double) stats.requestsTotal / 1E6));
-    builder.append("datasource:\n");
+    builder.append(String.format("datasource (%d):\n", stats.durationPerDatasource.size()));
     builder.append(format(durationInMs(stats.durationPerDatasource, stats.requestsPerDatasource), COMP_DOUBLE, FORMAT_DURATION));
-    builder.append("dataset:\n");
+    builder.append(String.format("dataset (%d):\n", stats.durationPerDataset.size()));
     builder.append(format(durationInMs(stats.durationPerDataset, stats.requestsPerDataset), COMP_DOUBLE, FORMAT_DURATION));
-    builder.append("metric:\n");
+    builder.append(String.format("metric (%d):\n", stats.durationPerMetric.size()));
     builder.append(format(durationInMs(stats.durationPerMetric, stats.requestsPerMetric), COMP_DOUBLE, FORMAT_DURATION));
-    builder.append("principal:\n");
+    builder.append(String.format("principal (%d):\n", stats.durationPerPrincipal.size()));
     builder.append(format(durationInMs(stats.durationPerPrincipal, stats.requestsPerPrincipal), COMP_DOUBLE, FORMAT_DURATION));
 
     builder.append('\n');
     builder.append("Failure rate:\n");
     builder.append(String.format(FORMAT_RATE, "total", stats.failureTotal / (double) stats.requestsTotal));
-    builder.append("datasource:\n");
+    builder.append(String.format("datasource (%d):\n", stats.failurePerDatasource.size()));
     builder.append(format(divide(stats.failurePerDatasource, stats.requestsPerDatasource), COMP_DOUBLE, FORMAT_RATE));
-    builder.append("dataset:\n");
+    builder.append(String.format("dataset (%d):\n", stats.failurePerDataset.size()));
     builder.append(format(divide(stats.failurePerDataset, stats.requestsPerDataset), COMP_DOUBLE, FORMAT_RATE));
-    builder.append("metric:\n");
+    builder.append(String.format("metric (%d):\n", stats.failurePerMetric.size()));
     builder.append(format(divide(stats.failurePerMetric, stats.requestsPerMetric), COMP_DOUBLE, FORMAT_RATE));
-    builder.append("principal:\n");
+    builder.append(String.format("principal (%d):\n", stats.failurePerPrincipal.size()));
     builder.append(format(divide(stats.failurePerPrincipal, stats.requestsPerPrincipal), COMP_DOUBLE, FORMAT_RATE));
 
     return builder.toString();
