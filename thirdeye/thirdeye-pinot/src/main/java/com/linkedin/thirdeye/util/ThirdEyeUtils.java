@@ -452,7 +452,7 @@ public abstract class ThirdEyeUtils {
     if (CollectionUtils.isNotEmpty(exceptions)) {
       StringBuilder sb = new StringBuilder();
       for (Exception exception : exceptions) {
-        sb.append(exception.getMessage()).append("\n").append(ExceptionUtils.getStackTrace(exception));
+        sb.append(ExceptionUtils.getStackTrace(exception));
         if (maxWordCount > 0 && sb.length() > maxWordCount) {
           message = sb.toString().substring(0, maxWordCount) + "\n...";
           break;
