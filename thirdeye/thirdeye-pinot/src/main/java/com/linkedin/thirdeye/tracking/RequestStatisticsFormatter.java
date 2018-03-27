@@ -92,7 +92,7 @@ public class RequestStatisticsFormatter {
   private Map<String, Double> divide(Map<String, Long> a, Map<String, Long> b) {
     Map<String, Double> out = new HashMap<>();
     for (String key : a.keySet()) {
-      if (!b.keySet().contains(key)) {
+      if (!b.containsKey(key)) {
         continue;
       }
       out.put(key, a.get(key) / (double) b.get(key));
@@ -103,7 +103,7 @@ public class RequestStatisticsFormatter {
   private Map<String, Double> durationInMs(Map<String, Long> durations, Map<String, Long> counts) {
     Map<String, Double> out = new HashMap<>();
     for (String key : durations.keySet()) {
-      if (!durations.keySet().contains(key)) {
+      if (!durations.containsKey(key)) {
         continue;
       }
       out.put(key, counts.get(key) / (double) counts.get(key) / 1E6);

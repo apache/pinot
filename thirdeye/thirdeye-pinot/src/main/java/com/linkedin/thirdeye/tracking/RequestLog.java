@@ -30,8 +30,8 @@ public class RequestLog {
    * @param datasource data source name
    * @param dataset data set name
    * @param metric metric name
-   * @param start request start time in ns
-   * @param end request end time in ns
+   * @param start request start time (in nanos)
+   * @param end request end time (in nanos)
    */
   public void success(String datasource, String dataset, String metric, long start, long end) {
     if (this.requestLogGauge.getAndIncrement() >= this.approximateCapacity) {
@@ -48,8 +48,8 @@ public class RequestLog {
    * @param datasource data source name
    * @param dataset data set name
    * @param metric metric name
-   * @param start request start time in ns
-   * @param end request end time in ns
+   * @param start request start time (in nanos)
+   * @param end request end time (in nanos)
    * @param exception exception
    */
   public void failure(String datasource, String dataset, String metric, long start, long end, Exception exception) {
