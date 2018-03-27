@@ -27,7 +27,7 @@ public class RequestStatisticsFormatter {
 
   private static final int MAX_KEY_LEN = 50;
   private static final String FORMAT_LONG = "  %-50s %10d\n";
-  private static final String FORMAT_DURATION = "  %-50s %10.1f\n";
+  private static final String FORMAT_DURATION = "  %-50s %10.0f\n";
   private static final String FORMAT_RATE = "  %-50s %10.3f\n";
 
   public String format(RequestStatistics stats) {
