@@ -176,9 +176,9 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
         final long tStartFunction = System.nanoTime();
         try {
           resultSetGroup = this.executePQL(new PinotQuery(pql, tableName));
-          ThirdeyeMetricsUtil.logRequestSuccess(this.getName(), metricFunction.getDataset(), metricFunction.getMetricName(), tStartFunction, System.nanoTime());
+          ThirdeyeMetricsUtil.getRequestLog().success(this.getName(), metricFunction.getDataset(), metricFunction.getMetricName(), tStartFunction, System.nanoTime());
         } catch (Exception e) {
-          ThirdeyeMetricsUtil.logRequestFailure(this.getName(), metricFunction.getDataset(), metricFunction.getMetricName(), tStartFunction, System.nanoTime(), e);
+          ThirdeyeMetricsUtil.getRequestLog().failure(this.getName(), metricFunction.getDataset(), metricFunction.getMetricName(), tStartFunction, System.nanoTime(), e);
           throw e;
         }
 

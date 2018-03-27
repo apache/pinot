@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.cache.CacheBuilder;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomaly.onboard.FunctionOnboardingResource;
-import com.linkedin.thirdeye.anomaly.utils.RequestStatisticsLogger;
+import com.linkedin.thirdeye.tracking.RequestStatisticsLogger;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.auth.AuthCookieSerializer;

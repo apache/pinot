@@ -57,9 +57,9 @@ public class PinotDataSourceMaxTime {
       try {
         pinotThirdEyeDataSource.refreshPQL(maxTimePinotQuery);
         resultSetGroup = pinotThirdEyeDataSource.executePQL(maxTimePinotQuery);
-        ThirdeyeMetricsUtil.logRequestSuccess(this.pinotThirdEyeDataSource.getName(), dataset, timeSpec.getColumnName(), tStart, System.nanoTime());
+        ThirdeyeMetricsUtil.getRequestLog().success(this.pinotThirdEyeDataSource.getName(), dataset, timeSpec.getColumnName(), tStart, System.nanoTime());
       } catch (ExecutionException e) {
-        ThirdeyeMetricsUtil.logRequestFailure(this.pinotThirdEyeDataSource.getName(), dataset, timeSpec.getColumnName(), tStart, System.nanoTime(), e);
+        ThirdeyeMetricsUtil.getRequestLog().failure(this.pinotThirdEyeDataSource.getName(), dataset, timeSpec.getColumnName(), tStart, System.nanoTime(), e);
         throw e;
       }
 

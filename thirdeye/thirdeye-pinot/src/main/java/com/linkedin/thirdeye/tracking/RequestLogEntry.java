@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.utils;
+package com.linkedin.thirdeye.tracking;
 
 /**
  * Data source request performance log entry

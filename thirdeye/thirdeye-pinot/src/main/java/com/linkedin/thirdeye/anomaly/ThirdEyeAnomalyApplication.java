@@ -9,7 +9,7 @@ import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardResource;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardServiceExecutor;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
-import com.linkedin.thirdeye.anomaly.utils.RequestStatisticsLogger;
+import com.linkedin.thirdeye.tracking.RequestStatisticsLogger;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.auto.onboard.AutoOnboardService;
