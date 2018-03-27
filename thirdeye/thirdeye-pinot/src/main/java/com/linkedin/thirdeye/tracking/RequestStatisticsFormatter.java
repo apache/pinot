@@ -103,10 +103,10 @@ public class RequestStatisticsFormatter {
   private Map<String, Double> durationInMs(Map<String, Long> durations, Map<String, Long> counts) {
     Map<String, Double> out = new HashMap<>();
     for (String key : durations.keySet()) {
-      if (!durations.containsKey(key)) {
+      if (!counts.containsKey(key)) {
         continue;
       }
-      out.put(key, counts.get(key) / (double) counts.get(key) / 1E6);
+      out.put(key, durations.get(key) / (double) counts.get(key) / 1E6);
     }
     return out;
   }
