@@ -20,20 +20,26 @@ public class RequestStatisticsLogger implements Runnable {
 
   @Override
   public void run() {
-    long timestamp = System.nanoTime();
-    RequestStatistics stats = ThirdeyeMetricsUtil.getRequestStatistics(timestamp);
-    ThirdeyeMetricsUtil.truncateRequestLog(timestamp);
+    try {
+      long timestamp = System.nanoTime();
+      RequestStatistics stats = ThirdeyeMetricsUtil.getRequestStatistics(0, timestamp);
+      ThirdeyeMetricsUtil.truncateRequestLog(timestamp);
 
-    RequestStatisticsFormatter formatter = new RequestStatisticsFormatter();
-    LOG.info("Recent request performance statistics:\n{}", formatter.format(stats));
+      RequestStatisticsFormatter formatter = new RequestStatisticsFormatter();
+      LOG.info("Recent request performance statistics:\n{}", formatter.format(stats));
+    } catch (Exception e) {
+      LOG.error("Could not generate statistics", e);
+    }
   }
 
   public void start() {
+    LOG.info("starting logger");
     this.scheduledExecutorService.scheduleWithFixedDelay(this,
         this.runFrequency.getSize(), this.runFrequency.getSize(), this.runFrequency.getUnit());
   }
 
   public void shutdown() {
+    LOG.info("stopping logger");
     this.scheduledExecutorService.shutdown();
   }
 }

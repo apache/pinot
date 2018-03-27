@@ -134,10 +134,11 @@ public class ThirdeyeMetricsUtil {
   /**
    * Return aggregate data source performance statistics up to the given timestamp. Weakly consistent.
    *
-   * @param maxTimestamp upper time bound for performance log entries to process
+   * @param start lower time bound for performance log entries
+   * @param end upper time bound for performance log entries
    * @return aggregated performance statistics
    */
-  public static RequestStatistics getRequestStatistics(long maxTimestamp) {
+  public static RequestStatistics getRequestStatistics(long start, long end) {
     Map<String, Long> requestsPerDatasource = new HashMap<>();
     Map<String, Long> requestsPerDataset = new HashMap<>();
     Map<String, Long> requestsPerMetric = new HashMap<>();
@@ -160,7 +161,10 @@ public class ThirdeyeMetricsUtil {
 
     // weakly consistent iteration
     for (RequestLogEntry req : dataSourceRequests) {
-      if (req.start > maxTimestamp) {
+      if (req.start < start) {
+        continue;
+      }
+      if (req.start > end) {
         break;
       }
 
