@@ -112,10 +112,7 @@ public class PinotSchemaRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas/{schemaName}")
   @ApiOperation(value = "Update a schema", notes = "Updates a schema")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully updated schema"),
-      @ApiResponse(code = 404, message = "Schema not found"),
-      @ApiResponse(code = 400, message = "Missing or invalid request body"),
-      @ApiResponse(code = 500, message = "Internal error")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully updated schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
       FormDataMultiPart multiPart) {
@@ -137,13 +134,12 @@ public class PinotSchemaRestletResource {
   @Path("/schemas/validate")
   @ApiOperation(value = "Validate schema", notes = "This API returns the schema that matches the one you get "
       + "from 'GET /schema/{schemaName}'. This allows us to validate schema before apply.")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"),
-      @ApiResponse(code = 400, message = "Missing or invalid request body"),
-      @ApiResponse(code = 500, message = "Internal error")})
-  public String validateSchema (FormDataMultiPart multiPart) throws Exception {
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
+  public String validateSchema(FormDataMultiPart multiPart) {
     Schema schema = getSchemaFromMultiPart(multiPart);
     if (!schema.validate(LOGGER)) {
-      throw new ControllerApplicationException(LOGGER, "Invalid schema. Check controller logs", Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, "Invalid schema. Check controller logs",
+          Response.Status.BAD_REQUEST);
     }
     return schema.getJSONSchema();
   }
@@ -191,18 +187,22 @@ public class PinotSchemaRestletResource {
   }
 
   private Schema getSchemaFromMultiPart(FormDataMultiPart multiPart) {
-    Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
-    if (!PinotSegmentUploadRestletResource.validateMultiPart(map, null)) {
-      throw new ControllerApplicationException(LOGGER, "Found not exactly one file from the multi-part fields",
-          Response.Status.BAD_REQUEST);
-    }
-    FormDataBodyPart bodyPart = map.values().iterator().next().get(0);
-    try (InputStream inputStream = bodyPart.getValueAs(InputStream.class)) {
-      return Schema.fromInputSteam(inputStream);
-    } catch (IOException e) {
-      throw new ControllerApplicationException(LOGGER,
-          "Caught exception while de-serializing the schema from request body: " + e.getMessage(),
-          Response.Status.BAD_REQUEST);
+    try {
+      Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
+      if (!PinotSegmentUploadRestletResource.validateMultiPart(map, null)) {
+        throw new ControllerApplicationException(LOGGER, "Found not exactly one file from the multi-part fields",
+            Response.Status.BAD_REQUEST);
+      }
+      FormDataBodyPart bodyPart = map.values().iterator().next().get(0);
+      try (InputStream inputStream = bodyPart.getValueAs(InputStream.class)) {
+        return Schema.fromInputSteam(inputStream);
+      } catch (IOException e) {
+        throw new ControllerApplicationException(LOGGER,
+            "Caught exception while de-serializing the schema from request body: " + e.getMessage(),
+            Response.Status.BAD_REQUEST);
+      }
+    } finally {
+      multiPart.cleanup();
     }
   }
 
