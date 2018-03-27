@@ -43,8 +43,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.map.JsonMappingException;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.json.JSONArray;
@@ -194,27 +192,17 @@ public class PinotSchemaRestletResource {
 
   private Schema getSchemaFromMultiPart(FormDataMultiPart multiPart) {
     Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
-    PinotSegmentUploadRestletResource.validateMultiPart(map, null);
-    final String name = map.keySet().iterator().next();
-    final FormDataBodyPart bodyPart = map.get(name).get(0);
-    InputStream is = null;
-    try {
-      is = bodyPart.getValueAs(InputStream.class);
-      return Schema.fromInputSteam(is);
-    } catch (JsonParseException | JsonMappingException e) {
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Invalid json in schema request body, schema: %s", name),
+    if (!PinotSegmentUploadRestletResource.validateMultiPart(map, null)) {
+      throw new ControllerApplicationException(LOGGER, "Found not exactly one file from the multi-part fields",
           Response.Status.BAD_REQUEST);
+    }
+    FormDataBodyPart bodyPart = map.values().iterator().next().get(0);
+    try (InputStream inputStream = bodyPart.getValueAs(InputStream.class)) {
+      return Schema.fromInputSteam(inputStream);
     } catch (IOException e) {
       throw new ControllerApplicationException(LOGGER,
-          String.format("Error reading request body for schema, name %s", name), Response.Status.INTERNAL_SERVER_ERROR,
-          e);
-    } finally {
-      try {
-        is.close();
-      } catch (IOException e) {
-        LOGGER.warn("Failed to close request input stream");
-      }
+          "Caught exception while de-serializing the schema from request body: " + e.getMessage(),
+          Response.Status.BAD_REQUEST);
     }
   }
 
