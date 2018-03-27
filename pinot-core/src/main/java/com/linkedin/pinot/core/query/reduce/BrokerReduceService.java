@@ -333,7 +333,6 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
    * @param havingFilterQueryMap having filter query map
    */
   @SuppressWarnings("unchecked")
-
   private void setGroupByHavingResults(@Nonnull BrokerResponseNative brokerResponseNative,
       @Nonnull AggregationFunction[] aggregationFunctions, boolean[] aggregationFunctionsSelectStatus,
       @Nonnull GroupBy groupBy, @Nonnull Map<ServerInstance, DataTable> dataTableMap,
@@ -392,7 +391,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
       //Now it is time to remove those groups that do not validate HAVING clause predicate
       //We use TreeMap which supports CASE_INSENSITIVE_ORDER
-      Map<String, Comparable> singleGroupAggResults = new TreeMap<String, Comparable>(String.CASE_INSENSITIVE_ORDER);
+      Map<String, Comparable> singleGroupAggResults = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
       Map<String, Comparable>[] finalFilteredResultMaps = new Map[numAggregationFunctions];
       for (int i = 0; i < numAggregationFunctions; i++) {
         finalFilteredResultMaps[i] = new HashMap<>();
@@ -440,11 +439,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       List<AggregationResult> aggregationResults = new ArrayList<>(count);
       for (int i = 0; i < aggregationNumsInFinalResult; i++) {
         List<GroupByResult> groupByResultList = groupByResultLists[i];
-        List<String> groupByColumns = groupBy.getExpressions();
-        if (groupByColumns == null) {
-          groupByColumns = groupBy.getColumns();
-        }
-        aggregationResults.add(new AggregationResult(groupByResultList, groupByColumns, finalColumnNames[i]));
+        aggregationResults.add(new AggregationResult(groupByResultList, groupBy.getExpressions(), finalColumnNames[i]));
       }
       brokerResponseNative.setAggregationResults(aggregationResults);
     } else {
