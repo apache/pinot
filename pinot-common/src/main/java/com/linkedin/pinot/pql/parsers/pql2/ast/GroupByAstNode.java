@@ -17,6 +17,7 @@ package com.linkedin.pinot.pql.parsers.pql2.ast;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 
 
 /**
@@ -36,10 +37,14 @@ public class GroupByAstNode extends BaseAstNode {
         // List of expression contains columns as well as expressions to maintain ordering of group by columns.
         groupBy.addToExpressions(groupByColumnName);
       } else {
-        FunctionCallAstNode functionCallAstNode = (FunctionCallAstNode) astNode;
-
-        // Remove all white-space until we start compiling expressions on broker side.
-        groupBy.addToExpressions(functionCallAstNode.getExpression());
+        // Compile to standard expression string
+        // NOTE: the purpose of this compilation is to ensure the function expression is valid. We serialize the
+        // compiled expression back to string and add it to the group-by expressions so that all expressions stored in
+        // group-by is with standard format.
+        // E.g. "  foo\t  ( bar  ('a'\t ,foobar(  b,  'c'\t, 123)  )   ,d  )\t" -> "foo(bar('a',foobar(b,'c','123')),d)"
+        // The standard format expressions will be used as "groupByColumns" in the broker response.
+        String expression = ((FunctionCallAstNode) astNode).getExpression();
+        groupBy.addToExpressions(TransformExpressionTree.compileToExpressionTree(expression).toString());
       }
     }
     brokerRequest.setGroupBy(groupBy);

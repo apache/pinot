@@ -32,7 +32,6 @@ public class TransformExpressionTreeTest {
   @Test
   public void testConstructor() {
     Assert.assertEquals(STANDARD_EXPRESSION_TREE.toString(), STANDARD_EXPRESSION);
-
     Assert.assertEquals(STANDARD_EXPRESSION_TREE.getExpressionType(), TransformExpressionTree.ExpressionType.FUNCTION);
     Assert.assertEquals(STANDARD_EXPRESSION_TREE.getValue(), "foo");
 
