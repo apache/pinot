@@ -40,7 +40,7 @@ public class TimeBasedAnomalyMerger {
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  private static final double MERGE_ANOMALY_ERROR_THRESHOLD = 0.1; // 10%
+  private static final double MERGE_ANOMALY_ERROR_THRESHOLD = 0.4; // 40%
   private static final int MAX_ERROR_MESSAGE_WORD_COUNT = 10_000; // 10k bytes
 
   private final static AnomalyMergeConfig DEFAULT_TIME_BASED_MERGE_CONFIG;

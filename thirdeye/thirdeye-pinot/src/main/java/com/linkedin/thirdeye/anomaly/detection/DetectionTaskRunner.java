@@ -53,7 +53,7 @@ public class DetectionTaskRunner implements TaskRunner {
 
   public static final String BACKFILL_PREFIX = "adhoc_";
 
-  private static final double DIMENSION_ERROR_THRESHOLD = 0.1; // 10%
+  private static final double DIMENSION_ERROR_THRESHOLD = 0.3; // 3 0%
   private static final int MAX_ERROR_MESSAGE_WORD_COUNT = 10_000; // 10k bytes
 
   private List<DateTime> windowStarts;
