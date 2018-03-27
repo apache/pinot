@@ -23,6 +23,16 @@ export const selfServeConst = {
   CONFIG_RECIPIENTS_INPUT: '#config-group-add-recipients',
   EMAIL_WARNING: '.te-form__alert--warning',
   SUBMIT_BUTTON: '.te-button--submit',
+  RESET_BUTTON: '.te-button--cancel',
+  SECONDARY_LINK: '.thirdeye-link-secondary',
+  IMPORT_DASHBOARD_INPUT: '#existing-dashboard-name',
+  IMPORT_DATASET_INPUT: '#import-custom-dataset',
+  IMPORT_METRIC_INPUT: '#import-custom-metric',
+  IMPORT_CONSOLIDATE_INPUT: '#select-consolidate',
+  IMPORT_RRD_INPUT: '#import-custom-rrd',
+  IMPORT_WARNING: '.alert-warning',
+  IMPORT_SUCCESS: '.te-form__banner--success',
+  IMPORT_RESULT_LIST: '.te-form__banner-list',
   PATTERN_OPTIONS: ['Higher or lower than expected', 'Higher than expected', 'Lower than expected']
 };
 

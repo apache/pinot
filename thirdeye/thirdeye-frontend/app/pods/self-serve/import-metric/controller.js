@@ -98,7 +98,7 @@ export default Controller.extend({
     if (isRrdImport) {
       return Promise.resolve(true);
     } else {
-      return fetch(url).then((res) => checkStatus(res, 'get', true));
+      return fetch(url).then(checkStatus);
     }
   },
 
@@ -259,7 +259,7 @@ export default Controller.extend({
       // Check whether provided dashboard name exists before sending onboard requests.
       this.validateDashboardName(isRrdImport, datasetName)
         .then((isValid) => {
-          if (isValid) {
+          if (typeof isValid === 'boolean' && isValid) {
             // Begin onboard sequence
             this.processNewImportSequence(isRrdImport, importObj);
             // Disable the form and show options to user
