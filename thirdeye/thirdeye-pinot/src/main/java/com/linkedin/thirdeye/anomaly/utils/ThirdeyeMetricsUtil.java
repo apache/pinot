@@ -178,23 +178,23 @@ public class ThirdeyeMetricsUtil {
       final String metric = req.dataset + "::" + req.metric;
       final String principal = req.principal;
 
-      increment(requestsPerDatasource, datasource, 1);
-      increment(requestsPerDataset, dataset, 1);
-      increment(requestsPerMetric, metric, 1);
-      increment(requestsPerPrincipal, principal, 1);
+      increment(requestsPerDatasource, datasource);
+      increment(requestsPerDataset, dataset);
+      increment(requestsPerMetric, metric);
+      increment(requestsPerPrincipal, principal);
 
       if (req.success) {
-        increment(successPerDatasource, datasource, 1);
-        increment(successPerDataset, dataset, 1);
-        increment(successPerMetric, metric, 1);
-        increment(successPerPrincipal, principal, 1);
+        increment(successPerDatasource, datasource);
+        increment(successPerDataset, dataset);
+        increment(successPerMetric, metric);
+        increment(successPerPrincipal, principal);
         successTotal++;
 
       } else {
-        increment(failurePerDatasource, datasource, 1);
-        increment(failurePerDataset, dataset, 1);
-        increment(failurePerMetric, metric, 1);
-        increment(failurePerPrincipal, principal, 1);
+        increment(failurePerDatasource, datasource);
+        increment(failurePerDataset, dataset);
+        increment(failurePerMetric, metric);
+        increment(failurePerPrincipal, principal);
         failureTotal++;
       }
 
@@ -245,6 +245,16 @@ public class ThirdeyeMetricsUtil {
       map.put(key, 0L);
     }
     map.put(key, map.get(key) + byValue);
+  }
+
+  /**
+   * Helper to increment (possibly non-existing) map value by one
+   *
+   * @param map map
+   * @param key key
+   */
+  private static void increment(Map<String, Long> map, String key) {
+    increment(map, key, 1);
   }
 
   /**
