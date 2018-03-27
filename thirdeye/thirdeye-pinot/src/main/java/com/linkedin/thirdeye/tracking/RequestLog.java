@@ -24,8 +24,8 @@ public class RequestLog {
   }
 
   /**
-   * Append statistics for a successful data source request to the performance log. May drop
-   * the log entry if capacity is exhausted
+   * Append statistics for a successful data source request to the performance log. Discards oldest
+   * log entries if capacity is exhausted.
    *
    * @param datasource data source name
    * @param dataset data set name
@@ -35,15 +35,14 @@ public class RequestLog {
    */
   public void success(String datasource, String dataset, String metric, long start, long end) {
     if (this.requestLogGauge.getAndIncrement() >= this.approximateCapacity) {
-      // weakly consistent limit
-      return;
+      this.requestLog.removeFirst();
     }
     this.requestLog.add(new RequestLogEntry(datasource, dataset, metric, getPrincipal(), true, start, end, null));
   }
 
   /**
-   * Append statistics for a failed data source request to the performance log. May drop
-   * the log entry if capacity is exhausted
+   * Append statistics for a failed data source request to the performance log. Discards oldest
+   * log entries if capacity is exhausted.
    *
    * @param datasource data source name
    * @param dataset data set name
@@ -54,8 +53,7 @@ public class RequestLog {
    */
   public void failure(String datasource, String dataset, String metric, long start, long end, Exception exception) {
     if (this.requestLogGauge.getAndIncrement() >= this.approximateCapacity) {
-      // weakly consistent limit
-      return;
+      this.requestLog.removeFirst();
     }
     this.requestLog.add(new RequestLogEntry(datasource, dataset, metric, getPrincipal(), false, start, end, exception));
   }

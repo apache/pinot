@@ -15,21 +15,21 @@ public class RequestLogTest {
 
   @Test
   public void testCapacityLimit() {
-    this.log.success("a", "", "", 0, 10);
-    this.log.success("b", "", "", 2, 12);
+    this.log.success("a", "", "", 2, 12);
+    this.log.success("b", "", "", 0, 10);
     this.log.success("c", "", "", 1, 11);
     this.log.success("d", "", "", 3, 13);
     this.log.success("e", "", "", 4, 14);
 
-    this.log.success("f", "", "", 5, 15); // should be dropped
+    this.log.success("f", "", "", 5, 15); // should discard first
 
     Assert.assertEquals(this.log.requestLogGauge.get(), 6);
     Assert.assertEquals(this.log.requestLog.size(), 5);
-    Assert.assertEquals(this.log.requestLog.pop().datasource, "a");
     Assert.assertEquals(this.log.requestLog.pop().datasource, "b");
     Assert.assertEquals(this.log.requestLog.pop().datasource, "c");
     Assert.assertEquals(this.log.requestLog.pop().datasource, "d");
     Assert.assertEquals(this.log.requestLog.pop().datasource, "e");
+    Assert.assertEquals(this.log.requestLog.pop().datasource, "f");
   }
 
   @Test
