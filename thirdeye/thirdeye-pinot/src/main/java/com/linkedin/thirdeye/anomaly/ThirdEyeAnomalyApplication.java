@@ -98,7 +98,7 @@ public class ThirdEyeAnomalyApplication
       @Override
       public void start() throws Exception {
 
-        requestStatisticsLogger = new RequestStatisticsLogger(new TimeGranularity(15, TimeUnit.MINUTES));
+        requestStatisticsLogger = new RequestStatisticsLogger(new TimeGranularity(1, TimeUnit.HOURS));
         requestStatisticsLogger.start();
 
         if (config.isWorker()) {
