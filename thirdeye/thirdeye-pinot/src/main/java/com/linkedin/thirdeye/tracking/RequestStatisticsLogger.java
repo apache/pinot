@@ -23,7 +23,7 @@ public class RequestStatisticsLogger implements Runnable {
   public void run() {
     try {
       long timestamp = System.nanoTime();
-      RequestStatistics stats = ThirdeyeMetricsUtil.getRequestLog().getStatistics(0, timestamp);
+      RequestStatistics stats = ThirdeyeMetricsUtil.getRequestLog().getStatistics(timestamp);
       ThirdeyeMetricsUtil.getRequestLog().truncate(timestamp);
 
       RequestStatisticsFormatter formatter = new RequestStatisticsFormatter();

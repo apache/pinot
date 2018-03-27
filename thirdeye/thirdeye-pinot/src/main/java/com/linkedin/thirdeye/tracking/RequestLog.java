@@ -13,14 +13,14 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Support append and truncation plus an approximate capacity gauge.
  */
 public class RequestLog {
-  private final int approximateLogCapacity;
+  final int approximateCapacity;
 
-  private final ConcurrentLinkedDeque<RequestLogEntry> requestLog = new ConcurrentLinkedDeque<>();
+  final ConcurrentLinkedDeque<RequestLogEntry> requestLog = new ConcurrentLinkedDeque<>();
 
-  private final AtomicInteger requestLogGauge = new AtomicInteger();
+  final AtomicInteger requestLogGauge = new AtomicInteger();
 
-  public RequestLog(int approximateLogCapacity) {
-    this.approximateLogCapacity = approximateLogCapacity;
+  public RequestLog(int approximateCapacity) {
+    this.approximateCapacity = approximateCapacity;
   }
 
   /**
@@ -34,7 +34,7 @@ public class RequestLog {
    * @param end request end time in ns
    */
   public void success(String datasource, String dataset, String metric, long start, long end) {
-    if (this.requestLogGauge.getAndIncrement() >= this.approximateLogCapacity) {
+    if (this.requestLogGauge.getAndIncrement() >= this.approximateCapacity) {
       // weakly consistent limit
       return;
     }
@@ -53,7 +53,7 @@ public class RequestLog {
    * @param exception exception
    */
   public void failure(String datasource, String dataset, String metric, long start, long end, Exception exception) {
-    if (this.requestLogGauge.getAndIncrement() >= this.approximateLogCapacity) {
+    if (this.requestLogGauge.getAndIncrement() >= this.approximateCapacity) {
       // weakly consistent limit
       return;
     }
@@ -84,11 +84,10 @@ public class RequestLog {
   /**
    * Return aggregate data source performance statistics up to the given timestamp. Weakly consistent.
    *
-   * @param start lower time bound for performance log entries
    * @param end upper time bound for performance log entries
    * @return aggregated performance statistics
    */
-  public RequestStatistics getStatistics(long start, long end) {
+  public RequestStatistics getStatistics(long end) {
     Map<String, Long> requestsPerDatasource = new HashMap<>();
     Map<String, Long> requestsPerDataset = new HashMap<>();
     Map<String, Long> requestsPerMetric = new HashMap<>();
@@ -115,9 +114,6 @@ public class RequestLog {
 
     // weakly consistent iteration
     for (RequestLogEntry req : this.requestLog) {
-      if (req.start < start) {
-        continue;
-      }
       if (req.start > end) {
         break;
       }
