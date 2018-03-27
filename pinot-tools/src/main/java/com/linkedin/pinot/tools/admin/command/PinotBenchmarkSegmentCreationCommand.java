@@ -87,8 +87,8 @@ public class PinotBenchmarkSegmentCreationCommand extends AbstractBaseAdminComma
             String tableSegmentsDir = _outDir+"/"+tableInfoRecord[0];
             createOutDir(tableSegmentsDir);
 
-            //for(int j=1;j<configLines.size();j++)
-            for(int j=1;j<2;j++)
+            for(int j=1;j<configLines.size();j++)
+            //for(int j=1;j<2;j++)
             {
                 String[] evenDataInfo = configLines.get(j).split(",");
 

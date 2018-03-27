@@ -13,7 +13,7 @@
   },
   "tableIndexConfig": {
     "loadMode": "HEAP",
-    "invertedIndexColumns": [],
+    "invertedIndexColumns": ["ArticleID"],
     "lazyLoad"  : "true"
   },
   "metadata": {

@@ -93,8 +93,8 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
         int[] everyRoundRecordCount = new int[5];
 
 
-        //for (int i = 1; i < timeIntervals.size(); i++) {
-        for (int i = 1; i < 2; i++) {
+        for (int i = 1; i < timeIntervals.size(); i++) {
+        //for (int i = 1; i < 2; i++) {
             String[] timeIntervalInfo = timeIntervals.get(i).split(",");
             String outDir = _outDir + "/" + timeIntervalInfo[0];
             File outDirFile = new File(outDir);
