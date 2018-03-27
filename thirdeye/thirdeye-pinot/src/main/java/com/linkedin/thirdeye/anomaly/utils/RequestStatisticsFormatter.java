@@ -41,6 +41,8 @@ public class RequestStatisticsFormatter {
     builder.append(format(stats.requestsPerDataset, COMP_LONG, FORMAT_LONG));
     builder.append("metric:\n");
     builder.append(format(stats.requestsPerMetric, COMP_LONG, FORMAT_LONG));
+    builder.append("principal:\n");
+    builder.append(format(stats.requestsPerPrincipal, COMP_LONG, FORMAT_LONG));
 
     builder.append('\n');
     builder.append("Average duration (ms):\n");
@@ -51,6 +53,8 @@ public class RequestStatisticsFormatter {
     builder.append(format(durationInMs(stats.durationPerDataset, stats.requestsPerDataset), COMP_DOUBLE, FORMAT_DURATION));
     builder.append("metric:\n");
     builder.append(format(durationInMs(stats.durationPerMetric, stats.requestsPerMetric), COMP_DOUBLE, FORMAT_DURATION));
+    builder.append("principal:\n");
+    builder.append(format(durationInMs(stats.durationPerPrincipal, stats.requestsPerPrincipal), COMP_DOUBLE, FORMAT_DURATION));
 
     builder.append('\n');
     builder.append("Failure rate:\n");
@@ -61,6 +65,8 @@ public class RequestStatisticsFormatter {
     builder.append(format(divide(stats.failurePerDataset, stats.requestsPerDataset), COMP_DOUBLE, FORMAT_RATE));
     builder.append("metric:\n");
     builder.append(format(divide(stats.failurePerMetric, stats.requestsPerMetric), COMP_DOUBLE, FORMAT_RATE));
+    builder.append("principal:\n");
+    builder.append(format(divide(stats.failurePerPrincipal, stats.requestsPerPrincipal), COMP_DOUBLE, FORMAT_RATE));
 
     return builder.toString();
   }

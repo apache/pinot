@@ -10,21 +10,25 @@ public final class RequestStatistics {
   Map<String, Long> requestsPerDatasource;
   Map<String, Long> requestsPerDataset;
   Map<String, Long> requestsPerMetric;
+  Map<String, Long> requestsPerPrincipal;
   long requestsTotal;
 
   Map<String, Long> successPerDatasource;
   Map<String, Long> successPerDataset;
   Map<String, Long> successPerMetric;
+  Map<String, Long> successPerPrincipal;
   long successTotal;
 
   Map<String, Long> failurePerDatasource;
   Map<String, Long> failurePerDataset;
   Map<String, Long> failurePerMetric;
+  Map<String, Long> failurePerPrincipal;
   long failureTotal;
 
   Map<String, Long> durationPerDatasource;
   Map<String, Long> durationPerDataset;
   Map<String, Long> durationPerMetric;
+  Map<String, Long> durationPerPrincipal;
   long durationTotal;
 
   public Map<String, Long> getRequestsPerDatasource() {
@@ -49,6 +53,14 @@ public final class RequestStatistics {
 
   public void setRequestsPerMetric(Map<String, Long> requestsPerMetric) {
     this.requestsPerMetric = requestsPerMetric;
+  }
+
+  public Map<String, Long> getRequestsPerPrincipal() {
+    return requestsPerPrincipal;
+  }
+
+  public void setRequestsPerPrincipal(Map<String, Long> requestsPerPrincipal) {
+    this.requestsPerPrincipal = requestsPerPrincipal;
   }
 
   public long getRequestsTotal() {
@@ -83,6 +95,14 @@ public final class RequestStatistics {
     this.successPerMetric = successPerMetric;
   }
 
+  public Map<String, Long> getSuccessPerPrincipal() {
+    return successPerPrincipal;
+  }
+
+  public void setSuccessPerPrincipal(Map<String, Long> successPerPrincipal) {
+    this.successPerPrincipal = successPerPrincipal;
+  }
+
   public long getSuccessTotal() {
     return successTotal;
   }
@@ -115,6 +135,14 @@ public final class RequestStatistics {
     this.failurePerMetric = failurePerMetric;
   }
 
+  public Map<String, Long> getFailurePerPrincipal() {
+    return failurePerPrincipal;
+  }
+
+  public void setFailurePerPrincipal(Map<String, Long> failurePerPrincipal) {
+    this.failurePerPrincipal = failurePerPrincipal;
+  }
+
   public long getFailureTotal() {
     return failureTotal;
   }
@@ -145,6 +173,14 @@ public final class RequestStatistics {
 
   public void setDurationPerMetric(Map<String, Long> durationPerMetric) {
     this.durationPerMetric = durationPerMetric;
+  }
+
+  public Map<String, Long> getDurationPerPrincipal() {
+    return durationPerPrincipal;
+  }
+
+  public void setDurationPerPrincipal(Map<String, Long> durationPerPrincipal) {
+    this.durationPerPrincipal = durationPerPrincipal;
   }
 
   public long getDurationTotal() {

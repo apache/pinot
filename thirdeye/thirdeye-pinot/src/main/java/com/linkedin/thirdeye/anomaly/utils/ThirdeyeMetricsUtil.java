@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.utils;
 
+import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
 import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
@@ -96,7 +97,7 @@ public class ThirdeyeMetricsUtil {
    * @param end request end time in ns
    */
   public static void logRequestSuccess(String datasource, String dataset, String metric, long start, long end) {
-    dataSourceRequests.add(new RequestLogEntry(datasource, dataset, metric, true, start, end, null));
+    dataSourceRequests.add(new RequestLogEntry(datasource, dataset, metric, getPrincipal(), true, start, end, null));
   }
 
   /**
@@ -110,7 +111,7 @@ public class ThirdeyeMetricsUtil {
    * @param exception exception
    */
   public static void logRequestFailure(String datasource, String dataset, String metric, long start, long end, Exception exception) {
-    dataSourceRequests.add(new RequestLogEntry(datasource, dataset, metric, false, start, end, exception));
+    dataSourceRequests.add(new RequestLogEntry(datasource, dataset, metric, getPrincipal(), false, start, end, exception));
   }
 
   /**
@@ -142,21 +143,25 @@ public class ThirdeyeMetricsUtil {
     Map<String, Long> requestsPerDatasource = new HashMap<>();
     Map<String, Long> requestsPerDataset = new HashMap<>();
     Map<String, Long> requestsPerMetric = new HashMap<>();
+    Map<String, Long> requestsPerPrincipal = new HashMap<>();
     long requestsTotal = 0;
 
     Map<String, Long> successPerDatasource = new HashMap<>();
     Map<String, Long> successPerDataset = new HashMap<>();
     Map<String, Long> successPerMetric = new HashMap<>();
+    Map<String, Long> successPerPrincipal = new HashMap<>();
     long successTotal = 0;
 
     Map<String, Long> failurePerDatasource = new HashMap<>();
     Map<String, Long> failurePerDataset = new HashMap<>();
     Map<String, Long> failurePerMetric = new HashMap<>();
+    Map<String, Long> failurePerPrincipal = new HashMap<>();
     long failureTotal = 0;
 
     Map<String, Long> durationPerDatasource = new HashMap<>();
     Map<String, Long> durationPerDataset = new HashMap<>();
     Map<String, Long> durationPerMetric = new HashMap<>();
+    Map<String, Long> durationPerPrincipal = new HashMap<>();
     long durationTotal = 0;
 
     // weakly consistent iteration
@@ -171,20 +176,25 @@ public class ThirdeyeMetricsUtil {
       final String datasource = req.datasource;
       final String dataset = req.dataset;
       final String metric = req.dataset + "::" + req.metric;
+      final String principal = req.principal;
 
       increment(requestsPerDatasource, datasource, 1);
       increment(requestsPerDataset, dataset, 1);
       increment(requestsPerMetric, metric, 1);
+      increment(requestsPerPrincipal, principal, 1);
 
       if (req.success) {
         increment(successPerDatasource, datasource, 1);
         increment(successPerDataset, dataset, 1);
         increment(successPerMetric, metric, 1);
+        increment(successPerPrincipal, principal, 1);
         successTotal++;
+
       } else {
         increment(failurePerDatasource, datasource, 1);
         increment(failurePerDataset, dataset, 1);
         increment(failurePerMetric, metric, 1);
+        increment(failurePerPrincipal, principal, 1);
         failureTotal++;
       }
 
@@ -192,6 +202,7 @@ public class ThirdeyeMetricsUtil {
       increment(durationPerDatasource, datasource, duration);
       increment(durationPerDataset, dataset, duration);
       increment(durationPerMetric, metric, duration);
+      increment(durationPerPrincipal, principal, duration);
       durationTotal += duration;
 
       requestsTotal++;
@@ -201,18 +212,22 @@ public class ThirdeyeMetricsUtil {
     stats.setRequestsPerDatasource(requestsPerDatasource);
     stats.setRequestsPerDataset(requestsPerDataset);
     stats.setRequestsPerMetric(requestsPerMetric);
+    stats.setRequestsPerPrincipal(requestsPerPrincipal);
     stats.setRequestsTotal(requestsTotal);
     stats.setSuccessPerDatasource(successPerDatasource);
     stats.setSuccessPerDataset(successPerDataset);
     stats.setSuccessPerMetric(successPerMetric);
+    stats.setSuccessPerPrincipal(successPerPrincipal);
     stats.setSuccessTotal(successTotal);
     stats.setFailurePerDatasource(failurePerDatasource);
     stats.setFailurePerDataset(failurePerDataset);
     stats.setFailurePerMetric(failurePerMetric);
+    stats.setFailurePerPrincipal(failurePerPrincipal);
     stats.setFailureTotal(failureTotal);
     stats.setDurationPerDatasource(durationPerDatasource);
     stats.setDurationPerDataset(durationPerDataset);
     stats.setDurationPerMetric(durationPerMetric);
+    stats.setDurationPerPrincipal(durationPerPrincipal);
     stats.setDurationTotal(durationTotal);
 
     return stats;
@@ -230,5 +245,17 @@ public class ThirdeyeMetricsUtil {
       map.put(key, 0L);
     }
     map.put(key, map.get(key) + byValue);
+  }
+
+  /**
+   * Helper to return current authenticated principal, if any.
+   *
+   * @return principal name
+   */
+  private static String getPrincipal() {
+    if (ThirdEyeAuthFilter.getCurrentPrincipal() == null) {
+      return "no-auth-user";
+    }
+    return ThirdEyeAuthFilter.getCurrentPrincipal().getName();
   }
 }

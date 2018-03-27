@@ -7,16 +7,18 @@ final class RequestLogEntry {
   final String datasource;
   final String dataset;
   final String metric;
+  final String principal;
   final boolean success;
   final long start;
   final long end;
   final Exception exception;
 
-  public RequestLogEntry(String datasource, String dataset, String metric, boolean success, long start, long end,
+  public RequestLogEntry(String datasource, String dataset, String metric, String principal, boolean success, long start, long end,
       Exception exception) {
     this.datasource = datasource;
     this.dataset = dataset;
     this.metric = metric;
+    this.principal = principal;
     this.success = success;
     this.start = start;
     this.end = end;
@@ -33,6 +35,10 @@ final class RequestLogEntry {
 
   public String getMetric() {
     return metric;
+  }
+
+  public String getPrincipal() {
+    return principal;
   }
 
   public boolean isSuccess() {
