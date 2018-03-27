@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
+import com.google.common.base.Strings;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
@@ -116,15 +117,20 @@ public class TimeBasedAnomalyMerger {
         try {
           computeMergedAnomalyInfo(mergedAnomaly, mergeConfig);
         } catch (Exception e) {
-          AnomalyFunctionDTO function = mergedAnomaly.getFunction();
-          String functionName = Long.toString(mergedAnomaly.getFunctionId());
-          if (function != null) {
-            functionName = function.getFunctionName();
+          String functionName = "";
+          if (mergedAnomaly.getFunction() != null) {
+            functionName = Strings.nullToEmpty(mergedAnomaly.getFunction().getFunctionName());
+          } else if (mergedAnomaly.getFunctionId() != null) {
+            functionName = mergedAnomaly.getFunctionId().toString();
+          }
+          long anomalyId = -1;
+          if (mergedAnomaly.getId() != null) {
+            anomalyId = mergedAnomaly.getId();
           }
 
           String message = String.format(
-              "Failed to update merged anomaly info. Dataset: %s, Metric: %s, Function: %s, Time:%s - %s.",
-              mergedAnomaly.getCollection(), mergedAnomaly.getMetric(), function.getFunctionName(),
+              "Failed to update merged anomaly info. ID: %s, dataset: %s, metric: %s, function: %s, time window:%s - %s",
+              anomalyId, mergedAnomaly.getCollection(), mergedAnomaly.getMetric(), functionName,
               new DateTime(mergedAnomaly.getStartTime()), new DateTime(mergedAnomaly.getEndTime()));
           LOG.warn(message, e);
           exceptions.add(new Exception(message, e));
