@@ -65,9 +65,9 @@ public abstract class QueryExecutor {
     public static List<QueryExecutor> getTableExecutors() {
         List<QueryExecutor> queryExecutors = new ArrayList<>();
         queryExecutors.add(ProfileViewQueryExecutor.getInstance());
-        queryExecutors.add(JobApplyQueryExecutor.getInstance());
+        //queryExecutors.add(JobApplyQueryExecutor.getInstance());
         //queryExecutors.add(AdClickQueryExecutor.getInstance());
-        queryExecutors.add(ArticleReadQueryExecutor.getInstance());
+        //queryExecutors.add(ArticleReadQueryExecutor.getInstance());
         //queryExecutors.add(CompanySearchQueryExecutor.getInstance());
 
         return queryExecutors;
@@ -75,7 +75,9 @@ public abstract class QueryExecutor {
 
     public void start() throws InterruptedException {
         loadConfig();
-        int threadCnt = Integer.parseInt(config.getProperty("ThreadCount"));
+        //int threadCnt = Integer.parseInt(config.getProperty("ThreadCount"));
+        int threadCnt = Integer.parseInt(config.getProperty("QPS"));
+
         _threadPool = new ArrayList<>();
 
         QueryTask queryTask = getTask(config);

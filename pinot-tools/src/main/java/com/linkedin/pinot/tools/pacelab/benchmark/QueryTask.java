@@ -59,7 +59,7 @@ public class QueryTask implements Runnable{
             try
             {
 
-                if(ignoreQPS != 1)
+                /*if(ignoreQPS != 1)
                 {
                     long intervalStart = System.currentTimeMillis();
                     for (int q = 0; q < QPS; q++)
@@ -91,6 +91,16 @@ public class QueryTask implements Runnable{
                             generateAndRunQuery(i);
                             break;
                         }
+                    }
+                }*/
+
+                float randomLikelihood = rand.nextFloat();
+                for (int i = 0; i < likelihood.length; i++)
+                {
+                    if (randomLikelihood <= likelihood[i])
+                    {
+                        generateAndRunQuery(i);
+                        break;
                     }
                 }
 
