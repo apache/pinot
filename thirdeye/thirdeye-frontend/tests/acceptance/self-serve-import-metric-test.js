@@ -55,6 +55,7 @@ module('Acceptance | import metric', function(hooks) {
       'Import dashboard field renders.'
     );
 
+    // Filling in a non-existent dashboard name
     await fillIn(selfServeConst.IMPORT_DASHBOARD_INPUT, 'test123X');
 
     assert.notOk(
@@ -62,6 +63,7 @@ module('Acceptance | import metric', function(hooks) {
       'Submit button is enabled'
     );
 
+    // Submitting a non-existent dashboard name
     await click(selfServeConst.SUBMIT_BUTTON);
 
     assert.equal(
@@ -74,7 +76,9 @@ module('Acceptance | import metric', function(hooks) {
       'Submit button is now disabled.'
     );
 
+    // Filling in an existing dashboard name
     await fillIn(selfServeConst.IMPORT_DASHBOARD_INPUT, dashboardToImport);
+    // Trigger key event in field to get submit button to detect change
     await triggerKeyEvent(selfServeConst.IMPORT_DASHBOARD_INPUT, 'keyup', '8');
 
     assert.notOk(
@@ -82,6 +86,7 @@ module('Acceptance | import metric', function(hooks) {
       'Submit button is enabled'
     );
 
+    // Submit new dashboard name
     await click(selfServeConst.SUBMIT_BUTTON);
 
     assert.ok(
@@ -102,6 +107,7 @@ module('Acceptance | import metric', function(hooks) {
       'Custom fields are disabled'
     );
 
+    // Click button to 'onboard another dashboard'
     await click(selfServeConst.SUBMIT_BUTTON);
 
     assert.equal(
@@ -115,7 +121,7 @@ module('Acceptance | import metric', function(hooks) {
     );
   });
 
-  test(`visiting metric import page to import custom dashboard`, async (assert) => {
+  test(`visiting metric import page to import custom dashboard (create new metrics via rrd import)`, async (assert) => {
     await visit(`/self-serve/import-metric`);
 
     const rrdName = 'my-new-rrd';
@@ -124,6 +130,7 @@ module('Acceptance | import metric', function(hooks) {
     const importSuccessMsgText2 = `You have successfully onboarded the ${datasetName} dataset , including the following metrics`;
     let $submitButton = $(selfServeConst.SUBMIT_BUTTON);
 
+    // Provide new dataset name
     await fillIn(selfServeConst.IMPORT_DATASET_INPUT, datasetName);
 
     assert.ok(
@@ -135,6 +142,7 @@ module('Acceptance | import metric', function(hooks) {
       'Import existing dashboard by name field is disabled.'
     );
 
+    // Provide new metric name
     await fillIn(selfServeConst.IMPORT_METRIC_INPUT, metricName);
 
     assert.ok(
@@ -142,6 +150,7 @@ module('Acceptance | import metric', function(hooks) {
       'Submit button is still disabled.'
     );
 
+    // Provide existin RRD key
     await fillIn(selfServeConst.IMPORT_RRD_INPUT, rrdName);
 
     assert.notOk(
@@ -149,6 +158,7 @@ module('Acceptance | import metric', function(hooks) {
       'Submit button is now enabled'
     );
 
+    // Submit for successful response
     await click(selfServeConst.SUBMIT_BUTTON);
 
     assert.ok(
