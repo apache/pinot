@@ -27,6 +27,9 @@ import org.apache.helix.model.IdealState;
 import static com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.*;
 
 
+/**
+ * Builder for ideal state for testing
+ */
 public class TestIdealStateBuilder {
 
   private IdealState _idealState;

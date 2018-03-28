@@ -75,7 +75,6 @@ public class PartitionAssignmentGenerator {
     return partitionAssignment;
   }
 
-
   /**
    * Generates partition assignment for given table, using tagged hosts and num partitions
    */
@@ -90,7 +89,6 @@ public class PartitionAssignmentGenerator {
     int numReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
     RealtimeTagConfig realtimeTagConfig = getRealtimeTagConfig(tableConfig);
 
-    // get consuming server tagged hosts from helix admin
     List<String> consumingTaggedInstances = getConsumingTaggedInstances(realtimeTagConfig);
     if (consumingTaggedInstances.size() < numReplicas) {
       throw new IllegalStateException(
@@ -117,8 +115,8 @@ public class PartitionAssignmentGenerator {
    * @param numReplicas
    * @return
    */
-  private PartitionAssignment uniformAssignment(String tableName, List<String> partitions,
-      int numReplicas, List<String> allInstances, int numInstancesToUse) {
+  private PartitionAssignment uniformAssignment(String tableName, List<String> partitions, int numReplicas,
+      List<String> allInstances, int numInstancesToUse) {
 
     PartitionAssignment partitionAssignment = new PartitionAssignment(tableName);
 
@@ -136,6 +134,7 @@ public class PartitionAssignmentGenerator {
       }
     }
 
+    // pick a hashed start again, so that even in cases where we use all servers, we don't overload the servers at the start of the list
     int hashedStartingServer = Math.abs(EqualityUtils.hashCodeOf(tableName)) % numInstancesToUse;
     for (String partition : partitions) {
       List<String> instances = new ArrayList<>(numReplicas);

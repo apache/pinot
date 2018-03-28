@@ -212,19 +212,23 @@ public class PartitionAssignmentGeneratorTest {
     previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 6,
         previousPartitionAssignment, exception, unchanged);
 
-    // 3 partitions - 12 consuming instances - use all
+    // set maxConsuming = 10 in realtimeTagConfig - use 6
+    _partitionAssignmentGenerator.setRealtimeTagConfigWithMaxConsuming(10);
+    unchanged = false;
+    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 6,
+        previousPartitionAssignment, exception, unchanged);
+
+    // same - shouldn't change
+    unchanged = true;
+    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 6,
+        previousPartitionAssignment, exception, unchanged);
+
+    // 3 partitions - 12 consuming instances - set max to 10, use 10
     consumingInstanceList = getConsumingInstanceList(12);
     _partitionAssignmentGenerator.setConsumingInstances(consumingInstanceList);
     unchanged = false;
-    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 12,
-        previousPartitionAssignment, exception, unchanged);
-
-    // set maxConsuming = 10 in realtimeTagConfig - use 10
-    _partitionAssignmentGenerator.setRealtimeTagConfigWithMaxConsuming(10);
-    unchanged = false;
     previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 10,
         previousPartitionAssignment, exception, unchanged);
-
 
     // same - shouldn't change
     unchanged = true;
