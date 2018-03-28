@@ -15,68 +15,46 @@
  */
 package com.linkedin.pinot.core.plan;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
+import com.linkedin.pinot.core.operator.DocIdSetOperator;
+import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * DocIdSetPlanNode takes care creating BDocIdSetOperator.
- * Configure filter query and max size of docId cache here.
- */
 public class DocIdSetPlanNode implements PlanNode {
+  public static int MAX_DOC_PER_CALL = 10000;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DocIdSetPlanNode.class);
-  public static int MAX_DOC_PER_CALL = 10000;
-  private final IndexSegment _indexSegment;
-  private final BrokerRequest _brokerRequest;
-  private final PlanNode _filterNode;
-  private final int _maxDocPerCall;
-  private BReusableFilteredDocIdSetOperator _projectOp = null;
 
-  public DocIdSetPlanNode(IndexSegment indexSegment, BrokerRequest query) {
-    this(indexSegment, query, MAX_DOC_PER_CALL);
+  private final IndexSegment _indexSegment;
+  private final FilterPlanNode _filterPlanNode;
+  private final int _maxDocPerCall;
+
+  public DocIdSetPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest, int maxDocPerCall) {
+    Preconditions.checkState(maxDocPerCall <= MAX_DOC_PER_CALL);
+    _indexSegment = indexSegment;
+    _filterPlanNode = new FilterPlanNode(_indexSegment, brokerRequest);
+    _maxDocPerCall = maxDocPerCall;
   }
 
-  /**
-   * @param indexSegment
-   * @param query
-   * @param maxDocPerCall must be <= MAX_DOC_PER_CALL
-   */
-  public DocIdSetPlanNode(IndexSegment indexSegment, BrokerRequest query, int maxDocPerCall) {
-    _maxDocPerCall = Math.min(maxDocPerCall, MAX_DOC_PER_CALL);
-    _indexSegment = indexSegment;
-    _brokerRequest = query;
-    _filterNode = new FilterPlanNode(_indexSegment, _brokerRequest);
+  public DocIdSetPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest) {
+    this(indexSegment, brokerRequest, MAX_DOC_PER_CALL);
   }
 
   @Override
-  public Operator run() {
-    int totalRawDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    long start = System.currentTimeMillis();
-    if (_projectOp == null) {
-      _projectOp = new BReusableFilteredDocIdSetOperator(_filterNode.run(), totalRawDocs, _maxDocPerCall);
-      long end = System.currentTimeMillis();
-      LOGGER.debug("DocIdSetPlanNode.run took:" + (end - start));
-      return _projectOp;
-    } else {
-      return _projectOp;
-    }
-
+  public DocIdSetOperator run() {
+    return new DocIdSetOperator(_filterPlanNode.run(), _maxDocPerCall);
   }
 
   @Override
   public void showTree(String prefix) {
     LOGGER.debug(prefix + "DocIdSetPlanNode Plan Node :");
-    LOGGER.debug(prefix + "Operator: BReusableFilteredDocIdSetOperator");
+    LOGGER.debug(prefix + "Operator: DocIdSetOperator");
     LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
-    if (_filterNode != null) {
-      LOGGER.debug(prefix + "Argument 1: FilterPlanNode :(see below)");
-      _filterNode.showTree(prefix + "    ");
-    }
+    LOGGER.debug(prefix + "Argument 1: FilterPlanNode:");
+    _filterPlanNode.showTree(prefix + "    ");
   }
-
 }

@@ -15,10 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.query;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -30,6 +26,10 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 
 /**
  * Aggregation operator that utilizes dictionary for serving aggregation queries.
@@ -55,8 +55,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
    * @param totalRawDocs total raw docs from segmet metadata
    * @param dictionaryMap Map of column to its dictionary.
    */
-  public DictionaryBasedAggregationOperator(
-      AggregationFunctionContext[] aggregationFunctionContexts, long totalRawDocs,
+  public DictionaryBasedAggregationOperator(AggregationFunctionContext[] aggregationFunctionContexts, long totalRawDocs,
       Map<String, Dictionary> dictionaryMap) {
     _aggregationFunctionContexts = aggregationFunctionContexts;
     _dictionaryMap = dictionaryMap;
@@ -76,29 +75,29 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
       Dictionary dictionary = _dictionaryMap.get(column);
       AggregationResultHolder resultHolder;
       switch (functionType) {
-      case MAX:
-        resultHolder = new DoubleAggregationResultHolder(dictionary.getDoubleValue(dictionary.length() - 1));
-        break;
-      case MIN:
-        resultHolder = new DoubleAggregationResultHolder(dictionary.getDoubleValue(0));
-        break;
-      case MINMAXRANGE:
-        double max = dictionary.getDoubleValue(dictionary.length() - 1);
-        double min = dictionary.getDoubleValue(0);
-        resultHolder = new ObjectAggregationResultHolder();
-        resultHolder.setValue(new MinMaxRangePair(min, max));
-        break;
-      default:
-        throw new UnsupportedOperationException(
-            "Dictionary based aggregation operator does not support function " + function.getName());
+        case MAX:
+          resultHolder = new DoubleAggregationResultHolder(dictionary.getDoubleValue(dictionary.length() - 1));
+          break;
+        case MIN:
+          resultHolder = new DoubleAggregationResultHolder(dictionary.getDoubleValue(0));
+          break;
+        case MINMAXRANGE:
+          double max = dictionary.getDoubleValue(dictionary.length() - 1);
+          double min = dictionary.getDoubleValue(0);
+          resultHolder = new ObjectAggregationResultHolder();
+          resultHolder.setValue(new MinMaxRangePair(min, max));
+          break;
+        default:
+          throw new UnsupportedOperationException(
+              "Dictionary based aggregation operator does not support function " + function.getName());
       }
       aggregationResults.add(function.extractAggregationResult(resultHolder));
     }
 
     // Create execution statistics. Set numDocsScanned to totalRawDocs for backward compatibility.
     _executionStatistics =
-        new ExecutionStatistics(_totalRawDocs, 0/* numEntriesScannedInFilter */,
-            0/* numEntriesScannedPostFilter */, _totalRawDocs);
+        new ExecutionStatistics(_totalRawDocs, 0/* numEntriesScannedInFilter */, 0/* numEntriesScannedPostFilter */,
+            _totalRawDocs);
 
     // Build intermediate result block based on aggregation result from the executor.
     return new IntermediateResultsBlock(_aggregationFunctionContexts, aggregationResults, false);

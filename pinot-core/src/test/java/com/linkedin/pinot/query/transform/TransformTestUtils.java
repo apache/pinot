@@ -68,10 +68,5 @@ public class TransformTestUtils {
     public DataType getValueType() {
       return _dataType;
     }
-
-    @Override
-    public int getNumDocs() {
-      return _numDocs;
-    }
   }
 }

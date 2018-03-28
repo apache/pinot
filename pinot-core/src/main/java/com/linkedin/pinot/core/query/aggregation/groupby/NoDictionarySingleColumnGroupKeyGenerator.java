@@ -30,6 +30,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.Iterator;
 import java.util.Map;
+import javax.annotation.Nonnull;
 
 
 /**
@@ -60,7 +61,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   @Override
-  public void generateKeysForBlock(TransformBlock transformBlock, int[] docIdToGroupKey) {
+  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[] docIdToGroupKey) {
     BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByColumn);
     FieldSpec.DataType dataType = blockValSet.getValueType();
     int numDocs = transformBlock.getNumDocs();
@@ -153,7 +154,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   @Override
-  public void generateKeysForBlock(TransformBlock transformBlock, int[][] docIdToGroupKeys) {
+  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[][] docIdToGroupKeys) {
     // TODO: Support generating keys for multi-valued columns.
     throw new UnsupportedOperationException("Operation not supported");
   }
@@ -169,7 +170,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   @Override
-  public void purgeKeys(int[] keysToPurge) {
+  public void purgeKeys(@Nonnull int[] keysToPurge) {
     // TODO: Implement purging.
     throw new UnsupportedOperationException("Purging keys not yet supported in GroupKeyGenerator without dictionary.");
   }

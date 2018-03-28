@@ -21,7 +21,6 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
-import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
 import java.util.HashMap;
 import java.util.Map;
@@ -87,7 +86,7 @@ public class RealtimeNoDictionaryTest {
       doubleRawIndex.setDouble(i, _doubleVals[i]);
     }
 
-    Map<String, BaseOperator> dataSourceBlock = new HashMap<>();
+    Map<String, DataSource> dataSourceBlock = new HashMap<>();
     dataSourceBlock.put(INT_COL_NAME, new ColumnDataSource(intSpec, NUM_ROWS, 0, intRawIndex, null, null));
     dataSourceBlock.put(LONG_COL_NAME, new ColumnDataSource(longSpec, NUM_ROWS, 0, longRawIndex, null, null));
     dataSourceBlock.put(FLOAT_COL_NAME, new ColumnDataSource(floatSpec, NUM_ROWS, 0, floatRawIndex, null, null));

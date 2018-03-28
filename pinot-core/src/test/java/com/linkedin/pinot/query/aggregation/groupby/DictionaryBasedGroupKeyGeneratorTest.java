@@ -28,7 +28,6 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
@@ -127,7 +126,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     IndexSegment indexSegment = Loaders.IndexSegment.load(new File(INDEX_DIR_PATH, SEGMENT_NAME), ReadMode.heap);
 
     // Get a data fetcher for the index segment.
-    Map<String, BaseOperator> dataSourceMap = new HashMap<>();
+    Map<String, DataSource> dataSourceMap = new HashMap<>();
     Map<String, Block> blockMap = new HashMap<>();
     Set<TransformExpressionTree> expressionTrees = new HashSet<>();
 

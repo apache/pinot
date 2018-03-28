@@ -19,13 +19,13 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
-import com.linkedin.pinot.core.operator.BaseOperator;
-import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.DocIdSetOperator;
+import com.linkedin.pinot.core.operator.ProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
@@ -90,8 +90,7 @@ public class RawIndexBenchmark {
 
   private int _numRows = 0;
 
-  public void run()
-      throws Exception {
+  public void run() throws Exception {
     if (_segmentDir == null && _dataFile == null) {
       System.out.println("Error: One of 'segmentDir' or 'dataFile' must be specified");
       return;
@@ -115,8 +114,7 @@ public class RawIndexBenchmark {
    *
    * @throws Exception
    */
-  private File buildSegment()
-      throws Exception {
+  private File buildSegment() throws Exception {
     Schema schema = new Schema();
 
     for (int i = 0; i < NUM_COLUMNS; i++) {
@@ -212,13 +210,11 @@ public class RawIndexBenchmark {
    */
   private long profileLookups(IndexSegment segment, String column, int[] docIds) {
     BaseFilterOperator filterOperator = FilterOperatorTestUtils.makeFilterOperator(docIds);
-    BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(filterOperator, docIds.length, DocIdSetPlanNode.MAX_DOC_PER_CALL);
-
-    ProjectionBlock projectionBlock;
-    MProjectionOperator projectionOperator = new MProjectionOperator(buildDataSourceMap(segment), docIdSetOperator);
+    DocIdSetOperator docIdSetOperator = new DocIdSetOperator(filterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    ProjectionOperator projectionOperator = new ProjectionOperator(buildDataSourceMap(segment), docIdSetOperator);
 
     long start = System.currentTimeMillis();
+    ProjectionBlock projectionBlock;
     while ((projectionBlock = projectionOperator.nextBlock()) != null) {
       ProjectionBlockValSet blockValueSet = (ProjectionBlockValSet) projectionBlock.getBlockValueSet(column);
       blockValueSet.getDoubleValuesSV();
@@ -242,8 +238,8 @@ public class RawIndexBenchmark {
    * @param segment Segment for which to build the map
    * @return Column to data source map
    */
-  private Map<String, BaseOperator> buildDataSourceMap(IndexSegment segment) {
-    Map<String, BaseOperator> dataSourceMap = new HashMap<>();
+  private Map<String, DataSource> buildDataSourceMap(IndexSegment segment) {
+    Map<String, DataSource> dataSourceMap = new HashMap<>();
     for (String column : segment.getColumnNames()) {
       dataSourceMap.put(column, segment.getDataSource(column));
     }
@@ -288,8 +284,7 @@ public class RawIndexBenchmark {
    * @param args Command line arguments.
    * @throws Exception
    */
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     RawIndexBenchmark benchmark = new RawIndexBenchmark();
     CmdLineParser parser = new CmdLineParser(benchmark);
     parser.parseArgument(args);

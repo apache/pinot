@@ -15,13 +15,13 @@
  */
 package com.linkedin.pinot.core.plan;
 
+import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
-import com.linkedin.pinot.core.operator.BaseOperator;
-import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.ProjectionOperator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,39 +33,30 @@ import org.slf4j.LoggerFactory;
 public class ProjectionPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(ProjectionPlanNode.class);
 
-  private final Map<String, ColumnarDataSourcePlanNode> _dataSourcePlanNodeMap =
-      new HashMap<>();
   private final DocIdSetPlanNode _docIdSetPlanNode;
-  private MProjectionOperator _projectionOperator = null;
+  private final Map<String, DataSourcePlanNode> _dataSourcePlanNodeMap;
 
-  public ProjectionPlanNode(IndexSegment indexSegment, Set<String> columns, DocIdSetPlanNode docIdSetPlanNode) {
+  public ProjectionPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull Set<String> columns,
+      @Nonnull DocIdSetPlanNode docIdSetPlanNode) {
     _docIdSetPlanNode = docIdSetPlanNode;
+    _dataSourcePlanNodeMap = new HashMap<>(columns.size());
     for (String column : columns) {
-      _dataSourcePlanNodeMap.put(column, new ColumnarDataSourcePlanNode(indexSegment, column));
+      _dataSourcePlanNodeMap.put(column, new DataSourcePlanNode(indexSegment, column));
     }
   }
 
   @Override
-  public MProjectionOperator run() {
-    long start = System.currentTimeMillis();
-    if (_projectionOperator == null) {
-      Map<String, BaseOperator> dataSourceMap = new HashMap<>();
-      BReusableFilteredDocIdSetOperator docIdSetOperator = (BReusableFilteredDocIdSetOperator) _docIdSetPlanNode.run();
-      for (String column : _dataSourcePlanNodeMap.keySet()) {
-        ColumnarDataSourcePlanNode columnarDataSourcePlanNode = _dataSourcePlanNodeMap.get(column);
-        BaseOperator operator = columnarDataSourcePlanNode.run();
-        dataSourceMap.put(column, operator);
-      }
-      _projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
+  public ProjectionOperator run() {
+    Map<String, DataSource> dataSourceMap = new HashMap<>(_dataSourcePlanNodeMap.size());
+    for (Map.Entry<String, DataSourcePlanNode> entry : _dataSourcePlanNodeMap.entrySet()) {
+      dataSourceMap.put(entry.getKey(), entry.getValue().run());
     }
-    long end = System.currentTimeMillis();
-    LOGGER.debug("Time take in ProjectionPlanNode: " + (end - start));
-    return _projectionOperator;
+    return new ProjectionOperator(dataSourceMap, _docIdSetPlanNode.run());
   }
 
   @Override
   public void showTree(String prefix) {
-    LOGGER.debug(prefix + "Operator: MProjectionOperator");
+    LOGGER.debug(prefix + "Operator: ProjectionOperator");
     LOGGER.debug(prefix + "Argument 0: DocIdSet - ");
     _docIdSetPlanNode.showTree(prefix + "    ");
     int i = 0;

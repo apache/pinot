@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.query.aggregation.groupby;
 
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
+import javax.annotation.Nonnull;
 
 
 /**
@@ -33,7 +34,7 @@ public interface GroupByExecutor {
    *
    * @param transformBlock Block to process
    */
-  void process(TransformBlock transformBlock);
+  void process(@Nonnull TransformBlock transformBlock);
 
   /**
    * Post processing (if any) to be done after all docIdSets have been processed, and

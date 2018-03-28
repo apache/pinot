@@ -18,10 +18,6 @@ package com.linkedin.pinot.core.common;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
 
-/**
- *
- *
- */
 public interface BlockValSet {
 
   BlockValIterator iterator();
@@ -29,13 +25,19 @@ public interface BlockValSet {
   DataType getValueType();
 
   /**
-   * Number of docs in the block val set.
-   * For completely filled blocks it is {@link com.linkedin.pinot.core.plan.DocIdSetPlanNode#MAX_DOC_PER_CALL}.
-   * For partially filled blocks it will be less than that.
-   *
-   * @return Number of docs in the blockVal set.
+   * DOCUMENT ID BASED APIs
    */
-  int getNumDocs();
+
+  /**
+   * Get dictionary Ids for the given docIds.
+   *
+   * @param inDocIds Input docIds
+   * @param inStartPos Start index in inDocIds
+   * @param inDocIdsSize Number of input doc ids
+   * @param outDictionaryIds Output array
+   * @param outStartPos Start position in outDictionaryIds
+   */
+  void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos);
 
   /**
    * Get Integer values for the given docIds.
@@ -92,99 +94,101 @@ public interface BlockValSet {
   void getStringValues(int[] inDocIds, int inStartPos, int inDocIdsSize, String[] outValues, int outStartPos);
 
   /**
-   * Get int values for a single-valued column.
-   * @return int values
+   * SINGLE-VALUED COLUMN APIs
+   */
+
+  /**
+   * Returns the dictionary Ids for a single-valued column.
+   *
+   * @return Array of dictionary Ids
+   */
+  int[] getDictionaryIdsSV();
+
+  /**
+   * Returns the int values for a single-valued column.
+   *
+   * @return Array of int values
    */
   int[] getIntValuesSV();
 
   /**
-   * Get int values for a multi-valued column.
-   * @return int values
-   */
-  int[][] getIntValuesMV();
-
-  /**
-   * Get long values for a single-valued column.
-   * @return long values
+   * Returns the long values for a single-valued column.
+   *
+   * @return Array of long values
    */
   long[] getLongValuesSV();
 
   /**
-   * Get long values for a single-valued column.
-   * @return long values
-   */
-  long[][] getLongValuesMV();
-
-  /**
-   * Get float values for a single-valued column.
-   * @return float values
+   * Returns the float values for a single-valued column.
+   *
+   * @return Array of float values
    */
   float[] getFloatValuesSV();
 
   /**
-   * Get int values for a single-valued column.
-   * @return int values
-   */
-  float[][] getFloatValuesMV();
-
-  /**
-   * Get double values for single-valued column.
+   * Returns the double values for a single-valued column.
    *
-   * @return Values for single-valued column.
+   * @return Array of double values
    */
   double[] getDoubleValuesSV();
 
   /**
-   * Get double values for multi-valued column.
+   * Returns the string values for a single-valued column.
    *
-   * @return Values for multi-valued column.
-   *
-   * TODO: Re-visit batch reading of multi-valued columns.
-   */
-  double[][] getDoubleValuesMV();
-
-  /**
-   * Get String values for single-valued column.
-   *
-   * @return Values for single-valued column.
+   * @return Array of string values
    */
   String[] getStringValuesSV();
 
   /**
-   * Get String values for multi-valued column.
+   * MULTI-VALUED COLUMN APIs
+   */
+
+  /**
+   * Returns the dictionary Ids for a multi-valued column.
    *
-   * @return Values for multi-valued column.
+   * @return Array of dictionary Ids
+   */
+  int[][] getDictionaryIdsMV();
+
+  /**
+   * Returns the int values for a multi-valued column.
    *
-   * TODO: Re-visit batch reading of multi-valued columns.
+   * @return Array of int values
+   */
+  int[][] getIntValuesMV();
+
+  /**
+   * Returns the long values for a multi-valued column.
+   *
+   * @return Array of long values
+   */
+  long[][] getLongValuesMV();
+
+  /**
+   * Returns the float values for a multi-valued column.
+   *
+   * @return Array of float values
+   */
+  float[][] getFloatValuesMV();
+
+  /**
+   * Returns the double values for a multi-valued column.
+   *
+   * @return Array of double values
+   */
+  double[][] getDoubleValuesMV();
+
+  /**
+   * Returns the string values for a multi-valued column.
+   *
+   * @return Array of string values
    */
   String[][] getStringValuesMV();
 
   /**
-   * Get the dictionary ids for all docs of this block.
-   * This version is for single-valued columns.
-   */
-  int[] getDictionaryIdsSV();
-
-  int[][] getDictionaryIdsMV();
-
-  /**
-   * Copies the dictionaryIds for the input range DocIds.
-   * Expects that the out array is properly sized
-   * @param inDocIds input set of doc ids for which to read dictionaryIds
-   * @param inStartPos start index in inDocIds
-   * @param inDocIdsSize size of inDocIds
-   * @param outDictionaryIds out parameter giving the dictionary ids corresponding to
-   *                         input docIds
-   * @param outStartPos starting index position in outDictionaryIds. Indexes will
-   *                    be copied starting at this position.
-   *                    outDictionaryIds must be atleast (outStartPos + inDocIdsSize) in size
-   * TODO: Remove arguments from this api, as ProjectionBlock has all the required info.
-   */
-  void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos);
-
-  /**
-   * Returns an array containing number of MV entries for each docId in the BlockValSet.
+   * Returns the number of MV entries for a multi-valued column.
+   *
    * @return Array of number of MV entries
    */
-  int[] getNumberOfMVEntriesArray();
+  int[] getNumMVEntries();
 }

@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.operator.docvalsets;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BaseBlockValSet;
 import com.linkedin.pinot.core.common.DataBlockCache;
-import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.ProjectionOperator;
 
 
 /**
@@ -33,8 +33,8 @@ public class ProjectionBlockValSet extends BaseBlockValSet {
 
   /**
    * Constructor for the class.
-   * The dataBlockCache argument is initialized in {@link com.linkedin.pinot.core.operator.MProjectionOperator},
-   * so that it can be reused across multiple calls to {@link MProjectionOperator#nextBlock()}.
+   * The dataBlockCache argument is initialized in {@link ProjectionOperator},
+   * so that it can be reused across multiple calls to {@link ProjectionOperator#nextBlock()}.
    *
    * @param dataBlockCache data block cache
    * @param column Projection column.
@@ -123,7 +123,7 @@ public class ProjectionBlockValSet extends BaseBlockValSet {
   }
 
   @Override
-  public int[] getNumberOfMVEntriesArray() {
+  public int[] getNumMVEntries() {
     return _dataBlockCache.getNumValuesForMVColumn(_column);
   }
 }

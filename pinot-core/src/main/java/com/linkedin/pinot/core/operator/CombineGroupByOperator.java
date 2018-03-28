@@ -44,11 +44,11 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <code>MCombineGroupByOperator</code> class is the operator to combine aggregation group-by results.
+ * The <code>CombineGroupByOperator</code> class is the operator to combine aggregation group-by results.
  */
-public class MCombineGroupByOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MCombineGroupByOperator.class);
-  private static final String OPERATOR_NAME = "MCombineGroupByOperator";
+public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(CombineGroupByOperator.class);
+  private static final String OPERATOR_NAME = "CombineGroupByOperator";
 
   // TODO: check whether it is better to use thread local.
   // Choose a proper prime number for the number of locks.
@@ -78,7 +78,7 @@ public class MCombineGroupByOperator extends BaseOperator<IntermediateResultsBlo
    * @param timeOutMs Timeout for combine.
    * @param brokerRequest BrokerRequest corresponding to the query.
    */
-  public MCombineGroupByOperator(List<Operator> operators, ExecutorService executorService, long timeOutMs,
+  public CombineGroupByOperator(List<Operator> operators, ExecutorService executorService, long timeOutMs,
       BrokerRequest brokerRequest) {
     Preconditions.checkArgument(brokerRequest.isSetAggregationsInfo() && brokerRequest.isSetGroupBy());
 

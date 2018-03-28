@@ -17,8 +17,8 @@ package com.linkedin.pinot.core.plan;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.operator.MCombineGroupByOperator;
-import com.linkedin.pinot.core.operator.MCombineOperator;
+import com.linkedin.pinot.core.operator.CombineGroupByOperator;
+import com.linkedin.pinot.core.operator.CombineOperator;
 import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
 import com.linkedin.pinot.core.util.trace.TraceCallable;
 import java.util.ArrayList;
@@ -115,17 +115,17 @@ public class CombinePlanNode implements PlanNode {
     // TODO: use the same combine operator for both aggregation and selection query.
     if (_brokerRequest.isSetAggregationsInfo() && _brokerRequest.getGroupBy() != null) {
       // Aggregation group-by query
-      return new MCombineGroupByOperator(operators, _executorService, _timeOutMs, _brokerRequest);
+      return new CombineGroupByOperator(operators, _executorService, _timeOutMs, _brokerRequest);
     } else {
       // Selection or aggregation only query
-      return new MCombineOperator(operators, _executorService, _timeOutMs, _brokerRequest);
+      return new CombineOperator(operators, _executorService, _timeOutMs, _brokerRequest);
     }
   }
 
   @Override
   public void showTree(String prefix) {
     LOGGER.debug(prefix + "Instance Level Inter-Segments Combine Plan Node:");
-    LOGGER.debug(prefix + "Operator: MCombineOperator/MCombineGroupByOperator");
+    LOGGER.debug(prefix + "Operator: CombineOperator/CombineGroupByOperator");
     LOGGER.debug(prefix + "Argument 0: BrokerRequest - " + _brokerRequest);
     int i = 1;
     for (PlanNode planNode : _planNodes) {

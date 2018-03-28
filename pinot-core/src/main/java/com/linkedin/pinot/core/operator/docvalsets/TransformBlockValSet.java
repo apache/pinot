@@ -118,11 +118,6 @@ public class TransformBlockValSet extends BaseBlockValSet {
   }
 
   @Override
-  public int getNumDocs() {
-    return _numDocs;
-  }
-
-  @Override
   public FieldSpec.DataType getValueType() {
     return _dataType;
   }

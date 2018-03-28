@@ -64,7 +64,7 @@ import org.testng.annotations.Test;
  * Unit test for transforms on group by columns.
  */
 public class TransformGroupByTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TransformExpressionOperatorTest.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(TransformOperatorTest.class);
 
   private static final String SEGMENT_DIR_NAME = System.getProperty("java.io.tmpdir") + File.separator + "xformGroupBy";
   private static final String SEGMENT_NAME = "xformGroupBySeg";

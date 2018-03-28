@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.query.aggregation.groupby;
 
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import java.util.Iterator;
+import javax.annotation.Nonnull;
 
 
 /**
@@ -35,23 +36,22 @@ public interface GroupKeyGenerator {
   int getGlobalGroupKeyUpperBound();
 
   /**
-   * Generate group keys for a given docId set and return the mapping in the passed in docIdToGroupKey array.
-   * This interface is for situation where all the group-by columns are single valued.
+   * Generates group keys on the given transform block and returns the result to the given buffer.
+   * <p>This method is for situation where all the group-by columns are single-valued.
    *
-   * @param transformBlock Transform block for which to generate keys.
-   * @param docIdToGroupKey buffer to return the results.
+   * @param transformBlock Transform block
+   * @param groupKeys Buffer to return the results
    */
-  void generateKeysForBlock(TransformBlock transformBlock, int[] docIdToGroupKey);
+  void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[] groupKeys);
 
   /**
-   * Generate group keys for the given docId set and return a mapping from docId to group keys(int[]) in the passed in
-   * docIdToGroupKeys array.
-   * This interface is for situation where at least one group-by columns are multi valued.
+   * Generate group keys on the given transform block and returns the result to the given buffer.
+   * <p>This method is for situation where at least one group-by columns are multi-valued.
    *
-   * @param transformBlock Transform block for which to generate keys
-   * @param docIdToGroupKeys buffer to return the results.
+   * @param transformBlock Transform block
+   * @param groupKeys Buffer to return the results
    */
-  void generateKeysForBlock(TransformBlock transformBlock, int[][] docIdToGroupKeys);
+  void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[][] groupKeys);
 
   /**
    * Get the current upper bound of the group key. All group keys already generated should be less than this value. This
@@ -73,7 +73,7 @@ public interface GroupKeyGenerator {
    * Purge the given group keys.
    * @param keysToPurge Group keys to purge
    */
-  void purgeKeys(int[] keysToPurge);
+  void purgeKeys(@Nonnull int[] keysToPurge);
 
   /**
    * This class encapsulates the integer group id and the string group key.

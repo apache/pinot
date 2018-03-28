@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.common;
 
-import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.docvalsets.SingleValueSet;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -51,16 +50,16 @@ public class DataFetcher {
    *
    * @param dataSourceMap Map from column to data source
    */
-  public DataFetcher(Map<String, BaseOperator> dataSourceMap) {
+  public DataFetcher(Map<String, DataSource> dataSourceMap) {
     int numColumns = dataSourceMap.size();
     _dictionaryMap = new HashMap<>(numColumns);
     _singleValueSetMap = new HashMap<>(numColumns);
     _blockMultiValIteratorMap = new HashMap<>(numColumns);
 
     int maxNumMultiValues = 0;
-    for (Map.Entry<String, BaseOperator> entry : dataSourceMap.entrySet()) {
+    for (Map.Entry<String, DataSource> entry : dataSourceMap.entrySet()) {
       String column = entry.getKey();
-      DataSource dataSource = (DataSource) entry.getValue();
+      DataSource dataSource = entry.getValue();
       _dictionaryMap.put(column, dataSource.getDictionary());
       DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
       BlockValSet blockValueSet = dataSource.nextBlock().getBlockValueSet();

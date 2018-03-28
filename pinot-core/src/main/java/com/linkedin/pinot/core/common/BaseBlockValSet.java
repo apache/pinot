@@ -33,7 +33,8 @@ public abstract class BaseBlockValSet implements BlockValSet {
   }
 
   @Override
-  public int getNumDocs() {
+  public void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds,
+      int outStartPos) {
     throw new UnsupportedOperationException();
   }
 
@@ -63,12 +64,12 @@ public abstract class BaseBlockValSet implements BlockValSet {
   }
 
   @Override
-  public int[] getIntValuesSV() {
+  public int[] getDictionaryIdsSV() {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public int[][] getIntValuesMV() {
+  public int[] getIntValuesSV() {
     throw new UnsupportedOperationException();
   }
 
@@ -78,17 +79,7 @@ public abstract class BaseBlockValSet implements BlockValSet {
   }
 
   @Override
-  public long[][] getLongValuesMV() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public float[] getFloatValuesSV() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public float[][] getFloatValuesMV() {
     throw new UnsupportedOperationException();
   }
 
@@ -98,22 +89,7 @@ public abstract class BaseBlockValSet implements BlockValSet {
   }
 
   @Override
-  public double[][] getDoubleValuesMV() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public String[] getStringValuesSV() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public String[][] getStringValuesMV() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public int[] getDictionaryIdsSV() {
     throw new UnsupportedOperationException();
   }
 
@@ -123,13 +99,32 @@ public abstract class BaseBlockValSet implements BlockValSet {
   }
 
   @Override
-  public void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds,
-      int outStartPos) {
+  public int[][] getIntValuesMV() {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public int[] getNumberOfMVEntriesArray() {
+  public long[][] getLongValuesMV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public float[][] getFloatValuesMV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public double[][] getDoubleValuesMV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String[][] getStringValuesMV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int[] getNumMVEntries() {
     throw new UnsupportedOperationException();
   }
 }

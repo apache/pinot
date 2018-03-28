@@ -18,9 +18,8 @@ package com.linkedin.pinot.core.plan;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
+import com.linkedin.pinot.core.operator.transform.TransformOperator;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import java.util.HashSet;
 import java.util.Set;
@@ -88,8 +87,8 @@ public class TransformPlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() {
-    return new TransformExpressionOperator(_projectionPlanNode.run(), _expressionTrees);
+  public TransformOperator run() {
+    return new TransformOperator(_projectionPlanNode.run(), _expressionTrees);
   }
 
   @Override

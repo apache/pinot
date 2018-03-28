@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.plan;
 
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.operator.UResultOperator;
+import com.linkedin.pinot.core.operator.InstanceResponseOperator;
 import com.linkedin.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,12 +39,12 @@ public class GlobalPlanImplV0 implements Plan {
   @Override
   public DataTable execute() {
     long startTime = System.currentTimeMillis();
-    UResultOperator uResultOperator = _instanceResponsePlanNode.run();
+    InstanceResponseOperator instanceResponseOperator = _instanceResponsePlanNode.run();
     long endTime1 = System.currentTimeMillis();
     LOGGER.debug("InstanceResponsePlanNode.run() took: {}ms", endTime1 - startTime);
-    InstanceResponseBlock instanceResponseBlock = uResultOperator.nextBlock();
+    InstanceResponseBlock instanceResponseBlock = instanceResponseOperator.nextBlock();
     long endTime2 = System.currentTimeMillis();
-    LOGGER.debug("UResultOperator.nextBlock() took: {}ms", endTime2 - endTime1);
+    LOGGER.debug("InstanceResponseOperator.nextBlock() took: {}ms", endTime2 - endTime1);
     return instanceResponseBlock.getInstanceResponseDataTable();
   }
 

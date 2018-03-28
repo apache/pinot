@@ -26,6 +26,7 @@ import com.linkedin.pinot.core.util.FixedIntArray;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import javax.annotation.Nonnull;
 
 
 /**
@@ -79,7 +80,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   }
 
   @Override
-  public void generateKeysForBlock(TransformBlock transformBlock, int[] docIdToGroupKey) {
+  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[] docIdToGroupKey) {
     int numGroupByColumns = _groupByColumns.length;
     int numDocs = transformBlock.getNumDocs();
 
@@ -150,7 +151,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   }
 
   @Override
-  public void generateKeysForBlock(TransformBlock transformBlock, int[][] docIdToGroupKeys) {
+  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[][] docIdToGroupKeys) {
     // TODO: Support generating keys for multi-valued columns.
     throw new UnsupportedOperationException("Operation not supported");
   }
@@ -166,7 +167,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   }
 
   @Override
-  public void purgeKeys(int[] keysToPurge) {
+  public void purgeKeys(@Nonnull int[] keysToPurge) {
     // TODO: Implement purging.
     throw new UnsupportedOperationException("Purging keys not yet supported in GroupKeyGenerator without dictionary.");
   }
