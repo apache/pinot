@@ -30,6 +30,9 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
 /**
+ * TODO: Replace uses of this class with {@link com.linkedin.pinot.common.partition.PartitionAssignmentGenerator}
+ * which doesn't depend on znode for partition assignment
+ *
  * Class to help generate partition assignment, given the table config, number of stream partitions,
  * instances and all tables needing reassignment
  */
