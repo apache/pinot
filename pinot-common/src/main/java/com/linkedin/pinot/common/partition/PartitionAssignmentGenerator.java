@@ -80,6 +80,8 @@ public class PartitionAssignmentGenerator {
    */
   public PartitionAssignment generatePartitionAssignment(TableConfig tableConfig, int numPartitions) {
 
+    // TODO: add an override which can read from znode, instead of generating on the fly
+
     List<String> partitions = new ArrayList<>(numPartitions);
     for (int i = 0; i < numPartitions; i++) {
       partitions.add(String.valueOf(i));
