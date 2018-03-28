@@ -55,7 +55,8 @@ public abstract class QueryExecutor {
     protected int _testDuration;
     protected String _dataDir;
     List<ExecutorService> _threadPool;
-    public static final String defaultPath = "pinot_benchmark/query_generator_config/";
+    public static final String QUERY_CONFIG_PATH = "pinot_benchmark/query_generator_config/";
+    public static final String PINOT_TOOLS_RESOURCES = "pinot-tools/src/main/resources/";
     ReentrantLock lock = new ReentrantLock();
     public static QueryExecutor getInstance(){
         return null;
@@ -108,7 +109,7 @@ public abstract class QueryExecutor {
             //InputStream in = QueryExecutor.class.getClassLoader().getResourceAsStream(configFile);
             config.load(in);
         } catch (FileNotFoundException e) {
-            System.out.println("FileNotFoundException, Path should be PINOT_HOME/pinot_benchmark/query_generator_config/");
+            System.out.println("FileNotFoundException, Path should be PINOT_HOME/pinot-tools/src/main/resources/pinot_benchmark/query_generator_config/");
             e.printStackTrace();
         } catch (IOException e) {
             System.out.println("IOException");
@@ -119,7 +120,7 @@ public abstract class QueryExecutor {
     }
 
     public String getPathOfConfigFile(){
-        String prop = defaultPath+getConfigFile();
+        String prop = PINOT_TOOLS_RESOURCES+QUERY_CONFIG_PATH+getConfigFile();
         //String prop = getConfigFile();
         String config;
         String propDir = System.getenv("PINOT_HOME");
