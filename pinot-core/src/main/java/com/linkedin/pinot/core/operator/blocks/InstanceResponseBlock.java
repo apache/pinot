@@ -35,8 +35,7 @@ public class InstanceResponseBlock implements Block {
 
   private DataTable _instanceResponseDataTable;
 
-  public InstanceResponseBlock(Block block) {
-    IntermediateResultsBlock intermediateResultsBlock = (IntermediateResultsBlock) block;
+  public InstanceResponseBlock(IntermediateResultsBlock intermediateResultsBlock) {
     try {
       _instanceResponseDataTable = intermediateResultsBlock.getDataTable();
     } catch (Exception e) {

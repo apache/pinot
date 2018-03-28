@@ -19,11 +19,10 @@ import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
-import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.ProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
@@ -38,11 +37,11 @@ import java.util.Set;
  *
  *
  */
-public class MSelectionOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final String OPERATOR_NAME = "MSelectionOrderByOperator";
+public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBlock> {
+  private static final String OPERATOR_NAME = "SelectionOrderByOperator";
 
   private final IndexSegment _indexSegment;
-  private final MProjectionOperator _projectionOperator;
+  private final ProjectionOperator _projectionOperator;
   private final Selection _selection;
   private final SelectionOperatorService _selectionOperatorService;
   private final DataSchema _dataSchema;
@@ -50,10 +49,11 @@ public class MSelectionOrderByOperator extends BaseOperator<IntermediateResultsB
   private final Set<String> _selectionColumns = new HashSet<>();
   private ExecutionStatistics _executionStatistics;
 
-  public MSelectionOrderByOperator(IndexSegment indexSegment, Selection selection, Operator projectionOperator) {
+  public SelectionOrderByOperator(IndexSegment indexSegment, Selection selection,
+      ProjectionOperator projectionOperator) {
     _indexSegment = indexSegment;
     _selection = selection;
-    _projectionOperator = (MProjectionOperator) projectionOperator;
+    _projectionOperator = projectionOperator;
 
     initColumnarDataSourcePlanNodeMap(indexSegment);
     _selectionOperatorService = new SelectionOperatorService(_selection, indexSegment);
@@ -90,7 +90,7 @@ public class MSelectionOrderByOperator extends BaseOperator<IntermediateResultsB
     // Create execution statistics.
     numDocsScanned += _selectionOperatorService.getNumDocsScanned();
     long numEntriesScannedInFilter = _projectionOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = numDocsScanned * _projectionOperator.getNumProjectionColumns();
+    long numEntriesScannedPostFilter = numDocsScanned * _projectionOperator.getNumColumnsProjected();
     long numTotalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
     _executionStatistics =
         new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,

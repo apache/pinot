@@ -22,6 +22,7 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nonnull;
 
 
 /**
@@ -67,7 +68,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
    * @param transformBlock Block upon which to perform aggregation.
    */
   @Override
-  public void aggregate(TransformBlock transformBlock) {
+  public void aggregate(@Nonnull TransformBlock transformBlock) {
     Preconditions.checkState(_inited,
         "Method 'aggregate' cannot be called before 'init' for class " + getClass().getName());
 

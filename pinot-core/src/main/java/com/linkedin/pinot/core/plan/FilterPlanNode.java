@@ -21,27 +21,19 @@ import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.filter.AndOperator;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
-import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.EmptyFilterOperator;
 import com.linkedin.pinot.core.operator.filter.FilterOperatorUtils;
 import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.operator.filter.OrOperator;
-import com.linkedin.pinot.core.operator.filter.ScanBasedFilterOperator;
-import com.linkedin.pinot.core.operator.filter.SortedInvertedIndexBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.StarTreeIndexBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,22 +49,18 @@ public class FilterPlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() {
-    long start = System.currentTimeMillis();
-    Operator operator;
+  public BaseFilterOperator run() {
     FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(_brokerRequest);
     if (RequestUtils.isFitForStarTreeIndex(_segment.getSegmentMetadata(), _brokerRequest, rootFilterNode)) {
-      operator = new StarTreeIndexBasedFilterOperator(_segment, _brokerRequest, rootFilterNode);
+      return new StarTreeIndexBasedFilterOperator(_segment, _brokerRequest, rootFilterNode);
     } else {
-      operator = constructPhysicalOperator(rootFilterNode, _segment);
+      return constructPhysicalOperator(rootFilterNode, _segment);
     }
-    long end = System.currentTimeMillis();
-    LOGGER.debug("FilterPlanNode.run took:{}", (end - start));
-    return operator;
   }
 
   /**
    * Helper method to build the operator tree from the filter query tree.
+   *
    * @param filterQueryTree
    * @param segment Index segment
    * @return Filter Operator created

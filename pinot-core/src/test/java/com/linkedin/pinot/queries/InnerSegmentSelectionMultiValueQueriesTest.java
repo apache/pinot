@@ -19,8 +19,8 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.operator.query.MSelectionOnlyOperator;
-import com.linkedin.pinot.core.operator.query.MSelectionOrderByOperator;
+import com.linkedin.pinot.core.operator.query.SelectionOnlyOperator;
+import com.linkedin.pinot.core.operator.query.SelectionOrderByOperator;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Queue;
@@ -38,7 +38,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     String query = "SELECT * FROM testTable";
 
     // Test query without filter.
-    MSelectionOnlyOperator selectionOnlyOperator = getOperatorForQuery(query);
+    SelectionOnlyOperator selectionOnlyOperator = getOperatorForQuery(query);
     IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) selectionOnlyOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
@@ -84,7 +84,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
   public void testSelectionOnly() {
     String query = "SELECT" + SELECTION + " FROM testTable";
 
-    MSelectionOnlyOperator selectionOnlyOperator = getOperatorForQuery(query);
+    SelectionOnlyOperator selectionOnlyOperator = getOperatorForQuery(query);
     IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) selectionOnlyOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
@@ -131,7 +131,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     String query = "SELECT" + SELECTION + " FROM testTable" + ORDER_BY;
 
     // Test query without filter.
-    MSelectionOrderByOperator selectionOrderByOperator = getOperatorForQuery(query);
+    SelectionOrderByOperator selectionOrderByOperator = getOperatorForQuery(query);
     IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) selectionOrderByOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 100000L);

@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.operator.transform;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
-import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.ProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import java.util.Set;
@@ -28,10 +28,10 @@ import javax.annotation.Nonnull;
 /**
  * Class for evaluating transform expressions.
  */
-public class TransformExpressionOperator extends BaseOperator<TransformBlock> {
-  private static final String OPERATOR_NAME = "TransformExpressionOperator";
+public class TransformOperator extends BaseOperator<TransformBlock> {
+  private static final String OPERATOR_NAME = "TransformOperator";
 
-  private final MProjectionOperator _projectionOperator;
+  private final ProjectionOperator _projectionOperator;
   private final TransformExpressionEvaluator _expressionEvaluator;
 
   /**
@@ -40,7 +40,7 @@ public class TransformExpressionOperator extends BaseOperator<TransformBlock> {
    * @param projectionOperator Projection operator
    * @param expressionTrees Set of expression trees to evaluate
    */
-  public TransformExpressionOperator(@Nonnull MProjectionOperator projectionOperator,
+  public TransformOperator(@Nonnull ProjectionOperator projectionOperator,
       @Nonnull Set<TransformExpressionTree> expressionTrees) {
     _projectionOperator = projectionOperator;
     _expressionEvaluator = new DefaultExpressionEvaluator(expressionTrees);
@@ -66,7 +66,7 @@ public class TransformExpressionOperator extends BaseOperator<TransformBlock> {
     return _projectionOperator.getExecutionStatistics();
   }
 
-  public int getNumProjectionColumns() {
-    return _projectionOperator.getNumProjectionColumns();
+  public int getNumColumnsProjected() {
+    return _projectionOperator.getNumColumnsProjected();
   }
 }

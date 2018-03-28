@@ -21,18 +21,18 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
-import com.linkedin.pinot.core.operator.BaseOperator;
-import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.DocIdSetOperator;
+import com.linkedin.pinot.core.operator.ProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
+import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
-import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
+import com.linkedin.pinot.core.operator.transform.TransformOperator;
 import com.linkedin.pinot.core.operator.transform.function.AdditionTransform;
 import com.linkedin.pinot.core.operator.transform.function.DivisionTransform;
 import com.linkedin.pinot.core.operator.transform.function.MultiplicationTransform;
@@ -60,10 +60,10 @@ import org.testng.annotations.Test;
 
 
 /**
- * Test for {@link TransformExpressionOperator}
+ * Test for {@link TransformOperator}
  */
-public class TransformExpressionOperatorTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TransformExpressionOperatorTest.class);
+public class TransformOperatorTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TransformOperatorTest.class);
 
   private static final String SEGMENT_DIR_NAME = System.getProperty("java.io.tmpdir") + File.separator + "xformSegDir";
   private static final String SEGMENT_NAME = "xformSeg";
@@ -115,17 +115,16 @@ public class TransformExpressionOperatorTest {
    * @return Result of evaluation
    */
   private double[] evaluateExpression(String expression) {
-    Operator filterOperator = new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalDocs());
-    final BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(filterOperator, _indexSegment.getSegmentMetadata().getTotalDocs(),
-            NUM_ROWS);
-    final Map<String, BaseOperator> dataSourceMap = buildDataSourceMap(_indexSegment.getSegmentMetadata().getSchema());
-    final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
+    BaseFilterOperator filterOperator =
+        new MatchEntireSegmentOperator(_indexSegment.getSegmentMetadata().getTotalDocs());
+    final DocIdSetOperator docIdSetOperator = new DocIdSetOperator(filterOperator, NUM_ROWS);
+    final Map<String, DataSource> dataSourceMap = buildDataSourceMap(_indexSegment.getSegmentMetadata().getSchema());
+    final ProjectionOperator projectionOperator = new ProjectionOperator(dataSourceMap, docIdSetOperator);
 
     Set<TransformExpressionTree> expressionTrees =
         Collections.singleton(TransformExpressionTree.compileToExpressionTree(expression));
-    TransformExpressionOperator transformOperator =
-        new TransformExpressionOperator(projectionOperator, expressionTrees);
+    TransformOperator transformOperator =
+        new TransformOperator(projectionOperator, expressionTrees);
     TransformBlock transformBlock = transformOperator.nextBlock();
     BlockValSet blockValueSet = transformBlock.getBlockValueSet(expression);
     return blockValueSet.getDoubleValuesSV();
@@ -198,8 +197,8 @@ public class TransformExpressionOperatorTest {
    * @param schema Schema for the index segment
    * @return Map of metric name to its data source.
    */
-  private Map<String, BaseOperator> buildDataSourceMap(Schema schema) {
-    final Map<String, BaseOperator> dataSourceMap = new HashMap<>();
+  private Map<String, DataSource> buildDataSourceMap(Schema schema) {
+    final Map<String, DataSource> dataSourceMap = new HashMap<>();
     for (String metricName : schema.getMetricNames()) {
       dataSourceMap.put(metricName, _indexSegment.getDataSource(metricName));
     }

@@ -26,12 +26,11 @@ import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
-import com.linkedin.pinot.core.operator.BaseOperator;
-import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.DocIdSetOperator;
+import com.linkedin.pinot.core.operator.ProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
-import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
+import com.linkedin.pinot.core.operator.transform.TransformOperator;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -73,7 +72,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
   private static final int NUM_COLUMNS = DATA_TYPES.length;
   private static final int NUM_ROWS = 1;
   private RecordReader _recordReader;
-  private Map<String, BaseOperator> _dataSourceMap;
+  private Map<String, DataSource> _dataSourceMap;
   private IndexSegment _indexSegment;
 
   @BeforeClass
@@ -127,16 +126,15 @@ public class NoDictionaryGroupKeyGeneratorTest {
   private void testGroupKeyGenerator(String[] groupByColumns, FieldSpec.DataType[] dataTypes) throws Exception {
     // Build the projection operator.
     MatchEntireSegmentOperator matchEntireSegmentOperator = new MatchEntireSegmentOperator(NUM_ROWS);
-    BReusableFilteredDocIdSetOperator docIdSetOperator =
-        new BReusableFilteredDocIdSetOperator(matchEntireSegmentOperator, NUM_ROWS, 10000);
-    MProjectionOperator projectionOperator = new MProjectionOperator(_dataSourceMap, docIdSetOperator);
+    DocIdSetOperator docIdSetOperator = new DocIdSetOperator(matchEntireSegmentOperator, 10000);
+    ProjectionOperator projectionOperator = new ProjectionOperator(_dataSourceMap, docIdSetOperator);
 
     Set<TransformExpressionTree> expressionTrees = new HashSet<>(groupByColumns.length);
     for (String column : groupByColumns) {
       expressionTrees.add(TransformExpressionTree.compileToExpressionTree(column));
     }
-    TransformExpressionOperator transformOperator =
-        new TransformExpressionOperator(projectionOperator, expressionTrees);
+    TransformOperator transformOperator =
+        new TransformOperator(projectionOperator, expressionTrees);
 
     // Iterator over all projection blocks and generate group keys.
     TransformBlock transformBlock;

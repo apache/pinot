@@ -18,11 +18,10 @@ package com.linkedin.pinot.core.operator.query;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
-import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.ProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
@@ -35,26 +34,26 @@ import java.util.List;
 
 
 /**
- * This MSelectionOnlyOperator will take care of applying a selection query to one IndexSegment.
+ * This SelectionOnlyOperator will take care of applying a selection query to one IndexSegment.
  * nextBlock() will return an IntermediateResultBlock for the given IndexSegment.
  *
  *
  */
-public class MSelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final String OPERATOR_NAME = "MSelectionOnlyOperator";
+public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock> {
+  private static final String OPERATOR_NAME = "SelectionOnlyOperator";
 
   private final IndexSegment _indexSegment;
-  private final MProjectionOperator _projectionOperator;
+  private final ProjectionOperator _projectionOperator;
   private final DataSchema _dataSchema;
   private final Block[] _blocks;
   private final int _limitDocs;
   private final Collection<Serializable[]> _rowEvents;
   private ExecutionStatistics _executionStatistics;
 
-  public MSelectionOnlyOperator(IndexSegment indexSegment, Selection selection, Operator projectionOperator) {
+  public SelectionOnlyOperator(IndexSegment indexSegment, Selection selection, ProjectionOperator projectionOperator) {
     _indexSegment = indexSegment;
     _limitDocs = selection.getSize();
-    _projectionOperator = (MProjectionOperator) projectionOperator;
+    _projectionOperator = projectionOperator;
     List<String> selectionColumns =
         SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), indexSegment);
     _dataSchema = SelectionOperatorUtils.extractDataSchema(null, selectionColumns, indexSegment);
@@ -86,7 +85,7 @@ public class MSelectionOnlyOperator extends BaseOperator<IntermediateResultsBloc
 
     // Create execution statistics.
     long numEntriesScannedInFilter = _projectionOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = numDocsScanned * _projectionOperator.getNumProjectionColumns();
+    long numEntriesScannedPostFilter = numDocsScanned * _projectionOperator.getNumColumnsProjected();
     long numTotalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
     _executionStatistics =
         new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,

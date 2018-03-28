@@ -37,16 +37,16 @@ import javax.annotation.Nonnull;
  * - Single/Multi valued columns.
  */
 public class DefaultGroupByExecutor implements GroupByExecutor {
-  // Thread local (reusable) array for dict id to group key mapping.
-  private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_ID_TO_GROUP_KEY = new ThreadLocal<int[]>() {
+  // Thread local (reusable) array for single-valued group keys
+  private static final ThreadLocal<int[]> THREAD_LOCAL_SV_GROUP_KEYS = new ThreadLocal<int[]>() {
     @Override
     protected int[] initialValue() {
       return new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
   };
 
-  // Thread local (reusable) array for dict id to MV group key mapping.
-  private static final ThreadLocal<int[][]> THREAD_LOCAL_DICT_ID_TO_MV_GROUP_KEY = new ThreadLocal<int[][]>() {
+  // Thread local (reusable) array for multi-valued group keys
+  private static final ThreadLocal<int[][]> THREAD_LOCAL_MV_GROUP_KEYS = new ThreadLocal<int[][]>() {
     @Override
     protected int[][] initialValue() {
       return new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
@@ -80,11 +80,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    * @param maxInitialResultHolderCapacity Maximum initial capacity for the result holder
    * @param numGroupsLimit Limit on number of aggregation groups returned in the result
    */
-  public DefaultGroupByExecutor(@Nonnull AggregationFunctionContext[] aggrFunctionContexts, GroupBy groupBy,
+  public DefaultGroupByExecutor(@Nonnull AggregationFunctionContext[] aggrFunctionContexts, @Nonnull GroupBy groupBy,
       int maxInitialResultHolderCapacity, int numGroupsLimit) {
-    Preconditions.checkNotNull(aggrFunctionContexts.length > 0);
-    Preconditions.checkNotNull(groupBy);
-
     List<String> groupByColumns = groupBy.getColumns();
     List<String> groupByExpressions = groupBy.getExpressions();
 
@@ -130,7 +127,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    * @param transformBlock Transform block to process
    */
   @Override
-  public void process(TransformBlock transformBlock) {
+  public void process(@Nonnull TransformBlock transformBlock) {
     Preconditions.checkState(_inited,
         "Method 'process' cannot be called before 'init' for class " + getClass().getName());
 
@@ -251,9 +248,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private void initDocIdToGroupKeyMap() {
     if (_hasMVGroupByColumns) {
       // TODO: Revisit block fetching of multi-valued columns
-      _docIdToMVGroupKey = THREAD_LOCAL_DICT_ID_TO_MV_GROUP_KEY.get();
+      _docIdToMVGroupKey = THREAD_LOCAL_MV_GROUP_KEYS.get();
     } else {
-      _docIdToSVGroupKey = THREAD_LOCAL_DICT_ID_TO_GROUP_KEY.get();
+      _docIdToSVGroupKey = THREAD_LOCAL_SV_GROUP_KEYS.get();
     }
   }
 

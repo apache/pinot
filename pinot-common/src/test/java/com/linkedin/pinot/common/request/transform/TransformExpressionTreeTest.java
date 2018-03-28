@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.query.transform;
+package com.linkedin.pinot.common.request.transform;
 
-import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.Test;

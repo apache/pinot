@@ -18,21 +18,22 @@ package com.linkedin.pinot.core.operator;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
+import javax.annotation.Nonnull;
+
 
 /**
- * BReusableFilteredDocIdSetOperator will take a filter Operator and get the matched docId set.
- * Internally, cached a given size of docIds, so this Operator could be replicated
- * for many ColumnarReaderDataSource.
+ * The <code>DocIdSetOperator</code> takes a filter operator and returns blocks with set of the matched document Ids.
+ * <p>Should call {@link #nextBlock()} multiple times until it returns <code>null</code> (already exhausts all the
+ * matched documents) or already gathered enough documents (for selection queries).
  */
-public class BReusableFilteredDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
-  private static final String OPERATOR_NAME = "BReusableFilteredDocIdSetOperator";
+public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
+  private static final String OPERATOR_NAME = "DocIdSetOperator";
 
-  private static final ThreadLocal<int[]> DOC_ID_ARRAY = new ThreadLocal<int[]>() {
+  private static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS = new ThreadLocal<int[]>() {
     @Override
     protected int[] initialValue() {
       return new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
@@ -41,46 +42,40 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator<DocIdSetBloc
 
   private final BaseFilterOperator _filterOperator;
   private final int _maxSizeOfDocIdSet;
+
   private FilterBlockDocIdSet _filterBlockDocIdSet;
   private BlockDocIdIterator _blockDocIdIterator;
   private int _currentDocId = 0;
 
-  /**
-   * @param filterOperator
-   * @param docSize
-   * @param maxSizeOfDocIdSet must be less than {@link DocIdSetPlanNode}. MAX_DOC_PER_CALL which is
-   *          10000
-   */
-  public BReusableFilteredDocIdSetOperator(Operator filterOperator, int docSize,
-      int maxSizeOfDocIdSet) {
+  public DocIdSetOperator(@Nonnull BaseFilterOperator filterOperator, int maxSizeOfDocIdSet) {
     Preconditions.checkArgument(maxSizeOfDocIdSet <= DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    _filterOperator = filterOperator;
     _maxSizeOfDocIdSet = maxSizeOfDocIdSet;
-    _filterOperator = (BaseFilterOperator) filterOperator;
   }
 
   @Override
   protected DocIdSetBlock getNextBlock() {
-    // Handle limit 0 clause safely.
-    // For limit 0, _docIdArray will be zero sized
     if (_currentDocId == Constants.EOF) {
       return null;
     }
-    int[] docIdArray = DOC_ID_ARRAY.get();
-    // Initialize filter block doc id set.
+
+    // Initialize filter block document Id set
     if (_filterBlockDocIdSet == null) {
       _filterBlockDocIdSet = (FilterBlockDocIdSet) _filterOperator.nextBlock().getBlockDocIdSet();
       _blockDocIdIterator = _filterBlockDocIdSet.iterator();
     }
+
     int pos = 0;
+    int[] docIds = THREAD_LOCAL_DOC_IDS.get();
     for (int i = 0; i < _maxSizeOfDocIdSet; i++) {
       _currentDocId = _blockDocIdIterator.next();
       if (_currentDocId == Constants.EOF) {
         break;
       }
-      docIdArray[pos++] = _currentDocId;
+      docIds[pos++] = _currentDocId;
     }
     if (pos > 0) {
-      return new DocIdSetBlock(docIdArray, pos);
+      return new DocIdSetBlock(docIds, pos);
     } else {
       return null;
     }

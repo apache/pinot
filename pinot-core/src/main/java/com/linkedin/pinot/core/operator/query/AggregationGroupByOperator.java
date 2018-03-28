@@ -20,8 +20,9 @@ import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
-import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
+import com.linkedin.pinot.core.operator.transform.TransformOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
+import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import javax.annotation.Nonnull;
@@ -33,18 +34,18 @@ import javax.annotation.Nonnull;
 public class AggregationGroupByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AggregationGroupByOperator";
 
-  private final AggregationFunctionContext[] _aggregationFunctionContexts;
+  private final AggregationFunctionContext[] _functionContexts;
   private final GroupBy _groupBy;
   private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
-  private final TransformExpressionOperator _transformOperator;
+  private final TransformOperator _transformOperator;
   private final long _numTotalRawDocs;
   private ExecutionStatistics _executionStatistics;
 
-  public AggregationGroupByOperator(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
+  public AggregationGroupByOperator(@Nonnull AggregationFunctionContext[] functionContexts,
       @Nonnull GroupBy groupBy, int maxInitialResultHolderCapacity, int numGroupsLimit,
-      @Nonnull TransformExpressionOperator transformOperator, long numTotalRawDocs) {
-    _aggregationFunctionContexts = aggregationFunctionContexts;
+      @Nonnull TransformOperator transformOperator, long numTotalRawDocs) {
+    _functionContexts = functionContexts;
     _groupBy = groupBy;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
@@ -56,9 +57,9 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
   protected IntermediateResultsBlock getNextBlock() {
     int numDocsScanned = 0;
 
-    // Perform aggregation group-by on all the blocks.
+    // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor =
-        new DefaultGroupByExecutor(_aggregationFunctionContexts, _groupBy, _maxInitialResultHolderCapacity,
+        new DefaultGroupByExecutor(_functionContexts, _groupBy, _maxInitialResultHolderCapacity,
             _numGroupsLimit);
     groupByExecutor.init();
     TransformBlock transformBlock;
@@ -67,16 +68,17 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
       groupByExecutor.process(transformBlock);
     }
     groupByExecutor.finish();
+    AggregationGroupByResult groupByResult = groupByExecutor.getResult();
 
-    // Create execution statistics.
+    // Gather execution statistics
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumProjectionColumns();
+    long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumColumnsProjected();
     _executionStatistics =
         new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
             _numTotalRawDocs);
 
-    // Build intermediate result block based on aggregation group-by result from the executor.
-    return new IntermediateResultsBlock(_aggregationFunctionContexts, groupByExecutor.getResult());
+    // Build intermediate result block based on aggregation group-by result from the executor
+    return new IntermediateResultsBlock(_functionContexts, groupByResult);
   }
 
   @Override

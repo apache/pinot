@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.operator.query;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -27,7 +28,6 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +40,7 @@ public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateR
   private static final String OPERATOR_NAME = "MetadataBasedAggregationOperator";
 
   private final AggregationFunctionContext[] _aggregationFunctionContexts;
-  private final Map<String, BaseOperator> _dataSourceMap;
+  private final Map<String, DataSource> _dataSourceMap;
   private final SegmentMetadata _segmentMetadata;
   private ExecutionStatistics _executionStatistics;
 
@@ -52,7 +52,7 @@ public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateR
    * @param dataSourceMap Map of column to its data source.
    */
   public MetadataBasedAggregationOperator(AggregationFunctionContext[] aggregationFunctionContexts,
-      SegmentMetadata segmentMetadata, Map<String, BaseOperator> dataSourceMap) {
+      SegmentMetadata segmentMetadata, Map<String, DataSource> dataSourceMap) {
     _aggregationFunctionContexts = aggregationFunctionContexts;
 
     // Datasource is currently not used, but will start getting used as we add support for aggregation

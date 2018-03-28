@@ -157,7 +157,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
    * {@inheritDoc}
    */
   @Override
-  public void generateKeysForBlock(TransformBlock transformBlock, int[] outGroupIds) {
+  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[] outGroupIds) {
     // Fetch dictionary ids in the given block for all group-by columns
     for (int i = 0; i < _numGroupByColumns; i++) {
       BlockValSet blockValueSet = transformBlock.getBlockValueSet(_groupByColumns[i]);
@@ -171,7 +171,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
    * {@inheritDoc}
    */
   @Override
-  public void generateKeysForBlock(TransformBlock transformBlock, int[][] outGroupIds) {
+  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[][] outGroupIds) {
     // Fetch dictionary ids in the given block for all group-by columns
     for (int i = 0; i < _numGroupByColumns; i++) {
       BlockValSet blockValueSet = transformBlock.getBlockValueSet(_groupByColumns[i]);
@@ -205,7 +205,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
    * {@inheritDoc}
    */
   @Override
-  public void purgeKeys(int[] keyIdsToPurge) {
+  public void purgeKeys(@Nonnull int[] keyIdsToPurge) {
     // TODO: Make trimming work
   }
 

@@ -15,29 +15,25 @@
  */
 package com.linkedin.pinot.core.plan;
 
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.BaseOperator;
 
+public class DataSourcePlanNode implements PlanNode {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DataSourcePlanNode.class);
 
-/**
- * ColumnarDataSourcePlanNode will take docIdSetPlanNode as input and replicate
- * BDocIdSetOperator as an input for ColumnarReaderDataSource.
- */
-public class ColumnarDataSourcePlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");
   private final IndexSegment _indexSegment;
   private final String _columnName;
 
-  public ColumnarDataSourcePlanNode(IndexSegment indexSegment, String columnName) {
+  public DataSourcePlanNode(IndexSegment indexSegment, String columnName) {
     _indexSegment = indexSegment;
     _columnName = columnName;
   }
 
   @Override
-  public BaseOperator run() {
+  public DataSource run() {
     return _indexSegment.getDataSource(_columnName);
   }
 
@@ -48,5 +44,4 @@ public class ColumnarDataSourcePlanNode implements PlanNode {
     LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
     LOGGER.debug(prefix + "Argument 1: Column Name - " + _columnName);
   }
-
 }

@@ -60,7 +60,7 @@ public abstract class ResourceManager {
   protected static final int QUERY_RUNNER_THREAD_PRIORITY = 7;
   // This executor service will run the "main" operation of query processing
   // including planning, distributing operators across threads, waiting and
-  // reducing the results from the parallel set of operators (MCombineOperator)
+  // reducing the results from the parallel set of operators (CombineOperator)
   //
   protected final ListeningExecutorService queryRunners;
   protected final ListeningExecutorService queryWorkers;

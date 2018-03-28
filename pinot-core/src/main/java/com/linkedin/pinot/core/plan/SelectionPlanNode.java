@@ -19,8 +19,8 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.query.MSelectionOnlyOperator;
-import com.linkedin.pinot.core.operator.query.MSelectionOrderByOperator;
+import com.linkedin.pinot.core.operator.query.SelectionOnlyOperator;
+import com.linkedin.pinot.core.operator.query.SelectionOrderByOperator;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,9 +55,9 @@ public class SelectionPlanNode implements PlanNode {
   public Operator run() {
     // Use selection order-by operator only if there are sorting columns and selection size is not 0.
     if (_selection.isSetSelectionSortSequence() && (_selection.getSize() != 0)) {
-      return new MSelectionOrderByOperator(_indexSegment, _selection, _projectionPlanNode.run());
+      return new SelectionOrderByOperator(_indexSegment, _selection, _projectionPlanNode.run());
     } else {
-      return new MSelectionOnlyOperator(_indexSegment, _selection, _projectionPlanNode.run());
+      return new SelectionOnlyOperator(_indexSegment, _selection, _projectionPlanNode.run());
     }
   }
 
@@ -65,9 +65,9 @@ public class SelectionPlanNode implements PlanNode {
   public void showTree(String prefix) {
     LOGGER.debug(prefix + "Segment Level Inner-Segment Plan Node:");
     if (_selection.isSetSelectionSortSequence()) {
-      LOGGER.debug(prefix + "Operator: MSelectionOrderByOperator");
+      LOGGER.debug(prefix + "Operator: SelectionOrderByOperator");
     } else {
-      LOGGER.debug(prefix + "Operator: MSelectionOnlyOperator");
+      LOGGER.debug(prefix + "Operator: SelectionOnlyOperator");
     }
     LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
     LOGGER.debug(prefix + "Argument 1: Selections - " + _selection);

@@ -24,7 +24,6 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import java.io.File;
@@ -121,7 +120,7 @@ public class DataFetcherTest {
 
     IndexSegment indexSegment = Loaders.IndexSegment.load(new File(INDEX_DIR_PATH, SEGMENT_NAME), ReadMode.heap);
 
-    Map<String, BaseOperator> dataSourceMap = new HashMap<>();
+    Map<String, DataSource> dataSourceMap = new HashMap<>();
     for (String column : indexSegment.getColumnNames()) {
       dataSourceMap.put(column, indexSegment.getDataSource(column));
     }

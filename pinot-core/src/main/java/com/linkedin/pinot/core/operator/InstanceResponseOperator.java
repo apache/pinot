@@ -17,25 +17,21 @@ package com.linkedin.pinot.core.operator;
 
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.InstanceResponseBlock;
+import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 
 
-/**
- * UResultOperator now only take one argument, wrap the operator to InstanceResponseBlock.
- * For now it's always MCombineOperator.
- *
- *
- */
-public class UResultOperator extends BaseOperator<InstanceResponseBlock> {
-  private static final String OPERATOR_NAME = "UResultOperator";
+public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock> {
+  private static final String OPERATOR_NAME = "InstanceResponseOperator";
+
   private final Operator _operator;
 
-  public UResultOperator(Operator combinedOperator) {
+  public InstanceResponseOperator(Operator combinedOperator) {
     _operator = combinedOperator;
   }
 
   @Override
   protected InstanceResponseBlock getNextBlock() {
-    return new InstanceResponseBlock(_operator.nextBlock());
+    return new InstanceResponseBlock((IntermediateResultsBlock) _operator.nextBlock());
   }
 
   @Override

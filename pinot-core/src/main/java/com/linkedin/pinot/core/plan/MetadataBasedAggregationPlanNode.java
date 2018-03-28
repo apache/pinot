@@ -16,9 +16,9 @@
 package com.linkedin.pinot.core.plan;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.query.MetadataBasedAggregationOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
 public class MetadataBasedAggregationPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(MetadataBasedAggregationPlanNode.class);
 
-  private final Map<String, ColumnarDataSourcePlanNode> _dataSourcePlanNodeMap;
+  private final Map<String, DataSourcePlanNode> _dataSourcePlanNodeMap;
   private final AggregationFunctionContext[] _aggregationFunctionContexts;
   private IndexSegment _indexSegment;
 
@@ -61,7 +61,7 @@ public class MetadataBasedAggregationPlanNode implements PlanNode {
         if (!aggregationFunctionContext.getAggregationFunction()
             .getName()
             .equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
-          _dataSourcePlanNodeMap.put(column, new ColumnarDataSourcePlanNode(indexSegment, column));
+          _dataSourcePlanNodeMap.put(column, new DataSourcePlanNode(indexSegment, column));
         }
       }
     }
@@ -69,12 +69,12 @@ public class MetadataBasedAggregationPlanNode implements PlanNode {
 
   @Override
   public Operator run() {
-    Map<String, BaseOperator> dataSourceMap = new HashMap<>();
+    Map<String, DataSource> dataSourceMap = new HashMap<>();
 
     for (String column : _dataSourcePlanNodeMap.keySet()) {
-      ColumnarDataSourcePlanNode columnarDataSourcePlanNode = _dataSourcePlanNodeMap.get(column);
-      BaseOperator operator = columnarDataSourcePlanNode.run();
-      dataSourceMap.put(column, operator);
+      DataSourcePlanNode dataSourcePlanNode = _dataSourcePlanNodeMap.get(column);
+      DataSource dataSource = dataSourcePlanNode.run();
+      dataSourceMap.put(column, dataSource);
     }
 
     return new MetadataBasedAggregationOperator(_aggregationFunctionContexts, _indexSegment.getSegmentMetadata(),

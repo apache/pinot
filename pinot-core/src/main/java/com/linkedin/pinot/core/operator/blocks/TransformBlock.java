@@ -71,7 +71,7 @@ public class TransformBlock implements Block {
       return block.getMetadata();
     } else {
       BlockValSet blockValueSet = getBlockValueSet(column);
-      return new BlockMetadataImpl(blockValueSet.getNumDocs(), true, 0, blockValueSet.getValueType(), null);
+      return new BlockMetadataImpl(getNumDocs(), true, 0, blockValueSet.getValueType(), null);
     }
   }
 

@@ -37,11 +37,11 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The <code>MCombineOperator</code> class is the operator to combine selection results and aggregation only results.
+ * The <code>CombineOperator</code> class is the operator to combine selection results and aggregation only results.
  */
-public class MCombineOperator extends BaseOperator<IntermediateResultsBlock> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MCombineOperator.class);
-  private static final String OPERATOR_NAME = "MCombineOperator";
+public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(CombineOperator.class);
+  private static final String OPERATOR_NAME = "CombineOperator";
 
   private final List<Operator> _operators;
   private final BrokerRequest _brokerRequest;
@@ -60,7 +60,7 @@ public class MCombineOperator extends BaseOperator<IntermediateResultsBlock> {
     MAX_THREADS_PER_QUERY = Math.min(10, (int) (numCores * .5));
   }
 
-  public MCombineOperator(List<Operator> operators, ExecutorService executorService, long timeOutMs,
+  public CombineOperator(List<Operator> operators, ExecutorService executorService, long timeOutMs,
       BrokerRequest brokerRequest) {
     _operators = operators;
     _executorService = executorService;

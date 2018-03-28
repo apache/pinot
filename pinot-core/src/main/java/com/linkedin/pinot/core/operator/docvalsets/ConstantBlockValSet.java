@@ -20,6 +20,7 @@ import com.linkedin.pinot.core.common.BaseBlockValSet;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nonnull;
 
 
 /**
@@ -33,20 +34,19 @@ import java.util.Map;
  * </ul>
  */
 public class ConstantBlockValSet extends BaseBlockValSet {
-  private final String _value;
-  private int _numDocs;
-  private Map<FieldSpec.DataType, Object> _valuesMap;
+  private final String _stringValue;
+  private final int _numDocs;
+  private final Map<FieldSpec.DataType, Object> _valuesMap = new HashMap<>();
 
   /**
    * Constructor for the class.
    *
-   * @param value String representation of the value.
+   * @param stringValue String representation of the value
    * @param numDocs Number of docs in the block
    */
-  public ConstantBlockValSet(String value, int numDocs) {
-    _value = value;
+  public ConstantBlockValSet(@Nonnull String stringValue, int numDocs) {
+    _stringValue = stringValue;
     _numDocs = numDocs;
-    _valuesMap = new HashMap<>();
   }
 
   @Override
@@ -56,7 +56,7 @@ public class ConstantBlockValSet extends BaseBlockValSet {
     if (values != null) {
       return (int[]) values;
     } else {
-      int value = Integer.parseInt(_value);
+      int value = Integer.parseInt(_stringValue);
       int[] valuesArray = new int[_numDocs];
       Arrays.fill(valuesArray, value);
       _valuesMap.put(FieldSpec.DataType.INT, valuesArray);
@@ -71,7 +71,7 @@ public class ConstantBlockValSet extends BaseBlockValSet {
     if (values != null) {
       return (long[]) values;
     } else {
-      long value = Long.parseLong(_value);
+      long value = Long.parseLong(_stringValue);
       long[] valuesArray = new long[_numDocs];
       Arrays.fill(valuesArray, value);
       _valuesMap.put(FieldSpec.DataType.LONG, valuesArray);
@@ -86,7 +86,7 @@ public class ConstantBlockValSet extends BaseBlockValSet {
     if (values != null) {
       return (float[]) values;
     } else {
-      float value = Float.parseFloat(_value);
+      float value = Float.parseFloat(_stringValue);
       float[] valuesArray = new float[_numDocs];
       Arrays.fill(valuesArray, value);
       _valuesMap.put(FieldSpec.DataType.FLOAT, valuesArray);
@@ -101,7 +101,7 @@ public class ConstantBlockValSet extends BaseBlockValSet {
     if (values != null) {
       return (double[]) values;
     } else {
-      double value = Double.parseDouble(_value);
+      double value = Double.parseDouble(_stringValue);
       double[] valuesArray = new double[_numDocs];
       Arrays.fill(valuesArray, value);
       _valuesMap.put(FieldSpec.DataType.DOUBLE, valuesArray);
@@ -117,14 +117,9 @@ public class ConstantBlockValSet extends BaseBlockValSet {
       return (String[]) values;
     } else {
       String[] valuesArray = new String[_numDocs];
-      Arrays.fill(valuesArray, _value);
+      Arrays.fill(valuesArray, _stringValue);
       _valuesMap.put(FieldSpec.DataType.STRING, valuesArray);
       return valuesArray;
     }
-  }
-
-  @Override
-  public int getNumDocs() {
-    return _numDocs;
   }
 }
