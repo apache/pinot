@@ -282,8 +282,8 @@ public class PartitionAssignmentGeneratorTest {
     Assert.assertEquals(partitionAssignment.getNumPartitions(), numPartitions);
 
     List<String> instancesUsed = new ArrayList<>();
-    for (Map.Entry<String, List<String>> entry : partitionAssignment.getPartitionToInstances().entrySet()) {
-      for (String instance : entry.getValue()) {
+    for (int p = 0; p < partitionAssignment.getNumPartitions(); p++) {
+      for (String instance : partitionAssignment.getInstancesListForPartition(String.valueOf(p))) {
         if (!instancesUsed.contains(instance)) {
           instancesUsed.add(instance);
         }
@@ -298,8 +298,8 @@ public class PartitionAssignmentGeneratorTest {
 
     // verify strategy is uniform
     int serverId = 0;
-    for (Map.Entry<String, List<String>> entry : partitionAssignment.getPartitionToInstances().entrySet()) {
-      for (String instance : entry.getValue()) {
+    for (int p = 0; p < partitionAssignment.getNumPartitions(); p++) {
+      for (String instance : partitionAssignment.getInstancesListForPartition(String.valueOf(p))) {
         Assert.assertTrue(instance.equals(instancesUsed.get(serverId++)));
         if (serverId == instancesUsed.size()) {
           serverId = 0;
