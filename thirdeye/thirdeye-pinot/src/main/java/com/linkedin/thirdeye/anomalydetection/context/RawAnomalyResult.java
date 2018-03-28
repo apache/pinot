@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomalydetection.context;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
@@ -120,4 +121,18 @@ public class RawAnomalyResult implements AnomalyResult {
     }
   }
 
+  @Override
+  public String toString() {
+    return MoreObjects.toStringHelper(this)
+        .add("startTime", startTime)
+        .add("endTime", endTime)
+        .add("dimensions", dimensions)
+        .add("score", score)
+        .add("weight", weight)
+        .add("avgCurrentVal", avgCurrentVal)
+        .add("avgBaselineVal", avgBaselineVal)
+        .add("properties", properties)
+        .add("feedback", feedback)
+        .toString();
+  }
 }
