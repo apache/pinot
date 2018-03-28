@@ -1,8 +1,26 @@
+/**
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.pinot.common.partition;
 
 import com.google.common.collect.Lists;
+import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TenantConfig;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,6 +40,7 @@ import static org.mockito.Mockito.*;
 public class PartitionAssignmentGeneratorTest {
 
   private String tableName = "aTableName_REALTIME";
+  private String aServerTenant = "aTenant";
   private TestPartitionAssignmentGenerator _partitionAssignmentGenerator;
 
   private String[] consumingServerNames;
@@ -34,7 +53,8 @@ public class PartitionAssignmentGeneratorTest {
 
   @BeforeMethod
   public void setUp() throws Exception {
-    _partitionAssignmentGenerator = new TestPartitionAssignmentGenerator(null);
+    HelixManager mockHelixManager = mock(HelixManager.class);
+    _partitionAssignmentGenerator = new TestPartitionAssignmentGenerator(mockHelixManager);
 
     final int maxInstances = 20;
     consumingServerNames = new String[maxInstances];
@@ -51,126 +71,85 @@ public class PartitionAssignmentGeneratorTest {
 
     TableConfig tableConfig = mock(TableConfig.class);
     when(tableConfig.getTableName()).thenReturn(tableName);
-    IdealState idealState = new IdealState(tableName);
+
+    TestIdealStateBuilder idealStateBuilder = new TestIdealStateBuilder(tableName);
+    IdealState idealState;
 
     int numPartitions = 0;
-    List<LLCSegmentName> segmentsToCheck = new ArrayList<>();
+    int numReplicas = 2;
 
     // empty ideal state
-    verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions, segmentsToCheck);
+    idealState = idealStateBuilder.build();
+    verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions);
 
     // 3 partitions 2 replicas, all on 0th seq number (6 segments)
-    LLCSegmentName llcSegment_0_0 = new LLCSegmentName(tableName, 0, 0, System.currentTimeMillis());
-    Map<String, String> instanceStateMap_0_0 = new HashMap<>(2);
-    instanceStateMap_0_0.put("s1", "CONSUMING");
-    instanceStateMap_0_0.put("s2", "CONSUMING");
-    LLCSegmentName llcSegment_1_0 = new LLCSegmentName(tableName, 1, 0, System.currentTimeMillis());
-    Map<String, String> instanceStateMap_1_0 = new HashMap<>(2);
-    instanceStateMap_1_0.put("s3", "CONSUMING");
-    instanceStateMap_1_0.put("s4", "CONSUMING");
-    LLCSegmentName llcSegment_2_0 = new LLCSegmentName(tableName, 2, 0, System.currentTimeMillis());
-    Map<String, String> instanceStateMap_2_0 = new HashMap<>(2);
-    instanceStateMap_2_0.put("s1", "CONSUMING");
-    instanceStateMap_2_0.put("s2", "CONSUMING");
-    idealState.setInstanceStateMap(llcSegment_0_0.getSegmentName(), instanceStateMap_0_0);
-    idealState.setInstanceStateMap(llcSegment_1_0.getSegmentName(), instanceStateMap_1_0);
-    idealState.setInstanceStateMap(llcSegment_2_0.getSegmentName(), instanceStateMap_2_0);
     numPartitions = 3;
-    segmentsToCheck = Lists.newArrayList(llcSegment_0_0, llcSegment_1_0, llcSegment_2_0);
-    verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions, segmentsToCheck);
+    List<String> instances = getConsumingInstanceList(4);
+    idealState = idealStateBuilder.addConsumingSegments(numPartitions, 0, numReplicas, instances).build();
+    verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions);
 
     // 3 partitions 2 replicas, 2 on 0th seq number 1 on 1st seq number (8 segments)
-    LLCSegmentName llcSegment_0_1 = new LLCSegmentName(tableName, 0, 1, System.currentTimeMillis());
-    instanceStateMap_0_0 = new HashMap<>(2);
-    instanceStateMap_0_0.put("s1", "ONLINE");
-    instanceStateMap_0_0.put("s2", "ONLINE");
-    Map<String, String> instanceStateMap_0_1 = new HashMap<>(2);
-    instanceStateMap_0_1.put("s1", "CONSUMING");
-    instanceStateMap_0_1.put("s2", "CONSUMING");
-    idealState.setInstanceStateMap(llcSegment_0_0.getSegmentName(), instanceStateMap_0_0);
-    idealState.setInstanceStateMap(llcSegment_0_1.getSegmentName(), instanceStateMap_0_1);
-    segmentsToCheck = Lists.newArrayList(llcSegment_0_1, llcSegment_1_0, llcSegment_2_0);
-    verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions, segmentsToCheck);
+    instances = idealStateBuilder.getInstances(0, 0);
+    idealState =
+        idealStateBuilder.transitionToState(0, 0, "ONLINE").addConsumingSegment(0, 1, numReplicas, instances).build();
+    verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions);
 
     // 3 partitions 2 replicas, all on 1st seg num (12 segments)
-    LLCSegmentName llcSegment_1_1 = new LLCSegmentName(tableName, 1, 1, System.currentTimeMillis());
-    instanceStateMap_1_0 = new HashMap<>(2);
-    instanceStateMap_1_0.put("s3", "ONLINE");
-    instanceStateMap_1_0.put("s4", "ONLINE");
-    Map<String, String> instanceStateMap_1_1 = new HashMap<>(2);
-    instanceStateMap_1_1.put("s3", "CONSUMING");
-    instanceStateMap_1_1.put("s4", "CONSUMING");
-    idealState.setInstanceStateMap(llcSegment_1_0.getSegmentName(), instanceStateMap_1_0);
-    idealState.setInstanceStateMap(llcSegment_1_1.getSegmentName(), instanceStateMap_1_1);
-    LLCSegmentName llcSegment_2_1 = new LLCSegmentName(tableName, 2, 1, System.currentTimeMillis());
-    instanceStateMap_2_0 = new HashMap<>(2);
-    instanceStateMap_2_0.put("s1", "ONLINE");
-    instanceStateMap_2_0.put("s2", "ONLINE");
-    Map<String, String> instanceStateMap_2_1 = new HashMap<>(2);
-    instanceStateMap_2_1.put("s1", "CONSUMING");
-    instanceStateMap_2_1.put("s2", "CONSUMING");
-    idealState.setInstanceStateMap(llcSegment_2_0.getSegmentName(), instanceStateMap_2_0);
-    idealState.setInstanceStateMap(llcSegment_2_1.getSegmentName(), instanceStateMap_2_1);
-    segmentsToCheck = Lists.newArrayList(llcSegment_0_1, llcSegment_1_1, llcSegment_2_1);
-    verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions, segmentsToCheck);
+    instances = idealStateBuilder.getInstances(1, 0);
+    idealStateBuilder.transitionToState(1, 0, "ONLINE").addConsumingSegment(1, 1, numReplicas, instances);
+    instances = idealStateBuilder.getInstances(2, 0);
+    idealState =
+        idealStateBuilder.transitionToState(2, 0, "ONLINE").addConsumingSegment(2, 1, numReplicas, instances).build();
+    verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions);
 
     // 3 partitions 2 replicas, seq 0 has moved to COMPLETED servers, seq 1 on CONSUMING instances
-    instanceStateMap_0_0 = new HashMap<>(2);
-    instanceStateMap_0_0.put("s1_completed", "ONLINE");
-    instanceStateMap_0_0.put("s2_completed", "ONLINE");
-    idealState.setInstanceStateMap(llcSegment_0_0.getSegmentName(), instanceStateMap_0_0);
-    instanceStateMap_1_0 = new HashMap<>(2);
-    instanceStateMap_1_0.put("s3_completed", "ONLINE");
-    instanceStateMap_1_0.put("s4_completed", "ONLINE");
-    idealState.setInstanceStateMap(llcSegment_1_0.getSegmentName(), instanceStateMap_1_0);
-    instanceStateMap_2_0 = new HashMap<>(2);
-    instanceStateMap_2_0.put("s1_completed", "ONLINE");
-    instanceStateMap_2_0.put("s2_completed", "ONLINE");
-    idealState.setInstanceStateMap(llcSegment_2_0.getSegmentName(), instanceStateMap_2_0);
-    verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions, segmentsToCheck);
+    instances = Lists.newArrayList("s1_completed", "s2_completed");
+    idealState = idealStateBuilder.moveToServers(0, 0, instances).build();
+    verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions);
 
     // status of latest segments OFFLINE/ERROR
-    instanceStateMap_2_1 = new HashMap<>(2);
-    instanceStateMap_2_1.put("s1", "ERROR");
-    instanceStateMap_2_1.put("s2", "ERROR");
-    idealState.setInstanceStateMap(llcSegment_2_1.getSegmentName(), instanceStateMap_2_1);
-    instanceStateMap_1_1 = new HashMap<>(2);
-    instanceStateMap_1_1.put("s3", "OFFLINE");
-    instanceStateMap_1_1.put("s4", "OFFLINE");
-    idealState.setInstanceStateMap(llcSegment_1_1.getSegmentName(), instanceStateMap_1_1);
-    verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions, segmentsToCheck);
+    idealState = idealStateBuilder.transitionToState(1, 1, "ERROR").transitionToState(2, 1, "OFFLINE").build();
+    verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions);
 
     // all non llc segments
-    idealState.getRecord().getMapFields().clear();
     String aNonLLCSegment = "randomName";
     Map<String, String> instanceStateMap = new HashMap<>(1);
     instanceStateMap.put("s1", "CONSUMING");
     instanceStateMap.put("s2", "CONSUMING");
-    idealState.setInstanceStateMap(aNonLLCSegment, instanceStateMap);
+    idealState = idealStateBuilder.clear().addSegment(aNonLLCSegment, instanceStateMap).build();
     numPartitions = 0;
-    segmentsToCheck.clear();
-    verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions, segmentsToCheck);
+    verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions);
 
     // some non llc segments, some llc segments
-    idealState.setInstanceStateMap(llcSegment_0_0.getSegmentName(), instanceStateMap_0_0);
     numPartitions = 1;
-    segmentsToCheck = Lists.newArrayList(llcSegment_0_0);
-    verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions, segmentsToCheck);
+    instances = getConsumingInstanceList(6);
+    idealState = idealStateBuilder.addConsumingSegments(numPartitions, 0, numReplicas, instances).build();
+    verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions);
   }
 
   private void verifyPartitionAssignmentFromIdealState(TableConfig tableConfig, IdealState idealState,
-      int numPartitions, List<LLCSegmentName> segmentsToCheck) {
+      int numPartitions) {
     PartitionAssignment partitionAssignmentFromIdealState =
         _partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
     Assert.assertEquals(tableConfig.getTableName(), partitionAssignmentFromIdealState.getTableName());
     Assert.assertEquals(partitionAssignmentFromIdealState.getNumPartitions(), numPartitions);
     // check that latest segments are honoring partition assignment
-    for (LLCSegmentName llcSegmentName : segmentsToCheck) {
-      String segmentName = llcSegmentName.getSegmentName();
-      int partitionId = llcSegmentName.getPartitionId();
-      Set<String> idealStateInstances = idealState.getInstanceStateMap(segmentName).keySet();
+    Map<Integer, LLCSegmentName> partitionIdToLatestLLCSegment = new HashMap<>(numPartitions);
+    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
+      String segmentName = entry.getKey();
+      if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
+        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+        int partitionId = llcSegmentName.getPartitionId();
+        LLCSegmentName latestLLCSegment = partitionIdToLatestLLCSegment.get(partitionId);
+        if (latestLLCSegment == null || llcSegmentName.getSequenceNumber() > latestLLCSegment.getSequenceNumber()) {
+          partitionIdToLatestLLCSegment.put(partitionId, llcSegmentName);
+        }
+      }
+    }
+    for (Map.Entry<Integer, LLCSegmentName> entry : partitionIdToLatestLLCSegment.entrySet()) {
+      Set<String> idealStateInstances = idealState.getInstanceStateMap(entry.getValue().getSegmentName()).keySet();
       List<String> partitionAssignmentInstances =
-          partitionAssignmentFromIdealState.getInstancesListForPartition(String.valueOf(partitionId));
+          partitionAssignmentFromIdealState.getInstancesListForPartition(String.valueOf(entry.getKey()));
       Assert.assertEquals(idealStateInstances.size(), partitionAssignmentInstances.size());
       Assert.assertTrue(idealStateInstances.containsAll(partitionAssignmentInstances));
     }
@@ -180,6 +159,9 @@ public class PartitionAssignmentGeneratorTest {
   public void testGeneratePartitionAssignment() {
     TableConfig tableConfig = mock(TableConfig.class);
     when(tableConfig.getTableName()).thenReturn(tableName);
+    TenantConfig mockTenantConfig = mock((TenantConfig.class));
+    when(mockTenantConfig.getServer()).thenReturn(aServerTenant);
+    when(tableConfig.getTenantConfig()).thenReturn(mockTenantConfig);
     SegmentsValidationAndRetentionConfig mockValidationConfig = mock(SegmentsValidationAndRetentionConfig.class);
     when(mockValidationConfig.getReplicasPerPartitionNumber()).thenReturn(2);
     when(tableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
@@ -191,12 +173,12 @@ public class PartitionAssignmentGeneratorTest {
 
     // 0 consuming instances - error not enough instances
     exception = true;
-    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
+    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 0,
         previousPartitionAssignment, exception, unchanged);
 
     // 1 consuming instance - error not enough instances
     consumingInstanceList = getConsumingInstanceList(1);
-    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
+    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 1,
         previousPartitionAssignment, exception, unchanged);
 
     // 0 partitions - 3 consuming instances - empty partition assignment
@@ -204,75 +186,82 @@ public class PartitionAssignmentGeneratorTest {
     _partitionAssignmentGenerator.setConsumingInstances(consumingInstanceList);
     exception = false;
     unchanged = true;
-    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
+    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 3,
         previousPartitionAssignment, exception, unchanged);
 
     // 3 partitions - 3 consuming instances - should use 3
     numPartitions = 3;
     unchanged = false;
-    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
+    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 3,
         previousPartitionAssignment, exception, unchanged);
 
     // same - shouldn't change
     unchanged = true;
-    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
+    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 3,
         previousPartitionAssignment, exception, unchanged);
 
     // 3 partitions - 6 consuming instances - increased instances, should use 6
     consumingInstanceList = getConsumingInstanceList(6);
     _partitionAssignmentGenerator.setConsumingInstances(consumingInstanceList);
     unchanged = false;
-    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
+    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 6,
         previousPartitionAssignment, exception, unchanged);
 
     // same - shouldn't change
     unchanged = true;
-    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
+    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 6,
         previousPartitionAssignment, exception, unchanged);
 
-    // 3 partitions - 12 consuming instances - increased beyond MAX allowed, should use 10 (or whatever is the MAX)
+    // 3 partitions - 12 consuming instances - use all
     consumingInstanceList = getConsumingInstanceList(12);
     _partitionAssignmentGenerator.setConsumingInstances(consumingInstanceList);
     unchanged = false;
-    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
+    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 12,
         previousPartitionAssignment, exception, unchanged);
+
+    // set maxConsuming = 10 in realtimeTagConfig - use 10
+    _partitionAssignmentGenerator.setRealtimeTagConfigWithMaxConsuming(10);
+    unchanged = false;
+    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 10,
+        previousPartitionAssignment, exception, unchanged);
+
 
     // same - shouldn't change
     unchanged = true;
-    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
+    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 10,
         previousPartitionAssignment, exception, unchanged);
 
     // increase in partitions - 4
     numPartitions = 4;
     unchanged = false;
-    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
+    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 10,
         previousPartitionAssignment, exception, unchanged);
 
     // same - shouldn't change
     unchanged = true;
-    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, previousPartitionAssignment,
-        exception, unchanged);
+    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 10,
+        previousPartitionAssignment, exception, unchanged);
 
     // increase in partitions - 8 (numPartitions * numReplicas = 8*2 = 16. but should still use only 10 instances)
     numPartitions = 8;
     unchanged = false;
-    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
+    previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 10,
         previousPartitionAssignment, exception, unchanged);
 
     // same - shouldn't change
     unchanged = true;
-    verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, previousPartitionAssignment,
+    verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList, 10,  previousPartitionAssignment,
         exception, unchanged);
   }
 
   private PartitionAssignment verifyGeneratePartitionAssignment(TableConfig tableConfig, int numPartitions,
-      List<String> consumingInstanceList, PartitionAssignment previousPartitionAssignment, boolean exception,
+      List<String> consumingInstanceList, int instancesToUse, PartitionAssignment previousPartitionAssignment, boolean exception,
       boolean unchanged) {
     PartitionAssignment partitionAssignment;
     try {
       partitionAssignment = _partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions);
       Assert.assertFalse(exception);
-      verify(partitionAssignment, numPartitions, consumingInstanceList, unchanged, previousPartitionAssignment);
+      verify(partitionAssignment, numPartitions, consumingInstanceList, instancesToUse, unchanged, previousPartitionAssignment);
     } catch (Exception e) {
       Assert.assertTrue(exception);
       partitionAssignment = previousPartitionAssignment;
@@ -281,9 +270,8 @@ public class PartitionAssignmentGeneratorTest {
     return partitionAssignment;
   }
 
-
   private void verify(PartitionAssignment partitionAssignment, int numPartitions, List<String> consumingInstanceList,
-      boolean unchanged, PartitionAssignment previousPartitionAssignment) {
+      int instancesToUse, boolean unchanged, PartitionAssignment previousPartitionAssignment) {
     Assert.assertEquals(partitionAssignment.getTableName(), tableName);
 
     // check num partitions equal
@@ -302,8 +290,7 @@ public class PartitionAssignmentGeneratorTest {
     Assert.assertTrue(consumingInstanceList.containsAll(instancesUsed));
 
     // count number of instances used, should be min(MAX_ALLOWED and provided)
-    int allowedNumInstances = _partitionAssignmentGenerator.getNumInstancesToUse(consumingInstanceList.size());
-    Assert.assertTrue(instancesUsed.size() <= allowedNumInstances);
+    Assert.assertTrue(instancesUsed.size() <= instancesToUse);
 
     // verify strategy is uniform
     int serverId = 0;
@@ -324,15 +311,33 @@ public class PartitionAssignmentGeneratorTest {
 
   private class TestPartitionAssignmentGenerator extends PartitionAssignmentGenerator {
 
+    private HelixManager _helixManager;
     private List<String> _consumingInstances;
+    private RealtimeTagConfig _realtimeTagConfig;
 
     public TestPartitionAssignmentGenerator(HelixManager helixManager) {
       super(helixManager);
+      _helixManager = helixManager;
       _consumingInstances = new ArrayList<>();
     }
 
     @Override
-    protected List<String> getConsumingTaggedInstances(TableConfig tableConfig) {
+    protected RealtimeTagConfig getRealtimeTagConfig(TableConfig tableConfig) {
+      if (_realtimeTagConfig == null) {
+        return new RealtimeTagConfig(tableConfig, _helixManager);
+      } else {
+        return _realtimeTagConfig;
+      }
+    }
+
+    void setRealtimeTagConfigWithMaxConsuming(int maxConsumingServers) {
+      RealtimeTagConfig realtimeTagConfig = mock(RealtimeTagConfig.class);
+      when(realtimeTagConfig.getMaxConsumingServers()).thenReturn(maxConsumingServers);
+      _realtimeTagConfig = realtimeTagConfig;
+    }
+
+    @Override
+    protected List<String> getConsumingTaggedInstances(RealtimeTagConfig realtimeTagConfig) {
       return _consumingInstances;
     }
 

@@ -36,9 +36,6 @@ import org.apache.helix.model.IdealState;
  */
 public class PartitionAssignmentGenerator {
 
-  // TODO: this needs to come from tenant config
-  private static final int MAX_NUM_SERVERS = 10;
-
   private HelixManager _helixManager;
 
   public PartitionAssignmentGenerator(HelixManager helixManager) {
@@ -91,13 +88,16 @@ public class PartitionAssignmentGenerator {
 
     String tableNameWithType = tableConfig.getTableName();
     int numReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
+    RealtimeTagConfig realtimeTagConfig = getRealtimeTagConfig(tableConfig);
 
     // get consuming server tagged hosts from helix admin
-    List<String> consumingTaggedInstances = getConsumingTaggedInstances(tableConfig);
+    List<String> consumingTaggedInstances = getConsumingTaggedInstances(realtimeTagConfig);
     if (consumingTaggedInstances.size() < numReplicas) {
       throw new IllegalStateException(
           "Not enough consuming instances tagged. Must be atleast equal to numReplicas:" + numReplicas);
     }
+    int maxConsumingServers = realtimeTagConfig.getMaxConsumingServers();
+    int numInstancesToUse = Math.min(maxConsumingServers, consumingTaggedInstances.size());
 
     /**
      * TODO: We will use only uniform assignment for now
@@ -105,25 +105,24 @@ public class PartitionAssignmentGenerator {
      * {@link PartitionAssignmentGenerator} and AssignmentStrategy interface will together replace
      * StreamPartitionAssignmentGenerator and StreamPartitionAssignmentStrategy
      */
-    return uniformAssignment(tableNameWithType, consumingTaggedInstances, partitions, numReplicas);
+    return uniformAssignment(tableNameWithType, partitions, numReplicas, consumingTaggedInstances, numInstancesToUse);
   }
 
   /**
    * Uniformly sprays the partitions and replicas across given list of instances
    * Picks starting point based on table hash value. This ensures that we will always pick the same starting point,
-   * and resturn consistent assignment across calls
+   * and return consistent assignment across calls
    * @param allInstances
    * @param partitions
    * @param numReplicas
    * @return
    */
-  private PartitionAssignment uniformAssignment(String tableName, List<String> allInstances, List<String> partitions,
-      int numReplicas) {
+  private PartitionAssignment uniformAssignment(String tableName, List<String> partitions,
+      int numReplicas, List<String> allInstances, int numInstancesToUse) {
 
     PartitionAssignment partitionAssignment = new PartitionAssignment(tableName);
 
     Collections.sort(allInstances);
-    int numInstancesToUse = getNumInstancesToUse(allInstances.size());
     List<String> instancesToUse = new ArrayList<>();
     if (allInstances.size() <= numInstancesToUse) {
       instancesToUse.addAll(allInstances);
@@ -152,9 +151,8 @@ public class PartitionAssignmentGenerator {
   }
 
   @VisibleForTesting
-  protected List<String> getConsumingTaggedInstances(TableConfig tableConfig) {
-    RealtimeTagConfig tagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
-    String consumingServerTag = tagConfig.getConsumingServerTag();
+  protected List<String> getConsumingTaggedInstances(RealtimeTagConfig realtimeTagConfig) {
+    String consumingServerTag = realtimeTagConfig.getConsumingServerTag();
     List<String> consumingTaggedInstances = _helixManager.getClusterManagmentTool()
         .getInstancesInClusterWithTag(_helixManager.getClusterName(), consumingServerTag);
     if (consumingTaggedInstances.isEmpty()) {
@@ -164,7 +162,7 @@ public class PartitionAssignmentGenerator {
   }
 
   @VisibleForTesting
-  protected int getNumInstancesToUse(int allConsumingInstancesSize) {
-    return Math.min(MAX_NUM_SERVERS, allConsumingInstancesSize);
+  protected RealtimeTagConfig getRealtimeTagConfig(TableConfig tableConfig) {
+    return new RealtimeTagConfig(tableConfig, _helixManager);
   }
 }
