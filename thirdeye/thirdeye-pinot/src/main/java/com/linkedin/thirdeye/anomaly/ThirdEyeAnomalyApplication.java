@@ -9,7 +9,9 @@ import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardResource;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardServiceExecutor;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
+import com.linkedin.thirdeye.tracking.RequestStatisticsLogger;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.auto.onboard.AutoOnboardService;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.common.ThirdEyeSwaggerBundle;
@@ -29,6 +31,7 @@ import io.dropwizard.setup.Environment;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
 
 
@@ -48,7 +51,8 @@ public class ThirdEyeAnomalyApplication
   private ClassificationJobScheduler classificationJobScheduler = null;
   private DetectionOnboardServiceExecutor detectionOnboardServiceExecutor = null;
   private EmailResource emailResource = null;
-  private HolidayEventsLoader holidayEventsLoader= null;
+  private HolidayEventsLoader holidayEventsLoader = null;
+  private RequestStatisticsLogger requestStatisticsLogger = null;
 
   public static void main(final String[] args) throws Exception {
 
@@ -93,6 +97,9 @@ public class ThirdEyeAnomalyApplication
     environment.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {
+
+        requestStatisticsLogger = new RequestStatisticsLogger(new TimeGranularity(1, TimeUnit.HOURS));
+        requestStatisticsLogger.start();
 
         if (config.isWorker()) {
           initAnomalyFunctionFactory(config.getFunctionConfigPath());
@@ -154,6 +161,9 @@ public class ThirdEyeAnomalyApplication
 
       @Override
       public void stop() throws Exception {
+        if (requestStatisticsLogger != null) {
+          requestStatisticsLogger.shutdown();
+        }
         if (taskDriver != null) {
           taskDriver.shutdown();
         }
