@@ -63,6 +63,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.lang.mutable.MutableLong;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.json.JSONObject;
@@ -511,13 +512,16 @@ public class BrokerRequestHandler {
     int numServersResponded = 0;
     long deserializationStartTime = System.nanoTime();
     Map<ServerInstance, DataTable> dataTableMap = new HashMap<>();
+    // Add a long variable to sum the total response sizes from both realtime and offline servers.
+    long totalServerResponseSize = 0L;
     if (offlineServerResponseMap != null) {
       numServersResponded += offlineServerResponseMap.size();
-      deserializeServerResponses(offlineServerResponseMap, true, dataTableMap, offlineTableName, processingExceptions);
+      totalServerResponseSize += deserializeServerResponses(offlineServerResponseMap, true, dataTableMap, offlineTableName,
+          processingExceptions);
     }
     if (realtimeServerResponseMap != null) {
       numServersResponded += realtimeServerResponseMap.size();
-      deserializeServerResponses(realtimeServerResponseMap, false, dataTableMap, realtimeTableName,
+      totalServerResponseSize += deserializeServerResponses(realtimeServerResponseMap, false, dataTableMap, realtimeTableName,
           processingExceptions);
     }
     phaseTimes.addToDeserializationTime(System.nanoTime() - deserializationStartTime);
@@ -543,6 +547,7 @@ public class BrokerRequestHandler {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED,
           1L);
     }
+    _brokerMetrics.addMeteredQueryValue(originalBrokerRequest, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE, totalServerResponseSize);
 
     return brokerResponse;
   }
@@ -616,7 +621,7 @@ public class BrokerRequestHandler {
 
   /**
    * Deserialize the server responses, put the de-serialized data table into the data table map passed in, append
-   * processing exceptions to the processing exception list passed in.
+   * processing exceptions to the processing exception list passed in, and return the total response size from pinot servers.
    * <p>For hybrid use case, multiple responses might be from the same instance. Use response sequence to distinguish
    * them.
    *
@@ -625,17 +630,21 @@ public class BrokerRequestHandler {
    * @param dataTableMap map from server to data table.
    * @param tableNameWithType table name with type suffix.
    * @param processingExceptions list of processing exceptions.
+   * @return total server response size.
    */
-  private void deserializeServerResponses(@Nonnull Map<ServerInstance, byte[]> responseMap, boolean isOfflineTable,
+  private long deserializeServerResponses(@Nonnull Map<ServerInstance, byte[]> responseMap, boolean isOfflineTable,
       @Nonnull Map<ServerInstance, DataTable> dataTableMap, @Nonnull String tableNameWithType,
       @Nonnull List<ProcessingException> processingExceptions) {
+    long totalResponseSize = 0L;
     for (Entry<ServerInstance, byte[]> entry : responseMap.entrySet()) {
       ServerInstance serverInstance = entry.getKey();
       if (!isOfflineTable) {
         serverInstance = serverInstance.withSeq(1);
       }
+      byte[] responseInBytes = entry.getValue();
+      totalResponseSize += responseInBytes.length;
       try {
-        dataTableMap.put(serverInstance, DataTableFactory.getDataTable(entry.getValue()));
+        dataTableMap.put(serverInstance, DataTableFactory.getDataTable(responseInBytes));
       } catch (Exception e) {
         LOGGER.error("Caught exceptions while deserializing response for table: {} from server: {}", tableNameWithType,
             serverInstance, e);
@@ -643,6 +652,7 @@ public class BrokerRequestHandler {
         processingExceptions.add(QueryException.getException(QueryException.DATA_TABLE_DESERIALIZATION_ERROR, e));
       }
     }
+    return totalResponseSize;
   }
 
   /**
