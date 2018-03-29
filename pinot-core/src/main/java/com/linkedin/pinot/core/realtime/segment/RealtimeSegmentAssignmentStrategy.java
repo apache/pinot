@@ -32,6 +32,6 @@ public interface RealtimeSegmentAssignmentStrategy {
    * @param partitionAssignment
    * @return
    */
-  Map<String, List<String>> assign(List<String> newSegments, PartitionAssignment partitionAssignment);
+  Map<String, List<String>> assign(List<String> newSegments, PartitionAssignment partitionAssignment) throws Exception;
 
 }

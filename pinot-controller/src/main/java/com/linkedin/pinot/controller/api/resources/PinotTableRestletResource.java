@@ -408,7 +408,7 @@ public class PinotTableRestletResource {
       JSONObject jsonObject = _pinotHelixResourceManager.rebalanceTable(tableName,
           CommonConstants.Helix.TableType.valueOf(tableType.toUpperCase()), rebalanceUserConfig);
       return jsonObject.toString();
-    } catch (JSONException e) {
+    } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }
   }

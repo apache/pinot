@@ -29,10 +29,6 @@ public class RealtimeTagConfig extends TagConfig {
   private String _completedRealtimeServerTag;
 
   private boolean _relocateCompletedSegments = false;
-  // TODO: get maxConsumingServers from the tenant config
-  private int _maxConsumingServers = Integer.MAX_VALUE;
-
-  // TODO: also add a maxServers for completed and offline
 
   public RealtimeTagConfig(TableConfig tableConfig, HelixManager helixManager) {
     super(tableConfig, helixManager);
@@ -54,10 +50,6 @@ public class RealtimeTagConfig extends TagConfig {
 
   public boolean isRelocateCompletedSegments() {
     return _relocateCompletedSegments;
-  }
-
-  public int getMaxConsumingServers() {
-    return _maxConsumingServers;
   }
 }
 

@@ -35,7 +35,7 @@ public interface RebalanceSegmentStrategy {
    * @return rebalanced partition assignments
    */
   PartitionAssignment rebalancePartitionAssignment(IdealState idealState, TableConfig tableConfig,
-      Configuration rebalanceUserConfig);
+      Configuration rebalanceUserConfig) throws Exception;
 
   /**
    * Rebalances segments and writes ideal state of table

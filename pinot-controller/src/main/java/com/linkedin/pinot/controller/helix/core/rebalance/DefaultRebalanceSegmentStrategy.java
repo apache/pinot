@@ -83,7 +83,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
    */
   @Override
   public PartitionAssignment rebalancePartitionAssignment(IdealState idealState, TableConfig tableConfig,
-      Configuration rebalanceUserConfig) {
+      Configuration rebalanceUserConfig) throws Exception {
     String tableNameWithType = tableConfig.getTableName();
     PartitionAssignment newPartitionAssignment = new PartitionAssignment(tableNameWithType);
 

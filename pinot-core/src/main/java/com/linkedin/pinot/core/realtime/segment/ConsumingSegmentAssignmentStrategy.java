@@ -34,7 +34,8 @@ public class ConsumingSegmentAssignmentStrategy implements RealtimeSegmentAssign
    * @param partitionAssignment partition assignment for the table to which the segments belong
    * @return map of segment name to instances list
    */
-  public Map<String, List<String>> assign(List<String> newSegments, PartitionAssignment partitionAssignment) {
+  public Map<String, List<String>> assign(List<String> newSegments, PartitionAssignment partitionAssignment)
+      throws Exception {
 
     Map<String, List<String>> segmentAssignment = new HashMap<>(newSegments.size());
 
@@ -44,7 +45,7 @@ public class ConsumingSegmentAssignmentStrategy implements RealtimeSegmentAssign
         int partitionId = llcSegmentName.getPartitionId();
         List<String> instancesListForPartition = partitionAssignment.getInstancesListForPartition(String.valueOf(partitionId));
         if (instancesListForPartition == null) {
-          throw new IllegalStateException("No partition assignment " + partitionId + " found for segment " + segmentName);
+          throw new Exception("No partition assignment " + partitionId + " found for segment " + segmentName);
         }
         segmentAssignment.put(segmentName, instancesListForPartition);
       }

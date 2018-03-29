@@ -20,7 +20,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,6 +32,7 @@ import org.apache.helix.model.IdealState;
 
 /**
  * Class to generate partitions assignment based on num partitions in ideal state, num tagged instances and num replicas
+ * TODO: This is only for LLC stream partition assignment. This will replace StreamPartitionAssignmentGenerator
  */
 public class PartitionAssignmentGenerator {
 
@@ -48,11 +48,31 @@ public class PartitionAssignmentGenerator {
   public PartitionAssignment getPartitionAssignmentFromIdealState(TableConfig tableConfig, IdealState idealState) {
     String tableNameWithType = tableConfig.getTableName();
 
+    // get latest segment in each partition
+    Map<String, LLCSegmentName> partitionIdToLatestSegment = getPartitionToLatestSegments(idealState);
+
+    // extract partition assignment from the latest segments
+    PartitionAssignment partitionAssignment = new PartitionAssignment(tableNameWithType);
+    Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
+    for (Map.Entry<String, LLCSegmentName> entry : partitionIdToLatestSegment.entrySet()) {
+      String segmentName = entry.getValue().getSegmentName();
+      Map<String, String> instanceStateMap = mapFields.get(segmentName);
+      partitionAssignment.addPartition(entry.getKey(), Lists.newArrayList(instanceStateMap.keySet()));
+    }
+    return partitionAssignment;
+  }
+
+  /**
+   * Generates a map of partition id to latest llc segment
+   * @param idealState
+   * @return
+   */
+  public Map<String, LLCSegmentName> getPartitionToLatestSegments(IdealState idealState) {
+    Map<String, LLCSegmentName> partitionIdToLatestSegment = new HashMap<>();
     // read all segments
     Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
 
     // get latest segment in each partition
-    Map<String, LLCSegmentName> partitionIdToLatestSegment = new HashMap<>();
     for (Map.Entry<String, Map<String, String>> entry : mapFields.entrySet()) {
       String segmentName = entry.getKey();
       if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
@@ -64,21 +84,13 @@ public class PartitionAssignmentGenerator {
         }
       }
     }
-
-    // extract partition assignment from the latest segments
-    PartitionAssignment partitionAssignment = new PartitionAssignment(tableNameWithType);
-    for (Map.Entry<String, LLCSegmentName> entry : partitionIdToLatestSegment.entrySet()) {
-      String segmentName = entry.getValue().getSegmentName();
-      Map<String, String> instanceStateMap = mapFields.get(segmentName);
-      partitionAssignment.addPartition(entry.getKey(), Lists.newArrayList(instanceStateMap.keySet()));
-    }
-    return partitionAssignment;
+    return partitionIdToLatestSegment;
   }
 
   /**
    * Generates partition assignment for given table, using tagged hosts and num partitions
    */
-  public PartitionAssignment generatePartitionAssignment(TableConfig tableConfig, int numPartitions) {
+  public PartitionAssignment generatePartitionAssignment(TableConfig tableConfig, int numPartitions) throws Exception {
 
     // TODO: add an override which can read from znode, instead of generating on the fly
 
@@ -93,11 +105,9 @@ public class PartitionAssignmentGenerator {
 
     List<String> consumingTaggedInstances = getConsumingTaggedInstances(realtimeTagConfig);
     if (consumingTaggedInstances.size() < numReplicas) {
-      throw new IllegalStateException(
+      throw new Exception(
           "Not enough consuming instances tagged. Must be atleast equal to numReplicas:" + numReplicas);
     }
-    int maxConsumingServers = realtimeTagConfig.getMaxConsumingServers();
-    int numInstancesToUse = Math.min(maxConsumingServers, consumingTaggedInstances.size());
 
     /**
      * TODO: We will use only uniform assignment for now
@@ -105,7 +115,7 @@ public class PartitionAssignmentGenerator {
      * {@link PartitionAssignmentGenerator} and AssignmentStrategy interface will together replace
      * StreamPartitionAssignmentGenerator and StreamPartitionAssignmentStrategy
      */
-    return uniformAssignment(tableNameWithType, partitions, numReplicas, consumingTaggedInstances, numInstancesToUse);
+    return uniformAssignment(tableNameWithType, partitions, numReplicas, consumingTaggedInstances);
   }
 
   /**
@@ -118,33 +128,19 @@ public class PartitionAssignmentGenerator {
    * @return
    */
   private PartitionAssignment uniformAssignment(String tableName, List<String> partitions, int numReplicas,
-      List<String> allInstances, int numInstancesToUse) {
+      List<String> allInstances) {
 
     PartitionAssignment partitionAssignment = new PartitionAssignment(tableName);
 
     Collections.sort(allInstances);
-    List<String> instancesToUse = new ArrayList<>();
-    if (allInstances.size() <= numInstancesToUse) {
-      instancesToUse.addAll(allInstances);
-    } else {
-      int hashedServerId = Math.abs(EqualityUtils.hashCodeOf(tableName)) % allInstances.size();
-      for (int i = 0; i < numInstancesToUse; i++) {
-        instancesToUse.add(allInstances.get(hashedServerId++));
-        if (hashedServerId == allInstances.size()) {
-          hashedServerId = 0;
-        }
-      }
-    }
 
-    // pick a hashed start again, so that even in cases where we use all servers, we don't overload the servers at the start of the list
-    int hashedStartingServer = Math.abs(EqualityUtils.hashCodeOf(tableName)) % numInstancesToUse;
+    int numInstances = allInstances.size();
+    int serverId = 0;
     for (String partition : partitions) {
       List<String> instances = new ArrayList<>(numReplicas);
       for (int r = 0; r < numReplicas; r++) {
-        instances.add(instancesToUse.get(hashedStartingServer++));
-        if (hashedStartingServer == numInstancesToUse) {
-          hashedStartingServer = 0;
-        }
+        instances.add(allInstances.get(serverId));
+        serverId = (serverId + 1) % numInstances;
       }
       partitionAssignment.addPartition(partition, instances);
     }

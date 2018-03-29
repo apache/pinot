@@ -30,12 +30,12 @@ import static com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.R
 /**
  * Builder for ideal state for testing
  */
-public class TestIdealStateBuilder {
+public class IdealStateBuilderUtil {
 
   private IdealState _idealState;
   private String _tableName;
 
-  public TestIdealStateBuilder(String resourceName) {
+  public IdealStateBuilderUtil(String resourceName) {
     _tableName = resourceName;
     _idealState = new IdealState(resourceName);
   }
@@ -44,17 +44,17 @@ public class TestIdealStateBuilder {
     return _idealState;
   }
 
-  public TestIdealStateBuilder setNumReplicas(int numReplicas) {
+  public IdealStateBuilderUtil setNumReplicas(int numReplicas) {
     _idealState.setReplicas(String.valueOf(numReplicas));
     return this;
   }
 
-  public TestIdealStateBuilder addSegment(String segmentName, Map<String, String> instanceStateMap) {
+  public IdealStateBuilderUtil addSegment(String segmentName, Map<String, String> instanceStateMap) {
     _idealState.setInstanceStateMap(segmentName, instanceStateMap);
     return this;
   }
 
-  public TestIdealStateBuilder addConsumingSegments(int numPartitions, int seqNum, int numReplicas, List<String> instances) {
+  public IdealStateBuilderUtil addConsumingSegments(int numPartitions, int seqNum, int numReplicas, List<String> instances) {
     int serverId = 0;
     for (int p = 0; p < numPartitions; p++) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(_tableName, p, seqNum, System.currentTimeMillis());
@@ -70,7 +70,7 @@ public class TestIdealStateBuilder {
     return this;
   }
 
-  public TestIdealStateBuilder transitionToState(int partition, int seqNum, String state) {
+  public IdealStateBuilderUtil transitionToState(int partition, int seqNum, String state) {
     for (String segmentName : _idealState.getRecord().getMapFields().keySet()) {
       if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
@@ -86,7 +86,7 @@ public class TestIdealStateBuilder {
     return this;
   }
 
-  public TestIdealStateBuilder addConsumingSegment(int partition, int seqNum, int numReplicas, List<String> instances) {
+  public IdealStateBuilderUtil addConsumingSegment(int partition, int seqNum, int numReplicas, List<String> instances) {
     LLCSegmentName llcSegmentName = new LLCSegmentName(_tableName, partition, seqNum, System.currentTimeMillis());
     Map<String, String> instanceStateMap = new HashMap<>(numReplicas);
     for (int i = 0; i < numReplicas; i++) {
@@ -96,7 +96,7 @@ public class TestIdealStateBuilder {
     return this;
   }
 
-  public TestIdealStateBuilder moveToServers(int partition, int seqNum, List<String> instances) {
+  public IdealStateBuilderUtil moveToServers(int partition, int seqNum, List<String> instances) {
     for (String segmentName : _idealState.getRecord().getMapFields().keySet()) {
       if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
@@ -130,7 +130,7 @@ public class TestIdealStateBuilder {
     return instances;
   }
 
-  public TestIdealStateBuilder clear() {
+  public IdealStateBuilderUtil clear() {
     _idealState.getRecord().getMapFields().clear();
     return this;
   }
