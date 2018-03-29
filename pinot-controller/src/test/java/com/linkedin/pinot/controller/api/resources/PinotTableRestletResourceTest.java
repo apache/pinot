@@ -222,6 +222,15 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     modifiedConfig = getTableConfig(tableName, "REALTIME");
     Assert.assertNotNull(modifiedConfig.getQuotaConfig());
     Assert.assertEquals(modifiedConfig.getQuotaConfig().getStorage(), "10G");
+    Assert.assertNull(modifiedConfig.getQuotaConfig().getMaxQueriesPerSecond());
+
+    quota.setMaxQueriesPerSecond("100.00");
+    tableConfig.setQuotaConfig(quota);
+    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJSONConfigString());
+    modifiedConfig = getTableConfig(tableName, "REALTIME");
+    Assert.assertNotNull(modifiedConfig.getQuotaConfig().getMaxQueriesPerSecond());
+    Assert.assertEquals(modifiedConfig.getQuotaConfig().getMaxQueriesPerSecond(), "100.00");
+
     boolean notFoundException = false;
     try {
       // table does not exist

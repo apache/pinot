@@ -17,6 +17,7 @@
 package com.linkedin.pinot.controller.validation;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.linkedin.pinot.common.config.QuotaConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.ControllerGauge;
@@ -82,7 +83,7 @@ public class StorageQuotaChecker {
     int numReplicas = _tableConfig.getValidationConfig().getReplicationNumber();
     final String tableName = _tableConfig.getTableName();
 
-    if (quotaConfig == null) {
+    if (quotaConfig == null || Strings.isNullOrEmpty(quotaConfig.getStorage())) {
       // no quota configuration...so ignore for backwards compatibility
       LOGGER.warn("Quota configuration not set for table: {}", tableNameWithType);
       return new QuotaCheckerResponse(true,

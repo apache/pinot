@@ -33,10 +33,12 @@ import org.slf4j.LoggerFactory;
 public class QuotaConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuotaConfig.class);
   private static final String STORAGE_FIELD_NAME = "storage";
+  private static final String MAX_QUERIES_PER_SECOND_FIELD_NAME = "maxQueriesPerSecond";
 
   @ConfigKey("storage")
   @ConfigDoc(value = "Storage allocated for this table", exampleValue = "10 GiB")
   private String _storage;
+  private String _maxQueriesPerSecond;
 
   @Nullable
   public String getStorage() {
@@ -45,6 +47,15 @@ public class QuotaConfig {
 
   public void setStorage(@Nullable String storage) {
     _storage = storage;
+  }
+
+  @Nullable
+  public String getMaxQueriesPerSecond() {
+    return _maxQueriesPerSecond;
+  }
+
+  public void setMaxQueriesPerSecond(@Nullable String maxQueriesPerSecond) {
+    _maxQueriesPerSecond = maxQueriesPerSecond;
   }
 
   /**
@@ -60,6 +71,7 @@ public class QuotaConfig {
     JSONObject quotaObject = new JSONObject();
     try {
       quotaObject.put(STORAGE_FIELD_NAME, _storage);
+      quotaObject.put(MAX_QUERIES_PER_SECOND_FIELD_NAME, _maxQueriesPerSecond);
     } catch (JSONException e) {
       LOGGER.error("Failed to convert to json", e);
     }
@@ -71,10 +83,35 @@ public class QuotaConfig {
   }
 
   public void validate() {
-    if (_storage != null && DataSize.toBytes(_storage) < 0) {
+    if (!isStorageValid()) {
       LOGGER.error("Failed to convert storage quota config: {} to bytes", _storage);
       throw new ConfigurationRuntimeException("Failed to convert storage quota config: " + _storage + " to bytes");
     }
+    if (!isMaxQueriesPerSecondValid()) {
+      LOGGER.error("Failed to convert qps quota config: {}", _maxQueriesPerSecond);
+      throw new ConfigurationRuntimeException("Failed to convert qps quota config: " + _maxQueriesPerSecond);
+    }
+  }
+
+  public boolean isStorageValid() {
+    return _storage == null || DataSize.toBytes(_storage) >= 0;
+  }
+
+  public boolean isMaxQueriesPerSecondValid() {
+    Double qps = null;
+    if (_maxQueriesPerSecond != null) {
+      try {
+        qps = Double.parseDouble(_maxQueriesPerSecond);
+      } catch (NumberFormatException e) {
+        LOGGER.error("Failed to convert qps quota config: {}", _maxQueriesPerSecond);
+        return false;
+      }
+      if (qps <= 0) {
+        LOGGER.error("Failed to convert qps quota config: {}", _maxQueriesPerSecond);
+        return false;
+      }
+    }
+    return _maxQueriesPerSecond == null || qps > 0;
   }
 
   @Override
@@ -89,12 +126,14 @@ public class QuotaConfig {
 
     QuotaConfig that = (QuotaConfig) o;
 
-    return EqualityUtils.isEqual(_storage, that._storage);
+    return EqualityUtils.isEqual(_storage, that._storage) && EqualityUtils.isEqual(
+        _maxQueriesPerSecond, that._maxQueriesPerSecond);
   }
 
   @Override
   public int hashCode() {
     int result = EqualityUtils.hashCodeOf(_storage);
+    result = EqualityUtils.hashCodeOf(result, _maxQueriesPerSecond);
     return result;
   }
 }

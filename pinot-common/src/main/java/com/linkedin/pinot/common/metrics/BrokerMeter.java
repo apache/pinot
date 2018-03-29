@@ -81,7 +81,11 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   ROUTING_TABLE_REBUILD_FAILURES("failures", false),
 
   GROUP_BY_SIZE("queries", false),
-  TOTAL_SERVER_RESPONSE_SIZE("queries", false);
+  TOTAL_SERVER_RESPONSE_SIZE("queries", false),
+
+  QUERY_QUOTA_EXCEEDED("exceptions", false),
+  QUERY_QUOTA_CAPACITY_UTILIZATION_RATE("tables", false);
+
 
   private final String brokerMeterName;
   private final String unit;

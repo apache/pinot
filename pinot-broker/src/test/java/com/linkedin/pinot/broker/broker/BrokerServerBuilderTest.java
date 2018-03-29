@@ -28,7 +28,7 @@ public class BrokerServerBuilderTest {
     PropertiesConfiguration config =
         new PropertiesConfiguration(new File(BrokerServerBuilderTest.class.getClassLoader()
             .getResource("broker.properties").toURI()));
-    final BrokerServerBuilder bld = new BrokerServerBuilder(config, null, null, null);
+    final BrokerServerBuilder bld = new BrokerServerBuilder(config, null, null, null, null);
     bld.buildNetwork();
     bld.buildHTTP();
     bld.start();

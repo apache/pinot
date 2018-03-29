@@ -66,7 +66,7 @@ public class BrokerRequestValidationTest {
 
     // Set the value for query response limit.
     config.addProperty(QUERY_RESPONSE_LIMIT_CONFIG, QUERY_RESPONSE_LIMIT);
-    brokerBuilder = new BrokerServerBuilder(config, null, timeBoundaryService, null);
+    brokerBuilder = new BrokerServerBuilder(config, null, timeBoundaryService, null, null);
     brokerBuilder.buildNetwork();
     brokerBuilder.buildHTTP();
     brokerBuilder.start();
