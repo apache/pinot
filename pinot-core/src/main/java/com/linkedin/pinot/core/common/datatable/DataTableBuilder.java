@@ -80,7 +80,6 @@ import javax.annotation.Nonnull;
 // TODO:   2. Use one dictionary for all columns (save space).
 // TODO:   3. Given a data schema, write all values one by one instead of using rowId and colId to position (save time).
 public class DataTableBuilder {
-  private static final String COUNT_STAR = "count_star";
   private final DataSchema _dataSchema;
   private final int[] _columnOffsets;
   private final int _rowSizeInBytes;
@@ -359,32 +358,5 @@ public class DataTableBuilder {
       dataTableBuilder.finishRow();
       return dataTableBuilder.build();
     }
-  }
-
-  /**
-   * Builds a Data table for count(*) with the provided value.
-   *
-   * @param count Value of count(*)
-   * @return DataTable for count(*)
-   *
-   * @throws IOException
-   */
-  public static DataTable buildCountStarDataTable(long count)
-      throws IOException {
-    String[] aggregationColumnNames = new String[]{COUNT_STAR};
-    FieldSpec.DataType[] dataTypes = new FieldSpec.DataType[] {FieldSpec.DataType.LONG};
-
-    DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(aggregationColumnNames, dataTypes));
-    dataTableBuilder.startRow();
-    dataTableBuilder.setColumn(0, count);
-    dataTableBuilder.finishRow();
-    DataTable dataTable = dataTableBuilder.build();
-    Map<String, String> metadata = dataTable.getMetadata();
-
-    // Set num docs scanned as well, for backward compatibility.
-    String totalDocs = Long.toString(count);
-    metadata.put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, totalDocs);
-    metadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, totalDocs);
-    return dataTable;
   }
 }
