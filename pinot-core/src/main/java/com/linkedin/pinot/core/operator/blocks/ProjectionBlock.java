@@ -30,7 +30,6 @@ import java.util.Map;
  * It provides DocIdSetBlock for a given column.
  */
 public class ProjectionBlock implements Block {
-
   private final Map<String, Block> _blockMap;
   private final DocIdSetBlock _docIdSetBlock;
   private final DataBlockCache _dataBlockCache;
@@ -39,7 +38,6 @@ public class ProjectionBlock implements Block {
     _blockMap = blockMap;
     _docIdSetBlock = docIdSetBlock;
     _dataBlockCache = dataBlockCache;
-    _dataBlockCache.initNewBlock(docIdSetBlock.getDocIdSet(), docIdSetBlock.getSearchableLength());
   }
 
   @Override
@@ -62,16 +60,13 @@ public class ProjectionBlock implements Block {
     throw new UnsupportedOperationException();
   }
 
+  // TODO: let selection operator use DataBlockCache as well
   public Block getBlock(String column) {
     return _blockMap.get(column);
   }
 
   public BlockValSet getBlockValueSet(String column) {
-    return new ProjectionBlockValSet(_dataBlockCache, column,_blockMap.get(column).getMetadata().getDataType());
-  }
-
-  public BlockMetadata getMetadata(String column) {
-    return _blockMap.get(column).getMetadata();
+    return new ProjectionBlockValSet(_dataBlockCache, column, _blockMap.get(column).getMetadata().getDataType());
   }
 
   public DocIdSetBlock getDocIdSetBlock() {

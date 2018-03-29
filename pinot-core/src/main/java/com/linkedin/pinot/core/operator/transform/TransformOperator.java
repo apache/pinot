@@ -16,11 +16,18 @@
 package com.linkedin.pinot.core.operator.transform;
 
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.ProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
+import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
+import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
 
@@ -32,7 +39,8 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   private static final String OPERATOR_NAME = "TransformOperator";
 
   private final ProjectionOperator _projectionOperator;
-  private final TransformExpressionEvaluator _expressionEvaluator;
+  private final Map<String, DataSource> _dataSourceMap;
+  private final Map<TransformExpressionTree, TransformFunction> _transformFunctionMap = new HashMap<>();
 
   /**
    * Constructor for the class
@@ -43,7 +51,41 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   public TransformOperator(@Nonnull ProjectionOperator projectionOperator,
       @Nonnull Set<TransformExpressionTree> expressionTrees) {
     _projectionOperator = projectionOperator;
-    _expressionEvaluator = new DefaultExpressionEvaluator(expressionTrees);
+    _dataSourceMap = projectionOperator.getDataSourceMap();
+    for (TransformExpressionTree expressionTree : expressionTrees) {
+      TransformFunction transformFunction = TransformFunctionFactory.get(expressionTree, _dataSourceMap);
+      _transformFunctionMap.put(expressionTree, transformFunction);
+    }
+  }
+
+  /**
+   * Returns the number of columns projected.
+   *
+   * @return Number of columns projected
+   */
+  public int getNumColumnsProjected() {
+    return _dataSourceMap.size();
+  }
+
+  /**
+   * Returns the data source metadata associated with the given expression tree.
+   *
+   * @param expressionTree Expression tree
+   * @return Data source metadata
+   */
+  public DataSourceMetadata getDataSourceMetadata(@Nonnull TransformExpressionTree expressionTree) {
+    return _transformFunctionMap.get(expressionTree).getResultMetadata();
+  }
+
+  /**
+   * Returns the dictionary associated with the given expression tree.
+   * <p>Should be called only if {@link #getDataSourceMetadata(TransformExpressionTree)} indicates that the data source
+   * has dictionary.
+   *
+   * @return Dictionary
+   */
+  public Dictionary getDictionary(@Nonnull TransformExpressionTree expressionTree) {
+    return _transformFunctionMap.get(expressionTree).getDictionary();
   }
 
   @Override
@@ -52,7 +94,7 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
     if (projectionBlock == null) {
       return null;
     } else {
-      return new TransformBlock(projectionBlock, _expressionEvaluator.evaluate(projectionBlock));
+      return new TransformBlock(projectionBlock, _transformFunctionMap);
     }
   }
 
@@ -64,9 +106,5 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   @Override
   public ExecutionStatistics getExecutionStatistics() {
     return _projectionOperator.getExecutionStatistics();
-  }
-
-  public int getNumColumnsProjected() {
-    return _projectionOperator.getNumColumnsProjected();
   }
 }

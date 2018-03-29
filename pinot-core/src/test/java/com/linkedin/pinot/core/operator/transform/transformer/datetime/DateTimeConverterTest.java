@@ -33,7 +33,7 @@ public class DateTimeConverterTest {
   }
 
   @DataProvider(name = "testDateTimeConversion")
-  public Object[][] provideTestData() {
+  public Object[][] testDateTimeConversion() {
     return new Object[][]{
         new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "15:MINUTES", new long[]{1505898300000L}, new long[1], new long[]{1505898000000L}},
         new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", new long[]{1505898000000L}, new long[1], new long[]{1505898000000L}},

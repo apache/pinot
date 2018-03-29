@@ -349,6 +349,69 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(3), String.valueOf(Double.NEGATIVE_INFINITY));
   }
 
+  @Test
+  public void testUDF() throws Exception {
+    String pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY timeConvert(DaysSinceEpoch,'DAYS','SECONDS')";
+    JSONObject response = postQuery(pqlQuery);
+    JSONObject groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
+    JSONObject groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByEntry.getInt("value"), 605);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 * 24 * 3600);
+    Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0),
+        "timeconvert(DaysSinceEpoch,'DAYS','SECONDS')");
+
+    pqlQuery =
+        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')";
+    response = postQuery(pqlQuery);
+    groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
+    groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByEntry.getInt("value"), 605);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 * 24);
+    Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0),
+        "datetimeconvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
+
+    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY add(DaysSinceEpoch,DaysSinceEpoch,15)";
+    response = postQuery(pqlQuery);
+    groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
+    groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByEntry.getInt("value"), 605);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 + 16138 + 15);
+    Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0),
+        "add(DaysSinceEpoch,DaysSinceEpoch,'15')");
+
+    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY sub(DaysSinceEpoch,25)";
+    response = postQuery(pqlQuery);
+    groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
+    groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByEntry.getInt("value"), 605);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 - 25);
+    Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0), "sub(DaysSinceEpoch,'25')");
+
+    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY mult(DaysSinceEpoch,24,3600)";
+    response = postQuery(pqlQuery);
+    groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
+    groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByEntry.getInt("value"), 605);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 * 24 * 3600);
+    Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0), "mult(DaysSinceEpoch,'24','3600')");
+
+    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY div(DaysSinceEpoch,2)";
+    response = postQuery(pqlQuery);
+    groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
+    groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByEntry.getInt("value"), 605);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 / 2);
+    Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0), "div(DaysSinceEpoch,'2')");
+
+    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY valueIn(DivAirports,'DFW','ORD')";
+    response = postQuery(pqlQuery);
+    groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
+    groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByEntry.getInt("value"), 336);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getString(0), "ORD");
+    Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0), "valuein(DivAirports,'DFW','ORD')");
+  }
+
   @AfterClass
   public void tearDown() throws Exception {
     // Test instance decommission before tearing down

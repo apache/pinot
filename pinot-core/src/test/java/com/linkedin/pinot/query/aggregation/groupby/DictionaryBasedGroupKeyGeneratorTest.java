@@ -20,22 +20,18 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.DataBlockCache;
-import com.linkedin.pinot.core.common.DataFetcher;
-import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
-import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
-import com.linkedin.pinot.core.operator.transform.DefaultExpressionEvaluator;
+import com.linkedin.pinot.core.operator.transform.TransformOperator;
+import com.linkedin.pinot.core.plan.TransformPlanNode;
 import com.linkedin.pinot.core.query.aggregation.groupby.DictionaryBasedGroupKeyGenerator;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -46,6 +42,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -53,47 +50,49 @@ import org.testng.annotations.Test;
 
 
 public class DictionaryBasedGroupKeyGeneratorTest {
-  private static final String SEGMENT_NAME = "DefaultGroupKeyGeneratorTestSegment";
+  private static final String SEGMENT_NAME = "testSegment";
   private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
+  private static final int ARRAY_BASED_THRESHOLD = 10_000;
   private static final int NUM_ROWS = 1000;
   private static final int UNIQUE_ROWS = 100;
   private static final int MAX_STEP_LENGTH = 1000;
   private static final int MAX_NUM_MULTI_VALUES = 10;
-  private static final String[] SINGLE_VALUE_COLUMNS = {"s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"};
-  private static final String[] MULTI_VALUE_COLUMNS = {"m1", "m2"};
+  private static final int[] SV_GROUP_KEY_BUFFER = new int[NUM_ROWS];
+  private static final int[][] MV_GROUP_KEY_BUFFER = new int[NUM_ROWS][];
+  private static final String FILTER_COLUMN = "docId";
+  private static final String[] SV_COLUMNS = {"s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"};
+  private static final String[] MV_COLUMNS = {"m1", "m2"};
 
   private final long _randomSeed = System.currentTimeMillis();
   private final Random _random = new Random(_randomSeed);
   private final String _errorMessage = "Random seed is: " + _randomSeed;
 
-  private static final int TEST_LENGTH = 20;
-  private final int[] _testDocIdSet = new int[TEST_LENGTH];
-  private final int[] _singleValueGroupKeyBuffer = new int[TEST_LENGTH];
-  private final int[][] _multiValueGroupKeyBuffer = new int[TEST_LENGTH][];
-
-  private static final int ARRAY_BASED_THRESHOLD = 10_000;
+  private TransformOperator _transformOperator;
   private TransformBlock _transformBlock;
 
   @BeforeClass
   private void setup() throws Exception {
+    FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
+
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     int value = _random.nextInt(MAX_STEP_LENGTH);
 
     // Generate random values for the segment.
     for (int i = 0; i < UNIQUE_ROWS; i++) {
       Map<String, Object> map = new HashMap<>();
-      for (String singleValueColumn : SINGLE_VALUE_COLUMNS) {
-        map.put(singleValueColumn, value);
+      map.put(FILTER_COLUMN, i);
+      for (String svColumn : SV_COLUMNS) {
+        map.put(svColumn, value);
         value += 1 + _random.nextInt(MAX_STEP_LENGTH);
       }
-      for (String multiValueColumn : MULTI_VALUE_COLUMNS) {
+      for (String mvColumn : MV_COLUMNS) {
         int numMultiValues = 1 + _random.nextInt(MAX_NUM_MULTI_VALUES);
         Integer[] values = new Integer[numMultiValues];
         for (int k = 0; k < numMultiValues; k++) {
           values[k] = value;
           value += 1 + _random.nextInt(MAX_STEP_LENGTH);
         }
-        map.put(multiValueColumn, values);
+        map.put(mvColumn, values);
       }
       GenericRow row = new GenericRow();
       row.init(map);
@@ -105,51 +104,34 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
     // Create an index segment with the random values.
     Schema schema = new Schema();
-    for (String singleValueColumn : SINGLE_VALUE_COLUMNS) {
-      DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(singleValueColumn, FieldSpec.DataType.INT, true);
-      schema.addField(dimensionFieldSpec);
+    schema.addField(new DimensionFieldSpec(FILTER_COLUMN, FieldSpec.DataType.INT, true));
+    for (String singleValueColumn : SV_COLUMNS) {
+      schema.addField(new DimensionFieldSpec(singleValueColumn, FieldSpec.DataType.INT, true));
     }
-    for (String multiValueColumn : MULTI_VALUE_COLUMNS) {
-      DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(multiValueColumn, FieldSpec.DataType.INT, false);
-      schema.addField(dimensionFieldSpec);
+    for (String multiValueColumn : MV_COLUMNS) {
+      schema.addField(new DimensionFieldSpec(multiValueColumn, FieldSpec.DataType.INT, false));
     }
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
-    FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
     config.setOutDir(INDEX_DIR_PATH);
     config.setSegmentName(SEGMENT_NAME);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, new GenericRowRecordReader(rows, schema));
     driver.build();
-
     IndexSegment indexSegment = Loaders.IndexSegment.load(new File(INDEX_DIR_PATH, SEGMENT_NAME), ReadMode.heap);
 
-    // Get a data fetcher for the index segment.
-    Map<String, DataSource> dataSourceMap = new HashMap<>();
-    Map<String, Block> blockMap = new HashMap<>();
-    Set<TransformExpressionTree> expressionTrees = new HashSet<>();
-
-    for (String column : indexSegment.getColumnNames()) {
-      DataSource dataSource = indexSegment.getDataSource(column);
-      dataSourceMap.put(column, dataSource);
-      blockMap.put(column, dataSource.nextBlock());
-      expressionTrees.add(TransformExpressionTree.compileToExpressionTree(column));
-    }
-
-    // Generate a random test doc id set.
-    int num1 = _random.nextInt(50);
-    int num2 = num1 + 1 + _random.nextInt(50);
-    for (int i = 0; i < 20; i += 2) {
-      _testDocIdSet[i] = num1 + 50 * i;
-      _testDocIdSet[i + 1] = num2 + 50 * i;
-    }
-
-    DataFetcher dataFetcher = new DataFetcher(dataSourceMap);
-    DocIdSetBlock docIdSetBlock = new DocIdSetBlock(_testDocIdSet, _testDocIdSet.length);
-    ProjectionBlock projectionBlock = new ProjectionBlock(blockMap, new DataBlockCache(dataFetcher), docIdSetBlock);
-    _transformBlock =
-        new TransformBlock(projectionBlock, new DefaultExpressionEvaluator(expressionTrees).evaluate(projectionBlock));
+    // Generate a random query to filter out 2 unique rows
+    int docId1 = _random.nextInt(50);
+    int docId2 = docId1 + 1 + _random.nextInt(50);
+    // NOTE: put all columns into group-by so that transform operator has expressions for all columns
+    String query =
+        String.format("SELECT COUNT(*) FROM table WHERE %s IN (%d, %d) GROUP BY %s, %s", FILTER_COLUMN, docId1, docId2,
+            StringUtils.join(SV_COLUMNS, ", "), StringUtils.join(MV_COLUMNS, ", "));
+    TransformPlanNode transformPlanNode =
+        new TransformPlanNode(indexSegment, new Pql2Compiler().compileToBrokerRequest(query));
+    _transformOperator = transformPlanNode.run();
+    _transformBlock = _transformOperator.nextBlock();
   }
 
   @Test
@@ -159,12 +141,12 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
     // Test initial status.
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
-        new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns, ARRAY_BASED_THRESHOLD);
+        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns), ARRAY_BASED_THRESHOLD);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
 
     // Test group key generation.
-    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, _singleValueGroupKeyBuffer);
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, SV_GROUP_KEY_BUFFER);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 100, _errorMessage);
     compareSingleValueBuffer();
     testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), 2);
@@ -178,12 +160,12 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     // Test initial status.
     long expected = (long) Math.pow(UNIQUE_ROWS, groupByColumns.length);
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
-        new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns, ARRAY_BASED_THRESHOLD);
+        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns), ARRAY_BASED_THRESHOLD);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), expected, _errorMessage);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
     // Test group key generation.
-    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, _singleValueGroupKeyBuffer);
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, SV_GROUP_KEY_BUFFER);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
     testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), 2);
@@ -196,13 +178,13 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
     // Test initial status.
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
-        new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns, ARRAY_BASED_THRESHOLD);
+        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns), ARRAY_BASED_THRESHOLD);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), Integer.MAX_VALUE,
         _errorMessage);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
     // Test group key generation.
-    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, _singleValueGroupKeyBuffer);
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, SV_GROUP_KEY_BUFFER);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
     testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), 2);
@@ -215,10 +197,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
    * Odd number index values should be different from even number index values.
    */
   private void compareSingleValueBuffer() {
-    Assert.assertTrue(_singleValueGroupKeyBuffer[0] != _singleValueGroupKeyBuffer[1], _errorMessage);
+    Assert.assertTrue(SV_GROUP_KEY_BUFFER[0] != SV_GROUP_KEY_BUFFER[1], _errorMessage);
     for (int i = 0; i < 20; i += 2) {
-      Assert.assertEquals(_singleValueGroupKeyBuffer[i], _singleValueGroupKeyBuffer[0], _errorMessage);
-      Assert.assertEquals(_singleValueGroupKeyBuffer[i + 1], _singleValueGroupKeyBuffer[1], _errorMessage);
+      Assert.assertEquals(SV_GROUP_KEY_BUFFER[i], SV_GROUP_KEY_BUFFER[0], _errorMessage);
+      Assert.assertEquals(SV_GROUP_KEY_BUFFER[i + 1], SV_GROUP_KEY_BUFFER[1], _errorMessage);
     }
   }
 
@@ -229,14 +211,14 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
     // Test initial status.
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
-        new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns, ARRAY_BASED_THRESHOLD);
+        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns), ARRAY_BASED_THRESHOLD);
     int groupKeyUpperBound = dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound();
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound,
         _errorMessage);
 
     // Test group key generation.
-    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, _multiValueGroupKeyBuffer);
-    int numUniqueKeys = _multiValueGroupKeyBuffer[0].length + _multiValueGroupKeyBuffer[1].length;
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, MV_GROUP_KEY_BUFFER);
+    int numUniqueKeys = MV_GROUP_KEY_BUFFER[0].length + MV_GROUP_KEY_BUFFER[1].length;
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound,
         _errorMessage);
     compareMultiValueBuffer();
@@ -250,12 +232,12 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
     // Test initial status.
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
-        new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns, ARRAY_BASED_THRESHOLD);
+        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns), ARRAY_BASED_THRESHOLD);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
     // Test group key generation.
-    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, _multiValueGroupKeyBuffer);
-    int numUniqueKeys = _multiValueGroupKeyBuffer[0].length + _multiValueGroupKeyBuffer[1].length;
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, MV_GROUP_KEY_BUFFER);
+    int numUniqueKeys = MV_GROUP_KEY_BUFFER[0].length + MV_GROUP_KEY_BUFFER[1].length;
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();
     testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), numUniqueKeys);
@@ -268,15 +250,24 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
     // Test initial status.
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
-        new DictionaryBasedGroupKeyGenerator(_transformBlock, groupByColumns, ARRAY_BASED_THRESHOLD);
+        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns), ARRAY_BASED_THRESHOLD);
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
     // Test group key generation.
-    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, _multiValueGroupKeyBuffer);
-    int numUniqueKeys = _multiValueGroupKeyBuffer[0].length + _multiValueGroupKeyBuffer[1].length;
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, MV_GROUP_KEY_BUFFER);
+    int numUniqueKeys = MV_GROUP_KEY_BUFFER[0].length + MV_GROUP_KEY_BUFFER[1].length;
     Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();
     testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), numUniqueKeys);
+  }
+
+  private static TransformExpressionTree[] getExpressions(String[] columns) {
+    int numColumns = columns.length;
+    TransformExpressionTree[] expressions = new TransformExpressionTree[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      expressions[i] = TransformExpressionTree.compileToExpressionTree(columns[i]);
+    }
+    return expressions;
   }
 
   /**
@@ -286,18 +277,18 @@ public class DictionaryBasedGroupKeyGeneratorTest {
    * Odd number index values should be different from even number index values.
    */
   private void compareMultiValueBuffer() {
-    int length0 = _multiValueGroupKeyBuffer[0].length;
-    int length1 = _multiValueGroupKeyBuffer[1].length;
+    int length0 = MV_GROUP_KEY_BUFFER[0].length;
+    int length1 = MV_GROUP_KEY_BUFFER[1].length;
     int compareLength = Math.min(length0, length1);
     for (int i = 0; i < compareLength; i++) {
-      Assert.assertTrue(_multiValueGroupKeyBuffer[0][i] != _multiValueGroupKeyBuffer[1][i], _errorMessage);
+      Assert.assertTrue(MV_GROUP_KEY_BUFFER[0][i] != MV_GROUP_KEY_BUFFER[1][i], _errorMessage);
     }
     for (int i = 0; i < 20; i += 2) {
       for (int j = 0; j < length0; j++) {
-        Assert.assertEquals(_multiValueGroupKeyBuffer[i][j], _multiValueGroupKeyBuffer[0][j], _errorMessage);
+        Assert.assertEquals(MV_GROUP_KEY_BUFFER[i][j], MV_GROUP_KEY_BUFFER[0][j], _errorMessage);
       }
       for (int j = 0; j < length1; j++) {
-        Assert.assertEquals(_multiValueGroupKeyBuffer[i + 1][j], _multiValueGroupKeyBuffer[1][j], _errorMessage);
+        Assert.assertEquals(MV_GROUP_KEY_BUFFER[i + 1][j], MV_GROUP_KEY_BUFFER[1][j], _errorMessage);
       }
     }
   }
@@ -326,7 +317,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
   }
 
   @AfterClass
-  public void cleanUp() {
+  public void tearDown() {
     FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
   }
 }

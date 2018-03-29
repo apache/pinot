@@ -15,9 +15,10 @@
  */
 package com.linkedin.pinot.core.query.aggregation.groupby;
 
-import com.linkedin.pinot.core.common.BlockMetadata;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
+import com.linkedin.pinot.core.operator.transform.TransformOperator;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
@@ -57,8 +58,8 @@ import javax.annotation.Nonnull;
  */
 // TODO: Revisit to make trimming work. Currently trimming is disabled
 public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
-  private final int _numGroupByColumns;
-  private final String[] _groupByColumns;
+  private final TransformExpressionTree[] _groupByExpressions;
+  private final int _numGroupByExpressions;
   private final int[] _cardinalities;
   private final boolean[] _isSingleValueColumn;
   private final Dictionary[] _dictionaries;
@@ -89,29 +90,22 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 //  }
 //  private TrimMode _trimMode;
 
-  /**
-   * Constructor for the class. Initializes data members (reusable arrays).
-   *
-   * @param transformBlock Transform block for which to generate group keys
-   * @param groupByColumns Group-by columns
-   * @param arrayBasedThreshold Threshold for array based result holder
-   */
-  public DictionaryBasedGroupKeyGenerator(TransformBlock transformBlock, String[] groupByColumns,
-      int arrayBasedThreshold) {
-    _numGroupByColumns = groupByColumns.length;
-    _groupByColumns = groupByColumns;
+  public DictionaryBasedGroupKeyGenerator(@Nonnull TransformOperator transformOperator,
+      @Nonnull TransformExpressionTree[] groupByExpressions, int arrayBasedThreshold) {
+    _groupByExpressions = groupByExpressions;
+    _numGroupByExpressions = groupByExpressions.length;
 
-    _cardinalities = new int[_numGroupByColumns];
-    _isSingleValueColumn = new boolean[_numGroupByColumns];
-    _dictionaries = new Dictionary[_numGroupByColumns];
-    _singleValueDictIds = new int[_numGroupByColumns][];
-    _multiValueDictIds = new int[_numGroupByColumns][][];
+    _cardinalities = new int[_numGroupByExpressions];
+    _isSingleValueColumn = new boolean[_numGroupByExpressions];
+    _dictionaries = new Dictionary[_numGroupByExpressions];
+    _singleValueDictIds = new int[_numGroupByExpressions][];
+    _multiValueDictIds = new int[_numGroupByExpressions][][];
 
     long cardinalityProduct = 1L;
     boolean longOverflow = false;
-    for (int i = 0; i < _numGroupByColumns; i++) {
-      BlockMetadata blockMetadata = transformBlock.getBlockMetadata(groupByColumns[i]);
-      _dictionaries[i] = blockMetadata.getDictionary();
+    for (int i = 0; i < _numGroupByExpressions; i++) {
+      TransformExpressionTree groupByExpression = groupByExpressions[i];
+      _dictionaries[i] = transformOperator.getDictionary(groupByExpression);
       int cardinality = _dictionaries[i].length();
       _cardinalities[i] = cardinality;
       if (!longOverflow) {
@@ -122,9 +116,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         }
       }
 
-      if (blockMetadata.isSingleValue()) {
-        _isSingleValueColumn[i] = true;
-      }
+      _isSingleValueColumn[i] = transformOperator.getDataSourceMetadata(groupByExpression).isSingleValue();
     }
 
     if (longOverflow) {
@@ -145,36 +137,27 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public int getGlobalGroupKeyUpperBound() {
     return _globalGroupIdUpperBound;
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
-  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[] outGroupIds) {
+  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[] groupKeys) {
     // Fetch dictionary ids in the given block for all group-by columns
-    for (int i = 0; i < _numGroupByColumns; i++) {
-      BlockValSet blockValueSet = transformBlock.getBlockValueSet(_groupByColumns[i]);
+    for (int i = 0; i < _numGroupByExpressions; i++) {
+      BlockValSet blockValueSet = transformBlock.getBlockValueSet(_groupByExpressions[i]);
       _singleValueDictIds[i] = blockValueSet.getDictionaryIdsSV();
     }
 
-    _rawKeyHolder.processSingleValue(transformBlock.getNumDocs(), outGroupIds);
+    _rawKeyHolder.processSingleValue(transformBlock.getNumDocs(), groupKeys);
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
-  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[][] outGroupIds) {
+  public void generateKeysForBlock(@Nonnull TransformBlock transformBlock, @Nonnull int[][] groupKeys) {
     // Fetch dictionary ids in the given block for all group-by columns
-    for (int i = 0; i < _numGroupByColumns; i++) {
-      BlockValSet blockValueSet = transformBlock.getBlockValueSet(_groupByColumns[i]);
+    for (int i = 0; i < _numGroupByExpressions; i++) {
+      BlockValSet blockValueSet = transformBlock.getBlockValueSet(_groupByExpressions[i]);
       if (_isSingleValueColumn[i]) {
         _singleValueDictIds[i] = blockValueSet.getDictionaryIdsSV();
       } else {
@@ -182,28 +165,19 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       }
     }
 
-    _rawKeyHolder.processMultiValue(transformBlock.getNumDocs(), outGroupIds);
+    _rawKeyHolder.processMultiValue(transformBlock.getNumDocs(), groupKeys);
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public int getCurrentGroupKeyUpperBound() {
     return _rawKeyHolder.getGroupIdUpperBound();
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public Iterator<GroupKey> getUniqueGroupKeys() {
     return _rawKeyHolder.iterator();
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public void purgeKeys(@Nonnull int[] keyIdsToPurge) {
     // TODO: Make trimming work
@@ -243,7 +217,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     public void processSingleValue(int numDocs, @Nonnull int[] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         int groupId = 0;
-        for (int j = _numGroupByColumns - 1; j >= 0; j--) {
+        for (int j = _numGroupByExpressions - 1; j >= 0; j--) {
           groupId = groupId * _cardinalities[j] + _singleValueDictIds[j][i];
         }
         outGroupIds[i] = groupId;
@@ -312,7 +286,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     public void processSingleValue(int numDocs, @Nonnull int[] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         int rawKey = 0;
-        for (int j = _numGroupByColumns - 1; j >= 0; j--) {
+        for (int j = _numGroupByExpressions - 1; j >= 0; j--) {
           rawKey = rawKey * _cardinalities[j] + _singleValueDictIds[j][i];
         }
         outGroupIds[i] = getGroupId(rawKey);
@@ -384,13 +358,13 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     int[] rawKeys = null;
 
     // Specialize single multi-value group-by column case
-    if (_numGroupByColumns == 1) {
+    if (_numGroupByExpressions == 1) {
       rawKeys = _multiValueDictIds[0][index];
     } else {
       // Before having to transform to array, use single value raw key for better performance
       int rawKey = 0;
 
-      for (int i = _numGroupByColumns - 1; i >= 0; i--) {
+      for (int i = _numGroupByExpressions - 1; i >= 0; i--) {
         int cardinality = _cardinalities[i];
         if (_isSingleValueColumn[i]) {
           int dictId = _singleValueDictIds[i][index];
@@ -459,13 +433,13 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
    */
   private String getGroupKey(int rawKey) {
     // Specialize single group-by column case
-    if (_numGroupByColumns == 1) {
+    if (_numGroupByExpressions == 1) {
       return _dictionaries[0].get(rawKey).toString();
     } else {
       int cardinality = _cardinalities[0];
       StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].get(rawKey % cardinality).toString());
       rawKey /= cardinality;
-      for (int i = 1; i < _numGroupByColumns; i++) {
+      for (int i = 1; i < _numGroupByExpressions; i++) {
         groupKeyBuilder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
         cardinality = _cardinalities[i];
         groupKeyBuilder.append(_dictionaries[i].get(rawKey % cardinality));
@@ -486,7 +460,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     public void processSingleValue(int numDocs, @Nonnull int[] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         long rawKey = 0L;
-        for (int j = _numGroupByColumns - 1; j >= 0; j--) {
+        for (int j = _numGroupByExpressions - 1; j >= 0; j--) {
           rawKey = rawKey * _cardinalities[j] + _singleValueDictIds[j][i];
         }
         outGroupIds[i] = getGroupId(rawKey);
@@ -562,7 +536,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     // Before having to transform to array, use single value raw key for better performance
     long rawKey = 0;
 
-    for (int i = _numGroupByColumns - 1; i >= 0; i--) {
+    for (int i = _numGroupByExpressions - 1; i >= 0; i--) {
       int cardinality = _cardinalities[i];
       if (_isSingleValueColumn[i]) {
         int dictId = _singleValueDictIds[i][index];
@@ -632,7 +606,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     int cardinality = _cardinalities[0];
     StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].get((int) (rawKey % cardinality)).toString());
     rawKey /= cardinality;
-    for (int i = 1; i < _numGroupByColumns; i++) {
+    for (int i = 1; i < _numGroupByExpressions; i++) {
       groupKeyBuilder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
       cardinality = _cardinalities[i];
       groupKeyBuilder.append(_dictionaries[i].get((int) (rawKey % cardinality)));
@@ -651,8 +625,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     @Override
     public void processSingleValue(int numDocs, @Nonnull int[] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
-        int[] dictIds = new int[_numGroupByColumns];
-        for (int j = 0; j < _numGroupByColumns; j++) {
+        int[] dictIds = new int[_numGroupByExpressions];
+        for (int j = 0; j < _numGroupByExpressions; j++) {
           dictIds[j] = _singleValueDictIds[j][i];
         }
         outGroupIds[i] = getGroupId(new IntArray(dictIds));
@@ -726,9 +700,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     IntArray[] rawKeys = null;
 
     // Before having to transform to array, use single value raw key for better performance
-    int[] dictIds = new int[_numGroupByColumns];
+    int[] dictIds = new int[_numGroupByExpressions];
 
-    for (int i = 0; i < _numGroupByColumns; i++) {
+    for (int i = 0; i < _numGroupByExpressions; i++) {
       if (_isSingleValueColumn[i]) {
         int dictId = _singleValueDictIds[i][index];
         if (rawKeys == null) {
@@ -800,7 +774,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
    */
   private String getGroupKey(IntArray rawKey) {
     StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].get(rawKey._elements[0]).toString());
-    for (int i = 1; i < _numGroupByColumns; i++) {
+    for (int i = 1; i < _numGroupByExpressions; i++) {
       groupKeyBuilder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
       groupKeyBuilder.append(_dictionaries[i].get(rawKey._elements[i]));
     }

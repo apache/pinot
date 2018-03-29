@@ -146,10 +146,7 @@ public class DefaultAggregationExecutorTest {
       aggrFuncContextArray[i].getAggregationFunction().accept(aggFuncInitializer);
     }
     AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(aggrFuncContextArray);
-    aggregationExecutor.init();
     aggregationExecutor.aggregate(transformBlock);
-    aggregationExecutor.finish();
-
     List<Object> result = aggregationExecutor.getResult();
     for (int i = 0; i < result.size(); i++) {
       double actual = (double) result.get(i);

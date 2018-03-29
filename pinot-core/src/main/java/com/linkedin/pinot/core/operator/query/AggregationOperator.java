@@ -36,6 +36,7 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   private final AggregationFunctionContext[] _functionContexts;
   private final TransformOperator _transformOperator;
   private final long _numTotalRawDocs;
+
   private ExecutionStatistics _executionStatistics;
 
   public AggregationOperator(@Nonnull AggregationFunctionContext[] functionContexts,
@@ -51,13 +52,11 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
 
     // Perform aggregation on all the transform blocks
     AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(_functionContexts);
-    aggregationExecutor.init();
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       numDocsScanned += transformBlock.getNumDocs();
       aggregationExecutor.aggregate(transformBlock);
     }
-    aggregationExecutor.finish();
     List<Object> aggregationResult = aggregationExecutor.getResult();
 
     // Create execution statistics

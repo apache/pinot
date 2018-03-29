@@ -15,110 +15,137 @@
  */
 package com.linkedin.pinot.core.operator.docvalsets;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BaseBlockValSet;
-import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.DataSourceMetadata;
+import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
-import java.util.HashMap;
-import java.util.Map;
+import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 
 
 /**
- * This class represents the BlockValSet for a TransformBlock (for a specific transform).
- * There's one TransformBlockValSet for each node in the {@link com.linkedin.pinot.common.request.transform.TransformExpressionTree}.
- * These are hooked up together in the same way as the expression tree itself, with projection/literal block val sets
- * at the leaf nodes. The reason for this is to enable lazy evaluation of transform expressions, which gets triggered
- * when the 'get' methods are called.
- *
+ * The <code>TransformBlockValSet</code> class represents the block value set for a transform function in the transform
+ * block.
+ * <p>Caller is responsible for calling the correct method based on the data source metadata for the block value set.
  */
 public class TransformBlockValSet extends BaseBlockValSet {
+  private final ProjectionBlock _projectionBlock;
+  private final TransformFunction _transformFunction;
 
-  private final TransformFunction _function;
-  private final BlockValSet[] _blockValSets;
-  private final int _numDocs;
-  private final FieldSpec.DataType _dataType;
+  private int[] _numMVEntries;
 
-  // Cache for result of different data types.
-  private Map<FieldSpec.DataType, Object> _resultMap;
+  public TransformBlockValSet(ProjectionBlock projectionBlock, TransformFunction transformFunction) {
+    _projectionBlock = projectionBlock;
+    _transformFunction = transformFunction;
+  }
 
-  /**
-   * Constructor for the class.
-   *
-   * @param function Transform function
-   * @param numDocs Number of docs in the input
-   * @param blockValSets Input block value sets
-   */
-  public TransformBlockValSet(TransformFunction function, int numDocs, BlockValSet... blockValSets) {
-    _function = function;
-    _numDocs = numDocs;
-    _blockValSets = blockValSets;
-    _dataType = function.getOutputType();
-    _resultMap = new HashMap<>();
+  @Override
+  public int[] getDictionaryIdsSV() {
+    return _transformFunction.transformToDictIdsSV(_projectionBlock);
   }
 
   @Override
   public int[] getIntValuesSV() {
-    int[] result = (int[]) _resultMap.get(FieldSpec.DataType.INT);
-
-    if (result != null) {
-      return result;
-    }
-
-    result = _function.transform(_numDocs, _blockValSets);
-    _resultMap.put(FieldSpec.DataType.INT, result);
-    return result;
+    return _transformFunction.transformToIntValuesSV(_projectionBlock);
   }
 
   @Override
   public long[] getLongValuesSV() {
-    long[] result = (long[]) _resultMap.get(FieldSpec.DataType.LONG);
-    if (result != null) {
-      return result;
-    }
-
-    result = _function.transform(_numDocs, _blockValSets);
-    _resultMap.put(FieldSpec.DataType.LONG, result);
-    return result;
+    return _transformFunction.transformToLongValuesSV(_projectionBlock);
   }
 
   @Override
   public float[] getFloatValuesSV() {
-    float[] result = (float[]) _resultMap.get(FieldSpec.DataType.FLOAT);
-    if (result != null) {
-      return result;
-    }
-
-    result = _function.transform(_numDocs, _blockValSets);
-    _resultMap.put(FieldSpec.DataType.FLOAT, result);
-    return result;
+    return _transformFunction.transformToFloatValuesSV(_projectionBlock);
   }
 
   @Override
   public double[] getDoubleValuesSV() {
-    double[] result = (double[]) _resultMap.get(FieldSpec.DataType.DOUBLE);
-    if (result != null) {
-      return result;
-    }
-
-    result = _function.transform(_numDocs, _blockValSets);
-    _resultMap.put(FieldSpec.DataType.DOUBLE, result);
-    return result;
+    return _transformFunction.transformToDoubleValuesSV(_projectionBlock);
   }
 
   @Override
   public String[] getStringValuesSV() {
-    String[] result = (String[]) _resultMap.get(FieldSpec.DataType.STRING);
-    if (result != null) {
-      return result;
-    }
-
-    result = _function.transform(_numDocs, _blockValSets);
-    _resultMap.put(FieldSpec.DataType.STRING, result);
-    return result;
+    return _transformFunction.transformToStringValuesSV(_projectionBlock);
   }
 
   @Override
-  public FieldSpec.DataType getValueType() {
-    return _dataType;
+  public int[][] getDictionaryIdsMV() {
+    return _transformFunction.transformToDictIdsMV(_projectionBlock);
+  }
+
+  @Override
+  public int[][] getIntValuesMV() {
+    return _transformFunction.transformToIntValuesMV(_projectionBlock);
+  }
+
+  @Override
+  public long[][] getLongValuesMV() {
+    return _transformFunction.transformToLongValuesMV(_projectionBlock);
+  }
+
+  @Override
+  public float[][] getFloatValuesMV() {
+    return _transformFunction.transformToFloatValuesMV(_projectionBlock);
+  }
+
+  @Override
+  public double[][] getDoubleValuesMV() {
+    return _transformFunction.transformToDoubleValuesMV(_projectionBlock);
+  }
+
+  @Override
+  public String[][] getStringValuesMV() {
+    return _transformFunction.transformToStringValuesMV(_projectionBlock);
+  }
+
+  @Override
+  public int[] getNumMVEntries() {
+    if (_numMVEntries == null) {
+      _numMVEntries = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+    int numDocs = _projectionBlock.getNumDocs();
+    DataSourceMetadata metadata = _transformFunction.getResultMetadata();
+    if (metadata.hasDictionary()) {
+      int[][] dictionaryIds = getDictionaryIdsMV();
+      for (int i = 0; i < numDocs; i++) {
+        _numMVEntries[i] = dictionaryIds[i].length;
+      }
+      return _numMVEntries;
+    } else {
+      switch (metadata.getDataType()) {
+        case INT:
+          int[][] intValues = getIntValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            _numMVEntries[i] = intValues[i].length;
+          }
+          return _numMVEntries;
+        case LONG:
+          long[][] longValues = getLongValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            _numMVEntries[i] = longValues[i].length;
+          }
+          return _numMVEntries;
+        case FLOAT:
+          float[][] floatValues = getFloatValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            _numMVEntries[i] = floatValues[i].length;
+          }
+          return _numMVEntries;
+        case DOUBLE:
+          double[][] doubleValues = getDoubleValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            _numMVEntries[i] = doubleValues[i].length;
+          }
+          return _numMVEntries;
+        case STRING:
+          String[][] stringValues = getStringValuesMV();
+          for (int i = 0; i < numDocs; i++) {
+            _numMVEntries[i] = stringValues[i].length;
+          }
+          return _numMVEntries;
+        default:
+          throw new IllegalStateException();
+      }
+    }
   }
 }

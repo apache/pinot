@@ -21,6 +21,8 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.operator.docvalsets.TransformBlockValSet;
+import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
 import java.util.Map;
 import javax.annotation.Nonnull;
 
@@ -31,12 +33,29 @@ import javax.annotation.Nonnull;
  */
 public class TransformBlock implements Block {
   private final ProjectionBlock _projectionBlock;
-  private final Map<TransformExpressionTree, BlockValSet> _blockValSetMap;
+  private final Map<TransformExpressionTree, TransformFunction> _transformFunctionMap;
 
   public TransformBlock(@Nonnull ProjectionBlock projectionBlock,
-      @Nonnull Map<TransformExpressionTree, BlockValSet> blockValSetMap) {
+      @Nonnull Map<TransformExpressionTree, TransformFunction> transformFunctionMap) {
     _projectionBlock = projectionBlock;
-    _blockValSetMap = blockValSetMap;
+    _transformFunctionMap = transformFunctionMap;
+  }
+
+  public int getNumDocs() {
+    return _projectionBlock.getNumDocs();
+  }
+
+  public BlockValSet getBlockValueSet(TransformExpressionTree expressionTree) {
+    if (expressionTree.getExpressionType() == TransformExpressionTree.ExpressionType.IDENTIFIER) {
+      return _projectionBlock.getBlockValueSet(expressionTree.getValue());
+    } else {
+      return new TransformBlockValSet(_projectionBlock, _transformFunctionMap.get(expressionTree));
+    }
+  }
+
+  @Override
+  public BlockDocIdSet getBlockDocIdSet() {
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -50,32 +69,7 @@ public class TransformBlock implements Block {
   }
 
   @Override
-  public BlockDocIdSet getBlockDocIdSet() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public BlockMetadata getMetadata() {
     throw new UnsupportedOperationException();
-  }
-
-  public BlockValSet getBlockValueSet(String column) {
-    return _blockValSetMap.get(TransformExpressionTree.compileToExpressionTree(column));
-  }
-
-  // TODO: metadata should be fetched from Operator instead of block
-  // TODO: Need to support dictionary for transformed block
-  public BlockMetadata getBlockMetadata(String column) {
-    Block block = _projectionBlock.getBlock(column);
-    if (block != null) {
-      return block.getMetadata();
-    } else {
-      BlockValSet blockValueSet = getBlockValueSet(column);
-      return new BlockMetadataImpl(getNumDocs(), true, 0, blockValueSet.getValueType(), null);
-    }
-  }
-
-  public int getNumDocs() {
-    return _projectionBlock.getNumDocs();
   }
 }

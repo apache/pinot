@@ -20,6 +20,10 @@ public class BadQueryRequestException extends RuntimeException {
     super(message);
   }
 
+  public BadQueryRequestException(String message, Throwable cause) {
+    super(message, cause);
+  }
+
   public BadQueryRequestException(Throwable cause) {
     super(cause);
   }
