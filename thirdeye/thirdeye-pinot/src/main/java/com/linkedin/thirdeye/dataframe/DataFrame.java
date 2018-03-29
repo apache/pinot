@@ -1287,7 +1287,7 @@ public class DataFrame {
     DataFrame df = this;
     for(int i=seriesNames.size()-1; i>=0; i--) {
       // TODO support "-series" order inversion
-      df = df.project(assertSeriesExists(seriesNames.get(i)).sortedIndex());
+      df = df.project(df.get(seriesNames.get(i)).sortedIndex());
     }
     return df;
   }
@@ -1526,8 +1526,28 @@ public class DataFrame {
    * @return DataFrame copy without null rows
    */
   public DataFrame dropNull() {
+    return this.dropNull(new ArrayList<>(this.getSeriesNames()));
+  }
+
+  /**
+   * Returns a copy of the DataFrame omitting rows that contain a {@code null} value in any given series.
+   *
+   * @param seriesNames series names to drop null values for
+   * @return DataFrame copy without null rows
+   */
+  public DataFrame dropNull(String... seriesNames) {
+    return this.dropNull(Arrays.asList(seriesNames));
+  }
+
+  /**
+   * Returns a copy of the DataFrame omitting rows that contain a {@code null} value in any given series.
+   *
+   * @param seriesNames series names to drop null values for
+   * @return DataFrame copy without null rows
+   */
+  public DataFrame dropNull(List<String> seriesNames) {
     BooleanSeries isNull = BooleanSeries.fillValues(this.size(), false);
-    for(Series s : this.series.values()) {
+    for(Series s : assertSeriesExist(seriesNames)) {
       isNull = isNull.or(s.isNull());
     }
 

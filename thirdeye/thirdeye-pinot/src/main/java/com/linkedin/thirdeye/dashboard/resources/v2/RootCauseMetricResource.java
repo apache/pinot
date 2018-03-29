@@ -475,13 +475,12 @@ public class RootCauseMetricResource {
    *
    * @param baseSlice metric slice that acts as base
    * @param offset offset identifier
-   * @param timezone timezone identifier (location long format)
+   * @param timeZoneString timezone identifier (location long format)
    * @return Baseline instance
    * @throws IllegalArgumentException if the offset cannot be parsed
    */
-  private Baseline parseOffset(MetricSlice baseSlice, String offset, String timezone) {
-    long timestamp = baseSlice.getStart();
-    boolean isDailyData = this.isDailyData(baseSlice);
+  private Baseline parseOffset(MetricSlice baseSlice, String offset, String timeZoneString) {
+    DateTimeZone timeZone = DateTimeZone.forID(timeZoneString);
 
     Matcher mCurrent = PATTERN_CURRENT.matcher(offset);
     if (mCurrent.find()) {
@@ -490,27 +489,27 @@ public class RootCauseMetricResource {
 
     Matcher mWeekOverWeek = PATTERN_WEEK_OVER_WEEK.matcher(offset);
     if (mWeekOverWeek.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.SUM, 1, Integer.valueOf(mWeekOverWeek.group(1)), timestamp, timezone, isDailyData);
+      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.SUM, 1, Integer.valueOf(mWeekOverWeek.group(1)), timeZone);
     }
 
     Matcher mMean = PATTERN_MEAN.matcher(offset);
     if (mMean.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEAN, Integer.valueOf(mMean.group(1)), 1, timestamp, timezone, isDailyData);
+      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEAN, Integer.valueOf(mMean.group(1)), 1, timeZone);
     }
 
     Matcher mMedian = PATTERN_MEDIAN.matcher(offset);
     if (mMedian.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, Integer.valueOf(mMedian.group(1)), 1, timestamp, timezone, isDailyData);
+      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, Integer.valueOf(mMedian.group(1)), 1, timeZone);
     }
 
     Matcher mMin = PATTERN_MIN.matcher(offset);
     if (mMin.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MIN, Integer.valueOf(mMin.group(1)), 1, timestamp, timezone, isDailyData);
+      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MIN, Integer.valueOf(mMin.group(1)), 1, timeZone);
     }
 
     Matcher mMax = PATTERN_MAX.matcher(offset);
     if (mMax.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MAX, Integer.valueOf(mMax.group(1)), 1, timestamp, timezone, isDailyData);
+      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MAX, Integer.valueOf(mMax.group(1)), 1, timeZone);
     }
 
     throw new IllegalArgumentException(String.format("Unknown offset '%s'", offset));
@@ -546,25 +545,6 @@ public class RootCauseMetricResource {
     long end = ((slice.getEnd() + offset + timeGranularity - 1) / timeGranularity) * timeGranularity - offset;
 
     return slice.withStart(start).withEnd(end).withGranularity(granularity);
-  }
-
-  /**
-   * Returns {@code true} if the slice references a dataset with daily time granularity
-   * @param slice metric slice
-   * @return {@code true} is daily time series, {@code false} otherwise
-   */
-  private boolean isDailyData(MetricSlice slice) {
-    MetricConfigDTO metric  = this.metricDAO.findById(slice.getMetricId());
-    if (metric == null) {
-      return false;
-    }
-
-    DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
-    if (dataset == null) {
-      return false;
-    }
-
-    return TimeUnit.DAYS.equals(dataset.bucketTimeGranularity().getUnit());
   }
 
   private MetricSlice makeSlice(String urn, long start, long end) {

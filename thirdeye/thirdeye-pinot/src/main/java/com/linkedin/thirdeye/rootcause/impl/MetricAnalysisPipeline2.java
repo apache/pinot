@@ -35,6 +35,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.StringUtils;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
+import org.joda.time.PeriodType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,8 +120,8 @@ public class MetricAnalysisPipeline2 extends Pipeline {
     TimeRangeEntity anomalyRange = TimeRangeEntity.getTimeRangeAnomaly(context);
     TimeRangeEntity baselineRange = TimeRangeEntity.getTimeRangeBaseline(context);
 
-    BaselineAggregate rangeCurrent = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Collections.singletonList(0L), false);
-    BaselineAggregate rangeBaseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, 4, 0, false);
+    BaselineAggregate rangeCurrent = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Collections.singletonList(new Period(0, PeriodType.weeks())), DateTimeZone.UTC);
+    BaselineAggregate rangeBaseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, 4, 0, DateTimeZone.UTC);
 
     Map<MetricEntity, MetricSlice> trainingSet = new HashMap<>();
     Map<MetricEntity, MetricSlice> testSet = new HashMap<>();
@@ -234,10 +237,10 @@ public class MetricAnalysisPipeline2 extends Pipeline {
 
         boolean isDailyData = this.isDailyData(sliceTest.getMetricId());
 
-        DataFrame testCurrent = rangeCurrent.withDailyData(isDailyData).gather(sliceTest, data);
-        DataFrame testBaseline = rangeBaseline.withDailyData(isDailyData).gather(sliceTest, data);
-        DataFrame trainingCurrent = rangeCurrent.withDailyData(isDailyData).gather(sliceTrain, data);
-        DataFrame trainingBaseline = rangeBaseline.withDailyData(isDailyData).gather(sliceTrain, data);
+        DataFrame testCurrent = rangeCurrent.gather(sliceTest, data);
+        DataFrame testBaseline = rangeBaseline.gather(sliceTest, data);
+        DataFrame trainingCurrent = rangeCurrent.gather(sliceTrain, data);
+        DataFrame trainingBaseline = rangeBaseline.gather(sliceTrain, data);
 
 //        LOG.info("Preparing training and test data for metric '{}'", me.getUrn());
 //        DataFrame trainingBaseline = extractTimeRange(timeseries, trainingBaselineStart, trainingBaselineEnd);

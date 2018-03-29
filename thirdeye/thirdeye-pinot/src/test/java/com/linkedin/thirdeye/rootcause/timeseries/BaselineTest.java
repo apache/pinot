@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -14,6 +15,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.ArrayUtils;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
+import org.joda.time.PeriodType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -95,7 +99,7 @@ public class BaselineTest {
 
   @Test
   public void testBaselineAggregateFrom() {
-    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Arrays.asList(-1200L, -4500L), false);
+    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, makePeriods(PeriodType.millis(), -1200L, -4500L), DateTimeZone.UTC);
 
     List<MetricSlice> slices = baseline.scatter(BASE_SLICE);
     Assert.assertEquals(slices.size(), 2);
@@ -109,7 +113,7 @@ public class BaselineTest {
 
   @Test
   public void testBaselineAggregateCompute() {
-    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Arrays.asList(-1200L, -4500L), false);
+    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, makePeriods(PeriodType.millis(), -1200L, -4500L), DateTimeZone.UTC);
 
     Map<MetricSlice, DataFrame> data = new HashMap<>();
     data.put(BASE_SLICE.withStart(13800).withEnd(15800),
@@ -133,7 +137,7 @@ public class BaselineTest {
 
   @Test
   public void testBaselineAggregateComputeMultiIndex() {
-    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Arrays.asList(-1200L, -4500L), false);
+    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, makePeriods(PeriodType.millis(), -1200L, -4500L), DateTimeZone.UTC);
 
     Map<MetricSlice, DataFrame> data = new HashMap<>();
     data.put(BASE_SLICE.withStart(13800).withEnd(15800),
@@ -158,12 +162,12 @@ public class BaselineTest {
     assertEquals(result.getDoubles(COL_VALUE), 450d, 550d, 650d, 750d, 4500d, 5500d, 6500d, 7500d);
   }
 
-  @Test(expectedExceptions = IllegalArgumentException.class)
-  public void testBaselineAggregateComputeInvalidSlice() {
-    BaselineAggregate baseline = BaselineAggregate.fromOffsets(BaselineAggregateType.MEDIAN, Arrays.asList(-1200L, -4500L), false);
-    baseline.gather(BASE_SLICE, Collections.singletonMap(
-        BASE_SLICE.withStart(13999), new DataFrame()
-    ));
+  private static List<Period> makePeriods(PeriodType periodType, long... offsetMillis) {
+    List<Period> output = new ArrayList<>();
+    for (long offset : offsetMillis) {
+      output.add(new Period(offset, periodType));
+    }
+    return output;
   }
 
   private static void assertEquals(LongSeries series, long... values) {
