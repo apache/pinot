@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.rootcause.timeseries;
 
 import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Grouping;
 import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.Series;
@@ -182,25 +181,64 @@ public class BaselineAggregate implements Baseline {
   /**
    * Returns an instance of BaselineAggregate for the specified type and {@code numWeeks} offsets
    * computed on a consecutive week-over-week basis starting with a lag of {@code offsetWeeks}.
-   * Additionally corrects for DST changes assuming a start date of {@code timestamp} in {@code timeZone}.
-   * <br/><b>NOTE:</b> As offsets are pre-computed, the DST correction will produce incorrect offsets
-   * if used to scatter a slice that does not start at {@code timestamp}.
+   * <br/><b>NOTE:</b> this will apply DST correction (modeled as 7 days)
    *
-   * @see BaselineAggregate#fromWeekOverWeek(BaselineAggregateType, int, int, DateTimeZone)
    * @see BaselineAggregateType
    *
    * @param type aggregation type
    * @param numWeeks number of consecutive weeks
    * @param offsetWeeks lag for starting consecutive weeks
    * @param timeZone time zone
-   * @return BaselineAggregate with given type and weekly offsets corrected for DST
+   * @return BaselineAggregate with given type and weekly offsets
    */
   public static BaselineAggregate fromWeekOverWeek(BaselineAggregateType type, int numWeeks, int offsetWeeks, DateTimeZone timeZone) {
     List<Period> offsets = new ArrayList<>();
     for (int i = 0; i < numWeeks; i++) {
-      offsets.add(new Period(-1 * (i + offsetWeeks), PeriodType.weeks()));
+      offsets.add(new Period(0, 0, 0, -1 * 7 * (i + offsetWeeks), 0, 0, 0, 0, PeriodType.days()));
     }
-    return new BaselineAggregate(type, offsets, timeZone, PeriodType.weeks());
+    return new BaselineAggregate(type, offsets, timeZone, PeriodType.days());
+  }
+
+  /**
+   * Returns an instance of BaselineAggregate for the specified type and {@code numDays} offsets
+   * computed on a consecutive day-over-day basis starting with a lag of {@code offsetDays}.
+   * <br/><b>NOTE:</b> this will apply DST correction
+   *
+   * @see BaselineAggregateType
+   *
+   * @param type aggregation type
+   * @param numDays number of consecutive weeks
+   * @param offsetDays lag for starting consecutive weeks
+   * @param timeZone time zone
+   * @return BaselineAggregate with given type and daily offsets
+   */
+  public static BaselineAggregate fromDayOverDay(BaselineAggregateType type, int numDays, int offsetDays, DateTimeZone timeZone) {
+    List<Period> offsets = new ArrayList<>();
+    for (int i = 0; i < numDays; i++) {
+      offsets.add(new Period(0, 0, 0, -1 * (i + offsetDays), 0, 0, 0, 0, PeriodType.days()));
+    }
+    return new BaselineAggregate(type, offsets, timeZone, PeriodType.days());
+  }
+
+  /**
+   * Returns an instance of BaselineAggregate for the specified type and {@code numDays} offsets
+   * computed on a consecutive day-over-day basis starting with a lag of {@code offsetHours}.
+   * <br/><b>NOTE:</b> this will <b>NOT</b> apply DST correction
+   *
+   * @see BaselineAggregateType
+   *
+   * @param type aggregation type
+   * @param numHours number of consecutive weeks
+   * @param offsetHours lag for starting consecutive weeks
+   * @param timeZone time zone
+   * @return BaselineAggregate with given type and daily offsets
+   */
+  public static BaselineAggregate fromHourOverHour(BaselineAggregateType type, int numHours, int offsetHours, DateTimeZone timeZone) {
+    List<Period> offsets = new ArrayList<>();
+    for (int i = 0; i < numHours; i++) {
+      offsets.add(new Period(0, 0, 0, 0, -1 * (i + offsetHours), 0, 0, 0, PeriodType.hours()));
+    }
+    return new BaselineAggregate(type, offsets, timeZone, PeriodType.hours());
   }
 
   /**
@@ -242,20 +280,19 @@ public class BaselineAggregate implements Baseline {
       fields.add(DateTimeFieldType.millisOfSecond());
 
     } else if (PeriodType.minutes().equals(this.periodType)) {
-      fields.add(DateTimeFieldType.millisOfSecond());
       fields.add(DateTimeFieldType.secondOfMinute());
+      fields.add(DateTimeFieldType.millisOfSecond());
 
     } else if (PeriodType.hours().equals(this.periodType)) {
-      fields.add(DateTimeFieldType.millisOfSecond());
-      fields.add(DateTimeFieldType.secondOfMinute());
       fields.add(DateTimeFieldType.minuteOfHour());
+      fields.add(DateTimeFieldType.secondOfMinute());
+      fields.add(DateTimeFieldType.millisOfSecond());
 
-    } else if (PeriodType.days().equals(this.periodType)
-        || PeriodType.weeks().equals(this.periodType)) {
-      fields.add(DateTimeFieldType.millisOfSecond());
-      fields.add(DateTimeFieldType.secondOfMinute());
-      fields.add(DateTimeFieldType.minuteOfHour());
+    } else if (PeriodType.days().equals(this.periodType)) {
       fields.add(DateTimeFieldType.hourOfDay());
+      fields.add(DateTimeFieldType.minuteOfHour());
+      fields.add(DateTimeFieldType.secondOfMinute());
+      fields.add(DateTimeFieldType.millisOfSecond());
 
     } else {
       throw new IllegalArgumentException(String.format("Unsupported PeriodType '%s'", this.periodType));
@@ -288,9 +325,9 @@ public class BaselineAggregate implements Baseline {
         @Override
         public long apply(long... values) {
           DateTime dateTime = new DateTime(values[0], BaselineAggregate.this.timeZone);
-          int seconds = new Period(origin, dateTime).getSeconds();
-          int millis = dateTime.getMillisOfSecond();
-          return seconds * 1000 + millis;
+          long seconds = new Period(origin, dateTime, BaselineAggregate.this.periodType).getSeconds();
+          long millis = dateTime.getMillisOfSecond();
+          return seconds * 1000L + millis;
         }
       };
 
@@ -299,10 +336,10 @@ public class BaselineAggregate implements Baseline {
         @Override
         public long apply(long... values) {
           DateTime dateTime = new DateTime(values[0], BaselineAggregate.this.timeZone);
-          int minutes = new Period(origin, dateTime).getMinutes();
-          int seconds = dateTime.getSecondOfMinute();
-          int millis = dateTime.getMillisOfSecond();
-          return minutes * 100000 + seconds * 1000 + millis;
+          long minutes = new Period(origin, dateTime, BaselineAggregate.this.periodType).getMinutes();
+          long seconds = dateTime.getSecondOfMinute();
+          long millis = dateTime.getMillisOfSecond();
+          return minutes * 100000L + seconds * 1000L + millis;
         }
       };
 
@@ -311,26 +348,25 @@ public class BaselineAggregate implements Baseline {
         @Override
         public long apply(long... values) {
           DateTime dateTime = new DateTime(values[0], BaselineAggregate.this.timeZone);
-          int hours = new Period(origin, dateTime).getHours();
-          int minutes = dateTime.getMinuteOfHour();
-          int seconds = dateTime.getSecondOfMinute();
-          int millis = dateTime.getMillisOfSecond();
-          return hours * 10000000 + minutes * 100000 + seconds * 1000 + millis;
+          long hours = new Period(origin, dateTime, BaselineAggregate.this.periodType).getHours();
+          long minutes = dateTime.getMinuteOfHour();
+          long seconds = dateTime.getSecondOfMinute();
+          long millis = dateTime.getMillisOfSecond();
+          return hours * 10000000L + minutes * 100000L + seconds * 1000L + millis;
         }
       };
 
-    } else if (PeriodType.days().equals(this.periodType)
-        || PeriodType.weeks().equals(this.periodType)) {
+    } else if (PeriodType.days().equals(this.periodType)) {
       return new Series.LongFunction() {
         @Override
         public long apply(long... values) {
           DateTime dateTime = new DateTime(values[0], BaselineAggregate.this.timeZone);
-          int days = new Period(origin, dateTime).getDays();
-          int hours = dateTime.getHourOfDay();
-          int minutes = dateTime.getMinuteOfHour();
-          int seconds = dateTime.getSecondOfMinute();
-          int millis = dateTime.getMillisOfSecond();
-          return days * 1000000000 + hours * 10000000 + minutes * 100000 + seconds * 1000 + millis;
+          long days = new Period(origin, dateTime, BaselineAggregate.this.periodType).getDays();
+          long hours = dateTime.getHourOfDay();
+          long minutes = dateTime.getMinuteOfHour();
+          long seconds = dateTime.getSecondOfMinute();
+          long millis = dateTime.getMillisOfSecond();
+          return days * 1000000000L + hours * 10000000L + minutes * 100000L + seconds * 1000L + millis;
         }
       };
 
@@ -359,8 +395,8 @@ public class BaselineAggregate implements Baseline {
       return new Series.LongFunction() {
         @Override
         public long apply(long... values) {
-          int seconds = (int) (values[0] / 1000);
-          int millis = (int) (values[0] % 1000);
+          int seconds = (int) (values[0] / 1000L);
+          int millis = (int) (values[0] % 1000L);
           return origin
               .plusSeconds(seconds)
               .plusMillis(millis)
@@ -372,9 +408,9 @@ public class BaselineAggregate implements Baseline {
       return new Series.LongFunction() {
         @Override
         public long apply(long... values) {
-          int minutes = (int) (values[0] / 100000);
-          int seconds = (int) (values[0] / 1000 % 100000);
-          int millis = (int) (values[0] % 1000);
+          int minutes = (int) (values[0] / 100000L);
+          int seconds = (int) ((values[0] / 1000L) % 100L);
+          int millis = (int) (values[0] % 1000L);
           return origin
               .plusMinutes(minutes)
               .plusSeconds(seconds)
@@ -387,10 +423,10 @@ public class BaselineAggregate implements Baseline {
       return new Series.LongFunction() {
         @Override
         public long apply(long... values) {
-          int hours = (int) (values[0] / 10000000);
-          int minutes = (int) (values[0] / 100000 % 10000000);
-          int seconds = (int) (values[0] / 1000 % 100000);
-          int millis = (int) (values[0] % 1000);
+          int hours = (int) (values[0] / 10000000L);
+          int minutes = (int) ((values[0] / 100000L) % 100L);
+          int seconds = (int) ((values[0] / 1000L) % 100L);
+          int millis = (int) (values[0] % 1000L);
           return origin
               .plusHours(hours)
               .plusMinutes(minutes)
@@ -400,16 +436,15 @@ public class BaselineAggregate implements Baseline {
         }
       };
 
-    } else if (PeriodType.days().equals(this.periodType)
-        || PeriodType.weeks().equals(this.periodType)) {
+    } else if (PeriodType.days().equals(this.periodType)) {
       return new Series.LongFunction() {
         @Override
         public long apply(long... values) {
-          int days = (int) (values[0] / 1000000000);
-          int hours = (int) (values[0] / 10000000 % 1000000000);
-          int minutes = (int) (values[0] / 100000 % 10000000);
-          int seconds = (int) (values[0] / 1000 % 100000);
-          int millis = (int) (values[0] % 1000);
+          int days = (int) (values[0] / 1000000000L);
+          int hours = (int) ((values[0] / 10000000L) % 100L);
+          int minutes = (int) ((values[0] / 100000L) % 100L);
+          int seconds = (int) ((values[0] / 1000L) % 100L);
+          int millis = (int) (values[0] % 1000L);
           return origin
               .plusDays(days)
               .plusHours(hours)

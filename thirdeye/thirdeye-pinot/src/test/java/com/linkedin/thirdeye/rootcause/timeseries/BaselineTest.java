@@ -28,6 +28,17 @@ public class BaselineTest {
 
   private static final MetricSlice BASE_SLICE = MetricSlice.from(12345, 15000, 17000, ArrayListMultimap.<String, String>create(), new TimeGranularity(500, TimeUnit.MILLISECONDS));
 
+  // PDT -> PST 2018
+  // 1520681115000 // Saturday, March 10, 2018 3:25:15 AM GMT-08:00
+  // 1520842545000 // Monday, March 12, 2018 1:15:45 AM GMT-07:00
+
+  // PST -> PDT 2018
+  // 1541240715000 // Saturday, November 3, 2018 3:25:15 AM GMT-07:00
+  // 1541409345000 // Monday, November 5, 2018 1:15:45 AM GMT-08:00
+
+  private static final MetricSlice PDT_PST_SLICE = MetricSlice.from(12345, 1520681115000L, 1520842545000L, ArrayListMultimap.<String, String>create(), new TimeGranularity(500, TimeUnit.MILLISECONDS));
+  private static final MetricSlice PST_PDT_SLICE = MetricSlice.from(12345, 1541240715000L, 1541409345000L, ArrayListMultimap.<String, String>create(), new TimeGranularity(500, TimeUnit.MILLISECONDS));
+
   @Test
   public void testBaselineOffsetFrom() {
     BaselineOffset baseline = BaselineOffset.fromOffset(-1000);
@@ -160,6 +171,69 @@ public class BaselineTest {
     assertEquals(result.getLongs(COL_TIME), 15000L, 15500L, 16000L, 16500L, 15000L, 15500L, 16000L, 16500L);
     assertEquals(result.getStrings("string"), "A", "A", "A", "A", "B", "B", "B", "B");
     assertEquals(result.getDoubles(COL_VALUE), 450d, 550d, 650d, 750d, 4500d, 5500d, 6500d, 7500d);
+  }
+
+  @Test
+  public void testBaselineWeekly() {
+    BaselineAggregate baseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, 2, 1, DateTimeZone.forID("America/Los_Angeles"));
+
+    List<MetricSlice> slicesDefault = baseline.scatter(PDT_PST_SLICE);
+
+    // expect DST correction
+    Assert.assertEquals(slicesDefault.get(0).getStart(), 1520681115000L - TimeUnit.DAYS.toMillis(7));
+    Assert.assertEquals(slicesDefault.get(0).getEnd(), 1520842545000L - TimeUnit.DAYS.toMillis(7) + TimeUnit.HOURS.toMillis(1));
+    Assert.assertEquals(slicesDefault.get(1).getStart(), 1520681115000L - TimeUnit.DAYS.toMillis(14));
+    Assert.assertEquals(slicesDefault.get(1).getEnd(), 1520842545000L - TimeUnit.DAYS.toMillis(14) + TimeUnit.HOURS.toMillis(1));
+
+    List<MetricSlice> slicesSummer = baseline.scatter(PST_PDT_SLICE);
+
+    // expect DST correction
+    Assert.assertEquals(slicesSummer.get(0).getStart(), 1541240715000L - TimeUnit.DAYS.toMillis(7));
+    Assert.assertEquals(slicesSummer.get(0).getEnd(), 1541409345000L - TimeUnit.DAYS.toMillis(7) - TimeUnit.HOURS.toMillis(1));
+    Assert.assertEquals(slicesSummer.get(1).getStart(), 1541240715000L - TimeUnit.DAYS.toMillis(14));
+    Assert.assertEquals(slicesSummer.get(1).getEnd(), 1541409345000L - TimeUnit.DAYS.toMillis(14) - TimeUnit.HOURS.toMillis(1));
+  }
+
+  @Test
+  public void testBaselineDaily() {
+    BaselineAggregate baseline = BaselineAggregate.fromDayOverDay(BaselineAggregateType.MEDIAN, 2, 1, DateTimeZone.forID("America/Los_Angeles"));
+
+    List<MetricSlice> slicesDefault = baseline.scatter(PDT_PST_SLICE);
+
+    // expect DST correction
+    Assert.assertEquals(slicesDefault.get(0).getStart(), 1520681115000L - TimeUnit.DAYS.toMillis(1));
+    Assert.assertEquals(slicesDefault.get(0).getEnd(), 1520842545000L - TimeUnit.DAYS.toMillis(1) + TimeUnit.HOURS.toMillis(1));
+    Assert.assertEquals(slicesDefault.get(1).getStart(), 1520681115000L - TimeUnit.DAYS.toMillis(2));
+    Assert.assertEquals(slicesDefault.get(1).getEnd(), 1520842545000L - TimeUnit.DAYS.toMillis(2) + TimeUnit.HOURS.toMillis(1));
+
+    List<MetricSlice> slicesSummer = baseline.scatter(PST_PDT_SLICE);
+
+    // expect DST correction
+    Assert.assertEquals(slicesSummer.get(0).getStart(), 1541240715000L - TimeUnit.DAYS.toMillis(1));
+    Assert.assertEquals(slicesSummer.get(0).getEnd(), 1541409345000L - TimeUnit.DAYS.toMillis(1) - TimeUnit.HOURS.toMillis(1));
+    Assert.assertEquals(slicesSummer.get(1).getStart(), 1541240715000L - TimeUnit.DAYS.toMillis(2));
+    Assert.assertEquals(slicesSummer.get(1).getEnd(), 1541409345000L - TimeUnit.DAYS.toMillis(2) - TimeUnit.HOURS.toMillis(1));
+  }
+
+  @Test
+  public void testBaselineHourly() {
+    BaselineAggregate baseline = BaselineAggregate.fromHourOverHour(BaselineAggregateType.MEDIAN, 2, 23, DateTimeZone.forID("America/Los_Angeles"));
+
+    List<MetricSlice> slicesDefault = baseline.scatter(PDT_PST_SLICE);
+
+    // do NOT expect DST correction
+    Assert.assertEquals(slicesDefault.get(0).getStart(), 1520681115000L - TimeUnit.HOURS.toMillis(23));
+    Assert.assertEquals(slicesDefault.get(0).getEnd(), 1520842545000L - TimeUnit.HOURS.toMillis(23));
+    Assert.assertEquals(slicesDefault.get(1).getStart(), 1520681115000L - TimeUnit.HOURS.toMillis(24));
+    Assert.assertEquals(slicesDefault.get(1).getEnd(), 1520842545000L - TimeUnit.HOURS.toMillis(24));
+
+    List<MetricSlice> slicesSummer = baseline.scatter(PST_PDT_SLICE);
+
+    // do NOT expect DST correction
+    Assert.assertEquals(slicesSummer.get(0).getStart(), 1541240715000L - TimeUnit.HOURS.toMillis(23));
+    Assert.assertEquals(slicesSummer.get(0).getEnd(), 1541409345000L - TimeUnit.HOURS.toMillis(23));
+    Assert.assertEquals(slicesSummer.get(1).getStart(), 1541240715000L - TimeUnit.HOURS.toMillis(24));
+    Assert.assertEquals(slicesSummer.get(1).getEnd(), 1541409345000L - TimeUnit.HOURS.toMillis(24));
   }
 
   private static List<Period> makePeriods(PeriodType periodType, long... offsetMillis) {
