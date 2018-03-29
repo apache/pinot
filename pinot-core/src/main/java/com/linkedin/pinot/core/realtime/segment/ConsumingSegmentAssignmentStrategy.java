@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.core.realtime.segment;
 
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import java.util.HashMap;
@@ -35,7 +36,7 @@ public class ConsumingSegmentAssignmentStrategy implements RealtimeSegmentAssign
    * @return map of segment name to instances list
    */
   public Map<String, List<String>> assign(List<String> newSegments, PartitionAssignment partitionAssignment)
-      throws Exception {
+      throws InvalidConfigException {
 
     Map<String, List<String>> segmentAssignment = new HashMap<>(newSegments.size());
 
@@ -43,14 +44,15 @@ public class ConsumingSegmentAssignmentStrategy implements RealtimeSegmentAssign
       if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
         int partitionId = llcSegmentName.getPartitionId();
-        List<String> instancesListForPartition = partitionAssignment.getInstancesListForPartition(String.valueOf(partitionId));
+        List<String> instancesListForPartition =
+            partitionAssignment.getInstancesListForPartition(String.valueOf(partitionId));
         if (instancesListForPartition == null) {
-          throw new Exception("No partition assignment " + partitionId + " found for segment " + segmentName);
+          throw new InvalidConfigException(
+              "No partition assignment " + partitionId + " found for segment " + segmentName);
         }
         segmentAssignment.put(segmentName, instancesListForPartition);
       }
     }
     return segmentAssignment;
   }
-
 }

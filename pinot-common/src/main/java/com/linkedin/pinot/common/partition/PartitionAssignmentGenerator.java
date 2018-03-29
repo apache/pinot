@@ -20,6 +20,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -67,7 +69,8 @@ public class PartitionAssignmentGenerator {
    * @param idealState
    * @return
    */
-  public Map<String, LLCSegmentName> getPartitionToLatestSegments(IdealState idealState) {
+  @VisibleForTesting
+  protected Map<String, LLCSegmentName> getPartitionToLatestSegments(IdealState idealState) {
     Map<String, LLCSegmentName> partitionIdToLatestSegment = new HashMap<>();
     // read all segments
     Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
@@ -90,7 +93,8 @@ public class PartitionAssignmentGenerator {
   /**
    * Generates partition assignment for given table, using tagged hosts and num partitions
    */
-  public PartitionAssignment generatePartitionAssignment(TableConfig tableConfig, int numPartitions) throws Exception {
+  public PartitionAssignment generatePartitionAssignment(TableConfig tableConfig, int numPartitions)
+      throws InvalidConfigException {
 
     // TODO: add an override which can read from znode, instead of generating on the fly
 
@@ -105,7 +109,7 @@ public class PartitionAssignmentGenerator {
 
     List<String> consumingTaggedInstances = getConsumingTaggedInstances(realtimeTagConfig);
     if (consumingTaggedInstances.size() < numReplicas) {
-      throw new Exception(
+      throw new InvalidConfigException(
           "Not enough consuming instances tagged. Must be atleast equal to numReplicas:" + numReplicas);
     }
 
@@ -135,7 +139,7 @@ public class PartitionAssignmentGenerator {
     Collections.sort(allInstances);
 
     int numInstances = allInstances.size();
-    int serverId = 0;
+    int serverId = Math.abs(EqualityUtils.hashCodeOf(tableName)) % numInstances;
     for (String partition : partitions) {
       List<String> instances = new ArrayList<>(numReplicas);
       for (int r = 0; r < numReplicas; r++) {

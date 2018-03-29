@@ -21,6 +21,7 @@ import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.OfflineTagConfig;
 import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.partition.PartitionAssignmentGenerator;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -83,7 +84,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
    */
   @Override
   public PartitionAssignment rebalancePartitionAssignment(IdealState idealState, TableConfig tableConfig,
-      Configuration rebalanceUserConfig) throws Exception {
+      Configuration rebalanceUserConfig) throws InvalidConfigException {
     String tableNameWithType = tableConfig.getTableName();
     PartitionAssignment newPartitionAssignment = new PartitionAssignment(tableNameWithType);
 

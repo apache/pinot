@@ -28,6 +28,7 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.TenantConfig;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.messages.SegmentRefreshMessage;
 import com.linkedin.pinot.common.messages.SegmentReloadMessage;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
@@ -2061,7 +2062,7 @@ public class PinotHelixResourceManager {
 
   @Nonnull
   public JSONObject rebalanceTable(final String rawTableName, TableType tableType, Configuration rebalanceUserConfig)
-      throws Exception {
+      throws JSONException, InvalidConfigException {
 
     TableConfig tableConfig = getTableConfig(rawTableName, tableType);
     String tableNameWithType = tableConfig.getTableName();
@@ -2082,8 +2083,8 @@ public class PinotHelixResourceManager {
     } catch (JSONException e) {
       LOGGER.error("Exception in constructing json response for rebalance table {}", tableNameWithType, e);
       throw e;
-    } catch (Exception e) {
-      LOGGER.error("Exception in rebalancing {}", tableNameWithType, e);
+    } catch (InvalidConfigException e) {
+      LOGGER.error("Exception in rebalancing config for table {}", tableNameWithType, e);
       throw e;
     }
     return jsonObject;

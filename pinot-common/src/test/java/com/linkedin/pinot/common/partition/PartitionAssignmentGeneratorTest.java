@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
 import org.testng.Assert;
@@ -39,10 +40,8 @@ import static org.mockito.Mockito.*;
 
 public class PartitionAssignmentGeneratorTest {
 
-  private String tableName = "aTableName_REALTIME";
   private String aServerTenant = "aTenant";
-  private TestPartitionAssignmentGenerator _partitionAssignmentGenerator;
-
+  private HelixManager _mockHelixManager;
   private String[] consumingServerNames;
 
   private List<String> getConsumingInstanceList(final int nServers) {
@@ -53,8 +52,7 @@ public class PartitionAssignmentGeneratorTest {
 
   @BeforeMethod
   public void setUp() throws Exception {
-    HelixManager mockHelixManager = mock(HelixManager.class);
-    _partitionAssignmentGenerator = new TestPartitionAssignmentGenerator(mockHelixManager);
+    _mockHelixManager = mock(HelixManager.class);
 
     final int maxInstances = 20;
     consumingServerNames = new String[maxInstances];
@@ -69,6 +67,7 @@ public class PartitionAssignmentGeneratorTest {
   @Test
   public void testGetPartitionAssignmentFromIdealState() {
 
+    String tableName = "aTableName_REALTIME";
     TableConfig tableConfig = mock(TableConfig.class);
     when(tableConfig.getTableName()).thenReturn(tableName);
 
@@ -129,12 +128,14 @@ public class PartitionAssignmentGeneratorTest {
 
   private void verifyPartitionAssignmentFromIdealState(TableConfig tableConfig, IdealState idealState,
       int numPartitions) {
+    TestPartitionAssignmentGenerator partitionAssignmentGenerator = new TestPartitionAssignmentGenerator(_mockHelixManager);
     PartitionAssignment partitionAssignmentFromIdealState =
-        _partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
+        partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
     Assert.assertEquals(tableConfig.getTableName(), partitionAssignmentFromIdealState.getTableName());
     Assert.assertEquals(partitionAssignmentFromIdealState.getNumPartitions(), numPartitions);
     // check that latest segments are honoring partition assignment
-    Map<String, LLCSegmentName> partitionIdToLatestLLCSegment = _partitionAssignmentGenerator.getPartitionToLatestSegments(idealState);
+    Map<String, LLCSegmentName> partitionIdToLatestLLCSegment =
+        partitionAssignmentGenerator.getPartitionToLatestSegments(idealState);
     for (Map.Entry<String, LLCSegmentName> entry : partitionIdToLatestLLCSegment.entrySet()) {
       Set<String> idealStateInstances = idealState.getInstanceStateMap(entry.getValue().getSegmentName()).keySet();
       List<String> partitionAssignmentInstances =
@@ -146,6 +147,15 @@ public class PartitionAssignmentGeneratorTest {
 
   @Test
   public void testGeneratePartitionAssignment() {
+    RandomStringUtils.randomAlphabetic(10);
+    for (int i = 0; i < 20; i++) {
+      String tableName = RandomStringUtils.randomAlphabetic(10) + "_REALTIME";
+      System.out.println("Random table name " + tableName);
+      testGeneratePartitionAssignmentForTable(tableName);
+    }
+  }
+
+  private void testGeneratePartitionAssignmentForTable(String tableName) {
     TableConfig tableConfig = mock(TableConfig.class);
     when(tableConfig.getTableName()).thenReturn(tableName);
     TenantConfig mockTenantConfig = mock((TenantConfig.class));
@@ -172,7 +182,6 @@ public class PartitionAssignmentGeneratorTest {
 
     // 0 partitions - 3 consuming instances - empty partition assignment
     consumingInstanceList = getConsumingInstanceList(3);
-    _partitionAssignmentGenerator.setConsumingInstances(consumingInstanceList);
     exception = false;
     unchanged = true;
     previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
@@ -191,7 +200,6 @@ public class PartitionAssignmentGeneratorTest {
 
     // 3 partitions - 6 consuming instances
     consumingInstanceList = getConsumingInstanceList(12);
-    _partitionAssignmentGenerator.setConsumingInstances(consumingInstanceList);
     unchanged = false;
     previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
         previousPartitionAssignment, exception, unchanged);
@@ -201,10 +209,8 @@ public class PartitionAssignmentGeneratorTest {
     previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
         previousPartitionAssignment, exception, unchanged);
 
-
     // 3 partitions - 12 consuming instances
     consumingInstanceList = getConsumingInstanceList(6);
-    _partitionAssignmentGenerator.setConsumingInstances(consumingInstanceList);
     unchanged = false;
     previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
         previousPartitionAssignment, exception, unchanged);
@@ -216,7 +222,6 @@ public class PartitionAssignmentGeneratorTest {
 
     String server0 = consumingInstanceList.get(0);
     consumingInstanceList.set(0, server0 + "_replaced");
-    _partitionAssignmentGenerator.setConsumingInstances(consumingInstanceList);
     unchanged = false;
     previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
         previousPartitionAssignment, exception, unchanged);
@@ -231,17 +236,19 @@ public class PartitionAssignmentGeneratorTest {
     unchanged = true;
     previousPartitionAssignment = verifyGeneratePartitionAssignment(tableConfig, numPartitions, consumingInstanceList,
         previousPartitionAssignment, exception, unchanged);
-
   }
 
   private PartitionAssignment verifyGeneratePartitionAssignment(TableConfig tableConfig, int numPartitions,
       List<String> consumingInstanceList, PartitionAssignment previousPartitionAssignment, boolean exception,
       boolean unchanged) {
+    TestPartitionAssignmentGenerator partitionAssignmentGenerator = new TestPartitionAssignmentGenerator(_mockHelixManager);
+    partitionAssignmentGenerator.setConsumingInstances(consumingInstanceList);
     PartitionAssignment partitionAssignment;
     try {
-      partitionAssignment = _partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions);
+      partitionAssignment = partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions);
       Assert.assertFalse(exception);
-      verify(partitionAssignment, numPartitions, consumingInstanceList, unchanged, previousPartitionAssignment);
+      verify(tableConfig.getTableName(), partitionAssignment, numPartitions, consumingInstanceList, unchanged,
+          previousPartitionAssignment);
     } catch (Exception e) {
       Assert.assertTrue(exception);
       partitionAssignment = previousPartitionAssignment;
@@ -250,7 +257,7 @@ public class PartitionAssignmentGeneratorTest {
     return partitionAssignment;
   }
 
-  private void verify(PartitionAssignment partitionAssignment, int numPartitions, List<String> consumingInstanceList,
+  private void verify(String tableName, PartitionAssignment partitionAssignment, int numPartitions, List<String> consumingInstanceList,
       boolean unchanged, PartitionAssignment previousPartitionAssignment) {
     Assert.assertEquals(partitionAssignment.getTableName(), tableName);
 
@@ -297,7 +304,6 @@ public class PartitionAssignmentGeneratorTest {
       _helixManager = helixManager;
       _consumingInstances = new ArrayList<>();
     }
-
 
     @Override
     protected List<String> getConsumingTaggedInstances(RealtimeTagConfig realtimeTagConfig) {
