@@ -4,9 +4,9 @@ import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalySummary;
-import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
@@ -35,10 +35,12 @@ import javax.ws.rs.core.MediaType;
 public class UserDashboardResource {
   private final MergedAnomalyResultManager anomalyDAO;
   private final AnomalyFunctionManager functionDAO;
+  private final MetricConfigManager metricDAO;
 
-  public UserDashboardResource(MergedAnomalyResultManager anomalyDAO, AnomalyFunctionManager functionDAO) {
+  public UserDashboardResource(MergedAnomalyResultManager anomalyDAO, AnomalyFunctionManager functionDAO, MetricConfigManager metricDAO) {
     this.anomalyDAO = anomalyDAO;
     this.functionDAO = functionDAO;
+    this.metricDAO = metricDAO;
   }
 
   /**
@@ -192,9 +194,10 @@ public class UserDashboardResource {
       summary.setEnd(anomaly.getEndTime());
       summary.setCurrent(anomaly.getAvgCurrentVal());
       summary.setBaseline(anomaly.getAvgBaselineVal());
-      summary.setMetricId(anomaly.getFunction().getMetricId());
-      summary.setMetric(anomaly.getMetric());
+      summary.setMetricId(getMetricId(anomaly));
+      summary.setMetricName(anomaly.getMetric());
       summary.setDimensions(anomaly.getDimensions());
+      summary.setDataset(anomaly.getCollection());
 
       // TODO use alert filter if necessary
       summary.setSeverity(Math.abs(anomaly.getWeight()));
@@ -213,5 +216,22 @@ public class UserDashboardResource {
     }
 
     return output;
+  }
+
+  /**
+   * Helper to work around for anomaly function not setting metric id
+   *
+   * @param anomaly anomaly dto
+   * @return metric id, or {@code -1} if the metric/dataset cannot be resolved
+   */
+  private long getMetricId(MergedAnomalyResultDTO anomaly) {
+    if (anomaly.getFunction().getMetricId() > 0) {
+      return anomaly.getFunction().getMetricId();
+    }
+    try {
+      return this.metricDAO.findByMetricAndDataset(anomaly.getMetric(), anomaly.getCollection()).getId();
+    } catch (Exception e) {
+      return -1;
+    }
   }
 }

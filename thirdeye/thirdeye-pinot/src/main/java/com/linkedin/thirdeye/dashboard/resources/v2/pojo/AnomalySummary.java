@@ -16,10 +16,11 @@ public class AnomalySummary {
   private double current;
   private double baseline;
   private AnomalyFeedbackType feedback;
-  private String metric;
+  private String metricName;
   private long metricId;
   private String functionName;
   private long functionId;
+  private String dataset;
 
   public AnomalySummary() {
     // left blank
@@ -89,12 +90,12 @@ public class AnomalySummary {
     this.feedback = feedback;
   }
 
-  public String getMetric() {
-    return metric;
+  public String getMetricName() {
+    return metricName;
   }
 
-  public void setMetric(String metric) {
-    this.metric = metric;
+  public void setMetricName(String metricName) {
+    this.metricName = metricName;
   }
 
   public String getFunctionName() {
@@ -119,5 +120,13 @@ public class AnomalySummary {
 
   public void setFunctionId(long functionId) {
     this.functionId = functionId;
+  }
+
+  public String getDataset() {
+    return dataset;
+  }
+
+  public void setDataset(String dataset) {
+    this.dataset = dataset;
   }
 }
