@@ -17,6 +17,7 @@
 package com.linkedin.pinot.controller.helix.core.rebalance;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.IdealState;
@@ -35,7 +36,7 @@ public interface RebalanceSegmentStrategy {
    * @return rebalanced partition assignments
    */
   PartitionAssignment rebalancePartitionAssignment(IdealState idealState, TableConfig tableConfig,
-      Configuration rebalanceUserConfig);
+      Configuration rebalanceUserConfig) throws InvalidConfigException;
 
   /**
    * Rebalances segments and writes ideal state of table

@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.common.partition;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -79,5 +80,28 @@ public class PartitionAssignment {
   public String toString() {
     return "PartitionAssignment{" + "_tableName='" + _tableName + '\'' + ", _partitionToInstances="
         + _partitionToInstances + '}';
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    PartitionAssignment that = (PartitionAssignment) o;
+
+    return EqualityUtils.isEqual(_tableName, that._tableName) && EqualityUtils.isEqual(_partitionToInstances,
+        that._partitionToInstances);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_tableName);
+    result = EqualityUtils.hashCodeOf(result, _partitionToInstances);
+    return result;
   }
 }

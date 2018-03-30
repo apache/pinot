@@ -21,14 +21,15 @@ import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.OfflineTagConfig;
 import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
+import com.linkedin.pinot.common.partition.PartitionAssignmentGenerator;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentGenerator;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -83,7 +84,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
    */
   @Override
   public PartitionAssignment rebalancePartitionAssignment(IdealState idealState, TableConfig tableConfig,
-      Configuration rebalanceUserConfig) {
+      Configuration rebalanceUserConfig) throws InvalidConfigException {
     String tableNameWithType = tableConfig.getTableName();
     PartitionAssignment newPartitionAssignment = new PartitionAssignment(tableNameWithType);
 
@@ -100,28 +101,13 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
           rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.INCLUDE_CONSUMING, DEFAULT_INCLUDE_CONSUMING);
       if (includeConsuming) {
 
-        StreamPartitionAssignmentGenerator streamPartitionAssignmentGenerator =
-            new StreamPartitionAssignmentGenerator(_propertyStore);
-        PartitionAssignment streamPartitionAssignment =
-            streamPartitionAssignmentGenerator.getStreamPartitionAssignment(tableNameWithType);
-        int numPartitions = streamPartitionAssignment.getNumPartitions();
+        PartitionAssignmentGenerator partitionAssignmentGenerator = new PartitionAssignmentGenerator(_helixManager);
+        PartitionAssignment partitionAssignmentFromIdealState =
+            partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
+        int numPartitions = partitionAssignmentFromIdealState.getNumPartitions();
+        newPartitionAssignment =
+            partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions);
 
-        RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
-        List<String> consumingInstances =
-            _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, realtimeTagConfig.getConsumingServerTag());
-
-        Map<String, PartitionAssignment> tableNameToStreamPartitionAssignmentMap =
-            streamPartitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions,
-                consumingInstances, Lists.newArrayList(tableNameWithType));
-        newPartitionAssignment = tableNameToStreamPartitionAssignmentMap.get(tableNameWithType);
-
-        boolean dryRun = rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN, DEFAULT_DRY_RUN);
-        if (!dryRun) {
-          LOGGER.info("Updating stream partition assignment for table {}", tableNameWithType);
-          streamPartitionAssignmentGenerator.writeStreamPartitionAssignment(tableNameToStreamPartitionAssignmentMap);
-        } else {
-          LOGGER.info("Dry run. Skip writing stream partition assignment to property store");
-        }
       } else {
         LOGGER.info("includeConsuming = false. No need to rebalance partition assignment for {}",
             tableConfig.getTableType());

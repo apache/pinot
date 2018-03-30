@@ -28,6 +28,7 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.TenantConfig;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.messages.SegmentRefreshMessage;
 import com.linkedin.pinot.common.messages.SegmentReloadMessage;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
@@ -2061,12 +2062,14 @@ public class PinotHelixResourceManager {
 
   @Nonnull
   public JSONObject rebalanceTable(final String rawTableName, TableType tableType, Configuration rebalanceUserConfig)
-      throws JSONException {
+      throws JSONException, InvalidConfigException {
 
     TableConfig tableConfig = getTableConfig(rawTableName, tableType);
     String tableNameWithType = tableConfig.getTableName();
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
 
+    JSONObject jsonObject = new JSONObject();
+    try {
     RebalanceSegmentStrategy rebalanceSegmentsStrategy =
         RebalanceSegmentStrategyFactory.getInstance().getRebalanceSegmentsStrategy(tableConfig);
     PartitionAssignment newPartitionAssignment =
@@ -2074,13 +2077,15 @@ public class PinotHelixResourceManager {
     IdealState newIdealState = rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig,
         rebalanceUserConfig, newPartitionAssignment);
 
-    JSONObject jsonObject = new JSONObject();
-    try {
+
       jsonObject.put("partitionAssignment", newPartitionAssignment);
       jsonObject.put("idealState", newIdealState);
     } catch (JSONException e) {
       LOGGER.error("Exception in constructing json response for rebalance table {}", tableNameWithType, e);
-      throw(e);
+      throw e;
+    } catch (InvalidConfigException e) {
+      LOGGER.error("Exception in rebalancing config for table {}", tableNameWithType, e);
+      throw e;
     }
     return jsonObject;
   }
