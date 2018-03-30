@@ -1,19 +1,23 @@
 package com.linkedin.thirdeye.rootcause.timeseries;
 
-import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.Grouping;
 import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeFieldType;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Partial;
+import org.joda.time.Period;
+import org.joda.time.PeriodType;
 
 
 /**
@@ -22,35 +26,43 @@ import org.joda.time.DateTimeZone;
  * @see BaselineAggregateType
  */
 public class BaselineAggregate implements Baseline {
-  private final BaselineAggregateType type;
-  private final List<Long> offsets;
-  private final boolean isDailyData;
+  private static final String COL_KEY = Grouping.GROUP_KEY;
 
-  private BaselineAggregate(BaselineAggregateType type, List<Long> offsets, boolean isDailyData) {
+  private final BaselineAggregateType type;
+  private final List<Period> offsets;
+  private final DateTimeZone timeZone;
+  private final PeriodType periodType;
+
+  private BaselineAggregate(BaselineAggregateType type, List<Period> offsets, DateTimeZone timezone, PeriodType periodType) {
     this.type = type;
     this.offsets = offsets;
-    this.isDailyData = isDailyData;
+    this.timeZone = timezone;
+    this.periodType = periodType;
   }
 
   public BaselineAggregate withType(BaselineAggregateType type) {
-    return new BaselineAggregate(type, this.offsets, this.isDailyData);
+    return new BaselineAggregate(type, this.offsets, this.timeZone, this.periodType);
   }
 
-  public BaselineAggregate withOffsets(List<Long> offsets) {
-    return new BaselineAggregate(this.type, offsets, this.isDailyData);
+  public BaselineAggregate withOffsets(List<Period> offsets) {
+    return new BaselineAggregate(this.type, offsets, this.timeZone, this.periodType);
   }
 
-  public BaselineAggregate withDailyData(boolean isDailyData) {
-    return new BaselineAggregate(this.type, this.offsets, isDailyData);
+  public BaselineAggregate withTimeZone(DateTimeZone timeZone) {
+    return new BaselineAggregate(this.type, this.offsets, timeZone, this.periodType);
+  }
+
+  public BaselineAggregate withPeriodType(PeriodType periodType) {
+    return new BaselineAggregate(this.type, this.offsets, this.timeZone, periodType);
   }
 
   @Override
   public List<MetricSlice> scatter(MetricSlice slice) {
     List<MetricSlice> slices = new ArrayList<>();
-    for (long offset : this.offsets) {
+    for (Period offset : this.offsets) {
       slices.add(slice
-          .withStart(slice.getStart() + offset)
-          .withEnd(slice.getEnd()+ offset));
+          .withStart(new DateTime(slice.getStart(), this.timeZone).plus(offset).getMillis())
+          .withEnd(new DateTime(slice.getEnd(), this.timeZone).plus(offset).getMillis()));
     }
     return slices;
   }
@@ -69,66 +81,76 @@ public class BaselineAggregate implements Baseline {
   }
 
   @Override
-  public DataFrame gather(MetricSlice slice, Map<MetricSlice, DataFrame> data) {
+  public DataFrame gather(final MetricSlice slice, Map<MetricSlice, DataFrame> data) {
     Map<MetricSlice, DataFrame> filtered = this.filter(slice, data);
 
-    // probe for daily data
-    LongSeries timestamps = makeTimestamps(slice, data);
-    Set<Long> timestampSet = new HashSet<>(timestamps.toList());
-
-    DataFrame output = new DataFrame(COL_TIME, BaselineUtil.makeTimestamps(slice));
-
-    boolean isInitialized = false;
+    DataFrame output = new DataFrame(COL_TIME, LongSeries.empty());
 
     List<String> colNames = new ArrayList<>();
     for (Map.Entry<MetricSlice, DataFrame> entry : filtered.entrySet()) {
       MetricSlice s = entry.getKey();
 
-      long offset = s.getStart() - slice.getStart();
-      if (!offsets.contains(offset)) {
-        throw new IllegalArgumentException(String.format("Found slice with invalid offset %d", offset));
+      Period period = new Period(
+          new DateTime(slice.getStart(), this.timeZone),
+          new DateTime(s.getStart(), this.timeZone),
+          this.periodType);
+
+      if (!offsets.contains(period)) {
+        continue;
       }
 
       String colName = String.valueOf(s.getStart());
       DataFrame df = new DataFrame(entry.getValue());
 
-      df.addSeries(COL_TIME, df.getLongs(COL_TIME).subtract(offset));
-      df.renameSeries(COL_VALUE, colName);
+      DataFrame dfTransform = new DataFrame(df);
+      dfTransform.addSeries(COL_TIME, this.toVirtualSeries(s.getStart(), dfTransform.getLongs(COL_TIME)));
+      dfTransform = eliminateDuplicates(dfTransform);
 
-      if (isDailyData) {
-        df = applyDSTCorrection(df, timestampSet);
-      }
+      dfTransform.renameSeries(COL_VALUE, colName);
 
-      if (!isInitialized) {
+      if (output.isEmpty()) {
         // handle multi-index via prototyping
-        DataFrame prototype = new DataFrame();
-        for (String name : df.getIndexNames()) {
-          prototype.addSeries(name, df.get(name));
-        }
+        output = dfTransform;
 
-        output = output.joinLeft(prototype, COL_TIME);
-        output.setIndex(df.getIndexNames());
-        isInitialized = true;
+      } else {
+        output = output.joinOuter(dfTransform);
       }
 
-      output = output.joinOuter(df);
       colNames.add(colName);
-
-      // TODO fill null forward?
     }
 
     String[] arrNames = colNames.toArray(new String[colNames.size()]);
 
     // aggregation
     output.addSeries(COL_VALUE, output.map(this.type.function, arrNames));
-    output = output.dropNull();
 
     // alignment
-    List<String> indexNames = output.getIndexNames();
-    output = output.setIndex(COL_TIME).joinRight(new DataFrame(COL_TIME, timestamps)).setIndex(indexNames);
-    output.sortedBy(output.getIndexNames());
+    output.addSeries(COL_TIME, this.toTimestampSeries(slice.getStart(), output.getLongs(COL_TIME)));
+
+    // filter by original time range
+    List<String> dropNames = new ArrayList<>(output.getSeriesNames());
+    dropNames.removeAll(output.getIndexNames());
+
+    output = output.filter(new Series.LongConditional() {
+      @Override
+      public boolean apply(long... values) {
+        return values[0] >= slice.getStart() && values[0] < slice.getEnd();
+      }
+    }, COL_TIME).dropNull(output.getIndexNames());
 
     return output;
+  }
+
+  private static DataFrame eliminateDuplicates(DataFrame df) {
+    List<String> aggExpressions = new ArrayList<>();
+    for (String seriesName : df.getIndexNames()) {
+      aggExpressions.add(String.format("%s:FIRST", seriesName));
+    }
+    aggExpressions.add(COL_VALUE + ":MEAN");
+
+    DataFrame res = df.groupByValue(df.getIndexNames()).aggregate(aggExpressions).dropSeries(COL_KEY);
+
+    return res.setIndex(df.getIndexNames());
   }
 
   /**
@@ -138,115 +160,302 @@ public class BaselineAggregate implements Baseline {
    *
    * @param type aggregation type
    * @param offsets time offsets
-   * @param isDailyData daily time series flag
    * @return BaselineAggregate with given type and offsets
    */
-  public static BaselineAggregate fromOffsets(BaselineAggregateType type, List<Long> offsets, boolean isDailyData) {
-    return new BaselineAggregate(type, offsets, isDailyData);
-  }
-
-  /**
-   * Returns an instance of BaselineAggregate for the specified type and {@code numWeeks} offsets
-   * computed on a consecutive week-over-week basis (in UTC time) starting with a lag of {@code offsetWeeks}.
-   * A lag of {@code 0} corresponds to the current week.
-   *
-   * @see BaselineAggregateType
-   *
-   * @param type aggregation type
-   * @param numWeeks number of consecutive weeks
-   * @param offsetWeeks lag for starting consecutive weeks
-   * @param isDailyData daily time series flag
-   * @return BaselineAggregate with given type and weekly offsets
-   */
-  public static BaselineAggregate fromWeekOverWeek(BaselineAggregateType type, int numWeeks, int offsetWeeks, boolean isDailyData) {
-    List<Long> offsets = new ArrayList<>();
-
-    for (int i = 0; i < numWeeks; i++) {
-      long offset = -1 * (i + offsetWeeks) * TimeUnit.DAYS.toMillis(7);
-      offsets.add(offset);
+  public static BaselineAggregate fromOffsets(BaselineAggregateType type, List<Period> offsets, DateTimeZone timeZone) {
+    if (offsets.isEmpty()) {
+      throw new IllegalArgumentException("Must provide at least one offset");
     }
 
-    return new BaselineAggregate(type, offsets, isDailyData);
+    PeriodType periodType = offsets.get(0).getPeriodType();
+    for (Period p : offsets) {
+      if (!periodType.equals(p.getPeriodType())) {
+        throw new IllegalArgumentException(String.format("Expected uniform period type but found '%s' and '%s'", periodType, p.getPeriodType()));
+      }
+    }
+
+    return new BaselineAggregate(type, offsets, timeZone, periodType);
   }
 
   /**
    * Returns an instance of BaselineAggregate for the specified type and {@code numWeeks} offsets
    * computed on a consecutive week-over-week basis starting with a lag of {@code offsetWeeks}.
-   * Additionally corrects for DST changes assuming a start date of {@code timestamp} in {@code timezone}.
-   * <br/><b>NOTE:</b> As offsets are pre-computed, the DST correction will produce incorrect offsets
-   * if used to scatter a slice that does not start at {@code timestamp}.
+   * <br/><b>NOTE:</b> this will apply DST correction (modeled as 7 days)
    *
-   * @see BaselineAggregate#fromWeekOverWeek(BaselineAggregateType, int, int, boolean)
    * @see BaselineAggregateType
    *
    * @param type aggregation type
    * @param numWeeks number of consecutive weeks
    * @param offsetWeeks lag for starting consecutive weeks
-   * @param timestamp assumed slice start timestamp
-   * @param timezone time zone (long form)
-   * @param isDailyData daily time series flag
-   * @return BaselineAggregate with given type and weekly offsets corrected for DST
+   * @param timeZone time zone
+   * @return BaselineAggregate with given type and weekly offsets
    */
-  public static BaselineAggregate fromWeekOverWeek(BaselineAggregateType type, int numWeeks, int offsetWeeks, long timestamp, String timezone, boolean isDailyData) {
-    DateTime baseDate = new DateTime(timestamp, DateTimeZone.forID(timezone));
-
-    List<Long> offsets = new ArrayList<>();
-
+  public static BaselineAggregate fromWeekOverWeek(BaselineAggregateType type, int numWeeks, int offsetWeeks, DateTimeZone timeZone) {
+    List<Period> offsets = new ArrayList<>();
     for (int i = 0; i < numWeeks; i++) {
-      long offset = baseDate.minusWeeks(i + offsetWeeks).getMillis() - timestamp;
-      offsets.add(offset);
+      offsets.add(new Period(0, 0, 0, -1 * 7 * (i + offsetWeeks), 0, 0, 0, 0, PeriodType.days()));
     }
-
-    return new BaselineAggregate(type, offsets, isDailyData);
+    return new BaselineAggregate(type, offsets, timeZone, PeriodType.days());
   }
 
   /**
-   * Returns acceptable timestamps given the input data set. Uses {@code slice}
-   * timestamps if available, otherwise constructs artificial time series.
+   * Returns an instance of BaselineAggregate for the specified type and {@code numDays} offsets
+   * computed on a consecutive day-over-day basis starting with a lag of {@code offsetDays}.
+   * <br/><b>NOTE:</b> this will apply DST correction
    *
-   * @param slice base metric slice
-   * @param data timeseries data
-   * @return timestamp series
+   * @see BaselineAggregateType
+   *
+   * @param type aggregation type
+   * @param numDays number of consecutive weeks
+   * @param offsetDays lag for starting consecutive weeks
+   * @param timeZone time zone
+   * @return BaselineAggregate with given type and daily offsets
    */
-  private LongSeries makeTimestamps(MetricSlice slice, Map<MetricSlice, DataFrame> data) {
-    if (data.containsKey(slice)) {
-      return data.get(slice).dropNull().getLongs(COL_TIME);
+  public static BaselineAggregate fromDayOverDay(BaselineAggregateType type, int numDays, int offsetDays, DateTimeZone timeZone) {
+    List<Period> offsets = new ArrayList<>();
+    for (int i = 0; i < numDays; i++) {
+      offsets.add(new Period(0, 0, 0, -1 * (i + offsetDays), 0, 0, 0, 0, PeriodType.days()));
     }
+    return new BaselineAggregate(type, offsets, timeZone, PeriodType.days());
+  }
 
-    if (this.isDailyData) {
-      // construct daily timestamps
-      return BaselineUtil.makeTimestamps(slice.withGranularity(new TimeGranularity(1, TimeUnit.DAYS)));
+  /**
+   * Returns an instance of BaselineAggregate for the specified type and {@code numDays} offsets
+   * computed on a consecutive day-over-day basis starting with a lag of {@code offsetHours}.
+   * <br/><b>NOTE:</b> this will <b>NOT</b> apply DST correction
+   *
+   * @see BaselineAggregateType
+   *
+   * @param type aggregation type
+   * @param numHours number of consecutive weeks
+   * @param offsetHours lag for starting consecutive weeks
+   * @param timeZone time zone
+   * @return BaselineAggregate with given type and daily offsets
+   */
+  public static BaselineAggregate fromHourOverHour(BaselineAggregateType type, int numHours, int offsetHours, DateTimeZone timeZone) {
+    List<Period> offsets = new ArrayList<>();
+    for (int i = 0; i < numHours; i++) {
+      offsets.add(new Period(0, 0, 0, 0, -1 * (i + offsetHours), 0, 0, 0, PeriodType.hours()));
+    }
+    return new BaselineAggregate(type, offsets, timeZone, PeriodType.hours());
+  }
+
+  /**
+   * Transform UTC timestamps into relative day-time-of-day timestamps
+   *
+   * @param origin origin timestamp
+   * @param timestampSeries timestamp series
+   * @return day-time-of-day series
+   */
+  private LongSeries toVirtualSeries(long origin, LongSeries timestampSeries) {
+    final DateTime dateOrigin = new DateTime(origin, this.timeZone).withFields(makeOriginPartial());
+    return timestampSeries.map(this.makeTimestampToVirtualFunction(dateOrigin));
+  }
+
+  /**
+   * Transform day-time-of-day timestamps into UTC timestamps
+   *
+   * @param origin origin timestamp
+   * @param virtualSeries day-time-of-day series
+   * @return utc timestamp series
+   */
+  private LongSeries toTimestampSeries(long origin, LongSeries virtualSeries) {
+    final DateTime dateOrigin = new DateTime(origin, this.timeZone).withFields(makeOriginPartial());
+    return virtualSeries.map(this.makeVirtualToTimestampFunction(dateOrigin));
+  }
+
+  /**
+   * Returns partial to zero out date fields based on period type
+   *
+   * @return partial
+   */
+  private Partial makeOriginPartial() {
+    List<DateTimeFieldType> fields = new ArrayList<>();
+
+    if (PeriodType.millis().equals(this.periodType)) {
+      // left blank
+
+    } else if (PeriodType.seconds().equals(this.periodType)) {
+      fields.add(DateTimeFieldType.millisOfSecond());
+
+    } else if (PeriodType.minutes().equals(this.periodType)) {
+      fields.add(DateTimeFieldType.secondOfMinute());
+      fields.add(DateTimeFieldType.millisOfSecond());
+
+    } else if (PeriodType.hours().equals(this.periodType)) {
+      fields.add(DateTimeFieldType.minuteOfHour());
+      fields.add(DateTimeFieldType.secondOfMinute());
+      fields.add(DateTimeFieldType.millisOfSecond());
+
+    } else if (PeriodType.days().equals(this.periodType)) {
+      fields.add(DateTimeFieldType.hourOfDay());
+      fields.add(DateTimeFieldType.minuteOfHour());
+      fields.add(DateTimeFieldType.secondOfMinute());
+      fields.add(DateTimeFieldType.millisOfSecond());
+
     } else {
-      return BaselineUtil.makeTimestamps(slice);
+      throw new IllegalArgumentException(String.format("Unsupported PeriodType '%s'", this.periodType));
+    }
+
+    int[] zeros = new int[fields.size()];
+    Arrays.fill(zeros, 0);
+
+    return new Partial(fields.toArray(new DateTimeFieldType[fields.size()]), zeros);
+  }
+
+  /**
+   * Returns a conversion function from utc timestamps to virtual, relative timestamps based
+   * on period type and an origin
+   *
+   * @param origin origin to base relative timestamp on
+   * @return LongFunction for converting to relative timestamps
+   */
+  private Series.LongFunction makeTimestampToVirtualFunction(final DateTime origin) {
+    if (PeriodType.millis().equals(this.periodType)) {
+      return new Series.LongFunction() {
+        @Override
+        public long apply(long... values) {
+          return values[0] - origin.getMillis();
+        }
+      };
+
+    } else if (PeriodType.seconds().equals(this.periodType)) {
+      return new Series.LongFunction() {
+        @Override
+        public long apply(long... values) {
+          DateTime dateTime = new DateTime(values[0], BaselineAggregate.this.timeZone);
+          long seconds = new Period(origin, dateTime, BaselineAggregate.this.periodType).getSeconds();
+          long millis = dateTime.getMillisOfSecond();
+          return seconds * 1000L + millis;
+        }
+      };
+
+    } else if (PeriodType.minutes().equals(this.periodType)) {
+      return new Series.LongFunction() {
+        @Override
+        public long apply(long... values) {
+          DateTime dateTime = new DateTime(values[0], BaselineAggregate.this.timeZone);
+          long minutes = new Period(origin, dateTime, BaselineAggregate.this.periodType).getMinutes();
+          long seconds = dateTime.getSecondOfMinute();
+          long millis = dateTime.getMillisOfSecond();
+          return minutes * 100000L + seconds * 1000L + millis;
+        }
+      };
+
+    } else if (PeriodType.hours().equals(this.periodType)) {
+      return new Series.LongFunction() {
+        @Override
+        public long apply(long... values) {
+          DateTime dateTime = new DateTime(values[0], BaselineAggregate.this.timeZone);
+          long hours = new Period(origin, dateTime, BaselineAggregate.this.periodType).getHours();
+          long minutes = dateTime.getMinuteOfHour();
+          long seconds = dateTime.getSecondOfMinute();
+          long millis = dateTime.getMillisOfSecond();
+          return hours * 10000000L + minutes * 100000L + seconds * 1000L + millis;
+        }
+      };
+
+    } else if (PeriodType.days().equals(this.periodType)) {
+      return new Series.LongFunction() {
+        @Override
+        public long apply(long... values) {
+          DateTime dateTime = new DateTime(values[0], BaselineAggregate.this.timeZone);
+          long days = new Period(origin, dateTime, BaselineAggregate.this.periodType).getDays();
+          long hours = dateTime.getHourOfDay();
+          long minutes = dateTime.getMinuteOfHour();
+          long seconds = dateTime.getSecondOfMinute();
+          long millis = dateTime.getMillisOfSecond();
+          return days * 1000000000L + hours * 10000000L + minutes * 100000L + seconds * 1000L + millis;
+        }
+      };
+
+    } else {
+      throw new IllegalArgumentException(String.format("Unsupported PeriodType '%s'", this.periodType));
     }
   }
 
   /**
-   * Returns a data time series aligned to a set of acceptable timestamps. Only operates
-   * on data series identified as daily data. This method is required to correct for
-   * incorrect DST adjustment of daily data at the data source level or below.
+   * Returns a conversion function from virtual, relative timestamps to UTC timestamps given
+   * a period type and an origin
    *
-   * @param data data series
-   * @param timestamps set of acceptable timestamps
-   * @return aligned data series
+   * @param origin origin to base absolute timestamps on
+   * @return LongFunction for converting to UTC timestamps
    */
-  private DataFrame applyDSTCorrection(DataFrame data, final Set<Long> timestamps) {
-    if (!this.isDailyData) {
-      return data;
+  private Series.LongFunction makeVirtualToTimestampFunction(final DateTime origin) {
+    if (PeriodType.millis().equals(this.periodType)) {
+      return new Series.LongFunction() {
+        @Override
+        public long apply(long... values) {
+          return values[0] + origin.getMillis();
+        }
+      };
+
+    } else if (PeriodType.seconds().equals(this.periodType)) {
+      return new Series.LongFunction() {
+        @Override
+        public long apply(long... values) {
+          int seconds = (int) (values[0] / 1000L);
+          int millis = (int) (values[0] % 1000L);
+          return origin
+              .plusSeconds(seconds)
+              .plusMillis(millis)
+              .getMillis();
+        }
+      };
+
+    } else if (PeriodType.minutes().equals(this.periodType)) {
+      return new Series.LongFunction() {
+        @Override
+        public long apply(long... values) {
+          int minutes = (int) (values[0] / 100000L);
+          int seconds = (int) ((values[0] / 1000L) % 100L);
+          int millis = (int) (values[0] % 1000L);
+          return origin
+              .plusMinutes(minutes)
+              .plusSeconds(seconds)
+              .plusMillis(millis)
+              .getMillis();
+        }
+      };
+
+    } else if (PeriodType.hours().equals(this.periodType)) {
+      return new Series.LongFunction() {
+        @Override
+        public long apply(long... values) {
+          int hours = (int) (values[0] / 10000000L);
+          int minutes = (int) ((values[0] / 100000L) % 100L);
+          int seconds = (int) ((values[0] / 1000L) % 100L);
+          int millis = (int) (values[0] % 1000L);
+          return origin
+              .plusHours(hours)
+              .plusMinutes(minutes)
+              .plusSeconds(seconds)
+              .plusMillis(millis)
+              .getMillis();
+        }
+      };
+
+    } else if (PeriodType.days().equals(this.periodType)) {
+      return new Series.LongFunction() {
+        @Override
+        public long apply(long... values) {
+          int days = (int) (values[0] / 1000000000L);
+          int hours = (int) ((values[0] / 10000000L) % 100L);
+          int minutes = (int) ((values[0] / 100000L) % 100L);
+          int seconds = (int) ((values[0] / 1000L) % 100L);
+          int millis = (int) (values[0] % 1000L);
+          return origin
+              .plusDays(days)
+              .plusHours(hours)
+              .plusMinutes(minutes)
+              .plusSeconds(seconds)
+              .plusMillis(millis)
+              .getMillis();
+        }
+      };
+
+    } else {
+      throw new IllegalArgumentException(String.format("Unsupported PeriodType '%s'", this.periodType));
     }
-
-    DataFrame dataPlusOneHour = new DataFrame(data).addSeries(COL_TIME, data.getLongs(COL_TIME).add(TimeUnit.HOURS.toMillis(1)));
-    DataFrame dataMinusOneHour = new DataFrame(data).addSeries(COL_TIME, data.getLongs(COL_TIME).subtract(TimeUnit.HOURS.toMillis(1)));
-
-    return new DataFrame(data)
-        .append(dataPlusOneHour, dataMinusOneHour)
-        .filter(new Series.LongConditional() {
-          @Override
-          public boolean apply(long... values) {
-            return timestamps.contains(values[0]);
-          }
-        }, COL_TIME)
-        .dropNull()
-        .sortedBy(COL_TIME);
   }
 }

@@ -1228,7 +1228,7 @@ public class DataFrameTest {
     assertEquals(sdfa.getLongs("index"), 5, 6, 1, 2, 7, 8, 3, 4);
 
     DataFrame sdfb = mydf.sortedBy("long", "double");
-    assertEquals(sdfb.getLongs("index"), 3, 4, 7, 8, 1, 2, 5, 6);
+    assertEquals(sdfb.getLongs("index"), 5, 6, 7, 8, 1, 2, 3, 4);
   }
 
   @Test
@@ -1241,7 +1241,7 @@ public class DataFrameTest {
     assertEquals(sdfa.getLongs("index"), 5, 6, 1, 2, 7, 8, 3, 4);
 
     DataFrame sdfb = mydf.sortedBy("boolean", "string");
-    assertEquals(sdfb.getLongs("index"), 3, 4, 7, 8, 1, 2, 5, 6);
+    assertEquals(sdfb.getLongs("index"), 5, 6, 7, 8, 1, 2, 3, 4);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
