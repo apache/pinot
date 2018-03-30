@@ -96,7 +96,6 @@ public class BaselineAggregate implements Baseline {
           this.periodType);
 
       if (!offsets.contains(period)) {
-        // throw new IllegalArgumentException(String.format("Found slice with invalid offset '%s'", period));
         continue;
       }
 
