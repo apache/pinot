@@ -70,7 +70,7 @@ public class PartitionAssignmentGenerator {
    * @return
    */
   @VisibleForTesting
-  protected Map<String, LLCSegmentName> getPartitionToLatestSegments(IdealState idealState) {
+  public Map<String, LLCSegmentName> getPartitionToLatestSegments(IdealState idealState) {
     Map<String, LLCSegmentName> partitionIdToLatestSegment = new HashMap<>();
     // read all segments
     Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
