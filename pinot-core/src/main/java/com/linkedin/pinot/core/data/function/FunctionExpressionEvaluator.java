@@ -23,12 +23,12 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 
 /**
- * Evaluates a function expression. This is optimized <br>
- * for evaluating the same expression many times with different inputs.
+ * Evaluates a function expression. This is optimized 
+ * for evaluating the an expression multiple times with different inputs.
  * Overall idea 
  *  - Parse the function expression into an expression tree
  *  - Convert each node in the expression tree into and ExecutableNode
- *  - A ExecutableNode can be a 
+ *  - An ExecutableNode can be a 
  *      - FunctionNode - That executes another function
  *      - ColumnNode - fetches the value of the column from the input GenericRow
  *      - ConstantNode - returns the same value - typically constant function arguments are represented using a ConstantNode
@@ -128,15 +128,15 @@ public class FunctionExpressionEvaluator {
   }
 
   private static class ConstantExecutionNode implements ExecutableNode {
-    private String _constant;
+    private String _value;
 
-    public ConstantExecutionNode(String constant) {
-      this._constant = constant;
+    public ConstantExecutionNode(String value) {
+      _value = value;
     }
 
     @Override
     public Object execute(GenericRow row) {
-      return _constant;
+      return _value;
     }
 
     @Override
@@ -150,7 +150,7 @@ public class FunctionExpressionEvaluator {
     private String _column;
 
     public ColumnExecutionNode(String column) {
-      this._column = column;
+      _column = column;
     }
 
     @Override

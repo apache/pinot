@@ -36,4 +36,39 @@ public class FunctionInfo {
     return _clazz;
   }
 
+  /**
+   * Check if the Function is applicable to the argumentTypes.
+   * We can only know the types at runtime, so we can validate if the return type is Object.
+   * For e.g funcA( funcB('3.14'), columnA)
+   * We can only know return type of funcB and 3.14 (String.class) but 
+   * we cannot know the type of columnA in advance without knowing the source schema
+   * @param argumentTypes
+   * @return
+   */
+  public boolean isApplicable(Class<?>[] argumentTypes) {
+
+    if (_method.getParameterCount() != argumentTypes.length) {
+      return false;
+    }
+
+    Class<?>[] parameterTypes = _method.getParameterTypes();
+    for (int i = 0; i < parameterTypes.length; i++) {
+      Class<?> type = parameterTypes[i];
+      //
+      if (!type.isAssignableFrom(argumentTypes[i]) && argumentTypes[i] != Object.class) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Eventually we will need to convert the input datatypes before invoking the actual method. For now, there is no conversion
+   * 
+   * @param args
+   * @return
+   */
+  public Object[] convertTypes(Object[] args) {
+    return args;
+  }
 }

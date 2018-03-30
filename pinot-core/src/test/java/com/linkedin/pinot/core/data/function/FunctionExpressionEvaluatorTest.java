@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.data.function;
 
+import java.lang.reflect.Method;
+
 import org.joda.time.DateTime;
 import org.joda.time.Days;
 import org.joda.time.MutableDateTime;
@@ -30,7 +32,10 @@ public class FunctionExpressionEvaluatorTest {
 
   @Test
   public void testExpressionWithColumn() throws Exception {
-    FunctionRegistry.registerStaticFunction(MyFunc.class.getDeclaredMethod("reverseString", String.class));
+    Method method = MyFunc.class.getDeclaredMethod("reverseString", String.class);
+    FunctionRegistry.registerStaticFunction(method);
+    FunctionInfo functionInfo = FunctionRegistry.resolve("reverseString", new Class<?>[]{Object.class});
+    System.out.println(functionInfo);
     String expression = "reverseString(testColumn)";
 
     FunctionExpressionEvaluator evaluator = new FunctionExpressionEvaluator("testColumn", expression);

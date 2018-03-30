@@ -37,14 +37,16 @@ public class FunctionInvoker {
   //TODO:Convert this functionality into a class that can be used in other places
   private static long EXCEPTION_LIMIT_DURATION = TimeUnit.MINUTES.toMillis(5);
   private static long EXCEPTION_LIMIT_RATE = 10;
-  Method _method;
-  Object _instance;
-  int exceptionCount;
-  long lastExceptionTime = 0;
+  private Method _method;
+  private Object _instance;
+  private int exceptionCount;
+  private long lastExceptionTime = 0;
+  private FunctionInfo _functionInfo;
 
-  public FunctionInvoker(FunctionInfo info) throws Exception {
-    _method = info.getMethod();
-    Class<?> clazz = info.getClazz();
+  public FunctionInvoker(FunctionInfo functionInfo) throws Exception {
+    _functionInfo = functionInfo;
+    _method = functionInfo.getMethod();
+    Class<?> clazz = functionInfo.getClazz();
     if (Modifier.isStatic(_method.getModifiers())) {
       _instance = null;
     } else {
@@ -62,7 +64,7 @@ public class FunctionInvoker {
 
   public Object process(Object[] args) {
     try {
-      return _method.invoke(_instance, args);
+      return _method.invoke(_instance, _functionInfo.convertTypes(args));
     } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
       //most likely the exception is in the udf,  get the exceptio
       Throwable cause = e.getCause();

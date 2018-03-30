@@ -55,7 +55,7 @@ public abstract class FieldSpec {
 
   private transient String _stringDefaultNullValue;
   
-  //apply a transform function to generate this column, this can be based on any other column
+  //apply a transform function to generate this column, this can be based on another column
   private String _transformFunction; 
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
