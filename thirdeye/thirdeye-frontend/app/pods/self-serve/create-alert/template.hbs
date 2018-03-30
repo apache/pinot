@@ -27,12 +27,6 @@
       {{/power-select}}
     </div>
 
-    {{#if isSelectMetricError}}
-      {{#bs-alert type="danger"}}
-        <strong>{{selectMetricErrMsg}}</strong> Unable to fetch data for this metric.
-      {{/bs-alert}}
-    {{/if}}
-
     <div class="col-xs-6 col-sm-4">
       <label for="select-granularity" class="control-label te-label te-label--taller">Monitor at this data granularity</label>
       {{#power-select
@@ -70,7 +64,7 @@
         searchPlaceholder="Type to filter..."
         triggerId="select-dimension"
         triggerClass="te-form__select"
-        disabled=(not isMetricSelected)
+        disabled=(not generalFieldsEnabled)
         as |dimension|
       }}
         {{dimension}}
@@ -155,7 +149,7 @@
         searchEnabled=false
         selected=selectedPattern
         onchange=(action "onSelectPattern")
-        disabled=(not isMetricSelected)
+        disabled=(not generalFieldsEnabled)
         required=true
         as |name|
       }}
@@ -242,7 +236,7 @@
           theme='ios'
           showLabels=true
           name="splitViewToggle"
-          disabled=(not isMetricSelected)
+          disabled=(not generalFieldsEnabled)
           onToggle=(action (mut selectedWeeklyEffect))
           as |toggle|}}
             {{#toggle.label value=selectedWeeklyEffect}}
@@ -276,7 +270,7 @@
         placeholder="Add a descriptive alert name"
         value=alertFunctionName
         key-up=(action "validateAlertName" alertFunctionName true)
-        disabled=(not isMetricSelected)
+        disabled=(not generalFieldsEnabled)
       }}
     </div>
 
@@ -293,7 +287,7 @@
           searchPlaceholder="Type to filter..."
           triggerId="anomaly-form-app-name"
           triggerClass="te-form__select"
-          disabled=(not isMetricSelected)
+          disabled=(not generalFieldsEnabled)
           as |app|
         }}
           {{app.application}}
@@ -313,7 +307,7 @@
         selected=selectedConfigGroup
         searchField="name"
         onchange=(action "onSelectConfigGroup")
-        disabled=(not isMetricSelected)
+        disabled=(not generalFieldsEnabled)
         searchField="name"
         loadingMessage="Waiting for the server...."
         placeholder="Select an existing alert subscription group"
@@ -339,7 +333,7 @@
         value=newConfigGroupName
         key-up="validateNewGroupName"
         focus-out="validateNewGroupName"
-        disabled=(not isMetricSelected)
+        disabled=(not generalFieldsEnabled)
       }}
     </div>
 
@@ -375,7 +369,7 @@
         placeholder="Add recipients. Type email addresses, separated by commas"
         autocomplete=false
         value=alertGroupNewRecipient
-        disabled=(not isMetricSelected)
+        disabled=(not generalFieldsEnabled)
         required=true
       }}
     </div>

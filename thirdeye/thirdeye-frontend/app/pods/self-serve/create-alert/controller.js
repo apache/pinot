@@ -290,13 +290,14 @@ export default Controller.extend({
     // TODO: const metricData = await fetch(metricUrl).then(checkStatus)
     fetch(metricUrl).then(checkStatus)
       .then(metricData => {
+        const isDataGood = this.isMetricGraphable(metricData);
         this.setProperties({
           metricId: metric.id,
-          isMetricSelected: true,
+          isMetricSelected: isDataGood,
           isMetricDataLoading: false,
           showGraphLegend: true,
           selectedMetric: Object.assign(metricData, { color: 'blue' }),
-          isMetricDataInvalid: !this.isMetricGraphable(metricData)
+          isMetricDataInvalid: !isDataGood
         });
 
         // Dimensions are selected. Compile, rank, and send them to the graph.
@@ -313,7 +314,11 @@ export default Controller.extend({
           }
         }
       }).catch((error) => {
-        this.set('selectMetricErrMsg', error);
+        this.setProperties({
+          isMetricDataInvalid: true,
+          isMetricDataLoading: false,
+          selectMetricErrMsg: error
+        });
       });
   },
 
@@ -412,12 +417,18 @@ export default Controller.extend({
     'alertGroupNewRecipient',
     'isAlertNameDuplicate',
     'isGroupNameDuplicate',
+    'isDuplicateEmail',
+    'isEmptyEmail',
+    'isEmailError',
     'isProcessingForm',
     function() {
       let isDisabled = false;
       const {
         requiredFields,
         isProcessingForm,
+        isDuplicateEmail,
+        isEmptyEmail,
+        isEmailError,
         newConfigGroupName,
         isAlertNameDuplicate,
         isGroupNameDuplicate,
@@ -426,6 +437,9 @@ export default Controller.extend({
       } = this.getProperties(
         'requiredFields',
         'isProcessingForm',
+        'isDuplicateEmail',
+        'isEmptyEmail',
+        'isEmailError',
         'newConfigGroupName',
         'isAlertNameDuplicate',
         'isGroupNameDuplicate',
@@ -444,7 +458,7 @@ export default Controller.extend({
         isDisabled = true;
       }
       // Duplicate alert Name or group name
-      if (isAlertNameDuplicate || isGroupNameDuplicate) {
+      if (isAlertNameDuplicate || isGroupNameDuplicate || isDuplicateEmail || isEmptyEmail || isEmailError) {
         isDisabled = true;
       }
       // For alert group email recipients, require presence only if group recipients is empty
@@ -583,6 +597,14 @@ export default Controller.extend({
       return this.get('isMetricDataInvalid') ? invalidMsg : defaultMsg;
     }
   ),
+
+  /**
+   * Determines whether input fields in general are enabled. When metric data is 'invalid',
+   * we will still enable alert creation.
+   * @method generalFieldsEnabled
+   * @return {Boolean}
+   */
+  generalFieldsEnabled: computed.or('isMetricSelected','isMetricDataInvalid'),
 
   /**
    * Preps a mailto link containing the currently selected metric name

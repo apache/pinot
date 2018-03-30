@@ -1,6 +1,6 @@
 
-
 export default function (server) {
+
   /**
    * get request for the entity mapping
    */

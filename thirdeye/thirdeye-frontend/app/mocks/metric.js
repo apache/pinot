@@ -4,7 +4,7 @@
 import alertConfig from 'thirdeye-frontend/mocks/alertConfig';
 import anomalyFunction from 'thirdeye-frontend/mocks/anomalyFunction';
 
-const id = alertConfig[0].reportConfigCollection.reportMetricConfigs.metricId;
+const id = alertConfig[0].reportConfigCollection.reportMetricConfigs[0].metricId;
 const { collection: dataset, metric: name } = anomalyFunction[0];
 const alias = `${dataset}::${name}`;
 

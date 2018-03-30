@@ -4,6 +4,14 @@ import { isPresent } from "@ember/utils";
  * General self-serve element selectors
  */
 export const selfServeConst = {
+  ALERT_NAME_INPUT: '#anomaly-form-function-name',
+  SUBSCRIPTION_GROUP: '#anomaly-form-app-name',
+  STATUS: '.te-toggle--form span',
+  STATUS_RESULT: '.te-search-results__tag',
+  EDIT_LINK: '/manage/alert/edit',
+  STATUS_TOGGLER: '.x-toggle-btn',
+  NEW_FUNC_NAME: 'test_function_2',
+  NEW_FUNC_RESULT: '.te-search-results__title-name',
   METRIC_SELECT: '#select-metric',
   METRIC_INPUT: '.ember-power-select-search-input',
   GRANULARITY_SELECT: '#select-granularity',
@@ -33,7 +41,17 @@ export const selfServeConst = {
   IMPORT_WARNING: '.alert-warning',
   IMPORT_SUCCESS: '.te-form__banner--success',
   IMPORT_RESULT_LIST: '.te-form__banner-list',
+  ALERT_ACTIVE_LABEL: '.te-search-results__tag--active',
+  ALERT_TITLE: '.te-search-results__title',
+  ALERT_CARDS_CONTAINER: '.te-horizontal-cards__container',
   PATTERN_OPTIONS: ['Higher or lower than expected', 'Higher than expected', 'Lower than expected']
+};
+
+/**
+ * General multi-use test settings for Self-Serve
+ */
+export const selfServeSettings = {
+  ALERT_ID: 1234567
 };
 
 /**
@@ -72,5 +90,6 @@ export const optionsToString = ($optionList) => {
 export default {
   selfServeConst,
   rootCauseConst,
-  optionsToString
+  optionsToString,
+  selfServeSettings
 };

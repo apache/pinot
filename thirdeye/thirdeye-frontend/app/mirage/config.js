@@ -1,17 +1,11 @@
 import queryRelatedMetrics from 'thirdeye-frontend/mocks/queryRelatedMetrics';
-import alertConfig from 'thirdeye-frontend/mocks/alertConfig';
-import entityApplication from 'thirdeye-frontend/mocks/entityApplication';
 import metric from 'thirdeye-frontend/mocks/metric';
 import timeseriesCompare from 'thirdeye-frontend/mocks/timeseriesCompare';
 import { filters, dimensions, granularities } from 'thirdeye-frontend/mocks/metricPeripherals';
-import { onboardJobStatus, onboardJobCreate } from 'thirdeye-frontend/mocks/detectionOnboard';
 import rootcause from './endpoints/rootcause';
+import selfserve from './endpoints/selfserve';
 import auth from './endpoints/auth';
-import importMetrics from './endpoints/import-metrics';
 import entityMapping from './endpoints/entity-mapping';
-/**
- * TODO: Group endpoints together and put them in files under the endpoints folder to prevent overloading this file
- */
 
 export default function() {
 
@@ -63,7 +57,7 @@ export default function() {
 
     //TODO: mock data dynamically
     return {
-      metricName: "example Metric",
+      metricName: 'example Metric',
       metricId: id,
       start: currentStart,
       end: currentEnd,
@@ -90,35 +84,6 @@ export default function() {
       }
     };
   });
-
-  /**
-   * Mocks a list of alerts, displayed in the /manage/alerts page
-   */
-  this.get('/thirdeye/entity/ANOMALY_FUNCTION', (schema) => {
-    return schema.alerts.all().models;
-  });
-
-  /**
-   * Mocks email subscription groups for alerts
-   */
-  this.get('/thirdeye/entity/ALERT_CONFIG', () => {
-    return alertConfig;
-  });
-
-  /**
-   * Mocks a list of applications that are onboarded onto ThirdEye
-   */
-  this.get('/thirdeye/entity/APPLICATION', () => {
-    return entityApplication;
-  });
-
-  /**
-   * Returns information about an alert by id in anomalyFunction mock data
-   */
-  this.get(`/onboard/function/:id`, (schema, request) => {
-    return schema.alerts.find(request.params.id);
-  });
-
 
   /**
    * Returns metric information about the first alert
@@ -156,48 +121,14 @@ export default function() {
   });
 
   /**
-   * Returns job status
-   */
-  this.post(`/detection-onboard/get-status`, (schema, request) => {
-    return onboardJobStatus;
-  });
-
-  /**
-   * Returns job id
-   */
-  this.post(`/detection-onboard/create-job`, (schema, request) => {
-    return onboardJobCreate;
-  });
-
-  /**
-   * Returns the email config by id
-   */
-  this.get(`/thirdeye/email/function/:id`, (schema, request) => {
-    return [alertConfig[request.params.id]];
-  });
-
-  /**
    * Returns mock data to render time series graph
    */
   this.get(`/timeseries/compare/${metric[0].id}/***`, () => {
     return timeseriesCompare;
   });
 
-  /**
-   * Post request for editing alert
-   */
-  this.post(`/thirdeye/entity`, (schema, request) => {
-    const params = request.queryParams && request.queryParams.entityType;
-
-    if (params === 'ANOMALY_FUNCTION') {
-      const requestBody = JSON.parse(request.requestBody);
-      const id = requestBody.id;
-      return schema.db.alerts.update(id, requestBody);
-    }
-  });
-
   rootcause(this);
+  selfserve(this);
   auth(this);
-  importMetrics(this);
   entityMapping(this);
 }
