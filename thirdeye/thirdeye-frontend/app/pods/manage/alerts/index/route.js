@@ -68,10 +68,10 @@ export default Route.extend({
     * @method error
     * @example: from Model hook `return RSVP.reject("FAIL");` will invoke the error action
     */
-    error(error, transition) {
-      if (error) {
-        return this.transitionTo('error');
-      }
-    }
+    // error(error, transition) {
+    //   if (error) {
+    //     return this.transitionTo('error');
+    //   }
+    // }
   }
 });
