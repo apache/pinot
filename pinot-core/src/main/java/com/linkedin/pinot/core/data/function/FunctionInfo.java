@@ -47,11 +47,12 @@ public class FunctionInfo {
    */
   public boolean isApplicable(Class<?>[] argumentTypes) {
 
-    if (_method.getParameterCount() != argumentTypes.length) {
+    Class<?>[] parameterTypes = _method.getParameterTypes();
+
+    if (parameterTypes.length != argumentTypes.length) {
       return false;
     }
 
-    Class<?>[] parameterTypes = _method.getParameterTypes();
     for (int i = 0; i < parameterTypes.length; i++) {
       Class<?> type = parameterTypes[i];
       //
