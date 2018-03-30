@@ -4,7 +4,6 @@ import alertConfig from 'thirdeye-frontend/mocks/alertConfig';
 import entityApplication from 'thirdeye-frontend/mocks/entityApplication';
 import anomalyChangeData from 'thirdeye-frontend/mocks/anomalyWowChange';
 import anomalyPerformanceData from 'thirdeye-frontend/mocks/anomalyPerformance';
-import { selfServeSettings } from 'thirdeye-frontend/tests/utils/constants';
 
 export default function (server) {
 
@@ -93,8 +92,8 @@ export default function (server) {
    */
   server.post('/function-onboard/create-function', (schema, request) => {
     // Update the test DB alert record with the new name. This endpoint generates the alert.
-    server.db.alerts.update({ functionName: request.queryParams.name });
-    return server.db.alerts.find(1);
+    const newAlert = server.create('alert', { functionName: request.queryParams.name });
+    return newAlert;
   });
 
   /**

@@ -13,7 +13,7 @@ module('Acceptance | edit alert', function(hooks) {
 
     assert.equal(
       currentURL(),
-      `/manage/alert/2/edit`,
+      `/manage/alert/1/edit`,
       'correctly redirects to edit alerts page'
     );
     assert.equal(

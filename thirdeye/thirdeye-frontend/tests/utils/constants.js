@@ -48,13 +48,6 @@ export const selfServeConst = {
 };
 
 /**
- * General multi-use test settings for Self-Serve
- */
-export const selfServeSettings = {
-  ALERT_ID: 1234567
-};
-
-/**
  * General root-cause element selectors
  */
 export const rootCauseConst = {
@@ -90,6 +83,5 @@ export const optionsToString = ($optionList) => {
 export default {
   selfServeConst,
   rootCauseConst,
-  optionsToString,
-  selfServeSettings
+  optionsToString
 };
