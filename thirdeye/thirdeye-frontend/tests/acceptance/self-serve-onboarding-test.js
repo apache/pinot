@@ -1,8 +1,9 @@
 import $ from 'jquery';
+import moment from 'moment';
 import { module, test } from 'qunit';
 import { setupApplicationTest } from 'ember-qunit';
-import { selfServeConst, optionsToString } from 'thirdeye-frontend/tests/utils/constants';
-import { visit, fillIn, click, currentURL, triggerKeyEvent } from '@ember/test-helpers';
+import { selfServeConst, selfServeSettings, optionsToString } from 'thirdeye-frontend/tests/utils/constants';
+import { visit, fillIn, click, currentURL, triggerKeyEvent, waitUntil } from '@ember/test-helpers';
 import { filters, dimensions, granularities } from 'thirdeye-frontend/mocks/metricPeripherals';
 import { selectChoose, clickTrigger } from 'thirdeye-frontend/tests/helpers/ember-power-select';
 
@@ -14,6 +15,9 @@ module('Acceptance | create alert', function(hooks) {
   const groupRecipient = 'simba@disney.com';
   const newRecipient = 'duane@therock.com';
   const selectedApp = 'the-lion-king';
+  const alertName = 'theLionKing_testMetric1_upDown_5Minutes';
+  const startDateDefault = moment().subtract(3, 'month').endOf('day').utc().valueOf();
+  const dateString = `?duration=3m&endDate=${moment().utc().valueOf()}&startDate=${startDateDefault}`;
 
   // Flatten filter object in order to easily compare it to the list of options rendered
   const filterArray = Object.values(filters).map(filterGroup => [...Object.values(filterGroup)]);
@@ -99,7 +103,7 @@ module('Acceptance | create alert', function(hooks) {
     await selectChoose(selfServeConst.APP_OPTIONS, selectedApp);
     assert.equal(
       $(selfServeConst.INPUT_NAME).val(),
-      'theLionKing_testMetric1_upDown_5Minutes',
+      alertName,
       'Alert name autocomplete primer is working.'
     );
 
@@ -131,9 +135,49 @@ module('Acceptance | create alert', function(hooks) {
     );
 
     await fillIn(selfServeConst.CONFIG_RECIPIENTS_INPUT, newRecipient);
+    assert.ok(
+      $(selfServeConst.SUBMIT_BUTTON).get(0).disabled,
+      'Submit button is disabled'
+    );
+
+    await fillIn(selfServeConst.CONFIG_RECIPIENTS_INPUT, 'test-onboarding@linkedin.com');
+
+    // Trigger key event in field to get submit button to detect change
+    await triggerKeyEvent(selfServeConst.CONFIG_RECIPIENTS_INPUT, 'keyup', '8');
+
     assert.notOk(
       $(selfServeConst.SUBMIT_BUTTON).get(0).disabled,
-      'Submit button is enabled'
+      'Submit button is enabled again'
+    );
+
+    // Submit the form to trigger alert onboard sequence
+    await click(selfServeConst.SUBMIT_BUTTON);
+
+    // Once sequence is complete (replay successful), verify transition to Alert Page
+    await waitUntil(() => document.querySelector(selfServeConst.ALERT_TITLE));
+
+    assert.ok(
+      currentURL().includes(`/manage/alert/1/explore?duration=3m`),
+      'Navigation to alert page succeeded'
+    );
+
+    assert.equal(
+      $(selfServeConst.ALERT_TITLE).get(0).firstElementChild.innerText.trim(),
+      alertName,
+      'Alert details header title is correct'
+    );
+
+    assert.equal(
+      $(selfServeConst.ALERT_ACTIVE_LABEL).get(0).innerText,
+      'Active',
+      'Alert status label is set to active.'
+    );
+
+    await waitUntil(() => document.querySelector(selfServeConst.ALERT_CARDS_CONTAINER));
+
+    assert.ok(
+      $(selfServeConst.ALERT_CARDS_CONTAINER).length > 0,
+      'Transition complete'
     );
   });
 });
