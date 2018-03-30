@@ -20,6 +20,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
@@ -404,13 +405,17 @@ public class PinotTableRestletResource {
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DRYRUN, dryRun);
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.INCLUDE_CONSUMING, includeConsuming);
 
+    JSONObject jsonObject = null;
     try {
-      JSONObject jsonObject = _pinotHelixResourceManager.rebalanceTable(tableName,
+      jsonObject = _pinotHelixResourceManager.rebalanceTable(tableName,
           CommonConstants.Helix.TableType.valueOf(tableType.toUpperCase()), rebalanceUserConfig);
-      return jsonObject.toString();
-    } catch (Exception e) {
+    } catch (JSONException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     }
+    return jsonObject.toString();
+
   }
 
 }

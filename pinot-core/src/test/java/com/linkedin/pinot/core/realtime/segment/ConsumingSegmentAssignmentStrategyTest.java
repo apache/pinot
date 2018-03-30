@@ -147,7 +147,7 @@ public class ConsumingSegmentAssignmentStrategyTest {
    *
    */
   @Test
-  public void testSegmentLifecycle() {
+  public void testSegmentLifecycle() throws Exception {
     String tableName = "tableName_REALTIME";
     int numReplicas = 2;
     List<String> completedInstances = Lists.newArrayList("CompletedServer_0", "CompletedServer_1");
@@ -164,7 +164,7 @@ public class ConsumingSegmentAssignmentStrategyTest {
   }
 
   private void testSegmentCompletionScenario(String tableName, int numPartitions, int numReplicas,
-      List<String> consumingInstances, List<String> completedInstances) {
+      List<String> consumingInstances, List<String> completedInstances) throws InvalidConfigException {
 
     IdealState idealState;
     TableConfig tableConfig = mock(TableConfig.class);
@@ -193,12 +193,7 @@ public class ConsumingSegmentAssignmentStrategyTest {
       LLCSegmentName segmentName = new LLCSegmentName(tableName, i, 1, System.currentTimeMillis());
       segmentNames.add(segmentName.getSegmentName());
     }
-    Map<String, List<String>> assignment = null;
-    try {
-      assignment = consumingSegmentAssignmentStrategy.assign(segmentNames, partitionAssignmentFromIdealState);
-    } catch (InvalidConfigException e) {
-      Assert.fail("Not expecting an invalid config exception for table " + tableName);
-    }
+    Map<String, List<String>> assignment = consumingSegmentAssignmentStrategy.assign(segmentNames, partitionAssignmentFromIdealState);
 
     // verify
     verifyAssignmentIsFromLatest(partitionAssignmentGenerator, idealState, assignment);
@@ -219,11 +214,7 @@ public class ConsumingSegmentAssignmentStrategyTest {
       LLCSegmentName segmentName = new LLCSegmentName(tableName, i, 2, System.currentTimeMillis());
       segmentNames.add(segmentName.getSegmentName());
     }
-    try {
-      assignment = consumingSegmentAssignmentStrategy.assign(segmentNames, partitionAssignmentFromIdealState);
-    } catch (InvalidConfigException e) {
-      Assert.fail("Not expecting an invalid config exception for table " + tableName);
-    }
+    assignment = consumingSegmentAssignmentStrategy.assign(segmentNames, partitionAssignmentFromIdealState);
 
     // verify
     verifyAssignmentIsFromLatest(partitionAssignmentGenerator, idealState, assignment);
@@ -237,11 +228,7 @@ public class ConsumingSegmentAssignmentStrategyTest {
     partitionAssignmentFromIdealState =
         partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
 
-    try {
-      assignment = consumingSegmentAssignmentStrategy.assign(segmentNames, partitionAssignmentFromIdealState);
-    } catch (InvalidConfigException e) {
-      Assert.fail("Not expecting an invalid config exception for table " + tableName);
-    }
+    assignment = consumingSegmentAssignmentStrategy.assign(segmentNames, partitionAssignmentFromIdealState);
 
     // verify
     verifyAssignmentIsFromLatest(partitionAssignmentGenerator, idealState, assignment);
@@ -255,11 +242,7 @@ public class ConsumingSegmentAssignmentStrategyTest {
     partitionAssignmentFromIdealState =
         partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
 
-    try {
-      assignment = consumingSegmentAssignmentStrategy.assign(segmentNames, partitionAssignmentFromIdealState);
-    } catch (InvalidConfigException e) {
-      Assert.fail("Not expecting an invalid config exception for table " + tableName);
-    }
+    assignment = consumingSegmentAssignmentStrategy.assign(segmentNames, partitionAssignmentFromIdealState);
 
     // verify
     verifyAssignmentIsFromLatest(partitionAssignmentGenerator, idealState, assignment);
