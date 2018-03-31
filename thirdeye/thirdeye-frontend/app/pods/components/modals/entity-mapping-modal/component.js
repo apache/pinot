@@ -143,7 +143,7 @@ export default Component.extend({
   showAdvancedInput: computed('selectedMappingType', function() {
     const selectedMappingType = get(this, 'selectedMappingType');
 
-    return ['dataset', 'metric', 'services'].includes(selectedMappingType);
+    return ['dataset', 'metric', 'service'].includes(selectedMappingType);
   }),
 
   /**
