@@ -26,47 +26,49 @@
         options=mappingTypes
         triggerId="select-mapping-type"
         renderInPlace=true
-        disabled=true
-        onchange=(action (mut selectedMappingType))
+        onchange=(action "onEntityMappingChange")
         searchEnabled=false
         as |type|
       }}
         {{type}}
       {{/power-select}}
-      {{#if isMetricEntityType}}
+
+      {{#if showAdvancedInput}}
         <div class="te-modal__dropdown--expand">
           {{#power-select 
             triggerClass="te-modal__filter-select te-modal__filter-select--flushed"
             selected=selectedEntity
-            disabled=(unless selectedMappingType true false)
             renderInPlace=true
-            onchange=(action "onEntitySelection")
             search=(action "onSearch")
-            searchPlaceholder=(concat "Searching for a " selectedMappingType)
+            onchange=(action "onEntitySelection")
             placeholder=(concat "Search for a " selectedMappingType)
             as |entity|
           }}
-            {{entity.alias}}
+            {{extract-dropdown-value entity "alias"}}
           {{/power-select}}
         </div>
+      {{else}}
+        {{input
+          type="text"
+          id="other-urn"
+          class="ember-power-select-trigger te-modal__filter-select te-modal__filter-select--flushed te-modal__input"
+          value=urn
+          key-press="onKeyPress"
+        }}
       {{/if}}
-      <a class="thirdeye-link thirdeye-link--secondary {{if mappingExists 'thirdeye-link--disabled'}}" {{action "onAddFilter"}}>
+
+      <a class="thirdeye-link thirdeye-link--secondary {{unless canAddMapping 'thirdeye-link--disabled'}}" {{action "onAddFilter"}}>
         Add Mapping
         {{#tooltip-on-element 
           class="te-modal__tooltip"
-          }}
+          isShown=showTooltip}}
+
           {{#if mappingExists}}
             This mapping already exists
           {{else}}
             Click to create mapping
           {{/if}}
-        {{/tooltip-on-element}}
 
-        {{#tooltip-on-element
-          class="te-modal__tooltip"
-          isShown=showTooltip
-          event='none'}}
-          Click here to add filters
         {{/tooltip-on-element}}
       </a>
     </p>

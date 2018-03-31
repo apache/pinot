@@ -14,8 +14,6 @@
  * @author yyuen
  */
 
-import { reads, equal } from '@ember/object/computed';
-
 import Component from '@ember/component';
 import {
   get,
@@ -25,8 +23,11 @@ import {
   computed,
   getWithDefault
 } from '@ember/object';
-import { inject as service } from '@ember/service';
+import { reads } from '@ember/object/computed';
 import { later } from '@ember/runloop';
+import { inject as service } from '@ember/service';
+import { isPresent } from "@ember/utils";
+
 import fetch from 'fetch';
 import { task, timeout } from 'ember-concurrency';
 import { checkStatus, postProps } from 'thirdeye-frontend/utils/utils';
@@ -38,9 +39,10 @@ const MAPPING_TYPES = [
   'DIMENSION',
   'SERVICE',
   'DATASET',
-  'LIXTAG',
-  'CUSTOM'
+  'LIXTAG'
 ];
+
+import entityMappingApi from 'thirdeye-frontend/utils/api/entity-mapping';
 
 export default Component.extend({
   session: service(),
@@ -48,17 +50,19 @@ export default Component.extend({
    * Default selected mapping type
    * @type {Array}
    */
-  selectedMappingType: 'metric',
+  selectedMappingType: 'dataset',
 
   /**
    * User selected entity to be mapped
    */
-  selectedEntity: {},
+  selectedEntity: '',
 
   /**
    * Mapping type array used for the mapping drop down
    */
-  mappingTypes: MAPPING_TYPES.map(type => type.toLowerCase()),
+  mappingTypes: MAPPING_TYPES
+    .map(type => type.toLowerCase())
+    .sort(),
 
   /**
    * Save the search task
@@ -68,18 +72,12 @@ export default Component.extend({
   /**
    * Mapping from urn to entities Ids
    */
-  urnToId: {},
+  urnToId: Object.assign({}),
 
   /**
    * Error Message String
    */
   errorMessage: '',
-
-
-  /**
-   * isDirty flag that determines if a changed occurs
-   */
-  hasNewMapping: false,
 
   /**
    * current logged in user
@@ -97,10 +95,9 @@ export default Component.extend({
   _cachedMetric: null,
 
   /**
-   * Determines if the mapping type is metric
-   * @returns {Boolean}
+   *
    */
-  isMetricEntityType: equal('selectedMappingType', 'metric'),
+  lastSearchTerm: '',
 
   /**
    * Primary metric urn
@@ -116,26 +113,15 @@ export default Component.extend({
   /**
    * Fetched related entities
    */
-  _relatedEntities: [],
+  _relatedEntities: Object.assign([]),
 
   /**
    * Applies data massaging while getting the property
    */
   relatedEntities: computed(
-    '_relatedEntities.@each',
-    'user', {
+    '_relatedEntities.@each', {
       get() {
-        const {
-          user,
-          _relatedEntities = []
-        } = getProperties(
-          this,
-          'user',
-          '_relatedEntities');
-
-        return _relatedEntities.map((entity) => {
-          return this.formatEntity(entity, user);
-        });
+        return getWithDefault(this, '_relatedEntities', []);
       },
       set(key, value) {
         return value;
@@ -143,23 +129,59 @@ export default Component.extend({
     }
   ),
 
+  showAdvancedInput: computed('selectedMappingType', function() {
+    const selectedMappingType = get(this, 'selectedMappingType');
+
+    return ['dataset', 'metric', 'services'].includes(selectedMappingType);
+  }),
+
   /**
-   * Data masssages the entity based on the user
-   * @param {Object} entity - the related entity
-   * @param {String} user   - the current logged in user
-   * @return {Object}
+   * Calculates the correct urn prefix
    */
-  formatEntity(entity, user) {
-    // Todo: allow all users to edit for now since
-    // we do not have consistent data
+  urnPrefix: computed('selectedMappingType', function () {
+    return `thirdeye:${this.get('selectedMappingType')}:`;
+  }),
 
-    // const { createdBy = 'unkown' } = entity;
-    // user = user || get(this, 'user');
-    // set(entity, 'isDeletable', createdBy === user);
-    set(entity, 'isDeletable', true);
+  /**
+   * Cached private property for the id portion of the urn
+   */
+  _id: '',
 
-    return entity;
-  },
+  /**
+   * Single source of truth for new entity mapping urn
+   */
+  urn: computed('urnPrefix', '_id', {
+    get() {
+      return `${this.get('urnPrefix')}${this.get('_id')}`;
+    },
+    set(key, value) {
+      if (value.startsWith(this.get('urnPrefix'))) {
+        const newUrn = value.split(':').pop();
+        this.set('_id', newUrn);
+      }
+      return value;
+    }
+  }),
+
+
+
+  // /**
+  //  * Data masssages the entity based on the user
+  //  * @param {Object} entity - the related entity
+  //  * @param {String} user   - the current logged in user
+  //  * @return {Object}
+  //  */
+  // formatEntity(entity, user) {
+  //   // Todo: allow all users to edit for now since
+  //   // we do not have consistent data
+
+  //   // const { createdBy = 'unkown' } = entity;
+  //   // user = user || get(this, 'user');
+  //   // set(entity, 'isDeletable', createdBy === user);
+  //   set(entity, 'isDeletable', true);
+
+  //   return entity;
+  // },
 
   /**
    * Build the Urn to Id mapping
@@ -182,11 +204,9 @@ export default Component.extend({
       .map((entity) => `${entity.toURN}`)
       .join(',');
 
-    if (!urnStrings.length) {
-      return;
+    if (urnStrings.length) {
+      return entityMappingApi.getRelatedEntitiesDataUrl(urnStrings);
     }
-
-    return `/rootcause/raw?framework=identity&urns=${urnStrings}`;
   },
 
   /**
@@ -194,8 +214,7 @@ export default Component.extend({
    */
   _fetchRelatedEntities: async function() {
     const metricUrn = get(this, 'metricUrn');
-
-    const entities = await fetch(`/entityMapping/view/fromURN/${metricUrn}`).then(checkStatus);
+    const entities = await fetch(`${entityMappingApi.getRelatedEntitiesUrl}/${metricUrn}`).then(checkStatus);
     const url = this.makeUrlString(entities);
     this.builUrnToId(entities);
 
@@ -229,7 +248,7 @@ export default Component.extend({
 
     if (showEntityMappingModal && metric && !_.isEqual(metric, _cachedMetric)) {
       set(this, '_cachedMetric', metric);
-
+      debugger;
       this._fetchRelatedEntities();
     }
   },
@@ -241,15 +260,17 @@ export default Component.extend({
     'selectedEntity.label',
     'relatedEntities.@each.alias',
     'metric',
+    'urn',
     function() {
       const {
         selectedEntity: entity,
         relatedEntities,
-        metric
-      } = getProperties(this, 'selectedEntity', 'relatedEntities', 'metric');
+        metric,
+        urn
+      } = getProperties(this, 'selectedEntity', 'relatedEntities', 'metric', 'urn');
 
-      return (metric.label === entity.alias) || relatedEntities.some((relatedEntity) => {
-        relatedEntity.label === entity.alias;
+      return [ metric, ...relatedEntities].some((relatedEntity) => {
+        return relatedEntity.label === entity.alias || relatedEntity.urn === urn;
       });
     }
   ),
@@ -273,16 +294,13 @@ export default Component.extend({
    * Entity Mapping columns to be passed into
    * ember-models-table
    */
-  entityColumns: [
+  entityColumns: Object.freeze([
     {
       propertyName: 'type',
       title: 'Types',
       filterWithSelect: true,
       className: 'te-modal__table-cell te-modal__table-cell--capitalized',
-      predefinedFilterOptions: [
-        'Metric',
-        'Other'
-      ]
+      predefinedFilterOptions: MAPPING_TYPES.map(type => type.toLowerCase())
     },
     {
       template: 'custom/filterLabel',
@@ -311,22 +329,45 @@ export default Component.extend({
       title: '',
       className: 'te-modal__table-cell te-modal__table-cell--delete te-modal__table-cell--dark'
     }
-  ],
+  ]),
 
   /**
    * Custom classes to be applied to the entity modal table
    */
-  classes: {
+  classes: Object.freeze({
     theadCell: "te-modal__table-header"
-  },
+  }),
+
+  /**
+   * Whether the user can add the currently selected entity
+   */
+  canAddMapping: computed('mappingExists', 'selectedEntity', '_id', function() {
+    const {
+      mappingExists,
+      _id,
+      metric
+    } = getProperties(this, 'mappingExists', '_id', 'metric');
+    return !mappingExists && [_id, metric].every(isPresent);
+  }),
+
 
   /**
    * Ember concurrency task that triggers the metric autocomplete
    */
-  searchEntities: task(function* (searchText) {
+  searchEntitiesTask: task(function* (searchString) {
     yield timeout(600);
+    const entityType = this.get('selectedMappingType');
+    let url = '';
 
-    let url = `/data/autocomplete/metric?name=${searchText}`;
+    switch(entityType) {
+      case 'metric':
+        url = entityMappingApi.metricAutoCompleteUrl(searchString);
+        break;
+
+      case 'dataset':
+      case 'service':
+        return this.get(`${entityType}s`).filter(item => item.includes(searchString));
+    }
 
     /**
      * Necessary headers for fetch
@@ -343,15 +384,64 @@ export default Component.extend({
 
     return fetch(url, headers)
       .then(checkStatus);
-  }),
+  }).restartable(),
+
+  async init() {
+    this._super(...arguments);
+
+    const datasets = await fetch(entityMappingApi.getDatasetsUrl).then(checkStatus);
+    const services = await fetch(entityMappingApi.getServicesUrl).then(checkStatus);
+
+    if (this.isDestroyed || this.isDestroying) {
+      return;
+    }
+
+    this.setProperties({
+      datasets,
+      services
+    });
+  },
+
+
+  entityParams: computed(
+    'selectedMappingType',
+    'metricUrn',
+    'urn',
+    function() {
+      const {
+        selectedMappingType: entityType,
+        metricUrn,
+        urn
+      } = getProperties(
+        this,
+        'metricUrn',
+        'selectedMappingType',
+        'urn'
+      );
+
+      return {
+        fromURN: metricUrn,
+        mappingType: `METRIC_TO_${entityType.toUpperCase()}`,
+        score: '1.0',
+        toURN: urn
+      };
+    }
+  ),
+
+  reset(selectedMappingType = 'dataset') {
+    this.setProperties({
+      selectedMappingType,
+      selectedEntity: '',
+      _id: ''
+    });
+  },
 
   actions: {
-
     /**
      * Handles the close event
      */
     onExit() {
-      this.attrs.onSubmit();
+      this.onSubmit();
     },
 
     /**
@@ -359,25 +449,22 @@ export default Component.extend({
      * @param {Object} entity - entity to delete
      */
     onDeleteEntity: async function(entity) {
-      if (entity.isDeletable) {
-        const relatedEntities = get(this, 'relatedEntities');
-        const id = get(this, 'urnToId')[entity.urn];
-        const url = `/entityMapping/delete/${id}`;
+      const relatedEntities = get(this, 'relatedEntities');
+      const id = get(this, 'urnToId')[entity.urn];
+      const url = `${entityMappingApi.deleteUrl}/${id}`;
 
-        try {
-          const res = await fetch(url, deleteProps);
-          const { status } = res;
-          if (status !== 200) {
-            throw new Error('Uh Oh. Something went wrong.');
-          }
-        } catch (error) {
-          return this.setError('error');
+      try {
+        const res = await fetch(url, deleteProps);
+        const { status } = res;
+        if (status !== 200) {
+          throw new Error('Uh Oh. Something went wrong.');
         }
-
-        this.clearError();
-        relatedEntities.removeObject(entity);
-        set(this, 'hasNewMapping', true);
+      } catch (error) {
+        return this.setError('error');
       }
+
+      this.clearError();
+      relatedEntities.removeObject(entity);
     },
 
     /**
@@ -386,31 +473,18 @@ export default Component.extend({
      */
     onAddFilter: async function() {
       const {
-        selectedEntity: entity,
-        mappingExists,
-        metric
+        canAddMapping,
+        entityParams
       } = getProperties(
         this,
-        'selectedEntity',
-        'relatedEntities',
-        'user',
-        'mappingExists',
-        'metric'
+        'canAddMapping',
+        'entityParams',
       );
 
-      if (!metric && mappingExists) { return; }
-
-      const url = `/entityMapping/create`;
-      const metricUrn = get(this, 'metricUrn');
-      const params = {
-        fromURN: metricUrn,
-        mappingType: 'METRIC_TO_METRIC',
-        score: '1.0',
-        toURN: `thirdeye:metric:${entity.id}`
-      };
+      if (!canAddMapping) { return; }
 
       try {
-        const res = await fetch(url, postProps(params));
+        const res = await fetch(entityMappingApi.createUrl, postProps(entityParams));
         const { status } = res;
         if (status !== 200) {
           throw new Error('Uh Oh. Something went wrong.');
@@ -419,8 +493,7 @@ export default Component.extend({
         return this.setError('error');
       }
       await this._fetchRelatedEntities();
-      set(this, 'selectedEntity', {});
-      set(this, 'hasNewMapping', true);
+      this.reset();
       this.clearError();
     },
 
@@ -431,11 +504,11 @@ export default Component.extend({
     onEntitySelection(entity) {
       setProperties(this, {
         selectedEntity: entity,
-        showTooltip: true
+        _id: entity.id || entity
       });
 
       // toggles the tooltip view
-      set(this, 'selectedEntity', entity);
+      set(this, 'showTooltip', true);
       later(() => {
         set(this, 'showTooltip', false);
       }, 2000);
@@ -446,16 +519,44 @@ export default Component.extend({
      * Performs a search task while cancelling the previous one
      * @param {Array} metrics
      */
-    onSearch(metrics) {
-      const lastSearch = get(this, 'mostRecentSearch');
-      if (lastSearch) {
-        lastSearch.cancel();
-      }
-      const task = get(this, 'searchEntities');
-      const taskInstance = task.perform(metrics);
-      this.set('mostRecentSearch', taskInstance);
+    onSearch(searchString) {
+      const {
+        lastSearch,
+        searchEntitiesTask: task
+      } = getProperties(this, 'mostRecentSearch', 'searchEntitiesTask');
+
+      searchString = searchString.length ? searchString : lastSearch;
+      const taskInstance = task.perform(searchString);
+      // if (lastSearch) {
+      //   lastSearch.cancel();
+      // }
+
+      this.setProperties({
+        // mostRecentSearch: taskInstance,
+        lastSearchTerm: searchString
+      });
+
 
       return taskInstance;
+    },
+
+    /**
+     * Action handler validating the custom urn strings
+     * @param {Object} metric
+     */
+    onKeyPress() {
+      const {
+        urn,
+        urnPrefix
+      } = getProperties(this, 'urn', 'urnPrefix');
+
+      if (!urn.startsWith(urnPrefix)) {
+        this.set('urn', urnPrefix);
+      }
+    },
+
+    onEntityMappingChange(selectedMappingType) {
+      this.reset(selectedMappingType);
     }
   }
 });
