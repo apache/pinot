@@ -1,10 +1,11 @@
 import { helper } from '@ember/component/helper';
 
 /**
- * Template helper that computes the background color
- * for the contribution map
- * @param {Number} [value=0] Contribution change in percentage
- * @return {String}          rgba color for background
+ * Template helper intended to be used with the powerselec component
+ * this extracts the item's value dynamically
+ * @param {Object}        element     - object found by power select
+ * @param {String}        propertyKey - key property to extract
+ * @return {String}         - value to be extracted
  */
 export function extractDropDownValue([element, propertyKey]) {
   if (typeof element === 'object') {
