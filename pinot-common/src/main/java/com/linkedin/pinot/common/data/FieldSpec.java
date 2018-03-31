@@ -54,6 +54,9 @@ public abstract class FieldSpec {
   protected Object _defaultNullValue;
 
   private transient String _stringDefaultNullValue;
+  
+  //apply a transform function to generate this column, this can be based on another column
+  private String _transformFunction; 
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public FieldSpec() {
@@ -180,6 +183,13 @@ public abstract class FieldSpec {
     }
   }
 
+  /**
+   * Transform function if defined else null.
+   * @return
+   */
+  public String getTransformFunction() {
+    return _transformFunction;
+  }
   /**
    * Returns the {@link JsonObject} representing the field spec.
    * <p>Only contains fields with non-default value.
