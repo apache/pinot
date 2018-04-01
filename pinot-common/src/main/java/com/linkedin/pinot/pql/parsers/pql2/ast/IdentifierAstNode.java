@@ -19,14 +19,27 @@ package com.linkedin.pinot.pql.parsers.pql2.ast;
  * AST node for identifiers (column names).
  */
 public class IdentifierAstNode extends BaseAstNode {
+  private String _expression;
   private String _name;
 
-  public IdentifierAstNode(String name) {
-    _name = name;
+  public IdentifierAstNode(String expression) {
+    _expression = expression;
+    if (
+      expression.charAt(0) == '`'
+      && expression.charAt(expression.length()-1) == '`'
+    ) {
+      _name = expression.substring(1, expression.length()-1);
+    } else {
+      _name = expression;
+    }
   }
 
   public String getName() {
     return _name;
+  }
+
+  public String getExpression() {
+    return _expression;
   }
 
   @Override

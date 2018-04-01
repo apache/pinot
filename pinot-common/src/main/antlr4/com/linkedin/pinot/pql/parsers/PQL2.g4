@@ -139,7 +139,7 @@ WHITESPACE: [ \t\n]+ -> skip;
 
 LINE_COMMENT: '--' ~[\r\n]* -> channel(HIDDEN);
 
-IDENTIFIER: [A-Za-z_][A-Za-z0-9_-]*;
+IDENTIFIER: [A-Za-z_][A-Za-z0-9_-]* | '`' (~'`')+ '`';
 STRING_LITERAL: '\'' ( ~'\'' | '\'\'')* '\'' | '"' (~'"' | '""')* '"';
 INTEGER_LITERAL : SIGN? DIGIT+;
 FLOATING_POINT_LITERAL : SIGN? DIGIT+ '.' DIGIT* | SIGN? DIGIT* '.' DIGIT+;

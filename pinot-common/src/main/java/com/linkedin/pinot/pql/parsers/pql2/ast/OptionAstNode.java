@@ -37,13 +37,13 @@ public class OptionAstNode extends BaseAstNode {
     AstNode rightNode = getChildren().get(1);
 
     if (leftNode instanceof IdentifierAstNode) {
-      left = ((IdentifierAstNode) leftNode).getName();
+      left = ((IdentifierAstNode) leftNode).getExpression();
     } else {
       throw new Pql2CompilationException("Expected left child node of OptionAstNode to be an identifier");
     }
 
     if (rightNode instanceof IdentifierAstNode) {
-      right = ((IdentifierAstNode) rightNode).getName();
+      right = ((IdentifierAstNode) rightNode).getExpression();
     } else if (rightNode instanceof LiteralAstNode) {
       right = ((LiteralAstNode) rightNode).getValueAsString();
     } else {
