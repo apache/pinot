@@ -17,8 +17,8 @@ package com.linkedin.pinot.core.operator.transform.function;
 
 import com.linkedin.pinot.common.data.DateTimeFieldSpec;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
 import com.linkedin.pinot.core.operator.transform.transformer.datetime.BaseDateTimeTransformer;
 import com.linkedin.pinot.core.operator.transform.transformer.datetime.DateTimeTransformerFactory;
 import com.linkedin.pinot.core.operator.transform.transformer.datetime.EpochToEpochTransformer;
@@ -81,7 +81,7 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
 
   private TransformFunction _mainTransformFunction;
   private BaseDateTimeTransformer _dateTimeTransformer;
-  private DataSourceMetadata _resultMetadata;
+  private TransformResultMetadata _resultMetadata;
   private long[] _longOutputTimes;
   private String[] _stringOutputTimes;
 
@@ -117,7 +117,7 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public DataSourceMetadata getResultMetadata() {
+  public TransformResultMetadata getResultMetadata() {
     return _resultMetadata;
   }
 

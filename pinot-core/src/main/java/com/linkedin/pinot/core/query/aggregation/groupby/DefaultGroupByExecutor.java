@@ -18,9 +18,9 @@ package com.linkedin.pinot.core.query.aggregation.groupby;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.operator.transform.TransformOperator;
+import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
@@ -96,13 +96,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     TransformExpressionTree[] groupByExpressions = new TransformExpressionTree[numGroupByExpressions];
     for (int i = 0; i < numGroupByExpressions; i++) {
       groupByExpressions[i] = TransformExpressionTree.compileToExpressionTree(groupByExpressionStrings.get(i));
-      DataSourceMetadata metadata = transformOperator.getDataSourceMetadata(groupByExpressions[i]);
-      if (!metadata.isSingleValue()) {
-        hasMVGroupByExpression = true;
-      }
-      if (!metadata.hasDictionary()) {
-        hasNoDictionaryGroupByExpression = true;
-      }
+      TransformResultMetadata transformResultMetadata = transformOperator.getResultMetadata(groupByExpressions[i]);
+      hasMVGroupByExpression |= !transformResultMetadata.isSingleValue();
+      hasNoDictionaryGroupByExpression |= !transformResultMetadata.hasDictionary();
     }
     _hasMVGroupByExpression = hasMVGroupByExpression;
     _hasNoDictionaryGroupByExpression = hasNoDictionaryGroupByExpression;

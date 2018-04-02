@@ -49,7 +49,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   public NoDictionarySingleColumnGroupKeyGenerator(@Nonnull TransformOperator transformOperator,
       @Nonnull TransformExpressionTree groupByExpression) {
     _groupByExpression = groupByExpression;
-    _dataType = transformOperator.getDataSourceMetadata(_groupByExpression).getDataType();
+    _dataType = transformOperator.getResultMetadata(_groupByExpression).getDataType();
     _groupKeyMap = createGroupKeyMap(_dataType);
   }
 

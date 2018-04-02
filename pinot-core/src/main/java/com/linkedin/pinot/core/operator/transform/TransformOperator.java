@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.operator.transform;
 
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.ProjectionOperator;
@@ -46,15 +45,15 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
    * Constructor for the class
    *
    * @param projectionOperator Projection operator
-   * @param expressionTrees Set of expression trees to evaluate
+   * @param expressions Set of expressions to evaluate
    */
   public TransformOperator(@Nonnull ProjectionOperator projectionOperator,
-      @Nonnull Set<TransformExpressionTree> expressionTrees) {
+      @Nonnull Set<TransformExpressionTree> expressions) {
     _projectionOperator = projectionOperator;
     _dataSourceMap = projectionOperator.getDataSourceMap();
-    for (TransformExpressionTree expressionTree : expressionTrees) {
-      TransformFunction transformFunction = TransformFunctionFactory.get(expressionTree, _dataSourceMap);
-      _transformFunctionMap.put(expressionTree, transformFunction);
+    for (TransformExpressionTree expression : expressions) {
+      TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+      _transformFunctionMap.put(expression, transformFunction);
     }
   }
 
@@ -68,24 +67,24 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   }
 
   /**
-   * Returns the data source metadata associated with the given expression tree.
+   * Returns the transform result metadata associated with the given expression.
    *
-   * @param expressionTree Expression tree
-   * @return Data source metadata
+   * @param expression Expression
+   * @return Transform result metadata
    */
-  public DataSourceMetadata getDataSourceMetadata(@Nonnull TransformExpressionTree expressionTree) {
-    return _transformFunctionMap.get(expressionTree).getResultMetadata();
+  public TransformResultMetadata getResultMetadata(@Nonnull TransformExpressionTree expression) {
+    return _transformFunctionMap.get(expression).getResultMetadata();
   }
 
   /**
-   * Returns the dictionary associated with the given expression tree.
-   * <p>Should be called only if {@link #getDataSourceMetadata(TransformExpressionTree)} indicates that the data source
+   * Returns the dictionary associated with the given expression.
+   * <p>Should be called only if {@link #getResultMetadata(TransformExpressionTree)} indicates that the transform result
    * has dictionary.
    *
    * @return Dictionary
    */
-  public Dictionary getDictionary(@Nonnull TransformExpressionTree expressionTree) {
-    return _transformFunctionMap.get(expressionTree).getDictionary();
+  public Dictionary getDictionary(@Nonnull TransformExpressionTree expression) {
+    return _transformFunctionMap.get(expression).getDictionary();
   }
 
   @Override

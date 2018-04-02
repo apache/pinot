@@ -16,8 +16,8 @@
 package com.linkedin.pinot.core.operator.transform.function;
 
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.List;
 import java.util.Map;
@@ -50,7 +50,7 @@ public class LiteralTransformFunction implements TransformFunction {
   }
 
   @Override
-  public DataSourceMetadata getResultMetadata() {
+  public TransformResultMetadata getResultMetadata() {
     throw new UnsupportedOperationException();
   }
 
