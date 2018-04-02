@@ -16,8 +16,8 @@
 package com.linkedin.pinot.core.operator.transform.function;
 
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -58,7 +58,7 @@ public class AdditionTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public DataSourceMetadata getResultMetadata() {
+  public TransformResultMetadata getResultMetadata() {
     return DOUBLE_SV_NO_DICTIONARY_METADATA;
   }
 

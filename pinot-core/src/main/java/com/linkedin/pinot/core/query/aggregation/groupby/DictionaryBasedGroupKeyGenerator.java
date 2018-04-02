@@ -116,7 +116,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         }
       }
 
-      _isSingleValueColumn[i] = transformOperator.getDataSourceMetadata(groupByExpression).isSingleValue();
+      _isSingleValueColumn[i] = transformOperator.getResultMetadata(groupByExpression).isSingleValue();
     }
 
     if (longOverflow) {

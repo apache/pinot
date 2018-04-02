@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.operator.transform.function;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.List;
 import java.util.Map;
@@ -31,10 +32,14 @@ import javax.annotation.Nonnull;
 public class IdentifierTransformFunction implements TransformFunction {
   private final String _columnName;
   private final DataSource _dataSource;
+  private final TransformResultMetadata _resultMetadata;
 
   public IdentifierTransformFunction(@Nonnull String columnName, @Nonnull DataSource dataSource) {
     _columnName = columnName;
     _dataSource = dataSource;
+    DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+    _resultMetadata = new TransformResultMetadata(dataSourceMetadata.getDataType(), dataSourceMetadata.isSingleValue(),
+        dataSourceMetadata.hasDictionary());
   }
 
   @Override
@@ -48,8 +53,8 @@ public class IdentifierTransformFunction implements TransformFunction {
   }
 
   @Override
-  public DataSourceMetadata getResultMetadata() {
-    return _dataSource.getDataSourceMetadata();
+  public TransformResultMetadata getResultMetadata() {
+    return _resultMetadata;
   }
 
   @Override

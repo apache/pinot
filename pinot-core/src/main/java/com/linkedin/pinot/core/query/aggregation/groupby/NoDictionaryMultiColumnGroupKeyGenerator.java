@@ -18,9 +18,9 @@ package com.linkedin.pinot.core.query.aggregation.groupby;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.operator.transform.TransformOperator;
+import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
 import com.linkedin.pinot.core.query.aggregation.groupby.utils.ValueToIdMap;
 import com.linkedin.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -59,9 +59,9 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
 
     for (int i = 0; i < _numGroupByExpressions; i++) {
       TransformExpressionTree groupByExpression = groupByExpressions[i];
-      DataSourceMetadata metadata = transformOperator.getDataSourceMetadata(groupByExpression);
-      _dataTypes[i] = metadata.getDataType();
-      if (metadata.hasDictionary()) {
+      TransformResultMetadata transformResultMetadata = transformOperator.getResultMetadata(groupByExpression);
+      _dataTypes[i] = transformResultMetadata.getDataType();
+      if (transformResultMetadata.hasDictionary()) {
         _dictionaries[i] = transformOperator.getDictionary(groupByExpression);
       } else {
         _onTheFlyDictionaries[i] = ValueToIdMapFactory.get(_dataTypes[i]);

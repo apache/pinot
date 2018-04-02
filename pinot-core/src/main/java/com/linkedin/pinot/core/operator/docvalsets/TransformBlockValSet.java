@@ -16,8 +16,8 @@
 package com.linkedin.pinot.core.operator.docvalsets;
 
 import com.linkedin.pinot.core.common.BaseBlockValSet;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 
@@ -104,15 +104,15 @@ public class TransformBlockValSet extends BaseBlockValSet {
       _numMVEntries = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     }
     int numDocs = _projectionBlock.getNumDocs();
-    DataSourceMetadata metadata = _transformFunction.getResultMetadata();
-    if (metadata.hasDictionary()) {
+    TransformResultMetadata resultMetadata = _transformFunction.getResultMetadata();
+    if (resultMetadata.hasDictionary()) {
       int[][] dictionaryIds = getDictionaryIdsMV();
       for (int i = 0; i < numDocs; i++) {
         _numMVEntries[i] = dictionaryIds[i].length;
       }
       return _numMVEntries;
     } else {
-      switch (metadata.getDataType()) {
+      switch (resultMetadata.getDataType()) {
         case INT:
           int[][] intValues = getIntValuesMV();
           for (int i = 0; i < numDocs; i++) {

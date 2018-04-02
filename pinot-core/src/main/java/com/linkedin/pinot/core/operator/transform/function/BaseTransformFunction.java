@@ -16,8 +16,8 @@
 package com.linkedin.pinot.core.operator.transform.function;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.util.ArrayCopyUtils;
@@ -28,55 +28,12 @@ import javax.annotation.Nonnull;
  * Base class for transform function providing the default implementation for all data types.
  */
 public abstract class BaseTransformFunction implements TransformFunction {
-  private static class SVNoDictionaryMetadata implements DataSourceMetadata {
-    final FieldSpec.DataType _dataType;
-
-    SVNoDictionaryMetadata(FieldSpec.DataType dataType) {
-      _dataType = dataType;
-    }
-
-    @Override
-    public FieldSpec.DataType getDataType() {
-      return _dataType;
-    }
-
-    @Override
-    public boolean isSingleValue() {
-      return true;
-    }
-
-    @Override
-    public boolean isSorted() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public int getNumDocs() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public int getMaxNumMultiValues() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean hasInvertedIndex() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean hasDictionary() {
-      return false;
-    }
-  }
-
-  protected static final DataSourceMetadata LONG_SV_NO_DICTIONARY_METADATA =
-      new SVNoDictionaryMetadata(FieldSpec.DataType.LONG);
-  protected static final DataSourceMetadata DOUBLE_SV_NO_DICTIONARY_METADATA =
-      new SVNoDictionaryMetadata(FieldSpec.DataType.DOUBLE);
-  protected static final DataSourceMetadata STRING_SV_NO_DICTIONARY_METADATA =
-      new SVNoDictionaryMetadata(FieldSpec.DataType.STRING);
+  protected static final TransformResultMetadata LONG_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(FieldSpec.DataType.LONG, true, false);
+  protected static final TransformResultMetadata DOUBLE_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(FieldSpec.DataType.DOUBLE, true, false);
+  protected static final TransformResultMetadata STRING_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(FieldSpec.DataType.STRING, true, false);
 
   private int[] _intValuesSV;
   private long[] _longValuesSV;

@@ -17,8 +17,8 @@ package com.linkedin.pinot.core.operator.transform.function;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
@@ -91,7 +91,7 @@ public class ValueInTransformFunction extends BaseTransformFunction {
   }
 
   @Override
-  public DataSourceMetadata getResultMetadata() {
+  public TransformResultMetadata getResultMetadata() {
     return _mainTransformFunction.getResultMetadata();
   }
 
