@@ -24,6 +24,7 @@ export default Component.extend({
   },
 
   compareModeOptions: [
+    'None',
     'WoW',
     'Wo2W',
     'Wo3W',

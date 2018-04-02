@@ -290,7 +290,10 @@ export default Component.extend({
 
     const series = {};
     [...urns].forEach(urn => {
-      series[this._makeLabel(urn)] = this._makeSeries(urn);
+      const s = this._makeSeries(urn);
+      if (!_.isEmpty(s.timestamps)) {
+        series[this._makeLabel(urn)] = s;
+      }
     });
 
     series['anomalyRange'] = {
