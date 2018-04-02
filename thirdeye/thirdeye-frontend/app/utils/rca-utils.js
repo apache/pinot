@@ -32,7 +32,8 @@ export const eventColorMapping = {
   informed: 'red',
   lix: 'purple',
   gcn: 'orange',
-  anomaly: 'teal'
+  anomaly: 'teal',
+  cm: 'grey'
 };
 
 export const dateFormatFull = 'ddd, MMM D YYYY, h:mm a';

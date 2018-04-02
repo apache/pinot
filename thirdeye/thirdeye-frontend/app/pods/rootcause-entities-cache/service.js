@@ -64,7 +64,7 @@ export default Service.extend({
         return;
       }
 
-      const frameworks = new Set(['eventAnomaly', 'eventHoliday', 'eventIssue', 'eventExperiment', 'eventDeployment', 'metricRelated']);
+      const frameworks = new Set(['eventAnomaly', 'eventHoliday', 'eventIssue', 'eventExperiment', 'eventDeployment', 'metricRelated', 'eventChange']);
 
       this.setProperties({ context: _.cloneDeep(requestContext), entities: newEntities, pending: frameworks });
 

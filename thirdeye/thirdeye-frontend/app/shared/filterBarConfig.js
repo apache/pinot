@@ -110,5 +110,33 @@ export default [
         type: "dropdown"
       }
     ]
-  }
+  },
+  {
+    header: "CM",
+    eventType: "cm",
+    framework: "eventChange",
+    color: "grey",
+    inputs: [
+      {
+        label: "Change Type",
+        labelMapping: "type",
+        type: "dropdown"
+      },
+      {
+        label: "Change Board",
+        labelMapping: "board",
+        type: "dropdown"
+      },
+      {
+        label: "Services",
+        labelMapping: "services",
+        type: "dropdown"
+      },
+      {
+        label: "Category",
+        labelMapping: "category",
+        type: "dropdown"
+      }
+    ]
+  },
 ];

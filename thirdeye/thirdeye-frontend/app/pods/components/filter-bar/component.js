@@ -227,44 +227,22 @@ export default Component.extend({
    */
   eventTypeMap: computed(
     'entities',
+    'filterBlocks',
     function() {
-      let holidayCount = 0;
-      let gcnCount = 0;
-      let lixCount = 0;
-      let informedCount = 0;
-      let anomalyCount = 0;
       const entities = get(this, 'entities');
-
+      const counts = {};
+      const filterBlocks = get(this, 'filterBlocks');
+      filterBlocks.forEach(block => {
+        counts[block.eventType] = 0;
+      });
       Object.keys(entities).forEach(urn => {
         const e = entities[urn];
         if (e.type === 'event') {
-          switch(e.eventType) {
-            case 'holiday':
-              holidayCount++;
-              break;
-            case 'gcn':
-              gcnCount++;
-              break;
-            case 'lix':
-              lixCount++;
-              break;
-            case 'informed':
-              informedCount++;
-              break;
-            case 'anomaly':
-              anomalyCount++;
-              break;
-          }
+          counts[e.eventType] = (counts[e.eventType] || 0) + 1;
         }
       });
 
-      return {
-        holiday: holidayCount,
-        gcn: gcnCount,
-        lix: lixCount,
-        informed: informedCount,
-        anomaly: anomalyCount
-      };
+      return counts;
     }
   ),
 
