@@ -718,7 +718,7 @@ public class AnomaliesResource {
   }
 
   private String getExternalURL(MergedAnomalyResultDTO mergedAnomaly) {
-    return new JSONObject(ResourceUtils.getExternalURLs(mergedAnomaly, this.metricConfigDAO)).toString();
+    return new JSONObject(ResourceUtils.getExternalURLs(mergedAnomaly, this.metricConfigDAO, this.datasetConfigDAO)).toString();
   }
 
   /**

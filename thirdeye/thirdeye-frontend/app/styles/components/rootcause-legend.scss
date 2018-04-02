@@ -26,10 +26,14 @@
     justify-content: space-between;
     margin-bottom: 4px;
 
+    &--indented {
+      padding-left: 20px;
+    }
+
     &:hover {
       .entity-indicator {
         transform: scale(1.2);
-        transition: transform 0.1s ease-in; 
+        transition: transform 0.1s ease-in;
       }
       .rootcause-legend__remove-icon {
         visibility: visible;
@@ -69,7 +73,7 @@
     word-break: break-word;
     &--inactive {
       color: app-shade(black, 0.15);
-      transition: color 0.1s ease-in; 
+      transition: color 0.1s ease-in;
     }
   }
 

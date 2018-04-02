@@ -6,9 +6,11 @@ import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.dashboard.resources.v2.ResourceUtils;
 import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEventEntityFormatter;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEventEntity;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -17,6 +19,7 @@ import com.linkedin.thirdeye.rootcause.impl.EventEntity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.lang.StringUtils;
 
 
@@ -38,15 +41,18 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
 
   private final MergedAnomalyResultManager anomalyDAO;
   private final MetricConfigManager metricDAO;
+  private final DatasetConfigManager datasetDAO;
 
   public AnomalyEventFormatter() {
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
+    this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
   }
 
-  public AnomalyEventFormatter(MergedAnomalyResultManager anomalyDAO, MetricConfigManager metricDAO) {
+  public AnomalyEventFormatter(MergedAnomalyResultManager anomalyDAO, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) {
     this.anomalyDAO = anomalyDAO;
     this.metricDAO = metricDAO;
+    this.datasetDAO = datasetDAO;
   }
 
   @Override
@@ -61,6 +67,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     MergedAnomalyResultDTO anomaly = this.anomalyDAO.findById(e.getId());
     AnomalyFunctionDTO function = anomaly.getFunction();
     MetricConfigDTO metric = this.getMetricFromFunction(function);
+    DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
 
     String comment = "";
     AnomalyFeedbackType status = AnomalyFeedbackType.NO_FEEDBACK;
@@ -69,7 +76,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
       status = anomaly.getFeedback().getFeedbackType();
     }
 
-    Map<String, String> externalUrls = ResourceUtils.getExternalURLs(anomaly, this.metricDAO);
+    Map<String, String> externalUrls = ResourceUtils.getExternalURLs(anomaly, this.metricDAO, this.datasetDAO);
 
     Multimap<String, String> attributes = ArrayListMultimap.create();
     attributes.put(ATTR_DATASET, anomaly.getCollection());
@@ -82,7 +89,6 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     attributes.put(ATTR_STATUS, status.toString());
     attributes.put(ATTR_COMMENT, comment);
     // attributes.put(ATTR_ISSUE_TYPE, null); // TODO
-    attributes.putAll(ATTR_DIMENSIONS, anomaly.getDimensions().keySet());
     attributes.putAll(ATTR_EXTERNAL_URLS, externalUrls.keySet());
     attributes.put(ATTR_SCORE, String.valueOf(anomaly.getScore()));
     attributes.put(ATTR_WEIGHT, String.valueOf(anomaly.getWeight()));
@@ -95,7 +101,12 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     // dimensions as attributes
     List<String> dimensionStrings = new ArrayList<>();
     for (Map.Entry<String, String> entry : anomaly.getDimensions().entrySet()) {
+      if (Objects.equals(entry.getValue(), dataset.getPreAggregatedKeyword())) {
+        // NOTE: workaround for anomaly detection inserting pre-aggregated keyword as dimension
+        continue;
+      }
       dimensionStrings.add(entry.getValue());
+      attributes.put(ATTR_DIMENSIONS, entry.getKey());
       attributes.put(entry.getKey(), entry.getValue());
     }
 
@@ -114,7 +125,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
   }
 
   private MetricConfigDTO getMetricFromFunction(AnomalyFunctionDTO function) {
-    // NOTE this should be >= 0 but is a limitation of null field in the DB being converted to 0 by default
+    // NOTE: this should be >= 0 but is a limitation of null field in the DB being converted to 0 by default
     if (function.getMetricId() > 0) {
       MetricConfigDTO metric = this.metricDAO.findById(function.getMetricId());
       if (metric == null) {

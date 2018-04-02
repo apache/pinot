@@ -6,6 +6,7 @@ import Controller from '@ember/controller';
 import {
   filterObject,
   filterPrefix,
+  hasPrefix,
   toBaselineUrn,
   toCurrentUrn,
   toOffsetUrn,
@@ -35,6 +36,7 @@ const ROOTCAUSE_SERVICE_ENTITIES = 'entities';
 const ROOTCAUSE_SERVICE_TIMESERIES = 'timeseries';
 const ROOTCAUSE_SERVICE_AGGREGATES = 'aggregates';
 const ROOTCAUSE_SERVICE_BREAKDOWNS = 'breakdowns';
+const ROOTCAUSE_SERVICE_ANOMALY_FUNCTIONS = 'anomalyFunctions';
 
 const ROOTCAUSE_SESSION_TIMER_INTERVAL = 300000;
 
@@ -82,6 +84,8 @@ export default Controller.extend({
   scoresService: service('rootcause-scores-cache'),
 
   sessionService: service('rootcause-session-datasource'),
+
+  anomalyFunctionService: service('rootcause-anomalyfunction-cache'),
 
   //
   // user details
@@ -144,10 +148,10 @@ export default Controller.extend({
   timeseriesMode: null,
 
   /**
-   * urn of the currently focused entity in the legend component
+   * urns of the currently focused entities in the legend component
    * @type {string}
    */
-  focusedUrn: null,
+  focusedUrns: null,
 
   /**
    * toggle for running _setupForMetric() on selection of the first metric
@@ -237,20 +241,23 @@ export default Controller.extend({
    * services to refresh caches on-demand. Changes propagate throughout the application via the respective
    * computed properties ('entities', 'timeseries', 'aggregates', 'breakdowns')
    *
-   * entities:     rootcause search results, such as events and metrics
-   *               (typically displayed in event table, timeseries chart)
+   * entities:         rootcause search results, such as events and metrics
+   *                   (typically displayed in event table, timeseries chart)
    *
-   * timeseries:   time-ordered metric values for display in chart
-   *               (typically displayed in timeseries chart)
+   * timeseries:       time-ordered metric values for display in chart
+   *                   (typically displayed in timeseries chart)
    *
-   * aggregates:   metrics values summarized over multiple time windows (anomaly, baseline, ...)
-   *               (typically displayed in metrics table, anomaly header)
+   * aggregates:       metrics values summarized over multiple time windows (anomaly, baseline, ...)
+   *                   (typically displayed in metrics table, anomaly header)
    *
-   * breakdowns:   de-aggregated metric values over multiple time windows (anomaly, baseline, ...)
-   *               (typically displayed in dimension heatmap)
+   * breakdowns:       de-aggregated metric values over multiple time windows (anomaly, baseline, ...)
+   *                   (typically displayed in dimension heatmap)
    *
-   * scores:       entity scores as computed by backend pipelines (e.g. metric anomality score)
-   *               (typically displayed in metrics table)
+   * scores:           entity scores as computed by backend pipelines (e.g. metric anomality score)
+   *                   (typically displayed in metrics table)
+   *
+   * anomalyfunctions: anomaly function baselines for display in chart
+   *                   (typically displayed in timeseries chart)
    */
   _contextObserver: observer(
     'context',
@@ -258,8 +265,8 @@ export default Controller.extend({
     'selectedUrns',
     'activeTab',
     function () {
-      const { context, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, activeTab, setupMode } =
-        this.getProperties('context', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'activeTab', 'setupMode');
+      const { context, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, anomalyFunctionService, activeTab, setupMode } =
+        this.getProperties('context', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'anomalyFunctionService', 'activeTab', 'setupMode');
 
       if (!context || !selectedUrns) {
         return;
@@ -277,6 +284,10 @@ export default Controller.extend({
       // timeseries
       timeseriesService.request(context, selectedUrns);
 
+      // anomaly function baselines
+      const anomalyFunctionUrns = filterPrefix(selectedUrns, 'frontend:anomalyfunction:');
+      anomalyFunctionService.request(context, new Set(anomalyFunctionUrns));
+
       // breakdowns
       if (activeTab === ROOTCAUSE_TAB_DIMENSIONS) {
         const metricUrns = new Set(filterPrefix(context.urns, 'thirdeye:metric:'));
@@ -285,30 +296,30 @@ export default Controller.extend({
         breakdownsService.request(context, new Set(currentUrns.concat(baselineUrns)));
       }
 
-      // aggregates
-      const aggregatesUrns = new Set();
+      // related metrics
+      const relatedMetricUrns = new Set();
 
       if (activeTab === ROOTCAUSE_TAB_METRICS) {
         // cache may be stale, fetch directly from service
         const entities = this.get('entitiesService.entities');
-        filterPrefix(Object.keys(entities), 'thirdeye:metric:').forEach(urn => aggregatesUrns.add(urn));
+        filterPrefix(Object.keys(entities), 'thirdeye:metric:').forEach(urn => relatedMetricUrns.add(urn));
       }
 
       if (context.anomalyUrns.size > 0) {
-        filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => aggregatesUrns.add(urn));
+        filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => relatedMetricUrns.add(urn));
       }
 
+      // scores
+      const scoresUrns = relatedMetricUrns;
+      scoresService.request(context, new Set(scoresUrns));
+
+      // aggregates
       const offsets = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
-      const offsetUrns = [...aggregatesUrns]
+      const offsetUrns = [...relatedMetricUrns]
         .map(urn => [].concat(offsets.map(offset => toOffsetUrn(urn, offset))))
         .reduce((agg, l) => agg.concat(l), []);
-
       aggregatesService.request(context, new Set(offsetUrns));
 
-      // scores
-      const scoresUrns = aggregatesUrns;
-
-      scoresService.request(context, new Set(scoresUrns));
     }
   ),
 
@@ -354,9 +365,37 @@ export default Controller.extend({
   entities: reads('entitiesService.entities'),
 
   /**
-   * Subscribed timeseries cache
+   * Subscribed timeseries cache (metrics, anomaly baselines)
    */
-  timeseries: reads('timeseriesService.timeseries'),
+  timeseries: computed(
+    'timeseriesService.timeseries',
+    'anomalyFunctionService.timeseries',
+    'context',
+    'invisibleUrns',
+    function () {
+      const { timeseriesService, anomalyFunctionService, context, invisibleUrns } =
+        this.getProperties('timeseriesService', 'anomalyFunctionService', 'context', 'invisibleUrns');
+
+      const timeseries = Object.assign({}, timeseriesService.timeseries);
+
+      const anomalyFunctionUrns = filterPrefix(context.anomalyUrns, 'frontend:anomalyfunction:');
+
+      if (_.isEmpty(anomalyFunctionUrns)) {
+        return timeseries;
+      }
+
+      // NOTE: only supports a single anomaly function baseline
+      const anomalyFunctionUrn = anomalyFunctionUrns[0];
+
+      if (!invisibleUrns.has(anomalyFunctionUrn)) {
+        filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => {
+          timeseries[toBaselineUrn(urn)] = anomalyFunctionService.timeseries[anomalyFunctionUrn];
+        });
+      }
+
+      return timeseries;
+    }
+  ),
 
   /**
    * Subscribed aggregates cache
@@ -461,6 +500,8 @@ export default Controller.extend({
 
   isLoadingScores: gt('scoresService.pending.size', 0),
 
+  isLoadingAnomalyFunctions: gt('anomalyFunctionService.pending.size', 0),
+
   loadingFrameworks: reads('entitiesService.pending'),
 
   //
@@ -478,12 +519,15 @@ export default Controller.extend({
 
   hasErrorsScores: gt('scoresService.errors.size', 0),
 
+  hasErrorsAnomalyFunctions: gt('scoresService.errors.size', 0),
+
   hasServiceErrors: or(
     'hasErrorsEntities',
     'hasErrorsTimeseries',
     'hasErrorsAggregates',
     'hasErrorsBreakdowns',
-    'hasErrorsScores'
+    'hasErrorsScores',
+    'hasErrorsAnomalyFunctions'
   ),
 
   //
@@ -712,12 +756,33 @@ export default Controller.extend({
     },
 
     /**
-     * Closure action passed into the legend component
-     * to handle the hover interactivity
-     * @param {String} urn
+     * Closure action passed into the legend component to handle the hover interactivity.
+     * Rewrites urns to highlight appropriate chart elements.
+     *
+     * @param {Array} urns
      */
-    onLegendHover(urn) {
-      this.set('focusedUrn', urn);
+    onLegendHover(urns) {
+      const { context } = this.getProperties('context');
+
+      let focusUrns = new Set(urns);
+
+      filterPrefix(focusUrns, 'frontend:anomalyfunction:').forEach(urn => {
+        const anomalyMetricUrns = filterPrefix(context.anomalyUrns, 'thirdeye:metric:');
+
+        if (!_.isEmpty(anomalyMetricUrns)) {
+          // NOTE: only supports single anomaly function baseline
+          const anomalyMetricUrn = anomalyMetricUrns[0];
+          focusUrns.add(toCurrentUrn(anomalyMetricUrn));
+          focusUrns.add(toBaselineUrn(anomalyMetricUrn));
+        }
+      });
+
+      filterPrefix(focusUrns, 'thirdeye:metric:').forEach(urn => {
+        focusUrns.add(toCurrentUrn(urn));
+        focusUrns.add(toBaselineUrn(urn));
+      });
+
+      this.set('focusedUrns', focusUrns);
     },
 
     /**
@@ -947,8 +1012,8 @@ export default Controller.extend({
      * Clears error logs of data services and/or route
      */
     clearErrors(type) {
-      const { entitiesService, timeseriesService, aggregatesService, breakdownsService } =
-        this.getProperties('entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService');
+      const { entitiesService, timeseriesService, aggregatesService, breakdownsService, anomalyFunctionService } =
+        this.getProperties('entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'anomalyFunctionService');
 
       switch(type) {
         case ROOTCAUSE_SERVICE_ENTITIES:
@@ -965,6 +1030,10 @@ export default Controller.extend({
 
         case ROOTCAUSE_SERVICE_BREAKDOWNS:
           breakdownsService.clearErrors();
+          break;
+
+        case ROOTCAUSE_SERVICE_ANOMALY_FUNCTIONS:
+          anomalyFunctionService.clearErrors();
           break;
 
         case ROOTCAUSE_SERVICE_ROUTE:

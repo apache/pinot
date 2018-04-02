@@ -98,6 +98,9 @@ export function stripTail(urn) {
   if (urn.startsWith('frontend:metric:')) {
     return _.slice(parts, 0, 4).join(':');
   }
+  if (urn.startsWith('frontend:anomalyfunction:')) {
+    return _.slice(parts, 0, 3).join(':');
+  }
   return urn;
 }
 
@@ -115,6 +118,9 @@ export function extractTail(urn) {
   }
   if (urn.startsWith('frontend:metric:')) {
     return _.slice(parts, 4);
+  }
+  if (urn.startsWith('frontend:anomalyfunction:')) {
+    return _.slice(parts, 3);
   }
   return [];
 }
@@ -286,6 +292,10 @@ function metricUrnHelper(prefix, urn) {
     const tail = makeUrnTail(parts, 4);
     return `${prefix}${parts[3]}${tail}`;
   }
+  if (hasPrefix(urn, 'frontend:anomalyfunction:')) {
+    const tail = makeUrnTail(parts, 3);
+    return `${prefix}${parts[2]}${tail}`;
+  }
   throw new Error(`Requires metric urn, but found ${urn}`);
 }
 
@@ -309,7 +319,7 @@ function makeUrnTail(parts, baseLen) {
  * @returns {boolean}
  */
 export function hasPrefix(urn, prefixes) {
-  return !_.isEmpty(makeIterable(prefixes).filter(pre => urn.startsWith(pre)));
+  return urn && !_.isEmpty(makeIterable(prefixes).filter(pre => urn.startsWith(pre)));
 }
 
 /**
@@ -388,7 +398,8 @@ export function toFilters(urns) {
   const dimensionFilters = filterPrefix(urns, 'thirdeye:dimension:').map(urn => _.slice(urn.split(':').map(decodeURIComponent), 2, 4));
   const metricFilters = filterPrefix(urns, 'thirdeye:metric:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
   const frontendMetricFilters = filterPrefix(urns, 'frontend:metric:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
-  return [...new Set([...dimensionFilters, ...metricFilters, ...frontendMetricFilters])].sort();
+  const anomalyFunctoinFilters = filterPrefix(urns, 'frontend:anomalyfunction:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
+  return [...new Set([...dimensionFilters, ...metricFilters, ...frontendMetricFilters, ...anomalyFunctoinFilters])].sort();
 }
 
 function splitFilterFragment(fragment) {
