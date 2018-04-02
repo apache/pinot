@@ -16,6 +16,9 @@
 package com.linkedin.pinot.tools.pacelab.benchmark;
 
 import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
+import com.linkedin.pinot.tools.admin.command.SegmentCreationCommand;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -50,11 +53,12 @@ class MyProperties extends Properties{
 
 }
 public abstract class QueryExecutor {
+    private static final Logger LOGGER = LoggerFactory.getLogger(QueryExecutor.class);
     protected Properties config;
     protected PostQueryCommand postQueryCommand;
-    protected int _testDuration;
     protected String _dataDir;
-    List<ExecutorService> _threadPool;
+    protected int _testDuration;
+
     public static final String QUERY_CONFIG_PATH = "pinot_benchmark/query_generator_config/";
     public static final String PINOT_TOOLS_RESOURCES = "pinot-tools/src/main/resources/";
     ReentrantLock lock = new ReentrantLock();
@@ -79,21 +83,27 @@ public abstract class QueryExecutor {
         //int threadCnt = Integer.parseInt(config.getProperty("ThreadCount"));
         int threadCnt = Integer.parseInt(config.getProperty("QPS"));
 
-        _threadPool = new ArrayList<>();
+        List<ExecutorService> threadPool = new ArrayList<>();
 
         QueryTask queryTask = getTask(config);
         queryTask.setPostQueryCommand(this.postQueryCommand);
 
         for(int i=0; i < threadCnt; i++)
         {
-            _threadPool.add(Executors.newFixedThreadPool(1));
+            //_threadPool.add(Executors.newFixedThreadPool(1));
+            threadPool.add(Executors.newSingleThreadScheduledExecutor());
         }
         for(int i=0; i < threadCnt; i++)
         {
-            _threadPool.get(i).execute(queryTask);
+            threadPool.get(i).execute(queryTask);
         }
-        //threadPool.awaitTermination(_testDuration, TimeUnit.SECONDS);
-        //threadPool.shutdownNow();
+
+        Thread.sleep(_testDuration*1000);
+        LOGGER.info("Test duration is completed! Ending threads then!");
+        for(int i=0; i<threadCnt;i++)
+        {
+            threadPool.get(i).shutdown();
+        }
     }
 
     public void loadConfig() {
@@ -160,12 +170,5 @@ public abstract class QueryExecutor {
     {
         return _dataDir;
     }
-    public void shutdownThreadPool()
-    {
-        int threadCnt = Integer.parseInt(config.getProperty("ThreadCount"));
-        for(int i=0; i<threadCnt;i++)
-        {
-            _threadPool.get(i).shutdown();
-        }
-    }
+
 }

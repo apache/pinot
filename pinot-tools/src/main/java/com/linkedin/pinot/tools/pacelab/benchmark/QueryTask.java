@@ -56,6 +56,8 @@ public class QueryTask implements Runnable{
         //while(!Thread.interrupted()) {
         while(secondsPassed < _testDuration && !Thread.interrupted())
         {
+            long timeBeforeSendingQuery = System.currentTimeMillis();
+
             try
             {
 
@@ -103,12 +105,19 @@ public class QueryTask implements Runnable{
                         break;
                     }
                 }
+                long timeAfterSendingQuery = System.currentTimeMillis();
+                long timeDistance = timeAfterSendingQuery-timeBeforeSendingQuery;
+                if (timeDistance < 1000)
+                {
+                    Thread.sleep(1000-timeDistance);
+                }
 
             }
             catch (Exception e)
             {
                 e.printStackTrace();
             }
+
             currentTimeMillisTime = System.currentTimeMillis();
             secondsPassed = (currentTimeMillisTime-runStartMillisTime)/1000;
             //System.out.println(secondsPassed);
