@@ -386,7 +386,7 @@ export default Component.extend({
    * @param {Array} entities - array of entities
    * @return {undefined}
    */
-  builUrnToId(entities) {
+  buildUrnToId(entities) {
     const urnToId = entities.reduce((agg, entity) => {
       agg[entity.toURN] = entity.id;
       return agg;
@@ -416,7 +416,7 @@ export default Component.extend({
     const metricUrn = get(this, 'metricUrn');
     const entities = await fetch(`${entityMappingApi.getRelatedEntitiesUrl}/${metricUrn}`).then(checkStatus);
     const url = this.makeUrlString(entities);
-    this.builUrnToId(entities);
+    this.buildUrnToId(entities);
 
     if (!url) {
       return;
@@ -424,7 +424,7 @@ export default Component.extend({
     const relatedEntities = await fetch(url).then(checkStatus);
 
     // merges createBy Props
-    relatedEntities.map((item) => {
+    relatedEntities.forEach((item) => {
       if (!item.urn) {
         return;
       }
@@ -523,18 +523,14 @@ export default Component.extend({
      */
     onSearch(searchString) {
       const {
-        lastSearch,
+        lastSearchTerm,
         searchEntitiesTask: task
       } = getProperties(this, 'lastSearch', 'searchEntitiesTask');
 
-      searchString = searchString.length ? searchString : lastSearch;
+      searchString = searchString.length ? searchString : lastSearchTerm;
       const taskInstance = task.perform(searchString);
 
-      this.setProperties({
-        lastSearchTerm: searchString
-      });
-
-
+      this.set('lastSearchTerm', searchString);
       return taskInstance;
     },
 

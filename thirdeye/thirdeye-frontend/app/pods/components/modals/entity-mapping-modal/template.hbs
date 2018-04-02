@@ -59,7 +59,7 @@
         }}
       {{/if}}
 
-      <a class="thirdeye-link thirdeye-link--secondary {{unless canAddMapping 'thirdeye-link--disabled'}}" {{action "onAddFilter"}}>
+      <a class="thirdeye-link thirdeye-link--secondary" class={{unless canAddMapping 'thirdeye-link--disabled'}} {{action "onAddFilter"}}>
         Add Mapping
         {{#tooltip-on-element 
           class="te-modal__tooltip"
