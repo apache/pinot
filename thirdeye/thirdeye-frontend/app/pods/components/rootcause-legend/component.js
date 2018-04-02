@@ -63,7 +63,7 @@ export default Component.extend({
 
   colors: computed(
     'entities',
-    'validUrns',
+    'selectedUrns',
     function () {
       const { entities, selectedUrns } = this.getProperties('entities', 'selectedUrns');
       return [...selectedUrns]
