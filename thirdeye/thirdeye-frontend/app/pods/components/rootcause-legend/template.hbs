@@ -6,23 +6,6 @@
     | <a class="thirdeye-link" {{action "visibleMetrics"}}>metrics</a>
   </div>
 
-  {{#if hasAnomalyFunctions}}
-    <ul class="rootcause-legend__list" onMouseLeave={{action "onMouseLeave"}}>
-      {{#each-in anomalyFunctions as |urn label|}}
-        <li class="rootcause-legend__item" onMouseEnter={{action "onMouseEnter" urn}}>
-          <div class="rootcause-legend__label-group {{if (set-has invisibleUrns urn) 'rootcause-legend__label-group--inactive'}}" {{action "toggleVisibility" urn}}>
-            <div class="rootcause-legend__indicator">
-              <span class="entity-indicator entity-indicator--grey entity-indicator--square {{if (set-has invisibleUrns urn) 'entity-indicator--inactive'}}">
-                {{tooltip-on-element text="Toggle view"}}
-              </span>
-            </div>
-            <span class="rootcause-legend__label">{{label}}</span>
-          </div>
-        </li>
-      {{/each-in}}
-    </ul>
-  {{/if}}
-
   {{#if hasMetrics}}
     <ul class="rootcause-legend__list" onMouseLeave={{action "onMouseLeave"}}>
       {{#each-in metrics as |urn label|}}
@@ -41,6 +24,18 @@
             </i>
           </a>
         </li>
+        {{#if (get-safe anomalyFunctions urn)}}
+          <li class="rootcause-legend__item rootcause-legend__item--indented" onMouseEnter={{action "onMouseEnter" (get-safe anomalyFunctions urn)}}>
+            <div class="rootcause-legend__label-group {{if (set-has invisibleUrns (get-safe anomalyFunctions urn)) 'rootcause-legend__label-group--inactive'}}" {{action "toggleVisibility" (get-safe anomalyFunctions urn)}}>
+              <div class="rootcause-legend__indicator">
+              <span class="entity-indicator entity-indicator--indented entity-indicator--light-{{get-safe colors urn}} entity-indicator--square {{if (set-has invisibleUrns (get-safe anomalyFunctions urn)) 'entity-indicator--inactive'}}">
+                {{tooltip-on-element text="Toggle view"}}
+              </span>
+              </div>
+              <span class="rootcause-legend__label">Show predicted baseline</span>
+            </div>
+          </li>
+        {{/if}}
       {{/each-in}}
     </ul>
   {{/if}}

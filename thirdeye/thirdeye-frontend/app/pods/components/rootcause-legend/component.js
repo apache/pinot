@@ -8,9 +8,12 @@ import {
   toMetricLabel,
   toEventLabel
 } from 'thirdeye-frontend/utils/rca-utils';
+import _ from 'lodash';
 
 export default Component.extend({
   entities: null, // {}
+
+  anomalyUrns: null, // Set
 
   selectedUrns: null, // Set
 
@@ -21,19 +24,6 @@ export default Component.extend({
   onSelection: null, // function (Set, bool)
 
   classNames: ['rootcause-legend'],
-
-  anomalyFunctions: computed(
-    'entities',
-    'selectedUrns',
-    function () {
-      const { selectedUrns } = this.getProperties('selectedUrns');
-      return filterPrefix(selectedUrns, 'frontend:anomalyfunction:')
-        .reduce((agg, urn) => {
-          agg[urn] = 'Show Detection Baseline';
-          return agg;
-        }, {});
-    }
-  ),
 
   metrics: computed(
     'entities',
@@ -103,6 +93,29 @@ export default Component.extend({
     'events',
     function () {
       return Object.keys(this.get('events')).length > 0;
+    }
+  ),
+
+  anomalyFunctions: computed(
+    'selectedUrns',
+    'anomalyUrns',
+    function () {
+      const { selectedUrns, anomalyUrns } = this.getProperties('selectedUrns', 'anomalyUrns');
+
+      // NOTE: only supports single anomaly function
+      const anomalyFunctions = filterPrefix(anomalyUrns, 'frontend:anomalyfunction:');
+
+      if (_.isEmpty(anomalyFunctions)) return {};
+
+      const anomalyFunction = anomalyFunctions[0];
+
+      return [...selectedUrns].reduce((agg, urn) => {
+        agg[urn] = false;
+        if (anomalyUrns.has(urn)) {
+          agg[urn] = anomalyFunction;
+        }
+        return agg;
+      }, {});
     }
   ),
 
