@@ -123,6 +123,11 @@
     }
   }
 
+  &__input {
+    // this is needed to force similar styling
+    padding-left: $te-spacing--sm !important; 
+  }
+
   &__label-wrapper {
     display: flex;
     flex-direction: column;
