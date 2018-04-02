@@ -15,11 +15,12 @@ import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
-import com.linkedin.thirdeye.rootcause.timeseries.BaselineOffset;
+import com.linkedin.thirdeye.rootcause.timeseries.BaselineNone;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +38,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
@@ -68,6 +70,7 @@ public class RootCauseMetricResource {
   private static final String TIMEZONE_DEFAULT = "UTC";
   private static final String GRANULARITY_DEFAULT = MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString();
 
+  private static final Pattern PATTERN_NONE = Pattern.compile("none");
   private static final Pattern PATTERN_CURRENT = Pattern.compile("current");
   private static final Pattern PATTERN_WEEK_OVER_WEEK = Pattern.compile("wo([1-9][0-9]*)w");
   private static final Pattern PATTERN_MEAN = Pattern.compile("mean([1-9][0-9]*)w");
@@ -465,6 +468,7 @@ public class RootCauseMetricResource {
    * <p>Supported offsets:</p>
    * <pre>
    *   current   the time range as specified by start and end)
+   *   none      empty time range
    *   woXw      week-over-week data points with a lag of X weeks)
    *   meanXw    average of data points from the the past X weeks, with a lag of 1 week)
    *   medianXw  median of data points from the the past X weeks, with a lag of 1 week)
@@ -483,6 +487,11 @@ public class RootCauseMetricResource {
     Matcher mCurrent = PATTERN_CURRENT.matcher(offset);
     if (mCurrent.find()) {
       return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.SUM, 1, 0, timeZone);
+    }
+
+    Matcher mNone = PATTERN_NONE.matcher(offset);
+    if (mNone.find()) {
+      return new BaselineNone();
     }
 
     Matcher mWeekOverWeek = PATTERN_WEEK_OVER_WEEK.matcher(offset);
