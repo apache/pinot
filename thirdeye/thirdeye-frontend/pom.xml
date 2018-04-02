@@ -58,6 +58,16 @@
               <arguments>run build -- --prod --output-path=../thirdeye-pinot/src/main/resources/app</arguments>
             </configuration>
           </execution>
+          <execution>
+            <id>test front end</id>
+            <phase>test</phase>
+            <goals>
+              <goal>yarn</goal>
+            </goals>
+            <configuration>
+              <arguments>run test</arguments>
+            </configuration>
+          </execution>
         </executions>
       </plugin>
 
