@@ -17,7 +17,9 @@ package com.linkedin.pinot.core.realtime.impl;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.GenericRow;
@@ -72,7 +74,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private final Map<String, Integer> _maxNumValuesMap = new HashMap<>();
   private final Map<String, RealtimeInvertedIndexReader> _invertedIndexMap = new HashMap<>();
   private final IdMap<FixedIntArray> _recordIdMap;
-  private final boolean _aggregateMetrics;
+  private boolean _aggregateMetrics;
 
   private volatile int _numDocsIndexed = 0;
 
@@ -107,10 +109,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     _logger = LoggerFactory.getLogger(
         RealtimeSegmentImpl.class.getName() + "_" + _segmentName + "_" + config.getStreamName());
 
-    _aggregateMetrics = config.aggregateMetrics();
-    _recordIdMap = (_aggregateMetrics) ? initMetricsAggregation(config) : null;
-
     Set<String> noDictionaryColumns = config.getNoDictionaryColumns();
+
+    // Metric aggregation can be enabled only if config is specified, and all dimensions have dictionary,
+    // and no metrics have dictionary. If not enabled, the map returned is null.
+    _recordIdMap = enableMetricsAggregationIfPossible(config, _schema, noDictionaryColumns);
+
     Set<String> invertedIndexColumns = config.getInvertedIndexColumns();
     int avgNumMultiValues = config.getAvgNumMultiValues();
 
@@ -182,8 +186,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     Map<String, Object> dictIdMap = updateDictionary(row);
 
     int numDocs = _numDocsIndexed;
+
+    // If metrics aggregation is enabled and if the dimension values were already seen, this will return existing docId,
+    // else this will return a new docId.
     int docId = getOrCreateDocId(dictIdMap);
 
+    // docId == numDocs implies new docId.
     if (docId == numDocs) {
       // Add forward and inverted indices for new document.
       addForwardIndex(row, docId, dictIdMap);
@@ -669,11 +677,62 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   }
 
   /**
-   * Helper method to initialize updating of metrics.
+   * Helper method to enable/initialize aggregation of metrics, based on following conditions:
+   * <ul>
+   *   <li> Config to enable aggregation of metrics is specified. </li>
+   *   <li> All dimensions and time are dictionary encoded. This is because an integer array containing dictionary id's
+   *        is used as key for dimensions to record Id map. </li>
+   *   <li> None of the metrics are dictionary encoded. </li>
+   * </ul>
    *
-   * @param config Segment config
+   * TODO: Eliminate the requirement on dictionary encoding for dimension and metric columns.
+   *
+   * @param config Segment config.
+   * @param schema Schema for the table.
+   * @param noDictionaryColumns Set of no dictionary columns.
+   *
+   * @return Map from dictionary id array to doc id, null if metrics aggregation cannot be enabled.
    */
-  private IdMap<FixedIntArray> initMetricsAggregation(RealtimeSegmentConfig config) {
+  private IdMap<FixedIntArray> enableMetricsAggregationIfPossible(RealtimeSegmentConfig config, Schema schema,
+      Set<String> noDictionaryColumns) {
+    _aggregateMetrics = config.aggregateMetrics();
+    if (!_aggregateMetrics) {
+      _logger.info("Metrics aggregation is disabled.");
+      return null;
+    }
+
+    // All metric columns should have no-dictionary index.
+    for (String metric : schema.getMetricNames()) {
+      if (!noDictionaryColumns.contains(metric)) {
+        _logger.warn("Metrics aggregation cannot be turned ON in presence of dictionary encoded metrics, eg: {}",
+            metric);
+        _aggregateMetrics = false;
+        break;
+      }
+    }
+
+    // All dimension columns should be dictionary encoded.
+    for (String dimension : schema.getDimensionNames()) {
+      if (noDictionaryColumns.contains(dimension)) {
+        _logger.warn("Metrics aggregation cannot be turned ON in presence of no-dictionary dimensions, eg: {}",
+            dimension);
+        _aggregateMetrics = false;
+        break;
+      }
+    }
+
+    // Time column should be dictionary encoded.
+    String timeColumn = schema.getTimeColumnName();
+    if (noDictionaryColumns.contains(timeColumn)) {
+      _logger.warn("Metrics aggregation cannot be turned ON in presence of no-dictionary time column, eg: {}",
+          timeColumn);
+      _aggregateMetrics = false;
+    }
+
+    if (!_aggregateMetrics) {
+      return null;
+    }
+
     int estimatedRowsToIndex;
     if (_statsHistory.isEmpty()) {
       // Choose estimated rows to index as maxNumRowsPerSegment / EXPECTED_COMPRESSION (1000, to be conservative in size).
