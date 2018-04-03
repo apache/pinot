@@ -26,7 +26,7 @@ public class ProfileViewQueryExecutor extends QueryExecutor{
         String[] queries = {
                 "SELECT COUNT(*) FROM ProfileView" +
                     " WHERE ViewStartTime > %d AND ViewStartTime < %d",
-                "SELECT * FROM ProfileView" +
+                "SELECT ViewerProfileId FROM ProfileView" +
                     " WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s' LIMIT %d",
                 "SELECT count(*) FROM ProfileView" +
                         " WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s'",
