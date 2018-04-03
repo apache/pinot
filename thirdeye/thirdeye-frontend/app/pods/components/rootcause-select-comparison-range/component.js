@@ -24,7 +24,8 @@ export default Component.extend({
   },
 
   compareModeOptions: [
-    'None',
+    'none',
+    'predicted',
     'WoW',
     'Wo2W',
     'Wo3W',

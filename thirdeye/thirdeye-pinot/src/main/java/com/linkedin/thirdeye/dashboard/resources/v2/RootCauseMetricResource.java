@@ -71,6 +71,7 @@ public class RootCauseMetricResource {
   private static final String GRANULARITY_DEFAULT = MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString();
 
   private static final Pattern PATTERN_NONE = Pattern.compile("none");
+  private static final Pattern PATTERN_PREDICTED = Pattern.compile("predicted");
   private static final Pattern PATTERN_CURRENT = Pattern.compile("current");
   private static final Pattern PATTERN_WEEK_OVER_WEEK = Pattern.compile("wo([1-9][0-9]*)w");
   private static final Pattern PATTERN_MEAN = Pattern.compile("mean([1-9][0-9]*)w");
@@ -491,6 +492,12 @@ public class RootCauseMetricResource {
 
     Matcher mNone = PATTERN_NONE.matcher(offset);
     if (mNone.find()) {
+      return new BaselineNone();
+    }
+
+    // TODO link with generic metric baseline prediction when available
+    Matcher mPredicted = PATTERN_PREDICTED.matcher(offset);
+    if (mPredicted.find()) {
       return new BaselineNone();
     }
 

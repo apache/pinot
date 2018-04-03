@@ -13,8 +13,6 @@ import _ from 'lodash';
 export default Component.extend({
   entities: null, // {}
 
-  anomalyUrns: null, // Set
-
   selectedUrns: null, // Set
 
   invisibleUrns: null, // Set
@@ -75,13 +73,6 @@ export default Component.extend({
     }
   ),
 
-  hasAnomalyFunctions: computed(
-    'metrics',
-    function () {
-      return Object.keys(this.get('anomalyFunctions')).length > 0;
-    }
-  ),
-
   hasMetrics: computed(
     'metrics',
     function () {
@@ -93,29 +84,6 @@ export default Component.extend({
     'events',
     function () {
       return Object.keys(this.get('events')).length > 0;
-    }
-  ),
-
-  anomalyFunctions: computed(
-    'selectedUrns',
-    'anomalyUrns',
-    function () {
-      const { selectedUrns, anomalyUrns } = this.getProperties('selectedUrns', 'anomalyUrns');
-
-      // NOTE: only supports single anomaly function
-      const anomalyFunctions = filterPrefix(anomalyUrns, 'frontend:anomalyfunction:');
-
-      if (_.isEmpty(anomalyFunctions)) return {};
-
-      const anomalyFunction = anomalyFunctions[0];
-
-      return [...selectedUrns].reduce((agg, urn) => {
-        agg[urn] = false;
-        if (anomalyUrns.has(urn)) {
-          agg[urn] = anomalyFunction;
-        }
-        return agg;
-      }, {});
     }
   ),
 

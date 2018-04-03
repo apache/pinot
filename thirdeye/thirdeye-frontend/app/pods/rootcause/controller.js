@@ -285,7 +285,7 @@ export default Controller.extend({
       timeseriesService.request(context, selectedUrns);
 
       // anomaly function baselines
-      const anomalyFunctionUrns = filterPrefix(selectedUrns, 'frontend:anomalyfunction:');
+      const anomalyFunctionUrns = filterPrefix(context.anomalyUrns, 'frontend:anomalyfunction:');
       anomalyFunctionService.request(context, new Set(anomalyFunctionUrns));
 
       // breakdowns
@@ -371,27 +371,23 @@ export default Controller.extend({
     'timeseriesService.timeseries',
     'anomalyFunctionService.timeseries',
     'context',
-    'invisibleUrns',
     function () {
-      const { timeseriesService, anomalyFunctionService, context, invisibleUrns } =
-        this.getProperties('timeseriesService', 'anomalyFunctionService', 'context', 'invisibleUrns');
+      const { timeseriesService, anomalyFunctionService, context } =
+        this.getProperties('timeseriesService', 'anomalyFunctionService', 'context');
 
       const timeseries = Object.assign({}, timeseriesService.timeseries);
 
-      const anomalyFunctionUrns = filterPrefix(context.anomalyUrns, 'frontend:anomalyfunction:');
-
-      if (_.isEmpty(anomalyFunctionUrns)) {
+      if (context.compareMode !== 'predicted') {
         return timeseries;
       }
 
       // NOTE: only supports a single anomaly function baseline
+      const anomalyFunctionUrns = filterPrefix(context.anomalyUrns, 'frontend:anomalyfunction:');
       const anomalyFunctionUrn = anomalyFunctionUrns[0];
 
-      if (!invisibleUrns.has(anomalyFunctionUrn)) {
-        filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => {
-          timeseries[toBaselineUrn(urn)] = anomalyFunctionService.timeseries[anomalyFunctionUrn];
-        });
-      }
+      filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => {
+        timeseries[toBaselineUrn(urn)] = anomalyFunctionService.timeseries[anomalyFunctionUrn];
+      });
 
       return timeseries;
     }
@@ -764,18 +760,7 @@ export default Controller.extend({
     onLegendHover(urns) {
       const { context } = this.getProperties('context');
 
-      let focusUrns = new Set(urns);
-
-      filterPrefix(focusUrns, 'frontend:anomalyfunction:').forEach(urn => {
-        const anomalyMetricUrns = filterPrefix(context.anomalyUrns, 'thirdeye:metric:');
-
-        if (!_.isEmpty(anomalyMetricUrns)) {
-          // NOTE: only supports single anomaly function baseline
-          const anomalyMetricUrn = anomalyMetricUrns[0];
-          focusUrns.add(toCurrentUrn(anomalyMetricUrn));
-          focusUrns.add(toBaselineUrn(anomalyMetricUrn));
-        }
-      });
+      const focusUrns = new Set(urns);
 
       filterPrefix(focusUrns, 'thirdeye:metric:').forEach(urn => {
         focusUrns.add(toCurrentUrn(urn));

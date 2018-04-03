@@ -238,7 +238,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
           anomalyRange,
           analysisRange,
           granularity,
-          compareMode,
+          compareMode: 'predicted',
           anomalyUrns: new Set([anomalyUrn, anomalyMetricUrn, anomalyFunctionUrn])
         };
 
