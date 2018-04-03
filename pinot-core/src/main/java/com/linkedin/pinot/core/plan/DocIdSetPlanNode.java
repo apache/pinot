@@ -34,7 +34,7 @@ public class DocIdSetPlanNode implements PlanNode {
   private final int _maxDocPerCall;
 
   public DocIdSetPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest, int maxDocPerCall) {
-    Preconditions.checkState(maxDocPerCall <= MAX_DOC_PER_CALL);
+    Preconditions.checkState(maxDocPerCall > 0 && maxDocPerCall <= MAX_DOC_PER_CALL);
     _indexSegment = indexSegment;
     _filterPlanNode = new FilterPlanNode(_indexSegment, brokerRequest);
     _maxDocPerCall = maxDocPerCall;

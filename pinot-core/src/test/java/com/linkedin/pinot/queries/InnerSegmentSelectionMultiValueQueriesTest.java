@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
+import com.linkedin.pinot.core.operator.query.EmptySelectionOperator;
 import com.linkedin.pinot.core.operator.query.SelectionOnlyOperator;
 import com.linkedin.pinot.core.operator.query.SelectionOrderByOperator;
 import java.io.Serializable;
@@ -34,12 +35,49 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
   private static final String ORDER_BY = " ORDER BY column5, column9";
 
   @Test
+  public void testSelectLimitZero() {
+    String query = "SELECT * FROM testTable LIMIT 0";
+
+    // Test query without filter
+    EmptySelectionOperator emptySelectionOperator = getOperatorForQuery(query);
+    IntermediateResultsBlock resultsBlock = emptySelectionOperator.nextBlock();
+    ExecutionStatistics executionStatistics = emptySelectionOperator.getExecutionStatistics();
+    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 0L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 0L);
+    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
+    DataSchema selectionDataSchema = resultsBlock.getSelectionDataSchema();
+    Assert.assertEquals(selectionDataSchema.size(), 10);
+    Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
+    Assert.assertEquals(selectionDataSchema.getColumnName(5), "column6");
+    Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnType(5), FieldSpec.DataType.INT_ARRAY);
+    Assert.assertTrue(resultsBlock.getSelectionResult().isEmpty());
+
+    // Test query with filter
+    emptySelectionOperator = getOperatorForQueryWithFilter(query);
+    resultsBlock = emptySelectionOperator.nextBlock();
+    executionStatistics = emptySelectionOperator.getExecutionStatistics();
+    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 0L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 0L);
+    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
+    selectionDataSchema = resultsBlock.getSelectionDataSchema();
+    Assert.assertEquals(selectionDataSchema.size(), 10);
+    Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
+    Assert.assertEquals(selectionDataSchema.getColumnName(5), "column6");
+    Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnType(5), FieldSpec.DataType.INT_ARRAY);
+    Assert.assertTrue(resultsBlock.getSelectionResult().isEmpty());
+  }
+
+  @Test
   public void testSelectStar() {
     String query = "SELECT * FROM testTable";
 
-    // Test query without filter.
+    // Test query without filter
     SelectionOnlyOperator selectionOnlyOperator = getOperatorForQuery(query);
-    IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) selectionOnlyOperator.nextBlock();
+    IntermediateResultsBlock resultsBlock = selectionOnlyOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
@@ -58,9 +96,9 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(((Integer) firstRow[0]).intValue(), 890282370);
     Assert.assertEquals(firstRow[5], new int[]{2147483647});
 
-    // Test query with filter.
+    // Test query with filter
     selectionOnlyOperator = getOperatorForQueryWithFilter(query);
-    resultsBlock = (IntermediateResultsBlock) selectionOnlyOperator.nextBlock();
+    resultsBlock = selectionOnlyOperator.nextBlock();
     executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 230501L);
@@ -84,8 +122,9 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
   public void testSelectionOnly() {
     String query = "SELECT" + SELECTION + " FROM testTable";
 
+    // Test query without filter
     SelectionOnlyOperator selectionOnlyOperator = getOperatorForQuery(query);
-    IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) selectionOnlyOperator.nextBlock();
+    IntermediateResultsBlock resultsBlock = selectionOnlyOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
@@ -104,9 +143,9 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(((Integer) firstRow[0]).intValue(), 890282370);
     Assert.assertEquals(firstRow[2], new int[]{2147483647});
 
-    // Test query with filter.
+    // Test query with filter
     selectionOnlyOperator = getOperatorForQueryWithFilter(query);
-    resultsBlock = (IntermediateResultsBlock) selectionOnlyOperator.nextBlock();
+    resultsBlock = selectionOnlyOperator.nextBlock();
     executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 230501L);
@@ -130,9 +169,9 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
   public void testSelectionOrderBy() {
     String query = "SELECT" + SELECTION + " FROM testTable" + ORDER_BY;
 
-    // Test query without filter.
+    // Test query without filter
     SelectionOrderByOperator selectionOrderByOperator = getOperatorForQuery(query);
-    IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) selectionOrderByOperator.nextBlock();
+    IntermediateResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 100000L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
@@ -151,9 +190,9 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals((String) lastRow[0], "AKXcXcIqsqOJFsdwxZ");
     Assert.assertEquals(lastRow[3], new int[]{1252});
 
-    // Test query with filter.
+    // Test query with filter
     selectionOrderByOperator = getOperatorForQueryWithFilter(query);
-    resultsBlock = (IntermediateResultsBlock) selectionOrderByOperator.nextBlock();
+    resultsBlock = selectionOrderByOperator.nextBlock();
     executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 15620L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 282430L);
