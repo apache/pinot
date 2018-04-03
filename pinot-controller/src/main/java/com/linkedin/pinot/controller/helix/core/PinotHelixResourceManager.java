@@ -2070,16 +2070,15 @@ public class PinotHelixResourceManager {
 
     JSONObject jsonObject = new JSONObject();
     try {
-    RebalanceSegmentStrategy rebalanceSegmentsStrategy =
-        RebalanceSegmentStrategyFactory.getInstance().getRebalanceSegmentsStrategy(tableConfig);
-    PartitionAssignment newPartitionAssignment =
-        rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
-    IdealState newIdealState = rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig,
-        rebalanceUserConfig, newPartitionAssignment);
+      RebalanceSegmentStrategy rebalanceSegmentsStrategy =
+          RebalanceSegmentStrategyFactory.getInstance().getRebalanceSegmentsStrategy(tableConfig);
+      PartitionAssignment newPartitionAssignment =
+          rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
+      IdealState newIdealState = rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig,
+          rebalanceUserConfig, newPartitionAssignment);
 
-
-      jsonObject.put("partitionAssignment", newPartitionAssignment);
-      jsonObject.put("idealState", newIdealState);
+      jsonObject.put("partitionAssignment", newPartitionAssignment.getPartitionToInstances());
+      jsonObject.put("idealState", newIdealState.getRecord().getMapFields());
     } catch (JSONException e) {
       LOGGER.error("Exception in constructing json response for rebalance table {}", tableNameWithType, e);
       throw e;

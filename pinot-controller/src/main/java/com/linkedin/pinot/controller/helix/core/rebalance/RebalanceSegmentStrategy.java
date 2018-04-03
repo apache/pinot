@@ -47,5 +47,5 @@ public interface RebalanceSegmentStrategy {
    * @return rebalanced ideal state
    */
   IdealState rebalanceIdealState(IdealState idealState, TableConfig tableConfig, Configuration rebalanceUserConfig,
-      PartitionAssignment newPartitionAssignment);
+      PartitionAssignment newPartitionAssignment) throws InvalidConfigException;
 }

@@ -97,7 +97,7 @@ public class PinotTableRestletResource {
   @Path("/tables")
   @ApiOperation(value = "Adds a table", notes = "Adds a table")
   public SuccessResponse addTable(String tableConfigStr) throws Exception {
-      // TODO introduce a table config ctor with json string.
+    // TODO introduce a table config ctor with json string.
     TableConfig tableConfig;
     String tableName;
     try {
@@ -128,8 +128,7 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
-  public String listTableConfigs(
-  ) {
+  public String listTableConfigs() {
     try {
       List<String> rawTables = _pinotHelixResourceManager.getAllRawTables();
       Collections.sort(rawTables);
@@ -146,14 +145,15 @@ public class PinotTableRestletResource {
     try {
       JSONObject ret = new JSONObject();
 
-      if ((tableTypeStr == null || CommonConstants.Helix.TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr)) && _pinotHelixResourceManager.hasOfflineTable(
-          tableName)) {
+      if ((tableTypeStr == null || CommonConstants.Helix.TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
+          && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
         TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
         Preconditions.checkNotNull(tableConfig);
         ret.put(CommonConstants.Helix.TableType.OFFLINE.name(), TableConfig.toJSONConfig(tableConfig));
       }
 
-      if ((tableTypeStr == null || CommonConstants.Helix.TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr)) && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+      if ((tableTypeStr == null || CommonConstants.Helix.TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
+          && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
         TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
         Preconditions.checkNotNull(tableConfig);
         ret.put(CommonConstants.Helix.TableType.REALTIME.name(), TableConfig.toJSONConfig(tableConfig));
@@ -167,15 +167,13 @@ public class PinotTableRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}")
-  @ApiOperation(value = "Get/Enable/Disable/Drop a table",
-      notes = "Get/Enable/Disable/Drop a table. If table name is the only parameter specified " +
-          ", the tableconfig will be printed"
-  )
+  @ApiOperation(value = "Get/Enable/Disable/Drop a table", notes =
+      "Get/Enable/Disable/Drop a table. If table name is the only parameter specified "
+          + ", the tableconfig will be printed")
   public String alterTableStateOrListTableConfig(
       @ApiParam(value = "Name of the table", required = false) @PathParam("tableName") String tableName,
       @ApiParam(value = "enable|disable|drop", required = false) @QueryParam("state") String stateStr,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
-  ) {
+      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr) {
     try {
       if (tableName == null) {
         List<String> rawTables = _pinotHelixResourceManager.getAllRawTables();
@@ -192,7 +190,8 @@ public class PinotTableRestletResource {
       JSONArray ret = new JSONArray();
       boolean tableExists = false;
 
-      if ((tableTypeStr == null || CommonConstants.Helix.TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr)) && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
+      if ((tableTypeStr == null || CommonConstants.Helix.TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
+          && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
         String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
         JSONObject offline = new JSONObject();
         tableExists = true;
@@ -202,8 +201,8 @@ public class PinotTableRestletResource {
         ret.put(offline);
       }
 
-      if ((tableTypeStr == null || CommonConstants.Helix.TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr)) && _pinotHelixResourceManager
-          .hasRealtimeTable(tableName)) {
+      if ((tableTypeStr == null || CommonConstants.Helix.TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
+          && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
         String realTimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
         JSONObject realTime = new JSONObject();
         tableExists = true;
@@ -215,12 +214,12 @@ public class PinotTableRestletResource {
       if (tableExists) {
         return ret.toString();
       } else {
-        throw new ControllerApplicationException(LOGGER, "Table '" + tableName + "' does not exist", Response.Status.BAD_REQUEST);
+        throw new ControllerApplicationException(LOGGER, "Table '" + tableName + "' does not exist",
+            Response.Status.BAD_REQUEST);
       }
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
-
   }
 
   @DELETE
@@ -229,8 +228,7 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Deletes a table", notes = "Deletes a table")
   public SuccessResponse deleteTable(
       @ApiParam(value = "Name of the table to delete", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr
-  ) {
+      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr) {
     List<String> tablesDeleted = new LinkedList<>();
     try {
       if (tableTypeStr == null || tableTypeStr.equalsIgnoreCase(CommonConstants.Helix.TableType.OFFLINE.name())) {
@@ -253,8 +251,7 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
   public SuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
-      String tableConfigStr
-  ) throws Exception {
+      String tableConfigStr) throws Exception {
     TableConfig tableConfig;
     try {
       JSONObject tableConfigJson = new JSONObject(tableConfigStr);
@@ -275,11 +272,13 @@ public class PinotTableRestletResource {
 
       if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
         if (!_pinotHelixResourceManager.hasOfflineTable(tableName)) {
-          throw new ControllerApplicationException(LOGGER, "Table " + tableName + " does not exist", Response.Status.BAD_REQUEST);
+          throw new ControllerApplicationException(LOGGER, "Table " + tableName + " does not exist",
+              Response.Status.BAD_REQUEST);
         }
       } else {
         if (!_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-          throw new ControllerApplicationException(LOGGER, "Table " + tableName + " does not exist", Response.Status.NOT_FOUND);
+          throw new ControllerApplicationException(LOGGER, "Table " + tableName + " does not exist",
+              Response.Status.NOT_FOUND);
         }
       }
 
@@ -300,17 +299,19 @@ public class PinotTableRestletResource {
   @POST
   @Path("/tables/validate")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Validate table config for a table",
-      notes = "This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
+  @ApiOperation(value = "Validate table config for a table", notes =
+      "This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")
-  public String checkTableConfig (String tableConfigStr) throws Exception {
+  public String checkTableConfig(String tableConfigStr) throws Exception {
     try {
       JSONObject tableConfigValidateStr = new JSONObject();
       TableConfig tableConfig = TableConfig.fromJSONConfig(new JSONObject(tableConfigStr));
       if (tableConfig.getTableType() == CommonConstants.Helix.TableType.OFFLINE) {
-        tableConfigValidateStr.put(CommonConstants.Helix.TableType.OFFLINE.name(), TableConfig.toJSONConfig(tableConfig));
+        tableConfigValidateStr.put(CommonConstants.Helix.TableType.OFFLINE.name(),
+            TableConfig.toJSONConfig(tableConfig));
       } else {
-        tableConfigValidateStr.put(CommonConstants.Helix.TableType.REALTIME.name(), TableConfig.toJSONConfig(tableConfig));
+        tableConfigValidateStr.put(CommonConstants.Helix.TableType.REALTIME.name(),
+            TableConfig.toJSONConfig(tableConfig));
       }
       return tableConfigValidateStr.toString();
     } catch (Exception e) {
@@ -393,11 +394,10 @@ public class PinotTableRestletResource {
   public String rebalance(
       @ApiParam(value = "Name of the table to rebalance") @Nonnull @PathParam("tableName") String tableName,
       @ApiParam(value = "offline|realtime") @Nonnull @QueryParam("type") String tableType,
-      @ApiParam(value = "true|false") @Nonnull @QueryParam("dryrun") Boolean dryRun,
+      @ApiParam(value = "true|false") @Nonnull @DefaultValue("true") @QueryParam("dryrun") Boolean dryRun,
       @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming) {
 
-    if (tableType != null
-        && !EnumUtils.isValidEnum(CommonConstants.Helix.TableType.class, tableType.toUpperCase())) {
+    if (tableType != null && !EnumUtils.isValidEnum(CommonConstants.Helix.TableType.class, tableType.toUpperCase())) {
       throw new ControllerApplicationException(LOGGER, "Illegal table type " + tableType, Response.Status.BAD_REQUEST);
     }
 
@@ -405,7 +405,7 @@ public class PinotTableRestletResource {
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DRYRUN, dryRun);
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.INCLUDE_CONSUMING, includeConsuming);
 
-    JSONObject jsonObject = null;
+    JSONObject jsonObject;
     try {
       jsonObject = _pinotHelixResourceManager.rebalanceTable(tableName,
           CommonConstants.Helix.TableType.valueOf(tableType.toUpperCase()), rebalanceUserConfig);
@@ -417,5 +417,4 @@ public class PinotTableRestletResource {
     return jsonObject.toString();
 
   }
-
 }
