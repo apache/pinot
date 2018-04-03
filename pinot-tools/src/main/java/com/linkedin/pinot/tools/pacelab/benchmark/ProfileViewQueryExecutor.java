@@ -26,19 +26,19 @@ public class ProfileViewQueryExecutor extends QueryExecutor{
         String[] queries = {
                 "SELECT COUNT(*) FROM ProfileView" +
                     " WHERE ViewStartTime > %d AND ViewStartTime < %d",
-                "SELECT ViewerProfileId FROM ProfileView" +
+                "SELECT ViewedProfileId FROM ProfileView" +
                     " WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s' LIMIT %d",
                 "SELECT count(*) FROM ProfileView" +
                         " WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s'",
                 "SELECT ViewerPosition, COUNT(*) FROM ProfileView" +
                         " WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s'"+
-                        " GROUP BY ViewerPosition ORDER BY COUNT(*) desc LIMIT %d",
+                        " GROUP BY ViewerPosition TOP %d",
                 "SELECT ViewerPosition, COUNT(*), AVG(ReviewTime), AVG(ViewedProfileStrength) FROM ProfileView " +
                     " WHERE ViewStartTime > %d AND ViewStartTime < %d " +
-                    " GROUP BY ViewerPosition ORDER BY COUNT(*) desc LIMIT %d",
+                    " GROUP BY ViewerPosition TOP %d",
                 "SELECT ViewerWorkPlace, ViewerPosition, ViewedProfileWorkPlace, ViewedProfilePosition, COUNT(*) FROM ProfileView" +
                     " WHERE ViewStartTime > %d AND ViewStartTime < %d" +
-                    " GROUP BY ViewerWorkPlace, ViewerPosition, ViewedProfileWorkPlace, ViewedProfilePosition ORDER BY COUNT(*) desc LIMIT %d"
+                    " GROUP BY ViewerWorkPlace, ViewerPosition, ViewedProfileWorkPlace, ViewedProfilePosition TOP %d"
         };
         return queries;
     }
