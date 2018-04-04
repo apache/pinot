@@ -117,6 +117,7 @@
     <jersey.version>2.23</jersey.version>
     <swagger.version>1.5.10</swagger.version>
     <hadoop.version>2.7.0</hadoop.version>
+    <antlr.version>4.6</antlr.version>
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine> -Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g </argLine>
   </properties>
@@ -562,12 +563,7 @@
       <dependency>
         <groupId>org.antlr</groupId>
         <artifactId>antlr4-runtime</artifactId>
-        <version>4.3</version>
-      </dependency>
-      <dependency>
-        <groupId>org.antlr</groupId>
-        <artifactId>antlr4-annotations</artifactId>
-        <version>4.3</version>
+        <version>${antlr.version}</version>
       </dependency>
       <dependency>
         <groupId>com.jcabi</groupId>

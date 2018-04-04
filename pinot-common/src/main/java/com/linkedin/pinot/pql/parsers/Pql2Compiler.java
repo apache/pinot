@@ -29,6 +29,9 @@ import com.linkedin.pinot.pql.parsers.pql2.ast.RegexpLikePredicateAstNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
@@ -40,8 +43,6 @@ import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.Recognizer;
 import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.UnbufferedTokenStream;
-import org.antlr.v4.runtime.misc.NotNull;
-import org.antlr.v4.runtime.misc.Nullable;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.lang.math.NumberUtils;
@@ -56,8 +57,8 @@ public class Pql2Compiler implements AbstractCompiler {
 
   private static class ErrorListener extends BaseErrorListener {
     @Override
-    public void syntaxError(@NotNull Recognizer<?, ?> recognizer, @Nullable Object offendingSymbol, int line,
-        int charPositionInLine, @NotNull String msg, @Nullable RecognitionException e) {
+    public void syntaxError(@Nonnull Recognizer<?, ?> recognizer, @Nullable Object offendingSymbol, int line,
+        int charPositionInLine, @Nonnull String msg, @Nullable RecognitionException e) {
       throw new Pql2CompilationException(msg, offendingSymbol, line, charPositionInLine, e);
     }
   }
