@@ -139,13 +139,13 @@ export default Controller.extend({
    * displayed investigation tab ('metrics', 'dimensions', ...)
    * @type {string}
    */
-  activeTab: null,
+  activeTab: ROOTCAUSE_TAB_METRICS,
 
   /**
    * display mode for timeseries chart
    * @type {string}
    */
-  timeseriesMode: null,
+  timeseriesMode: 'split',
 
   /**
    * urns of the currently focused entities in the legend component
@@ -223,9 +223,7 @@ export default Controller.extend({
     this.setProperties({
       invisibleUrns: new Set(),
       hoverUrns: new Set(),
-      filteredUrns: new Set(),
-      activeTab: ROOTCAUSE_TAB_METRICS,
-      timeseriesMode: 'split'
+      filteredUrns: new Set()
     });
 
     // This is a flag for the acceptance test for rootcause to prevent it from timing out because of this run loop
@@ -572,7 +570,7 @@ export default Controller.extend({
    * @private
    */
   _updateSession(sessionId) {
-    const { username } = this.getProperties('username');
+    const { username, metricId, anomalyId } = this.getProperties('username', 'metricId', 'anomalyId');
 
     this.setProperties({
       sessionId,
@@ -580,7 +578,19 @@ export default Controller.extend({
       sessionUpdatedTime: moment().valueOf(),
       sessionModified: false
     });
-    this.transitionToRoute({ queryParams: { sessionId, anomalyId: null, metricId: null }});
+
+    const queryParams = {};
+    queryParams['sessionId'] = sessionId;
+
+    if (!_.isEmpty(metricId)) {
+      queryParams['metricId'] = null;
+    }
+
+    if (!_.isEmpty(anomalyId)) {
+      queryParams['anomalyId'] = null;
+    }
+
+    this.transitionToRoute({ queryParams });
   },
 
   /**

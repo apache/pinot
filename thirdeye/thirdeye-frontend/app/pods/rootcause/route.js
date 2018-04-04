@@ -281,6 +281,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
     controller.setProperties({
       routeErrors,
+      anomalyId,
+      metricId,
       sessionId,
       sessionName,
       sessionText,

@@ -31,7 +31,7 @@ export default Component.extend({
 
   onHover: null, // function (urns)
 
-  timeseriesMode: null, // 'absolute', 'relative', 'log'
+  timeseriesMode: null, // 'absolute', 'relative', 'log', 'split'
 
   classNames: ['rootcause-chart'],
 
@@ -48,11 +48,6 @@ export default Component.extend({
   focusedIds: computed('focusedUrns', function() {
     return this.get('focusedUrns');
   }),
-
-  init() {
-    this._super(...arguments);
-    this.set('timeseriesMode', TIMESERIES_MODE_ABSOLUTE);
-  },
 
   legend: {
     show: false
