@@ -20,12 +20,16 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.readers.sort.OffHeapPinotSegmentSorter;
+import com.linkedin.pinot.core.data.readers.sort.OnDiskPinotSegmentSorter;
+import com.linkedin.pinot.core.data.readers.sort.OnHeapPinotSegmentSorter;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -39,6 +43,7 @@ public class PinotSegmentRecordReader implements RecordReader {
   private final Map<String, PinotSegmentColumnReader> _columnReaderMap;
 
   private int _nextDocId = 0;
+  private int[] _docIdsInSortedColumnOrder;
 
   /**
    * Read records using the segment schema.
@@ -87,6 +92,21 @@ public class PinotSegmentRecordReader implements RecordReader {
     }
   }
 
+  /**
+   * Read records using the passed in schema and in the order of sorted column.
+   */
+  public PinotSegmentRecordReader(File indexDir, Schema schema, List<String> sortedOrder) throws Exception {
+    this(indexDir, schema);
+    // If sorted column is not specified or the segment is already sorted, we don't need to compute ordering for docIds.
+    if (!sortedOrder.isEmpty()) {
+      OnDiskPinotSegmentSorter sorter = new OnDiskPinotSegmentSorter(_numDocs, schema, _columnReaderMap);
+
+//      OffHeapPinotSegmentSorter sorter = new OffHeapPinotSegmentSorter(_numDocs, schema, _columnReaderMap, new File("/Users/snlee/data/test/temp"));
+//      OnHeapPinotSegmentSorter sorter = new OnHeapPinotSegmentSorter(_numDocs, schema, _columnReaderMap);
+      _docIdsInSortedColumnOrder = sorter.getSortedDocIds(sortedOrder);
+    }
+  }
+
   @Override
   public boolean hasNext() {
     return _nextDocId < _numDocs;
@@ -99,32 +119,10 @@ public class PinotSegmentRecordReader implements RecordReader {
 
   @Override
   public GenericRow next(GenericRow reuse) {
-    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
-      String fieldName = fieldSpec.getName();
-      if (fieldSpec.isSingleValueField()) {
-        switch (fieldSpec.getDataType()) {
-          case INT:
-            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readInt(_nextDocId));
-            break;
-          case LONG:
-            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readLong(_nextDocId));
-            break;
-          case FLOAT:
-            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readFloat(_nextDocId));
-            break;
-          case DOUBLE:
-            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readDouble(_nextDocId));
-            break;
-          case STRING:
-            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readString(_nextDocId));
-            break;
-          default:
-            throw new IllegalStateException(
-                "Field: " + fieldName + " has illegal data type: " + fieldSpec.getDataType());
-        }
-      } else {
-        reuse.putField(fieldName, _columnReaderMap.get(fieldName).readMV(_nextDocId));
-      }
+    if (_docIdsInSortedColumnOrder == null) {
+      reuse = getRecord(reuse, _nextDocId);
+    } else {
+      reuse = getRecord(reuse, _docIdsInSortedColumnOrder[_nextDocId]);
     }
     _nextDocId++;
     return reuse;
@@ -143,5 +141,39 @@ public class PinotSegmentRecordReader implements RecordReader {
   @Override
   public void close() {
     _indexSegment.destroy();
+  }
+
+  /**
+   * Return the row given a docId
+   */
+  public GenericRow getRecord(GenericRow reuse, int docId) {
+    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+      String fieldName = fieldSpec.getName();
+      if (fieldSpec.isSingleValueField()) {
+        switch (fieldSpec.getDataType()) {
+          case INT:
+            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readInt(docId));
+            break;
+          case LONG:
+            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readLong(docId));
+            break;
+          case FLOAT:
+            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readFloat(docId));
+            break;
+          case DOUBLE:
+            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readDouble(docId));
+            break;
+          case STRING:
+            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readString(docId));
+            break;
+          default:
+            throw new IllegalStateException(
+                "Field: " + fieldName + " has illegal data type: " + fieldSpec.getDataType());
+        }
+      } else {
+        reuse.putField(fieldName, _columnReaderMap.get(fieldName).readMV(docId));
+      }
+    }
+    return reuse;
   }
 }

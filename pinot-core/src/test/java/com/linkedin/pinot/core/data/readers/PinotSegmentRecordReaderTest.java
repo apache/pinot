@@ -47,11 +47,12 @@ import org.testng.annotations.Test;
  */
 public class PinotSegmentRecordReaderTest {
   private static final int NUM_ROWS = 10000;
+  private static final int NUM_SEGMENTS = 3;
 
-  private String segmentName;
+  private List<String> segmentNames;
+  private List<String> segmentOutputDirs;
+  private List<File> segmentIndexDirs;
   private Schema schema;
-  private String segmentOutputDir;
-  private File segmentIndexDir;
   private List<GenericRow> rows;
   private RecordReader recordReader;
 
@@ -63,10 +64,19 @@ public class PinotSegmentRecordReaderTest {
 
   @BeforeClass
   public void setup() throws Exception {
-    segmentName = "pinotSegmentRecordReaderTest";
+    segmentNames = new ArrayList<>(NUM_SEGMENTS);
+    segmentOutputDirs = new ArrayList<>(NUM_SEGMENTS);
+    segmentIndexDirs = new ArrayList<>(NUM_SEGMENTS);
+
+    for (int i = 0; i < NUM_SEGMENTS; i++) {
+      String segmentName = "pinotSegmentRecordReaderTest_" + i;
+      String segmentOutputDir = Files.createTempDir().toString();
+      segmentNames.add(segmentName);
+      segmentOutputDirs.add(segmentOutputDir);
+      segmentIndexDirs.add(new File(segmentOutputDir, segmentName));
+    }
+
     schema = createPinotSchema();
-    segmentOutputDir = Files.createTempDir().toString();
-    segmentIndexDir = new File(segmentOutputDir, segmentName);
     createTestData();
     recordReader = new GenericRowRecordReader(rows, schema);
     createSegment();
@@ -113,25 +123,25 @@ public class PinotSegmentRecordReaderTest {
   }
 
   private void createSegment() throws Exception {
+    for (int i = 0; i < NUM_SEGMENTS; i++) {
+      SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
+      segmentGeneratorConfig.setTableName(segmentNames.get(i));
+      segmentGeneratorConfig.setOutDir(segmentOutputDirs.get(i));
+      segmentGeneratorConfig.setSegmentName(segmentNames.get(i));
 
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
-    segmentGeneratorConfig.setTableName(segmentName);
-    segmentGeneratorConfig.setOutDir(segmentOutputDir);
-    segmentGeneratorConfig.setSegmentName(segmentName);
-
-    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig, recordReader);
-    driver.build();
-
-    if (!segmentIndexDir.exists()) {
-      throw new IllegalStateException("Segment generation failed");
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(segmentGeneratorConfig, recordReader);
+      driver.build();
+      if (!segmentIndexDirs.get(i).exists()) {
+        throw new IllegalStateException("Segment generation failed");
+      }
     }
   }
 
   @Test
   public void testPinotSegmentRecordReader() throws Exception {
     List<GenericRow> outputRows = new ArrayList<>();
-
+    File segmentIndexDir = segmentIndexDirs.get(0);
     try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(segmentIndexDir)) {
       while (pinotSegmentRecordReader.hasNext()) {
         outputRows.add(pinotSegmentRecordReader.next());
@@ -151,8 +161,83 @@ public class PinotSegmentRecordReaderTest {
     }
   }
 
+  @Test
+  public void testPinotSegmentRecordReaderSortedColumn() throws Exception {
+    List<GenericRow> outputRows = new ArrayList<>();
+    File segmentIndexDir = segmentIndexDirs.get(0);
+    List<String> sortOrder = new ArrayList<>();
+    sortOrder.add(D_SV_1);
+
+    try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(segmentIndexDir, schema,
+        sortOrder)) {
+      while (pinotSegmentRecordReader.hasNext()) {
+        GenericRow row = pinotSegmentRecordReader.next();
+        outputRows.add(row);
+      }
+    }
+    Assert.assertEquals(outputRows.size(), rows.size(),
+        "Number of rows returned by PinotSegmentRecordReader is incorrect");
+
+    // Check that the rows are sorted based on sorted column
+    GenericRow prev = outputRows.get(0);
+    for (int i = 1; i < outputRows.size(); i++) {
+      GenericRow current = outputRows.get(i);
+      Assert.assertTrue(((String) prev.getValue(D_SV_1)).compareTo((String) current.getValue(D_SV_1)) <= 0);
+      prev = current;
+    }
+  }
+
+  @Test
+  public void testMultiplePinotSegmentRecordReader() throws Exception {
+    List<GenericRow> outputRows = new ArrayList<>();
+    try (MultiplePinotSegmentRecordReader pinotSegmentRecordReader = new MultiplePinotSegmentRecordReader(
+        segmentIndexDirs, schema)) {
+      while (pinotSegmentRecordReader.hasNext()) {
+        outputRows.add(pinotSegmentRecordReader.next());
+      }
+    }
+
+    Assert.assertEquals(outputRows.size(), NUM_SEGMENTS * rows.size(),
+        "Number of rows returned by PinotSegmentRecordReader is incorrect");
+    for (int i = 0; i < outputRows.size(); i++) {
+      int rowsIndex = i % rows.size();
+      GenericRow outputRow = outputRows.get(i);
+      GenericRow row = rows.get(rowsIndex);
+      Assert.assertEquals(outputRow.getValue(D_SV_1), row.getValue(D_SV_1));
+      Assert.assertEquals(outputRow.getValue(D_MV_1), row.getValue(D_MV_1));
+      Assert.assertEquals(outputRow.getValue(M1), row.getValue(M1));
+      Assert.assertEquals(outputRow.getValue(M2), row.getValue(M2));
+      Assert.assertEquals(outputRow.getValue(TIME), row.getValue(TIME));
+    }
+  }
+
+  @Test
+  public void testMultiplePinotSegmentRecordReaderSortedColumn() throws Exception {
+    List<String> sortOrder = new ArrayList<>();
+    sortOrder.add(D_SV_1);
+
+    List<GenericRow> outputRows = new ArrayList<>();
+    try (MultiplePinotSegmentRecordReader pinotSegmentRecordReader = new MultiplePinotSegmentRecordReader(
+        segmentIndexDirs, schema, sortOrder)) {
+      while (pinotSegmentRecordReader.hasNext()) {
+        outputRows.add(pinotSegmentRecordReader.next());
+      }
+    }
+
+    Assert.assertEquals(outputRows.size(), NUM_SEGMENTS * rows.size(),
+        "Number of rows returned by PinotSegmentRecordReader is incorrect");
+    GenericRow prev = outputRows.get(0);
+    for (int i = 1; i < outputRows.size(); i++) {
+      GenericRow current = outputRows.get(i);
+      Assert.assertTrue(((String) prev.getValue(D_SV_1)).compareTo((String) current.getValue(D_SV_1)) <= 0);
+      prev = current;
+    }
+  }
+
   @AfterClass
   public void cleanup() {
-    FileUtils.deleteQuietly(new File(segmentOutputDir));
+    for (String segmentOutputDir : segmentOutputDirs) {
+      FileUtils.deleteQuietly(new File(segmentOutputDir));
+    }
   }
 }

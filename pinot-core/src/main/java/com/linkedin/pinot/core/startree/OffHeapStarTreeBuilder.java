@@ -107,8 +107,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   private static final long MMAP_SIZE_THRESHOLD = 500_000_000;
 
   private File _tempDir;
-  private File _dataFile;
-  private DataOutputStream _dataOutputStream;
+  protected File _dataFile;
+  protected DataOutputStream _dataOutputStream;
 
   private Schema _schema;
   private List<Integer> _dimensionsSplitOrder;
@@ -118,24 +118,24 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   private int _maxNumLeafRecords;
   private boolean _excludeSkipMaterializationDimensionsForStarTreeIndex;
 
-  private int _numRawDocs;
+  protected int _numRawDocs;
   private int _numAggregatedDocs;
   private TreeNode _rootNode;
   private int _numNodes;
 
   // Dimensions
-  private int _numDimensions;
-  private final List<String> _dimensionNames = new ArrayList<>();
+  protected int _numDimensions;
+  protected final List<String> _dimensionNames = new ArrayList<>();
   private final List<Object> _dimensionStarValues = new ArrayList<>();
   private final List<BiMap<Object, Integer>> _dimensionDictionaries = new ArrayList<>();
-  private int _dimensionSize;
+  protected int _dimensionSize;
   // Metrics
-  private int _numMetrics;
-  private final List<String> _metricNames = new ArrayList<>();
-  private int _metricSize;
+  protected int _numMetrics;
+  protected final List<String> _metricNames = new ArrayList<>();
+  protected int _metricSize;
 
   private long _docSize;
-  private int[] _sortOrder;
+  protected int[] _sortOrder;
 
   // Store data tables that need to be closed in close()
   private final List<StarTreeDataTable> _dataTablesToClose = new ArrayList<>();
@@ -278,7 +278,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     appendToRawBuffer(dimensions, metrics);
   }
 
-  private void appendToRawBuffer(DimensionBuffer dimensions, MetricBuffer metrics) throws IOException {
+  protected void appendToRawBuffer(DimensionBuffer dimensions, MetricBuffer metrics) throws IOException {
     appendToBuffer(dimensions, metrics);
     _numRawDocs++;
   }

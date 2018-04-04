@@ -77,7 +77,12 @@ public class StarTreeDataTable implements Closeable {
    * @param sortOrder Sort order of dimensions
    */
   public void sort(int startDocId, int endDocId, final int[] sortOrder) {
-    // Get sorted doc ids
+    int[] sortedDocIds = sortedDocIds(startDocId, endDocId, sortOrder);
+    write(startDocId, endDocId, sortedDocIds);
+  }
+
+
+  public int[] sortedDocIds(int startDocId, int endDocId, final int[] sortOrder) {
     int numDocs = endDocId - startDocId;
     int startDocIdOffset = startDocId - _startDocId;
     final int[] sortedDocIds = new int[numDocs];
@@ -128,9 +133,15 @@ public class StarTreeDataTable implements Closeable {
       dimensionBuffer1.release();
       dimensionBuffer2.release();
     }
+    return sortedDocIds;
+  }
 
+  public void write(int startDocId, int endDocId, final int[] sortedDocIds) {
     // Re-arrange documents based on the sorted document ids
     // Each write places a document in it's proper location, so time complexity is O(n)
+    int numDocs = endDocId - startDocId;
+    int startDocIdOffset = startDocId - _startDocId;
+
     LBuffer docBuffer = new LBuffer(_docSize);
     try {
       for (int i = 0; i < numDocs; i++) {
