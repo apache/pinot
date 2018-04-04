@@ -24,7 +24,8 @@ const ROOTCAUSE_ROLE_VALUE = 'value';
 const ROOTCAUSE_ROLE_HEAD = 'head';
 const ROOTCAUSE_ROLE_TAIL = 'tail';
 
-const ROOTCAUSE_ROLLUP_RANGE = [0, 20];
+const ROOTCAUSE_ROLLUP_RANGE = [0, 100];
+const ROOTCAUSE_ROLLUP_EXPLAIN_FRACTION = 0.95;
 
 const ROOTCAUSE_MODE_MAPPING = {
   'Percentage Change': ROOTCAUSE_ROLLUP_MODE_CHANGE,
@@ -163,8 +164,8 @@ export default Component.extend({
     'baseline',
     'rollupRange',
     function () {
-      const { current, baseline, rollupRange } =
-        this.getProperties('current', 'baseline', 'rollupRange');
+      const { current, baseline } =
+        this.getProperties('current', 'baseline');
 
       // collect all dimension names
       const dimNames = new Set(Object.keys(current).concat(Object.keys(baseline)));
@@ -182,8 +183,19 @@ export default Component.extend({
 
         const range = ROOTCAUSE_ROLLUP_RANGE;
         const head = _.slice(all, 0, range[0]);
-        const visible = _.slice(all, range[0], range[1]);
-        const tail = _.slice(all, range[1]);
+
+        // select keys explaining ROOTCAUSE_ROLLUP_EXPLAIN_FRACTION of total
+        const visible = [];
+        const cutoff = this._sum(all.map(v => current[n][v])) * ROOTCAUSE_ROLLUP_EXPLAIN_FRACTION;
+        let sum = this._sum(head.map(v => current[n][v]));
+        let i = range[0];
+        while (i < range[1] && sum < cutoff) {
+          sum += current[n][all[i]];
+          visible.push(all[i]);
+          i++;
+        }
+
+        const tail = _.slice(all, i);
 
         const curr = this._makeRollup(current[n], head, visible, tail);
         const base = this._makeRollup(baseline[n], head, visible, tail);
@@ -325,10 +337,14 @@ export default Component.extend({
     return Object.keys(dimNameObj).map(v => [dimNameObj[v], v]).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0])).map(t => t[1]);
   },
 
+  _sum(arr) {
+    return arr.reduce((agg, x) => agg + x, 0);
+  },
+
   actions: {
     onHeatmapClick(role, dimName, dimValue) {
-      const { rollupRange, selectedUrn, onSelection, currentUrn } =
-        this.getProperties('rollupRange', 'selectedUrn', 'onSelection', 'currentUrn');
+      const { selectedUrn, onSelection } =
+        this.getProperties('selectedUrn', 'onSelection');
 
       // selection
       if (role === ROOTCAUSE_ROLE_VALUE) {
