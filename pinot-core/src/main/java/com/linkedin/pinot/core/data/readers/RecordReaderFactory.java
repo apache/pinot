@@ -40,7 +40,7 @@ public class RecordReaderFactory {
       case JSON:
         return new JSONRecordReader(dataFile, schema);
       case PINOT:
-        return new PinotSegmentRecordReader(dataFile, schema);
+        return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());
       case THRIFT:
         return new ThriftRecordReader(dataFile, schema,(ThriftRecordReaderConfig)segmentGeneratorConfig.getReaderConfig());
       default:
