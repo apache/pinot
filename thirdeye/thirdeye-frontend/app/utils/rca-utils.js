@@ -347,6 +347,7 @@ export function toBaselineRange(range, offset) {
   const offsetWeeks = {
     current: 0,
     none: 0,
+    predicted: 0,
     wow: 1,
     wo1w: 1,
     wo2w: 2,
