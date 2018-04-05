@@ -48,7 +48,7 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   private int _currentDocId = 0;
 
   public DocIdSetOperator(@Nonnull BaseFilterOperator filterOperator, int maxSizeOfDocIdSet) {
-    Preconditions.checkArgument(maxSizeOfDocIdSet <= DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    Preconditions.checkArgument(maxSizeOfDocIdSet > 0 && maxSizeOfDocIdSet <= DocIdSetPlanNode.MAX_DOC_PER_CALL);
     _filterOperator = filterOperator;
     _maxSizeOfDocIdSet = maxSizeOfDocIdSet;
   }
