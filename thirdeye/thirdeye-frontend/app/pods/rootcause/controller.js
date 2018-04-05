@@ -23,6 +23,8 @@ import _ from 'lodash';
 
 const ROOTCAUSE_TAB_DIMENSIONS = 'dimensions';
 const ROOTCAUSE_TAB_METRICS = 'metrics';
+const ROOTCAUSE_TAB_EVENTS = 'events';
+const ROOTCAUSE_TAB_TREND = 'trend';
 
 const ROOTCAUSE_SETUP_MODE_CONTEXT = "context";
 const ROOTCAUSE_SETUP_MODE_SELECTED = "selected";
@@ -274,32 +276,20 @@ export default Controller.extend({
         return;
       }
 
+      //
       // entities
+      //
       const entitiesUrns = new Set([...selectedUrns, ...context.urns, ...context.anomalyUrns]);
       entitiesService.request(context, entitiesUrns);
 
-
-      // timeseries
-      timeseriesService.request(context, selectedUrns);
-
-      // anomaly function baselines
-      const anomalyFunctionUrns = filterPrefix(context.anomalyUrns, 'frontend:anomalyfunction:');
-      anomalyFunctionService.request(context, new Set(anomalyFunctionUrns));
-
-      // breakdowns
-      if (activeTab === ROOTCAUSE_TAB_DIMENSIONS) {
-        const metricUrns = new Set(filterPrefix(context.urns, 'thirdeye:metric:'));
-        const currentUrns = [...metricUrns].map(toCurrentUrn);
-        const baselineUrns = [...metricUrns].map(toBaselineUrn);
-        breakdownsService.request(context, new Set(currentUrns.concat(baselineUrns)));
-      }
-
+      //
       // related metrics
+      //
       const relatedMetricUrns = new Set();
 
-      if (activeTab === ROOTCAUSE_TAB_METRICS) {
-        // cache may be stale, fetch directly from service
-        const entities = this.get('entitiesService.entities');
+      if (activeTab === ROOTCAUSE_TAB_METRICS
+          || activeTab === ROOTCAUSE_TAB_TREND) {
+        const entities = this.get('entitiesService.entities'); // cache may be stale, fetch directly
         filterPrefix(Object.keys(entities), 'thirdeye:metric:').forEach(urn => relatedMetricUrns.add(urn));
       }
 
@@ -307,11 +297,45 @@ export default Controller.extend({
         filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => relatedMetricUrns.add(urn));
       }
 
-      // scores
-      const scoresUrns = relatedMetricUrns;
-      scoresService.request(context, new Set(scoresUrns));
+      //
+      // timeseries
+      //
+      const timeseriesUrns = new Set(selectedUrns);
 
+      if (activeTab === ROOTCAUSE_TAB_TREND) {
+        [...relatedMetricUrns].forEach(urn => timeseriesUrns.add(toCurrentUrn(urn)));
+        [...relatedMetricUrns].forEach(urn => timeseriesUrns.add(toBaselineUrn(urn)));
+      }
+
+      timeseriesService.request(context, timeseriesUrns);
+
+      //
+      // anomaly function baselines
+      //
+      const anomalyFunctionUrns = filterPrefix(context.anomalyUrns, 'frontend:anomalyfunction:');
+      anomalyFunctionService.request(context, new Set(anomalyFunctionUrns));
+
+      //
+      // breakdowns
+      //
+      if (activeTab === ROOTCAUSE_TAB_DIMENSIONS) {
+        const metricUrns = new Set(filterPrefix(context.urns, 'thirdeye:metric:'));
+        const currentUrns = [...metricUrns].map(toCurrentUrn);
+        const baselineUrns = [...metricUrns].map(toBaselineUrn);
+        breakdownsService.request(context, new Set(currentUrns.concat(baselineUrns)));
+      }
+
+      //
+      // scores
+      //
+      if (activeTab === ROOTCAUSE_TAB_METRICS) {
+        const scoresUrns = new Set(relatedMetricUrns);
+        scoresService.request(context, new Set(scoresUrns));
+      }
+
+      //
       // aggregates
+      //
       const offsets = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
       const offsetUrns = [...relatedMetricUrns]
         .map(urn => [].concat(offsets.map(offset => toOffsetUrn(urn, offset))))
