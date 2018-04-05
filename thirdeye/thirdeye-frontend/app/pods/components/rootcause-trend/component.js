@@ -70,44 +70,96 @@ export default Component.extend({
   //
 
   /**
-   * Display flag for table. Hack for ember models table not re-rendering columns on init()
+   * Display flag for table. Hack for ember models table only re-rendering columns on init()
    * @type {bool}
    */
   showTable: true,
 
   /**
-   * Observer hack for ember models table only re-rendering columns on init()
+   * Hack for ember models table only re-rendering columns on init()
    */
-  _columnObserver: observer(
-    'columns',
-    function () {
-      this.set('showTable', false);
-      later(this, () => this.set('showTable', true), 0);
-    }
-  ),
+  _columnObserver: observer('columns', function () {
+    this.set('showTable', false);
+    later(this, () => this.set('showTable', true), 0);
+  }),
 
   /**
-   * Time buckets for columns
+   * Start time for time table, overridden by drop down
+   * @type {int}
+   */
+  startTime: computed('context', function () {
+    return this.get('context').analysisRange[0];
+  }),
+
+  /**
+   * Start time formatted
+   * @type {string}
+   */
+  startTimeFormatted: computed('startTime', function () {
+    return this._formatTime(this.get('startTime'));
+  }),
+
+  /**
+   * Start time options for dropdown
+   */
+  startTimeOptions: computed('availableBuckets', function () {
+    const { availableBuckets } = this.getProperties('availableBuckets');
+
+    const options = [];
+    for (let i = 0; i < availableBuckets.length; i += ROOTCAUSE_TREND_MAX_COLUMNS) {
+      options.push(this._formatTime(moment(availableBuckets[i])));
+    }
+
+    return options;
+  }),
+
+  /**
+   * Reverse lookup mapping for start time options for dropdown
+   */
+  startTimeOptionsMapping: computed('availableBuckets', function () {
+    const { availableBuckets } = this.getProperties('availableBuckets');
+
+    const options = {};
+    for (let i = 0; i < availableBuckets.length; i += ROOTCAUSE_TREND_MAX_COLUMNS) {
+      options[this._formatTime(moment(availableBuckets[i]))] = availableBuckets[i];
+    }
+
+    return options;
+  }),
+
+  /**
+   * Possible time buckets from analysis range
+   * @type {int[]}
+   */
+  availableBuckets: computed('context', function () {
+    const { context } = this.getProperties('context');
+
+    const buckets = [];
+    const [stepSize, stepUnit] = context.granularity.split('_').map(s => s.toLowerCase());
+    const limit = moment(context.analysisRange[1]);
+    let time = moment(context.analysisRange[0]);
+    while (time < limit) {
+      buckets.push(time.valueOf());
+      time = time.add(stepSize, stepUnit);
+    }
+
+    return buckets;
+  }),
+
+  /**
+   * Actual time buckets for columns
    * @type {int[]}
    */
   buckets: computed(
-    'context',
-    function () {
-      const { context } = this.getProperties('context');
+    'availableBuckets',
+    'startTime',
+      function () {
+      const { availableBuckets, startTime } = this.getProperties('availableBuckets', 'startTime');
 
-      const buckets = [];
-      const [stepSize, stepUnit] = context.granularity.split('_').map(s => s.toLowerCase());
-      const limit = moment(context.analysisRange[1]);
-      let time = moment(context.analysisRange[0]);
-      let i = 0;
-      while ((time < limit) && (i < ROOTCAUSE_TREND_MAX_COLUMNS)) {
-        // do something
-        buckets.push(time.valueOf());
-        time = time.add(stepSize, stepUnit);
-        i++;
-      }
+      const startOffset = startTime || availableBuckets[0];
+      const startIndex = availableBuckets.findIndex(t => t >= startOffset);
 
-      return buckets;
+      return _.slice(availableBuckets, startIndex, startIndex + ROOTCAUSE_TREND_MAX_COLUMNS);
     }
   ),
 
@@ -115,45 +167,42 @@ export default Component.extend({
    * Columns for trend table
    * @type {object[]}
    */
-  columns: computed(
-    'buckets',
-    function () {
-      const { buckets } = this.getProperties('buckets');
+  columns: computed('buckets', function () {
+    const { buckets } = this.getProperties('buckets');
 
-      const columns = [
-        {
-          template: 'custom/table-checkbox',
-          className: 'metrics-table__column'
-        }, {
-          propertyName: 'label',
-          title: 'Metric',
-          className: 'metrics-table__column metrics-table__column--large'
-        }
-      ];
+    const columns = [
+      {
+        template: 'custom/table-checkbox',
+        className: 'metrics-table__column'
+      }, {
+        propertyName: 'label',
+        title: 'Metric',
+        className: 'metrics-table__column metrics-table__column--large'
+      }
+    ];
 
-      buckets.forEach(t => {
-        columns.push({
-          propertyName: `${t}`,
-          template: 'custom/trend-table-cell',
-          title: moment(t).format('MM/DD h:mm') + moment(t).format('a')[0],
-          sortedBy: `${t}_raw`,
-          disableFiltering: true,
-          className: 'metrics-table__column metrics-table__column--small'
-        });
-      });
-
+    buckets.forEach(t => {
       columns.push({
-        template: 'custom/rca-metric-links',
-        propertyName: 'links',
-        title: 'Links',
+        propertyName: `${t}`,
+        template: 'custom/trend-table-cell',
+        title: this._formatTime(t),
+        sortedBy: `${t}_raw`,
         disableFiltering: true,
-        disableSorting: true,
         className: 'metrics-table__column metrics-table__column--small'
       });
+    });
 
-      return columns;
-    }
-  ),
+    columns.push({
+      template: 'custom/rca-metric-links',
+      propertyName: 'links',
+      title: 'Links',
+      disableFiltering: true,
+      disableSorting: true,
+      className: 'metrics-table__column metrics-table__column--small'
+    });
+
+    return columns;
+  }),
 
   /**
    * Change values, per metric/row
@@ -259,32 +308,29 @@ export default Component.extend({
    *  ]
    * }
    */
-  links: computed(
-    'entities',
-    function() {
-      const { entities } = this.getProperties('entities');
-      let metricUrlMapping = {};
+  links: computed('entities', function() {
+    const { entities } = this.getProperties('entities');
+    let metricUrlMapping = {};
 
-      filterPrefix(Object.keys(entities), 'thirdeye:metric:')
-        .forEach(urn => {
-          const attributes = entities[urn].attributes;
-          const { externalUrls = [] } = attributes;
-          let urlArr = [];
+    filterPrefix(Object.keys(entities), 'thirdeye:metric:')
+      .forEach(urn => {
+        const attributes = entities[urn].attributes;
+        const { externalUrls = [] } = attributes;
+        let urlArr = [];
 
-          // Add the list of urls for each url type
-          externalUrls.forEach(urlLabel => {
-            urlArr.push({
-              [urlLabel]: attributes[urlLabel][0] // each type should only have 1 url
-            });
+        // Add the list of urls for each url type
+        externalUrls.forEach(urlLabel => {
+          urlArr.push({
+            [urlLabel]: attributes[urlLabel][0] // each type should only have 1 url
           });
-
-          // Map all the url lists to a metric urn
-          metricUrlMapping[urn] = urlArr;
         });
 
-      return metricUrlMapping;
-    }
-  ),
+        // Map all the url lists to a metric urn
+        metricUrlMapping[urn] = urlArr;
+      });
+
+    return metricUrlMapping;
+  }),
 
   /**
    * Keeps track of items that are selected in the table
@@ -298,6 +344,16 @@ export default Component.extend({
       return [...selectedUrns].filter(urn => data[urn]).map(urn => data[urn]);
     }
   ),
+
+  /**
+   * Helper to format time stamp specifically for trend table
+   *
+   * @param {int} t timestamp
+   * @private
+   */
+  _formatTime(t) {
+    return moment(t).format('MM/DD h:mm') + moment(t).format('a')[0];
+  },
 
   actions: {
     /**
@@ -320,6 +376,14 @@ export default Component.extend({
         }
         onSelection(updates);
       }
+    },
+
+    /**
+     * Triggered by drop down on change of selection
+     */
+    startTimeChanged(timestamp) {
+      const lookup = this.get('startTimeOptionsMapping');
+      this.set('startTime', lookup[timestamp]);
     }
   }
 });
