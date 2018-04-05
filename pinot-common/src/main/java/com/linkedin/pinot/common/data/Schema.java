@@ -22,6 +22,8 @@ import com.google.gson.JsonObject;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -612,4 +614,5 @@ public final class Schema {
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
     return result;
   }
+  
 }

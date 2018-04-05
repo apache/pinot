@@ -35,21 +35,13 @@ import com.linkedin.pinot.pql.parsers.Pql2Compiler;
  */
 public class FunctionExpressionEvaluator {
   /**
-   * PQL compilers are not thread safe. Creating one per thread
-   */
-  static ThreadLocal<Pql2Compiler> COMPILER_CACHE = new ThreadLocal<Pql2Compiler>() {
-    protected Pql2Compiler initialValue() {
-      return new Pql2Compiler();
-    };
-  };
-  /**
    * Root of the execution tree
    */
   ExecutableNode _rootNode;
 
   public FunctionExpressionEvaluator(String columnName, String expression) throws Exception {
     TransformExpressionTree expressionTree;
-    expressionTree = COMPILER_CACHE.get().compileToExpressionTree(expression);
+    expressionTree = Pql2Compiler.get().compileToExpressionTree(expression);
     _rootNode = planExecution(expressionTree);
   }
 

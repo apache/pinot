@@ -55,6 +55,19 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 @ThreadSafe
 public class Pql2Compiler implements AbstractCompiler {
 
+  /**
+   * PQL compilers are not thread safe. Creating one per thread
+   */
+  static ThreadLocal<Pql2Compiler> COMPILER_CACHE = new ThreadLocal<Pql2Compiler>() {
+    protected Pql2Compiler initialValue() {
+      return new Pql2Compiler();
+    };
+  };
+
+  public static Pql2Compiler get() {
+    return COMPILER_CACHE.get();
+  }
+
   private static class ErrorListener extends BaseErrorListener {
     @Override
     public void syntaxError(@Nonnull Recognizer<?, ?> recognizer, @Nullable Object offendingSymbol, int line,

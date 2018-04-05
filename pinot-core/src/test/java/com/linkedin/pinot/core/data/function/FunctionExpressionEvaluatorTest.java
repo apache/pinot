@@ -24,7 +24,9 @@ import org.joda.time.format.DateTimeFormat;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 
 import scala.collection.mutable.StringBuilder;
 
