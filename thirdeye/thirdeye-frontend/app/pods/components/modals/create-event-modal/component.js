@@ -15,7 +15,7 @@ import Component from '@ember/component';
 import {
   get, set, getProperties
 } from '@ember/object';
-import {inject as service} from '@ember/service';
+import { inject as service } from '@ember/service';
 
 import fetch from 'fetch';
 
@@ -23,10 +23,14 @@ import createEventApi from 'thirdeye-frontend/utils/api/create-event';
 
 export default Component.extend({
 
-  session: service(), /**
-   * Default selected mapping type
-   * @type {String}
+  session: service(),
+  /**
+   * Custom classes to be applied
    */
+  classes: Object.freeze({
+    theadCell: "te-modal__table-header"
+  }),
+
   actions: {
     /**
      * Handles the close event
@@ -36,6 +40,10 @@ export default Component.extend({
       this.set('isShowingModal', false);
     },
 
+    /**
+     * Handles save event
+     * @return {undefined}
+     */
     onSave() {
       const {
         startTime, endTime, eventName, countryCode
