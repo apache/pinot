@@ -82,7 +82,7 @@ export default Component.extend({
     'columns',
     function () {
       this.set('showTable', false);
-      later(this, () => this.set('showTable', true), 1000);
+      later(this, () => this.set('showTable', true), 0);
     }
   ),
 
@@ -135,7 +135,7 @@ export default Component.extend({
         columns.push({
           propertyName: `${t}`,
           template: 'custom/trend-table-cell',
-          title: moment(t).format('MM/DD hh:mm'), // TODO
+          title: moment(t).format('MM/DD h:mm') + moment(t).format('a')[0],
           sortedBy: `${t}_raw`,
           disableFiltering: true,
           className: 'metrics-table__column metrics-table__column--small'
@@ -191,7 +191,7 @@ export default Component.extend({
 
           // TODO use O(logN) data structure (e.g. treemap)
           const index = buckets.findIndex(b => b >= t);
-          if (index >= 0 && index < buckets.length && Number.isNaN(changes[urn][index])) {
+          if (index >= 0 && index < buckets.length) {
             changes[urn][index] = change;
           }
         });
