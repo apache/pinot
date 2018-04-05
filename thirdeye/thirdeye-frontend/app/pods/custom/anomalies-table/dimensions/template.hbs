@@ -1,4 +1,9 @@
 <ul class="te-anomaly-table__list">
+  <li class="te-anomaly-table__list-item te-anomaly-table__list-item--smaller" title="{{record.functionName}}">
+    {{#link-to 'rootcause' (query-params anomalyId=record.id)}}
+      {{record.functionName}}
+    {{/link-to}}
+  </li>
   {{#each-in record.dimensions as |dimName dimList|}}
    <li class="te-anomaly-table__list-item te-anomaly-table__list-item--smaller" title="{{dimension.dimensionVal}}">
      {{dimName}}:<span class="te-anomaly-table__list-value">{{dimList}}</span>

@@ -33,13 +33,14 @@ export default Component.extend({
      */
      onChangeAnomalyResponse: async function(anomalyRecord, selectedResponse, inputObj) {
       const responseObj = anomalyUtil.anomalyResponseObj.find(res => res.name === selectedResponse);
+
       set(inputObj, 'selected', selectedResponse);
       let res;
       try {
         // Save anomaly feedback
-        res = await anomalyUtil.updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value)
+        res = await anomalyUtil.updateAnomalyFeedback(anomalyRecord.id, responseObj.value)
         // We make a call to ensure our new response got saved
-        res = await anomalyUtil.verifyAnomalyFeedback(anomalyRecord.anomalyId, responseObj.status)
+        res = await anomalyUtil.verifyAnomalyFeedback(anomalyRecord.id, responseObj.status)
         const filterMap = getWithDefault(res, 'searchFilters.statusFilterMap', null);
         if (filterMap && filterMap.hasOwnProperty(responseObj.status)) {
           setProperties(anomalyRecord, {

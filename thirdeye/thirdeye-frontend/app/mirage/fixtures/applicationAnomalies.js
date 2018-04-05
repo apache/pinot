@@ -4,7 +4,7 @@ import moment from 'moment';
 export default [
   {
     id: 1,
-    anomalyId: 26020862,
+    anomalyId: 33330871,
     start: 1491804013000,
     end: 1491890413000,
     anomalyFeedback: 'True anomaly',

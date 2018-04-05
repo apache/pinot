@@ -1,40 +1,63 @@
-<div class="container card-container">
-  <div class="application-header">
-    <p class="te-title">{{defaultApplication.application}}</p>
-    <div class="application-header__dropdown">
-      {{#power-select
-        options=model.applications
-        selected=defaultApplication
-        onchange=(action "selectApplication")
-        as |app|}}
-        {{app.application}}
-      {{/power-select}}
-    </div>
-  </div>
+<div class="container dashboard-container">
+  <header>
+    {{range-pill-selectors
+      title="Showing"
+      uiDateFormat=uiDateFormat
+      activeRangeEnd=activeRangeEnd
+      activeRangeStart=activeRangeStart
+      timeRangeOptions=timeRangeOptions
+      timePickerIncrement=timePickerIncrement
+      selectAction=(action "onRangeSelection")
+    }}
+  </header>
+  <article class="dashboard-container__body">
+    <section class="dashboard-container__application-header">
+      <h2 class="dashboard-container__title">Application:<span>{{appName}}</span></h2>
+      <div class="dashboard-container__application-header-dropdown">
+        {{#power-select
+          options=model.applications
+          selected=appNameSelected
+          onchange=(action "selectApplication")
+          as |app|}}
+          {{app.application}}
+        {{/power-select}}
+      </div>
+    </section>
 
-  {{stats-cards
-    stats=stats}}
+    <section>
+      {{stats-cards stats=stats}}
+    </section>
 
-  {{#each-in model.anomalyMapping as |metric alertList|}}
-    <p>Metric: {{metric}}</p>
-    {{#each-in alertList as |alert anomalyList|}}
-      <p>Alert: {{alert}}</p>
-      {{models-table
-        data=anomalyList
-        columns=columns
-        customClasses=classes
-        showColumnsDropdown=false
-        showGlobalFilter=false
-        filteringIgnoreCase=true
-        multipleExpand=true
-        pageSize=5
-        showComponentFooter=false
-      }}
-      {{#if (gt anomalyList.length 5) }}
-        <a href="{{get (get model.redirectLink metric) alert}}" class="te-anomaly-table__redirect-link">
-          See More
-        </a>
+    <section>
+      {{#if (gt anomaliesCount 0)}}
+        {{#each-in model.anomalyMapping as |metric alertList|}}
+          <h4 class="dashboard-container__title">Metric:
+            <span><strong>{{metric}} ({{alertList.length}} {{if (gt alertList.length 1) "alerts" "alert"}})</strong></span>
+          </h4>
+            {{models-table
+              data=alertList
+              columns=columns
+              customClasses=classes
+              showColumnsDropdown=false
+              showGlobalFilter=false
+              filteringIgnoreCase=true
+              multipleExpand=true
+              pageSize=5
+              showComponentFooter=false
+            }}
+            {{#if (gt alertList.length 5)}}
+              <a href="{{get (get model.redirectLink metric) alert}}" class="dashboard-container__redirect-link">
+                See More
+              </a>
+            {{/if}}
+        {{/each-in}}
+      {{else}}
+        <div class="card-container card-container--md card-container--flush-top">
+          {{rootcause-placeholder
+            message="No anomalies found for this time range."
+            iconClass="glyphicon glyphicon-equalizer"}}
+        </div>
       {{/if}}
-    {{/each-in}}
-  {{/each-in}}
+    </section>
+  </article>
 </div>

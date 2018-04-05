@@ -12,6 +12,7 @@ import {
   toMetricLabel,
   colorMapping
 } from 'thirdeye-frontend/utils/rca-utils';
+import _ from 'lodash';
 
 const TIMESERIES_MODE_ABSOLUTE = 'absolute';
 const TIMESERIES_MODE_RELATIVE = 'relative';

@@ -57,7 +57,7 @@ export default Component.extend({
 
       card.forEach((stat, index) => {
         const property = props[index];
-        obj[property] = stat;
+        obj[property] = (property === 'value' && Number.isNaN(stat)) ? 0 : stat;//let's return a number vs NaN
       });
       cards.push(obj);
     });

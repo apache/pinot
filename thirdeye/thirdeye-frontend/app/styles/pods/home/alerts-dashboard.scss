@@ -1,16 +1,35 @@
-.application-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-
-  &__dropdown {
-    width: 200px;
+.dashboard-container {
+  &__body {
+    background-color: #FFF;
+    margin-bottom: $te-default-element-spacing;
+    padding: 0 15px;
+    border: app-shade(black, 0.1);
   }
-}
 
-.anomalies-table {
-  &__column-cell {
+  &__title {
+    margin: 30px 0 15px 0;
+
+    span {
+      margin-left: 5px;
+    }
+  }
+
+  &__application-header {
     display: flex;
-    align-items: center;
+    justify-content: space-between;
+    align-items: baseline;
+
+    &-dropdown {
+      width: 200px;
+    }
+  }
+
+  &__redirect-link{
+    display: flex;
+    justify-content: center;
+    border: solid 1px $te-light-grey;
+    border-top: none;
+    padding-top: 10px;
+    padding-bottom: 10px;
   }
 }
