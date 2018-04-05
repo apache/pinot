@@ -43,6 +43,7 @@ import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -518,12 +519,28 @@ public class AnomalyResource {
       }
     }
 
+    // parse dimensions to explore
+    List<String> exploreDimensions = Collections.emptyList();
+    if (!StringUtils.isBlank(anomalyFunctionSpec.getExploreDimensions())) {
+      exploreDimensions = Arrays.asList(anomalyFunctionSpec.getExploreDimensions().split(","));
+    }
+
     // Get DimensionMap from input dimension String
     Map<String, String> inputDimension = OBJECT_MAPPER.readValue(dimension, Map.class);
+
+    // populate pre-aggregated dimension values, if necessary
+    DatasetConfigDTO datasetConfigDTO = this.datasetConfigDAO.findByDataset(anomalyFunctionSpec.getCollection());
+    if (datasetConfigDTO != null && !datasetConfigDTO.isAdditive()) {
+      for (String dimName : exploreDimensions) {
+        if (!inputDimension.containsKey(dimName) &&
+            !datasetConfigDTO.getDimensionsHaveNoPreAggregation().contains(dimName)) {
+          inputDimension.put(dimName, datasetConfigDTO.getPreAggregatedKeyword());
+        }
+      }
+    }
+
     DimensionMap dimensionsToBeEvaluated = new DimensionMap();
-    if (anomalyFunctionSpec.getExploreDimensions() != null &&
-        StringUtils.isNotBlank(anomalyFunctionSpec.getExploreDimensions())) {
-      String[] exploreDimensions = anomalyFunctionSpec.getExploreDimensions().split(",");
+    if (anomalyFunctionSpec.getExploreDimensions() != null) {
       for (String exploreDimension : exploreDimensions) {
         if (!inputDimension.containsKey(exploreDimension)) {
           String msg =
@@ -538,7 +555,6 @@ public class AnomalyResource {
 
     // Get the anomaly time lines view of the anomaly function on each dimension
     AnomaliesResource anomaliesResource = new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory);
-    DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(anomalyFunctionSpec.getCollection());
     AnomalyTimelinesView anomalyTimelinesView = null;
     try {
       if (mode.equalsIgnoreCase("ONLINE")) {

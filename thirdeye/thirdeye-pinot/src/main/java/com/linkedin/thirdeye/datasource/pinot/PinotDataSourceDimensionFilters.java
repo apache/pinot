@@ -114,7 +114,11 @@ public class PinotDataSourceDimensionFilters {
         }
 
         // remove pre-aggregation dimension value by default
-        values.remove(datasetConfig.getPreAggregatedKeyword());
+        if (!datasetConfig.isAdditive()) {
+          if (!datasetConfig.getDimensionsHaveNoPreAggregation().contains(dimension)) {
+            values.remove(datasetConfig.getPreAggregatedKeyword());
+          }
+        }
 
         Collections.sort(values);
         result.put(dimension, values);
