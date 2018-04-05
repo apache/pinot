@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.events;
 import com.linkedin.thirdeye.dashboard.resources.CustomizedEventResource;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import org.testng.Assert;
@@ -22,12 +23,13 @@ public class CustomizedEventResourceTest {
 
   @Test
   public void testCreateCustomizedEvent() {
-    customizedEventResource.createCustomizedEvent("test event", 1521832836L, 1521849599L);
+    customizedEventResource.createCustomizedEvent("test event", 1521832836L, 1521849599L, Arrays.asList("US", "CA"));
 
     List<EventDTO> events = eventDAO.findAll();
     Assert.assertEquals(events.size(), 1);
     Assert.assertEquals(events.get(0).getName(), "test event");
     Assert.assertEquals(events.get(0).getStartTime(), 1521832836L);
     Assert.assertEquals(events.get(0).getEndTime(), 1521849599L);
+    Assert.assertEquals(events.get(0).getTargetDimensionMap().get("countryCode"), Arrays.asList("US", "CA"));
   }
 }

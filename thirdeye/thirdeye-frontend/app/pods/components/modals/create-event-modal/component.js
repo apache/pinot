@@ -38,13 +38,13 @@ export default Component.extend({
 
     onSave() {
       const {
-        startTime, endTime, eventName
-      } = getProperties(this, 'startTime', 'endTime', 'eventName');
+        startTime, endTime, eventName, countryCode
+      } = getProperties(this, 'startTime', 'endTime', 'eventName', 'countryCode');
 
       const startTimeSinceEpoch = new Date(startTime).getTime();
       const endTimeSinceEpoch = new Date(endTime).getTime();
 
-      fetch(createEventApi.createEventUrl(startTimeSinceEpoch, endTimeSinceEpoch, eventName), {method: 'POST'})
+      fetch(createEventApi.createEventUrl(startTimeSinceEpoch, endTimeSinceEpoch, eventName, countryCode), {method: 'POST'})
     }
   }
 });

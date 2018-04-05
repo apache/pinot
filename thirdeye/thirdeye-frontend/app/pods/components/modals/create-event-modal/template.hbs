@@ -9,8 +9,7 @@
     <p class="col-md-2">
       <span class="te-label te-label--bold te-label--dark">Start Time</span>
     </p>
-    <p class="col-md-10">
-      <span>
+    <p class="col-md-4">
         {{input
           type="text"
           id="start-time"
@@ -18,15 +17,12 @@
           placeholder="YYYY-MM-DD HH:mm am/pm"
           class=" te-modal__input"
         }}
-      </span>
     </p>
-  </div>
-  <div class="row te-modal__settings">
+
     <p class="col-md-2">
       <span class="te-label te-label--bold te-label--dark">End Time</span>
     </p>
-    <p class="col-md-10">
-      <span>
+    <p class="col-md-4">
         {{input
           type="text"
           id="end-time"
@@ -34,23 +30,31 @@
           placeholder="YYYY-MM-DD HH:mm am/pm"
           class=" te-modal__input"
         }}
-      </span>
     </p>
   </div>
   <div class="row te-modal__settings">
     <p class="col-md-2">
       <span class="te-label te-label--bold te-label--dark">Event Name</span>
     </p>
-    <p class="col-md-10">
-      <span>
+    <p class="col-md-4">
         {{input
           type="text"
           id="event-name"
           value=eventName
           class=" te-modal__input"
         }}
-      </span>
+    </p>
+    <p class="col-md-2">
+      <span class="te-label te-label--bold te-label--dark">Country Codes</span>
+    </p>
+    <p class="col-md-4">
+        {{input
+          type="text"
+          id="country-code"
+          value=countryCode
+          placeholder="Separated by commas"
+          class=" te-modal__input"
+        }}
     </p>
   </div>
-
 {{/te-modal}}

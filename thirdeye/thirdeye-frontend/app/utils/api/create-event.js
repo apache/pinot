@@ -2,8 +2,8 @@
  * Endpoints for create event
  */
 export const createEventApi = {
-  createEventUrl(startTime, endTime, eventName) {
-    return `/events/create?eventName=${eventName}&startTime=${startTime}&endTime=${endTime}`;
+  createEventUrl(startTime, endTime, eventName, countryCode) {
+    return `/events/create?eventName=${eventName}&startTime=${startTime}&endTime=${endTime}&countryCode=${countryCode}`;
   }
 };
 
