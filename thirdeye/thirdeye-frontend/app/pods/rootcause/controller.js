@@ -1075,6 +1075,13 @@ export default Controller.extend({
       this.get('entitiesService').flushCache();
       this.notifyPropertyChange('context');
       this.set('showEntityMappingModal', false);
+    },
+
+    /**
+     * Toggles the create event modal view
+     */
+    onCreateEventClick() {
+      this.set('showCreateEventModal', true);
     }
   }
 });
