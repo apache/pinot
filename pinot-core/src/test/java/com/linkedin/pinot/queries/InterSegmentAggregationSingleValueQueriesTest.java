@@ -47,9 +47,9 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   public void testMax() {
     String query = "SELECT MAX(column1), MAX(column3) FROM testTable";
 
+    // Query should be answered by MetadataBasedAggregationOperator, so check if numEntriesScannedInFilter and
+    // numEntriesScannedPostFilter are 0
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
-    /* numEntriedScannedInFilter and numEntriedScannedPostFilter are 0 here,
-     * because this query gets answered by metadataBasedAggregationOperator */
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
         new String[]{"2146952047.00000", "2147419555.00000"});
 
@@ -70,9 +70,9 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   public void testMin() {
     String query = "SELECT MIN(column1), MIN(column3) FROM testTable";
 
+    // Query should be answered by MetadataBasedAggregationOperator, so check if numEntriesScannedInFilter and
+    // numEntriesScannedPostFilter are 0
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
-    /* numEntriedScannedInFilter and numEntriedScannedPostFilter are 0 here,
-     * because this query gets answered by metadataBasedAggregationOperator */
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
         new String[]{"240528.00000", "17891.00000"});
 
@@ -135,9 +135,9 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   public void testMinMaxRange() {
     String query = "SELECT MINMAXRANGE(column1), MINMAXRANGE(column3) FROM testTable";
 
+    // Query should be answered by MetadataBasedAggregationOperator, so check if numEntriesScannedInFilter and
+    // numEntriesScannedPostFilter are 0
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
-    /* numEntriedScannedInFilter and numEntriedScannedPostFilter are 0 here,
-     * because this query gets answered by metadataBasedAggregationOperator */
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
         new String[]{"2146711519.00000", "2147401664.00000"});
 
