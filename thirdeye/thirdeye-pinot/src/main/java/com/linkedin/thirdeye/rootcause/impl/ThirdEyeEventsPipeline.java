@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
@@ -55,7 +54,7 @@ public class ThirdEyeEventsPipeline extends Pipeline {
   private final StrategyType strategy;
   private final EventManager eventDAO;
   private final int k;
-  private final EventType eventType;
+  private final String eventType;
 
   /**
    * Constructor for dependency injection
@@ -67,7 +66,7 @@ public class ThirdEyeEventsPipeline extends Pipeline {
    * @param k the k
    * @param eventType the event type
    */
-  public ThirdEyeEventsPipeline(String outputName, Set<String> inputNames, EventManager eventDAO, StrategyType strategy, int k, EventType eventType) {
+  public ThirdEyeEventsPipeline(String outputName, Set<String> inputNames, EventManager eventDAO, StrategyType strategy, int k, String eventType) {
     super(outputName, inputNames);
     this.eventDAO = eventDAO;
     this.strategy = strategy;
@@ -86,7 +85,7 @@ public class ThirdEyeEventsPipeline extends Pipeline {
     super(outputName, inputNames);
     this.eventDAO = DAORegistry.getInstance().getEventDAO();
     this.strategy = StrategyType.valueOf(MapUtils.getString(properties, PROP_STRATEGY, PROP_STRATEGY_DEFAULT));
-    this.eventType = EventType.valueOf(MapUtils.getString(properties, PROP_EVENT_TYPE, "HOLIDAY"));
+    this.eventType = MapUtils.getString(properties, PROP_EVENT_TYPE, "holiday");
     this.k = MapUtils.getInteger(properties, PROP_K, PROP_K_DEFAULT);
   }
 
@@ -121,9 +120,8 @@ public class ThirdEyeEventsPipeline extends Pipeline {
     return this.eventDAO.findByPredicate(Predicate.AND(
         Predicate.GE("startTime", start - OVERFETCH),
         Predicate.LT("endTime", end + OVERFETCH),
-        Predicate.EQ("eventType", eventType)
+        Predicate.EQ("eventType", eventType.toUpperCase())
     ));
-
   }
 
   /* **************************************************************************

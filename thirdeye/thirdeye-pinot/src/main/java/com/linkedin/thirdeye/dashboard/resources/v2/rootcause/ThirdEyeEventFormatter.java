@@ -38,7 +38,7 @@ public class ThirdEyeEventFormatter extends RootCauseEventEntityFormatter {
     String label = String.format("%s%s", eventDto.getName(), dimensions.toString());
     String link = "";
 
-    if (thirdEyeEventEntity.getEventType().equals("HOLIDAY")){
+    if (thirdEyeEventEntity.getEventType().equals("holiday")){
       link = String.format("https://www.google.com/search?q=%s", eventDto.getName());
     }
 

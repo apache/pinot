@@ -13,7 +13,7 @@
 export default [
   {
     header: "Holidays",
-    eventType: "HOLIDAY",
+    eventType: "holiday",
     framework: "eventHoliday",
     color: "green",
     inputs: [
@@ -141,7 +141,7 @@ export default [
   },
   {
     header: "Custom",
-    eventType: "CUSTOM",
+    eventType: "custom",
     framework: "eventCustom",
     color: "pink",
     inputs: [
