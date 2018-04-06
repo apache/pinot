@@ -27,43 +27,39 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * ProjectionPlanNode takes care of a map from column name to its corresponding
- * data source.
+ * The <code>ProjectionPlanNode</code> class provides the execution plan for fetching projection columns' data source
+ * on a single segment.
  */
 public class ProjectionPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(ProjectionPlanNode.class);
 
+  private final IndexSegment _indexSegment;
+  private final Set<String> _projectionColumns;
   private final DocIdSetPlanNode _docIdSetPlanNode;
-  private final Map<String, DataSourcePlanNode> _dataSourcePlanNodeMap;
 
-  public ProjectionPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull Set<String> columns,
+  public ProjectionPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull Set<String> projectionColumns,
       @Nonnull DocIdSetPlanNode docIdSetPlanNode) {
+    _indexSegment = indexSegment;
+    _projectionColumns = projectionColumns;
     _docIdSetPlanNode = docIdSetPlanNode;
-    _dataSourcePlanNodeMap = new HashMap<>(columns.size());
-    for (String column : columns) {
-      _dataSourcePlanNodeMap.put(column, new DataSourcePlanNode(indexSegment, column));
-    }
   }
 
   @Override
   public ProjectionOperator run() {
-    Map<String, DataSource> dataSourceMap = new HashMap<>(_dataSourcePlanNodeMap.size());
-    for (Map.Entry<String, DataSourcePlanNode> entry : _dataSourcePlanNodeMap.entrySet()) {
-      dataSourceMap.put(entry.getKey(), entry.getValue().run());
+    Map<String, DataSource> dataSourceMap = new HashMap<>(_projectionColumns.size());
+    for (String column : _projectionColumns) {
+      dataSourceMap.put(column, _indexSegment.getDataSource(column));
     }
     return new ProjectionOperator(dataSourceMap, _docIdSetPlanNode.run());
   }
 
   @Override
   public void showTree(String prefix) {
+    LOGGER.debug(prefix + "Segment Level Inner-Segment Plan Node:");
     LOGGER.debug(prefix + "Operator: ProjectionOperator");
-    LOGGER.debug(prefix + "Argument 0: DocIdSet - ");
+    LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
+    LOGGER.debug(prefix + "Argument 1: Projection Columns - " + _projectionColumns);
+    LOGGER.debug(prefix + "Argument 2: DocIdSet - ");
     _docIdSetPlanNode.showTree(prefix + "    ");
-    int i = 0;
-    for (String column : _dataSourcePlanNodeMap.keySet()) {
-      LOGGER.debug(prefix + "Argument " + (i + 1) + ": DataSourceOperator");
-      _dataSourcePlanNodeMap.get(column).showTree(prefix + "    ");
-      i++;
-    }
   }
 }

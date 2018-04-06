@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.plan;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -36,62 +37,47 @@ import org.slf4j.LoggerFactory;
 public class MetadataBasedAggregationPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(MetadataBasedAggregationPlanNode.class);
 
-  private final Map<String, DataSourcePlanNode> _dataSourcePlanNodeMap;
-  private final AggregationFunctionContext[] _aggregationFunctionContexts;
-  private IndexSegment _indexSegment;
+  private final IndexSegment _indexSegment;
+  private final List<AggregationInfo> _aggregationInfos;
 
   /**
    * Constructor for the class.
    *
    * @param indexSegment Segment to process
-   * @param aggregationInfos List of aggregation context info.
+   * @param aggregationInfos List of aggregation info
    */
   public MetadataBasedAggregationPlanNode(IndexSegment indexSegment, List<AggregationInfo> aggregationInfos) {
     _indexSegment = indexSegment;
-    _dataSourcePlanNodeMap = new HashMap<>();
-
-    _aggregationFunctionContexts =
-        AggregationFunctionUtils.getAggregationFunctionContexts(aggregationInfos, indexSegment.getSegmentMetadata());
-
-    for (AggregationFunctionContext aggregationFunctionContext : _aggregationFunctionContexts) {
-      String column = aggregationFunctionContext.getAggregationColumns()[0];
-
-      if (!_dataSourcePlanNodeMap.containsKey(column)) {
-        // For count(*), there's no column to have the metadata for.
-        if (!aggregationFunctionContext.getAggregationFunction()
-            .getName()
-            .equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
-          _dataSourcePlanNodeMap.put(column, new DataSourcePlanNode(indexSegment, column));
-        }
-      }
-    }
+    _aggregationInfos = aggregationInfos;
   }
 
   @Override
   public Operator run() {
-    Map<String, DataSource> dataSourceMap = new HashMap<>();
+    SegmentMetadata segmentMetadata = _indexSegment.getSegmentMetadata();
+    AggregationFunctionContext[] aggregationFunctionContexts =
+        AggregationFunctionUtils.getAggregationFunctionContexts(_aggregationInfos, segmentMetadata);
 
-    for (String column : _dataSourcePlanNodeMap.keySet()) {
-      DataSourcePlanNode dataSourcePlanNode = _dataSourcePlanNodeMap.get(column);
-      DataSource dataSource = dataSourcePlanNode.run();
-      dataSourceMap.put(column, dataSource);
+    Map<String, DataSource> dataSourceMap = new HashMap<>();
+    for (AggregationFunctionContext aggregationFunctionContext : aggregationFunctionContexts) {
+      if (!aggregationFunctionContext.getAggregationFunction()
+          .getName()
+          .equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+        for (String column : aggregationFunctionContext.getAggregationColumns()) {
+          if (!dataSourceMap.containsKey(column)) {
+            dataSourceMap.put(column, _indexSegment.getDataSource(column));
+          }
+        }
+      }
     }
 
-    return new MetadataBasedAggregationOperator(_aggregationFunctionContexts, _indexSegment.getSegmentMetadata(),
-        dataSourceMap);
+    return new MetadataBasedAggregationOperator(aggregationFunctionContexts, segmentMetadata, dataSourceMap);
   }
 
   @Override
   public void showTree(String prefix) {
-    LOGGER.debug("{} Segment Level Inner-Segment Plan Node:", prefix);
-    LOGGER.debug("{} Operator: MetadataBasedAggregationOperator", prefix);
-    LOGGER.debug("{} IndexSegment: {}", prefix, _indexSegment.getSegmentName());
-
-    int i = 0;
-    for (String column : _dataSourcePlanNodeMap.keySet()) {
-      LOGGER.debug("{} Argument {}: DataSourceOperator", prefix, (i + 1));
-      _dataSourcePlanNodeMap.get(column).showTree(prefix + "    ");
-      i++;
-    }
+    LOGGER.debug(prefix + "Segment Level Inner-Segment Plan Node:");
+    LOGGER.debug(prefix + "Operator: MetadataBasedAggregationOperator");
+    LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
+    LOGGER.debug(prefix + "Argument 1: Aggregations - " + _aggregationInfos);
   }
 }
