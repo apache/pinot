@@ -68,7 +68,7 @@ frameworks:
         #######################################################################
         - outputName: EVENT_HOLIDAY
           inputNames: [INPUT, DIMENSION_TOPK]
-          className: com.linkedin.thirdeye.rootcause.impl.HolidayEventsPipeline
+          className: com.linkedin.thirdeye.rootcause.impl.ThirdEyeEventsPipeline
 
         - outputName: EVENT_ANOMALY
           inputNames: [INPUT, METRIC_TOPK]

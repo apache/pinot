@@ -24,13 +24,13 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * HolidayEventsPipeline produces EventEntities associated with holidays within the current
- * TimeRange. It matches holidays based on incoming DimensionEntities (e.g. from contribution
+ * ThirdEyeEventsPipeline produces EventEntities within the current
+ * TimeRange. It matches holidays and customized events based on incoming DimensionEntities (e.g. from contribution
  * analysis) and scores them based on the number of matching DimensionEntities.
- * Holiday pipeline will add a buffer of 2 days to the time range provided
+ * This pipeline will add a buffer of 2 days to the time range provided
  */
-public class HolidayEventsPipeline extends Pipeline {
-  private static final Logger LOG = LoggerFactory.getLogger(HolidayEventsPipeline.class);
+public class ThirdEyeEventsPipeline extends Pipeline {
+  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeEventsPipeline.class);
 
   private static final String DIMENSION_COUNTRY_CODE = "countryCode";
 
@@ -48,12 +48,14 @@ public class HolidayEventsPipeline extends Pipeline {
 
   private static final String PROP_STRATEGY = "strategy";
   private static final String PROP_STRATEGY_DEFAULT = StrategyType.COMPOUND.toString();
+  private static final String PROP_EVENT_TYPE = "eventType";
 
   private static final long OVERFETCH = TimeUnit.DAYS.toMillis(2);
 
   private final StrategyType strategy;
   private final EventManager eventDAO;
   private final int k;
+  private final EventType eventType;
 
   /**
    * Constructor for dependency injection
@@ -62,12 +64,15 @@ public class HolidayEventsPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param eventDAO event DAO
    * @param strategy scoring strategy
+   * @param k the k
+   * @param eventType the event type
    */
-  public HolidayEventsPipeline(String outputName, Set<String> inputNames, EventManager eventDAO, StrategyType strategy, int k) {
+  public ThirdEyeEventsPipeline(String outputName, Set<String> inputNames, EventManager eventDAO, StrategyType strategy, int k, EventType eventType) {
     super(outputName, inputNames);
     this.eventDAO = eventDAO;
     this.strategy = strategy;
     this.k = k;
+    this.eventType = eventType;
   }
 
   /**
@@ -77,10 +82,11 @@ public class HolidayEventsPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param properties configuration properties ({@code PROP_STRATEGY})
    */
-  public HolidayEventsPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
+  public ThirdEyeEventsPipeline(String outputName, Set<String> inputNames, Map<String, Object> properties) {
     super(outputName, inputNames);
     this.eventDAO = DAORegistry.getInstance().getEventDAO();
     this.strategy = StrategyType.valueOf(MapUtils.getString(properties, PROP_STRATEGY, PROP_STRATEGY_DEFAULT));
+    this.eventType = EventType.valueOf(MapUtils.getString(properties, PROP_EVENT_TYPE, "HOLIDAY"));
     this.k = MapUtils.getInteger(properties, PROP_K, PROP_K_DEFAULT);
   }
 
@@ -102,20 +108,20 @@ public class HolidayEventsPipeline extends Pipeline {
       }
     }
 
-    Set<HolidayEventEntity> entities = new MaxScoreSet<>();
+    Set<EventEntity> entities = new MaxScoreSet<>();
     entities.addAll(EntityUtils.addRelated(score(strategyAnomaly,
-        this.getHolidayEvents(analysis.getStart(), anomaly.getEnd()), countryCodeLookup, anomaly.getScore()), anomaly));
+        this.getThirdEyeEvents(analysis.getStart(), anomaly.getEnd()), countryCodeLookup, anomaly.getScore()), anomaly));
     entities.addAll(EntityUtils.addRelated(score(strategyBaseline,
-        this.getHolidayEvents(baseline.getStart(), baseline.getEnd()), countryCodeLookup, baseline.getScore()), baseline));
+        this.getThirdEyeEvents(baseline.getStart(), baseline.getEnd()), countryCodeLookup, baseline.getScore()), baseline));
 
     return new PipelineResult(context, EntityUtils.topk(entities, this.k));
   }
 
-  private List<EventDTO> getHolidayEvents(long start, long end) {
+  private List<EventDTO> getThirdEyeEvents(long start, long end) {
     return this.eventDAO.findByPredicate(Predicate.AND(
         Predicate.GE("startTime", start - OVERFETCH),
-        Predicate.LT("endTime", start + OVERFETCH),
-        Predicate.EQ("eventType", EventType.HOLIDAY)
+        Predicate.LT("endTime", end + OVERFETCH),
+        Predicate.EQ("eventType", eventType)
     ));
 
   }
@@ -123,8 +129,8 @@ public class HolidayEventsPipeline extends Pipeline {
   /* **************************************************************************
    * Entity scoring
    * *************************************************************************/
-  private List<HolidayEventEntity> score(ScoringStrategy strategy, Iterable<EventDTO> events, Map<String, DimensionEntity> countryCodeLookup, double coefficient) {
-    List<HolidayEventEntity> entities = new ArrayList<>();
+  private List<EventEntity> score(ScoringStrategy strategy, Iterable<EventDTO> events, Map<String, DimensionEntity> countryCodeLookup, double coefficient) {
+    List<EventEntity> entities = new ArrayList<>();
     for(EventDTO dto : events) {
       List<Entity> related = new ArrayList<>();
 
@@ -137,7 +143,7 @@ public class HolidayEventsPipeline extends Pipeline {
         }
       }
 
-      HolidayEventEntity entity = HolidayEventEntity.fromDTO(1.0, related, dto);
+      ThirdEyeEventEntity entity = ThirdEyeEventEntity.fromDTO(1.0, related, dto, eventType);
       entities.add(entity.withScore(strategy.score(entity) * coefficient));
     }
     return entities;
@@ -163,7 +169,7 @@ public class HolidayEventsPipeline extends Pipeline {
   }
 
   private interface ScoringStrategy {
-    double score(HolidayEventEntity entity);
+    double score(ThirdEyeEventEntity entity);
   }
 
   /**
@@ -177,7 +183,7 @@ public class HolidayEventsPipeline extends Pipeline {
     }
 
     @Override
-    public double score(HolidayEventEntity entity) {
+    public double score(ThirdEyeEventEntity entity) {
       return this.delegate.score(entity.getDto().getStartTime(), entity.getDto().getEndTime());
     }
   }
@@ -187,7 +193,7 @@ public class HolidayEventsPipeline extends Pipeline {
    */
   private static class DimensionStrategy implements ScoringStrategy {
     @Override
-    public double score(HolidayEventEntity entity) {
+    public double score(ThirdEyeEventEntity entity) {
       double max = 0.0;
       for(Entity r : entity.getRelated()) {
         if(r instanceof DimensionEntity) {
@@ -213,7 +219,7 @@ public class HolidayEventsPipeline extends Pipeline {
     }
 
     @Override
-    public double score(HolidayEventEntity entity) {
+    public double score(ThirdEyeEventEntity entity) {
       double scoreTime = this.delegateTime.score(entity);
       double scoreDimension = this.delegateDimension.score(entity);
       double scoreHasDimension = scoreDimension > 0 ? 1 : 0;

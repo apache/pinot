@@ -13,7 +13,7 @@
 export default [
   {
     header: "Holidays",
-    eventType: "holiday",
+    eventType: "HOLIDAY",
     framework: "eventHoliday",
     color: "green",
     inputs: [
@@ -135,6 +135,19 @@ export default [
       {
         label: "Category",
         labelMapping: "category",
+        type: "dropdown"
+      }
+    ]
+  },
+  {
+    header: "Custom",
+    eventType: "CUSTOM",
+    framework: "eventCustom",
+    color: "pink",
+    inputs: [
+      {
+        label: "Country",
+        labelMapping: "countryCode",
         type: "dropdown"
       }
     ]
