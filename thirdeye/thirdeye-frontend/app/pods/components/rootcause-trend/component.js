@@ -1,10 +1,8 @@
-import { computed, observer } from '@ember/object';
-import { later } from '@ember/runloop';
+import { computed } from '@ember/object';
 import Component from '@ember/component';
 import {
   toCurrentUrn,
   toBaselineUrn,
-  toOffsetUrn,
   hasPrefix,
   filterPrefix,
   toMetricLabel,
@@ -68,20 +66,6 @@ export default Component.extend({
   //
   // internal properties
   //
-
-  /**
-   * Display flag for table. Hack for ember models table only re-rendering columns on init()
-   * @type {bool}
-   */
-  showTable: true,
-
-  /**
-   * Hack for ember models table only re-rendering columns on init()
-   */
-  _columnObserver: observer('columns', function () {
-    this.set('showTable', false);
-    later(this, () => this.set('showTable', true), 0);
-  }),
 
   /**
    * Start time for time table, overridden by drop down

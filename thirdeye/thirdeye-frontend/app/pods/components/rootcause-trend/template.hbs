@@ -27,15 +27,13 @@
   {{/if}}
 </div>
 
-{{#if showTable}}
-  {{update-table
-    data=data
-    columns=columns
-    preselectedItems=preselectedItems
-    showColumnsDropdown=false
-    showGlobalFilter=false
-    filteringIgnoreCase=true
-    multipleExpand=true
-    multipleSelect=true
-    sendDisplayDataChangedAction=true}}
-{{/if}}
+{{update-table
+  data=data
+  columns=columns
+  preselectedItems=preselectedItems
+  showColumnsDropdown=false
+  showGlobalFilter=false
+  filteringIgnoreCase=true
+  multipleExpand=true
+  multipleSelect=true
+  sendDisplayDataChangedAction=true}}
