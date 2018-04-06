@@ -219,7 +219,6 @@ export default Component.extend({
       const changes = {};
       const metricUrns = filterPrefix(Object.keys(entities), 'thirdeye:metric:');
 
-      console.log('changes', metricUrns);
       metricUrns.forEach(urn => {
         const currUrn = toCurrentUrn(urn);
         const baseUrn = toBaselineUrn(urn);
@@ -246,8 +245,6 @@ export default Component.extend({
         });
       });
 
-      console.log('changes done', changes);
-
       return changes;
     }
   ),
@@ -268,7 +265,6 @@ export default Component.extend({
 
       const metricUrns = filterPrefix(Object.keys(entities), 'thirdeye:metric:');
 
-      console.log('data', metricUrns);
       const rows = metricUrns.map(urn => {
         const row = {
           urn,
@@ -288,8 +284,6 @@ export default Component.extend({
 
         return row;
       });
-
-      console.log('data done', rows);
 
       return rows;
     }

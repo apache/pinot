@@ -303,8 +303,10 @@ export default Controller.extend({
       const timeseriesUrns = new Set(selectedUrns);
 
       if (activeTab === ROOTCAUSE_TAB_TREND) {
-        [...relatedMetricUrns].forEach(urn => timeseriesUrns.add(toCurrentUrn(urn)));
-        [...relatedMetricUrns].forEach(urn => timeseriesUrns.add(toBaselineUrn(urn)));
+        [...relatedMetricUrns].forEach(urn => {
+          timeseriesUrns.add(toCurrentUrn(urn));
+          timeseriesUrns.add(toBaselineUrn(urn));
+        });
       }
 
       timeseriesService.request(context, timeseriesUrns);
