@@ -242,7 +242,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
           anomalyUrns: new Set([anomalyUrn, anomalyMetricUrn, anomalyFunctionUrn])
         };
 
-        selectedUrns = new Set([anomalyUrn, anomalyMetricUrn, anomalyFunctionUrn]);
+        selectedUrns = new Set([anomalyUrn, anomalyMetricUrn]);
         sessionName = 'New Investigation of #' + anomalyId + ' (' + moment().format(dateFormatFull) + ')';
         setupMode = ROOTCAUSE_SETUP_MODE_SELECTED;
 
