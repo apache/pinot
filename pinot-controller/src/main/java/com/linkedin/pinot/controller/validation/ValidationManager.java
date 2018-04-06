@@ -185,6 +185,7 @@ public class ValidationManager {
   }
 
   // For LLC segments, validate that there is at least one segment in CONSUMING state for every partition.
+  @Deprecated
   void validateLLCSegments(TableConfig tableConfig, List<RealtimeSegmentZKMetadata> metadataList) {
     final String realtimeTableName = tableConfig.getTableName();
     LOGGER.info("Validating LLC Segments for {}", realtimeTableName);

@@ -36,6 +36,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
  * Class to help generate partition assignment, given the table config, number of stream partitions,
  * instances and all tables needing reassignment
  */
+@Deprecated
 public class StreamPartitionAssignmentGenerator {
 
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;

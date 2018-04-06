@@ -102,11 +102,8 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
       if (includeConsuming) {
 
         PartitionAssignmentGenerator partitionAssignmentGenerator = new PartitionAssignmentGenerator(_helixManager);
-        PartitionAssignment partitionAssignmentFromIdealState =
-            partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
-        int numPartitions = partitionAssignmentFromIdealState.getNumPartitions();
-        newPartitionAssignment =
-            partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions);
+        int numPartitions = partitionAssignmentGenerator.getNumPartitionsFromIdealState(idealState);
+        newPartitionAssignment = partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions);
 
       } else {
         LOGGER.info("includeConsuming = false. No need to rebalance partition assignment for {}",
