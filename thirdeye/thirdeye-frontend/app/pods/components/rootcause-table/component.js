@@ -1,8 +1,10 @@
 import { computed } from '@ember/object';
 import Component from '@ember/component';
-import _ from 'lodash';
 import moment from 'moment';
 import { toEventLabel } from 'thirdeye-frontend/utils/rca-utils';
+import _ from 'lodash';
+
+const ROOTCAUSE_EVENT_DATE_FORMAT = 'ddd, MMM DD hh:mm A';
 
 export default Component.extend({
   columns: null, // []
@@ -14,63 +16,78 @@ export default Component.extend({
   onSelection: null, // function (e)
 
   /**
-   * Returns a list of record objects to display in the table
-   * Sets the 'isSelected' property to respond to table selection
-   * @type {Object} - object with keys as urns and values as entities
+   * Returns a list of values to display in the rootcause table
+   * Add human readable date properties to the list of values
+   * @type {objects[]} - array of entities
    */
-  records: computed(
+  data: computed(
     'entities',
     'selectedUrns',
     function () {
       const { entities, selectedUrns } = this.getProperties('entities', 'selectedUrns');
 
-      const records = _.cloneDeep(entities);
-      Object.keys(records).forEach(urn => records[urn].isSelected = selectedUrns.has(urn));
-      return records;
-    }
-  ),
+      return Object.values(entities)
+        .filter(e => e.type === 'event')
+        .map(e => {
+          const duration = e.end <= 0 ? Number.POSITIVE_INFINITY : (e.end - e.start);
 
-  /**
-   * Returns a list of values to display in the rootcause table
-   * Add human readable date properties to the list of values
-   * @type {Array[Objects]} - array of entities
-   */
-  data: computed(
-    'records',
-    function () {
-      let values = Object.values(this.get('records'));
-      let format = 'ddd, MMM DD hh:mm A';
-
-      values.forEach((value) => {
-        value.humanStart = moment(value.start).format(format);
-        // If this is an ongoing event
-        if (value.end <= 0) {
-          value.duration = 'ongoing';
-        } else {
-          value.label = toEventLabel(value.urn, this.get('records'));
-          let timeDiff = value.end - value.start;
-          let duration = moment.duration(timeDiff).days();
-          value.duration = duration > 1 ? `${duration} days` : `${duration} day`;
-        }
-      });
-
-      return values;
+          return Object.assign({}, e, {
+            isSelected: selectedUrns.has(e.urn),
+            duration,
+            humanStart: moment(e.start).format(ROOTCAUSE_EVENT_DATE_FORMAT),
+            humanDuration: this._formatDuration(duration),
+            label: toEventLabel(e.urn, entities)
+          });
+        });
     }
   ),
 
   /**
    * Keeps track of items that are selected in the table
-   * @type {Array}
+   * @type {object[]}
    */
   preselectedItems: computed(
-    'records',
+    'data',
     'selectedUrns',
     function () {
-      const { records, selectedUrns } = this.getProperties('records', 'selectedUrns');
-      const selectedEntities = [...selectedUrns].filter(urn => records[urn]).map(urn => records[urn]);
-      return selectedEntities;
+      const { data, selectedUrns } = this.getProperties('data', 'selectedUrns');
+      return [...selectedUrns].filter(urn => data[urn]).map(urn => data[urn]);
     }
   ),
+
+  /**
+   * Helper for formatting durations specifically for events
+   *
+   * @param {int} duration (in millis)
+   * @returns {string} formatted duration
+   * @private
+   */
+  _formatDuration(duration) {
+    if (!Number.isFinite(duration)) {
+      return 'ongoing';
+    }
+
+    if (duration <= 0) {
+      return '';
+    }
+
+    const d = moment.duration(duration);
+
+    if (d.days() >= 1) {
+      const days = d.days();
+      return days > 1 ? `${days} days` : `${days} day`;
+    }
+
+    if (d.hours() >= 1) {
+      const hours = d.hours();
+      return hours > 1 ? `${hours} hours` : `${hours} hour`;
+    }
+
+    if (d.minutes() >= 1) {
+      const minutes = d.minutes();
+      return minutes > 1 ? `${minutes} minutes` : `${minutes} minute`;
+    }
+  },
 
   actions: {
     /**
@@ -78,18 +95,14 @@ export default Component.extend({
      * @param {Object} e
      */
     displayDataChanged (e) {
-      const { records, selectedUrns, onSelection } = this.getProperties('records', 'selectedUrns', 'onSelection');
-      if (onSelection) {
-        const table = new Set(e.selectedItems.map(e => e.urn));
-        const added = [...table].filter(urn => !selectedUrns.has(urn));
-        const removed = [...selectedUrns].filter(urn => records[urn] && !table.has(urn));
+      if (_.isEmpty(e.selectedItems)) { return; }
 
-        const updates = {};
-        added.forEach(urn => updates[urn] = true);
-        removed.forEach(urn => updates[urn] = false);
+      const { selectedUrns, onSelection } = this.getProperties('selectedUrns', 'onSelection');
 
-        onSelection(updates);
-      }
+      if (!onSelection) { return; }
+
+      const urn = e.selectedItems[0].urn;
+      onSelection({ [urn]: !selectedUrns.has(urn) });
     }
   }
 });

@@ -25,6 +25,7 @@ export default Component.extend({
    * Columns for metrics table
    * @type Object[]
    */
+  // TODO move this to shared
   metricsTableColumns: [
     {
       template: 'custom/table-checkbox',
@@ -271,21 +272,23 @@ export default Component.extend({
      * Updates the currently selected urns based on user selection on the table
      * @param {Object} e
      */
-    displayDataChanged(e) {
-      const {selectedUrns, onSelection} = this.getProperties('selectedUrns', 'onSelection');
+    displayDataChanged (e) {
+      if (_.isEmpty(e.selectedItems)) { return; }
 
-      const selectedItemsArr = [...e.selectedItems];
-      const urn = selectedItemsArr.length ? selectedItemsArr[0].urn : '';
+      const { selectedUrns, onSelection } = this.getProperties('selectedUrns', 'onSelection');
 
-      if (onSelection && urn) {
-        const state = !selectedUrns.has(urn);
-        const updates = {[urn]: state};
-        if (hasPrefix(urn, 'thirdeye:metric:')) {
-          updates[toCurrentUrn(urn)] = state;
-          updates[toBaselineUrn(urn)] = state;
-        }
-        onSelection(updates);
+      if (!onSelection) { return; }
+
+      const urn = e.selectedItems[0].urn;
+      const state = !selectedUrns.has(urn);
+
+      const updates = {[urn]: state};
+      if (hasPrefix(urn, 'thirdeye:metric:')) {
+        updates[toCurrentUrn(urn)] = state;
+        updates[toBaselineUrn(urn)] = state;
       }
+
+      onSelection(updates);
     }
   }
 });

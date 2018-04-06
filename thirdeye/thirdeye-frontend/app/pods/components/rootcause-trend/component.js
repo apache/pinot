@@ -10,11 +10,7 @@ import {
   toColorDirection,
   makeSortable
 } from 'thirdeye-frontend/utils/rca-utils';
-import {
-  humanizeChange,
-  humanizeFloat,
-  humanizeScore
-} from 'thirdeye-frontend/utils/utils';
+import { humanizeChange } from 'thirdeye-frontend/utils/utils';
 import moment from 'moment';
 import _ from 'lodash';
 
@@ -68,12 +64,30 @@ export default Component.extend({
   //
 
   /**
-   * Start time for time table, overridden by drop down
+   * User-specified start time (in dropdown)
    * @type {int}
    */
-  startTime: computed('context', function () {
-    return this.get('context').analysisRange[0];
-  }),
+  desiredStartTime: null,
+
+  /**
+   * Actual start time for time table (from context or dropdown)
+   * @type {int}
+   */
+  startTime: computed(
+    'context',
+    'desiredStartTime',
+    function () {
+      const { context, desiredStartTime } = this.getProperties('context', 'desiredStartTime');
+
+      const startTime = desiredStartTime || context.analysisRange[0];
+      if (startTime < context.analysisRange[0]
+          || startTime >= context.analysisRange[1]) {
+        return context.analysisRange[0];
+      }
+
+      return startTime;
+    }
+  ),
 
   /**
    * Start time formatted
@@ -87,7 +101,7 @@ export default Component.extend({
    * Start time options for dropdown
    */
   startTimeOptions: computed('availableBuckets', function () {
-    const { availableBuckets } = this.getProperties('availableBuckets');
+    const availableBuckets = this.get('availableBuckets');
 
     const options = [];
     for (let i = 0; i < availableBuckets.length; i += ROOTCAUSE_TREND_MAX_COLUMNS) {
@@ -101,7 +115,7 @@ export default Component.extend({
    * Reverse lookup mapping for start time options for dropdown
    */
   startTimeOptionsMapping: computed('availableBuckets', function () {
-    const { availableBuckets } = this.getProperties('availableBuckets');
+    const availableBuckets = this.get('availableBuckets');
 
     const options = {};
     for (let i = 0; i < availableBuckets.length; i += ROOTCAUSE_TREND_MAX_COLUMNS) {
@@ -116,7 +130,7 @@ export default Component.extend({
    * @type {int[]}
    */
   availableBuckets: computed('context', function () {
-    const { context } = this.getProperties('context');
+    const context = this.get('context');
 
     const buckets = [];
     const [stepSize, stepUnit] = context.granularity.split('_').map(s => s.toLowerCase());
@@ -137,7 +151,7 @@ export default Component.extend({
   buckets: computed(
     'availableBuckets',
     'startTime',
-      function () {
+    function () {
       const { availableBuckets, startTime } = this.getProperties('availableBuckets', 'startTime');
 
       const startOffset = startTime || availableBuckets[0];
@@ -152,7 +166,7 @@ export default Component.extend({
    * @type {object[]}
    */
   columns: computed('buckets', function () {
-    const { buckets } = this.getProperties('buckets');
+    const buckets = this.get('buckets');
 
     const columns = [
       {
@@ -287,7 +301,7 @@ export default Component.extend({
    * }
    */
   links: computed('entities', function() {
-    const { entities } = this.getProperties('entities');
+    const entities = this.get('entities');
     let metricUrlMapping = {};
 
     filterPrefix(Object.keys(entities), 'thirdeye:metric:')
@@ -339,21 +353,23 @@ export default Component.extend({
      * Updates the currently selected urns based on user selection on the table
      * @param {Object} e
      */
-    displayDataChanged(e) {
+    displayDataChanged (e) {
+      if (_.isEmpty(e.selectedItems)) { return; }
+
       const { selectedUrns, onSelection } = this.getProperties('selectedUrns', 'onSelection');
 
-      const selectedItemsArr = [...e.selectedItems];
-      const urn = selectedItemsArr.length ? selectedItemsArr[0].urn : '';
+      if (!onSelection) { return; }
 
-      if (onSelection && urn) {
-        const state = !selectedUrns.has(urn);
-        const updates = {[urn]: state};
-        if (hasPrefix(urn, 'thirdeye:metric:')) {
-          updates[toCurrentUrn(urn)] = state;
-          updates[toBaselineUrn(urn)] = state;
-        }
-        onSelection(updates);
+      const urn = e.selectedItems[0].urn;
+      const state = !selectedUrns.has(urn);
+
+      const updates = {[urn]: state};
+      if (hasPrefix(urn, 'thirdeye:metric:')) {
+        updates[toCurrentUrn(urn)] = state;
+        updates[toBaselineUrn(urn)] = state;
       }
+
+      onSelection(updates);
     },
 
     /**
@@ -361,7 +377,7 @@ export default Component.extend({
      */
     startTimeChanged(timestamp) {
       const lookup = this.get('startTimeOptionsMapping');
-      this.set('startTime', lookup[timestamp]);
+      this.set('desiredStartTime', lookup[timestamp]);
     }
   }
 });

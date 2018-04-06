@@ -20,7 +20,7 @@ export default [
     disableFiltering: true
   },
   {
-    propertyName: 'duration',
+    propertyName: 'humanDuration',
     title: 'Duration',
     sortedBy: 'duration',
     className: 'events-table__column events-table__column--compact',
