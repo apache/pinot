@@ -26,18 +26,20 @@ import java.util.concurrent.ThreadLocalRandom;
 public class ExponentialBackoffRetryPolicy extends BaseRetryPolicy {
   private final ThreadLocalRandom _random = ThreadLocalRandom.current();
   private final double _delayScaleFactor;
+  private final long _maxDelayMs;
   private long _minDelayMs;
 
   public ExponentialBackoffRetryPolicy(int maxNumAttempts, long initialDelayMs, double delayScaleFactor) {
     super(maxNumAttempts);
     _delayScaleFactor = delayScaleFactor;
     _minDelayMs = initialDelayMs;
+    _maxDelayMs = (long) (_minDelayMs * Math.pow(delayScaleFactor, maxNumAttempts));
   }
 
   @Override
   protected long getNextDelayMs() {
-    long maxDelayMs = (long) (_minDelayMs * _delayScaleFactor);
-    long nextDelayMs = _random.nextLong(_minDelayMs, maxDelayMs);
+    long maxDelayMs = Math.min((long) (_minDelayMs * _delayScaleFactor), _maxDelayMs);
+    long nextDelayMs = _random.nextLong(_minDelayMs, maxDelayMs + 1);
     _minDelayMs = maxDelayMs;
     return nextDelayMs;
   }
