@@ -20,25 +20,24 @@ import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Retry policy with exponential backoff delay between attempts.
- * <p>The delay between the i<sup>th</sup> and (i + 1)<sup>th</sup> attempts is between delayScaleFactor<sup>i - 1</sup>
- * * initialDelayMs and delayScaleFactor<sup>i</sup> * initialDelayMs.
+ * <p>The delay between the i<sup>th</sup> and (i + 1)<sup>th</sup> attempts is between delayScaleFactor<sup>i</sup>
+ * * initialDelayMs and delayScaleFactor<sup>(i + 1)</sup> * initialDelayMs.
  */
 public class ExponentialBackoffRetryPolicy extends BaseRetryPolicy {
   private final ThreadLocalRandom _random = ThreadLocalRandom.current();
+  private final long _initialDelayMs;
   private final double _delayScaleFactor;
-  private long _minDelayMs;
 
   public ExponentialBackoffRetryPolicy(int maxNumAttempts, long initialDelayMs, double delayScaleFactor) {
     super(maxNumAttempts);
+    _initialDelayMs = initialDelayMs;
     _delayScaleFactor = delayScaleFactor;
-    _minDelayMs = initialDelayMs;
   }
 
   @Override
-  protected long getNextDelayMs() {
-    long maxDelayMs = (long) (_minDelayMs * _delayScaleFactor);
-    long nextDelayMs = _random.nextLong(_minDelayMs, maxDelayMs);
-    _minDelayMs = maxDelayMs;
-    return nextDelayMs;
+  protected long getDelayMs(int currentAttempt) {
+    double minDelayMs = _initialDelayMs * Math.pow(_delayScaleFactor, currentAttempt);
+    double maxDelayMs = minDelayMs * _delayScaleFactor;
+    return _random.nextLong((long) minDelayMs, (long) maxDelayMs);
   }
 }

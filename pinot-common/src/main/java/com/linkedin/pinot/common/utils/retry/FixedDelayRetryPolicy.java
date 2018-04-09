@@ -27,7 +27,7 @@ public class FixedDelayRetryPolicy extends BaseRetryPolicy {
   }
 
   @Override
-  protected long getNextDelayMs() {
+  protected long getDelayMs(int currentAttempt) {
     return _delayMs;
   }
 }

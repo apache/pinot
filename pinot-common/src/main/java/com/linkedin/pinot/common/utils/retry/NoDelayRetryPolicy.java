@@ -25,7 +25,7 @@ public class NoDelayRetryPolicy extends BaseRetryPolicy {
   }
 
   @Override
-  protected long getNextDelayMs() {
+  protected long getDelayMs(int currentAttempt) {
     return 0L;
   }
 }
