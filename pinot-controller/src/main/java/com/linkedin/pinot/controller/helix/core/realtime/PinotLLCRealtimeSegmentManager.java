@@ -206,7 +206,7 @@ public class PinotLLCRealtimeSegmentManager {
         // Perhaps we should just let validationmanager do all the adjustments, and let the leadership transfer
         // be quick. If the leadership transfer happened due to zk connection issues, then writing to zk at this time
         // may be bad as well.
-        completeCommittingSegments();
+        //completeCommittingSegments(); // TODO: validateLLC() ?
       } else {
         // We already had leadership, nothing to do.
         LOGGER.info("Already leader. Duplicate notification");
@@ -1780,7 +1780,7 @@ public class PinotLLCRealtimeSegmentManager {
     try {
       instanceAssignments = strategy.assign(Lists.newArrayList(newSegmentId), partitionAssignment);
     } catch (InvalidConfigException e) {
-      e.printStackTrace();
+      throw new RuntimeException(e.getMessage());
     }
 
     List<String> newSegmentInstances = instanceAssignments.get(newSegmentId);

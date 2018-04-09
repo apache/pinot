@@ -144,10 +144,7 @@ public class ValidationManager {
       if (tableType == TableType.OFFLINE) {
         validateOfflineSegmentPush(propertyStore, tableNameWithType);
       } else {
-        List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadataList =
-            ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(propertyStore, tableNameWithType);
         TableConfig tableConfig = null;
-        StreamMetadata streamMetadata = null;
         try {
           tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableNameWithType);
           if (tableConfig == null) {
@@ -158,8 +155,6 @@ public class ValidationManager {
         } catch (Exception e) {
           if (tableConfig == null) {
             LOGGER.warn("Cannot get realtime table config for table: {}", tableNameWithType);
-          } else if (streamMetadata == null) {
-            LOGGER.warn("Cannot get stream config for table: {}", tableNameWithType);
           } else {
             LOGGER.error("Exception while validating table: {}", tableNameWithType, e);
           }

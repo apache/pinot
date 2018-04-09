@@ -1337,16 +1337,6 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     }
 
     @Override
-    protected void setupInitialSegments(TableConfig tableConfig, StreamMetadata streamMetadata,
-        PartitionAssignment partitionAssignment, IdealState idealState, boolean create, int flushSize) {
-      _realtimeTableName = tableConfig.getTableName();
-      _currentTablePartitionAssignment = partitionAssignment;
-      _startOffset = streamMetadata.getKafkaConsumerProperties()
-          .get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
-      super.setupInitialSegments(tableConfig, streamMetadata, partitionAssignment, idealState, create, flushSize);
-    }
-
-    @Override
     protected List<String> getExistingSegments(String realtimeTableName) {
       return _existingLLCSegments;
     }
@@ -1357,18 +1347,6 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
         @Nonnull final PartitionAssignment partitionAssignment) {
       _nCallsToUpdateHelix++;
       super.updateIdealStateOnSegmentCompletion(_tableIdealState, currentSegmentId, newSegmentId, partitionAssignment);
-    }
-
-    @Override
-    protected void updateIdealState(IdealState idealState, String realtimeTableName,
-        Map<String, List<String>> idealStateEntries, boolean create, int nReplicas) {
-      _realtimeTableName = realtimeTableName;
-      _idealStateEntries = idealStateEntries;
-      _nReplicas = nReplicas;
-      _createNew = create;
-      for (Map.Entry<String, List<String>> entry : idealStateEntries.entrySet()) {
-        _idealStateEntries.put(entry.getKey(), entry.getValue());
-      }
     }
 
     @Override
@@ -1385,15 +1363,6 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
       return super.updateOldSegmentMetadataZNRecord(realtimeTableName, committingLLCSegmentName, nextOffset);
     }
 
-    protected void updateIdealState(final String realtimeTableName, final List<String> newInstances,
-        final String oldSegmentNameStr, final String newSegmentNameStr) {
-      _realtimeTableName = realtimeTableName;
-      _newInstances = newInstances;
-      _oldSegmentNameStr.add(oldSegmentNameStr);
-      _newSegmentNameStr.add(newSegmentNameStr);
-      _idealStateEntries.put(newSegmentNameStr, newInstances);
-      _nCallsToUpdateHelix++;
-    }
 
     @Override
     public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName,

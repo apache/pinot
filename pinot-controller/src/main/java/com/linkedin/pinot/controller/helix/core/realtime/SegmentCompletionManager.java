@@ -942,6 +942,7 @@ public class SegmentCompletionManager {
     private SegmentCompletionProtocol.Response processStoppedConsuming(String instanceId, long offset, String reason, boolean createNew) {
       LOGGER.info("Instance {} stopped consuming segment {} at offset {}, state {}, createNew: {}, reason:{}",
           instanceId, _segmentName, offset, _state, createNew, reason);
+      // TODO: what happens to this method? below method is deprecated
       _segmentManager.segmentStoppedConsuming(_segmentName, instanceId);
       return SegmentCompletionProtocol.RESP_PROCESSED;
     }
