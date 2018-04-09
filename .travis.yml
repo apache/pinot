@@ -19,9 +19,14 @@ matrix:
 cache:
   directories:
     - $HOME/.m2
+  yarn: true
+
 
 dist: precise
 sudo: false
+
+addons:
+  firefox: latest
 
 install:
   - ./.travis_install.sh
