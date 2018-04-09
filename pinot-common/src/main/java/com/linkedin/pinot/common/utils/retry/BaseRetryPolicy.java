@@ -18,6 +18,11 @@ package com.linkedin.pinot.common.utils.retry;
 import java.util.concurrent.Callable;
 
 
+/**
+ * The <clase>BaseRetryPolicy</clase> is the base class for all retry policies. To implement a new retry policy, extends
+ * this class and implements the method {@link #getDelayMs(int)}.
+ * <p>NOTE: All the retry policies should be stateless so that they can be cached and reused.
+ */
 public abstract class BaseRetryPolicy implements RetryPolicy {
   private final int _maxNumAttempts;
 
@@ -26,24 +31,24 @@ public abstract class BaseRetryPolicy implements RetryPolicy {
   }
 
   /**
-   * Get the delay in milliseconds before the next attempt.
+   * Gets the delay in milliseconds before the next attempt.
    *
+   * @param currentAttempt Current attempt number
    * @return Delay in milliseconds
    */
-  protected abstract long getNextDelayMs();
+  protected abstract long getDelayMs(int currentAttempt);
 
   @Override
   public void attempt(Callable<Boolean> operation) throws AttemptsExceededException, RetriableOperationException {
-    int numAttempts = 0;
-    while (numAttempts < _maxNumAttempts) {
+    int attempt = 0;
+    while (attempt < _maxNumAttempts) {
       try {
-        if (operation.call()) {
+        if (Boolean.TRUE.equals(operation.call())) {
           // Succeeded
           return;
         } else {
           // Failed
-          numAttempts++;
-          Thread.sleep(getNextDelayMs());
+          Thread.sleep(getDelayMs(attempt++));
         }
       } catch (Exception e) {
         throw new RetriableOperationException(e);
