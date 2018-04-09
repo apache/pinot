@@ -1,4 +1,6 @@
 language: java
+sudo: false
+dist: trusty
 
 env:
   - RUN_INTEGRATION_TESTS=true
@@ -11,10 +13,6 @@ cache:
   directories:
     - $HOME/.m2
   yarn: true
-
-
-dist: precise
-sudo: false
 
 addons:
   firefox: latest
