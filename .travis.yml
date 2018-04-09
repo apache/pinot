@@ -5,16 +5,7 @@ env:
   - RUN_INTEGRATION_TESTS=false
 
 jdk:
-  - oraclejdk7
-  - openjdk7
   - oraclejdk8
-
-matrix:
-  exclude:
-    - jdk: openjdk7
-      env: RUN_INTEGRATION_TESTS=false
-    - jdk: oraclejdk8
-      env: RUN_INTEGRATION_TESTS=false
 
 cache:
   directories:
