@@ -1268,7 +1268,7 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     }
 
     @Override
-    protected boolean isTooSoonToCorrect(String tableNameWithType, String segmentId) {
+    protected boolean isTooSoonToCorrect(String tableNameWithType, String segmentId, long now) {
       return tooSoonToCorrect;
     }
 

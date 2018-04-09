@@ -1542,8 +1542,7 @@ public class PinotLLCRealtimeSegmentManager {
    */
   private static int MAX_SEGMENT_COMPLETION_TIME_MINS = 10;
 
-  protected boolean isTooSoonToCorrect(String tableNameWithType, String segmentId) {
-    long now = getCurrentTimeMs();
+  protected boolean isTooSoonToCorrect(String tableNameWithType, String segmentId, long now) {
     Stat stat = new Stat();
     LLCRealtimeSegmentZKMetadata metadata = getRealtimeSegmentZKMetadata(tableNameWithType, segmentId, stat);
     long metadataUpdateTime = stat.getMtime();
@@ -1591,6 +1590,7 @@ public class PinotLLCRealtimeSegmentManager {
       LOGGER.info("Skipping validation for disabled table {}", tableNameWithType);
       return idealState;
     }
+    final long now = getCurrentTimeMs();
 
     // Get the metadata for the latest 2 segments of each partition
     Map<Integer, MinMaxPriorityQueue<LLCRealtimeSegmentZKMetadata>> latestMetadata =
@@ -1629,17 +1629,16 @@ public class PinotLLCRealtimeSegmentManager {
       final String segmentId = metadata.getSegmentName();
       final LLCSegmentName segmentName = new LLCSegmentName(segmentId);
 
-      if (isTooSoonToCorrect(tableNameWithType, segmentId)) {
-        LOGGER.info("Skipping correction of segment {} (too soon to correct)", segmentId);
-        continue;
-      }
-
       Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
       if (mapFields.containsKey(segmentId)) {
         // Latest segment of metadata is in idealstate.
         Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentId);
         if (instanceStateMap.values().contains(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE)) {
           if (metadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.DONE)) {
+            if (isTooSoonToCorrect(tableNameWithType, segmentId, now)) {
+              LOGGER.info("Skipping correction of segment {} (too soon to correct)", segmentId);
+              continue;
+            }
             // step-1 of commmitSegmentMetadata is done (i.e. marking old segment as DONE)
             // but step-2 is not done (i.e. adding new metadata for the next segment)
             // and ideal state update (i.e. marking old segment as ONLINE and new segment as CONSUMING) is not done either.
@@ -1648,7 +1647,6 @@ public class PinotLLCRealtimeSegmentManager {
                 tableNameWithType, partition, segmentId);
 
             final int newSeqNum = segmentName.getSequenceNumber() + 1;
-            final long now = getCurrentTimeMs();
             LLCSegmentName newLLCSegmentName =
                 new LLCSegmentName(segmentName.getTableName(), partition, newSeqNum, now);
 
@@ -1679,7 +1677,6 @@ public class PinotLLCRealtimeSegmentManager {
           LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableNameWithType, partition);
           startOffset =
               getBetterStartOffsetIfNeeded(tableNameWithType, partition, segmentName, startOffset, nextSeqNum);
-          long now = getCurrentTimeMs();
           LLCSegmentName newLLCSegmentName =
               new LLCSegmentName(segmentName.getTableName(), partition, nextSeqNum, now);
 
@@ -1693,6 +1690,10 @@ public class PinotLLCRealtimeSegmentManager {
         }
         // else It can be in ONLINE state, in which case there is no need to repair the segment.
       } else {
+        if (isTooSoonToCorrect(tableNameWithType, segmentId, now)) {
+          LOGGER.info("Skipping correction of segment {} (too soon to correct)", segmentId);
+          continue;
+        }
         // idealstate does not have an entry for the segment (but metadata is present)
         // controller has failed between step-2 and step-3 of commitSegmentMetadata.
         // i.e. after updating old segment metadata (old segment metadata state = DONE)
@@ -1726,7 +1727,6 @@ public class PinotLLCRealtimeSegmentManager {
       LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableNameWithType, partition);
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
-      long now = getCurrentTimeMs();
       LLCSegmentName newLLCSegmentName = new LLCSegmentName(rawTableName, partition, nextSeqNum, now);
 
       // TODO Need to create another method that we can use.
