@@ -6,22 +6,22 @@ import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEventEntityFormatte
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEventEntity;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.rootcause.impl.EventEntity;
-import com.linkedin.thirdeye.rootcause.impl.HolidayEventEntity;
+import com.linkedin.thirdeye.rootcause.impl.ThirdEyeEventEntity;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 
 
-public class HolidayEventFormatter extends RootCauseEventEntityFormatter {
+public class ThirdEyeEventFormatter extends RootCauseEventEntityFormatter {
   @Override
   public boolean applies(EventEntity entity) {
-    return entity instanceof HolidayEventEntity;
+    return entity instanceof ThirdEyeEventEntity;
   }
 
   @Override
   public RootCauseEventEntity format(EventEntity entity) {
-    HolidayEventEntity holidayEvent = (HolidayEventEntity) entity;
-    EventDTO eventDto = holidayEvent.getDto();
+    ThirdEyeEventEntity thirdEyeEventEntity = (ThirdEyeEventEntity) entity;
+    EventDTO eventDto = thirdEyeEventEntity.getDto();
 
     Multimap<String, String> attributes = ArrayListMultimap.create();
 
@@ -36,7 +36,11 @@ public class HolidayEventFormatter extends RootCauseEventEntityFormatter {
     }
 
     String label = String.format("%s%s", eventDto.getName(), dimensions.toString());
-    String link =  String.format("https://www.google.com/search?q=%s", eventDto.getName());
+    String link = "";
+
+    if (thirdEyeEventEntity.getEventType().equals("holiday")){
+      link = String.format("https://www.google.com/search?q=%s", eventDto.getName());
+    }
 
     RootCauseEventEntity out = makeRootCauseEventEntity(entity, label, link, eventDto.getStartTime(), eventDto.getEndTime(), "");
     out.setAttributes(attributes);

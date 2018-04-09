@@ -139,4 +139,17 @@ export default [
       }
     ]
   },
+  {
+    header: "Custom",
+    eventType: "custom",
+    framework: "eventCustom",
+    color: "pink",
+    inputs: [
+      {
+        label: "Country",
+        labelMapping: "countryCode",
+        type: "dropdown"
+      }
+    ]
+  },
 ];
