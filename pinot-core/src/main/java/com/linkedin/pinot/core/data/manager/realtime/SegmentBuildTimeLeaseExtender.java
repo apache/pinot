@@ -66,7 +66,7 @@ public class SegmentBuildTimeLeaseExtender {
 
   private SegmentBuildTimeLeaseExtender(String instanceId) {
     _instanceId = instanceId;
-    _protocolHandler = new ServerSegmentCompletionProtocolHandler(_instanceId);
+    _protocolHandler = new ServerSegmentCompletionProtocolHandler();
     _executor = new ScheduledThreadPoolExecutor(1);
   }
 
@@ -89,7 +89,8 @@ public class SegmentBuildTimeLeaseExtender {
   public void addSegment(String segmentId, long initialBuildTimeMs, long offset) {
     final long initialDelayMs = initialBuildTimeMs * 9 / 10;
     final SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
-    reqParams.withOffset(offset).withSegmentName(segmentId).withExtraTimeSec(EXTRA_TIME_SECONDS);
+    reqParams.withOffset(offset).withSegmentName(segmentId).withExtraTimeSec(EXTRA_TIME_SECONDS)
+        .withInstanceId(_instanceId);
     Future future = _executor.scheduleWithFixedDelay(new LeaseExtender(reqParams), initialDelayMs,
         REPEAT_REQUEST_PERIOD_SEC * 1000L, TimeUnit.MILLISECONDS);
     _segmentToFutureMap.put(segmentId, future);

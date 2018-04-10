@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.Utils;
@@ -124,26 +125,42 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  private class SegmentFileAndOffset {
-    final String _segmentFile;
+  protected class SegmentBuildDescriptor {
+    final String _segmentTarFilePath;
     final long _offset;
-    SegmentFileAndOffset(String segmentFile, long offset) {
-      _segmentFile = segmentFile;
+    final long _waitTimeMillis;
+    final long _buildTimeMillis;
+    final String _segmentDirPath;
+    SegmentBuildDescriptor(String segmentTarFilePath, long offset, String segmentDirPath, long buildTimeMillis,
+        long waitTimeMillis) {
+      _segmentTarFilePath = segmentTarFilePath;
       _offset = offset;
+      _buildTimeMillis = buildTimeMillis;
+      _waitTimeMillis = waitTimeMillis;
+      _segmentDirPath = segmentDirPath;
     }
+
     public long getOffset() {
       return _offset;
     }
 
-    public String getSegmentFile() {
-      return _segmentFile;
+    public long getBuildTimeMillis() {
+      return _buildTimeMillis;
+    }
+
+    public long getWaitTimeMillis() {
+      return _waitTimeMillis;
+    }
+
+    public String getSegmentTarFilePath() {
+      return _segmentTarFilePath;
     }
 
     public void deleteSegmentFile() {
       // If segment build fails with an exception then we will not be able to create a segment file and
       // the file name will be null.
-      if (_segmentFile != null) {
-        FileUtils.deleteQuietly(new File(_segmentFile));
+      if (_segmentTarFilePath != null) {
+        FileUtils.deleteQuietly(new File(_segmentTarFilePath));
       }
     }
   }
@@ -175,7 +192,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String _segmentNameStr;
   private final SegmentVersion _segmentVersion;
   private final SegmentBuildTimeLeaseExtender _leaseExtender;
-  private SegmentFileAndOffset _segmentFileAndOffset;
+  private SegmentBuildDescriptor _segmentBuildDescriptor;
   private PinotStreamConsumerFactory _pinotStreamConsumerFactory;
 
   // Segment end criteria
@@ -515,12 +532,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT, 1);
               _state = State.COMMITTING;
               long buildTimeSeconds = response.getBuildTimeSeconds();
-              final String segmentTarFile = buildSegmentForCommit(buildTimeSeconds * 1000L);
-              if (segmentTarFile == null) {
+              buildSegmentForCommit(buildTimeSeconds * 1000L);
+              if (_segmentBuildDescriptor == null) {
                 // We could not build the segment. Go into error state.
                 _state = State.ERROR;
               } else {
-                success = commitSegment(segmentTarFile, response);
+                success = commitSegment(response);
                 if (success) {
                   _state = State.COMMITTED;
                 } else {
@@ -561,17 +578,17 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return new File(_resourceDataDir, _segmentZKMetadata.getSegmentName());
   }
 
-  protected String buildSegmentForCommit(long buildTimeLeaseMs) {
+  // Modifies _segmentBuildDescriptor if we have do not have a valid built segment file.
+  protected void buildSegmentForCommit(long buildTimeLeaseMs) {
     try {
-      if (_segmentFileAndOffset != null) {
-        if (_segmentFileAndOffset.getOffset() == _currentOffset) {
+      if (_segmentBuildDescriptor != null) {
+        if (_segmentBuildDescriptor.getOffset() == _currentOffset) {
           // Double-check that we have the file, just in case.
-          String segTarFile = _segmentFileAndOffset.getSegmentFile();
+          String segTarFile = _segmentBuildDescriptor.getSegmentTarFilePath();
           if (new File(segTarFile).exists()) {
-            return _segmentFileAndOffset.getSegmentFile();
-          } else {
-            _segmentFileAndOffset = null;
+            return;
           }
+          _segmentBuildDescriptor = null;
         }
         removeSegmentFile();
       }
@@ -586,21 +603,30 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         }
       }
       _leaseExtender.addSegment(_segmentNameStr, buildTimeLeaseMs, _currentOffset);
-      String segTarFile =  buildSegmentInternal(true);
-      _segmentFileAndOffset = new SegmentFileAndOffset(segTarFile, _currentOffset);
-      return segTarFile;
+      _segmentBuildDescriptor = buildSegmentInternal(true);
     } finally {
       _leaseExtender.removeSegment(_segmentNameStr);
     }
   }
 
-  protected String buildSegmentInternal(boolean forCommit) {
+  @VisibleForTesting
+  protected long getCurrentOffset() {
+    return _currentOffset;
+  }
+
+  @VisibleForTesting
+  protected SegmentBuildDescriptor getSegmentBuildDescriptor() {
+    return _segmentBuildDescriptor;
+  }
+
+  protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
     try {
+      final long startTimeMillis = now();
       if (_segBuildSemaphore != null) {
         segmentLogger.info("Waiting to acquire semaphore for building segment");
         _segBuildSemaphore.acquire();
       }
-      long startTimeMillis = System.currentTimeMillis();
+      final long lockAquireTimeMillis = now();
       // Build a segment from in-memory rows.If buildTgz is true, then build the tar.gz file as well
       // TODO Use an auto-closeable object to delete temp resources.
       File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + _segmentNameStr + "-" + String.valueOf(now()));
@@ -611,7 +637,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               _invertedIndexColumns, _noDictionaryColumns, _starTreeIndexSpec);
       logStatistics();
       segmentLogger.info("Trying to build segment");
-      final long buildStartTime = now();
       try {
         converter.build(_segmentVersion, _serverMetrics);
       } catch (Exception e) {
@@ -619,8 +644,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         FileUtils.deleteQuietly(tempSegmentFolder);
         return null;
       }
-      final long buildEndTime = now();
-      segmentLogger.info("Successfully built segment in {} ms", (buildEndTime - buildStartTime));
+      segmentLogger.info("Successfully built segment in {} ms", (now() - lockAquireTimeMillis));
       File destDir = makeSegmentDirPath();
       FileUtils.deleteQuietly(destDir);
       try {
@@ -634,15 +658,21 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         return null;
       }
       FileUtils.deleteQuietly(tempSegmentFolder);
-      long endTimeMillis = System.currentTimeMillis();
+      final long buildTimeMillis = now() - lockAquireTimeMillis;
+      final long waitTimeMillis = lockAquireTimeMillis - startTimeMillis;
 
       _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
-          TimeUnit.MILLISECONDS.toSeconds(endTimeMillis - startTimeMillis));
+          TimeUnit.MILLISECONDS.toSeconds(buildTimeMillis));
+      _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_WAIT_TIME_SECONDS,
+          TimeUnit.MILLISECONDS.toSeconds(waitTimeMillis));
 
       if (forCommit) {
-        return destDir.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENTION;
+        return new SegmentBuildDescriptor(
+            destDir.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENTION, _currentOffset,
+            null, buildTimeMillis, waitTimeMillis);
       }
-      return destDir.getAbsolutePath();
+      return new SegmentBuildDescriptor( null, _currentOffset, destDir.getAbsolutePath(),
+          buildTimeMillis, waitTimeMillis);
     } catch (InterruptedException e) {
       segmentLogger.error("Interrupted while waiting for semaphore");
       return null;
@@ -653,22 +683,36 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  protected SegmentCompletionProtocol.Response doSplitCommit(File segmentTarFile, SegmentCompletionProtocol.Response prevResponse) {
-    SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(_currentOffset, _segmentNameStr);
+  private SegmentCompletionProtocol.Response doSplitCommit(SegmentCompletionProtocol.Response prevResponse) {
+    final File segmentTarFile = new File(_segmentBuildDescriptor.getSegmentTarFilePath());
+    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
+
+    params.withSegmentName(_segmentNameStr).withOffset(_currentOffset).withNumRows(_numRowsConsumed)
+        .withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes()).withInstanceId(_instanceId)
+        .withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
+        .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
+    SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(params);
     if (!segmentCommitStartResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
       segmentLogger.warn("CommitStart failed  with response {}", segmentCommitStartResponse.toJsonString());
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    SegmentCompletionProtocol.Response segmentCommitUploadResponse = _protocolHandler.segmentCommitUpload(
-        _currentOffset, _segmentNameStr, segmentTarFile, prevResponse.getControllerVipUrl());
+    params = new SegmentCompletionProtocol.Request.Params();
+    params.withOffset(_currentOffset).withSegmentName(_segmentNameStr).withInstanceId(_instanceId);
+    SegmentCompletionProtocol.Response segmentCommitUploadResponse = _protocolHandler.segmentCommitUpload(params,
+        segmentTarFile, prevResponse.getControllerVipUrl());
     if (!segmentCommitUploadResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS)) {
       segmentLogger.warn("Segment upload failed  with response {}", segmentCommitUploadResponse.toJsonString());
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    SegmentCompletionProtocol.Response commitEndResponse =  _protocolHandler.segmentCommitEnd(_currentOffset,
-        _segmentNameStr, segmentCommitUploadResponse.getSegmentLocation(), _memoryManager.getTotalAllocatedBytes());
+    params = new SegmentCompletionProtocol.Request.Params();
+    params.withInstanceId(_instanceId).withOffset(_currentOffset).withSegmentName(_segmentNameStr)
+        .withSegmentLocation(segmentCommitUploadResponse.getSegmentLocation())
+        .withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes()).withNumRows(_numRowsConsumed)
+        .withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
+        .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
+    SegmentCompletionProtocol.Response commitEndResponse =  _protocolHandler.segmentCommitEnd(params);
     if (!commitEndResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS))  {
       segmentLogger.warn("CommitEnd failed  with response {}", commitEndResponse.toJsonString());
       return SegmentCompletionProtocol.RESP_FAILED;
@@ -676,7 +720,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return commitEndResponse;
   }
 
-  protected boolean commitSegment(final String segTarFileName, SegmentCompletionProtocol.Response response) {
+  protected boolean commitSegment(SegmentCompletionProtocol.Response response) {
+    final String segTarFileName = _segmentBuildDescriptor.getSegmentTarFilePath();
     File segTarFile = new File(segTarFileName);
     if (!segTarFile.exists()) {
       throw new RuntimeException("Segment file does not exist:" + segTarFileName);
@@ -685,11 +730,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (response.getIsSplitCommit() && _indexLoadingConfig.isEnableSplitCommit()) {
       // Send segmentStart, segmentUpload, & segmentCommitEnd to the controller
       // if that succeeds, swap in-memory segment with the one built.
-      returnedResponse = doSplitCommit(segTarFile, response);
+      returnedResponse = doSplitCommit(response);
     } else {
       // Send segmentCommit() to the controller
       // if that succeeds, swap in-memory segment with the one built.
-      returnedResponse = postSegmentCommitMsg(segTarFile);
+      returnedResponse = postSegmentCommitMsg();
     }
     if (!returnedResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
       return false;
@@ -699,9 +744,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return true;
   }
 
-  protected SegmentCompletionProtocol.Response postSegmentCommitMsg(File segmentTarFile) {
-    SegmentCompletionProtocol.Response response = _protocolHandler.segmentCommit(_currentOffset, _segmentNameStr,
-        _memoryManager.getTotalAllocatedBytes(), segmentTarFile);
+  protected SegmentCompletionProtocol.Response postSegmentCommitMsg() {
+    final File segmentTarFile = new File(_segmentBuildDescriptor.getSegmentTarFilePath());
+    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
+    params.withInstanceId(_instanceId).withOffset(_currentOffset).withSegmentName(_segmentNameStr)
+        .withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes()).withNumRows(_numRowsConsumed)
+        .withInstanceId(_instanceId).withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
+        .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
+    SegmentCompletionProtocol.Response response = _protocolHandler.segmentCommit(params, segmentTarFile);
     if (!response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
       segmentLogger.warn("Commit failed  with response {}", response.toJsonString());
     }
@@ -709,8 +759,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected boolean buildSegmentAndReplace() {
-    String segmentDirName = buildSegmentInternal(false);
-    if (segmentDirName == null) {
+    SegmentBuildDescriptor descriptor = buildSegmentInternal(false);
+    if (descriptor == null) {
       return false;
     }
     _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
@@ -745,14 +795,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Post segmentConsumed to current leader.
     // Retry maybe once if leader is not found.
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.withOffset(_currentOffset).withSegmentName(_segmentNameStr).withReason(_stopReason);
+    params.withOffset(_currentOffset).withSegmentName(_segmentNameStr).withReason(_stopReason)
+      .withNumRows(_numRowsConsumed).withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes())
+      .withInstanceId(_instanceId);
     return _protocolHandler.segmentConsumed(params);
   }
 
   private void removeSegmentFile() {
-    if (_segmentFileAndOffset != null) {
-      _segmentFileAndOffset.deleteSegmentFile();
-      _segmentFileAndOffset = null;
+    if (_segmentBuildDescriptor != null) {
+      _segmentBuildDescriptor.deleteSegmentFile();
+      _segmentBuildDescriptor = null;
     }
   }
 
@@ -906,7 +958,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _instanceId = _realtimeTableDataManager.getServerInstance();
     _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_instanceId);
-    _protocolHandler = new ServerSegmentCompletionProtocolHandler(_instanceId);
+    _protocolHandler = new ServerSegmentCompletionProtocolHandler();
 
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
