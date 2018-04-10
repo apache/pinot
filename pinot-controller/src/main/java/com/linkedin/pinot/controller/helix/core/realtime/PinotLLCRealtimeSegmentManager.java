@@ -1586,7 +1586,7 @@ public class PinotLLCRealtimeSegmentManager {
    *   and so it is currently in back-off stage.
    * - ValidationManager starts to run, and finds the segment in improper state and manages to fix it in idealstate.
    * - The segment completion thread comes back to update the ideal state (should already find the same segment in there)
-   *
+   * TODO: split this method into multiple smaller methods
    */
   @VisibleForTesting
   protected IdealState validateLLCSegments(final TableConfig tableConfig, IdealState idealState,
@@ -1616,7 +1616,8 @@ public class PinotLLCRealtimeSegmentManager {
     try {
       partitionAssignment = _partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, partitionCount);
     } catch (InvalidConfigException e) {
-      throw new RuntimeException(e.getMessage());
+      throw new IllegalStateException(
+          "Caught exception when generating partition assignment for table " + tableNameWithType, e);
     }
 
     Map<String, String> oldToNewSegmentsMap = new HashMap<>();
@@ -1747,7 +1748,8 @@ public class PinotLLCRealtimeSegmentManager {
       assignments =
           segmentAssignmentStrategy.assign(Lists.newArrayList(oldToNewSegmentsMap.values()), partitionAssignment);
     } catch (InvalidConfigException e) {
-      e.printStackTrace();
+      throw new IllegalStateException(
+          "Caught exception when assigning segments using partition assignment for table " + tableNameWithType);
     }
 
     for (Map.Entry<String, String> entry : oldToNewSegmentsMap.entrySet()) {
