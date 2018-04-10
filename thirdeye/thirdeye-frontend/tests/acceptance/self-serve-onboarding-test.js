@@ -16,8 +16,6 @@ module('Acceptance | create alert', function(hooks) {
   const newRecipient = 'duane@therock.com';
   const selectedApp = 'the-lion-king';
   const alertName = 'theLionKing_testMetric1_upDown_5Minutes';
-  const startDateDefault = moment().subtract(3, 'month').endOf('day').utc().valueOf();
-  const dateString = `?duration=3m&endDate=${moment().utc().valueOf()}&startDate=${startDateDefault}`;
 
   // Flatten filter object in order to easily compare it to the list of options rendered
   const filterArray = Object.values(filters).map(filterGroup => [...Object.values(filterGroup)]);

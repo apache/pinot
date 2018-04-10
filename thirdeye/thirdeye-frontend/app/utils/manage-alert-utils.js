@@ -64,8 +64,9 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
   // Loop over all anomalies to configure display settings
   anomalies.forEach((anomaly) => {
     let dimensionList = [];
+    let targetAnomaly = resolvedScores.find(score => Number(score.id) === Number(anomaly.anomalyId));
     // Extract current anomaly's score from array of all scores
-    const score = resolvedScores.length ? resolvedScores.find(score => score.id === anomaly.anomalyId).score : null;
+    const score = resolvedScores.length && targetAnomaly ? targetAnomaly.score : null;
     // Set up anomaly change rate display
     const changeRate = (anomaly.current && anomaly.baseline) ? floatToPercent((anomaly.current - anomaly.baseline) / anomaly.baseline) : 0;
     const isNullChangeRate = Number.isNaN(Number(changeRate));

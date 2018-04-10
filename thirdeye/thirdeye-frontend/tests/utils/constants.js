@@ -43,8 +43,21 @@ export const selfServeConst = {
   IMPORT_RESULT_LIST: '.te-form__banner-list',
   ALERT_ACTIVE_LABEL: '.te-search-results__tag--active',
   ALERT_TITLE: '.te-search-results__title',
+  PATTERN_OPTIONS: ['Higher or lower than expected', 'Higher than expected', 'Lower than expected'],
+
+  // Alert search page elements: /manage/alerts
+  RESULTS_TITLE: '.te-search-title',
+  RESULTS_LINK: '.te-search-results__title-name',
+  ALERT_PROPS_ITEM: '.te-search-results__option',
+
+  // Alert Page elements
   ALERT_CARDS_CONTAINER: '.te-horizontal-cards__container',
-  PATTERN_OPTIONS: ['Higher or lower than expected', 'Higher than expected', 'Lower than expected']
+  ALERT_PAGE_HEADER_PROPS: '.te-search-results__list--details-block',
+  ALERT_PAGE_HEADER_LINK: '.te-search-results__cta',
+  RANGE_PILL_SELECTOR_ITEM: '.range-pill-selectors__item',
+  RANGE_PILL_SELECTOR_TRIGGER: '.range-pill-selectors__range-picker .daterangepicker-input',
+  RANGE_PILL_PRESET_OPTION: '.daterangepicker:last .ranges li:contains("Last 1 month")',
+  LINK_TUNE_ALERT: '.te-self-serve__side-link:contains("Customize sensitivity")',
 };
 
 /**
