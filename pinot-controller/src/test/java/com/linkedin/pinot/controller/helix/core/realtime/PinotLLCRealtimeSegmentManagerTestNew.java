@@ -494,6 +494,7 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
           // general verifyRepairs
           verifyRepairs(tableConfig, idealState, expectedPartitionAssignment, segmentManager, oldMapFields);
         } else {
+          // 2. seq number matured, latest metadata IN_PROGRESS, but segment missing
           int randomlySelectedPartition = random.nextInt(nPartitions);
 
           String rawTableName = TableNameBuilder.extractRawTableName(tableName);

@@ -199,16 +199,6 @@ public class PinotLLCRealtimeSegmentManager {
         // We were not leader before, now we are.
         _amILeader = true;
         LOGGER.info("Became leader");
-        // Scanning tables to check for incomplete table additions is optional if we make table addtition operations
-        // idempotent.The user can retry the failed operation and it will work.
-        //
-        // Go through all partitions of all tables that have LL configured, and check that they have as many
-        // segments in CONSUMING state in Idealstate as there are kafka partitions.
-        // TODO We should not call Kafka to get new number of partitions during controller leadership transfer.
-        // Perhaps we should just let validationmanager do all the adjustments, and let the leadership transfer
-        // be quick. If the leadership transfer happened due to zk connection issues, then writing to zk at this time
-        // may be bad as well.
-        //completeCommittingSegments(); // TODO: validateLLC() ?
       } else {
         // We already had leadership, nothing to do.
         LOGGER.info("Already leader. Duplicate notification");
@@ -1053,7 +1043,6 @@ public class PinotLLCRealtimeSegmentManager {
             partitionId, segmentId);
 
         LOGGER.info("{}: Assigning segment {} to {}", realtimeTableName, segmentId, newInstances);
-        // TODO Re-write num-partitions in metadata if needed.
         // If there was a prev segment in the same partition, then we need to fix it to be ONLINE.
 
         LLCSegmentName prevSegmentName = entry.getValue().pollLast();
@@ -1454,6 +1443,7 @@ public class PinotLLCRealtimeSegmentManager {
     return PinotTableIdealStateBuilder.getPartitionCount(streamMetadata);
   }
 
+  @Deprecated
   public PartitionAssignment getStreamPartitionAssignment(String realtimeTableName) {
     return _streamPartitionAssignmentGenerator.getStreamPartitionAssignment(realtimeTableName);
   }
@@ -1468,12 +1458,23 @@ public class PinotLLCRealtimeSegmentManager {
   ////////////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////////////
 
+  /**
+   * Given a table name, returns a list of metadata for all segments of that table from the property store
+   * @param tableNameWithType
+   * @return
+   */
+  @VisibleForTesting
   protected List<LLCRealtimeSegmentZKMetadata> getAllSegmentMetadata(String tableNameWithType) {
     return ZKMetadataProvider.getLLCRealtimeSegmentZKMetadataListForTable(_helixManager.getHelixPropertyStore(),
         tableNameWithType);
   }
 
-  // Gets latest 2 metadata. We need only the 2 latest metadata for each partition
+  /**
+   * Gets latest 2 metadata. We need only the 2 latest metadata for each partition in order to perform repairs
+    * @param tableNameWithType
+   * @return
+   */
+  @VisibleForTesting
   protected Map<Integer, MinMaxPriorityQueue<LLCRealtimeSegmentZKMetadata>> getLatestMetadata(String tableNameWithType) {
     List<LLCRealtimeSegmentZKMetadata> metadatas = getAllSegmentMetadata(tableNameWithType);
 
@@ -1502,6 +1503,10 @@ public class PinotLLCRealtimeSegmentManager {
     return partitionToLatestSegments;
   }
 
+  /**
+   * Validates llc segments in ideal state and repairs them if necessary
+   * @param tableConfig
+   */
   public void validateLLCSegments(final TableConfig tableConfig) {
     final String tableNameWithType = tableConfig.getTableName();
     final StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
@@ -1515,6 +1520,13 @@ public class PinotLLCRealtimeSegmentManager {
     }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f), true);
   }
 
+  /**
+   * Updates ideal state after completion of a realtime segment
+   * @param tableNameWithType
+   * @param currentSegmentId
+   * @param newSegmentId
+   * @param partitionAssignment
+   */
   @VisibleForTesting
   protected void updateIdealStateOnSegmentCompletion(@Nonnull final String tableNameWithType,
       @Nonnull final String currentSegmentId, @Nonnull final String newSegmentId,
@@ -1548,7 +1560,7 @@ public class PinotLLCRealtimeSegmentManager {
    * We check the segment's metadata to see if that is old enough for repair. If it is fairly new, we
    * leave it as it is, to be fixed the next time repair job triggers.
    */
-
+  @VisibleForTesting
   protected boolean isTooSoonToCorrect(String tableNameWithType, String segmentId, long now) {
     Stat stat = new Stat();
     LLCRealtimeSegmentZKMetadata metadata = getRealtimeSegmentZKMetadata(tableNameWithType, segmentId, stat);
@@ -1559,6 +1571,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
     return false;
   }
+
 
   private boolean isAllInstancesOffline(Map<String, String> instanceStateMap) {
     for (String state : instanceStateMap.values()) {
@@ -1572,20 +1585,23 @@ public class PinotLLCRealtimeSegmentManager {
   /*
    * Validate LLC segments of a table.
    *
-   * This method combines the logic in the previous completeCommitingSegmentsInternal()
-   * and createConsumingSegment() methods.
+   * Iterates over latest metadata for each partition and checks for following scenarios and repairs them:
+   * 1) Segment present in ideal state
+   * a) metadata status is IN_PROGRESS, segment state is CONSUMING - happy path
+   * b) metadata status is IN_PROGRESS, segment state is OFFLINE - create new metadata and new CONSUMING segment
+   * c) metadata status is DONE, segment state is OFFLINE - create new metadata and new CONSUMING segment
+   * d) metadata status is DONE, segment state is CONSUMING - create new metadata and new CONSUMINg segment
+   * 2) Segment is absent from ideal state - add new segment to ideal state
+   *
+   * Also checks if it is too soon to correct (could be in the process of committing segment)
+   * If new partitions are detected, gets them started
+   * If new instances are detected, uses them for new assignments
    *
    * So, the method may:
    * - Add or modify one or more segment metadata znodes
    * - Update the idealstate, which may fail if some other process updated the idealstate.
    *
    * In case idealstate update fails, then we need to start over.
-   *
-   * TODO Verify right things happen in the following case:
-   * - A segment completion is triggered, that manages to update metadata but ideal state update fails
-   *   and so it is currently in back-off stage.
-   * - ValidationManager starts to run, and finds the segment in improper state and manages to fix it in idealstate.
-   * - The segment completion thread comes back to update the ideal state (should already find the same segment in there)
    * TODO: split this method into multiple smaller methods
    */
   @VisibleForTesting
@@ -1667,12 +1683,6 @@ public class PinotLLCRealtimeSegmentManager {
             LOGGER.info("{}: Creating new segment metadata for {}", tableNameWithType,
                 newLLCSegmentName.getSegmentName());
 
-            // TODO
-            // Change the lines below to do the following once segment assignment interfaces are ready
-            // 1. get PartitionAssignment from idealstate (and the new segment?)
-            // 2. use partition assignment to fill in the number of rows metadata
-            // 3. add metadata to zk
-            // 4. change idealstate.
             createNewSegmentMetadataZNRecord(tableNameWithType, newLLCSegmentName, metadata.getEndOffset(),
                 partitionAssignment);
 
@@ -1694,11 +1704,6 @@ public class PinotLLCRealtimeSegmentManager {
           LLCSegmentName newLLCSegmentName =
               new LLCSegmentName(segmentName.getTableName(), partition, nextSeqNum, now);
 
-          // TODO Change the lines below to the following:
-          // 1. get PartitionAssignment from idealstate (and the new segment?)
-          // 2. use partition assignment to fill in the number of rows metadata
-          // 3. add metadata to zk
-          // 4. change idealstate.
           createNewSegmentMetadataZNRecord(tableNameWithType, newLLCSegmentName, startOffset, partitionAssignment);
           segmentMapper.addMapping(segmentMapper.generateNewSegmentKey(partition), newLLCSegmentName.getSegmentName());
         }
@@ -1717,8 +1722,6 @@ public class PinotLLCRealtimeSegmentManager {
         Preconditions.checkArgument(metadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.IN_PROGRESS));
         LOGGER.info("{}:Repairing segment for partition {}. Segment {} not found in idealstate", tableNameWithType,
             partition, segmentId);
-
-        // TODO Re-write num-partitions in metadata if needed.
 
         // If there was a prev segment in the same partition, then we need to fix it to be ONLINE.
         LLCRealtimeSegmentZKMetadata prevMetadata = entry.getValue().pollLast();
@@ -1746,7 +1749,6 @@ public class PinotLLCRealtimeSegmentManager {
 
         LLCSegmentName newLLCSegmentName = new LLCSegmentName(rawTableName, partition, nextSeqNum, now);
 
-        // TODO Need to create another method that we can use.
         createNewSegmentMetadataZNRecord(tableNameWithType, newLLCSegmentName, startOffset, partitionAssignment);
         segmentMapper.addMapping(segmentMapper.generateNewSegmentKey(partition), newLLCSegmentName.getSegmentName());
       }
@@ -1786,6 +1788,7 @@ public class PinotLLCRealtimeSegmentManager {
     return idealState;
   }
 
+  @VisibleForTesting
   protected long getCurrentTimeMs() {
     return System.currentTimeMillis();
   }

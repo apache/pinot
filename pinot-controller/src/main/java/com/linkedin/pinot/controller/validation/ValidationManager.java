@@ -169,8 +169,7 @@ public class ValidationManager {
     List<RealtimeSegmentZKMetadata> metadataList =
             ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(propertystore, tableNameWithType);
     boolean countHLCSegments = true;  // false if this table has ONLY LLC segments (i.e. fully migrated)
-    StreamMetadata streamMetadata = null;
-    streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+    StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
     if (streamMetadata.hasSimpleKafkaConsumerType() && !streamMetadata.hasHighLevelKafkaConsumerType()) {
       countHLCSegments = false;
     }
@@ -189,7 +188,6 @@ public class ValidationManager {
 
     IdealState idealState =
         HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), realtimeTableName);
-
 
     PartitionAssignment partitionAssignment = _llcRealtimeSegmentManager.getStreamPartitionAssignment(realtimeTableName);
     if (partitionAssignment == null) {
