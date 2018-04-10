@@ -114,6 +114,8 @@ public class PinotLLCRealtimeSegmentManager {
   private static final String METADATA_TEMP_DIR_SUFFIX = ".metadata.tmp";
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
   private static final String NEW_SEGMENT_PREFIX = "_PINOT_NEW";
+  // TODO: make this configurable with default set to 10
+  private static int MAX_SEGMENT_COMPLETION_TIME_MINS = 10;
 
   private static PinotLLCRealtimeSegmentManager INSTANCE = null;
 
@@ -655,6 +657,10 @@ public class PinotLLCRealtimeSegmentManager {
       long memoryUsedBytes) {
     final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     TableConfig tableConfig = getRealtimeTableConfig(realtimeTableName);
+    if (tableConfig == null) {
+      LOGGER.warn("Did not find table config for table {}", realtimeTableName);
+      return false;
+    }
 
     /*
      * Update zookeeper in 3 steps.
@@ -692,7 +698,9 @@ public class PinotLLCRealtimeSegmentManager {
     try {
       partitionAssignment = _partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions);
     } catch (InvalidConfigException e) {
-      e.printStackTrace();
+      LOGGER.error("Exception when generating partition assignment for table {} and numPartitions {}",
+          realtimeTableName, numPartitions, e);
+      return false;
     }
 
     // If an LLC table is dropped (or cleaned up), we will get null here. In that case we should not be creating a new segment
@@ -1540,7 +1548,6 @@ public class PinotLLCRealtimeSegmentManager {
    * We check the segment's metadata to see if that is old enough for repair. If it is fairly new, we
    * leave it as it is, to be fixed the next time repair job triggers.
    */
-  private static int MAX_SEGMENT_COMPLETION_TIME_MINS = 10;
 
   protected boolean isTooSoonToCorrect(String tableNameWithType, String segmentId, long now) {
     Stat stat = new Stat();
