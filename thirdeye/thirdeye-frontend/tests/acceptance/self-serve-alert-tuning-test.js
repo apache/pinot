@@ -37,17 +37,18 @@ module('Acceptance | tune alert settings', function(hooks) {
 
     // Click into Alert Page for first listed alert
     await click($targetAlertLink.get(0));
-    const alertPropLabels = Object.values($(selfServeConst.ALERT_PROPS_ITEM)).filter(y => y.nodeName ==='DIV').map(x => x.innerText);
+    const alertPropsElementArray = Object.values($(selfServeConst.ALERT_PROPS_ITEM)).filter(el => el.nodeName ==='DIV');
+    const alertPropLabelsArray = alertPropsElementArray.map(el => el.innerText);
 
-
+    // Verify transition to Alert Page
     assert.ok(
       currentURL().includes(`/manage/alert/1/explore?duration=3m`),
       'Navigation to alert page succeeded'
     );
 
-    // Verify default search results
+    // Verify all alert property labels are present
     assert.ok(
-      alertPropLabels.join() === alertProps.join(),
+      alertPropLabelsArray.join() === alertProps.join(),
       'All needed labels are displayed in header for Alert Page'
     );
 
@@ -64,6 +65,16 @@ module('Acceptance | tune alert settings', function(hooks) {
       urlCustomTune,
       'In transition to tuning page, the user-selected custom date range was persisted'
     );
-
   });
+
+  /**
+   * TODO: extend this test with the following flow:
+   * - click "preview performance", verify expected alert performance results, verify anomaly table results
+   * - click "reset", verify clean slate
+   * - click preview on custom settings, verify expected alert performance results
+   * - save a custom MTTD, verify banner
+   * - change date time range
+   * - navigate back to alert page, verify mttd % is consistent and time range is persisted
+   * - click report missing anomaly, enter time range, verify success banner and closed modal
+   */
 });

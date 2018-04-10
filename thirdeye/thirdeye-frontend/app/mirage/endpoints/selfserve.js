@@ -3,7 +3,7 @@ import { anomalySet } from 'thirdeye-frontend/mocks/anomalies';
 import alertConfig from 'thirdeye-frontend/mocks/alertConfig';
 import entityApplication from 'thirdeye-frontend/mocks/entityApplication';
 import anomalyChangeData from 'thirdeye-frontend/mocks/anomalyWowChange';
-import { perfBeforeTuning, perfAfterTuning } from 'thirdeye-frontend/mocks/anomalyPerformance';
+import { performanceData } from 'thirdeye-frontend/mocks/anomalyPerformance';
 
 export default function (server) {
 
@@ -135,7 +135,7 @@ export default function (server) {
    * Tune alert: GET request to fetch new perf data
    */
   server.get('/detection-job/eval/autotune/:id', () => {
-    return perfAfterTuning;
+    return performanceData(1);
   });
 
   /**
@@ -168,7 +168,7 @@ export default function (server) {
    * get request for metric import verification
    */
   server.get('/detection-job/eval/:type/:id', () => {
-    return perfBeforeTuning;
+    return performanceData();
   });
 
   /**
