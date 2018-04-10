@@ -75,19 +75,19 @@ export default Controller.extend({
   //
   authService: service('session'),
 
-  entitiesService: service('rootcause-entities-cache'),
+  entitiesService: service('services/rootcause-entities-cache'),
 
-  timeseriesService: service('rootcause-timeseries-cache'),
+  timeseriesService: service('services/rootcause-timeseries-cache'),
 
-  aggregatesService: service('rootcause-aggregates-cache'),
+  aggregatesService: service('services/rootcause-aggregates-cache'),
 
-  breakdownsService: service('rootcause-breakdowns-cache'),
+  breakdownsService: service('services/rootcause-breakdowns-cache'),
 
-  scoresService: service('rootcause-scores-cache'),
+  scoresService: service('services/rootcause-scores-cache'),
 
-  sessionService: service('rootcause-session-datasource'),
+  sessionService: service('services/rootcause-session-datasource'),
 
-  anomalyFunctionService: service('rootcause-anomalyfunction-cache'),
+  anomalyFunctionService: service('services/rootcause-anomalyfunction-cache'),
 
   //
   // user details
@@ -1106,4 +1106,3 @@ export default Controller.extend({
     }
   }
 });
-
