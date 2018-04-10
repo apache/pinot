@@ -1,5 +1,4 @@
-{{#link-to 'rootcause' (query-params anomalyId=record.id)
-  class="te-anomaly-table__link"}}
+{{#link-to 'rootcause' (query-params anomalyId=record.id)}}
    {{moment-format record.start 'MMM D, hh:mm A'}}
 {{/link-to}}
 <p class="anomalies-table__duration">

@@ -75,30 +75,6 @@ module('Acceptance | rootcause', async function(hooks) {
         'default baseline is correct');
     });
 
-  test('visiting rootcause page with an anomaly should have correct anomaly information', async assert => {
-    await visit('/rootcause?anomalyId=1');
-    await click(rcEl.EXPAND_ANOMALY_BTN);
-
-    assert.equal(
-      currentURL(),
-      '/rootcause?anomalyId=1',
-      'link is correct');
-    assert.equal(
-      $(rcEl.ANOMALY_TITLE).get(0).innerText,
-      'Anomaly #1 anomaly_label',
-      'anomaly title is correct'
-    );
-    assert.equal(
-      $(rcEl.ANOMALY_VALUE).get(0).innerText,
-      'pageViews',
-      'metric name in anomaly card is correct'
-    );
-    assert.equal(
-      $(rcEl.ANOMALY_STATUS).get(0).innerText.trim(),
-      'No (False Alarm)',
-      'anomaly status is correct');
-  });
-
   test('Metrics, Dimensions, and Events tabs exist and should have correct information', async (assert) => {
     await visit('/rootcause?metricId=1');
 

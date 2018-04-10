@@ -130,7 +130,9 @@ export function setUpTimeRangeOptions(datesKeys, duration) {
     [ '1m', ['Last 30 Days', 1, 'month'] ],
     [ '3m', ['3 Months', 3, 'month'] ],
     [ '2w', ['Last 2 Weeks', 2, 'week'] ],
-    [ '1w', ['Last Week', 1, 'week'] ]
+    [ '1w', ['Last Week', 1, 'week'] ],
+    [ '2d', ['Yesterday', 2, 'day'] ],
+    [ '1d', ['Today', 1, 'day'] ],
   ]);
 
   datesKeys.forEach((value) => {

@@ -18,6 +18,7 @@ export default Service.extend({
   errors: null, // Set({ urn, error })
 
   init() {
+    this._super(...arguments);
     this.setProperties({ timeseries: {}, context: {}, pending: new Set(), errors: new Set() });
   },
 
@@ -119,7 +120,7 @@ export default Service.extend({
     const filterMap = {};
     [...filters].forEach(tup => {
       const [key, value] = tup;
-      filterMap[key] = value
+      filterMap[key] = value;
     });
     return filterMap;
   }

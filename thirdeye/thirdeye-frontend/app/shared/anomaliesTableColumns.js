@@ -10,7 +10,7 @@ export default [
   {
     propertyName: 'dimensions',
     template: 'custom/anomalies-table/dimensions',
-    title: 'Dimensions',
+    title: 'Alert/Dimensions',
     className: 'anomalies-table__column',
     disableFiltering: true
   },
