@@ -28,10 +28,10 @@ function buildAnomalyData(ids) {
       anomalyFunctionType: 'DETECTION_MODEL_TYPE',
       anomalyFunctionProps: '',
       anomalyFunctionDimension: '{}'
-    })
+    });
   });
   return anomalyList;
-};
+}
 
 export const anomalySet = (ids) => {
   return {
@@ -55,7 +55,9 @@ export const anomalySet = (ids) => {
     'anomalyDetailsList': buildAnomalyData(ids),
     'totalAnomalies': ids.length,
     'numAnomaliesOnPage': ids.length
-  }
-};
+  };
+}
 
-export default { anomalySet }
+export default {
+  anomalySet
+};
