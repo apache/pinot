@@ -511,5 +511,5 @@ export default Component.extend({
       onHover(outputUrns, d);
       return outputUrns;
     }
-  },
+  }
 });
