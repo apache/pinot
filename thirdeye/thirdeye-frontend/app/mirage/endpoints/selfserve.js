@@ -1,9 +1,9 @@
 import metrics from 'thirdeye-frontend/mocks/metric';
-import anomalySet from 'thirdeye-frontend/mocks/anomalies';
+import { anomalySet } from 'thirdeye-frontend/mocks/anomalies';
 import alertConfig from 'thirdeye-frontend/mocks/alertConfig';
 import entityApplication from 'thirdeye-frontend/mocks/entityApplication';
 import anomalyChangeData from 'thirdeye-frontend/mocks/anomalyWowChange';
-import anomalyPerformanceData from 'thirdeye-frontend/mocks/anomalyPerformance';
+import { perfBeforeTuning, perfAfterTuning } from 'thirdeye-frontend/mocks/anomalyPerformance';
 
 export default function (server) {
 
@@ -63,7 +63,7 @@ export default function (server) {
   /**
    * Post request for editing alert
    */
-  server.post(`/thirdeye/entity`, (schema, request) => {
+  server.post('/thirdeye/entity', (schema, request) => {
     const params = request.queryParams && request.queryParams.entityType;
 
     if (params === 'ANOMALY_FUNCTION') {
@@ -76,14 +76,14 @@ export default function (server) {
   /**
    * Returns the email config by id
    */
-  server.get(`/thirdeye/email/function/:id`, (schema, request) => {
+  server.get('/thirdeye/email/function/:id', (schema, request) => {
     return [alertConfig[1]];
   });
 
   /**
    * Returns information about an alert by id in anomalyFunction mock data
    */
-  server.get(`/onboard/function/:id`, (schema, request) => {
+  server.get('/onboard/function/:id', (schema, request) => {
     return schema.alerts.find(request.params.id);
   });
 
@@ -108,6 +108,34 @@ export default function (server) {
     });
 
     return server.db.jobs.find(1);
+  });
+
+  /**
+   * Tune alert: POST request to apply tuning filters for anomaly detection
+   */
+  server.post('/detection-job/autotune/filter/:id', () => {
+    return [1234567];
+  });
+
+  /**
+   * Tune alert: GET request to fetch new mttd value
+   */
+  server.get('/detection-job/eval/projected/mttd/:id', () => {
+    return '0';
+  });
+
+  /**
+   * Tune alert: GET request to fetch new projected anomalies
+   */
+  server.get('/detection-job/eval/projected/anomalies/:id', () => {
+    return [ 38456269 ];
+  });
+
+  /**
+   * Tune alert: GET request to fetch new perf data
+   */
+  server.get('/detection-job/eval/autotune/:id', () => {
+    return perfAfterTuning;
   });
 
   /**
@@ -140,7 +168,7 @@ export default function (server) {
    * get request for metric import verification
    */
   server.get('/detection-job/eval/:type/:id', () => {
-    return anomalyPerformanceData;
+    return perfBeforeTuning;
   });
 
   /**
@@ -174,7 +202,8 @@ export default function (server) {
   /**
    * get request for metric import verification
    */
-  server.get('/anomalies/search/anomalyIds/0/0/1', () => {
-    return anomalySet;
+  server.get('/anomalies/search/anomalyIds/0/0/1', (schema, request) => {
+    const idArray = request.queryParams.anomalyIds ? request.queryParams.anomalyIds : [ 38456269 ];
+    return anomalySet(idArray.split(','));
   });
 }
