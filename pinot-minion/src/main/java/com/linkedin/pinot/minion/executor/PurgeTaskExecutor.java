@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import com.linkedin.pinot.core.common.MinionConstants;
 import com.linkedin.pinot.core.minion.SegmentPurger;
+import com.linkedin.pinot.minion.events.MinionEventNotifierFactory;
 import java.io.File;
 import java.util.Collections;
 import javax.annotation.Nonnull;
@@ -28,7 +29,7 @@ import javax.annotation.Nonnull;
 public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
 
   @Override
-  protected File convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
+  protected SegmentConversionInfo convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
       @Nonnull File workingDir) throws Exception {
     String rawTableName =
         TableNameBuilder.extractRawTableName(pinotTaskConfig.getConfigs().get(MinionConstants.TABLE_NAME_KEY));
@@ -43,7 +44,12 @@ public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
       recordModifier = recordModifierFactory.getRecordModifier(rawTableName);
     }
 
-    return new SegmentPurger(originalIndexDir, workingDir, recordPurger, recordModifier).purgeSegment();
+    SegmentPurger segmentPurger = new SegmentPurger(originalIndexDir, workingDir, recordPurger, recordModifier);
+    File purgedSegmentFile = segmentPurger.purgeSegment();
+    return new SegmentConversionInfo.SegmentConversionInfoBuilder()
+        .setFile(purgedSegmentFile)
+        .setSegmentPurger(segmentPurger)
+        .build();
   }
 
   @Override
@@ -51,5 +57,10 @@ public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.REPLACE,
         Collections.singletonMap(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
             String.valueOf(System.currentTimeMillis())));
+  }
+
+  @Override
+  protected void runOnSuccess(MinionEventNotifierFactory minionEventNotifierFactory, SegmentConversionInfo segmentConversionInfo) {
+    minionEventNotifierFactory.create().notifyOnPurge(segmentConversionInfo);
   }
 }

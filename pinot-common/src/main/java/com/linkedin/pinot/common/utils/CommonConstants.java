@@ -264,6 +264,7 @@ public class CommonConstants {
     public static final String INSTANCE_TYPE = "minion";
     public static final String UNTAGGED_INSTANCE = "minion_untagged";
     public static final String METRICS_PREFIX = "pinot.minion.";
+    public static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
 
     // Config keys
     public static final String METRICS_REGISTRY_REGISTRATION_LISTENERS_KEY = "metricsRegistryRegistrationListeners";

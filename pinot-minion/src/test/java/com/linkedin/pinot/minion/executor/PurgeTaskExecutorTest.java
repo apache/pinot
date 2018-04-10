@@ -121,7 +121,7 @@ public class PurgeTaskExecutorTest {
     PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.PurgeTask.TASK_TYPE,
         Collections.singletonMap(MinionConstants.TABLE_NAME_KEY,
             TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME)));
-    File purgedIndexDir = purgeTaskExecutor.convert(pinotTaskConfig, _originalIndexDir, PURGED_SEGMENT_DIR);
+    File purgedIndexDir = purgeTaskExecutor.convert(pinotTaskConfig, _originalIndexDir, PURGED_SEGMENT_DIR).getFile();
 
     try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(purgedIndexDir)) {
       int numRecordsRemaining = 0;

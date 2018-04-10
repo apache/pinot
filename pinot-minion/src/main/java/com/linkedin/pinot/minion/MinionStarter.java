@@ -41,7 +41,6 @@ import org.apache.helix.task.TaskStateModelFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * The class <code>MinionStarter</code> provides methods to start and stop the Pinot Minion.
  * <p>Pinot Minion will automatically join the given Helix cluster as a participant.

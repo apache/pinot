@@ -28,6 +28,7 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import com.linkedin.pinot.core.common.MinionConstants;
+import com.linkedin.pinot.minion.events.MinionEventNotifierFactory;
 import com.linkedin.pinot.minion.exception.TaskCancelledException;
 import java.io.File;
 import java.net.URI;
@@ -67,11 +68,15 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
 
   private static SSLContext _sslContext;
 
+  private static MinionEventNotifierFactory _minionEventNotifierFactory;
+
   public static void init(Configuration uploaderConfig) {
     Configuration httpsConfig = uploaderConfig.subset(HTTPS_PROTOCOL);
     if (httpsConfig.getBoolean(CONFIG_OF_CONTROLLER_HTTPS_ENABLED, false)) {
       _sslContext = new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
     }
+    _minionEventNotifierFactory = MinionEventNotifierFactory.loadFactory(
+        uploaderConfig.subset(CommonConstants.Minion.METADATA_EVENT_NOTIFIER_PREFIX));
   }
 
   /**
@@ -83,10 +88,14 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
    * @return Index directory for the converted segment
    * @throws Exception
    */
-  protected abstract File convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
+  protected abstract SegmentConversionInfo convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
       @Nonnull File workingDir) throws Exception;
 
   protected abstract SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier() throws Exception;
+
+  protected void runOnSuccess(MinionEventNotifierFactory minionEventNotifierFactory, SegmentConversionInfo segmentConversionInfo) {
+
+  }
 
   @Override
   public void executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) throws Exception {
@@ -120,7 +129,8 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       // Convert the segment
       File workingDir = new File(tempDataDir, "workingDir");
       Preconditions.checkState(workingDir.mkdir());
-      File convertedIndexDir = convert(pinotTaskConfig, indexDir, workingDir);
+      SegmentConversionInfo segmentConversionInfo = convert(pinotTaskConfig, indexDir, workingDir);
+      File convertedIndexDir = segmentConversionInfo.getFile();
 
       // Tar the converted segment
       File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
@@ -193,6 +203,8 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
           }
         });
       }
+
+      runOnSuccess(_minionEventNotifierFactory, segmentConversionInfo);
 
       LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableName, segmentName);
     } finally {

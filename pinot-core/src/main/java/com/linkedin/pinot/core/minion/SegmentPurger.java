@@ -29,6 +29,8 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -92,13 +94,21 @@ public class SegmentPurger {
     }
   }
 
+  public RecordPurger getRecordPurger() {
+    return _recordPurger;
+  }
+
+  public RecordModifier getRecordModifier() {
+    return _recordModifier;
+  }
+
   @VisibleForTesting
-  int getNumRecordsPurged() {
+  public int getNumRecordsPurged() {
     return _numRecordsPurged;
   }
 
   @VisibleForTesting
-  int getNumRecordsModified() {
+  public int getNumRecordsModified() {
     return _numRecordsModified;
   }
 
