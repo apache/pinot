@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalySummary;
@@ -10,6 +11,9 @@ import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiOperation;
+import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -30,6 +34,7 @@ import javax.ws.rs.core.MediaType;
 /**
  * Endpoints for user-customized dashboards (currently alerts only)
  */
+@Api(tags = {Constants.DASHBOARD_TAG})
 @Path(value = "/userdashboard")
 @Produces(MediaType.APPLICATION_JSON)
 public class UserDashboardResource {
@@ -78,11 +83,17 @@ public class UserDashboardResource {
    */
   @GET
   @Path("/anomalies")
+  @ApiOperation(value = "Query anomalies")
   public List<AnomalySummary> queryAnomalies(
+      @ApiParam(value = "start time of anomaly retrieval window")
       @QueryParam("start") Long start,
+      @ApiParam(value = "end time of anomaly retrieval window")
       @QueryParam("end") Long end,
+      @ApiParam(value = "alert owner")
       @QueryParam("owner") String owner,
+      @ApiParam(value = "alert application/product/team")
       @QueryParam("application") String application,
+      @ApiParam(value = "max number of results")
       @QueryParam("limit") Integer limit) {
 
     //

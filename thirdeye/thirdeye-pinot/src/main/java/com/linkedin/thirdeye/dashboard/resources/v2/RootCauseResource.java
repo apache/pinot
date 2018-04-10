@@ -51,14 +51,22 @@ public class RootCauseResource {
   @Path("/query")
   @ApiOperation(value = "Send query")
   public List<RootCauseEntity> query(
+      @ApiParam(value = "framework name")
       @QueryParam("framework") String framework,
+      @ApiParam(value = "start time of the anomalous time period for the metric under analysis")
       @QueryParam("anomalyStart") Long anomalyStart,
+      @ApiParam(value = "end time of the anomalous time period for the metric under analysis")
       @QueryParam("anomalyEnd") Long anomalyEnd,
+      @ApiParam(value = "baseline start time, e.g. anomaly start time offset by 1 week")
       @QueryParam("baselineStart") Long baselineStart,
+      @ApiParam(value = "baseline end time, e.g. typically anomaly start time offset by 1 week")
       @QueryParam("baselineEnd") Long baselineEnd,
+      @ApiParam(value = "start overall time window to consider for events")
       @QueryParam("analysisStart") Long analysisStart,
+      @ApiParam(value = "end of overall time window to consider for events")
       @QueryParam("analysisEnd") Long analysisEnd,
       @QueryParam("formatterDepth") Integer formatterDepth,
+      @ApiParam(value = "URNs of metrics to analyze")
       @QueryParam("urns") List<String> urns) throws Exception {
 
     // configuration validation
