@@ -73,6 +73,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -113,7 +114,6 @@ public class PinotLLCRealtimeSegmentManager {
 
   private static final String METADATA_TEMP_DIR_SUFFIX = ".metadata.tmp";
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
-  private static final String NEW_SEGMENT_PREFIX = "_PINOT_NEW";
   // TODO: make this configurable with default set to 10
   private static int MAX_SEGMENT_COMPLETION_TIME_MINS = 10;
 
@@ -1620,7 +1620,7 @@ public class PinotLLCRealtimeSegmentManager {
           "Caught exception when generating partition assignment for table " + tableNameWithType, e);
     }
 
-    Map<String, String> oldToNewSegmentsMap = new HashMap<>();
+    OldToNewSegmentMapper segmentMapper = new OldToNewSegmentMapper();
     // Walk over all partitions that we have metadata for, and repair any partitions necessary.
     // Possible things to repair:
     // 1. The latest metadata is in DONE state, but the idealstate says segment is CONSUMING:
@@ -1670,7 +1670,7 @@ public class PinotLLCRealtimeSegmentManager {
             createNewSegmentMetadataZNRecord(tableNameWithType, newLLCSegmentName, metadata.getEndOffset(),
                 partitionAssignment);
 
-            oldToNewSegmentsMap.put(metadata.getSegmentName(), newLLCSegmentName.getSegmentName());
+            segmentMapper.addMapping(metadata.getSegmentName(), newLLCSegmentName.getSegmentName());
           }
           // else, the metadata should be IN_PROGRESS, which is the right state for a consuming segment.
         } else if (isAllInstancesOffline(instanceStateMap)) {
@@ -1694,7 +1694,7 @@ public class PinotLLCRealtimeSegmentManager {
           // 3. add metadata to zk
           // 4. change idealstate.
           createNewSegmentMetadataZNRecord(tableNameWithType, newLLCSegmentName, startOffset, partitionAssignment);
-          oldToNewSegmentsMap.put(NEW_SEGMENT_PREFIX + String.valueOf(partition), newLLCSegmentName.getSegmentName());
+          segmentMapper.addMapping(segmentMapper.generateNewSegmentKey(partition), newLLCSegmentName.getSegmentName());
         }
         // else It can be in ONLINE state, in which case there is no need to repair the segment.
       } else {
@@ -1716,12 +1716,12 @@ public class PinotLLCRealtimeSegmentManager {
 
         // If there was a prev segment in the same partition, then we need to fix it to be ONLINE.
         LLCRealtimeSegmentZKMetadata prevMetadata = entry.getValue().pollLast();
-        String prevSegmentId = NEW_SEGMENT_PREFIX + String.valueOf(partition);
+        String prevSegmentId = segmentMapper.generateNewSegmentKey(partition);
         if (prevMetadata != null) {
           prevSegmentId = prevMetadata.getSegmentName();
         }
 
-        oldToNewSegmentsMap.put(prevSegmentId, segmentId);
+        segmentMapper.addMapping(prevSegmentId, segmentId);
       }
     }
 
@@ -1739,20 +1739,20 @@ public class PinotLLCRealtimeSegmentManager {
 
       // TODO Need to create another method that we can use.
       createNewSegmentMetadataZNRecord(tableNameWithType, newLLCSegmentName, startOffset, partitionAssignment);
-      oldToNewSegmentsMap.put(NEW_SEGMENT_PREFIX + String.valueOf(partition), newLLCSegmentName.getSegmentName());
+      segmentMapper.addMapping(segmentMapper.generateNewSegmentKey(partition), newLLCSegmentName.getSegmentName());
     }
 
     RealtimeSegmentAssignmentStrategy segmentAssignmentStrategy = new ConsumingSegmentAssignmentStrategy();
     Map<String, List<String>> assignments = null;
     try {
       assignments =
-          segmentAssignmentStrategy.assign(Lists.newArrayList(oldToNewSegmentsMap.values()), partitionAssignment);
+          segmentAssignmentStrategy.assign(Lists.newArrayList(segmentMapper.getAllNewSegmentNames()), partitionAssignment);
     } catch (InvalidConfigException e) {
       throw new IllegalStateException(
           "Caught exception when assigning segments using partition assignment for table " + tableNameWithType);
     }
 
-    for (Map.Entry<String, String> entry : oldToNewSegmentsMap.entrySet()) {
+    for (Map.Entry<String, String> entry : segmentMapper.getAll().entrySet()) {
       String oldSeg = entry.getKey();
       String newSeg = entry.getValue();
       List<String> newInstances = assignments.get(newSeg);
@@ -1764,7 +1764,7 @@ public class PinotLLCRealtimeSegmentManager {
         idealState.setPartitionState(newSeg, instance,
             PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
       }
-      if (!oldSeg.startsWith(NEW_SEGMENT_PREFIX)) {
+      if (!segmentMapper.isNewSegmentKey(oldSeg)) {
         Set<String> oldInstances = idealState.getInstanceSet(oldSeg);
         Preconditions.checkArgument(CollectionUtils.isNotEmpty(oldInstances));
         for (String instance : oldInstances) {
@@ -1811,6 +1811,39 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     return idealState;
+  }
+
+  /**
+   * Class to maintain the mapping from old segments to new segments
+   */
+  private class OldToNewSegmentMapper {
+
+    static final String NEW_SEGMENT_PREFIX = "_PINOT_NEW_";
+    Map<String, String> _oldSegmentToNewSegmentMap = new HashMap<>();
+
+    String generateNewSegmentKey(int partitionId) {
+      return NEW_SEGMENT_PREFIX + partitionId;
+    }
+
+    boolean isNewSegmentKey(String key) {
+      if (key.startsWith(NEW_SEGMENT_PREFIX)) {
+        return true;
+      }
+      return false;
+    }
+
+    void addMapping(String oldSegmentName, String newSegmentName) {
+      _oldSegmentToNewSegmentMap.put(oldSegmentName, newSegmentName);
+    }
+
+    Map<String, String> getAll() {
+      return _oldSegmentToNewSegmentMap;
+    }
+
+    Collection<String> getAllNewSegmentNames() {
+      return _oldSegmentToNewSegmentMap.values();
+    }
+
   }
 
   private static class KafkaOffsetFetcher implements Callable<Boolean> {
