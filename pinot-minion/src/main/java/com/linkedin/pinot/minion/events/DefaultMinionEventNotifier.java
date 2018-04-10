@@ -19,7 +19,10 @@ import com.linkedin.pinot.minion.executor.SegmentConversionInfo;
 
 
 public class DefaultMinionEventNotifier implements MinionEventNotifier {
-  public void notifyOnPurge(SegmentConversionInfo segmentConversionInfo) {
-
+  public void notifyMinionTaskStart(SegmentConversionInfo segmentConversionInfo) {
+    // Nothing to do
+  }
+  public void notifyMinionTaskEnd(SegmentConversionInfo segmentConversionInfo) {
+    // Nothing to do
   }
 }

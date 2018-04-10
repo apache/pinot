@@ -15,12 +15,23 @@
  */
 package com.linkedin.pinot.minion.events;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.minion.executor.SegmentConversionInfo;
 
 
+/**
+ * Emits events that provide information about the state of minion tasks.
+ */
 public interface MinionEventNotifier {
 
-  void notifyOnPurge(SegmentConversionInfo segmentConversionInfo);
+  /**
+   * Invoked when a minion task begins
+   * @param segmentConversionInfo
+   */
+  void notifyMinionTaskStart(SegmentConversionInfo segmentConversionInfo);
+
+  /**
+   * Invoked when a minion task ends
+   * @param segmentConversionInfo
+   */
+  void notifyMinionTaskEnd(SegmentConversionInfo segmentConversionInfo);
 }
