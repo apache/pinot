@@ -134,7 +134,8 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     TableConfig tableConfig;
     IdealState idealState;
     int nPartitions;
-    boolean exceptionExpected;
+    boolean exceptionExpected = false;
+    boolean skipNewPartitions = true;
     List<String> instances = getInstanceList(1);
 
     // noop path - insufficient instances
@@ -142,8 +143,8 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
         DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
     idealState = idealStateBuilder.build();
     nPartitions = 4;
-    exceptionExpected = true;
-    validateLLCNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, exceptionExpected);
+    validateLLCNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, exceptionExpected,
+        skipNewPartitions);
 
     // bad stream configs
     tableConfig =
@@ -152,7 +153,8 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     nPartitions = 4;
     instances = getInstanceList(3);
     exceptionExpected = true;
-    validateLLCNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, exceptionExpected);
+    validateLLCNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, exceptionExpected,
+        skipNewPartitions);
 
     // noop path - 0 partitions
     tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
@@ -160,7 +162,8 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     idealState = idealStateBuilder.build();
     nPartitions = 0;
     exceptionExpected = false;
-    validateLLCNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, exceptionExpected);
+    validateLLCNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, exceptionExpected,
+        skipNewPartitions);
 
     // noop path - ideal state disabled
     tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
@@ -168,7 +171,8 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     idealState = idealStateBuilder.disableIdealState().build();
     nPartitions = 4;
     exceptionExpected = false;
-    validateLLCNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, exceptionExpected);
+    validateLLCNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, exceptionExpected,
+        skipNewPartitions);
 
     // happy paths - new table config with nPartitions and sufficient instances
     tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
@@ -176,24 +180,28 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     idealState = idealStateBuilder.build();
     nPartitions = 4;
     exceptionExpected = false;
-    validateLLCNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, exceptionExpected);
+    validateLLCNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, exceptionExpected,
+        skipNewPartitions);
 
     idealState = idealStateBuilder.build();
     nPartitions = 8;
-    validateLLCNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, exceptionExpected);
+    validateLLCNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, exceptionExpected,
+        skipNewPartitions);
 
     idealState = idealStateBuilder.build();
     nPartitions = 8;
     instances = getInstanceList(10);
-    validateLLCNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, exceptionExpected);
+    validateLLCNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, exceptionExpected,
+        skipNewPartitions);
 
     idealState = idealStateBuilder.build();
     nPartitions = 12;
-    validateLLCNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, exceptionExpected);
+    validateLLCNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, exceptionExpected,
+        skipNewPartitions);
   }
 
   private IdealState validateLLCNewTable(TableConfig tableConfig, IdealState idealState, int nPartitions, int nReplicas,
-      List<String> instances, boolean exceptionExpected) {
+      List<String> instances, boolean exceptionExpected, boolean skipNewPartitions) {
     IdealState updatedIdealState = null;
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(null);
     segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
@@ -203,7 +211,7 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
       Map<String, LLCSegmentName> partitionToLatestSegments =
           segmentManager._partitionAssignmentGenerator.getPartitionToLatestSegments(updatedIdealState);
       Map<String, Map<String, String>> mapFields = updatedIdealState.getRecord().getMapFields();
-      if (!idealState.isEnabled()) {
+      if (!idealState.isEnabled() || skipNewPartitions) {
         Assert.assertTrue(partitionToLatestSegments.isEmpty());
       } else {
         Assert.assertEquals(mapFields.size(), nPartitions);
@@ -273,7 +281,6 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
 
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(null);
     String tableName = "validateThisTable_REALTIME";
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     int nReplicas = 2;
     IdealStateBuilderUtil idealStateBuilder = new IdealStateBuilderUtil(tableName);
 
@@ -281,6 +288,7 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     IdealState idealState;
     int nPartitions;
     boolean exceptionExpected;
+    boolean skipNewPartitions = false;
     List<String> instances = getInstanceList(5);
 
     // empty to 4 partitions
@@ -290,12 +298,12 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     nPartitions = 4;
     exceptionExpected = false;
     validateLLCPartitionsIncrease(segmentManager, idealState, tableConfig, nPartitions, nReplicas, instances,
-        exceptionExpected);
+        exceptionExpected, skipNewPartitions);
 
     // only initial segments present CONSUMING - metadata INPROGRESS - increase numPartitions
     nPartitions = 6;
     validateLLCPartitionsIncrease(segmentManager, idealState, tableConfig, nPartitions, nReplicas, instances,
-        exceptionExpected);
+        exceptionExpected, skipNewPartitions);
 
     // 2 partitions advanced a seq number
     PartitionAssignment partitionAssignment =
@@ -306,34 +314,34 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     }
     idealState = idealStateBuilder.build();
     validateLLCPartitionsIncrease(segmentManager, idealState, tableConfig, nPartitions, nReplicas, instances,
-        exceptionExpected);
+        exceptionExpected, skipNewPartitions);
 
     // increase num partitions
     nPartitions = 10;
     validateLLCPartitionsIncrease(segmentManager, idealState, tableConfig, nPartitions, nReplicas, instances,
-        exceptionExpected);
+        exceptionExpected, skipNewPartitions);
 
     // keep num partitions same - noop
     validateLLCPartitionsIncrease(segmentManager, idealState, tableConfig, nPartitions, nReplicas, instances,
-        exceptionExpected);
+        exceptionExpected, skipNewPartitions);
 
     // keep num partitions same, but bad instances - error
     instances = getInstanceList(1);
-    exceptionExpected = true;
     validateLLCPartitionsIncrease(segmentManager, idealState, tableConfig, nPartitions, nReplicas, instances,
-        exceptionExpected);
+        exceptionExpected, skipNewPartitions);
 
     // increase num partitions, but bad instances - error
     nPartitions = 12;
+    skipNewPartitions = true;
     validateLLCPartitionsIncrease(segmentManager, idealState, tableConfig, nPartitions, nReplicas, instances,
-        exceptionExpected);
+        exceptionExpected, skipNewPartitions);
 
     // increase num partitions, but disabled ideal state - noop
     idealState = idealStateBuilder.disableIdealState().build();
     exceptionExpected = false;
     instances = getInstanceList(6);
     validateLLCPartitionsIncrease(segmentManager, idealState, tableConfig, nPartitions, nReplicas, instances,
-        exceptionExpected);
+        exceptionExpected, skipNewPartitions);
   }
 
   private void advanceASeqForPartition(IdealState idealState, FakePinotLLCRealtimeSegmentManager segmentManager,
@@ -350,7 +358,8 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
   }
 
   private void validateLLCPartitionsIncrease(FakePinotLLCRealtimeSegmentManager segmentManager, IdealState idealState,
-      TableConfig tableConfig, int nPartitions, int nReplicas, List<String> instances, boolean exceptionExpected) {
+      TableConfig tableConfig, int nPartitions, int nReplicas, List<String> instances, boolean exceptionExpected,
+      boolean skipNewPartitions) {
     try {
       Map<String, Map<String, String>> oldMapFields = new HashMap<>(idealState.getRecord().getMapFields());
       Map<String, LLCRealtimeSegmentZKMetadata> oldMetadataMap = new HashMap<>(segmentManager._metadataMap);
@@ -394,10 +403,13 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
         int partitionId = llcSegmentName.getPartitionId();
         partitionToAllSegmentsMap.get(partitionId).add(segmentName);
       }
+
+      // if skipNewPartitions, new partitions should not have any assignment
+
       // each new partition should have exactly 1 new segment in CONSUMING state, and metadata in IN_PROGRESS state
       for (Integer partitionId : newPartitions) {
         List<String> allSegmentsForPartition = partitionToAllSegmentsMap.get(partitionId);
-        if (idealState.isEnabled()) {
+        if (!skipNewPartitions && idealState.isEnabled()) {
           Assert.assertEquals(allSegmentsForPartition.size(), 1);
           for (String segment : allSegmentsForPartition) {
             Map<String, String> instanceStateMap = updatedMapFields.get(segment);

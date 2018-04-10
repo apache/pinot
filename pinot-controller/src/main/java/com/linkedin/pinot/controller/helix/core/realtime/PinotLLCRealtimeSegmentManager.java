@@ -1613,11 +1613,17 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     PartitionAssignment partitionAssignment;
+    boolean skipNewPartitions = false;
     try {
       partitionAssignment = _partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, partitionCount);
     } catch (InvalidConfigException e) {
-      throw new IllegalStateException(
-          "Caught exception when generating partition assignment for table " + tableNameWithType, e);
+      _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.PARTITION_ASSIGNMENT_GENERATION_ERROR,
+          1L);
+      LOGGER.warn(
+          "Could not generate partition assignment. Fetching partition assignment from ideal state for repair of table {}",
+          tableNameWithType);
+      partitionAssignment = _partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
+      skipNewPartitions = true;
     }
 
     OldToNewSegmentMapper segmentMapper = new OldToNewSegmentMapper();
@@ -1720,26 +1726,30 @@ public class PinotLLCRealtimeSegmentManager {
         if (prevMetadata != null) {
           prevSegmentId = prevMetadata.getSegmentName();
         }
+        if (skipNewPartitions && prevMetadata == null) {
+          continue;
+        }
 
         segmentMapper.addMapping(prevSegmentId, segmentId);
       }
     }
 
-    for (int partition : newPartitions) {
-      int nextSeqNum = STARTING_SEQUENCE_NUMBER;
-      LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", tableNameWithType, partition,
-          nextSeqNum);
-      String consumerStartOffsetSpec = streamMetadata.getKafkaConsumerProperties()
-          .get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
-      long startOffset = getKafkaPartitionOffset(streamMetadata, consumerStartOffsetSpec, partition);
-      LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableNameWithType, partition);
-      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    if (!skipNewPartitions) {
+      for (int partition : newPartitions) {
+        int nextSeqNum = STARTING_SEQUENCE_NUMBER;
+        LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", tableNameWithType, partition,
+            nextSeqNum);
+        String consumerStartOffsetSpec = streamMetadata.getKafkaConsumerProperties().get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
+        long startOffset = getKafkaPartitionOffset(streamMetadata, consumerStartOffsetSpec, partition);
+        LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableNameWithType, partition);
+        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
-      LLCSegmentName newLLCSegmentName = new LLCSegmentName(rawTableName, partition, nextSeqNum, now);
+        LLCSegmentName newLLCSegmentName = new LLCSegmentName(rawTableName, partition, nextSeqNum, now);
 
-      // TODO Need to create another method that we can use.
-      createNewSegmentMetadataZNRecord(tableNameWithType, newLLCSegmentName, startOffset, partitionAssignment);
-      segmentMapper.addMapping(segmentMapper.generateNewSegmentKey(partition), newLLCSegmentName.getSegmentName());
+        // TODO Need to create another method that we can use.
+        createNewSegmentMetadataZNRecord(tableNameWithType, newLLCSegmentName, startOffset, partitionAssignment);
+        segmentMapper.addMapping(segmentMapper.generateNewSegmentKey(partition), newLLCSegmentName.getSegmentName());
+      }
     }
 
     RealtimeSegmentAssignmentStrategy segmentAssignmentStrategy = new ConsumingSegmentAssignmentStrategy();
@@ -1789,7 +1799,9 @@ public class PinotLLCRealtimeSegmentManager {
     try {
       instanceAssignments = strategy.assign(Lists.newArrayList(newSegmentId), partitionAssignment);
     } catch (InvalidConfigException e) {
-      throw new RuntimeException(e.getMessage());
+      _controllerMetrics.addMeteredTableValue(idealState.getResourceName(),
+          ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
+      throw new IllegalStateException("Caught exception when updating ideal state on segment completion", e);
     }
 
     List<String> newSegmentInstances = instanceAssignments.get(newSegmentId);
