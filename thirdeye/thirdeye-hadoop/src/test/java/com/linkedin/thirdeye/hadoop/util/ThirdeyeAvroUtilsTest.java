@@ -32,6 +32,12 @@ public class ThirdeyeAvroUtilsTest {
   }
 
   @Test
+  public void testGetDimensionTypesEmpty() throws Exception{
+    String dimensionTypesProperty = ThirdeyeAvroUtils.getDimensionTypesProperty("", avroSchema);
+    Assert.assertEquals(dimensionTypesProperty, "", "Dimension property not extracted correctly");
+  }
+
+  @Test
   public void testGetMetricTypes() throws Exception{
     String metricTypesProperty = ThirdeyeAvroUtils.getMetricTypesProperty("m1,m2", null, avroSchema);
     Assert.assertEquals(metricTypesProperty, "INT,INT", "Metric property not extracted correctly");
