@@ -19,10 +19,15 @@ import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 
 
 /**
- *
+ * Strategy to manage segment retention.
  */
 public interface RetentionStrategy {
 
-  // Return true when segment meets deletion conditions.
+  /**
+   * Returns whether the segment should be purged
+   *
+   * @param segmentZKMetadata Segment ZK metadata
+   * @return Whether the segment should be purged
+   */
   boolean isPurgeable(SegmentZKMetadata segmentZKMetadata);
 }

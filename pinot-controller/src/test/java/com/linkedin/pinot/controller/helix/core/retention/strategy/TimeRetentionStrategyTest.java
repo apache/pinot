@@ -20,27 +20,31 @@ import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import java.util.concurrent.TimeUnit;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /**
  * Unit test for time retention.
  */
 public class TimeRetentionStrategyTest {
+
   @Test
-  public void testTimeRetention() throws Exception {
-    TimeRetentionStrategy retentionStrategy = new TimeRetentionStrategy("DAYS", "30");
+  public void testTimeRetention() {
+    TimeRetentionStrategy retentionStrategy = new TimeRetentionStrategy(TimeUnit.DAYS, 30L);
 
     SegmentZKMetadata metadata = new OfflineSegmentZKMetadata();
+
+    // Without setting time unit or end time, should not throw exception
+    assertFalse(retentionStrategy.isPurgeable(metadata));
     metadata.setTimeUnit(TimeUnit.DAYS);
+    assertFalse(retentionStrategy.isPurgeable(metadata));
 
     // Set end time to Jan 2nd, 1970 (not purgeable due to bogus timestamp)
     metadata.setEndTime(1L);
     assertFalse(retentionStrategy.isPurgeable(metadata));
 
     // Set end time to today
-    final long today = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis());
+    long today = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis());
     metadata.setEndTime(today);
     assertFalse(retentionStrategy.isPurgeable(metadata));
 
