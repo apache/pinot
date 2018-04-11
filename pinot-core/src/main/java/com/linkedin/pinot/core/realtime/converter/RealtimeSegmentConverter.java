@@ -26,9 +26,9 @@ import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import java.io.File;
 import java.util.ArrayList;
@@ -39,8 +39,7 @@ import javax.annotation.Nullable;
 
 
 public class RealtimeSegmentConverter {
-
-  private RealtimeSegmentImpl realtimeSegmentImpl;
+  private MutableSegmentImpl realtimeSegmentImpl;
   private String outputPath;
   private Schema dataSchema;
   private String tableName;
@@ -50,7 +49,7 @@ public class RealtimeSegmentConverter {
   private List<String> noDictionaryColumns;
   private StarTreeIndexSpec starTreeIndexSpec;
 
-  public RealtimeSegmentConverter(RealtimeSegmentImpl realtimeSegment, String outputPath, Schema schema,
+  public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
       String tableName, String segmentName, String sortedColumn, List<String> invertedIndexColumns,
       List<String> noDictionaryColumns, StarTreeIndexSpec starTreeIndexSpec) {
     if (new File(outputPath).exists()) {
@@ -85,7 +84,7 @@ public class RealtimeSegmentConverter {
     this.starTreeIndexSpec = starTreeIndexSpec;
   }
 
-  public RealtimeSegmentConverter(RealtimeSegmentImpl realtimeSegment, String outputPath, Schema schema,
+  public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
       String tableName, String segmentName, String sortedColumn) {
     this(realtimeSegment, outputPath, schema, tableName, segmentName, sortedColumn, new ArrayList<String>(),
         new ArrayList<String>(), null/*StarTreeIndexSpec*/);

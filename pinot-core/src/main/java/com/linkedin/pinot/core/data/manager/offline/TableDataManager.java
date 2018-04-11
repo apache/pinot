@@ -19,7 +19,7 @@ import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.List;
@@ -42,9 +42,9 @@ public interface TableDataManager {
   void shutDown();
 
   /**
-   * Adds a loaded {@link IndexSegment} into the table.
+   * Adds a loaded immutable segment into the table.
    */
-  void addSegment(@Nonnull IndexSegment indexSegment);
+  void addSegment(@Nonnull ImmutableSegment immutableSegment);
 
   /**
    * Adds a segment from local disk into the OFFLINE table.

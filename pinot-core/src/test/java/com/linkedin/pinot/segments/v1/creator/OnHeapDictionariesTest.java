@@ -26,9 +26,9 @@ import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.File;
 import java.io.IOException;
@@ -77,12 +77,12 @@ public class OnHeapDictionariesTest {
     IndexLoadingConfig loadingConfig = new IndexLoadingConfig();
     loadingConfig.setReadMode(ReadMode.mmap);
     loadingConfig.setSegmentVersion(SegmentVersion.v3);
-    _offHeapSegment = Loaders.IndexSegment.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), loadingConfig);
+    _offHeapSegment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), loadingConfig);
 
     loadingConfig.setOnHeapDictionaryColumns(new HashSet<>(
         Arrays.asList(new String[]{INT_COLUMN, LONG_COLUMN, FLOAT_COLUMN, DOUBLE_COLUMN, STRING_COLUMN})));
 
-    _onHeapSegment = Loaders.IndexSegment.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), loadingConfig);
+    _onHeapSegment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), loadingConfig);
   }
 
   @AfterClass

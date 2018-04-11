@@ -15,12 +15,12 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
@@ -32,12 +32,12 @@ public class PinotSegmentColumnReader {
   private final ReaderContext _readerContext;
   private final int[] _mvBuffer;
 
-  public PinotSegmentColumnReader(IndexSegmentImpl indexSegment, String columnName) {
-    _dictionary = indexSegment.getDictionaryFor(columnName);
-    _reader = indexSegment.getForwardIndexReaderFor(columnName);
+  public PinotSegmentColumnReader(ImmutableSegment immutableSegment, String column) {
+    _dictionary = immutableSegment.getDictionary(column);
+    _reader = immutableSegment.getForwardIndex(column);
     _readerContext = _reader.createContext();
-    SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) indexSegment.getSegmentMetadata();
-    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(columnName);
+    SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) immutableSegment.getSegmentMetadata();
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
     if (columnMetadata.isSingleValue()) {
       _mvBuffer = null;
     } else {

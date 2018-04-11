@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.query.utils.Pair;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.HashMap;
@@ -25,15 +25,15 @@ import java.util.Map;
 
 
 public class Selection {
-  private final IndexSegmentImpl _indexSegment;
+  private final ImmutableSegment _immutableSegment;
   private final SegmentMetadataImpl _metadata;
   private final List<Integer> _filteredDocIds;
   private final List<Pair> _selectionColumns;
 
-  public Selection(IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata, List<Integer> filteredDocIds,
+  public Selection(ImmutableSegment immutableSegment, SegmentMetadataImpl metadata, List<Integer> filteredDocIds,
       List<Pair> selectionColumns) {
 
-    _indexSegment = indexSegment;
+    _immutableSegment = immutableSegment;
     _metadata = metadata;
     _filteredDocIds = filteredDocIds;
     _selectionColumns = selectionColumns;
@@ -48,11 +48,11 @@ public class Selection {
       if (column.equals("*")) {
         addCountStar = true;
       }
-      dictionaryMap.put(column, _indexSegment.getDictionaryFor(column));
+      dictionaryMap.put(column, _immutableSegment.getDictionary(column));
     }
 
     Projection projection =
-        new Projection(_indexSegment, _metadata, _filteredDocIds, _selectionColumns, dictionaryMap, addCountStar);
+        new Projection(_immutableSegment, _metadata, _filteredDocIds, _selectionColumns, dictionaryMap, addCountStar);
 
     return projection.run();
   }

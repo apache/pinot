@@ -20,13 +20,12 @@ import com.linkedin.pinot.core.common.DataBlockCache;
 import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import com.linkedin.pinot.startree.hll.HllConfig;
 import com.linkedin.pinot.startree.hll.HllConstants;
@@ -113,7 +112,7 @@ public class HllIndexCreationTest {
         LOGGER.debug("* " + name + ": " + driver.getColumnStatisticsCollector(name).getCardinality());
       }
       LOGGER.debug("Loading ...");
-      IndexSegment indexSegment = Loaders.IndexSegment.load(helper.getSegmentDirectory(), ReadMode.mmap);
+      IndexSegment indexSegment = ImmutableSegmentLoader.load(helper.getSegmentDirectory(), ReadMode.mmap);
 
       int[] docIdSet = new int[maxDocLength];
       for (int i = 0; i < maxDocLength; i++) {
@@ -166,7 +165,7 @@ public class HllIndexCreationTest {
 
       // verify that the segment loads correctly. This is necessary and sufficient
       // full proof way to ensure that segment is correctly translated
-      IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentDirectory, v3LoadingConfig);
+      IndexSegment indexSegment = ImmutableSegmentLoader.load(segmentDirectory, v3LoadingConfig);
       Assert.assertNotNull(indexSegment);
       Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3.toString());
     } finally {

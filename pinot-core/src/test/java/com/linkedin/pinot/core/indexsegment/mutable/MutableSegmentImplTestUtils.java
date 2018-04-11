@@ -13,41 +13,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.realtime;
+package com.linkedin.pinot.core.indexsegment.mutable;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
-import java.io.IOException;
-import java.util.Collections;
+import java.util.Set;
+import javax.annotation.Nonnull;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 
-public class RealtimeSegmentTestUtils {
-  private RealtimeSegmentTestUtils() {
+public class MutableSegmentImplTestUtils {
+  private MutableSegmentImplTestUtils() {
   }
 
-  public static RealtimeSegmentImpl createRealtimeSegmentImpl(Schema schema, int sizeThresholdToFlushSegment,
-      String segmentName, String streamName) throws IOException {
+  private static final String SEGMENT_NAME = "testSegment";
+  private static final String STEAM_NAME = "testStream";
+
+  public static MutableSegmentImpl createMutableSegmentImpl(@Nonnull Schema schema,
+      @Nonnull Set<String> noDictionaryColumns, @Nonnull Set<String> invertedIndexColumns, boolean aggregateMetrics) {
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
-    when(statsHistory.getEstimatedCardinality(any(String.class))).thenReturn(200);
-    when(statsHistory.getEstimatedAvgColSize(any(String.class))).thenReturn(32);
-    RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder().setSegmentName(segmentName)
-        .setStreamName(streamName)
+    when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
+    when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
+
+    RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder().setSegmentName(SEGMENT_NAME)
+        .setStreamName(STEAM_NAME)
         .setSchema(schema)
-        .setCapacity(sizeThresholdToFlushSegment)
+        .setCapacity(100000)
         .setAvgNumMultiValues(2)
-        .setNoDictionaryColumns(Collections.<String>emptySet())
-        .setInvertedIndexColumns(Collections.<String>emptySet())
+        .setNoDictionaryColumns(noDictionaryColumns)
+        .setInvertedIndexColumns(invertedIndexColumns)
         .setRealtimeSegmentZKMetadata(new RealtimeSegmentZKMetadata())
-        .setMemoryManager(new DirectMemoryManager(segmentName))
+        .setMemoryManager(new DirectMemoryManager(SEGMENT_NAME))
         .setStatsHistory(statsHistory)
+        .setAggregateMetrics(aggregateMetrics)
         .build();
-    return new RealtimeSegmentImpl(realtimeSegmentConfig);
+    return new MutableSegmentImpl(realtimeSegmentConfig);
   }
 }

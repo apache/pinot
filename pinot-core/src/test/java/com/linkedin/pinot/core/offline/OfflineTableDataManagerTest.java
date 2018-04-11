@@ -20,11 +20,11 @@ import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.AbstractTableDataManager;
-import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.OfflineTableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.lang.reflect.Field;
@@ -38,8 +38,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 import org.testng.Assert;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeMethod;
@@ -59,13 +57,13 @@ public class OfflineTableDataManagerTest {
   // Set once for every test
   private volatile int _nDestroys;
   private volatile boolean _closing;
-  private Set<IndexSegment> _allSegments = new HashSet<>();
+  private Set<ImmutableSegment> _allSegments = new HashSet<>();
   private Set<SegmentDataManager> _accessedSegManagers =
       Collections.newSetFromMap(new ConcurrentHashMap<SegmentDataManager, Boolean>());
   private Set<SegmentDataManager> _allSegManagers =
       Collections.newSetFromMap(new ConcurrentHashMap<SegmentDataManager, Boolean>());
   private AtomicInteger _numQueries = new AtomicInteger(0);
-  private Map<String, OfflineSegmentDataManager> _internalSegMap;
+  private Map<String, ImmutableSegmentDataManager> _internalSegMap;
   private Throwable _exception;
   private Thread _masterThread;
   // Segment numbers in place.
@@ -113,25 +111,22 @@ public class OfflineTableDataManagerTest {
     tableDataManager.start();
     Field segsMapField = AbstractTableDataManager.class.getDeclaredField("_segmentsMap");
     segsMapField.setAccessible(true);
-    _internalSegMap = (Map<String, OfflineSegmentDataManager>) segsMapField.get(tableDataManager);
+    _internalSegMap = (Map<String, ImmutableSegmentDataManager>) segsMapField.get(tableDataManager);
     return tableDataManager;
   }
 
-  private IndexSegment makeIndexSegment(String name, int totalDocs) {
-    IndexSegment indexSegment = mock(IndexSegment.class);
+  private ImmutableSegment makeOfflineSegment(String name, int totalDocs) {
+    ImmutableSegment immutableSegment = mock(ImmutableSegment.class);
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(indexSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
-    when(indexSegment.getSegmentName()).thenReturn(name);
-    when(indexSegment.getSegmentMetadata().getTotalDocs()).thenReturn(totalDocs);
-    doAnswer(new Answer() {
-      @Override
-      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
-        _nDestroys++;
-        return null;
-      }
-    }).when(indexSegment).destroy();
-    _allSegments.add(indexSegment);
-    return indexSegment;
+    when(immutableSegment.getSegmentMetadata()).thenReturn(segmentMetadata);
+    when(immutableSegment.getSegmentName()).thenReturn(name);
+    when(immutableSegment.getSegmentMetadata().getTotalDocs()).thenReturn(totalDocs);
+    doAnswer(invocation -> {
+      _nDestroys++;
+      return null;
+    }).when(immutableSegment).destroy();
+    _allSegments.add(immutableSegment);
+    return immutableSegment;
   }
 
   @Test
@@ -141,8 +136,8 @@ public class OfflineTableDataManagerTest {
     final int totalDocs = 23456;
     // Add the segment, get it for use, remove the segment, and then return it.
     // Make sure that the segment is not destroyed before return.
-    IndexSegment indexSegment = makeIndexSegment(segmentName, totalDocs);
-    tableDataManager.addSegment(indexSegment);
+    ImmutableSegment immutableSegment = makeOfflineSegment(segmentName, totalDocs);
+    tableDataManager.addSegment(immutableSegment);
     SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
     Assert.assertEquals(segmentDataManager.getRefCnt(), 2);
     tableDataManager.removeSegment(segmentName);
@@ -164,7 +159,7 @@ public class OfflineTableDataManagerTest {
 
     // Add a new segment and remove it in order this time.
     final String anotherSeg = "AnotherSegment";
-    IndexSegment ix1 = makeIndexSegment(anotherSeg, totalDocs);
+    ImmutableSegment ix1 = makeOfflineSegment(anotherSeg, totalDocs);
     tableDataManager.addSegment(ix1);
     SegmentDataManager sdm1 = tableDataManager.acquireSegment(anotherSeg);
     Assert.assertNotNull(sdm1);
@@ -181,7 +176,7 @@ public class OfflineTableDataManagerTest {
     tableDataManager.releaseSegment(sdm1);
     Assert.assertEquals(sdm1.getRefCnt(), 1);
     // Now replace the segment with another one.
-    IndexSegment ix2 = makeIndexSegment(anotherSeg, totalDocs + 1);
+    ImmutableSegment ix2 = makeOfflineSegment(anotherSeg, totalDocs + 1);
     tableDataManager.addSegment(ix2);
     // Now the previous one should have been destroyed, and
     Assert.assertEquals(sdm1.getRefCnt(), 0);
@@ -225,7 +220,7 @@ public class OfflineTableDataManagerTest {
 
     for (int i = _lo; i <= _hi; i++) {
       final String segName = SEGMENT_PREFIX + i;
-      tableDataManager.addSegment(makeIndexSegment(segName, random.nextInt()));
+      tableDataManager.addSegment(makeOfflineSegment(segName, random.nextInt()));
       _allSegManagers.add(_internalSegMap.get(segName));
     }
 
@@ -411,7 +406,7 @@ public class OfflineTableDataManagerTest {
     private void addSegment() {
       final int segmentToAdd = _hi + 1;
       final String segName = SEGMENT_PREFIX + segmentToAdd;
-      _tableDataManager.addSegment(makeIndexSegment(segName, _random.nextInt()));
+      _tableDataManager.addSegment(makeOfflineSegment(segName, _random.nextInt()));
       _allSegManagers.add(_internalSegMap.get(segName));
       _hi = segmentToAdd;
     }
@@ -420,7 +415,7 @@ public class OfflineTableDataManagerTest {
     private void replaceSegment() {
       int segToReplace = _random.nextInt(_hi - _lo + 1) + _lo;
       final String segName = SEGMENT_PREFIX + segToReplace;
-      _tableDataManager.addSegment(makeIndexSegment(segName, _random.nextInt()));
+      _tableDataManager.addSegment(makeOfflineSegment(segName, _random.nextInt()));
       _allSegManagers.add(_internalSegMap.get(segName));
     }
 

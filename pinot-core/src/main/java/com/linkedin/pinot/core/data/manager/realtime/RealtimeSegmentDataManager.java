@@ -18,12 +18,17 @@ package com.linkedin.pinot.core.data.manager.realtime;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
+import com.linkedin.pinot.core.indexsegment.mutable.MutableSegment;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.MmapMemoryManager;
 
 
 public abstract class RealtimeSegmentDataManager extends SegmentDataManager {
+
+  @Override
+  public abstract MutableSegment getSegment();
+
   protected static PinotDataBufferMemoryManager getMemoryManager(String consumerDir, String segmentName,
       boolean offHeap, boolean directOffHeap, ServerMetrics serverMetrics) {
     if (offHeap && !directOffHeap) {

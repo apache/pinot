@@ -21,9 +21,9 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.startree.hll.SegmentWithHllIndexCreateHelper;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.startree.hll.HllConfig;
@@ -147,7 +147,7 @@ public class ColumnMetadataTest {
     driver.build();
 
     // Load segment metadata.
-    IndexSegment segment = Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
+    IndexSegment segment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
     SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
     verifySegmentAfterLoading(metadata);
 
@@ -165,7 +165,7 @@ public class ColumnMetadataTest {
     driver.build();
 
     // Load segment metadata.
-    IndexSegment segment = Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
+    IndexSegment segment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
     SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
     verifySegmentAfterLoading(metadata);
 
@@ -183,7 +183,7 @@ public class ColumnMetadataTest {
     driver.build();
 
     // Load segment metadata.
-    IndexSegment segment = Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
+    IndexSegment segment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
     SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
     verifySegmentAfterLoading(metadata);
 
@@ -199,10 +199,10 @@ public class ColumnMetadataTest {
       // Build the Segment metadata.
       helper = new SegmentWithHllIndexCreateHelper(
           "testHllIndexRelatedMetadata", getClass().getClassLoader().getResource("data/test_data-sv.avro"), "daysSinceEpoch", TimeUnit.DAYS, "starTreeSegment");
-      helper.build(true, new HllConfig(9, new HashSet<String>(Arrays.asList("column7")), "_hllSuffix"));
+      helper.build(true, new HllConfig(9, new HashSet<>(Arrays.asList("column7")), "_hllSuffix"));
 
       // Load segment metadata.
-      IndexSegment segment = Loaders.IndexSegment.load(helper.getSegmentDirectory(), ReadMode.mmap);
+      IndexSegment segment = ImmutableSegmentLoader.load(helper.getSegmentDirectory(), ReadMode.mmap);
       SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
       Assert.assertEquals(metadata.getHllLog2m(), 9);
 

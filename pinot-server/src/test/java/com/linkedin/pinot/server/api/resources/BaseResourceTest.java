@@ -22,9 +22,9 @@ import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
@@ -40,8 +40,6 @@ import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -55,12 +53,13 @@ public abstract class BaseResourceTest {
   protected static final String TABLE_NAME = "testTable";
 
   private final Map<String, TableDataManager> _tableDataManagerMap = new HashMap<>();
-  protected final List<IndexSegment> _indexSegments = new ArrayList<>();
+  protected final List<ImmutableSegment> _indexSegments = new ArrayList<>();
 
   private File _avroFile;
   private AdminApiApplication _adminApiApplication;
   protected WebTarget _webTarget;
 
+  @SuppressWarnings("SuspiciousMethodCalls")
   @BeforeClass
   public void setUp() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
@@ -71,13 +70,8 @@ public abstract class BaseResourceTest {
 
     // Mock the instance data manager
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
-    when(instanceDataManager.getTableDataManager(anyString())).thenAnswer(new Answer<TableDataManager>() {
-      @SuppressWarnings("SuspiciousMethodCalls")
-      @Override
-      public TableDataManager answer(InvocationOnMock invocation) throws Throwable {
-        return _tableDataManagerMap.get(invocation.getArguments()[0]);
-      }
-    });
+    when(instanceDataManager.getTableDataManager(anyString())).thenAnswer(
+        invocation -> _tableDataManagerMap.get(invocation.getArguments()[0]));
     when(instanceDataManager.getTableDataManagers()).thenReturn(_tableDataManagerMap.values());
 
     // Mock the server instance
@@ -94,42 +88,42 @@ public abstract class BaseResourceTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown() {
     _adminApiApplication.stop();
-    for (IndexSegment indexSegment : _indexSegments) {
-      indexSegment.destroy();
+    for (ImmutableSegment immutableSegment : _indexSegments) {
+      immutableSegment.destroy();
     }
-
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  protected List<IndexSegment> setUpSegments(int numSegments) throws Exception {
-    List<IndexSegment> indexSegments = new ArrayList<>();
+  protected List<ImmutableSegment> setUpSegments(int numSegments) throws Exception {
+    List<ImmutableSegment> immutableSegments = new ArrayList<>();
     for (int i = 0; i < numSegments; i++) {
-      indexSegments.add(setUpSegment(Integer.toString(_indexSegments.size())));
+      immutableSegments.add(setUpSegment(Integer.toString(_indexSegments.size())));
     }
-    return indexSegments;
+    return immutableSegments;
   }
 
-  protected IndexSegment setUpSegment(String segmentNamePostfix) throws Exception {
+  protected ImmutableSegment setUpSegment(String segmentNamePostfix) throws Exception {
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, TABLE_NAME);
     config.setSegmentNamePostfix(segmentNamePostfix);
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
-    IndexSegment indexSegment = ColumnarSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.mmap);
-    _indexSegments.add(indexSegment);
-    _tableDataManagerMap.get(TABLE_NAME).addSegment(indexSegment);
-    return indexSegment;
+    ImmutableSegment immutableSegment =
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.mmap);
+    _indexSegments.add(immutableSegment);
+    _tableDataManagerMap.get(TABLE_NAME).addSegment(immutableSegment);
+    return immutableSegment;
   }
 
+  @SuppressWarnings("unchecked")
   protected void addTable(String tableName) {
     TableDataManagerConfig tableDataManagerConfig = mock(TableDataManagerConfig.class);
     when(tableDataManagerConfig.getTableDataManagerType()).thenReturn("offline");
     when(tableDataManagerConfig.getTableName()).thenReturn(tableName);
     when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
-    @SuppressWarnings("unchecked")
     TableDataManager tableDataManager =
         TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, "testInstance",
             mock(ZkHelixPropertyStore.class), mock(ServerMetrics.class));

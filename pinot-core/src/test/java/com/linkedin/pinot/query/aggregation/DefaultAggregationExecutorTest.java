@@ -26,6 +26,7 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.operator.DocIdSetOperator;
 import com.linkedin.pinot.core.operator.ProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
@@ -37,7 +38,6 @@ import com.linkedin.pinot.core.query.aggregation.AggregationExecutor;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -197,7 +197,7 @@ public class DefaultAggregationExecutorTest {
     driver.init(config, new GenericRowRecordReader(rows, schema));
     driver.build();
 
-    _indexSegment = Loaders.IndexSegment.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.heap);
+    _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.heap);
   }
 
   /**
