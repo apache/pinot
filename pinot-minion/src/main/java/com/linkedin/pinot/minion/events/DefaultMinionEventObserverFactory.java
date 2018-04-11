@@ -18,7 +18,7 @@ package com.linkedin.pinot.minion.events;
 import org.apache.commons.configuration.Configuration;
 
 
-public class DefaultMinionEventNotifierFactory extends MinionEventNotifierFactory {
+public class DefaultMinionEventObserverFactory extends MinionEventObserverFactory {
 
   public MinionEventObserver create() {
     return new DefaultMinionEventObserver();

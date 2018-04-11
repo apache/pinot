@@ -17,11 +17,11 @@ package com.linkedin.pinot.minion.events;
 
 public class PurgeMinionEventObserver implements MinionEventObserver {
 
-  public void notifyMinionTaskStart(Object taskInformation, String taskType) {
+  public void notifyMinionJobStart(Object taskInformation, String taskType) {
     // do nothing
   }
 
-  public void notifyMinionTaskEnd(Object taskInformation, String taskType) {
+  public void notifyMinionJobEnd(Object taskInformation, String taskType) {
     // do nothing
   }
 }

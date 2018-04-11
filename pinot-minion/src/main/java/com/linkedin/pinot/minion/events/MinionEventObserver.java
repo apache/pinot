@@ -21,16 +21,16 @@ package com.linkedin.pinot.minion.events;
 public interface MinionEventObserver {
 
   /**
-   * Invoked when a minion task begins
+   * Invoked when a minion job begins
    * @param taskInformation
    * @param taskType
    */
-  void notifyMinionTaskStart(Object taskInformation, String taskType);
+  void notifyMinionJobStart(Object taskInformation, String taskType);
 
   /**
-   * Invoked when a minion task ends
+   * Invoked when a minion job ends
    * @param taskInformation
    * @param taskType
    */
-  void notifyMinionTaskEnd(Object taskInformation, String taskType);
+  void notifyMinionJobEnd(Object taskInformation, String taskType);
 }

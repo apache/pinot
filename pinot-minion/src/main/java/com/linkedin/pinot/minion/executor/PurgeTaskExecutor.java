@@ -20,13 +20,16 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import com.linkedin.pinot.core.common.MinionConstants;
 import com.linkedin.pinot.core.minion.SegmentPurger;
-import com.linkedin.pinot.minion.events.MinionEventNotifierFactory;
+import com.linkedin.pinot.minion.events.MinionEventObserverFactory;
 import java.io.File;
 import java.util.Collections;
 import javax.annotation.Nonnull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PurgeTaskExecutor.class);
 
   @Override
   protected SegmentConversionInfo convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
@@ -61,7 +64,8 @@ public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
   }
 
   @Override
-  protected void runOnSuccess(MinionEventNotifierFactory minionEventNotifierFactory, SegmentConversionInfo segmentConversionInfo) {
-    minionEventNotifierFactory.create().notifyMinionTaskEnd(segmentConversionInfo, MinionConstants.PurgeTask.TASK_TYPE);
+  protected void runOnSuccess(MinionEventObserverFactory minionEventObserverFactory, SegmentConversionInfo segmentConversionInfo) {
+    LOGGER.info("Purge has finished. Running minion observer notifier for table {}, segment {}", segmentConversionInfo.getTableName(), segmentConversionInfo.getFile().getName());
+    minionEventObserverFactory.create().notifyMinionJobEnd(segmentConversionInfo, MinionConstants.PurgeTask.TASK_TYPE);
   }
 }

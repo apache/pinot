@@ -28,7 +28,7 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import com.linkedin.pinot.core.common.MinionConstants;
-import com.linkedin.pinot.minion.events.MinionEventNotifierFactory;
+import com.linkedin.pinot.minion.events.MinionEventObserverFactory;
 import com.linkedin.pinot.minion.exception.TaskCancelledException;
 import java.io.File;
 import java.net.URI;
@@ -68,15 +68,14 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
 
   private static SSLContext _sslContext;
 
-  private static MinionEventNotifierFactory _minionEventNotifierFactory;
+  private static MinionEventObserverFactory _minionEventObserverFactory;
 
-  public static void init(Configuration uploaderConfig) {
+  public static void init(Configuration uploaderConfig, Configuration observerConfig) {
     Configuration httpsConfig = uploaderConfig.subset(HTTPS_PROTOCOL);
     if (httpsConfig.getBoolean(CONFIG_OF_CONTROLLER_HTTPS_ENABLED, false)) {
       _sslContext = new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
     }
-    _minionEventNotifierFactory = MinionEventNotifierFactory.loadFactory(
-        uploaderConfig.subset(CommonConstants.Minion.METADATA_EVENT_NOTIFIER_PREFIX));
+    _minionEventObserverFactory = MinionEventObserverFactory.loadFactory(observerConfig);
   }
 
   /**
@@ -93,7 +92,7 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
 
   protected abstract SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier() throws Exception;
 
-  protected void runOnSuccess(MinionEventNotifierFactory minionEventNotifierFactory, SegmentConversionInfo segmentConversionInfo) {
+  protected void runOnSuccess(MinionEventObserverFactory minionEventObserverFactory, SegmentConversionInfo segmentConversionInfo) {
 
   }
 
@@ -204,7 +203,11 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
         });
       }
 
-      runOnSuccess(_minionEventNotifierFactory, segmentConversionInfo);
+      try {
+        runOnSuccess(_minionEventObserverFactory, segmentConversionInfo);
+      } catch(Exception e) {
+        LOGGER.error("Could not send minion observer event with segmentName {}, tableName {}", segmentName, tableName);
+      }
 
       LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableName, segmentName);
     } finally {

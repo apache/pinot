@@ -20,24 +20,25 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public abstract class MinionEventNotifierFactory {
-  public static final Logger LOGGER = LoggerFactory.getLogger(MinionEventNotifierFactory.class);
+public abstract class MinionEventObserverFactory {
+  public static final Logger LOGGER = LoggerFactory.getLogger(MinionEventObserverFactory.class);
   public static final String METADATA_EVENT_CLASS_CONFIG = "factory.class";
 
   public abstract void init(Configuration configuration);
 
   public abstract MinionEventObserver create();
 
-  public static MinionEventNotifierFactory loadFactory(Configuration configuration) {
-    MinionEventNotifierFactory metadataEventNotifierFactory;
+  public static MinionEventObserverFactory loadFactory(Configuration configuration) {
+    MinionEventObserverFactory metadataEventNotifierFactory;
     String metadataEventNotifierClassName = configuration.getString(METADATA_EVENT_CLASS_CONFIG);
     if (metadataEventNotifierClassName == null) {
-      metadataEventNotifierClassName = DefaultMinionEventNotifierFactory.class.getName();
+      LOGGER.info("Metadata event notifier class name is null, setting to {}", DefaultMinionEventObserver.class);
+      metadataEventNotifierClassName = DefaultMinionEventObserverFactory.class.getName();
     }
     try {
       LOGGER.info("Instantiating metadata event notifier factory class {}", metadataEventNotifierClassName);
       metadataEventNotifierFactory =
-          (MinionEventNotifierFactory) Class.forName(metadataEventNotifierClassName).newInstance();
+          (MinionEventObserverFactory) Class.forName(metadataEventNotifierClassName).newInstance();
       metadataEventNotifierFactory.init(configuration);
       return metadataEventNotifierFactory;
     } catch (Exception e) {

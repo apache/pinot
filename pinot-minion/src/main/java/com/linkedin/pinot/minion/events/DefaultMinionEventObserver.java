@@ -16,10 +16,10 @@
 package com.linkedin.pinot.minion.events;
 
 public class DefaultMinionEventObserver implements MinionEventObserver {
-  public void notifyMinionTaskStart(Object taskInformation, String taskType) {
+  public void notifyMinionJobStart(Object taskInformation, String taskType) {
     // Nothing to do
   }
-  public void notifyMinionTaskEnd(Object segmentConversionInfo, String taskType) {
+  public void notifyMinionJobEnd(Object segmentConversionInfo, String taskType) {
     // Nothing to do
   }
 }

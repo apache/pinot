@@ -113,7 +113,9 @@ public class MinionStarter {
         .init(_config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
 
     // Need to do this before we start receiving state transitions.
-    BaseSegmentConversionExecutor.init(_config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
+    LOGGER.info("Initializing segment conversion executor");
+    BaseSegmentConversionExecutor.init(_config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER)
+        ,_config.subset(CommonConstants.Minion.METADATA_EVENT_OBSERVER_PREFIX));
     // Join the Helix cluster
     LOGGER.info("Joining the Helix cluster");
     _helixManager.getStateMachineEngine()
