@@ -15,14 +15,13 @@
  */
 package com.linkedin.pinot.minion.events;
 
-import com.linkedin.pinot.minion.executor.SegmentConversionInfo;
+public class PurgeMinionEventObserver implements MinionEventObserver {
 
-
-public class DefaultMinionEventNotifier implements MinionEventNotifier {
-  public void notifyMinionTaskStart(SegmentConversionInfo segmentConversionInfo) {
-    // Nothing to do
+  public void notifyMinionTaskStart(Object taskInformation, String taskType) {
+    // do nothing
   }
-  public void notifyMinionTaskEnd(SegmentConversionInfo segmentConversionInfo) {
-    // Nothing to do
+
+  public void notifyMinionTaskEnd(Object taskInformation, String taskType) {
+    // do nothing
   }
 }

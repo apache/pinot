@@ -15,23 +15,11 @@
  */
 package com.linkedin.pinot.minion.events;
 
-import com.linkedin.pinot.minion.executor.SegmentConversionInfo;
-
-
-/**
- * Emits events that provide information about the state of minion tasks.
- */
-public interface MinionEventNotifier {
-
-  /**
-   * Invoked when a minion task begins
-   * @param segmentConversionInfo
-   */
-  void notifyMinionTaskStart(SegmentConversionInfo segmentConversionInfo);
-
-  /**
-   * Invoked when a minion task ends
-   * @param segmentConversionInfo
-   */
-  void notifyMinionTaskEnd(SegmentConversionInfo segmentConversionInfo);
+public class DefaultMinionEventObserver implements MinionEventObserver {
+  public void notifyMinionTaskStart(Object taskInformation, String taskType) {
+    // Nothing to do
+  }
+  public void notifyMinionTaskEnd(Object segmentConversionInfo, String taskType) {
+    // Nothing to do
+  }
 }

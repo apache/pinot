@@ -15,17 +15,22 @@
  */
 package com.linkedin.pinot.minion.events;
 
-import org.apache.commons.configuration.Configuration;
+/**
+ * Emits events that provide information about the state of minion tasks.
+ */
+public interface MinionEventObserver {
 
+  /**
+   * Invoked when a minion task begins
+   * @param taskInformation
+   * @param taskType
+   */
+  void notifyMinionTaskStart(Object taskInformation, String taskType);
 
-public class DefaultMinionEventNotifierFactory extends MinionEventNotifierFactory {
-
-  public MinionEventObserver create() {
-    return new DefaultMinionEventObserver();
-  }
-
-  public void init(Configuration configuration) {
-
-  }
-
+  /**
+   * Invoked when a minion task ends
+   * @param taskInformation
+   * @param taskType
+   */
+  void notifyMinionTaskEnd(Object taskInformation, String taskType);
 }

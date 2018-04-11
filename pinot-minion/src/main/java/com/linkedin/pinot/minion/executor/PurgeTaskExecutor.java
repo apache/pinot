@@ -61,6 +61,6 @@ public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
 
   @Override
   protected void runOnSuccess(MinionEventNotifierFactory minionEventNotifierFactory, SegmentConversionInfo segmentConversionInfo) {
-    minionEventNotifierFactory.create().notifyMinionTaskEnd(segmentConversionInfo);
+    minionEventNotifierFactory.create().notifyMinionTaskEnd(segmentConversionInfo, MinionConstants.PurgeTask.TASK_TYPE);
   }
 }

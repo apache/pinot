@@ -26,7 +26,7 @@ public abstract class MinionEventNotifierFactory {
 
   public abstract void init(Configuration configuration);
 
-  public abstract MinionEventNotifier create();
+  public abstract MinionEventObserver create();
 
   public static MinionEventNotifierFactory loadFactory(Configuration configuration) {
     MinionEventNotifierFactory metadataEventNotifierFactory;
