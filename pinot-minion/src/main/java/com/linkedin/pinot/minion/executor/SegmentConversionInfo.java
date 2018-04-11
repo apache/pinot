@@ -17,16 +17,17 @@ package com.linkedin.pinot.minion.executor;
 
 import com.linkedin.pinot.core.minion.SegmentPurger;
 import java.io.File;
-import java.util.Map;
 
 
 public class SegmentConversionInfo {
   private File _file;
   private SegmentPurger _segmentPurger;
+  private String _tableName;
 
   public SegmentConversionInfo(SegmentConversionInfoBuilder segmentConversionInfoBuilder) {
     _file = segmentConversionInfoBuilder._file;
     _segmentPurger = segmentConversionInfoBuilder._segmentPurger;
+    _tableName = segmentConversionInfoBuilder._tableName;
   }
 
   public File getFile() {
@@ -37,6 +38,10 @@ public class SegmentConversionInfo {
     return _segmentPurger;
   }
 
+  public String getTableName() {
+    return _tableName;
+  }
+
   public SegmentConversionInfo build() {
     return this;
   }
@@ -44,6 +49,7 @@ public class SegmentConversionInfo {
   public static class SegmentConversionInfoBuilder {
     private File _file;
     private SegmentPurger _segmentPurger;
+    private String _tableName;
 
     public SegmentConversionInfoBuilder() { }
 
@@ -54,6 +60,11 @@ public class SegmentConversionInfo {
 
     public SegmentConversionInfoBuilder setSegmentPurger(SegmentPurger segmentPurger) {
       _segmentPurger = segmentPurger;
+      return this;
+    }
+
+    public SegmentConversionInfoBuilder setTableName(String tableName) {
+      _tableName = tableName;
       return this;
     }
 

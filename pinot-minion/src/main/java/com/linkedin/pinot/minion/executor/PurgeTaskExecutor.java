@@ -49,6 +49,7 @@ public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
     return new SegmentConversionInfo.SegmentConversionInfoBuilder()
         .setFile(purgedSegmentFile)
         .setSegmentPurger(segmentPurger)
+        .setTableName(pinotTaskConfig.getConfigs().get(MinionConstants.TABLE_NAME_KEY))
         .build();
   }
 
