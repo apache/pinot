@@ -38,17 +38,6 @@
   {{/if}}
 
   <div class="row card-container card-container--md card-container--box-shadow">
-    <div class="card-container__header card-container__header--no-border card-container__header--flush-bottom">
-      <span class="card-container__title card-container__title--grow">Root cause Analysis</span>
-      <label class="te-label">
-        {{x-toggle
-          classNames="te-toggle pull-right rootcause-to-legacy-toggle"
-          theme='ios'
-          onToggle=(action "onLegacyToggle" metricUrn)
-          value=false}}
-        Use Legacy RCA
-      </label>
-    </div>
     <div class="card-container__body--padding-md card-container__body--flush-bottom">
       {{#if selectedUrns.size}}
         <div class="rootcause-wrapper">
