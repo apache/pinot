@@ -32,6 +32,7 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -185,15 +186,17 @@ public class ThirdeyeAvroUtils {
 
   /**
    * Constructs dimensionTypes property string from the dimension names with the help of the avro schema
-   * @param metricNamesProperty
+   * @param dimensionNamesProperty
    * @param avroSchema
    * @return
    */
   public static String getDimensionTypesProperty(String dimensionNamesProperty, Schema avroSchema) {
     List<String> dimensionTypesFromSchema = new ArrayList<>();
-    List<String> dimensionNamesFromConfig = Lists.newArrayList(dimensionNamesProperty.split(ThirdEyeConstants.FIELD_SEPARATOR));
-    for (String dimensionName : dimensionNamesFromConfig) {
-      dimensionTypesFromSchema.add(ThirdeyeAvroUtils.getDataTypeForField(dimensionName, avroSchema));
+    if (StringUtils.isNotBlank(dimensionNamesProperty)) {
+      List<String> dimensionNamesFromConfig = Lists.newArrayList(dimensionNamesProperty.split(ThirdEyeConstants.FIELD_SEPARATOR));
+      for (String dimensionName : dimensionNamesFromConfig) {
+        dimensionTypesFromSchema.add(ThirdeyeAvroUtils.getDataTypeForField(dimensionName, avroSchema));
+      }
     }
     return Joiner.on(ThirdEyeConstants.FIELD_SEPARATOR).join(dimensionTypesFromSchema);
   }
