@@ -15,356 +15,187 @@
  */
 package com.linkedin.pinot.controller.helix.core.retention;
 
+import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
+import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
+import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
-import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
-import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
-import javax.annotation.Nonnull;
 
 
 /**
- * RetentionManager is scheduled to run only on Leader controller.
- * It will first scan the table configs to get segment retention strategy then
- * do data retention..
- *
- *
+ * The <code>RetentionManager</code> class manages retention for all segments and delete expired segments.
+ * <p>It is scheduled to run only on leader controller.
  */
 public class RetentionManager {
-  public static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
+  public static final long OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(5L);
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
 
   private final PinotHelixResourceManager _pinotHelixResourceManager;
-
-  private final Map<String, RetentionStrategy> _tableDeletionStrategy = new HashMap<>();
-  private final Map<String, List<SegmentZKMetadata>> _segmentMetadataMap = new HashMap<>();
-  private final Object _lock = new Object();
-
   private final ScheduledExecutorService _executorService;
   private final int _runFrequencyInSeconds;
   private final int _deletedSegmentsRetentionInDays;
-
-  private static final int RETENTION_TIME_FOR_OLD_LLC_SEGMENTS_DAYS = 5;
-  private static final int DEFAULT_RETENTION_FOR_DELETED_SEGMENTS_DAYS = 7;
 
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, int runFrequencyInSeconds,
       int deletedSegmentsRetentionInDays) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _runFrequencyInSeconds = runFrequencyInSeconds;
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
-    _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
-      @Override
-      public Thread newThread(@Nonnull Runnable runnable) {
-        Thread thread = new Thread(runnable);
-        thread.setName("PinotRetentionManagerExecutorService");
-        return thread;
-      }
-    });
-  }
-
-  public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, int runFrequencyInSeconds) {
-    this(pinotHelixResourceManager, runFrequencyInSeconds, DEFAULT_RETENTION_FOR_DELETED_SEGMENTS_DAYS);
-  }
-
-  public static long getRetentionTimeForOldLLCSegmentsDays() {
-    return RETENTION_TIME_FOR_OLD_LLC_SEGMENTS_DAYS;
+    _executorService =
+        Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "PinotRetentionManagerExecutorService"));
   }
 
   public void start() {
-    scheduleRetentionThreadWithFrequency(_runFrequencyInSeconds);
-    LOGGER.info("RetentionManager is started!");
+    LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
+        _runFrequencyInSeconds, _deletedSegmentsRetentionInDays);
+    _executorService.scheduleWithFixedDelay(this::execute, Math.min(60, _runFrequencyInSeconds), _runFrequencyInSeconds,
+        TimeUnit.SECONDS);
+    LOGGER.info("RetentionManager started");
   }
 
-  private void scheduleRetentionThreadWithFrequency(int runFrequencyInSeconds) {
-    _executorService.scheduleWithFixedDelay(new Runnable() {
-      @Override
-      public void run() {
-        synchronized (getLock()) {
-          execute();
-        }
-      }
-    }, Math.min(50, runFrequencyInSeconds), runFrequencyInSeconds, TimeUnit.SECONDS);
-  }
-
-  private Object getLock() {
-    return _lock;
-  }
-
-  private void execute() {
+  public void execute() {
+    LOGGER.info("Start managing retention for all tables");
     try {
       if (_pinotHelixResourceManager.isLeader()) {
-        LOGGER.info("Trying to run retentionManager!");
-        updateDeletionStrategiesForEntireCluster();
-        LOGGER.info("Finished update deletion strategies for entire cluster!");
-        updateSegmentMetadataForEntireCluster();
-        LOGGER.info("Finished update segment metadata for entire cluster!");
-        scanSegmentMetadataAndPurge();
-        LOGGER.info("Finished segment purge for entire cluster!");
-        removeAgedDeletedSegments();
-        LOGGER.info("Finished remove aged deleted segments!");
+        long startTime = System.currentTimeMillis();
+
+        for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
+          LOGGER.info("Start managing retention for table: {}", tableNameWithType);
+          manageRetentionForTable(tableNameWithType);
+        }
+
+        LOGGER.info("Removing aged (more than {} days) deleted segments for all tables",
+            _deletedSegmentsRetentionInDays);
+        _pinotHelixResourceManager.getSegmentDeletionManager()
+            .removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
+
+        LOGGER.info("Finished managing retention for all tables in {}ms", System.currentTimeMillis() - startTime);
       } else {
-        LOGGER.info("Not leader of the controller, sleep!");
+        LOGGER.info("Controller is not leader, skip");
       }
     } catch (Exception e) {
-      LOGGER.error("Caught exception while running retention", e);
+      LOGGER.error("Caught exception while managing retention for all tables", e);
     }
   }
 
-  private void scanSegmentMetadataAndPurge() {
-    for (String tableName : _segmentMetadataMap.keySet()) {
-      List<SegmentZKMetadata> segmentZKMetadataList = _segmentMetadataMap.get(tableName);
-      List<String> segmentsToDelete = new ArrayList<>(128);
-      IdealState idealState = null;
-      try {
-        if (TableNameBuilder.getTableTypeFromTableName(tableName).equals(TableType.REALTIME)) {
-          idealState = _pinotHelixResourceManager.getHelixAdmin().getResourceIdealState(
-              _pinotHelixResourceManager.getHelixClusterName(), tableName);
-        }
-      } catch (Exception e) {
-        LOGGER.warn("Could not get idealstate for {}", tableName, e);
-        // Ignore, worst case we have some old inactive segments in place.
+  private void manageRetentionForTable(String tableNameWithType) {
+    try {
+      // Build retention strategy from table config
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      if (tableConfig == null) {
+        LOGGER.error("Failed to get table config for table: {}", tableNameWithType);
+        return;
       }
-      for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
-        RetentionStrategy deletionStrategy;
-        deletionStrategy = _tableDeletionStrategy.get(tableName);
-        if (deletionStrategy == null) {
-          LOGGER.info("No Retention strategy found for segment: {}", segmentZKMetadata.getSegmentName());
-          continue;
-        }
-        if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
-          final RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = (RealtimeSegmentZKMetadata)segmentZKMetadata;
-          if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
-            final String segmentId = realtimeSegmentZKMetadata.getSegmentName();
-            if (SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
-              continue;
-            }
-            // This is an in-progress LLC segment. Delete any old ones hanging around. Do not delete
-            // segments that are current since there may be a race with the ValidationManager trying to
-            // auto-create LLC segments.
-            if (shouldDeleteInProgressLLCSegment(segmentId, idealState, realtimeSegmentZKMetadata)) {
-              segmentsToDelete.add(segmentId);
-            }
-            continue;
+      SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+      String segmentPushType = validationConfig.getSegmentPushType();
+      if (!"APPEND".equalsIgnoreCase(segmentPushType)) {
+        LOGGER.info("Segment push type is not APPEND for table: {}, skip", tableNameWithType);
+        return;
+      }
+      String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
+      String retentionTimeValue = validationConfig.getRetentionTimeValue();
+      RetentionStrategy retentionStrategy;
+      try {
+        retentionStrategy = new TimeRetentionStrategy(TimeUnit.valueOf(retentionTimeUnit.toUpperCase()),
+            Long.parseLong(retentionTimeValue));
+      } catch (Exception e) {
+        LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", retentionTimeUnit, retentionTimeValue);
+        return;
+      }
+
+      // Scan all segment ZK metadata and purge segments if necessary
+      if (TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableNameWithType)) {
+        manageRetentionForOfflineTable(tableNameWithType, retentionStrategy);
+      } else {
+        manageRetentionForRealtimeTable(tableNameWithType, retentionStrategy);
+      }
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while managing retention for table: {}", tableNameWithType, e);
+    }
+  }
+
+  private void manageRetentionForOfflineTable(String offlineTableName, RetentionStrategy retentionStrategy) {
+    List<String> segmentsToDelete = new ArrayList<>();
+    for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _pinotHelixResourceManager.getOfflineSegmentMetadata(
+        offlineTableName)) {
+      if (retentionStrategy.isPurgeable(offlineSegmentZKMetadata)) {
+        segmentsToDelete.add(offlineSegmentZKMetadata.getSegmentName());
+      }
+    }
+    if (!segmentsToDelete.isEmpty()) {
+      LOGGER.info("Deleting segments: {} from table: {}", segmentsToDelete, offlineTableName);
+      _pinotHelixResourceManager.deleteSegments(offlineTableName, segmentsToDelete);
+    }
+  }
+
+  private void manageRetentionForRealtimeTable(String realtimeTableName, RetentionStrategy retentionStrategy) {
+    List<String> segmentsToDelete = new ArrayList<>();
+    IdealState idealState = _pinotHelixResourceManager.getHelixAdmin()
+        .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), realtimeTableName);
+    for (RealtimeSegmentZKMetadata realtimeSegmentZKMetadata : _pinotHelixResourceManager.getRealtimeSegmentMetadata(
+        realtimeTableName)) {
+      String segmentName = realtimeSegmentZKMetadata.getSegmentName();
+      if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
+        // In progress segment, only check LLC segment
+        if (SegmentName.isLowLevelConsumerSegmentName(segmentName)) {
+          // Delete old LLC segment that hangs around. Do not delete segment that are current since there may be a race
+          // with ValidationManager trying to auto-create the LLC segment
+          if (shouldDeleteInProgressLLCSegment(segmentName, idealState, realtimeSegmentZKMetadata)) {
+            segmentsToDelete.add(segmentName);
           }
         }
-        if (deletionStrategy.isPurgeable(segmentZKMetadata)) {
-          LOGGER.info("Marking segment to delete: {}", segmentZKMetadata.getSegmentName());
-          segmentsToDelete.add(segmentZKMetadata.getSegmentName());
+      } else {
+        // Sealed segment
+        if (retentionStrategy.isPurgeable(realtimeSegmentZKMetadata)) {
+          segmentsToDelete.add(segmentName);
         }
       }
-      if (segmentsToDelete.size() > 0) {
-        LOGGER.info("Trying to delete {} segments for table {}", segmentsToDelete.size(), tableName);
-        _pinotHelixResourceManager.deleteSegments(tableName, segmentsToDelete);
-      }
+    }
+    if (!segmentsToDelete.isEmpty()) {
+      LOGGER.info("Deleting segments: {} from table: {}", segmentsToDelete, realtimeTableName);
+      _pinotHelixResourceManager.deleteSegments(realtimeTableName, segmentsToDelete);
     }
   }
 
-  private void removeAgedDeletedSegments() {
-    // Trigger clean-up for deleted segments from the deleted directory
-    _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
-  }
-
-  private boolean shouldDeleteInProgressLLCSegment(final String segmentId, final IdealState idealState, RealtimeSegmentZKMetadata segmentZKMetadata) {
+  private boolean shouldDeleteInProgressLLCSegment(String segmentName, IdealState idealState,
+      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata) {
     if (idealState == null) {
       return false;
     }
-    Map<String, String> stateMap = idealState.getInstanceStateMap(segmentId);
+    Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
     if (stateMap == null) {
-      // segment is there in propertystore but not in idealstate. mark for deletion
+      // Segment is in property store but not in ideal state, delete it
       return true;
     } else {
+      // Delete segment if all of its replicas are OFFLINE and it is old enough
       Set<String> states = new HashSet<>(stateMap.values());
-      if (states.size() == 1 && states
-          .contains(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE)) {
-        // All replicas of this segment are offline, delete it if it is old enough
-        final long now = System.currentTimeMillis();
-        if (now - segmentZKMetadata.getCreationTime() >= TimeUnit.DAYS.toMillis(
-            RETENTION_TIME_FOR_OLD_LLC_SEGMENTS_DAYS)) {
-          return true;
-        }
-      }
+      return states.size() == 1 && states.contains(
+          CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE)
+          && System.currentTimeMillis() - realtimeSegmentZKMetadata.getCreationTime()
+          > OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS;
     }
-    return false;
-  }
-
-  private void updateDeletionStrategiesForEntireCluster() {
-    List<String> tableNames = _pinotHelixResourceManager.getAllTables();
-    for (String tableName : tableNames) {
-      updateDeletionStrategyForTable(tableName);
-    }
-  }
-
-  private void updateDeletionStrategyForTable(String tableName) {
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    assert tableType != null;
-    switch (tableType) {
-      case OFFLINE:
-        updateDeletionStrategyForOfflineTable(tableName);
-        break;
-      case REALTIME:
-        updateDeletionStrategyForRealtimeTable(tableName);
-        break;
-      default:
-        throw new IllegalArgumentException("No table type matches table name: " + tableName);
-    }
-  }
-
-  /**
-   * Update deletion strategy for offline table.
-   * <ul>
-   *   <li>Keep the current deletion strategy when one of the followings happened:
-   *     <ul>
-   *       <li>Failed to fetch the retention config.</li>
-   *       <li>Push type is not valid (neither 'APPEND' nor 'REFRESH').</li>
-   *     </ul>
-   *   <li>
-   *     Remove the deletion strategy when one of the followings happened:
-   *     <ul>
-   *       <li>Push type is set to 'REFRESH'.</li>
-   *       <li>No valid retention time is set.</li>
-   *     </ul>
-   *   </li>
-   *   <li>Update the deletion strategy when push type is set to 'APPEND' and valid retention time is set.</li>
-   * </ul>
-   */
-  private void updateDeletionStrategyForOfflineTable(String offlineTableName) {
-    // Fetch table config.
-    TableConfig offlineTableConfig;
-    try {
-      offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(TableNameBuilder.extractRawTableName(offlineTableName));
-      if (offlineTableConfig == null) {
-        LOGGER.error("Table config is null, skip updating deletion strategy for table: {}.", offlineTableName);
-        return;
-      }
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while fetching table config, skip updating deletion strategy for table: {}.",
-          offlineTableName, e);
-      return;
-    }
-
-    // Fetch validation config.
-    SegmentsValidationAndRetentionConfig validationConfig = offlineTableConfig.getValidationConfig();
-    if (validationConfig == null) {
-      LOGGER.error("Validation config is null, skip updating deletion strategy for table: {}.", offlineTableName);
-      return;
-    }
-
-    // Fetch push type.
-    String segmentPushType = validationConfig.getSegmentPushType();
-    if ((segmentPushType == null)
-        || (!segmentPushType.equalsIgnoreCase("APPEND") && !segmentPushType.equalsIgnoreCase("REFRESH"))) {
-      LOGGER.error(
-          "Segment push type: {} is not valid ('APPEND' or 'REFRESH'), skip updating deletion strategy for table: {}.",
-          segmentPushType, offlineTableName);
-      return;
-    }
-    if (segmentPushType.equalsIgnoreCase("REFRESH")) {
-      LOGGER.info("Segment push type is set to 'REFRESH', remove deletion strategy for table: {}.", offlineTableName);
-      _tableDeletionStrategy.remove(offlineTableName);
-      return;
-    }
-
-    // Fetch retention time unit and value.
-    String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
-    String retentionTimeValue = validationConfig.getRetentionTimeValue();
-    if (((retentionTimeUnit == null) || retentionTimeUnit.isEmpty())
-        || ((retentionTimeValue == null) || retentionTimeValue.isEmpty())) {
-      LOGGER.info("Retention time unit/value is not set, remove deletion strategy for table: {}.", offlineTableName);
-      _tableDeletionStrategy.remove(offlineTableName);
-      return;
-    }
-
-    // Update time retention strategy.
-    try {
-      TimeRetentionStrategy timeRetentionStrategy = new TimeRetentionStrategy(retentionTimeUnit, retentionTimeValue);
-      _tableDeletionStrategy.put(offlineTableName, timeRetentionStrategy);
-      LOGGER.info("Updated deletion strategy for table: {} using retention time: {} {}.", offlineTableName,
-          retentionTimeValue, retentionTimeUnit);
-    } catch (Exception e) {
-      LOGGER.error(
-          "Caught exception while building deletion strategy with retention time: {} {], remove deletion strategy for table: {}.",
-          retentionTimeValue, retentionTimeUnit, offlineTableName);
-      _tableDeletionStrategy.remove(offlineTableName);
-    }
-  }
-
-  /**
-   * Update deletion strategy for realtime table.
-   * <ul>
-   *   <li>Keep the current deletion strategy when failed to get a valid retention time</li>
-   *   <li>Update the deletion strategy when valid retention time is set.</li>
-   * </ul>
-   * The reason for this is that we don't allow realtime table without deletion strategy.
-   */
-  private void updateDeletionStrategyForRealtimeTable(String realtimeTableName) {
-    try {
-      TableConfig realtimeTableConfig =
-          _pinotHelixResourceManager.getRealtimeTableConfig(TableNameBuilder.extractRawTableName(realtimeTableName));
-      assert realtimeTableConfig != null;
-      SegmentsValidationAndRetentionConfig validationConfig = realtimeTableConfig.getValidationConfig();
-      TimeRetentionStrategy timeRetentionStrategy =
-          new TimeRetentionStrategy(validationConfig.getRetentionTimeUnit(), validationConfig.getRetentionTimeValue());
-      _tableDeletionStrategy.put(realtimeTableName, timeRetentionStrategy);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while updating deletion strategy, skip updating deletion strategy for table: {}.",
-          realtimeTableName, e);
-    }
-  }
-
-  private void updateSegmentMetadataForEntireCluster() {
-    // Gets table names with type.
-    List<String> tableNames = _pinotHelixResourceManager.getAllTables();
-    for (String tableNameWithType : tableNames) {
-      _segmentMetadataMap.put(tableNameWithType, retrieveSegmentMetadataForTable(tableNameWithType));
-    }
-  }
-
-  private List<SegmentZKMetadata> retrieveSegmentMetadataForTable(String tableNameWithType) {
-    List<SegmentZKMetadata> segmentMetadataList = new ArrayList<>();
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    assert tableType != null;
-    switch (tableType) {
-      case OFFLINE:
-        List<OfflineSegmentZKMetadata> offlineSegmentZKMetadatas = _pinotHelixResourceManager.getOfflineSegmentMetadata(
-            tableNameWithType);
-        for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadatas) {
-          segmentMetadataList.add(offlineSegmentZKMetadata);
-        }
-        break;
-      case REALTIME:
-        List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadatas = _pinotHelixResourceManager.getRealtimeSegmentMetadata(
-            tableNameWithType);
-        for (RealtimeSegmentZKMetadata realtimeSegmentZKMetadata : realtimeSegmentZKMetadatas) {
-          segmentMetadataList.add(realtimeSegmentZKMetadata);
-        }
-        break;
-      default:
-        throw new IllegalArgumentException("No table type matches table name: " + tableNameWithType);
-    }
-    return segmentMetadataList;
   }
 
   public void stop() {
+    LOGGER.info("Stopping RetentionManager");
     _executorService.shutdown();
+    LOGGER.info("RetentionManager stopped");
   }
 }

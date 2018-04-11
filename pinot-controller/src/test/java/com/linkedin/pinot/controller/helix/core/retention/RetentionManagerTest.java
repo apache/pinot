@@ -28,7 +28,6 @@ import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.controller.helix.core.SegmentDeletionManager;
 import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -46,6 +45,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.*;
 
 
@@ -81,23 +81,17 @@ public class RetentionManagerTest {
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
     setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager);
 
-    when(pinotHelixResourceManager.getOfflineTableConfig(TEST_TABLE_NAME)).thenReturn(tableConfig);
+    when(pinotHelixResourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
     when(pinotHelixResourceManager.getOfflineSegmentMetadata(OFFLINE_TABLE_NAME)).thenReturn(metadataList);
 
-    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, 100000);
-    Method execute = RetentionManager.class.getDeclaredMethod("execute");
-    execute.setAccessible(true);
-    execute.invoke(retentionManager);
-
+    new RetentionManager(pinotHelixResourceManager, 0, 0).execute();
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
     // Verify that the removeAgedDeletedSegments() method in deletion manager is actually called.
     verify(deletionManager, times(1)).removeAgedDeletedSegments(anyInt());
 
     // Verify that the deleteSegments method is actually called.
-    verify(pinotHelixResourceManager, times(1)).deleteSegments(anyString(), ArgumentMatchers.<String>anyList());
-
-    retentionManager.stop();
+    verify(pinotHelixResourceManager, times(1)).deleteSegments(anyString(), anyList());
   }
 
   @Test
@@ -157,7 +151,7 @@ public class RetentionManagerTest {
   }
 
   private void setupPinotHelixResourceManager(TableConfig tableConfig, final List<String> removedSegments,
-      PinotHelixResourceManager resourceManager) throws Exception {
+      PinotHelixResourceManager resourceManager) {
     final String tableNameWithType = tableConfig.getTableName();
     when(resourceManager.isLeader()).thenReturn(true);
     when(resourceManager.getAllTables()).thenReturn(Collections.singletonList(tableNameWithType));
@@ -205,24 +199,18 @@ public class RetentionManagerTest {
         setupSegmentMetadata(tableConfig, now, initialNumSegments, removedSegments);
     setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager);
 
-    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, 100000);
-    Method execute = RetentionManager.class.getDeclaredMethod("execute");
-    execute.setAccessible(true);
-    execute.invoke(retentionManager);
-
+    new RetentionManager(pinotHelixResourceManager, 0, 0).execute();
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
     // Verify that the removeAgedDeletedSegments() method in deletion manager is actually called.
     verify(deletionManager, times(1)).removeAgedDeletedSegments(anyInt());
 
     // Verify that the deleteSegments method is actually called.
-    verify(pinotHelixResourceManager, times(1)).deleteSegments(anyString(), ArgumentMatchers.<String>anyList());
-
-    retentionManager.stop();
+    verify(pinotHelixResourceManager, times(1)).deleteSegments(anyString(), anyList());
   }
 
   private PinotHelixResourceManager setupSegmentMetadata(TableConfig tableConfig, final long now, final int nSegments,
-      List<String> segmentsToBeDeleted) throws Exception {
+      List<String> segmentsToBeDeleted) {
     final int replicaCount = Integer.valueOf(tableConfig.getValidationConfig().getReplicasPerPartition());
 
     List<RealtimeSegmentZKMetadata> allSegments = new ArrayList<>();
@@ -258,8 +246,7 @@ public class RetentionManagerTest {
         segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
         idealState.setPartitionState(segName, serverName, "OFFLINE");
         allSegments.add(segmentMetadata);
-        if ((now - segmentCreationTime) >= TimeUnit.DAYS.toMillis(
-            RetentionManager.getRetentionTimeForOldLLCSegmentsDays())) {
+        if (now - segmentCreationTime > RetentionManager.OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS) {
           segmentsToBeDeleted.add(segmentMetadata.getSegmentName());
         }
       }
@@ -267,7 +254,7 @@ public class RetentionManagerTest {
 
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
 
-    when(pinotHelixResourceManager.getRealtimeTableConfig(TEST_TABLE_NAME)).thenReturn(tableConfig);
+    when(pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
     when(pinotHelixResourceManager.getRealtimeSegmentMetadata(REALTIME_TABLE_NAME)).thenReturn(allSegments);
     when(pinotHelixResourceManager.getHelixClusterName()).thenReturn(HELIX_CLUSTER_NAME);
 
