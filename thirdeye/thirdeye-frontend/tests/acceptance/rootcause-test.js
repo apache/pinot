@@ -108,11 +108,4 @@ module('Acceptance | rootcause', async function(hooks) {
       $(rcEl.EVENTS_TABLE).get(0),
       'events table exists in events tab');
   });
-
-  test('links to legacy rca should work', async (assert) => {
-    await visit('/rootcause');
-    await click(rcEl.RCA_TOGGLE);
-
-    assert.ok(currentURL().includes('rca'), currentURL());
-  });
 });
