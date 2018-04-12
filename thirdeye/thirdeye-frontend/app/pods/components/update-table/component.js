@@ -1,4 +1,5 @@
 import modelsTable from 'ember-models-table/components/models-table';
+import _ from 'lodash';
 
 /**
  * We are overriding ember-models-table to allow the table to be responsive to external changes
@@ -15,12 +16,20 @@ export default modelsTable.extend({
   // Necessary to receive displayDataChanged action
   sendDisplayDataChangedAction: true,
 
+  _columnsCache: null,
+
   /**
    * Overriding ember-models-table API
    * Allows preselectedItems and columns to listen to changes, rather than only being assigned on init
    */
   didReceiveAttrs() {
+    const { columns, _columnsCache } = this.getProperties('columns', '_columnsCache');
+
     this._setupSelectedRows();
-    this._setupColumns();
+
+    if (!_.isEqual(columns, _columnsCache)) {
+      this._setupColumns();
+      this.set('_columnsCache', columns);
+    }
   }
 });
