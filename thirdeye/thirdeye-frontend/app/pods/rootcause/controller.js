@@ -1065,23 +1065,6 @@ export default Controller.extend({
     },
 
     /**
-     * Toggle that links to the legacy rca
-     * @param {String} urn current metricUrn
-    */
-    onLegacyToggle(urn = '') {
-      // later is used here so that the transition occurs after
-      // the component's toggle animation
-      later(() => {
-        if (urn.startsWith('thirdeye:metric')) {
-          const id = urn.split(':')[2];
-          this.send('transitionToRcaDetails', id);
-        } else {
-          this.send('transitionToRca');
-        }
-      }, 1000);
-    },
-
-    /**
      * Toggles the modal view
     */
     onEntityMappingClick() {
