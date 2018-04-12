@@ -50,7 +50,7 @@ const toAnomalyOffset = (granularity) => {
 const toAnalysisOffset = (granularity) => {
   const UNIT_MAPPING = {
     minute: -1,
-    hour: -3,
+    hour: -2,
     day: -7
   };
   return UNIT_MAPPING[granularity[1]] || -1;
@@ -219,10 +219,16 @@ export default Route.extend(AuthenticatedRouteMixin, {
     // anomaly-initialized context
     if (anomalyId && anomalyUrn) {
       if (!_.isEmpty(anomalyEntity)) {
+        const granularity = anomalyEntity.attributes.metricGranularity[0];
+        const metricGranularity = toMetricGranularity(granularity);
+
         const anomalyRange = [parseInt(anomalyEntity.start, 10), parseInt(anomalyEntity.end, 10)];
 
         // align to local end of day
-        const analysisRange = [moment(anomalyRange[0]).startOf('day').add(-1, 'day').valueOf(), moment(anomalyRange[1]).startOf('day').add(1, 'day').valueOf()];
+        const analysisRangeEnd = moment(anomalyRange[1]).startOf('day').add(1, 'day').valueOf();
+        const analysisRangeStartOffset = toAnalysisOffset(metricGranularity);
+        const analysisRangeStart = moment(anomalyRange[0]).startOf('day').add(analysisRangeStartOffset, 'day').valueOf();
+        const analysisRange = [analysisRangeStart, analysisRangeEnd];
 
         const anomalyDimNames = anomalyEntity.attributes['dimensions'] || [];
         const anomalyFilters = anomalyDimNames.map(dimName => [dimName, anomalyEntity.attributes[dimName]]);
