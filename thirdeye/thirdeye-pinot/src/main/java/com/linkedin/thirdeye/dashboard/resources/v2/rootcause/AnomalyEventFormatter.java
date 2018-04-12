@@ -38,6 +38,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
   public static final String ATTR_EXTERNAL_URLS = "externalUrls";
   public static final String ATTR_WEIGHT = "weight";
   public static final String ATTR_SCORE = "score";
+  public static final String ATTR_METRIC_GRANULARITY = "metricGranularity";
 
   private final MergedAnomalyResultManager anomalyDAO;
   private final MetricConfigManager metricDAO;
@@ -92,6 +93,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     attributes.putAll(ATTR_EXTERNAL_URLS, externalUrls.keySet());
     attributes.put(ATTR_SCORE, String.valueOf(anomaly.getScore()));
     attributes.put(ATTR_WEIGHT, String.valueOf(anomaly.getWeight()));
+    attributes.put(ATTR_METRIC_GRANULARITY, dataset.bucketTimeGranularity().toAggregationGranularityString());
 
     // external urls as attributes
     for (Map.Entry<String, String> entry : externalUrls.entrySet()) {
