@@ -16,6 +16,7 @@
 #
 
 # ThirdEye related changes
+export MAVEN_OPTS="-Xmx8G -Xss128M -XX:MetaspaceSize=512M -XX:MaxMetaspaceSize=1024M -XX:+CMSClassUnloadingEnabled"
 release_opts=
 if [ -n "$RELEASE_VERSION" ]; then
 release_opts="$release_opts -DreleaseVersion=$RELEASE_VERSION"
@@ -23,4 +24,4 @@ fi
 if [ -n "$NEXT_VERSION" ]; then
 release_opts="$release_opts -DdevelopmentVersion=$NEXT_VERSION"
 fi
-mvn -B release:clean release:prepare release:perform -Darguments="-DskipTests" $release_opts
+mvn -e -B release:clean release:prepare release:perform -Darguments="-DskipTests" $release_opts
