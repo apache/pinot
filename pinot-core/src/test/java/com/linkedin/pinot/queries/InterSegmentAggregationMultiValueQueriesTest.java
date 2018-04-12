@@ -176,19 +176,19 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
 
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L,
-        new String[]{"20039"});
+        new String[]{"18835"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1129720L, 62480L, 400000L,
-        new String[]{"1296"});
+        new String[]{"1196"});
 
     brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L,
-        new String[]{"4715"});
+        new String[]{"4850"});
 
     brokerResponse = getBrokerResponseForQuery(query + MV_GROUP_BY);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L,
-        new String[]{"3490"});
+        new String[]{"3403"});
   }
 
   @Test

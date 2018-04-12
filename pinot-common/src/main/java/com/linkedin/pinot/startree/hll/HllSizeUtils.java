@@ -24,8 +24,18 @@ import com.google.common.collect.ImmutableBiMap;
  */
 public class HllSizeUtils {
 
-  private static final ImmutableBiMap<Integer, Integer> LOG2M_TO_SIZE_IN_BYTES =
-      ImmutableBiMap.of(5, 32, 6, 52, 7, 96, 8, 180, 9, 352);
+  private static final ImmutableBiMap<Integer, Integer> LOG2M_TO_SIZE_IN_BYTES = getLog2mToSizeInBytesInitialValues();
+
+  private static ImmutableBiMap<Integer, Integer> getLog2mToSizeInBytesInitialValues() {
+    return ImmutableBiMap.<Integer, Integer>builder()
+        .put(5, 32)
+        .put(6, 52)
+        .put(7, 96)
+        .put(8, 180)
+        .put(9, 352)
+        .put(13, 5472)
+        .build();
+  }
 
   public static ImmutableBiMap<Integer, Integer> getLog2mToSizeInBytes() {
     return LOG2M_TO_SIZE_IN_BYTES;

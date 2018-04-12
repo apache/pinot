@@ -20,7 +20,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.linkedin.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>0.016</version>
+  <version>0.1.076-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>pinot</name>
   <modules>
@@ -89,8 +89,19 @@
     </developer>
   </developers>
   <scm>
-    <developerConnection>scm:git:git://git@github.com/linkedin/pinot.git</developerConnection>
+    <developerConnection>scm:git:gitolite@code.uber.internal:data/pinot</developerConnection>
+    <tag>pinot-0.1.076-SNAPSHOT</tag>
   </scm>
+  <distributionManagement>
+    <repository>
+      <id>central</id>
+      <url>http://artifactory.uber.internal:4587/artifactory/libs-release-local/</url>
+    </repository>
+    <snapshotRepository>
+      <id>snapshots</id>
+      <url>http://artifactory.uber.internal:4587/artifactory/libs-snapshot-local/</url>
+    </snapshotRepository>
+  </distributionManagement>
   <inceptionYear>2014-2016</inceptionYear>
   <properties>
     <build.profile.id>dev</build.profile.id>
@@ -1029,10 +1040,8 @@
         <configuration>
           <shadedArtifactAttached>true</shadedArtifactAttached>
           <transformers>
-            <transformer
-                implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-            <transformer
-                implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
               <mainClass>${mainClass}</mainClass>
             </transformer>
           </transformers>
