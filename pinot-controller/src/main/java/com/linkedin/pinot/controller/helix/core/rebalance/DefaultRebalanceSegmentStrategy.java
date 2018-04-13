@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.controller.helix.core.rebalance;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.OfflineTagConfig;
@@ -90,8 +91,8 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
 
     if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
       StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
-      if (streamMetadata.hasHighLevelKafkaConsumerType()) {
-        LOGGER.info("Table {} uses HLC and will have no partition assignment", tableNameWithType);
+      if (!streamMetadata.hasSimpleKafkaConsumerType()) {
+        LOGGER.info("Table {} does not have LLC and will have no partition assignment", tableNameWithType);
         return newPartitionAssignment;
       }
 
@@ -101,7 +102,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
           rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.INCLUDE_CONSUMING, DEFAULT_INCLUDE_CONSUMING);
       if (includeConsuming) {
 
-        PartitionAssignmentGenerator partitionAssignmentGenerator = new PartitionAssignmentGenerator(_helixManager);
+        PartitionAssignmentGenerator partitionAssignmentGenerator = getPartitionAssignmentGenerator();
         int numPartitions = partitionAssignmentGenerator.getNumPartitionsFromIdealState(idealState);
         newPartitionAssignment = partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions);
 
@@ -111,6 +112,11 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
       }
     }
     return newPartitionAssignment;
+  }
+
+  @VisibleForTesting
+  protected PartitionAssignmentGenerator getPartitionAssignmentGenerator() {
+    return new PartitionAssignmentGenerator(_helixManager);
   }
 
   /**

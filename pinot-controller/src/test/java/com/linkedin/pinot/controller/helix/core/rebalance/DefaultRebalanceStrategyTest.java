@@ -16,9 +16,17 @@
 package com.linkedin.pinot.controller.helix.core.rebalance;
 
 import com.google.common.collect.Lists;
+import com.linkedin.pinot.common.config.IndexingConfig;
+import com.linkedin.pinot.common.config.RealtimeTagConfig;
+import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
+import com.linkedin.pinot.common.partition.IdealStateBuilderUtil;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
+import com.linkedin.pinot.common.partition.PartitionAssignmentGenerator;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -130,6 +138,125 @@ public class DefaultRebalanceStrategyTest {
       serverNames[i] = "Server_" + i;
       consumingServerNames[i] = "ConsumingServer_" + i;
     }
+  }
+
+  /**
+   * Tests for rebalancePartitionAssignment
+   * Checks for :
+   * 1. rebalance only for realtime table
+   * 2. rebalance only if presence of simple consumer type
+   * 3. rebalance only if includeConsuming flag true
+   * 4. exception on invalid config
+   * 5. gracefully handle empty ideal state
+   * 6. handle capacity changes
+   * 7. allow both hlc and llc
+   *
+   * @throws InvalidConfigException
+   */
+  @Test
+  public void testGetRebalancedPartitionAssignment() throws InvalidConfigException {
+    HelixManager mockHelixManager = mock(HelixManager.class);
+    TestPartitionAssignmentGenerator partitionAssignmentGenerator = new TestPartitionAssignmentGenerator(mockHelixManager);
+    TestRebalanceSegmentsStrategy rebalanceSegmentsStrategy = new TestRebalanceSegmentsStrategy(mockHelixManager);
+    rebalanceSegmentsStrategy.setPartitionAssignmentGenerator(partitionAssignmentGenerator);
+
+    int nReplicas = 2;
+    int nPartitions = 8;
+    String consumerTypesCSV = "simple";
+    String tableName = "anOfflineTable_OFFLINE";
+    TableConfig tableConfig = makeTableConfig(tableName, nReplicas, consumerTypesCSV);
+    IdealStateBuilderUtil idealStateBuilderUtil = new IdealStateBuilderUtil(tableName);
+    IdealState idealState = idealStateBuilderUtil.build();
+    Configuration rebalanceUserConfig = new PropertiesConfiguration();
+
+    // not realtime table
+    PartitionAssignment partitionAssignment =
+        rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
+    Assert.assertEquals(partitionAssignment.getNumPartitions(), 0);
+
+    // does not have simple type consumer
+    tableName = "aRealtimeTable_REALTIME";
+    consumerTypesCSV = "highLevel";
+    tableConfig = makeTableConfig(tableName, nReplicas, consumerTypesCSV);
+    idealStateBuilderUtil = new IdealStateBuilderUtil(tableName);
+    idealState = idealStateBuilderUtil.build();
+    partitionAssignment =
+        rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
+    Assert.assertEquals(partitionAssignment.getNumPartitions(), 0);
+
+    // includeConsuming not present - default should be false
+    consumerTypesCSV = "simple";
+    tableConfig = makeTableConfig(tableName, nReplicas, consumerTypesCSV);
+    partitionAssignment =
+        rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
+    Assert.assertEquals(partitionAssignment.getNumPartitions(), 0);
+
+    // include consuming false
+    rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.INCLUDE_CONSUMING, false);
+    partitionAssignment =
+        rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
+    Assert.assertEquals(partitionAssignment.getNumPartitions(), 0);
+
+    //  invalid config
+    rebalanceUserConfig.setProperty(RebalanceUserConfigConstants.INCLUDE_CONSUMING, true);
+    try {
+      partitionAssignment =
+          rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
+    } catch (InvalidConfigException e) {
+
+    }
+    Assert.assertEquals(partitionAssignment.getNumPartitions(), 0);
+
+    // empty ideal state
+    List<String> instances = getConsumingInstanceList(4);
+    partitionAssignmentGenerator.setConsumingTaggedInstances(instances);
+    partitionAssignment =
+        rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
+    Assert.assertEquals(partitionAssignment.getNumPartitions(), 0);
+
+    // llc
+    idealState = idealStateBuilderUtil.addConsumingSegments(nPartitions, 0, nReplicas, instances).build();
+    partitionAssignment =
+        rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
+    Assert.assertEquals(partitionAssignment.getNumPartitions(), nPartitions);
+    Assert.assertEquals(partitionAssignment.getAllInstances().size(), instances.size());
+    Assert.assertTrue(partitionAssignment.getAllInstances().containsAll(instances));
+
+    idealState = idealStateBuilderUtil.setSegmentState(0, 0, "ONLINE")
+        .setSegmentState(1, 0, "ONLINE")
+        .setSegmentState(2, 0, "ONLINE")
+        .setSegmentState(3, 0, "ONLINE")
+        .setSegmentState(4, 0, "ONLINE")
+        .setSegmentState(5, 0, "ONLINE")
+        .setSegmentState(6, 0, "ONLINE")
+        .setSegmentState(7, 0, "ONLINE")
+        .addConsumingSegments(nPartitions, 1, nReplicas, instances).build();
+    partitionAssignment =
+        rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
+    Assert.assertEquals(partitionAssignment.getNumPartitions(), nPartitions);
+    Assert.assertEquals(partitionAssignment.getAllInstances().size(), instances.size());
+    Assert.assertTrue(partitionAssignment.getAllInstances().containsAll(instances));
+
+    // instances changed
+    instances = getConsumingInstanceList(7);
+    instances.set(0, "replacedServer0");
+    partitionAssignmentGenerator.setConsumingTaggedInstances(instances);
+    partitionAssignment =
+        rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
+    Assert.assertEquals(partitionAssignment.getNumPartitions(), nPartitions);
+    Assert.assertEquals(partitionAssignment.getAllInstances().size(), instances.size());
+    Assert.assertTrue(partitionAssignment.getAllInstances().containsAll(instances));
+
+    // hlc
+    Map<String, String> instanceStateMap = new HashMap<>(2);
+    instanceStateMap.put(instances.get(0), "ONLINE");
+    instanceStateMap.put(instances.get(1), "ONLINE");
+    idealState = idealStateBuilderUtil.addSegment("anHlcSegment", instanceStateMap).build();partitionAssignment =
+        rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
+    Assert.assertEquals(partitionAssignment.getNumPartitions(), nPartitions);
+    Assert.assertEquals(partitionAssignment.getAllInstances().size(), instances.size());
+    Assert.assertTrue(partitionAssignment.getAllInstances().containsAll(instances));
+
   }
 
   @Test
@@ -440,5 +567,72 @@ public class DefaultRebalanceStrategyTest {
       }
     }
     Assert.assertEquals(changeExpected, changed);
+  }
+
+  private TableConfig makeTableConfig(String tableName, int nReplicas, String consumerTypesCSV) {
+    TableConfig mockTableConfig = mock(TableConfig.class);
+    when(mockTableConfig.getTableName()).thenReturn(tableName);
+    SegmentsValidationAndRetentionConfig mockValidationConfig = mock(SegmentsValidationAndRetentionConfig.class);
+    when(mockValidationConfig.getReplicasPerPartition()).thenReturn(Integer.toString(nReplicas));
+    when(mockValidationConfig.getReplicasPerPartitionNumber()).thenReturn(nReplicas);
+    when(mockTableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
+    CommonConstants.Helix.TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
+    when(mockTableConfig.getTableType()).thenReturn(tableTypeFromTableName);
+
+    Map<String, String> streamConfigMap = new HashMap<>(1);
+    streamConfigMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
+        CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), consumerTypesCSV);
+    IndexingConfig mockIndexConfig = mock(IndexingConfig.class);
+    when(mockIndexConfig.getStreamConfigs()).thenReturn(streamConfigMap);
+    when(mockTableConfig.getIndexingConfig()).thenReturn(mockIndexConfig);
+
+    return mockTableConfig;
+  }
+
+  /**
+   * Test class for DefaultRebalanceSegmentsStrategy
+   */
+  private class TestRebalanceSegmentsStrategy extends DefaultRebalanceSegmentStrategy {
+    HelixManager _helixManager;
+    PartitionAssignmentGenerator _partitionAssignmentGenerator;
+
+    public TestRebalanceSegmentsStrategy(HelixManager helixManager) {
+      super(helixManager);
+      _helixManager = helixManager;
+    }
+
+    @Override
+    protected PartitionAssignmentGenerator getPartitionAssignmentGenerator() {
+      return _partitionAssignmentGenerator;
+    }
+
+    void setPartitionAssignmentGenerator(PartitionAssignmentGenerator partitionAssignmentGenerator) {
+      _partitionAssignmentGenerator = partitionAssignmentGenerator;
+    }
+  }
+
+  /**
+   * Test class for partition assignment generator
+   */
+  private class TestPartitionAssignmentGenerator extends PartitionAssignmentGenerator {
+    private List<String> _consumingTaggedInstances = new ArrayList<>();
+
+    public TestPartitionAssignmentGenerator(HelixManager helixManager) {
+      super(helixManager);
+    }
+
+    @Override
+    protected RealtimeTagConfig getRealtimeTagConfig(TableConfig tableConfig) {
+      return null;
+    }
+
+    @Override
+    protected List<String> getConsumingTaggedInstances(RealtimeTagConfig realtimeTagConfig) {
+      return _consumingTaggedInstances;
+    }
+
+    void setConsumingTaggedInstances(List<String> consumingTaggedInstances) {
+      _consumingTaggedInstances = consumingTaggedInstances;
+    }
   }
 }
