@@ -578,20 +578,18 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return new File(_resourceDataDir, _segmentZKMetadata.getSegmentName());
   }
 
-  // Modifies _segmentBuildDescriptor if we have do not have a valid built segment file.
+  // Side effect: Modifies _segmentBuildDescriptor if we do not have a valid built segment file and we
+  // built the segment successfully.
   protected void buildSegmentForCommit(long buildTimeLeaseMs) {
     try {
-      if (_segmentBuildDescriptor != null) {
-        if (_segmentBuildDescriptor.getOffset() == _currentOffset) {
-          // Double-check that we have the file, just in case.
-          String segTarFile = _segmentBuildDescriptor.getSegmentTarFilePath();
-          if (new File(segTarFile).exists()) {
-            return;
-          }
-          _segmentBuildDescriptor = null;
+      if (_segmentBuildDescriptor != null && _segmentBuildDescriptor.getOffset() == _currentOffset) {
+        // Double-check that we have the file, just in case.
+        String segTarFile = _segmentBuildDescriptor.getSegmentTarFilePath();
+        if (new File(segTarFile).exists()) {
+          return;
         }
-        removeSegmentFile();
       }
+      removeSegmentFile();
       if (buildTimeLeaseMs <= 0) {
         if (_segBuildSemaphore == null) {
           buildTimeLeaseMs = SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds() * 1000L;
@@ -644,7 +642,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         FileUtils.deleteQuietly(tempSegmentFolder);
         return null;
       }
-      segmentLogger.info("Successfully built segment in {} ms", (now() - lockAquireTimeMillis));
+      final long buildTimeMillis = now() - lockAquireTimeMillis;
+      final long waitTimeMillis = lockAquireTimeMillis - startTimeMillis;
+      segmentLogger.info("Successfully built segment in {} ms, after lockWaitTime {} ms",
+          buildTimeMillis, waitTimeMillis);
       File destDir = makeSegmentDirPath();
       FileUtils.deleteQuietly(destDir);
       try {
@@ -658,8 +659,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         return null;
       }
       FileUtils.deleteQuietly(tempSegmentFolder);
-      final long buildTimeMillis = now() - lockAquireTimeMillis;
-      final long waitTimeMillis = lockAquireTimeMillis - startTimeMillis;
 
       _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
           TimeUnit.MILLISECONDS.toSeconds(buildTimeMillis));
