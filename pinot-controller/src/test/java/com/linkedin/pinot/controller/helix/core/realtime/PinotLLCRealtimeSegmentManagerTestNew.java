@@ -62,6 +62,7 @@ import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.IdealState;
 import org.apache.zookeeper.data.Stat;
 import org.joda.time.Interval;
@@ -341,8 +342,14 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
       TableConfig tableConfig, int nPartitions, int nReplicas, List<String> instances, boolean exceptionExpected,
       boolean skipNewPartitions) {
     try {
-      Map<String, Map<String, String>> oldMapFields = new HashMap<>(idealState.getRecord().getMapFields());
-      Map<String, LLCRealtimeSegmentZKMetadata> oldMetadataMap = new HashMap<>(segmentManager._metadataMap);
+      ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
+      IdealState idealStateCopy = new IdealState(
+          (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+      Map<String, Map<String, String>> oldMapFields = idealStateCopy.getRecord().getMapFields();
+      Map<String, LLCRealtimeSegmentZKMetadata> oldMetadataMap = new HashMap<>(segmentManager._metadataMap.size());
+      for (Map.Entry<String, LLCRealtimeSegmentZKMetadata> entry : segmentManager._metadataMap.entrySet()) {
+        oldMetadataMap.put(entry.getKey(), new LLCRealtimeSegmentZKMetadata(entry.getValue().toZNRecord()));
+      }
       segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
       IdealState updatedIdealState = segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
       Assert.assertFalse(exceptionExpected);
@@ -410,13 +417,49 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     }
   }
 
+  /**
+   * Tests that we can repair all invalid scenarios that can generate during segment completion which leave the ideal state in an incorrect state
+   * Segment completion takes place in 3 steps:
+   * 1. Update committing segment metadata to DONE
+   * 2. Create new segment metadata IN_PROGRESS
+   * 3. Update ideal state as committing segment state ONLINE and create new segment with state CONSUMING
+   *
+   * If a failure happens before step 1 or after step 3, we do not need to fix it
+   * If a failure happens after step 1 is done and before step 3 completes, we will be left in an incorrect state, and should be able to fix it
+   *
+   * Scenarios:
+   * 1. Step 3 failed - we will find new segment metadata IN_PROGRESS but no segment in ideal state
+   * Correction: create new segment in ideal state with CONSUMING, update prev segment (if exists) in ideal state to ONLINE
+   *
+   * 2. Step 2 failed - we will find segment metadata DONE but ideal state CONSUMING
+   * Correction: create new segment metadata with state IN_PROGRESS, create new segment in ideal state CONSUMING, update prev segment to ONLINE
+   *
+   * 3. All replicas of a latest segment are in OFFLINE
+   * Correction: create new metadata IN_PROGRESS, new segment in ideal state CONSUMING. If prev metadata was DONE, start from end offset. If prev metadata was IN_PROGRESS, start from prev start offset
+   *
+   * 4. TooSoonToCorrect: Segment completion has 10 minutes to retry and complete between steps 1 and 3.
+   * Correction: Don't correct a segment before the allowed time
+   *
+   * 5. Num Partitions increased
+   * Correction: create new metadata and segment in ideal state for new partition
+   *
+   * 6. Num instances changed
+   * Correction: use updated instances for new segment assignments
+   *
+   * @throws InvalidConfigException
+   */
   @Test
   public void testValidateLLCRepair() throws InvalidConfigException {
+    // Printing out the random seed to console so that we can use the seed to reproduce failure conditions
+    long seed = new Random().nextLong();
+    System.out.println("Random seed for validate llc repairs " + seed);
 
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(null);
     String tableName = "repairThisTable_REALTIME";
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     int nReplicas = 2;
     IdealStateBuilderUtil idealStateBuilder = new IdealStateBuilderUtil(tableName);
+    ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
 
     TableConfig tableConfig;
     IdealState idealState;
@@ -433,52 +476,66 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     // set up a happy path - segment is present in ideal state, is CONSUMING, metadata says IN_PROGRESS
     idealState = clearAndSetupHappyPathIdealState(idealStateBuilder, segmentManager, tableConfig, nPartitions);
 
-    // randomly introduce an error condition and assert that we repair it
-    long seed = new Random().nextLong();
-    System.out.println("Random seed for validate llc repairs " + seed);
-    Random random = new Random(seed);
+    final int nInstancesChanged = 0;
+    final int nPartitionsIncreased = 1;
+    final int nInstancesChangedAndNPartitionsIncreased = 2;
+    final int[] numInstancesSet = new int[]{4, 6, 8, 10};
 
+    // randomly introduce an error condition and assert that we repair it
+    Random random = new Random(seed);
     for (int run = 0; run < 200; run++) {
 
-      boolean consuming = true;
-      boolean inProgress = true;
-      if (random.nextBoolean()) {
+      final boolean step3NotDone = random.nextBoolean();
+
+      final boolean tooSoonToCorrect = random.nextBoolean();
+      if (tooSoonToCorrect) {
         segmentManager.tooSoonToCorrect = true;
       }
-      if (!random.nextBoolean()) { // not present in ideal state
-        // 1. very first metadata IN_PROGRESS, but segment missing - repair: create segment CONSUMING
-        // 2. seq number matured, latest metadata IN_PROGRESS, but segment missing - repair: create segment CONSUMING, prev segment transition to ONLINE
-        if (random.nextBoolean()) {
-          // 1. very first seq number of this partition
+
+      if (step3NotDone) {
+        // failed after completing step 2: hence not present in ideal state
+
+        final boolean prevMetadataNull = random.nextBoolean();
+
+        if (prevMetadataNull) {
+          // very first seq number of this partition i.e. prev metadata null
           clearAndSetupInitialSegments(idealStateBuilder, segmentManager, tableConfig, nPartitions);
 
+          // generate the error scenario - remove segment from ideal state, but metadata is IN_PROGRESS
           int randomlySelectedPartition = random.nextInt(nPartitions);
           Map<String, LLCSegmentName> partitionToLatestSegments =
               segmentManager._partitionAssignmentGenerator.getPartitionToLatestSegments(idealState);
           LLCSegmentName llcSegmentName = partitionToLatestSegments.get(String.valueOf(randomlySelectedPartition));
           idealStateBuilder.removeSegment(llcSegmentName.getSegmentName());
 
+          // get old state
           Assert.assertNull(idealState.getRecord().getMapFields().get(llcSegmentName.getSegmentName()));
           nPartitions = expectedPartitionAssignment.getNumPartitions();
-          Map<String, Map<String, String>> oldMapFields = idealState.getRecord().getMapFields();
-          segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
-          if (segmentManager.tooSoonToCorrect) {
+          IdealState idealStateCopy = new IdealState(
+              (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+          Map<String, Map<String, String>> oldMapFields = idealStateCopy.getRecord().getMapFields();
+
+          if (tooSoonToCorrect) {
+            segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
             // validate nothing changed and try again with disabled
             Assert.assertEquals(oldMapFields, idealState.getRecord().getMapFields());
             segmentManager.tooSoonToCorrect = false;
-            segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
           }
-          // specific verifyRepairs - verify that new segment gets created in ideal state with CONSUMING
+
+          segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+
+          // verify that new segment gets created in ideal state with CONSUMING
           Assert.assertNotNull(idealState.getRecord().getMapFields().get(llcSegmentName.getSegmentName()));
+          Assert.assertNotNull(idealState.getRecord().getMapFields().get(llcSegmentName.getSegmentName()).values().contains("CONSUMING"));
           Assert.assertNotNull(
               segmentManager.getRealtimeSegmentZKMetadata(tableName, llcSegmentName.getSegmentName(), null));
-          // general verifyRepairs
+
           verifyRepairs(tableConfig, idealState, expectedPartitionAssignment, segmentManager, oldMapFields);
         } else {
-          // 2. seq number matured, latest metadata IN_PROGRESS, but segment missing
-          int randomlySelectedPartition = random.nextInt(nPartitions);
+          // not the very first seq number in this partition i.e. prev metadata not null
 
-          String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+          // generate the error scenario - segment missing from ideal state, but metadata IN_PROGRESS
+          int randomlySelectedPartition = random.nextInt(nPartitions);
           Map<String, LLCSegmentName> partitionToLatestSegments =
               segmentManager._partitionAssignmentGenerator.getPartitionToLatestSegments(idealState);
           LLCSegmentName latestSegment = partitionToLatestSegments.get(String.valueOf(randomlySelectedPartition));
@@ -492,54 +549,76 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
           segmentManager.createNewSegmentMetadataZNRecord(tableName, newLlcSegmentName,
               latestMetadata.getStartOffset() + 100, expectedPartitionAssignment);
 
+          // get old state
           Assert.assertNull(idealState.getRecord().getMapFields().get(newLlcSegmentName.getSegmentName()));
           nPartitions = expectedPartitionAssignment.getNumPartitions();
-          Map<String, Map<String, String>> oldMapFields = idealState.getRecord().getMapFields();
-          segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
-          if (segmentManager.tooSoonToCorrect) {
+          IdealState idealStateCopy = new IdealState(
+              (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+          Map<String, Map<String, String>> oldMapFields = idealStateCopy.getRecord().getMapFields();
+
+          if (tooSoonToCorrect) {
+            segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
             // validate nothing changed and try again with disabled
             Assert.assertEquals(oldMapFields, idealState.getRecord().getMapFields());
             segmentManager.tooSoonToCorrect = false;
-            segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
           }
+
+          segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+
           // verify that new segment gets created in ideal state with CONSUMING and old segment ONLINE
+          Assert.assertNotNull(idealState.getRecord().getMapFields().get(latestSegment.getSegmentName()).values().
+              contains("ONLINE"));
           Assert.assertNotNull(idealState.getRecord().getMapFields().get(newLlcSegmentName.getSegmentName()));
+          Assert.assertNotNull(idealState.getRecord().getMapFields().get(newLlcSegmentName.getSegmentName()).values().
+              contains("CONSUMING"));
           Assert.assertNotNull(
               segmentManager.getRealtimeSegmentZKMetadata(tableName, latestSegment.getSegmentName(), null));
           Assert.assertNotNull(
               segmentManager.getRealtimeSegmentZKMetadata(tableName, newLlcSegmentName.getSegmentName(), null));
-          // general verifyRepairs
+
           verifyRepairs(tableConfig, idealState, expectedPartitionAssignment, segmentManager, oldMapFields);
         }
-      } else { // present in ideal state
-        // 1. metadata IN_PROGRESS, segment CONSUMING - happy path
-        // 2. metadata IN_PROGRESS/DONE, segment OFFLINE - repair: create new metadata and new segment
-        // 3. metadata DONE, segment CONSUMING - repair: transition segment to ONLINE, new metadata, new segment
-        if (!random.nextBoolean()) {
-          consuming = false;
-        }
-        if (!random.nextBoolean()) {
-          inProgress = false;
-        }
+      } else {
 
-        if (consuming) {
-          if (inProgress) { // 1. happy path
-            Map<String, Map<String, String>> oldIdealState = new HashMap<>(idealState.getRecord().getMapFields());
-            nPartitions = expectedPartitionAssignment.getNumPartitions();
+        // latest segment metadata is present in ideal state
 
-            Map<String, Map<String, String>> oldMapFields = idealState.getRecord().getMapFields();
+        // segment is in OFFLINE state
+        final boolean allReplicasInOffline = random.nextBoolean();
+
+        if (allReplicasInOffline) {
+
+          // generate error scenario - all replicas in OFFLINE state
+          int randomlySelectedPartition = random.nextInt(nPartitions);
+          Map<String, LLCSegmentName> partitionToLatestSegments =
+              segmentManager._partitionAssignmentGenerator.getPartitionToLatestSegments(idealState);
+          LLCSegmentName latestSegment = partitionToLatestSegments.get(String.valueOf(randomlySelectedPartition));
+          idealState = idealStateBuilder.setSegmentState(latestSegment.getSegmentName(), "OFFLINE").build();
+
+          // get old state
+          nPartitions = expectedPartitionAssignment.getNumPartitions();
+          IdealState idealStateCopy = new IdealState(
+              (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+          Map<String, Map<String, String>> oldMapFields = idealStateCopy.getRecord().getMapFields();
+
+          if (tooSoonToCorrect) {
             segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
-            if (segmentManager.tooSoonToCorrect) {
-              // validate nothing changed and try again with disabled
-              Assert.assertEquals(oldMapFields, idealState.getRecord().getMapFields());
-              segmentManager.tooSoonToCorrect = false;
-              segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
-            }
-            // verify that nothing changed
-            Assert.assertEquals(oldIdealState, idealState.getRecord().getMapFields());
-            // general verifyRepairs
-            verifyRepairs(tableConfig, idealState, expectedPartitionAssignment, segmentManager, oldMapFields);
-          } else { // 3. DONE + CONSUMING
+            // validate nothing changed and try again with disabled
+            Assert.assertEquals(oldMapFields, idealState.getRecord().getMapFields());
+            segmentManager.tooSoonToCorrect = false;
+          }
+
+          segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+
+          verifyRepairs(tableConfig, idealState, expectedPartitionAssignment, segmentManager, oldMapFields);
+        } else {
+          // at least 1 replica of latest segments is in CONSUMING state
+
+          final boolean step2NotDone = random.nextBoolean();
+
+          if (step2NotDone) {
+            // failed after step 1 : hence metadata is DONE but segment is still CONSUMING
+
+            // generate error scenario
             int randomlySelectedPartition = random.nextInt(nPartitions);
             Map<String, LLCSegmentName> partitionToLatestSegments =
                 segmentManager._partitionAssignmentGenerator.getPartitionToLatestSegments(idealState);
@@ -549,55 +628,69 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
             segmentManager.updateOldSegmentMetadataZNRecord(tableName, latestSegment,
                 latestMetadata.getStartOffset() + 100);
 
+            // get old state
             nPartitions = expectedPartitionAssignment.getNumPartitions();
-            Map<String, Map<String, String>> oldMapFields = idealState.getRecord().getMapFields();
-            segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
-            if (segmentManager.tooSoonToCorrect) {
+            IdealState idealStateCopy = new IdealState(
+                (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+            Map<String, Map<String, String>> oldMapFields = idealStateCopy.getRecord().getMapFields();
+
+            if (tooSoonToCorrect) {
+              segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
               // validate nothing changed and try again with disabled
               Assert.assertEquals(oldMapFields, idealState.getRecord().getMapFields());
               segmentManager.tooSoonToCorrect = false;
-              segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
             }
 
-            // general verifyRepairs
+            segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+
+            verifyRepairs(tableConfig, idealState, expectedPartitionAssignment, segmentManager, oldMapFields);
+          } else {
+            // happy path
+
+            // get old state
+            nPartitions = expectedPartitionAssignment.getNumPartitions();
+            IdealState idealStateCopy = new IdealState(
+                (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+            Map<String, Map<String, String>> oldMapFields = idealStateCopy.getRecord().getMapFields();
+
+            if (tooSoonToCorrect) {
+              segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+              // validate nothing changed and try again with disabled
+              Assert.assertEquals(oldMapFields, idealState.getRecord().getMapFields());
+              segmentManager.tooSoonToCorrect = false;
+            }
+
+            segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+
+            // verify that nothing changed
+            Assert.assertEquals(oldMapFields, idealState.getRecord().getMapFields());
+
             verifyRepairs(tableConfig, idealState, expectedPartitionAssignment, segmentManager, oldMapFields);
           }
-        } else { // 2. OFFLINE
-          int randomlySelectedPartition = random.nextInt(nPartitions);
-          Map<String, LLCSegmentName> partitionToLatestSegments =
-              segmentManager._partitionAssignmentGenerator.getPartitionToLatestSegments(idealState);
-          LLCSegmentName latestSegment = partitionToLatestSegments.get(String.valueOf(randomlySelectedPartition));
-          idealState = idealStateBuilder.setSegmentState(latestSegment.getSegmentName(), "OFFLINE").build();
-
-          nPartitions = expectedPartitionAssignment.getNumPartitions();
-          Map<String, Map<String, String>> oldMapFields = idealState.getRecord().getMapFields();
-          segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
-          if (segmentManager.tooSoonToCorrect) {
-            // validate nothing changed and try again with disabled
-            Assert.assertEquals(oldMapFields, idealState.getRecord().getMapFields());
-            segmentManager.tooSoonToCorrect = false;
-            segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
-          }
-          verifyRepairs(tableConfig, idealState, expectedPartitionAssignment, segmentManager, oldMapFields);
         }
       }
 
       // randomly change instances used, or increase partition count
       int randomExternalChanges = random.nextInt(20);
-      int[] numInstancesSet = new int[]{4, 6, 8, 10};
-      // randomly change instances and hence set a new expected partition assignment
-      if (randomExternalChanges == 0) {
+
+      if (randomExternalChanges == nInstancesChanged) {
+
+        // randomly change instances and hence set a new expected partition assignment
         int numInstances = numInstancesSet[random.nextInt(numInstancesSet.length)];
         instances = getInstanceList(numInstances);
         segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
         expectedPartitionAssignment =
             segmentManager._partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, nPartitions);
-      } else if (randomExternalChanges == 1) {
+
+      } else if (randomExternalChanges == nPartitionsIncreased) {
+
         // randomly increase partitions and hence set a new expected partition assignment
         expectedPartitionAssignment =
             segmentManager._partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, nPartitions + 1);
-      } else if (randomExternalChanges == 2) {
-        // both and hence set a new expected partition assignment
+
+      } else if (randomExternalChanges == nInstancesChangedAndNPartitionsIncreased) {
+
+        // both changed and hence set a new expected partition assignment
         int numInstances = numInstancesSet[random.nextInt(numInstancesSet.length)];
         instances = getInstanceList(numInstances);
         segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
