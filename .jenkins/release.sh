@@ -24,4 +24,4 @@ fi
 if [ -n "$NEXT_VERSION" ]; then
 release_opts="$release_opts -DdevelopmentVersion=$NEXT_VERSION"
 fi
-mvn -e -B release:clean release:prepare release:perform -Darguments="-DskipTests" $release_opts
+mvn -e -B release:clean release:prepare release:perform -Darguments="-DskipTests -Dmaven.javadoc.skip=true" $release_opts
