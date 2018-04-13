@@ -1518,6 +1518,8 @@ public class PinotLLCRealtimeSegmentManager {
    * If the controller fails after step-3, we are fine because the idealState has the new segments.
    * If the controller fails before step-1, the server will see this as an upload failure, and will re-try.
    * @param tableConfig
+   *
+   * TODO: We need to find a place to detect and update a gauge for nonConsumingPartitionsCount for a table, and reset it to 0 at the end of validateLLC
    */
   public void validateLLCSegments(final TableConfig tableConfig) {
     final String tableNameWithType = tableConfig.getTableName();
@@ -1874,7 +1876,7 @@ public class PinotLLCRealtimeSegmentManager {
 
       LLCSegmentName newLLCSegmentName = new LLCSegmentName(rawTableName, partition, nextSeqNum, now);
       createNewSegmentMetadataZNRecord(tableNameWithType, newLLCSegmentName, startOffset, partitionAssignment);
-      
+
       segmentMapper.addNewSegment(newLLCSegmentName.getSegmentName());
     }
   }
