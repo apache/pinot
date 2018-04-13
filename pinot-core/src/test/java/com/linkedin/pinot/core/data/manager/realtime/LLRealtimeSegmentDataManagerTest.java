@@ -590,7 +590,7 @@ public class LLRealtimeSegmentDataManagerTest {
     final long leaseTime = 50000L;
 
     // The first time we invoke build, it should go ahead and build the segment.
-    String segTarFileName = segmentDataManager.invokeBuildForCommit(leaseTime);
+    String segTarFileName = segmentDataManager.invokeBuildForCommit(leaseTime).getSegmentTarFilePath();
     Assert.assertTrue(segmentDataManager._buildSegmentCalled);
     Assert.assertFalse(segmentDataManager.invokeCommit(segTarFileName));
     Assert.assertTrue(new File(segTarFileName).exists());
@@ -598,7 +598,7 @@ public class LLRealtimeSegmentDataManagerTest {
     segmentDataManager._buildSegmentCalled = false;
 
     // This time around it should not build the segment.
-    String segTarFileName1 = segmentDataManager.invokeBuildForCommit(leaseTime);
+    String segTarFileName1 = segmentDataManager.invokeBuildForCommit(leaseTime).getSegmentTarFilePath();
     Assert.assertFalse(segmentDataManager._buildSegmentCalled);
     Assert.assertEquals(segTarFileName1, segTarFileName);
     Assert.assertTrue(new File(segTarFileName).exists());
@@ -623,7 +623,7 @@ public class LLRealtimeSegmentDataManagerTest {
     segmentDataManager.setCurrentOffset(finalOffset);
 
     // We have set up commit to fail, so we should carry over the segment file.
-    String segTarFileName = segmentDataManager.invokeBuildForCommit(leaseTime);
+    String segTarFileName = segmentDataManager.invokeBuildForCommit(leaseTime).getSegmentTarFilePath();
     Assert.assertTrue(segmentDataManager._buildSegmentCalled);
     Assert.assertFalse(segmentDataManager.invokeCommit(segTarFileName));
     Assert.assertTrue(new File(segTarFileName).exists());
@@ -692,14 +692,15 @@ public class LLRealtimeSegmentDataManagerTest {
       return consumer;
     }
 
-    public String invokeBuildForCommit(long leaseTime) {
-      return super.buildSegmentForCommit(leaseTime);
+    public SegmentBuildDescriptor invokeBuildForCommit(long leaseTime) {
+      super.buildSegmentForCommit(leaseTime);
+      return getSegmentBuildDescriptor();
     }
 
     public boolean invokeCommit(String segTarFileName) {
       SegmentCompletionProtocol.Response response = mock(SegmentCompletionProtocol.Response.class);
       when(response.getIsSplitCommit()).thenReturn(false);
-      return super.commitSegment(segTarFileName, response);
+      return super.commitSegment(response);
     }
 
     private void terminateLoopIfNecessary() {
@@ -735,7 +736,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected SegmentCompletionProtocol.Response postSegmentCommitMsg(File segTarFile) {
+    protected SegmentCompletionProtocol.Response postSegmentCommitMsg() {
       SegmentCompletionProtocol.Response response = _responses.remove();
       return response;
     }
@@ -778,13 +779,13 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected String buildSegmentInternal(boolean forCommit) {
+    protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
       _buildSegmentCalled = true;
       if (_failSegmentBuild) {
         return null;
       }
       if (!forCommit) {
-        return _segmentDir;
+        return new SegmentBuildDescriptor(null, getCurrentOffset(), _segmentDir, 0, 0);
       }
       final String segTarFileName =  _segmentDir + "/" + "segmentFile";
       File segmentTgzFile = new File(segTarFileName);
@@ -793,11 +794,11 @@ public class LLRealtimeSegmentDataManagerTest {
       } catch (IOException e) {
         Assert.fail("Could not create file " + segmentTgzFile);
       }
-      return segTarFileName;
+      return new SegmentBuildDescriptor(segTarFileName, getCurrentOffset(), null, 0, 0);
     }
 
     @Override
-    protected boolean commitSegment(final String segTarFile, SegmentCompletionProtocol.Response response) {
+    protected boolean commitSegment(SegmentCompletionProtocol.Response response) {
       _commitSegmentCalled = true;
       return true;
     }
