@@ -90,7 +90,7 @@ public class IdealStateBuilderUtil {
     return this;
   }
 
-  public IdealStateBuilderUtil transitionToState(int partition, int seqNum, String state) {
+  public IdealStateBuilderUtil setSegmentState(int partition, int seqNum, String state) {
     for (String segmentName : _idealState.getRecord().getMapFields().keySet()) {
       if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
@@ -106,7 +106,7 @@ public class IdealStateBuilderUtil {
     return this;
   }
 
-  public IdealStateBuilderUtil transitionToState(String segmentName, String state) {
+  public IdealStateBuilderUtil setSegmentState(String segmentName, String state) {
     Map<String, String> instanceStateMap = _idealState.getInstanceStateMap(segmentName);
     for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
       instanceStateMap.put(entry.getKey(), state);

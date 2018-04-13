@@ -200,9 +200,9 @@ public class ConsumingSegmentAssignmentStrategyTest {
 
     // 2) consuming segments moved to ONLINE, new set of consuming segments generated
 
-    idealState = idealStateBuilder.transitionToState(0, 0, "ONLINE")
-        .transitionToState(1, 0, "ONLINE")
-        .transitionToState(2, 0, "ONLINE")
+    idealState = idealStateBuilder.setSegmentState(0, 0, "ONLINE")
+        .setSegmentState(1, 0, "ONLINE")
+        .setSegmentState(2, 0, "ONLINE")
         .addConsumingSegments(numPartitions, 1, numReplicas, consumingInstances)
         .build();
 
@@ -235,9 +235,9 @@ public class ConsumingSegmentAssignmentStrategyTest {
 
     // 4) latest consuming segments became OFFLINE
 
-    idealState = idealStateBuilder.transitionToState(0, 1, "OFFLINE")
-        .transitionToState(1, 1, "OFFLINE")
-        .transitionToState(2, 1, "OFFLINE")
+    idealState = idealStateBuilder.setSegmentState(0, 1, "OFFLINE")
+        .setSegmentState(1, 1, "OFFLINE")
+        .setSegmentState(2, 1, "OFFLINE")
         .build();
     partitionAssignmentFromIdealState =
         partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);

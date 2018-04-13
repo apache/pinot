@@ -567,7 +567,7 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
           Map<String, LLCSegmentName> partitionToLatestSegments =
               segmentManager._partitionAssignmentGenerator.getPartitionToLatestSegments(idealState);
           LLCSegmentName latestSegment = partitionToLatestSegments.get(String.valueOf(randomlySelectedPartition));
-          idealState = idealStateBuilder.transitionToState(latestSegment.getSegmentName(), "OFFLINE").build();
+          idealState = idealStateBuilder.setSegmentState(latestSegment.getSegmentName(), "OFFLINE").build();
 
           nPartitions = expectedPartitionAssignment.getNumPartitions();
           Map<String, Map<String, String>> oldMapFields = idealState.getRecord().getMapFields();
@@ -855,7 +855,7 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     String deleteSegment = newZnRec.getId();
     Map<String, String> instanceStateMap1 = idealState.getInstanceStateMap(deleteSegment);
     idealState =
-        idealStateBuilder.removeSegment(deleteSegment).transitionToState(oldZnRec.getId(), "CONSUMING").build();
+        idealStateBuilder.removeSegment(deleteSegment).setSegmentState(oldZnRec.getId(), "CONSUMING").build();
     nextOffset = 5000;
     committingSegmentMetadata = new LLCRealtimeSegmentZKMetadata(oldZnRec);
     segmentManager._paths.clear();
