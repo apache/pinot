@@ -19,6 +19,7 @@ package com.linkedin.pinot.server.api.resources;
 import com.linkedin.pinot.common.restlet.resources.TableSegments;
 import com.linkedin.pinot.common.restlet.resources.TablesList;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.util.List;
 import javax.ws.rs.core.Response;
@@ -132,16 +133,16 @@ public class TablesResourceTest extends BaseResourceTest {
     String segmentsCrcPath = "/tables/" + TABLE_NAME + "/segments/crc";
 
     // Upload segments
-    List<IndexSegment> indexSegments = setUpSegments(2);
+    List<ImmutableSegment> immutableSegments = setUpSegments(2);
 
     // Trigger crc api to fetch crc information
     String response = _webTarget.path(segmentsCrcPath).request().get(String.class);
     JSONObject segmentsCrc = new JSONObject(response);
 
     // Check that crc info is correct
-    for (IndexSegment indexSegment : indexSegments) {
-      String segmentName = indexSegment.getSegmentName();
-      String crc = indexSegment.getSegmentMetadata().getCrc();
+    for (ImmutableSegment immutableSegment : immutableSegments) {
+      String segmentName = immutableSegment.getSegmentName();
+      String crc = immutableSegment.getSegmentMetadata().getCrc();
       Assert.assertEquals(segmentsCrc.getString(segmentName), crc);
     }
   }

@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -45,8 +46,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class LoadersTest {
-  private static final File INDEX_DIR = new File(LoadersTest.class.getName());
+public class LoaderTest {
+  private static final File INDEX_DIR = new File(LoaderTest.class.getName());
   private static final String AVRO_DATA = "data/test_data-mv.avro";
   private static final String PADDING_OLD = "data/paddingOld.tar.gz";
   private static final String PADDING_PERCENT = "data/paddingPercent.tar.gz";
@@ -113,19 +114,19 @@ public class LoadersTest {
 
   private void testConversion() throws Exception {
     // Do not set segment version, should not convert the segment
-    IndexSegment indexSegment = Loaders.IndexSegment.load(_indexDir, ReadMode.mmap);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.mmap);
     Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1.toString());
     Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     indexSegment.destroy();
 
     // Set segment version to v1, should not convert the segment
-    indexSegment = Loaders.IndexSegment.load(_indexDir, _v1IndexLoadingConfig);
+    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v1IndexLoadingConfig);
     Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1.toString());
     Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     indexSegment.destroy();
 
     // Set segment version to v3, should convert the segment to v3
-    indexSegment = Loaders.IndexSegment.load(_indexDir, _v3IndexLoadingConfig);
+    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig);
     Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3.toString());
     Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
     indexSegment.destroy();
@@ -134,7 +135,7 @@ public class LoadersTest {
   @Test
   public void testPadding() throws Exception {
     // Old Format
-    URL resourceUrl = Loaders.class.getClassLoader().getResource(PADDING_OLD);
+    URL resourceUrl = LoaderTest.class.getClassLoader().getResource(PADDING_OLD);
     Assert.assertNotNull(resourceUrl);
     TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(resourceUrl)), INDEX_DIR);
     File segmentDirectory = new File(INDEX_DIR, "paddingOld");
@@ -154,7 +155,7 @@ public class LoadersTest {
     Assert.assertEquals(dict.indexOf("lynda%%"), 1);
 
     // New Format Padding character %
-    resourceUrl = Loaders.class.getClassLoader().getResource(PADDING_PERCENT);
+    resourceUrl = LoaderTest.class.getClassLoader().getResource(PADDING_PERCENT);
     Assert.assertNotNull(resourceUrl);
     TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(resourceUrl)), INDEX_DIR);
     segmentDirectory = new File(INDEX_DIR, "paddingPercent");
@@ -174,7 +175,7 @@ public class LoadersTest {
     Assert.assertEquals(dict.indexOf("lynda%%"), 1);
 
     // New Format Padding character Null
-    resourceUrl = Loaders.class.getClassLoader().getResource(PADDING_NULL);
+    resourceUrl = LoaderTest.class.getClassLoader().getResource(PADDING_NULL);
     Assert.assertNotNull(resourceUrl);
     TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(resourceUrl)), INDEX_DIR);
     segmentDirectory = new File(INDEX_DIR, "paddingNull");
@@ -203,12 +204,12 @@ public class LoadersTest {
     schema.addField(new DimensionFieldSpec("SVString", FieldSpec.DataType.STRING, true, ""));
     schema.addField(new DimensionFieldSpec("MVString", FieldSpec.DataType.STRING, false, ""));
 
-    IndexSegment indexSegment = Loaders.IndexSegment.load(_indexDir, _v1IndexLoadingConfig, schema);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, _v1IndexLoadingConfig, schema);
     Assert.assertEquals(indexSegment.getDataSource("SVString").getDictionary().get(0), "");
     Assert.assertEquals(indexSegment.getDataSource("MVString").getDictionary().get(0), "");
     indexSegment.destroy();
 
-    indexSegment = Loaders.IndexSegment.load(_indexDir, _v3IndexLoadingConfig, schema);
+    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, schema);
     Assert.assertEquals(indexSegment.getDataSource("SVString").getDictionary().get(0), "");
     Assert.assertEquals(indexSegment.getDataSource("MVString").getDictionary().get(0), "");
     indexSegment.destroy();

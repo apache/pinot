@@ -20,8 +20,9 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
@@ -34,7 +35,6 @@ import com.linkedin.pinot.core.segment.creator.impl.stats.IntColumnPreIndexStats
 import com.linkedin.pinot.core.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import com.linkedin.pinot.core.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
@@ -77,8 +77,7 @@ public class DictionariesTest {
   }
 
   @BeforeClass
-  public static void before()
-      throws Exception {
+  public static void before() throws Exception {
     final String filePath =
         TestUtils.getFileFromResourceUrl(DictionariesTest.class.getClassLoader().getResource(AVRO_DATA));
     if (INDEX_DIR.exists()) {
@@ -104,9 +103,9 @@ public class DictionariesTest {
       i++;
     }
 
-    uniqueEntries = new HashMap<String, Set<Object>>();
+    uniqueEntries = new HashMap<>();
     for (final String column : columns) {
-      uniqueEntries.put(column, new HashSet<Object>());
+      uniqueEntries.put(column, new HashSet<>());
     }
 
     while (avroReader.hasNext()) {
@@ -140,15 +139,14 @@ public class DictionariesTest {
   }
 
   @Test
-  public void test1()
-      throws Exception {
-    final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, ReadMode.heap);
-    final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, ReadMode.mmap);
+  public void test1() throws Exception {
+    ImmutableSegment heapSegment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.heap);
+    ImmutableSegment mmapSegment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.mmap);
 
     for (final String column : ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap()
         .keySet()) {
-      final ImmutableDictionaryReader heapDictionary = heapSegment.getDictionaryFor(column);
-      final ImmutableDictionaryReader mmapDictionary = mmapSegment.getDictionaryFor(column);
+      ImmutableDictionaryReader heapDictionary = heapSegment.getDictionary(column);
+      ImmutableDictionaryReader mmapDictionary = mmapSegment.getDictionary(column);
 
       switch (((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap()
           .get(column)
@@ -184,16 +182,15 @@ public class DictionariesTest {
   }
 
   @Test
-  public void test2()
-      throws Exception {
-    final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, ReadMode.heap);
-    final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, ReadMode.mmap);
+  public void test2() throws Exception {
+    ImmutableSegment heapSegment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.heap);
+    ImmutableSegment mmapSegment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.mmap);
 
     final Map<String, ColumnMetadata> metadataMap =
         ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap();
     for (final String column : metadataMap.keySet()) {
-      final ImmutableDictionaryReader heapDictionary = heapSegment.getDictionaryFor(column);
-      final ImmutableDictionaryReader mmapDictionary = mmapSegment.getDictionaryFor(column);
+      final ImmutableDictionaryReader heapDictionary = heapSegment.getDictionary(column);
+      final ImmutableDictionaryReader mmapDictionary = mmapSegment.getDictionary(column);
 
       final Set<Object> uniques = uniqueEntries.get(column);
       final List<Object> list = Arrays.asList(uniques.toArray());
@@ -209,24 +206,23 @@ public class DictionariesTest {
   }
 
   @Test
-  public void testIntColumnPreIndexStatsCollector()
-      throws Exception {
+  public void testIntColumnPreIndexStatsCollector() {
     AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.INT);
-    statsCollector.collect(new Integer(1));
+    statsCollector.collect(1);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Float(2));
+    statsCollector.collect(2f);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Long(3));
+    statsCollector.collect(3L);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Double(4));
+    statsCollector.collect(4d);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Integer(4));
+    statsCollector.collect(4);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Float(2));
+    statsCollector.collect(2f);
     Assert.assertFalse(statsCollector.isSorted());
-    statsCollector.collect(new Double(40));
+    statsCollector.collect(40d);
     Assert.assertFalse(statsCollector.isSorted());
-    statsCollector.collect(new Double(20));
+    statsCollector.collect(20d);
     Assert.assertFalse(statsCollector.isSorted());
     statsCollector.seal();
     Assert.assertEquals(statsCollector.getCardinality(), 6);
@@ -236,24 +232,23 @@ public class DictionariesTest {
   }
 
   @Test
-  public void testFloatColumnPreIndexStatsCollector()
-      throws Exception {
+  public void testFloatColumnPreIndexStatsCollector() {
     AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.FLOAT);
-    statsCollector.collect(new Integer(1));
+    statsCollector.collect(1);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Float(2));
+    statsCollector.collect(2f);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Long(3));
+    statsCollector.collect(3L);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Double(4));
+    statsCollector.collect(4d);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Integer(4));
+    statsCollector.collect(4);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Float(2));
+    statsCollector.collect(2f);
     Assert.assertFalse(statsCollector.isSorted());
-    statsCollector.collect(new Double(40));
+    statsCollector.collect(40d);
     Assert.assertFalse(statsCollector.isSorted());
-    statsCollector.collect(new Double(20));
+    statsCollector.collect(20d);
     Assert.assertFalse(statsCollector.isSorted());
     statsCollector.seal();
     Assert.assertEquals(statsCollector.getCardinality(), 6);
@@ -263,24 +258,23 @@ public class DictionariesTest {
   }
 
   @Test
-  public void testLongColumnPreIndexStatsCollector()
-      throws Exception {
+  public void testLongColumnPreIndexStatsCollector() {
     AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.LONG);
-    statsCollector.collect(new Integer(1));
+    statsCollector.collect(1);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Float(2));
+    statsCollector.collect(2f);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Long(3));
+    statsCollector.collect(3L);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Double(4));
+    statsCollector.collect(4d);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Integer(4));
+    statsCollector.collect(4);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Float(2));
+    statsCollector.collect(2f);
     Assert.assertFalse(statsCollector.isSorted());
-    statsCollector.collect(new Double(40));
+    statsCollector.collect(40d);
     Assert.assertFalse(statsCollector.isSorted());
-    statsCollector.collect(new Double(20));
+    statsCollector.collect(20d);
     Assert.assertFalse(statsCollector.isSorted());
     statsCollector.seal();
     Assert.assertEquals(statsCollector.getCardinality(), 6);
@@ -290,24 +284,23 @@ public class DictionariesTest {
   }
 
   @Test
-  public void testDoubleColumnPreIndexStatsCollector()
-      throws Exception {
+  public void testDoubleColumnPreIndexStatsCollector() {
     AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.DOUBLE);
-    statsCollector.collect(new Integer(1));
+    statsCollector.collect(1);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Float(2));
+    statsCollector.collect(2f);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Long(3));
+    statsCollector.collect(3L);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Double(4));
+    statsCollector.collect(4d);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Integer(4));
+    statsCollector.collect(4);
     Assert.assertTrue(statsCollector.isSorted());
-    statsCollector.collect(new Float(2));
+    statsCollector.collect(2f);
     Assert.assertFalse(statsCollector.isSorted());
-    statsCollector.collect(new Double(40));
+    statsCollector.collect(40d);
     Assert.assertFalse(statsCollector.isSorted());
-    statsCollector.collect(new Double(20));
+    statsCollector.collect(20d);
     Assert.assertFalse(statsCollector.isSorted());
     statsCollector.seal();
     Assert.assertEquals(statsCollector.getCardinality(), 6);
@@ -317,8 +310,7 @@ public class DictionariesTest {
   }
 
   @Test
-  public void testStringColumnPreIndexStatsCollectorForRandomString()
-      throws Exception {
+  public void testStringColumnPreIndexStatsCollectorForRandomString() {
     AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.STRING);
     statsCollector.collect("a");
     Assert.assertTrue(statsCollector.isSorted());
@@ -344,8 +336,7 @@ public class DictionariesTest {
   }
 
   @Test
-  public void testStringColumnPreIndexStatsCollectorForBoolean()
-      throws Exception {
+  public void testStringColumnPreIndexStatsCollectorForBoolean() {
     AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.BOOLEAN);
     statsCollector.collect("false");
     Assert.assertTrue(statsCollector.isSorted());
@@ -409,8 +400,8 @@ public class DictionariesTest {
     indexDir.deleteOnExit();
     FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true);
 
-    try (SegmentDictionaryCreator dictionaryCreator =
-        new SegmentDictionaryCreator(new String[]{""}, fieldSpec, indexDir)) {
+    try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(new String[]{""}, fieldSpec,
+        indexDir)) {
       dictionaryCreator.build();
       Assert.assertEquals(dictionaryCreator.getNumBytesPerString(), 0);
       Assert.assertEquals(dictionaryCreator.indexOfSV(""), 0);
@@ -454,5 +445,4 @@ public class DictionariesTest {
         throw new IllegalArgumentException("Illegal data type for stats builder: " + dataType);
     }
   }
-
 }

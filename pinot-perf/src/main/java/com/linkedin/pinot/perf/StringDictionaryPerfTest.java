@@ -23,9 +23,9 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import java.io.File;
 import java.util.ArrayList;
@@ -61,8 +61,7 @@ public class StringDictionaryPerfTest {
    * @param dictLength Length of the dictionary
    * @throws Exception
    */
-  public void buildSegment(int dictLength)
-      throws Exception {
+  public void buildSegment(int dictLength) throws Exception {
     Schema schema = new Schema();
     String segmentName = "perfTestSegment" + System.currentTimeMillis();
     _indexDir = new File(TMP_DIR + File.separator + segmentName);
@@ -113,10 +112,9 @@ public class StringDictionaryPerfTest {
    * @param numLookups Number of lookups to perform
    * @throws Exception
    */
-  public void perfTestLookups(int numLookups)
-      throws Exception {
-    IndexSegmentImpl segment = (IndexSegmentImpl) Loaders.IndexSegment.load(_indexDir, ReadMode.heap);
-    ImmutableDictionaryReader dictionary = segment.getDictionaryFor(COLUMN_NAME);
+  public void perfTestLookups(int numLookups) throws Exception {
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
+    ImmutableDictionaryReader dictionary = immutableSegment.getDictionary(COLUMN_NAME);
 
     Random random = new Random(System.nanoTime());
     long start = System.currentTimeMillis();
@@ -130,8 +128,7 @@ public class StringDictionaryPerfTest {
     System.out.println("Total time for " + TOTAL_NUM_LOOKUPS + " lookups: " + (System.currentTimeMillis() - start));
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     if (args.length != 2) {
       System.out.println("Usage: StringDictionaryPerfRunner <dictionary_length> <num_lookups> ");
     }

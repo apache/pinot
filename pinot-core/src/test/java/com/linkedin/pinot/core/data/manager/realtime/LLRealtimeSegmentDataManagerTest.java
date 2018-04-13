@@ -25,7 +25,7 @@ import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
+import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
@@ -566,7 +566,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
   // Replace the realtime segment with a mock that returns numDocs for raw doc count.
   private void replaceRealtimeSegment(FakeLLRealtimeSegmentDataManager segmentDataManager, int numDocs) throws Exception {
-    RealtimeSegmentImpl mockSegmentImpl = mock(RealtimeSegmentImpl.class);
+    MutableSegmentImpl mockSegmentImpl = mock(MutableSegmentImpl.class);
     when(mockSegmentImpl.getNumDocsIndexed()).thenReturn(numDocs);
     Field segmentImpl = LLRealtimeSegmentDataManager.class.getDeclaredField("_realtimeSegment");
     segmentImpl.setAccessible(true);

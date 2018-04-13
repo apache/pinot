@@ -17,9 +17,9 @@ package com.linkedin.pinot.tools.scan.query;
 
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
@@ -33,7 +33,7 @@ import org.apache.commons.lang.ArrayUtils;
 
 
 public class Projection {
-  private final IndexSegmentImpl _indexSegment;
+  private final ImmutableSegment _immutableSegment;
   private final SegmentMetadataImpl _metadata;
   private final List<Integer> _filteredDocIds;
   private final List<Pair> _columnList;
@@ -43,10 +43,9 @@ public class Projection {
   private boolean _addCountStar;
   private int _limit = 10;
 
-  Projection(IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata, List<Integer> filteredDocIds,
+  Projection(ImmutableSegment immutableSegment, SegmentMetadataImpl metadata, List<Integer> filteredDocIds,
       List<Pair> columns, Map<String, Dictionary> dictionaryMap, boolean addCountStar) {
-
-    _indexSegment = indexSegment;
+    _immutableSegment = immutableSegment;
     _metadata = metadata;
     _filteredDocIds = filteredDocIds;
     _dictionaryMap = dictionaryMap;
@@ -78,7 +77,7 @@ public class Projection {
       String column = (String) pair.getFirst();
       if (!_mvColumns.contains(column)) {
         BlockSingleValIterator bvIter =
-            (BlockSingleValIterator) _indexSegment.getDataSource(column).nextBlock().getBlockValueSet().iterator();
+            (BlockSingleValIterator) _immutableSegment.getDataSource(column).nextBlock().getBlockValueSet().iterator();
 
         int rowId = 0;
         for (Integer docId : _filteredDocIds) {
@@ -87,7 +86,7 @@ public class Projection {
         }
       } else {
         BlockMultiValIterator bvIter =
-            (BlockMultiValIterator) _indexSegment.getDataSource(column).nextBlock().getBlockValueSet().iterator();
+            (BlockMultiValIterator) _immutableSegment.getDataSource(column).nextBlock().getBlockValueSet().iterator();
 
         int rowId = 0;
         for (Integer docId : _filteredDocIds) {

@@ -13,17 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package com.linkedin.pinot.core.indexsegment.utils;
+package com.linkedin.pinot.core.io.writer.impl;
 
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import java.util.Arrays;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
-import com.linkedin.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
-import junit.framework.Assert;
 
 
 public class MutableOffHeapByteArrayStoreTest {
@@ -44,9 +41,9 @@ public class MutableOffHeapByteArrayStoreTest {
   public void maxValueTest() throws Exception {
     MutableOffHeapByteArrayStore store = new MutableOffHeapByteArrayStore(_memoryManager, "stringColumn", 1024, 32);
     final int arrSize = store.getStartSize();
-    byte[] dataIn = new byte[arrSize-4];
+    byte[] dataIn = new byte[arrSize - 4];
     for (int i = 0; i < dataIn.length; i++) {
-      dataIn[i] = (byte)(i % Byte.MAX_VALUE);
+      dataIn[i] = (byte) (i % Byte.MAX_VALUE);
     }
     int index = store.add(dataIn);
     byte[] dataOut = store.get(index);
@@ -61,12 +58,12 @@ public class MutableOffHeapByteArrayStoreTest {
 
     byte[] b1 = new byte[3];
     for (int i = 0; i < b1.length; i++) {
-      b1[i] = (byte)i;
+      b1[i] = (byte) i;
     }
 
     byte[] b2 = new byte[maxSize];
     for (int i = 0; i < b2.length; i++) {
-      b2[i] = (byte)(i % Byte.MAX_VALUE);
+      b2[i] = (byte) (i % Byte.MAX_VALUE);
     }
 
     // Add small array
@@ -93,7 +90,7 @@ public class MutableOffHeapByteArrayStoreTest {
 
     byte[] b3 = new byte[5];
     for (int i = 0; i < b3.length; i++) {
-      b3[i] = (byte)(i+1);
+      b3[i] = (byte) (i + 1);
     }
 
     int ix = -1;

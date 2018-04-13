@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package com.linkedin.pinot.core.indexsegment.utils;
+package com.linkedin.pinot.core.io.writer.impl;
 
 import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import com.linkedin.pinot.core.io.writer.impl.MmapMemoryManager;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -67,7 +65,7 @@ public class MmapMemoryManagerTest {
     b1.putLong(0, s1);
     Assert.assertEquals(b1.getLong(0), s1);
     b1.put((int) s1 - 1, value);
-    Assert.assertEquals(b1.get((int)s1-1), value);
+    Assert.assertEquals(b1.get((int) s1 - 1), value);
 
     PinotDataBuffer buf2 = memoryManager.allocate(s2, col2);
     ByteBuffer b2 = buf2.toDirectByteBuffer(0, (int) s2);
@@ -141,7 +139,7 @@ public class MmapMemoryManagerTest {
     PinotDataBufferMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
     final long s1 = MmapMemoryManager.getDefaultFileLength() - 1;
     final long s2 = 1;
-    final long s3 = 100*1024*1024;
+    final long s3 = 100 * 1024 * 1024;
     final String colName = "col";
     final byte v1 = 56;
     final byte v2 = 11;
@@ -150,7 +148,7 @@ public class MmapMemoryManagerTest {
     // Allocate a buffer 1 less than the default file length, and write the last byte of the buffer.
     PinotDataBuffer b1 = memoryManager.allocate(s1, colName);
     ByteBuffer bb1 = b1.toDirectByteBuffer(0, (int) s1);
-    bb1.put((int)s1-1, v1);
+    bb1.put((int) s1 - 1, v1);
 
     // Allocate another buffer that is 1 byte in size, should be in the same file.
     // Write a value in the byte.

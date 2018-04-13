@@ -15,40 +15,37 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 
 
 /**
- * An immutable wrapper of IndexSegment.
- *
- *
+ * Segment data manager for immutable segment.
  */
-public class OfflineSegmentDataManager extends SegmentDataManager {
+public class ImmutableSegmentDataManager extends SegmentDataManager {
 
-  private final IndexSegment _indexSegment;
+  private final ImmutableSegment _immutableSegment;
 
-  public OfflineSegmentDataManager(IndexSegment indexSegment) {
-    super();
-    _indexSegment = indexSegment;
-  }
-
-  @Override
-  public IndexSegment getSegment() {
-    return _indexSegment;
+  public ImmutableSegmentDataManager(ImmutableSegment immutableSegment) {
+    _immutableSegment = immutableSegment;
   }
 
   @Override
   public String getSegmentName() {
-    return _indexSegment.getSegmentName();
+    return _immutableSegment.getSegmentName();
   }
 
   @Override
-  public String toString() {
-    return "SegmentDataManager { " + _indexSegment.getSegmentName() + " } ";
+  public ImmutableSegment getSegment() {
+    return _immutableSegment;
   }
 
   @Override
   public void destroy() {
-    _indexSegment.destroy();
+    _immutableSegment.destroy();
+  }
+
+  @Override
+  public String toString() {
+    return "ImmutableSegmentDataManager(" + _immutableSegment.getSegmentName() + ")";
   }
 }

@@ -13,8 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package com.linkedin.pinot.core.indexsegment.utils;
+package com.linkedin.pinot.core.io.writer.impl;
 
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import java.util.Random;
@@ -22,8 +21,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
-import com.linkedin.pinot.core.io.writer.impl.OffHeapStringStore;
 
 
 public class OffHeapStringStoreTest {
@@ -109,7 +106,7 @@ public class OffHeapStringStoreTest {
   private String generateRandomString(final int len) {
     byte[] bytes = new byte[len];
     for (int i = 0; i < len; i++) {
-      bytes[i] = (byte)(RANDOM.nextInt(92) + 32);
+      bytes[i] = (byte) (RANDOM.nextInt(92) + 32);
     }
     return new String(bytes);
   }

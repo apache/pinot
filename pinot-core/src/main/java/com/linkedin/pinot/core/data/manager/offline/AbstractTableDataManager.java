@@ -23,7 +23,7 @@ import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.ArrayList;
@@ -111,20 +111,20 @@ public abstract class AbstractTableDataManager implements TableDataManager {
   protected abstract void doShutdown();
 
   /**
-   * Add a segment (or replace it, if one exists with the same name).
-   * <p>
-   * Ensures that reference count of the old segment (if replaced) is reduced by 1, so that the
-   * last user of the old segment (or the calling thread, if there are none) remove the segment.
-   * The new segment is added with a refcnt of 1, so that is never removed until a drop command
-   * comes through.
+   * {@inheritDoc}
+   * <p>If one segment already exists with the same name, replaces it with the new one.
+   * <p>Ensures that reference count of the old segment (if replaced) is reduced by 1, so that the last user of the old
+   * segment (or the calling thread, if there are none) remove the segment.
+   * <p>The new segment is added with reference count of 1, so that is never removed until a drop command comes through.
    *
-   * @param indexSegmentToAdd new segment to add/replace.
+   * @param immutableSegment Immutable segment to add
    */
-  public void addSegment(@Nonnull IndexSegment indexSegmentToAdd) {
-    final String segmentName = indexSegmentToAdd.getSegmentName();
-    _logger.info("Trying to add a new segment {} of table {} with OfflineSegmentDataManager", segmentName, _tableName);
-    OfflineSegmentDataManager newSegmentManager = new OfflineSegmentDataManager(indexSegmentToAdd);
-    final int newNumDocs = indexSegmentToAdd.getSegmentMetadata().getTotalRawDocs();
+  @Override
+  public void addSegment(@Nonnull ImmutableSegment immutableSegment) {
+    String segmentName = immutableSegment.getSegmentName();
+    _logger.info("Adding immutable segment: {} to table: {}", segmentName, _tableName);
+    ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
+    int newNumDocs = immutableSegment.getSegmentMetadata().getTotalRawDocs();
     SegmentDataManager oldSegmentManager;
     int refCnt = -1;
     try {

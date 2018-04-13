@@ -20,7 +20,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.File;
 import java.util.ArrayList;
@@ -100,7 +100,7 @@ public class SegmentInfoProvider {
       segmentDir = segmentFile;
     }
 
-    IndexSegment indexSegment = Loaders.IndexSegment.load(segmentDir, ReadMode.heap);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(segmentDir, ReadMode.heap);
     Schema schema = indexSegment.getSegmentMetadata().getSchema();
 
     // Add time column if exists.

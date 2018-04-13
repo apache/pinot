@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package com.linkedin.pinot.core.indexsegment.utils;
+package com.linkedin.pinot.core.io.writer.impl;
 
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import com.linkedin.pinot.core.io.writer.impl.MmapMemoryManager;
 import java.io.File;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;

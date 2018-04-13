@@ -13,21 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.realtime.impl;
+package com.linkedin.pinot.core.indexsegment.mutable;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.indexsegment.IndexSegmentUtils;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
-import com.linkedin.pinot.core.realtime.RealtimeSegment;
+import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
+import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryFactory;
 import com.linkedin.pinot.core.realtime.impl.invertedindex.RealtimeInvertedIndexReader;
@@ -48,7 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class RealtimeSegmentImpl implements RealtimeSegment {
+public class MutableSegmentImpl implements MutableSegment {
   // For multi-valued column, forward-index.
   // Maximum number of multi-values per row. We assert on this.
   private static final int MAX_MULTI_VALUES_PER_ROW = 1000;
@@ -83,7 +83,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private volatile long _maxTime = Long.MIN_VALUE;
   private final int _numKeyColumns;
 
-  public RealtimeSegmentImpl(RealtimeSegmentConfig config) {
+  public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
     _schema = config.getSchema();
     _capacity = config.getCapacity();
@@ -107,7 +107,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     _numKeyColumns = _schema.getDimensionNames().size() + 1;
 
     _logger = LoggerFactory.getLogger(
-        RealtimeSegmentImpl.class.getName() + "_" + _segmentName + "_" + config.getStreamName());
+        MutableSegmentImpl.class.getName() + "_" + _segmentName + "_" + config.getStreamName());
 
     Set<String> noDictionaryColumns = config.getNoDictionaryColumns();
 
@@ -346,53 +346,6 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   }
 
   @Override
-  public GenericRow getRecord(int docId, GenericRow reuse) {
-    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
-      String column = fieldSpec.getName();
-      DataFileReader indexReaderWriter = _indexReaderWriterMap.get(column);
-      MutableDictionary dictionary = _dictionaryMap.get(column);
-      if (dictionary != null) {
-        // Column with dictionary
-        if (fieldSpec.isSingleValueField()) {
-          int dictId = ((FixedByteSingleColumnSingleValueReaderWriter) indexReaderWriter).getInt(docId);
-          reuse.putField(column, dictionary.get(dictId));
-        } else {
-          int[] dictIds = new int[_maxNumValuesMap.get(column)];
-          int numValues = ((FixedByteSingleColumnMultiValueReaderWriter) indexReaderWriter).getIntArray(docId, dictIds);
-          Object[] values = new Object[numValues];
-          for (int i = 0; i < numValues; i++) {
-            values[i] = dictionary.get(dictIds[i]);
-          }
-          reuse.putField(column, values);
-        }
-      } else {
-        // No-dictionary column
-        FixedByteSingleColumnSingleValueReaderWriter singleValueReaderWriter =
-            (FixedByteSingleColumnSingleValueReaderWriter) indexReaderWriter;
-        FieldSpec.DataType dataType = fieldSpec.getDataType();
-        switch (dataType) {
-          case INT:
-            reuse.putField(column, singleValueReaderWriter.getInt(docId));
-            break;
-          case LONG:
-            reuse.putField(column, singleValueReaderWriter.getLong(docId));
-            break;
-          case FLOAT:
-            reuse.putField(column, singleValueReaderWriter.getFloat(docId));
-            break;
-          case DOUBLE:
-            reuse.putField(column, singleValueReaderWriter.getDouble(docId));
-            break;
-          default:
-            throw new UnsupportedOperationException(
-                "Unsupported data type: " + dataType + " for no-dictionary column: " + column);
-        }
-      }
-    }
-    return reuse;
-  }
-
-  @Override
   public String getSegmentName() {
     return _segmentName;
   }
@@ -419,8 +372,14 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   }
 
   @Override
-  public long getDiskSizeBytes() {
-    return 0;
+  public GenericRow getRecord(int docId, GenericRow reuse) {
+    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+      String column = fieldSpec.getName();
+      reuse.putField(column,
+          IndexSegmentUtils.getValue(docId, fieldSpec, _indexReaderWriterMap.get(column), _dictionaryMap.get(column),
+              _maxNumValuesMap.getOrDefault(column, 0)));
+    }
+    return reuse;
   }
 
   @Override

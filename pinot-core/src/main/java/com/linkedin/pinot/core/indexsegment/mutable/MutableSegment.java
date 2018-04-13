@@ -13,8 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.indexsegment.realtime;
+package com.linkedin.pinot.core.indexsegment.mutable;
 
-public class RealtimeSegmentLoader {
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
+
+public interface MutableSegment extends IndexSegment {
+
+  /**
+   * Indexes a record into the segment.
+   *
+   * @param row Record represented as a {@link GenericRow}
+   * @return Whether the segment is full (i.e. cannot index more record into it)
+   */
+  boolean index(GenericRow row);
+
+  /**
+   * Returns the number of records already indexed into the segment.
+   *
+   * @return The number of records indexed
+   */
+  int getNumDocsIndexed();
 }

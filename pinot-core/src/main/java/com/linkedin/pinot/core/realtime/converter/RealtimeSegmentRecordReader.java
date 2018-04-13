@@ -18,28 +18,28 @@ package com.linkedin.pinot.core.realtime.converter;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
+import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 
 
 /**
  * Record reader for Pinot realtime segment.
  */
 public class RealtimeSegmentRecordReader implements RecordReader {
-  private final RealtimeSegmentImpl _realtimeSegment;
+  private final MutableSegmentImpl _realtimeSegment;
   private final int _numDocs;
   private final Schema _schema;
   private final int[] _sortedDocIdIterationOrder;
 
   private int _nextDocId = 0;
 
-  public RealtimeSegmentRecordReader(RealtimeSegmentImpl realtimeSegment, Schema schema) {
+  public RealtimeSegmentRecordReader(MutableSegmentImpl realtimeSegment, Schema schema) {
     _realtimeSegment = realtimeSegment;
     _numDocs = realtimeSegment.getNumDocsIndexed();
     _schema = schema;
     _sortedDocIdIterationOrder = null;
   }
 
-  public RealtimeSegmentRecordReader(RealtimeSegmentImpl realtimeSegment, Schema schema, String sortedColumn) {
+  public RealtimeSegmentRecordReader(MutableSegmentImpl realtimeSegment, Schema schema, String sortedColumn) {
     _realtimeSegment = realtimeSegment;
     _numDocs = realtimeSegment.getNumDocsIndexed();
     _schema = schema;

@@ -32,12 +32,7 @@ public class VarByteChunkSingleValueReader extends BaseChunkSingleValueReader {
   private final int _maxChunkSize;
 
   // Thread local (reusable) byte[] to read bytes from data file.
-  private final ThreadLocal<byte[]> _reusableBytes = new ThreadLocal<byte[]>() {
-    @Override
-    protected byte[] initialValue() {
-      return new byte[_lengthOfLongestEntry];
-    }
-  };
+  private final ThreadLocal<byte[]> _reusableBytes = ThreadLocal.withInitial(() -> new byte[_lengthOfLongestEntry]);
 
   /**
    * Constructor for the class.
@@ -45,12 +40,16 @@ public class VarByteChunkSingleValueReader extends BaseChunkSingleValueReader {
    * @param pinotDataBuffer Data buffer to read from
    * @throws IOException
    */
-  public VarByteChunkSingleValueReader(PinotDataBuffer pinotDataBuffer)
-      throws IOException {
+  public VarByteChunkSingleValueReader(PinotDataBuffer pinotDataBuffer) {
     super(pinotDataBuffer);
 
     int chunkHeaderSize = _numDocsPerChunk * INT_SIZE;
     _maxChunkSize = chunkHeaderSize + (_lengthOfLongestEntry * _numDocsPerChunk);
+  }
+
+  @Override
+  public String getString(int row) {
+    return getString(row, createContext());
   }
 
   @Override

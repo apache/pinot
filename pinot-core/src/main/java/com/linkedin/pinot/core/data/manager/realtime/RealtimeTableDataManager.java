@@ -32,8 +32,8 @@ import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.manager.offline.AbstractTableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerManager;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
@@ -135,7 +135,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
     // If a consumer directory has been configured, use it to create a per-table path under the consumer dir.
     // Otherwise, create a sub-dir under the table-specific data director and use it for consumer mmaps
     if (consumerDirPath != null) {
-       consumerDir = new File(consumerDirPath, _tableName);
+      consumerDir = new File(consumerDirPath, _tableName);
     } else {
       consumerDirPath = _tableDataDir + File.separator + CONSUMERS_DIR;
       consumerDir = new File(consumerDirPath);
@@ -150,7 +150,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
     return consumerDir.getAbsolutePath();
   }
 
-  public void notifySegmentCommitted(RealtimeSegmentZKMetadata metadata, IndexSegment segment) {
+  public void notifySegmentCommitted(RealtimeSegmentZKMetadata metadata, ImmutableSegment segment) {
     ZKMetadataProvider.setRealtimeSegmentZKMetadata(_propertyStore, metadata);
     addSegment(segment);
   }
@@ -190,7 +190,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
         return;
       }
 
-      IndexSegment segment = ColumnarSegmentLoader.load(indexDir, indexLoadingConfig);
+      ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
       addSegment(segment);
     } else {
       // Either we don't have the segment on disk or we have not committed in ZK. We should be starting the consumer
@@ -258,7 +258,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
   // Replace a committed segment.
   public void replaceLLSegment(@Nonnull String segmentName, @Nonnull IndexLoadingConfig indexLoadingConfig) {
     try {
-      IndexSegment indexSegment = ColumnarSegmentLoader.load(new File(_indexDir, segmentName), indexLoadingConfig);
+      ImmutableSegment indexSegment = ImmutableSegmentLoader.load(new File(_indexDir, segmentName), indexLoadingConfig);
       addSegment(indexSegment);
     } catch (Exception e) {
       throw new RuntimeException(e);

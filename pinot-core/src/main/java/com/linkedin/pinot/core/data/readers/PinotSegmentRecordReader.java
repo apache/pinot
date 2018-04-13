@@ -19,10 +19,10 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;
@@ -33,7 +33,7 @@ import java.util.Map;
  * Record reader for Pinot segment.
  */
 public class PinotSegmentRecordReader implements RecordReader {
-  private final IndexSegmentImpl _indexSegment;
+  private final ImmutableSegment _immutableSegment;
   private final int _numDocs;
   private final Schema _schema;
   private final Map<String, PinotSegmentColumnReader> _columnReaderMap;
@@ -44,18 +44,18 @@ public class PinotSegmentRecordReader implements RecordReader {
    * Read records using the segment schema.
    */
   public PinotSegmentRecordReader(File indexDir) throws Exception {
-    _indexSegment = (IndexSegmentImpl) Loaders.IndexSegment.load(indexDir, ReadMode.mmap);
+    _immutableSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     try {
-      SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) _indexSegment.getSegmentMetadata();
+      SegmentMetadata segmentMetadata = _immutableSegment.getSegmentMetadata();
       _numDocs = segmentMetadata.getTotalRawDocs();
       _schema = segmentMetadata.getSchema();
       Collection<String> columnNames = _schema.getColumnNames();
       _columnReaderMap = new HashMap<>(columnNames.size());
       for (String columnName : columnNames) {
-        _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_indexSegment, columnName));
+        _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_immutableSegment, columnName));
       }
     } catch (Exception e) {
-      _indexSegment.destroy();
+      _immutableSegment.destroy();
       throw e;
     }
   }
@@ -65,10 +65,10 @@ public class PinotSegmentRecordReader implements RecordReader {
    * <p>Passed in schema must be a subset of the segment schema.
    */
   public PinotSegmentRecordReader(File indexDir, Schema schema) throws Exception {
-    _indexSegment = (IndexSegmentImpl) Loaders.IndexSegment.load(indexDir, ReadMode.mmap);
+    _immutableSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     _schema = schema;
     try {
-      SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) _indexSegment.getSegmentMetadata();
+      SegmentMetadata segmentMetadata = _immutableSegment.getSegmentMetadata();
       _numDocs = segmentMetadata.getTotalRawDocs();
       Schema segmentSchema = segmentMetadata.getSchema();
       Collection<FieldSpec> fieldSpecs = _schema.getAllFieldSpecs();
@@ -79,10 +79,10 @@ public class PinotSegmentRecordReader implements RecordReader {
         Preconditions.checkState(fieldSpec.equals(segmentFieldSpec),
             "Field spec mismatch for column: %s, in the given schema: %s, in the segment schema: %s", columnName,
             fieldSpec, segmentFieldSpec);
-        _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_indexSegment, columnName));
+        _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_immutableSegment, columnName));
       }
     } catch (Exception e) {
-      _indexSegment.destroy();
+      _immutableSegment.destroy();
       throw e;
     }
   }
@@ -142,6 +142,6 @@ public class PinotSegmentRecordReader implements RecordReader {
 
   @Override
   public void close() {
-    _indexSegment.destroy();
+    _immutableSegment.destroy();
   }
 }
