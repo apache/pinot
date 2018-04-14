@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.realtime.segment;
 
 import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -33,6 +34,6 @@ public interface RealtimeSegmentAssignmentStrategy {
    * @param partitionAssignment
    * @return
    */
-  Map<String, List<String>> assign(List<String> newSegments, PartitionAssignment partitionAssignment)
+  Map<String, List<String>> assign(Collection<String> newSegments, PartitionAssignment partitionAssignment)
       throws InvalidConfigException;
 }

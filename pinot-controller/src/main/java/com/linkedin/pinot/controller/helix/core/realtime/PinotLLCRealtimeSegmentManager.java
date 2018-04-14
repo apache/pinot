@@ -1585,30 +1585,19 @@ public class PinotLLCRealtimeSegmentManager {
       newPartitions.add(partition);
     }
 
-    OldToNewSegmentMapper segmentMapper = new OldToNewSegmentMapper();
-    setupNewPartitions(tableNameWithType, streamMetadata, partitionAssignment, newPartitions, now, segmentMapper);
+    Set<String> consumingSegments =
+        setupNewPartitions(tableNameWithType, streamMetadata, partitionAssignment, newPartitions, now);
 
     RealtimeSegmentAssignmentStrategy segmentAssignmentStrategy = new ConsumingSegmentAssignmentStrategy();
     Map<String, List<String>> assignments;
     try {
-      assignments =
-          segmentAssignmentStrategy.assign(Lists.newArrayList(segmentMapper.getNewSegmentNames()), partitionAssignment);
+      assignments = segmentAssignmentStrategy.assign(consumingSegments, partitionAssignment);
     } catch (InvalidConfigException e) {
       throw new IllegalStateException(
           "Caught exception when assigning segments using partition assignment for table " + tableNameWithType);
     }
 
-    for (String newSegment : segmentMapper.getNewSegmentNames()) {
-      List<String> newInstances = assignments.get(newSegment);
-      Map<String, String> instanceStateMap = idealState.getInstanceStateMap(newSegment);
-      if (instanceStateMap != null) {
-        instanceStateMap.clear();
-      }
-      for (String instance : newInstances) {
-        idealState.setPartitionState(newSegment, instance,
-            PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-      }
-    }
+    updateIdealState(idealState, null, consumingSegments, assignments);
     return idealState;
   }
 
@@ -1713,7 +1702,9 @@ public class PinotLLCRealtimeSegmentManager {
       skipNewPartitions = true;
     }
 
-    OldToNewSegmentMapper segmentMapper = new OldToNewSegmentMapper();
+    Set<String> onlineSegments = new HashSet<>(); // collect all segment names which should be updated to ONLINE state
+    Set<String> consumingSegments = new HashSet<>(); // collect all segment names which should be created in CONSUMING state
+
     // Walk over all partitions that we have metadata for, and repair any partitions necessary.
     // Possible things to repair:
     // 1. The latest metadata is in DONE state, but the idealstate says segment is CONSUMING:
@@ -1761,7 +1752,8 @@ public class PinotLLCRealtimeSegmentManager {
             createNewSegmentMetadataZNRecord(tableNameWithType, newLLCSegmentName, metadata.getEndOffset(),
                 partitionAssignment);
 
-            segmentMapper.addOnlineToConsumingMapping(segmentId, newLLCSegmentName.getSegmentName());
+            onlineSegments.add(segmentId);
+            consumingSegments.add(newLLCSegmentName.getSegmentName());
           }
           // else, the metadata should be IN_PROGRESS, which is the right state for a consuming segment.
         } else if (isAllInstancesOffline(instanceStateMap)) {
@@ -1781,7 +1773,7 @@ public class PinotLLCRealtimeSegmentManager {
 
           createNewSegmentMetadataZNRecord(tableNameWithType, newLLCSegmentName, startOffset, partitionAssignment);
 
-          segmentMapper.addNewSegment(newLLCSegmentName.getSegmentName());
+          consumingSegments.add(newLLCSegmentName.getSegmentName());
         }
         // else It can be in ONLINE state, in which case there is no need to repair the segment.
       } else {
@@ -1802,68 +1794,86 @@ public class PinotLLCRealtimeSegmentManager {
         // If there was a prev segment in the same partition, then we need to fix it to be ONLINE.
         LLCRealtimeSegmentZKMetadata prevMetadata = entry.getValue().pollLast();
 
-        if (prevMetadata == null) {
-          if (skipNewPartitions) {
-            continue;
-          }
-          segmentMapper.addNewSegment(segmentId);
-        } else {
-          segmentMapper.addOnlineToConsumingMapping(prevMetadata.getSegmentName(), segmentId);
+        if (prevMetadata == null && skipNewPartitions) {
+          continue;
         }
+        if (prevMetadata != null) {
+          onlineSegments.add(prevMetadata.getSegmentName());
+        }
+        consumingSegments.add(segmentId);
       }
     }
 
     if (!skipNewPartitions) {
-      setupNewPartitions(tableNameWithType, streamMetadata, partitionAssignment, newPartitions, now, segmentMapper);
+      Set<String> newPartitionSegments =
+          setupNewPartitions(tableNameWithType, streamMetadata, partitionAssignment, newPartitions, now);
+      consumingSegments.addAll(newPartitionSegments);
     }
 
     RealtimeSegmentAssignmentStrategy segmentAssignmentStrategy = new ConsumingSegmentAssignmentStrategy();
     Map<String, List<String>> assignments;
     try {
       assignments =
-          segmentAssignmentStrategy.assign(Lists.newArrayList(segmentMapper.getAllSegmentsToAssign()), partitionAssignment);
+          segmentAssignmentStrategy.assign(consumingSegments, partitionAssignment);
     } catch (InvalidConfigException e) {
       throw new IllegalStateException(
           "Caught exception when assigning segments using partition assignment for table " + tableNameWithType);
     }
 
-    for (Map.Entry<String, String> entry : segmentMapper.getOnlineToConsumingSegmentsMapping().entrySet()) {
-      String oldSeg = entry.getKey();
-      String newSeg = entry.getValue();
-      List<String> newInstances = assignments.get(newSeg);
-      Map<String, String> instanceStateMap = idealState.getInstanceStateMap(newSeg);
-      if (instanceStateMap != null) {
-        instanceStateMap.clear();
-      }
-      for (String instance : newInstances) {
-        idealState.setPartitionState(newSeg, instance,
-            PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-      }
-      Set<String> oldInstances = idealState.getInstanceSet(oldSeg);
-      Preconditions.checkArgument(CollectionUtils.isNotEmpty(oldInstances));
-      for (String instance : oldInstances) {
-        idealState.setPartitionState(oldSeg, instance, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
-      }
-    }
-
-    for (String newSegment : segmentMapper.getNewSegmentNames()) {
-      List<String> newInstances = assignments.get(newSegment);
-      Map<String, String> instanceStateMap = idealState.getInstanceStateMap(newSegment);
-      if (instanceStateMap != null) {
-        instanceStateMap.clear();
-      }
-      for (String instance : newInstances) {
-        idealState.setPartitionState(newSegment, instance,
-            PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-      }
-    }
+    updateIdealState(idealState, onlineSegments, consumingSegments, assignments);
     return idealState;
   }
 
-  private void setupNewPartitions(String tableNameWithType, StreamMetadata streamMetadata,
-      PartitionAssignment partitionAssignment, Set<Integer> newPartitions, long now,
-      OldToNewSegmentMapper segmentMapper) {
+  /**
+   * Updates the ideal state object
+   * Adds the segments in consumingSegments to CONSUMING state using instances from assignments
+   * Sets the segments in onlineSegments to ONLINE state
+   * @param idealState
+   * @param consumingSegments
+   * @param onlineSegments
+   * @param assignments
+   */
+  private void updateIdealState(IdealState idealState, Set<String> onlineSegments, Set<String> consumingSegments,
+      Map<String, List<String>> assignments) {
+    if (onlineSegments != null) {
+      for (String segment : onlineSegments) {
+        Set<String> oldInstances = idealState.getInstanceSet(segment);
+        Preconditions.checkArgument(CollectionUtils.isNotEmpty(oldInstances));
+        for (String instance : oldInstances) {
+          idealState.setPartitionState(segment, instance,
+              PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+        }
+      }
+    }
 
+    if (consumingSegments != null) {
+      for (String segment : consumingSegments) {
+        List<String> newInstances = assignments.get(segment);
+        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segment);
+        if (instanceStateMap != null) {
+          instanceStateMap.clear();
+        }
+        for (String instance : newInstances) {
+          idealState.setPartitionState(segment, instance,
+              PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+        }
+      }
+    }
+  }
+
+  /**
+   * Create metadata for new partitions
+   * @param tableNameWithType
+   * @param streamMetadata
+   * @param partitionAssignment
+   * @param newPartitions
+   * @param now
+   * @return set of newly created segment names
+   */
+  private Set<String> setupNewPartitions(String tableNameWithType, StreamMetadata streamMetadata,
+      PartitionAssignment partitionAssignment, Set<Integer> newPartitions, long now) {
+
+    Set<String> newSegmentNames = new HashSet<>(newPartitions.size());
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     int nextSeqNum = STARTING_SEQUENCE_NUMBER;
     String consumerStartOffsetSpec = streamMetadata.getKafkaConsumerProperties()
@@ -1877,8 +1887,9 @@ public class PinotLLCRealtimeSegmentManager {
       LLCSegmentName newLLCSegmentName = new LLCSegmentName(rawTableName, partition, nextSeqNum, now);
       createNewSegmentMetadataZNRecord(tableNameWithType, newLLCSegmentName, startOffset, partitionAssignment);
 
-      segmentMapper.addNewSegment(newLLCSegmentName.getSegmentName());
+      newSegmentNames.add(newLLCSegmentName.getSegmentName());
     }
+    return newSegmentNames;
   }
 
 
@@ -1920,38 +1931,6 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     return idealState;
-  }
-
-  /**
-   * Keeps a mapping of segment names that need to move from CONSUMING to ONLINE, to new segment names (to be created in CONSUMING state)
-   * Keeps a set of new segments for new partitions
-   */
-  private class OldToNewSegmentMapper {
-    Map<String, String> _onlineToConsumingSegmentsMap = new HashMap<>();
-    Set<String> _newSegmentsSet = new HashSet<>();
-
-    void addOnlineToConsumingMapping(String oldSegmentName, String newSegmentName) {
-      _onlineToConsumingSegmentsMap.put(oldSegmentName, newSegmentName);
-    }
-
-    Map<String, String> getOnlineToConsumingSegmentsMapping() {
-      return _onlineToConsumingSegmentsMap;
-    }
-
-    void addNewSegment(String newSegmentName) {
-      _newSegmentsSet.add(newSegmentName);
-    }
-
-    Set<String> getNewSegmentNames() {
-      return _newSegmentsSet;
-    }
-
-    Set<String> getAllSegmentsToAssign() {
-      Set<String> allSegments = new HashSet<>();
-      allSegments.addAll(_newSegmentsSet);
-      allSegments.addAll(_onlineToConsumingSegmentsMap.values());
-      return allSegments;
-    }
   }
 
   private static class KafkaOffsetFetcher implements Callable<Boolean> {
