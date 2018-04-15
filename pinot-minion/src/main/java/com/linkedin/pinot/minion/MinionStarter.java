@@ -41,7 +41,6 @@ import org.apache.helix.task.TaskStateModelFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * The class <code>MinionStarter</code> provides methods to start and stop the Pinot Minion.
  * <p>Pinot Minion will automatically join the given Helix cluster as a participant.
@@ -114,7 +113,9 @@ public class MinionStarter {
         .init(_config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
 
     // Need to do this before we start receiving state transitions.
-    BaseSegmentConversionExecutor.init(_config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
+    LOGGER.info("Initializing segment conversion executor");
+    BaseSegmentConversionExecutor.init(_config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER)
+        ,_config.subset(CommonConstants.Minion.METADATA_EVENT_OBSERVER_PREFIX));
     // Join the Helix cluster
     LOGGER.info("Joining the Helix cluster");
     _helixManager.getStateMachineEngine()

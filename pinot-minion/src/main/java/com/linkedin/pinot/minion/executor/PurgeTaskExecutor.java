@@ -20,15 +20,19 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import com.linkedin.pinot.core.common.MinionConstants;
 import com.linkedin.pinot.core.minion.SegmentPurger;
+import com.linkedin.pinot.minion.events.MinionEventObserverFactory;
 import java.io.File;
 import java.util.Collections;
 import javax.annotation.Nonnull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PurgeTaskExecutor.class);
 
   @Override
-  protected File convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
+  protected SegmentConversionInfo convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
       @Nonnull File workingDir) throws Exception {
     String rawTableName =
         TableNameBuilder.extractRawTableName(pinotTaskConfig.getConfigs().get(MinionConstants.TABLE_NAME_KEY));
@@ -43,7 +47,13 @@ public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
       recordModifier = recordModifierFactory.getRecordModifier(rawTableName);
     }
 
-    return new SegmentPurger(originalIndexDir, workingDir, recordPurger, recordModifier).purgeSegment();
+    SegmentPurger segmentPurger = new SegmentPurger(originalIndexDir, workingDir, recordPurger, recordModifier);
+    File purgedSegmentFile = segmentPurger.purgeSegment();
+    return new SegmentConversionInfo.SegmentConversionInfoBuilder()
+        .setFile(purgedSegmentFile)
+        .setSegmentPurger(segmentPurger)
+        .setTableName(pinotTaskConfig.getConfigs().get(MinionConstants.TABLE_NAME_KEY))
+        .build();
   }
 
   @Override
@@ -51,5 +61,11 @@ public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.REPLACE,
         Collections.singletonMap(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
             String.valueOf(System.currentTimeMillis())));
+  }
+
+  @Override
+  protected void runOnSuccess(MinionEventObserverFactory minionEventObserverFactory, SegmentConversionInfo segmentConversionInfo) {
+    LOGGER.info("Purge has finished. Running minion observer notifier for table {}, segment {}", segmentConversionInfo.getTableName(), segmentConversionInfo.getFile().getName());
+    minionEventObserverFactory.create().notifyMinionJobEnd(segmentConversionInfo, MinionConstants.PurgeTask.TASK_TYPE);
   }
 }

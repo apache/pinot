@@ -27,11 +27,11 @@ import javax.annotation.Nonnull;
 public class ConvertToRawIndexTaskExecutor extends BaseSegmentConversionExecutor {
 
   @Override
-  protected File convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
+  protected SegmentConversionInfo convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
       @Nonnull File workingDir) throws Exception {
     new RawIndexConverter(originalIndexDir, workingDir,
         pinotTaskConfig.getConfigs().get(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY)).convert();
-    return workingDir;
+    return new SegmentConversionInfo.SegmentConversionInfoBuilder().setFile(workingDir).build();
   }
 
   @Override
