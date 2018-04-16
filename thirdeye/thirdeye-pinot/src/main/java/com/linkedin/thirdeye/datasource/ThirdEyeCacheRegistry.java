@@ -1,31 +1,28 @@
 package com.linkedin.thirdeye.datasource;
 
 import com.google.common.base.Preconditions;
-import java.net.URL;
-import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.dashboard.resources.CacheResource;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datasource.cache.DatasetMaxDataTimeCacheLoader;
-import com.linkedin.thirdeye.datasource.cache.DatasetListCache;
 import com.linkedin.thirdeye.datasource.cache.DatasetConfigCacheLoader;
+import com.linkedin.thirdeye.datasource.cache.DatasetListCache;
+import com.linkedin.thirdeye.datasource.cache.DatasetMaxDataTimeCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.DimensionFiltersCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.MetricConfigCacheLoader;
 import com.linkedin.thirdeye.datasource.cache.MetricDataset;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
+import java.net.URL;
+import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ThirdEyeCacheRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeCacheRegistry.class);
@@ -39,7 +36,7 @@ public class ThirdEyeCacheRegistry {
   private static MetricConfigManager metricConfigDAO;
   private static AnomalyFunctionManager anomalyFunctionDAO;
 
-  // TODO: Rename QueryCache to a name like DataSrouceCache.
+  // TODO: Rename QueryCache to a name like DataSourceCache.
   private QueryCache queryCache;
 
   // Meta-data caches
@@ -110,93 +107,51 @@ public class ThirdEyeCacheRegistry {
         "Data sources are not initialzed. Please invoke initDataSources() before this method.");
 
     // DatasetConfig cache
+    // TODO deprecate. read from database directly
     LoadingCache<String, DatasetConfigDTO> datasetConfigCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS).build(new DatasetConfigCacheLoader(datasetConfigDAO));
+        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS)
+        .build(new DatasetConfigCacheLoader(datasetConfigDAO));
     cacheRegistry.registerDatasetConfigCache(datasetConfigCache);
 
     // MetricConfig cache
+    // TODO deprecate. read from database directly
     LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS).build(new MetricConfigCacheLoader(metricConfigDAO));
+        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS)
+        .build(new MetricConfigCacheLoader(metricConfigDAO));
     cacheRegistry.registerMetricConfigCache(metricConfigCache);
 
     // DatasetMaxDataTime Cache
     LoadingCache<String, Long> datasetMaxDataTimeCache = CacheBuilder.newBuilder()
-        .refreshAfterWrite(5, TimeUnit.MINUTES)
+        .expireAfterWrite(5, TimeUnit.MINUTES)
         .build(new DatasetMaxDataTimeCacheLoader(queryCache, datasetConfigDAO));
     cacheRegistry.registerDatasetMaxDataTimeCache(datasetMaxDataTimeCache);
 
     // Dimension Filter cache
-    LoadingCache<String, String> dimensionFiltersCache =
-        CacheBuilder.newBuilder().expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS)
-            .build(new DimensionFiltersCacheLoader(queryCache, datasetConfigDAO));
+    LoadingCache<String, String> dimensionFiltersCache = CacheBuilder.newBuilder()
+        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS)
+        .build(new DimensionFiltersCacheLoader(queryCache, datasetConfigDAO));
     cacheRegistry.registerDimensionFiltersCache(dimensionFiltersCache);
 
     // Datasets list cache
+    // TODO deprecate. read from database directly
     DatasetListCache datasetsCache = new DatasetListCache(anomalyFunctionDAO, datasetConfigDAO, thirdeyeConfig);
     cacheRegistry.registerDatasetsCache(datasetsCache);
   }
 
   private static void initPeriodicCacheRefresh() {
-
-    final CacheResource cacheResource = new CacheResource();
-    // manually refreshing on startup, and setting delay
-    // as weeklyService starts before hourlyService finishes,
-    // causing NPE in reading collectionsCache
-
-    // Start initial cache loading asynchronously to reduce application start time
-    Executors.newSingleThreadExecutor().submit(new Runnable() {
-      @Override public void run() {
-        LOGGER.info("Refreshing datasets list cache");
-        cacheResource.refreshDatasets();
-        LOGGER.info("Refreshing dataset configs cache");
-        cacheResource.refreshDatasetConfigCache();
-        LOGGER.info("Refreshing metrics config cache");
-        cacheResource.refreshMetricConfigCache();
-        LOGGER.info("Refreshing max data dime cache");
-        cacheResource.refreshMaxDataTimeCache();
-        LOGGER.info("Refreshing dimension filters cache");
-        cacheResource.refreshDimensionFiltersCache();
-      }
-    });
-
-    ScheduledExecutorService minuteService = Executors.newSingleThreadScheduledExecutor();
-    minuteService.scheduleAtFixedRate(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          LOGGER.info("Refreshing dataset max time cache");
-          cacheResource.refreshMaxDataTimeCache();
-        } catch (Exception e) {
-          LOGGER.error("Exception while refreshing max time cache", e);
-        }
-      }
-    }, 30, 30, TimeUnit.MINUTES);
-
+    // TODO deprecate this
     ScheduledExecutorService hourlyService = Executors.newSingleThreadScheduledExecutor();
     hourlyService.scheduleAtFixedRate(new Runnable() {
       @Override
       public void run() {
         try {
           LOGGER.info("Refreshing datasets list cache");
-          cacheResource.refreshDatasets();
+          ThirdEyeCacheRegistry.getInstance().getDatasetsCache().loadDatasets();
         } catch (Exception e) {
           LOGGER.error("Exception while refreshing datasets list", e);
         }
       }
     }, 1, 1, TimeUnit.HOURS);
-
-    ScheduledExecutorService weeklyService = Executors.newSingleThreadScheduledExecutor();
-    weeklyService.scheduleAtFixedRate(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          LOGGER.info("Refreshing dimension filters cache");
-          cacheResource.refreshDimensionFiltersCache();
-        } catch (Exception e) {
-          LOGGER.error("Exception while loading filter caches", e);
-        }
-      }
-    }, 7, 7, TimeUnit.DAYS);
   }
 
   public LoadingCache<String, Long> getDatasetMaxDataTimeCache() {
@@ -246,5 +201,4 @@ public class ThirdEyeCacheRegistry {
   public void registerMetricConfigCache(LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache) {
     this.metricConfigCache = metricConfigCache;
   }
-
 }
