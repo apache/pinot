@@ -13,22 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.data.manager.offline;
+package com.linkedin.pinot.core.data.manager;
 
 import com.linkedin.pinot.common.data.DataManager;
 import java.util.Collection;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.ThreadSafe;
 
 
+// TODO: resolve the dependency issue between pinot-common and pinot-core, merge DataManager into InstanceDataManager
+@ThreadSafe
 public interface InstanceDataManager extends DataManager {
+
   /**
-   * Get table manager for given table
-   * @param tableName table name
-   * @return Table data manager for table, null if tableName does not exist
+   * Gets the table manager for the given table.
+   *
+   * @param tableNameWithType Table name with type suffix
+   * @return Table data manager for the given table, null if table does not exist
    */
   @Nullable
-  TableDataManager getTableDataManager(String tableName);
+  TableDataManager getTableDataManager(@Nonnull String tableNameWithType);
 
   @Nonnull
   Collection<TableDataManager> getTableDataManagers();

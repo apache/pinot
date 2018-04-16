@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.data.manager.offline;
+package com.linkedin.pinot.core.data.manager;
 
-import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
@@ -24,7 +23,7 @@ import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.List;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
@@ -32,13 +31,25 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 /**
  * The <code>TableDataManager</code> interface provides APIs to manage segments under a table.
  */
+@ThreadSafe
 public interface TableDataManager {
 
+  /**
+   * Initializes the table data manager. Should be called only once and before calling any other method.
+   */
   void init(@Nonnull TableDataManagerConfig tableDataManagerConfig, @Nonnull String instanceId,
       @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull ServerMetrics serverMetrics);
 
+  /**
+   * Starts the table data manager. Should be called only once after table data manager gets initialized but before
+   * calling any other method.
+   */
   void start();
 
+  /**
+   * Shuts down the table data manager. Should be called only once. After calling shut down, no other method should be
+   * called.
+   */
   void shutDown();
 
   /**
@@ -61,42 +72,46 @@ public interface TableDataManager {
   /**
    * Removes a segment from the table.
    */
-  void removeSegment(String segmentName);
+  void removeSegment(@Nonnull String segmentName);
 
   /**
+   * Acquires all segments of the table.
+   * <p>It is the caller's responsibility to return the segments by calling {@link #releaseSegment(SegmentDataManager)}.
    *
-   * @note This method gets a lock on the segments. It is the caller's responsibility to return the segments
-   * using the {@link #releaseSegment(SegmentDataManager) releaseSegment} method
-   * @return segments by giving a list of segment names in this TableDataManager.
+   * @return List of segment data managers
    */
   @Nonnull
-  ImmutableList<SegmentDataManager> acquireAllSegments();
+  List<SegmentDataManager> acquireAllSegments();
 
   /**
+   * Acquires the segments with the given segment names.
+   * <p>It is the caller's responsibility to return the segments by calling {@link #releaseSegment(SegmentDataManager)}.
    *
-   * @note This method gets a lock on the segments. It is the caller's responsibility to return the segments
-   * using the {@link #releaseSegment(SegmentDataManager) releaseSegment} method
-   * @return segments by giving a list of segment names in this TableDataManager.
+   * @param segmentNames List of names of the segment to acquire
+   * @return List of segment data managers
    */
-  List<SegmentDataManager> acquireSegments(List<String> segmentList);
+  @Nonnull
+  List<SegmentDataManager> acquireSegments(@Nonnull List<String> segmentNames);
 
   /**
+   * Acquires the segments with the given segment name.
+   * <p>It is the caller's responsibility to return the segments by calling {@link #releaseSegment(SegmentDataManager)}.
    *
-   * @note This method gets a lock on the segment. It is the caller's responsibility to return the segment
-   * using the {@link #releaseSegment(SegmentDataManager) releaseSegment} method.
-   * @return a segment by giving the name of this segment in this TableDataManager.
+   * @param segmentName Name of the segment to acquire
+   * @return Segment data manager with the given name, or <code>null</code> if no segment matches the name
    */
-  @Nullable
-  SegmentDataManager acquireSegment(String segmentName);
+  SegmentDataManager acquireSegment(@Nonnull String segmentName);
 
   /**
+   * Releases the acquired segment.
    *
-   * give back segmentReader, so the segment could be safely deleted.
+   * @param segmentDataManager Segment data manager
    */
-  void releaseSegment(SegmentDataManager segmentDataManager);
+  void releaseSegment(@Nonnull SegmentDataManager segmentDataManager);
 
   /**
-   * Get the table name managed by this instance
+   * Returns the table name managed by this instance.
    */
+  @Nonnull
   String getTableName();
 }

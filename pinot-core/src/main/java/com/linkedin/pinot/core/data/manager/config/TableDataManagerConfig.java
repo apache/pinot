@@ -15,12 +15,12 @@
  */
 package com.linkedin.pinot.core.data.manager.config;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 
 
@@ -36,8 +36,7 @@ public class TableDataManagerConfig {
 
   private final Configuration _tableDataManagerConfig;
 
-  public TableDataManagerConfig(Configuration tableDataManagerConfig)
-      throws ConfigurationException {
+  public TableDataManagerConfig(@Nonnull Configuration tableDataManagerConfig) {
     _tableDataManagerConfig = tableDataManagerConfig;
   }
 
@@ -66,27 +65,17 @@ public class TableDataManagerConfig {
   }
 
   public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(
-      @Nonnull InstanceDataManagerConfig instanceDataManagerConfig, @Nonnull String tableName)
-      throws ConfigurationException {
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    assert tableType != null;
-
+      @Nonnull InstanceDataManagerConfig instanceDataManagerConfig, @Nonnull String tableNameWithType) {
     Configuration defaultConfig = new PropertiesConfiguration();
-    defaultConfig.addProperty(TABLE_DATA_MANAGER_NAME, tableName);
-    String dataDir = instanceDataManagerConfig.getInstanceDataDir() + "/" + tableName;
-    defaultConfig.addProperty(TABLE_DATA_MANAGER_DATA_DIRECTORY, dataDir);
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_NAME, tableNameWithType);
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_DATA_DIRECTORY,
+        instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType);
     defaultConfig.addProperty(TABLE_DATA_MANAGER_CONSUMER_DIRECTORY, instanceDataManagerConfig.getConsumerDir());
-    defaultConfig.addProperty(TABLE_DATA_MANAGER_MAX_PARALLEL_SEGMENT_BUILDS, instanceDataManagerConfig.getMaxParallelSegmentBuilds());
-    switch (tableType) {
-      case OFFLINE:
-        defaultConfig.addProperty(TABLE_DATA_MANAGER_TYPE, "offline");
-        break;
-      case REALTIME:
-        defaultConfig.addProperty(TABLE_DATA_MANAGER_TYPE, "realtime");
-        break;
-      default:
-        throw new UnsupportedOperationException("Unsupported table type for table: " + tableName);
-    }
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_MAX_PARALLEL_SEGMENT_BUILDS,
+        instanceDataManagerConfig.getMaxParallelSegmentBuilds());
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    Preconditions.checkNotNull(tableType);
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_TYPE, tableType.name());
 
     return new TableDataManagerConfig(defaultConfig);
   }
