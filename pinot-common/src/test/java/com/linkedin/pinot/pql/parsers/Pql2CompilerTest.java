@@ -15,12 +15,15 @@
  */
 package com.linkedin.pinot.pql.parsers;
 
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
+import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
+import com.linkedin.pinot.pql.parsers.pql2.ast.TopAstNode;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.pql.parsers.pql2.ast.TopAstNode;
+
+import java.util.Collections;
 
 
 /**
@@ -185,5 +188,21 @@ public class Pql2CompilerTest {
     Assert.assertEquals(brokerRequest.getQueryOptions().get("delicious"), "yes");
     Assert.assertEquals(brokerRequest.getQueryOptions().get("foo"), "1234");
     Assert.assertEquals(brokerRequest.getQueryOptions().get("bar"), "potato");
+  }
+
+  @Test
+  public void testIdentifierQuoteCharacter() {
+    Pql2Compiler compiler = new Pql2Compiler();
+
+    TransformExpressionTree expTree = compiler.compileToExpressionTree("`a.b.c`");
+    Assert.assertEquals(expTree.getExpressionType(), TransformExpressionTree.ExpressionType.IDENTIFIER);
+    Assert.assertEquals(expTree.getValue(), "a.b.c");
+
+    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(
+            "select avg(`attributes.age`) as `avg_age` from `person` group by `attributes.address_city` having avg(`attributes.age`)=20");
+
+    Assert.assertEquals(brokerRequest.getAggregationsInfo().get(0).getAggregationParams().get("column"),"attributes.age");
+    Assert.assertEquals(brokerRequest.getGroupBy().getColumns(), Collections.singletonList("attributes.address_city"));
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getAggregationInfo().getAggregationParams().get("column"),"attributes.age");
   }
 }

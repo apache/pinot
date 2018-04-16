@@ -31,11 +31,10 @@ public class GroupByAstNode extends BaseAstNode {
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof IdentifierAstNode) {
         IdentifierAstNode node = (IdentifierAstNode) astNode;
-        String groupByColumnName = node.getName();
-        groupBy.addToColumns(groupByColumnName);
+        groupBy.addToColumns(node.getName());
 
         // List of expression contains columns as well as expressions to maintain ordering of group by columns.
-        groupBy.addToExpressions(groupByColumnName);
+        groupBy.addToExpressions(node.getExpression());
       } else {
         // Compile to standard expression string
         // NOTE: the purpose of this compilation is to ensure the function expression is valid. We serialize the
