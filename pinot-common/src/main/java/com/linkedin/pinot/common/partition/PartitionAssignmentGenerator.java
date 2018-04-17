@@ -26,8 +26,10 @@ import com.linkedin.pinot.common.utils.LLCSegmentName;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
 
@@ -88,6 +90,19 @@ public class PartitionAssignmentGenerator {
       }
     }
     return partitionIdToLatestSegment;
+  }
+
+  public int getNumPartitionsFromIdealState(IdealState idealState) {
+    Set<Integer> partitions = new HashSet<>();
+    Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
+    for (Map.Entry<String, Map<String, String>> entry : mapFields.entrySet()) {
+      String segmentName = entry.getKey();
+      if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
+        LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
+        partitions.add(llcSegmentName.getPartitionId());
+      }
+    }
+    return partitions.size();
   }
 
   /**

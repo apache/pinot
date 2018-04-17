@@ -90,15 +90,15 @@ public class PartitionAssignmentGeneratorTest {
     // 3 partitions 2 replicas, 2 on 0th seq number 1 on 1st seq number (8 segments)
     instances = idealStateBuilder.getInstances(0, 0);
     idealState =
-        idealStateBuilder.transitionToState(0, 0, "ONLINE").addConsumingSegment(0, 1, numReplicas, instances).build();
+        idealStateBuilder.setSegmentState(0, 0, "ONLINE").addConsumingSegment(0, 1, numReplicas, instances).build();
     verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions);
 
     // 3 partitions 2 replicas, all on 1st seg num (12 segments)
     instances = idealStateBuilder.getInstances(1, 0);
-    idealStateBuilder.transitionToState(1, 0, "ONLINE").addConsumingSegment(1, 1, numReplicas, instances);
+    idealStateBuilder.setSegmentState(1, 0, "ONLINE").addConsumingSegment(1, 1, numReplicas, instances);
     instances = idealStateBuilder.getInstances(2, 0);
     idealState =
-        idealStateBuilder.transitionToState(2, 0, "ONLINE").addConsumingSegment(2, 1, numReplicas, instances).build();
+        idealStateBuilder.setSegmentState(2, 0, "ONLINE").addConsumingSegment(2, 1, numReplicas, instances).build();
     verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions);
 
     // 3 partitions 2 replicas, seq 0 has moved to COMPLETED servers, seq 1 on CONSUMING instances
@@ -107,7 +107,7 @@ public class PartitionAssignmentGeneratorTest {
     verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions);
 
     // status of latest segments OFFLINE/ERROR
-    idealState = idealStateBuilder.transitionToState(1, 1, "OFFLINE").transitionToState(2, 1, "OFFLINE").build();
+    idealState = idealStateBuilder.setSegmentState(1, 1, "OFFLINE").setSegmentState(2, 1, "OFFLINE").build();
     verifyPartitionAssignmentFromIdealState(tableConfig, idealState, numPartitions);
 
     // all non llc segments

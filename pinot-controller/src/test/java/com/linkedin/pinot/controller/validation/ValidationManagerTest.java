@@ -15,35 +15,24 @@
  */
 package com.linkedin.pinot.controller.validation;
 
-import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metrics.ValidationMetrics;
+import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
-import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -334,102 +323,5 @@ public class ValidationManagerTest {
 
     List<Interval> computeMissingIntervals = ValidationManager.computeMissingIntervals(intervals, frequency);
     Assert.assertEquals(computeMissingIntervals.size(), 22);
-  }
-
-  @Test
-  public void testLLCValidation() throws Exception {
-    final String topicName = "topic";
-    final int kafkaPartitionCount = 2;
-    final String realtimeTableName = "table_REALTIME";
-    final String tableName = TableNameBuilder.extractRawTableName(realtimeTableName);
-    final String S1 = "S1"; // Server 1
-    final String S2 = "S2"; // Server 2
-    final String S3 = "S3"; // Server 3
-    final List<String> hosts = Arrays.asList(new String[]{S1, S2, S3});
-    final HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
-
-    PartitionAssignment partitionAssignment = new PartitionAssignment(topicName);
-    for (int i = 0; i < kafkaPartitionCount; i++) {
-      partitionAssignment.addPartition(Integer.toString(i), hosts);
-    }
-    makeMockPinotLLCRealtimeSegmentManager(partitionAssignment);
-
-    long msSinceEpoch = 1540;
-
-    LLCSegmentName p0s0 = new LLCSegmentName(tableName, 0, 0, msSinceEpoch);
-    LLCSegmentName p0s1 = new LLCSegmentName(tableName, 0, 1, msSinceEpoch);
-    LLCSegmentName p1s0 = new LLCSegmentName(tableName, 1, 0, msSinceEpoch);
-    LLCSegmentName p1s1 = new LLCSegmentName(tableName, 1, 1, msSinceEpoch);
-
-    IdealState idealstate = PinotTableIdealStateBuilder.buildEmptyIdealStateFor(realtimeTableName, 3);
-    idealstate.setPartitionState(p0s0.getSegmentName(), S1,
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
-    idealstate.setPartitionState(p0s0.getSegmentName(), S2,
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
-    idealstate.setPartitionState(p0s0.getSegmentName(), S3,
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
-//    idealstate.setPartitionState(p0s1.getSegmentName(), S1, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-//    idealstate.setPartitionState(p0s1.getSegmentName(), S2, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-//    idealstate.setPartitionState(p0s1.getSegmentName(), S3, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-    idealstate.setPartitionState(p1s0.getSegmentName(), S1,
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
-    idealstate.setPartitionState(p1s0.getSegmentName(), S2,
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
-    idealstate.setPartitionState(p1s0.getSegmentName(), S3,
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
-    idealstate.setPartitionState(p1s1.getSegmentName(), S1,
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-    idealstate.setPartitionState(p1s1.getSegmentName(), S2,
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-    idealstate.setPartitionState(p1s1.getSegmentName(), S3,
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-    helixAdmin.addResource(HELIX_CLUSTER_NAME, realtimeTableName, idealstate);
-
-    FakeValidationMetrics validationMetrics = new FakeValidationMetrics();
-
-    ValidationManager validationManager =
-        new ValidationManager(validationMetrics, _pinotHelixResourceManager, new ControllerConf(), _segmentManager);
-    Map<String, String> streamConfigs = new HashMap<String, String>(4);
-    streamConfigs.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-        CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), "highLevel,simple");
-    Field autoCreateOnError = ValidationManager.class.getDeclaredField("_autoCreateOnError");
-    autoCreateOnError.setAccessible(true);
-    autoCreateOnError.setBoolean(validationManager, false);
-    TableConfig tableConfig = mock(TableConfig.class);
-    IndexingConfig indexingConfig = mock(IndexingConfig.class);
-    when(tableConfig.getIndexingConfig()).thenReturn(indexingConfig);
-    when(indexingConfig.getStreamConfigs()).thenReturn(streamConfigs);
-
-    validationManager.validateLLCSegments(realtimeTableName, tableConfig);
-
-    Assert.assertEquals(validationMetrics.partitionCount, 1);
-
-    // Set partition 0 to have one instance in CONSUMING state, and others in OFFLINE.
-    // we should not flag any partitions to correct.
-    helixAdmin.dropResource(HELIX_CLUSTER_NAME, realtimeTableName);
-    idealstate.setPartitionState(p0s1.getSegmentName(), S1,
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-    idealstate.setPartitionState(p0s1.getSegmentName(), S2,
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE);
-    idealstate.setPartitionState(p0s1.getSegmentName(), S3,
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE);
-    helixAdmin.addResource(HELIX_CLUSTER_NAME, realtimeTableName, idealstate);
-    validationManager.validateLLCSegments(realtimeTableName, tableConfig);
-    Assert.assertEquals(validationMetrics.partitionCount, 0);
-
-    helixAdmin.dropResource(HELIX_CLUSTER_NAME, realtimeTableName);
-  }
-
-  private class FakeValidationMetrics extends ValidationMetrics {
-    public int partitionCount = -1;
-
-    public FakeValidationMetrics() {
-      super(null);
-    }
-
-    @Override
-    public void updateNonConsumingPartitionCountMetric(final String tableName, final int count) {
-      partitionCount = count;
-    }
   }
 }

@@ -144,31 +144,17 @@ public class ValidationManager {
       if (tableType == TableType.OFFLINE) {
         validateOfflineSegmentPush(propertyStore, tableNameWithType);
       } else {
-        List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadataList =
-            ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(propertyStore, tableNameWithType);
-        boolean countHLCSegments = true;  // false if this table has ONLY LLC segments (i.e. fully migrated)
         TableConfig tableConfig = null;
-        StreamMetadata streamMetadata = null;
         try {
           tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableNameWithType);
           if (tableConfig == null) {
             continue;
           }
-          streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
-          if (streamMetadata.hasSimpleKafkaConsumerType() && !streamMetadata.hasHighLevelKafkaConsumerType()) {
-            countHLCSegments = false;
-          }
-          // Update the gauge to contain the total document count in the segments
-          _validationMetrics.updateTotalDocumentCountGauge(tableNameWithType,
-              computeRealtimeTotalDocumentInSegments(realtimeSegmentZKMetadataList, countHLCSegments));
-          if (streamMetadata.hasSimpleKafkaConsumerType()) {
-            validateLLCSegments(tableNameWithType, tableConfig);
-          }
+          updateRealtimeDocumentCount(propertyStore, tableConfig);
+          _llcRealtimeSegmentManager.validateLLCSegments(tableConfig);
         } catch (Exception e) {
           if (tableConfig == null) {
             LOGGER.warn("Cannot get realtime table config for table: {}", tableNameWithType);
-          } else if (streamMetadata == null) {
-            LOGGER.warn("Cannot get stream config for table: {}", tableNameWithType);
           } else {
             LOGGER.error("Exception while validating table: {}", tableNameWithType, e);
           }
@@ -178,10 +164,31 @@ public class ValidationManager {
     LOGGER.info("Validation completed");
   }
 
+  private void updateRealtimeDocumentCount(ZkHelixPropertyStore<ZNRecord> propertystore, TableConfig tableConfig) {
+    final String tableNameWithType = tableConfig.getTableName();
+    List<RealtimeSegmentZKMetadata> metadataList =
+            ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(propertystore, tableNameWithType);
+    boolean countHLCSegments = true;  // false if this table has ONLY LLC segments (i.e. fully migrated)
+    StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+    if (streamMetadata.hasSimpleKafkaConsumerType() && !streamMetadata.hasHighLevelKafkaConsumerType()) {
+      countHLCSegments = false;
+    }
+    // Update the gauge to contain the total document count in the segments
+    _validationMetrics.updateTotalDocumentCountGauge(tableConfig.getTableName(),
+          computeRealtimeTotalDocumentInSegments(metadataList, countHLCSegments));
+  }
+
   // For LLC segments, validate that there is at least one segment in CONSUMING state for every partition.
-  void validateLLCSegments(final String realtimeTableName, TableConfig tableConfig) {
+  @Deprecated
+  void validateLLCSegments(TableConfig tableConfig, List<RealtimeSegmentZKMetadata> metadataList) {
+    final String realtimeTableName = tableConfig.getTableName();
     LOGGER.info("Validating LLC Segments for {}", realtimeTableName);
-    Map<String, String> streamConfigs = tableConfig.getIndexingConfig().getStreamConfigs();
+
+    _llcRealtimeSegmentManager.validateLLCSegments(tableConfig);
+
+    IdealState idealState =
+        HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), realtimeTableName);
+
     PartitionAssignment partitionAssignment = _llcRealtimeSegmentManager.getStreamPartitionAssignment(realtimeTableName);
     if (partitionAssignment == null) {
       LOGGER.warn("No partition assignment found for table {}", realtimeTableName);
@@ -195,8 +202,6 @@ public class ValidationManager {
       nonConsumingKafkaPartitions.add(Integer.valueOf(partitionStr));
     }
 
-    IdealState idealState =
-        HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), realtimeTableName);
     if (!idealState.isEnabled()) {
       // No validation to be done.
       LOGGER.info("Skipping validation for {} since it is disabled", realtimeTableName);

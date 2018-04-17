@@ -18,6 +18,7 @@ package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.LLCUtils;
 import com.linkedin.pinot.common.utils.SegmentName;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -87,7 +88,7 @@ public class KafkaLowLevelConsumerRoutingTableBuilder extends GeneratorBasedRout
     public void init(ExternalView externalView, List<InstanceConfig> instanceConfigList) {
       // 1. Gather all segments and group them by Kafka partition, sorted by sequence number
       Map<String, SortedSet<SegmentName>> sortedSegmentsByKafkaPartition =
-          KafkaLowLevelRoutingTableBuilderUtil.getSortedSegmentsByKafkaPartition(externalView);
+          LLCUtils.sortSegmentsByStreamPartition(externalView.getPartitionSet());
 
       // 2. Ensure that for each Kafka partition, we have at most one Helix partition (Pinot segment) in consuming state
       Map<String, SegmentName> allowedSegmentInConsumingStateByKafkaPartition =

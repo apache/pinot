@@ -52,7 +52,8 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   LLC_KAFKA_DATA_LOSS("dataLoss", false),
   NUMBER_TIMES_SCHEDULE_TASKS_CALLED("tasks", true),
   NUMBER_TASKS_SUBMITTED("tasks", false),
-  NUMBER_SEGMENT_UPLOAD_TIMEOUT_EXCEEDED("SegmentUploadTimeouts", true);
+  NUMBER_SEGMENT_UPLOAD_TIMEOUT_EXCEEDED("SegmentUploadTimeouts", true),
+  PARTITION_ASSIGNMENT_GENERATION_ERROR("partitionAssignmentError", false);
 
 
   private final String brokerMeterName;

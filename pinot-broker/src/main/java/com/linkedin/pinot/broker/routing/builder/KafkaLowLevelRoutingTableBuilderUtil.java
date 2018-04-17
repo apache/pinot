@@ -17,12 +17,10 @@
 package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.SortedSet;
-import java.util.TreeSet;
 import org.apache.helix.model.ExternalView;
 
 
@@ -30,36 +28,6 @@ import org.apache.helix.model.ExternalView;
  * Util class for Kafka low level routing table builder.
  */
 public class KafkaLowLevelRoutingTableBuilderUtil {
-
-  /**
-   * Compute the table of a sorted list of segments grouped by Kafka partition.
-   *
-   * @param externalView helix external view.
-   * @return map of Kafka partition to sorted set of segment names.
-   */
-  public static Map<String, SortedSet<SegmentName>> getSortedSegmentsByKafkaPartition(ExternalView externalView) {
-    Map<String, SortedSet<SegmentName>> sortedSegmentsByKafkaPartition = new HashMap<>();
-    for (String helixPartitionName : externalView.getPartitionSet()) {
-      // Ignore segments that are not low level consumer segments
-      if (!SegmentName.isLowLevelConsumerSegmentName(helixPartitionName)) {
-        continue;
-      }
-
-      final LLCSegmentName segmentName = new LLCSegmentName(helixPartitionName);
-      String kafkaPartitionName = segmentName.getPartitionRange();
-      SortedSet<SegmentName> segmentsForPartition = sortedSegmentsByKafkaPartition.get(kafkaPartitionName);
-
-      // Create sorted set if necessary
-      if (segmentsForPartition == null) {
-        segmentsForPartition = new TreeSet<>();
-
-        sortedSegmentsByKafkaPartition.put(kafkaPartitionName, segmentsForPartition);
-      }
-
-      segmentsForPartition.add(segmentName);
-    }
-    return sortedSegmentsByKafkaPartition;
-  }
 
   /**
    * Compute the map of allowed 'consuming' segments for each partition.

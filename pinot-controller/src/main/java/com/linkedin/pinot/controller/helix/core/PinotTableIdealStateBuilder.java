@@ -16,26 +16,25 @@
 package com.linkedin.pinot.controller.helix.core;
 
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.RealtimeTagConfig;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
@@ -186,9 +185,8 @@ public class PinotTableIdealStateBuilder {
   }
 
   public static void buildLowLevelRealtimeIdealStateFor(String realtimeTableName, TableConfig realtimeTableConfig,
-      HelixAdmin helixAdmin, String helixClusterName, HelixManager helixManager, IdealState idealState) {
+      IdealState idealState) {
 
-    boolean create = false;
     // Validate replicasPerPartition here.
     final String replicasPerPartitionStr = realtimeTableConfig.getValidationConfig().getReplicasPerPartition();
     if (replicasPerPartitionStr == null || replicasPerPartitionStr.isEmpty()) {
@@ -203,18 +201,13 @@ public class PinotTableIdealStateBuilder {
     }
     if (idealState == null) {
       idealState = buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName, nReplicas);
-      create = true;
     }
-    LOGGER.info("Assigning partitions to instances for simple consumer for table {}", realtimeTableName);
-    final StreamMetadata kafkaMetadata = new StreamMetadata(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
     final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
-    final int nPartitions = getPartitionCount(kafkaMetadata);
-    LOGGER.info("Assigning {} partitions to instances for simple consumer for table {}", nPartitions, realtimeTableName);
-
-    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(realtimeTableConfig, helixManager);
-    final List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName,
-        realtimeTagConfig.getConsumingServerTag());
-    segmentManager.setupHelixEntries(realtimeTagConfig, kafkaMetadata, nPartitions, realtimeInstances, idealState, create);
+    try {
+      segmentManager.setupNewTable(realtimeTableConfig, idealState);
+    } catch (InvalidConfigException e) {
+      throw new IllegalStateException("Caught exception when creating table " + realtimeTableName, e);
+    }
   }
 
   public static int getPartitionCount(StreamMetadata kafkaMetadata) {
