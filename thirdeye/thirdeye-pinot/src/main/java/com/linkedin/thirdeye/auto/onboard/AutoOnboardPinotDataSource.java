@@ -242,8 +242,7 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
           String configKey = customConfig.getKey();
           String configValue = customConfig.getValue();
 
-          String existingValue = properties.get(configKey);
-          if (!Objects.equals(configValue, existingValue)) {
+          if (!properties.containsKey(configKey)) {
             properties.put(configKey, configValue);
             hasUpdate = true;
           }
