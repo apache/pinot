@@ -228,7 +228,7 @@ public class PinotLLCRealtimeSegmentManager {
    * @param tableConfig
    * @param emptyIdealState may contain HLC segments if both HLC and LLC are configured
    */
-  public void setupNewTable(TableConfig tableConfig, IdealState emptyIdealState) {
+  public void setupNewTable(TableConfig tableConfig, IdealState emptyIdealState) throws InvalidConfigException {
     final StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
     int partitionCount = getKafkaPartitionCount(streamMetadata);
     List<String> currentSegments = getExistingSegments(tableConfig.getTableName());
@@ -1562,7 +1562,8 @@ public class PinotLLCRealtimeSegmentManager {
    * @param partitionCount
    * @return
    */
-  private IdealState setupTable(TableConfig tableConfig, IdealState idealState, int partitionCount) {
+  private IdealState setupTable(TableConfig tableConfig, IdealState idealState, int partitionCount)
+      throws InvalidConfigException {
     final String tableNameWithType = tableConfig.getTableName();
     if (!idealState.isEnabled()) {
       LOGGER.info("Skipping validation for disabled table {}", tableNameWithType);
@@ -1571,14 +1572,8 @@ public class PinotLLCRealtimeSegmentManager {
     final StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
     final long now = getCurrentTimeMs();
 
-    PartitionAssignment partitionAssignment;
-    try {
-      partitionAssignment = _partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, partitionCount);
-    } catch (InvalidConfigException e) {
-      throw new IllegalStateException(
-          "Caught exception when generating partition assignment for table " + tableNameWithType
-              + " with partitionCount " + partitionCount);
-    }
+    PartitionAssignment partitionAssignment =
+        _partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, partitionCount);
 
     Set<Integer> newPartitions = new HashSet<>(partitionCount);
     for (int partition = 0; partition < partitionCount; partition++) {
@@ -1589,13 +1584,7 @@ public class PinotLLCRealtimeSegmentManager {
         setupNewPartitions(tableNameWithType, streamMetadata, partitionAssignment, newPartitions, now);
 
     RealtimeSegmentAssignmentStrategy segmentAssignmentStrategy = new ConsumingSegmentAssignmentStrategy();
-    Map<String, List<String>> assignments;
-    try {
-      assignments = segmentAssignmentStrategy.assign(consumingSegments, partitionAssignment);
-    } catch (InvalidConfigException e) {
-      throw new IllegalStateException(
-          "Caught exception when assigning segments using partition assignment for table " + tableNameWithType);
-    }
+    Map<String, List<String>> assignments = segmentAssignmentStrategy.assign(consumingSegments, partitionAssignment);
 
     updateIdealState(idealState, null, consumingSegments, assignments);
     return idealState;

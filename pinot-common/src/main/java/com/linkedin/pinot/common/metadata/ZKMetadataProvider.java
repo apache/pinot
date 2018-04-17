@@ -337,10 +337,9 @@ public class ZKMetadataProvider {
       if (znRecordList != null) {
         for (ZNRecord record : znRecordList) {
           RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = new RealtimeSegmentZKMetadata(record);
-          if (SegmentName.isHighLevelConsumerSegmentName(realtimeSegmentZKMetadata.getSegmentName())) {
-            continue;
+          if (SegmentName.isLowLevelConsumerSegmentName(realtimeSegmentZKMetadata.getSegmentName())) {
+            resultList.add(new LLCRealtimeSegmentZKMetadata(record));
           }
-          resultList.add(new LLCRealtimeSegmentZKMetadata(record));
         }
       }
     }

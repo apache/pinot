@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.helix.core;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -202,7 +203,11 @@ public class PinotTableIdealStateBuilder {
       idealState = buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName, nReplicas);
     }
     final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
-    segmentManager.setupNewTable(realtimeTableConfig, idealState);
+    try {
+      segmentManager.setupNewTable(realtimeTableConfig, idealState);
+    } catch (InvalidConfigException e) {
+      throw new IllegalStateException("Caught exception when creating table " + realtimeTableName, e);
+    }
   }
 
   public static int getPartitionCount(StreamMetadata kafkaMetadata) {
