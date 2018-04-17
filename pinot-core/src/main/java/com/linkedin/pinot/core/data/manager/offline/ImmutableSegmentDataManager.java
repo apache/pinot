@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
+import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 
 

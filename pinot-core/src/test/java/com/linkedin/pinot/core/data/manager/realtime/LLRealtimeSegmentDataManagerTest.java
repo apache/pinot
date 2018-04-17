@@ -122,7 +122,6 @@ public class LLRealtimeSegmentDataManagerTest {
     when(statsHistory.getEstimatedCardinality(any(String.class))).thenReturn(200);
     when(statsHistory.getEstimatedAvgColSize(any(String.class))).thenReturn(32);
     when(tableDataManager.getStatsHistory()).thenReturn(statsHistory);
-    when(tableDataManager.getServerMetrics()).thenReturn(new ServerMetrics(new MetricsRegistry()));
     return tableDataManager;
   }
 

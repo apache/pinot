@@ -18,7 +18,7 @@ package com.linkedin.pinot.server.starter;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
+import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
@@ -89,8 +89,7 @@ public class ServerBuilder {
     return _serverMetrics;
   }
 
-  public InstanceDataManager buildInstanceDataManager()
-      throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+  public InstanceDataManager buildInstanceDataManager() throws Exception {
     String className = _serverConf.getInstanceDataManagerClassName();
     LOGGER.info("Building instance data manager of class: {}", className);
     InstanceDataManager instanceDataManager = (InstanceDataManager) Class.forName(className).newInstance();

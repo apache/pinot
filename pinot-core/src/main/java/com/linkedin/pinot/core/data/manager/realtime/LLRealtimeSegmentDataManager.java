@@ -979,7 +979,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _tableStreamName = _tableName + "_" + kafkaStreamProviderConfig.getStreamName();
     _memoryManager = getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentNameStr,
         indexLoadingConfig.isRealtimeOffheapAllocation(), indexLoadingConfig.isDirectRealtimeOffheapAllocation(),
-        realtimeTableDataManager.getServerMetrics());
+        serverMetrics);
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     if (sortedColumns.isEmpty()) {

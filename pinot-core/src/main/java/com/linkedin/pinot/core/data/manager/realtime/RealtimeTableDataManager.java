@@ -30,8 +30,8 @@ import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.data.manager.offline.AbstractTableDataManager;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.BaseTableDataManager;
+import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
@@ -47,10 +47,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import javax.annotation.Nonnull;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.FileUtils;
 
 
-public class RealtimeTableDataManager extends AbstractTableDataManager {
+@ThreadSafe
+public class RealtimeTableDataManager extends BaseTableDataManager {
   private final ExecutorService _segmentAsyncExecutorService =
       Executors.newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
   private SegmentBuildTimeLeaseExtender _leaseExtender;
@@ -72,7 +74,8 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
     try {
       _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
     } catch (IOException | ClassNotFoundException e) {
-      _logger.error("Error reading history object for table {} from {}", _tableName, statsFile.getAbsolutePath(), e);
+      _logger.error("Error reading history object for table {} from {}", _tableNameWithType,
+          statsFile.getAbsolutePath(), e);
       File savedFile = new File(_tableDataDir, STATS_FILE_NAME + "." + UUID.randomUUID());
       try {
         FileUtils.moveFile(statsFile, savedFile);
@@ -110,9 +113,13 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
   }
 
   @Override
+  protected void doStart() {
+  }
+
+  @Override
   protected void doShutdown() {
     _segmentAsyncExecutorService.shutdown();
-    for (SegmentDataManager segmentDataManager : _segmentsMap.values()) {
+    for (SegmentDataManager segmentDataManager : _segmentDataManagerMap.values()) {
       segmentDataManager.destroy();
     }
     KafkaConsumerManager.closeAllConsumers();
@@ -135,7 +142,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
     // If a consumer directory has been configured, use it to create a per-table path under the consumer dir.
     // Otherwise, create a sub-dir under the table-specific data director and use it for consumer mmaps
     if (consumerDirPath != null) {
-      consumerDir = new File(consumerDirPath, _tableName);
+      consumerDir = new File(consumerDirPath, _tableNameWithType);
     } else {
       consumerDirPath = _tableDataDir + File.separator + CONSUMERS_DIR;
       consumerDir = new File(consumerDirPath);
@@ -174,7 +181,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
   public void addSegment(@Nonnull String segmentName, @Nonnull TableConfig tableConfig,
       @Nonnull IndexLoadingConfig indexLoadingConfig) throws Exception {
     RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
-        ZKMetadataProvider.getRealtimeSegmentZKMetadata(_propertyStore, _tableName, segmentName);
+        ZKMetadataProvider.getRealtimeSegmentZKMetadata(_propertyStore, _tableNameWithType, segmentName);
     Preconditions.checkNotNull(realtimeSegmentZKMetadata);
 
     File indexDir = new File(_indexDir, segmentName);
@@ -184,9 +191,10 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
     LoaderUtils.reloadFailureRecovery(indexDir);
     if (indexDir.exists() && (realtimeSegmentZKMetadata.getStatus() == Status.DONE)) {
       // segment already exists on file, and we have committed the realtime segment in ZK. Treat it like an offline segment
-      if (_segmentsMap.containsKey(segmentName)) {
-        _logger.warn("Got reload for segment already on disk {} table {}, have {}", segmentName, _tableName,
-            _segmentsMap.get(segmentName).getClass().getSimpleName());
+      SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+      if (segmentDataManager != null) {
+        _logger.warn("Got reload for segment already on disk {} table {}, have {}", segmentName, _tableNameWithType,
+            segmentDataManager.getClass().getSimpleName());
         return;
       }
 
@@ -196,16 +204,17 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
       // Either we don't have the segment on disk or we have not committed in ZK. We should be starting the consumer
       // for realtime segment here. If we wrote it on disk but could not get to commit to zk yet, we should replace the
       // on-disk segment next time
-      if (_segmentsMap.containsKey(segmentName)) {
-        _logger.warn("Got reload for segment not on disk {} table {}, have {}", segmentName, _tableName,
-            _segmentsMap.get(segmentName).getClass().getSimpleName());
+      SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+      if (segmentDataManager != null) {
+        _logger.warn("Got reload for segment not on disk {} table {}, have {}", segmentName, _tableNameWithType,
+            segmentDataManager.getClass().getSimpleName());
         return;
       }
-      Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableName);
+      Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
       Preconditions.checkNotNull(schema);
       if (!isValid(schema, tableConfig.getIndexingConfig())) {
         _logger.error("Not adding segment {}", segmentName);
-        throw new RuntimeException("Mismatching schema/table config for " + _tableName);
+        throw new RuntimeException("Mismatching schema/table config for " + _tableNameWithType);
       }
 
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, _instanceId);
@@ -224,12 +233,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
             _indexDir.getAbsolutePath(), indexLoadingConfig, schema, _serverMetrics);
       }
       _logger.info("Initialize RealtimeSegmentDataManager - " + segmentName);
-      try {
-        _rwLock.writeLock().lock();
-        _segmentsMap.put(segmentName, manager);
-      } finally {
-        _rwLock.writeLock().unlock();
-      }
+      _segmentDataManagerMap.put(segmentName, manager);
     }
   }
 
