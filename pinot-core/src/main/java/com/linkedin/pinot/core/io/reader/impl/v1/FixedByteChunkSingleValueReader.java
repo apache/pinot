@@ -29,6 +29,9 @@ import java.nio.ByteBuffer;
  */
 public class FixedByteChunkSingleValueReader extends BaseChunkSingleValueReader {
 
+  // Thread local (reusable) byte[] to read bytes from data file.
+  private final ThreadLocal<byte[]> _reusableBytes = ThreadLocal.withInitial(() -> new byte[_lengthOfLongestEntry]);
+
   /**
    * Constructor for the class.
    *
@@ -106,6 +109,28 @@ public class FixedByteChunkSingleValueReader extends BaseChunkSingleValueReader 
     int chunkRowId = row % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkForRow(row, context);
     return chunkBuffer.getDouble(chunkRowId * DOUBLE_SIZE);
+  }
+
+  @Override
+  public byte[] getBytes(int row) {
+    if (!isCompressed()) {
+      byte[] bytes = _reusableBytes.get();
+      getRawData().copyTo(row * _lengthOfLongestEntry, bytes, 0, _lengthOfLongestEntry);
+      return bytes;
+    } else {
+      throw new UnsupportedOperationException("Read without context not supported for compressed data.");
+    }
+  }
+
+  @Override
+  public byte[] getBytes(int row, ChunkReaderContext context) {
+    int chunkRowId = row % _numDocsPerChunk;
+    ByteBuffer chunkBuffer = getChunkForRow(row, context);
+
+    byte[] bytes = _reusableBytes.get();
+    chunkBuffer.position(chunkRowId * _lengthOfLongestEntry );
+    chunkBuffer.get(bytes);
+    return bytes;
   }
 
   @Override

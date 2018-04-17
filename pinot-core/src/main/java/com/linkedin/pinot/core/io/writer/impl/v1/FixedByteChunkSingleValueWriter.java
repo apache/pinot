@@ -101,6 +101,13 @@ public class FixedByteChunkSingleValueWriter extends BaseChunkSingleValueWriter 
   }
 
   @Override
+  public void setBytes(int row, byte[] bytes) {
+    _chunkBuffer.put(bytes);
+    _chunkDataOffset += bytes.length;
+    flushChunkIfNeeded();
+  }
+
+  @Override
   protected void writeChunk() {
     super.writeChunk();
     _chunkDataOffset = 0;

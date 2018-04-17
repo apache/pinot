@@ -39,14 +39,14 @@ import org.testng.annotations.Test;
 public class VarByteChunkSingleValueReaderWriteTest {
   private static final Charset UTF_8 = Charset.forName("UTF-8");
 
-  private static final int NUM_STRINGS = 5003;
+  private static final int NUM_ENTRIES = 5003;
   private static final int NUM_DOCS_PER_CHUNK = 1009;
   private static final int MAX_STRING_LENGTH = 101;
   private static final String TEST_FILE = System.getProperty("java.io.tmpdir") + File.separator + "varByteSVRTest";
 
   /**
-   * This test writes {@link #NUM_STRINGS} using {@link VarByteChunkSingleValueWriter}. It then reads
-   * the strings using {@link VarByteChunkSingleValueReader}, and asserts that what was written is the same as
+   * This test writes {@link #NUM_ENTRIES} using {@link VarByteChunkSingleValueWriter}. It then reads
+   * the strings & bytes using {@link VarByteChunkSingleValueReader}, and asserts that what was written is the same as
    * what was read in.
    *
    * Number of docs and docs per chunk are chosen to generate complete as well partial chunks.
@@ -56,26 +56,28 @@ public class VarByteChunkSingleValueReaderWriteTest {
   @Test
   public void test()
       throws Exception {
-    String[] expected = new String[NUM_STRINGS];
+    String[] expected = new String[NUM_ENTRIES];
     Random random = new Random();
 
     File outFile = new File(TEST_FILE);
     FileUtils.deleteQuietly(outFile);
 
     int maxStringLengthInBytes = 0;
-    for (int i = 0; i < NUM_STRINGS; i++) {
+    for (int i = 0; i < NUM_ENTRIES; i++) {
       expected[i] = RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH));
       maxStringLengthInBytes = Math.max(maxStringLengthInBytes, expected[i].getBytes(UTF_8).length);
     }
 
     ChunkCompressorFactory.CompressionType compressionType = ChunkCompressorFactory.CompressionType.SNAPPY;
     VarByteChunkSingleValueWriter writer =
-        new VarByteChunkSingleValueWriter(outFile, compressionType, NUM_STRINGS, NUM_DOCS_PER_CHUNK,
+        new VarByteChunkSingleValueWriter(outFile, compressionType, NUM_ENTRIES, NUM_DOCS_PER_CHUNK,
             maxStringLengthInBytes);
 
-    for (int i = 0; i < NUM_STRINGS; i++) {
+    for (int i = 0; i < NUM_ENTRIES; i += 2) {
       writer.setString(i, expected[i]);
+      writer.setBytes(i + 1, expected[i].getBytes(UTF_8));
     }
+
     writer.close();
 
     PinotDataBuffer pinotDataBuffer =
@@ -84,9 +86,11 @@ public class VarByteChunkSingleValueReaderWriteTest {
     VarByteChunkSingleValueReader reader = new VarByteChunkSingleValueReader(pinotDataBuffer);
     ChunkReaderContext context = reader.createContext();
 
-    for (int i = 0; i < NUM_STRINGS; i++) {
+    for (int i = 0; i < NUM_ENTRIES; i += 2) {
       String actual = reader.getString(i, context);
       Assert.assertEquals(actual, expected[i]);
+      Assert.assertEquals(actual.getBytes(UTF_8), expected[i].getBytes(UTF_8));
+      Assert.assertEquals(reader.getBytes(i + 1), expected[i].getBytes(UTF_8));
     }
     reader.close();
     FileUtils.deleteQuietly(outFile);

@@ -89,6 +89,11 @@ public abstract class BaseSingleColumnSingleValueReaderWriter<T extends ReaderCo
   }
 
   @Override
+  public byte[] getBytes(int row, ReaderContext context) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public void readValues(int[] rows, int rowStartPos, int rowSize, int[] values, int valuesStartPos) {
     throw new UnsupportedOperationException();
   }
