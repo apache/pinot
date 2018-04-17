@@ -608,7 +608,7 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
 
           verifyRepairs(tableConfig, idealState, expectedPartitionAssignment, segmentManager, oldMapFields);
         } else {
-          // at least 1 replica of latest segments is in CONSUMING state
+          // at least 1 replica of latest segments in ideal state is in CONSUMING state
 
           final boolean step2NotDone = random.nextBoolean();
 
