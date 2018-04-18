@@ -42,14 +42,18 @@ import org.apache.commons.lang.StringUtils;
 @Path(value = "/userdashboard")
 @Produces(MediaType.APPLICATION_JSON)
 public class UserDashboardResource {
+  private static final int ANOMALIES_LIMIT_DEFAULT = 100;
+
   private final MergedAnomalyResultManager anomalyDAO;
   private final AnomalyFunctionManager functionDAO;
   private final MetricConfigManager metricDAO;
+  private final DatasetConfigManager datasetDAO;
 
-  public UserDashboardResource(MergedAnomalyResultManager anomalyDAO, AnomalyFunctionManager functionDAO, MetricConfigManager metricDAO) {
+  public UserDashboardResource(MergedAnomalyResultManager anomalyDAO, AnomalyFunctionManager functionDAO, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) {
     this.anomalyDAO = anomalyDAO;
     this.functionDAO = functionDAO;
     this.metricDAO = metricDAO;
+    this.datasetDAO = datasetDAO;
   }
 
   /**
@@ -69,6 +73,7 @@ public class UserDashboardResource {
    *     "feedback" : "NO_FEEDBACK",
    *     "metricId" : 12346
    *     "metric" : "page_views",
+   *     "metricUrn" : "thirdeye:metric:12345:country%3Dus"
    *     "functionId" : 12347
    *     "functionName" : "page_views_monitoring"
    *     },
@@ -103,6 +108,9 @@ public class UserDashboardResource {
     //
     // query params
     //
+    if (limit == null) {
+      limit = ANOMALIES_LIMIT_DEFAULT;
+    }
 
     // safety condition
     Preconditions.checkNotNull(start);
@@ -203,7 +211,7 @@ public class UserDashboardResource {
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       AnomalySummary summary = new AnomalySummary();
       summary.setId(anomaly.getId());
-      summary.setStart(anomaly.getEndTime());
+      summary.setStart(anomaly.getStartTime());
       summary.setEnd(anomaly.getEndTime());
       summary.setCurrent(anomaly.getAvgCurrentVal());
       summary.setBaseline(anomaly.getAvgBaselineVal());
@@ -211,6 +219,7 @@ public class UserDashboardResource {
       summary.setMetricName(anomaly.getMetric());
       summary.setDimensions(anomaly.getDimensions());
       summary.setDataset(anomaly.getCollection());
+      summary.setMetricUrn(this.getMetricUrn(anomaly));
 
       // TODO use alert filter if necessary
       summary.setSeverity(Math.abs(anomaly.getWeight()));
@@ -246,5 +255,15 @@ public class UserDashboardResource {
     } catch (Exception e) {
       return -1;
     }
+  }
+
+  /**
+   * Returns an URN matching the anomalies associated metric (and dimensions)
+   *
+   * @param anomaly anomaly dto
+   * @return metric urn
+   */
+  private String getMetricUrn(MergedAnomalyResultDTO anomaly) {
+    return MetricEntity.fromMetric(1.0, this.getMetricId(anomaly), ResourceUtils.getAnomalyFilters(anomaly, this.datasetDAO)).getUrn();
   }
 }

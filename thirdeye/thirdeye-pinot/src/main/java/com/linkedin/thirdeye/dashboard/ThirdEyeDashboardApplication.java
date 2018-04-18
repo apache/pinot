@@ -155,10 +155,11 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new FunctionOnboardingResource());
     env.jersey().register(new CustomizedEventResource(DAO_REGISTRY.getEventDAO()));
     env.jersey().register(new TimeSeriesResource());
-    env.jersey().register(new UserDashboardResource(DAO_REGISTRY.getMergedAnomalyResultDAO(), DAO_REGISTRY.getAnomalyFunctionDAO(), DAO_REGISTRY.getMetricConfigDAO()));
+    env.jersey().register(new UserDashboardResource(DAO_REGISTRY.getMergedAnomalyResultDAO(), DAO_REGISTRY.getAnomalyFunctionDAO(), DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO()));
 
     TimeSeriesLoader timeSeriesLoader = new DefaultTimeSeriesLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache());
     AggregationLoader aggregationLoader = new DefaultAggregationLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
+
     env.jersey().register(new RootCauseSessionResource(DAO_REGISTRY.getRootcauseSessionDAO(), new ObjectMapper()));
     env.jersey().register(new RootCauseMetricResource(Executors.newCachedThreadPool(), aggregationLoader, timeSeriesLoader, DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO()));
 

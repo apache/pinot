@@ -17,6 +17,7 @@ public class AnomalySummary {
   private double baseline;
   private AnomalyFeedbackType feedback;
   private String metricName;
+  private String metricUrn;
   private long metricId;
   private String functionName;
   private long functionId;
@@ -112,6 +113,14 @@ public class AnomalySummary {
 
   public void setMetricId(long metricId) {
     this.metricId = metricId;
+  }
+
+  public String getMetricUrn() {
+    return metricUrn;
+  }
+
+  public void setMetricUrn(String metricUrn) {
+    this.metricUrn = metricUrn;
   }
 
   public long getFunctionId() {
