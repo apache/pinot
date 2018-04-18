@@ -41,12 +41,14 @@ public class DateTimeConverterTest {
         new Object[]{"1:MILLISECONDS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS", new long[]{1505898300000L}, new String[1], new String[]{"20170920"}},
         new Object[]{"1:YEARS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:MILLISECONDS:EPOCH", "1:DAYS", new String[]{"20170601"}, new long[1], new long[]{1496275200000L}},
         new Object[]{"1:MINUTES:SIMPLE_DATE_FORMAT:M/d/yyyy hh a", "1:MILLISECONDS:EPOCH", "5:DAYS", new String[]{"8/7/2017 1 AM"}, new long[1], new long[]{1502064000000L}},
-        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy hh:mm a", "1:MONTHS:SIMPLE_DATE_FORMAT:yyyyMMddHHmm", "1:DAYS", new String[]{"1/2/1994 06:28 AM"}, new String[1], new String[]{"199401020628"}},
+        new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy hh:mm a", "1:MONTHS:SIMPLE_DATE_FORMAT:yyyyMMddHHmm", "1:DAYS", new String[]{"1/2/1994 06:28 AM"}, new String[1], new String[]{"199401020000"}},
         new Object[]{"1:SECONDS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", "1:MILLISECONDS:EPOCH", "1:HOURS", new String[]{"12/27/2016 11:20:00 PM"}, new long[1], new long[]{1482879600000L}},
         new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", new String[]{"8/7/2017 12:45:50 AM"}, new long[1], new long[]{1502066750000L}},
         new Object[]{"5:MINUTES:EPOCH", "1:MILLISECONDS:EPOCH", "1:HOURS", new long[]{5019675L}, new long[1], new long[]{1505901600000L}},
         new Object[]{"5:MINUTES:EPOCH", "1:HOURS:EPOCH", "1:HOURS", new long[]{5019661L}, new long[1], new long[]{418305L}},
-        new Object[]{"1:MILLISECONDS:EPOCH", "1:WEEKS:EPOCH", "1:MILLISECONDS", new long[]{1505898000000L}, new long[1], new long[]{2489L}}
+        new Object[]{"1:MILLISECONDS:EPOCH", "1:WEEKS:EPOCH", "1:MILLISECONDS", new long[]{1505898000000L}, new long[1], new long[]{2489L}},
+        new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS", "15:MINUTES", new long[]{1523560598233L}, new String[1], new String[]{"2018-04-12 19:15:00.000"}},
+        new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "15:SECONDS", new long[]{1523560598233L}, new String[1], new String[]{"2018-04-12 13:16:30.000"}}
     };
   }
 }

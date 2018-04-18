@@ -27,7 +27,7 @@ import org.joda.time.format.DateTimeFormatter;
 /**
  * Base date time transformer to transform and bucket date time values from epoch/simple date format to epoch/simple
  * date format.
- * <p>NOTE: time size, time unit and output granularity does not apply to simple date format.
+ * <p>NOTE: time size and time unit do not apply to simple date format.
  */
 public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I, O> {
   private final int _inputTimeSize;
@@ -62,7 +62,7 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
   }
 
   protected String transformMillisToSDF(long millisSinceEpoch) {
-    return _outputDateTimeFormatter.print(millisSinceEpoch);
+    return _outputDateTimeFormatter.print(transformToOutputGranularity(millisSinceEpoch));
   }
 
   protected long transformToOutputGranularity(long millisSinceEpoch) {
