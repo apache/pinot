@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.query.selection;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.query.selection.iterator.DoubleArraySelectionColumnIterator;
@@ -49,11 +48,11 @@ public class SelectionFetcher {
 
     for (int i = 0; i < _numColumns; i++) {
       Block block = blocks[i];
-      FieldSpec.DataType columnType = dataSchema.getColumnType(i);
+      DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
       if (block.getMetadata().hasDictionary()) {
         // With dictionary
 
-        switch (columnType) {
+        switch (columnDataType) {
           // Single value
           case INT:
           case LONG:
@@ -84,7 +83,7 @@ public class SelectionFetcher {
       } else {
         // No dictionary
 
-        switch (columnType) {
+        switch (columnDataType) {
           case INT:
             _selectionColumnIterators[i] = new IntSelectionColumnIterator(block);
             break;

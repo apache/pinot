@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.queries;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -50,8 +49,8 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(selectionDataSchema.size(), 10);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
     Assert.assertEquals(selectionDataSchema.getColumnName(5), "column6");
-    Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnType(5), FieldSpec.DataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(5), DataSchema.ColumnDataType.INT_ARRAY);
     Assert.assertTrue(resultsBlock.getSelectionResult().isEmpty());
 
     // Test query with filter
@@ -66,8 +65,8 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(selectionDataSchema.size(), 10);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
     Assert.assertEquals(selectionDataSchema.getColumnName(5), "column6");
-    Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnType(5), FieldSpec.DataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(5), DataSchema.ColumnDataType.INT_ARRAY);
     Assert.assertTrue(resultsBlock.getSelectionResult().isEmpty());
   }
 
@@ -87,8 +86,8 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(selectionDataSchema.size(), 10);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
     Assert.assertEquals(selectionDataSchema.getColumnName(5), "column6");
-    Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnType(5), FieldSpec.DataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(5), DataSchema.ColumnDataType.INT_ARRAY);
     List<Serializable[]> selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     Serializable[] firstRow = selectionResult.get(0);
@@ -108,8 +107,8 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(selectionDataSchema.size(), 10);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
     Assert.assertEquals(selectionDataSchema.getColumnName(5), "column6");
-    Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnType(5), FieldSpec.DataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(5), DataSchema.ColumnDataType.INT_ARRAY);
     selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     firstRow = selectionResult.get(0);
@@ -134,8 +133,8 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(selectionDataSchema.size(), 3);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
     Assert.assertEquals(selectionDataSchema.getColumnName(2), "column6");
-    Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnType(2), FieldSpec.DataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(2), DataSchema.ColumnDataType.INT_ARRAY);
     List<Serializable[]> selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     Serializable[] firstRow = selectionResult.get(0);
@@ -155,8 +154,8 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(selectionDataSchema.size(), 3);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
     Assert.assertEquals(selectionDataSchema.getColumnName(2), "column6");
-    Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnType(2), FieldSpec.DataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(2), DataSchema.ColumnDataType.INT_ARRAY);
     selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     firstRow = selectionResult.get(0);
@@ -181,8 +180,8 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(selectionDataSchema.size(), 4);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column5");
     Assert.assertEquals(selectionDataSchema.getColumnName(3), "column6");
-    Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.STRING);
-    Assert.assertEquals(selectionDataSchema.getColumnType(3), FieldSpec.DataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(0), DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(3), DataSchema.ColumnDataType.INT_ARRAY);
     Queue<Serializable[]> selectionResult = (Queue<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     Serializable[] lastRow = selectionResult.peek();
@@ -202,8 +201,8 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(selectionDataSchema.size(), 4);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column5");
     Assert.assertEquals(selectionDataSchema.getColumnName(3), "column6");
-    Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.STRING);
-    Assert.assertEquals(selectionDataSchema.getColumnType(3), FieldSpec.DataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(0), DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(3), DataSchema.ColumnDataType.INT_ARRAY);
     selectionResult = (Queue<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     lastRow = selectionResult.peek();

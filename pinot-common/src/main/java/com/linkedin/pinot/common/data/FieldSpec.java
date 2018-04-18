@@ -18,9 +18,9 @@ package com.linkedin.pinot.common.data;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
-import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.avro.Schema.Type;
 
 
@@ -52,11 +52,11 @@ public abstract class FieldSpec {
   protected DataType _dataType;
   protected boolean _isSingleValueField = true;
   protected Object _defaultNullValue;
+  // Transform function to generate this column, can be based on other columns
+  protected String _transformFunction;
 
   private transient String _stringDefaultNullValue;
-  
-  //apply a transform function to generate this column, this can be based on another column
-  private String _transformFunction; 
+
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public FieldSpec() {
@@ -183,13 +183,15 @@ public abstract class FieldSpec {
     }
   }
 
-  /**
-   * Transform function if defined else null.
-   * @return
-   */
   public String getTransformFunction() {
     return _transformFunction;
   }
+
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  public void setTransformFunction(@Nonnull String transformFunction) {
+    _transformFunction = transformFunction;
+  }
+
   /**
    * Returns the {@link JsonObject} representing the field spec.
    * <p>Only contains fields with non-default value.
@@ -292,144 +294,26 @@ public abstract class FieldSpec {
   }
 
   /**
-   * The <code>DataType</code> enum is used to demonstrate the data type of a column.
-   * <p>Array <code>DataType</code> is only used in {@link DataSchema}.
-   * <p>In {@link Schema}, use non-array <code>DataType</code> only.
-   * <p>In pinot, we store data using 5 <code>DataType</code>s: INT, LONG, FLOAT, DOUBLE, STRING. All other
-   * <code>DataType</code>s will be converted to one of them.
+   * The <code>DataType</code> enum is used to demonstrate the data type of a field.
    */
   public enum DataType {
-    BOOLEAN,      // Stored as STRING.
-    BYTE,         // Stored as INT.
-    CHAR,         // Stored as STRING.
-    SHORT,        // Stored as INT.
     INT,
     LONG,
     FLOAT,
     DOUBLE,
+    BOOLEAN,  // Stored as STRING
     STRING,
-    OBJECT,       // Used in dataTable to transfer data structure.
-    //EVERYTHING AFTER THIS MUST BE ARRAY TYPE
-    BYTE_ARRAY,   // Unused.
-    CHAR_ARRAY,   // Unused.
-    SHORT_ARRAY,  // Unused.
-    INT_ARRAY,
-    LONG_ARRAY,
-    FLOAT_ARRAY,
-    DOUBLE_ARRAY,
-    STRING_ARRAY;
-
-    public boolean isNumber() {
-      switch (this) {
-        case BYTE:
-        case SHORT:
-        case INT:
-        case LONG:
-        case FLOAT:
-        case DOUBLE:
-          return true;
-        default:
-          return false;
-      }
-    }
-
-    public boolean isInteger() {
-      switch (this) {
-        case BYTE:
-        case SHORT:
-        case INT:
-        case LONG:
-          return true;
-        default:
-          return false;
-      }
-    }
-
-    public boolean isSingleValue() {
-      return this.ordinal() < BYTE_ARRAY.ordinal();
-    }
-
-    public DataType toMultiValue() {
-      switch (this) {
-        case BYTE:
-          return BYTE_ARRAY;
-        case CHAR:
-          return CHAR_ARRAY;
-        case INT:
-          return INT_ARRAY;
-        case LONG:
-          return LONG_ARRAY;
-        case FLOAT:
-          return FLOAT_ARRAY;
-        case DOUBLE:
-          return DOUBLE_ARRAY;
-        case STRING:
-          return STRING_ARRAY;
-        default:
-          throw new UnsupportedOperationException("Unsupported toMultiValue for data type: " + this);
-      }
-    }
-
-    public DataType toSingleValue() {
-      switch (this) {
-        case BYTE_ARRAY:
-          return BYTE;
-        case CHAR_ARRAY:
-          return CHAR;
-        case INT_ARRAY:
-          return INT;
-        case LONG_ARRAY:
-          return LONG;
-        case FLOAT_ARRAY:
-          return FLOAT;
-        case DOUBLE_ARRAY:
-          return DOUBLE;
-        case STRING_ARRAY:
-          return STRING;
-        default:
-          throw new UnsupportedOperationException("Unsupported toSingleValue for data type: " + this);
-      }
-    }
-
-    public boolean isCompatible(DataType anotherDataType) {
-      // Single-value is not compatible with multi-value.
-      if (isSingleValue() != anotherDataType.isSingleValue()) {
-        return false;
-      }
-      // Number is not compatible with String.
-      if (isSingleValue()) {
-        return isNumber() == anotherDataType.isNumber();
-      } else {
-        return toSingleValue().isNumber() == anotherDataType.toSingleValue().isNumber();
-      }
-    }
+    BYTES;
 
     /**
-     * Return the {@link DataType} stored in pinot.
+     * Returns the data type stored in Pinot.
      */
     public DataType getStoredType() {
-      switch (this) {
-        case BYTE:
-        case SHORT:
-        case INT:
-          return INT;
-        case LONG:
-          return LONG;
-        case FLOAT:
-          return FLOAT;
-        case DOUBLE:
-          return DOUBLE;
-        case BOOLEAN:
-        case CHAR:
-        case STRING:
-          return STRING;
-        default:
-          throw new UnsupportedOperationException("Unsupported data type: " + this);
-      }
+      return this == BOOLEAN ? STRING : this;
     }
 
     /**
-     * Return the {@link DataType} associate with the {@link Type}
+     * Returns the data type stored in Pinot that is associated with the given Avro type.
      */
     public static DataType valueOf(Type avroType) {
       switch (avroType) {
@@ -451,7 +335,7 @@ public abstract class FieldSpec {
     }
 
     /**
-     * Return number of bytes needed for storage.
+     * Returns the number of bytes needed to store the data type.
      */
     public int size() {
       switch (this) {
@@ -464,7 +348,7 @@ public abstract class FieldSpec {
         case DOUBLE:
           return 8;
         default:
-          throw new UnsupportedOperationException("Cannot get number of bytes for: " + this);
+          throw new IllegalStateException("Cannot get number of bytes for: " + this);
       }
     }
   }

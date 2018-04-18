@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.query.selection;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.response.broker.SelectionResults;
@@ -42,17 +41,15 @@ import org.testng.annotations.Test;
 public class SelectionOperatorServiceTest {
   private final String[] _columnNames =
       {"int", "long", "float", "double", "string", "int_array", "long_array", "float_array", "double_array", "string_array"};
-  private final FieldSpec.DataType[] _dataTypes =
-      {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.STRING, FieldSpec.DataType.INT_ARRAY, FieldSpec.DataType.LONG_ARRAY, FieldSpec.DataType.FLOAT_ARRAY, FieldSpec.DataType.DOUBLE_ARRAY, FieldSpec.DataType.STRING_ARRAY};
-  private final DataSchema _dataSchema = new DataSchema(_columnNames, _dataTypes);
-  private final FieldSpec.DataType[] _compatibleDataTypes =
-      {FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.INT, FieldSpec.DataType.STRING, FieldSpec.DataType.LONG_ARRAY, FieldSpec.DataType.FLOAT_ARRAY, FieldSpec.DataType.DOUBLE_ARRAY, FieldSpec.DataType.INT_ARRAY, FieldSpec.DataType.STRING_ARRAY};
-  private final DataSchema _compatibleDataSchema =
-      new DataSchema(_columnNames, _compatibleDataTypes);
-  private final FieldSpec.DataType[] _upgradedDataTypes =
-      new FieldSpec.DataType[]{FieldSpec.DataType.LONG, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.STRING, FieldSpec.DataType.LONG_ARRAY, FieldSpec.DataType.DOUBLE_ARRAY, FieldSpec.DataType.DOUBLE_ARRAY, FieldSpec.DataType.DOUBLE_ARRAY, FieldSpec.DataType.STRING_ARRAY};
-  private final DataSchema _upgradedDataSchema =
-      new DataSchema(_columnNames, _upgradedDataTypes);
+  private final DataSchema.ColumnDataType[] _columnDataTypes =
+      {DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.FLOAT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.LONG_ARRAY, DataSchema.ColumnDataType.FLOAT_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY};
+  private final DataSchema _dataSchema = new DataSchema(_columnNames, _columnDataTypes);
+  private final DataSchema.ColumnDataType[] _compatibleColumnDataTypes =
+      {DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.FLOAT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG_ARRAY, DataSchema.ColumnDataType.FLOAT_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY};
+  private final DataSchema _compatibleDataSchema = new DataSchema(_columnNames, _compatibleColumnDataTypes);
+  private final DataSchema.ColumnDataType[] _upgradedColumnDataTypes =
+      new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.LONG_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY, DataSchema.ColumnDataType.STRING_ARRAY};
+  private final DataSchema _upgradedDataSchema = new DataSchema(_columnNames, _upgradedColumnDataTypes);
   private final Serializable[] _row1 =
       {0, 1L, 2.0F, 3.0, "4", new int[]{5}, new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new String[]{"9"}};
   private final Serializable[] _row2 =
@@ -121,8 +118,7 @@ public class SelectionOperatorServiceTest {
   }
 
   @Test
-  public void testCompatibleRowsDataTableTransformation()
-      throws Exception {
+  public void testCompatibleRowsDataTableTransformation() throws Exception {
     Collection<Serializable[]> rows = new ArrayList<>(2);
     rows.add(_row1.clone());
     rows.add(_compatibleRow1.clone());
@@ -148,8 +144,10 @@ public class SelectionOperatorServiceTest {
         SelectionOperatorUtils.renderSelectionResultsWithoutOrdering(rows, _upgradedDataSchema,
             Arrays.asList(_columnNames));
     List<Serializable[]> formattedRows = selectionResults.getRows();
-    Serializable[] expectedFormattedRow1 = {"0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9"}};
-    Serializable[] expectedFormattedRow2 = {"1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"}, new String[]{"10"}};
+    Serializable[] expectedFormattedRow1 =
+        {"0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9"}};
+    Serializable[] expectedFormattedRow2 =
+        {"1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"}, new String[]{"10"}};
     Assert.assertEquals(formattedRows.get(0), expectedFormattedRow1);
     Assert.assertEquals(formattedRows.get(1), expectedFormattedRow2);
   }
@@ -164,8 +162,10 @@ public class SelectionOperatorServiceTest {
     rows.offer(_compatibleRow2.clone());
     SelectionResults selectionResults = selectionOperatorService.renderSelectionResultsWithOrdering();
     List<Serializable[]> formattedRows = selectionResults.getRows();
-    Serializable[] expectedFormattedRow1 = {"1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"}, new String[]{"10"}};
-    Serializable[] expectedFormattedRow2 = {"0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9"}};
+    Serializable[] expectedFormattedRow1 =
+        {"1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"}, new String[]{"10"}};
+    Serializable[] expectedFormattedRow2 =
+        {"0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9"}};
     Assert.assertEquals(formattedRows.get(0), expectedFormattedRow1);
     Assert.assertEquals(formattedRows.get(1), expectedFormattedRow2);
   }
