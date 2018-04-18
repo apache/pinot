@@ -28,8 +28,6 @@ public class ThirdEyeCacheRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeCacheRegistry.class);
   private static final ThirdEyeCacheRegistry INSTANCE = new ThirdEyeCacheRegistry();
 
-  public static final long CACHE_EXPIRATION_HOURS = 1;
-
   // DAO to ThirdEye's data and meta-data storage.
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static DatasetConfigManager datasetConfigDAO;
@@ -109,14 +107,14 @@ public class ThirdEyeCacheRegistry {
     // DatasetConfig cache
     // TODO deprecate. read from database directly
     LoadingCache<String, DatasetConfigDTO> datasetConfigCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS)
+        .expireAfterWrite(1, TimeUnit.MINUTES)
         .build(new DatasetConfigCacheLoader(datasetConfigDAO));
     cacheRegistry.registerDatasetConfigCache(datasetConfigCache);
 
     // MetricConfig cache
     // TODO deprecate. read from database directly
     LoadingCache<MetricDataset, MetricConfigDTO> metricConfigCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS)
+        .expireAfterWrite(1, TimeUnit.MINUTES)
         .build(new MetricConfigCacheLoader(metricConfigDAO));
     cacheRegistry.registerMetricConfigCache(metricConfigCache);
 
@@ -128,7 +126,7 @@ public class ThirdEyeCacheRegistry {
 
     // Dimension Filter cache
     LoadingCache<String, String> dimensionFiltersCache = CacheBuilder.newBuilder()
-        .expireAfterWrite(CACHE_EXPIRATION_HOURS, TimeUnit.HOURS)
+        .expireAfterWrite(1, TimeUnit.HOURS)
         .build(new DimensionFiltersCacheLoader(queryCache, datasetConfigDAO));
     cacheRegistry.registerDimensionFiltersCache(dimensionFiltersCache);
 
