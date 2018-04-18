@@ -26,7 +26,6 @@ import com.linkedin.pinot.common.utils.time.TimeConverter;
 import com.linkedin.pinot.common.utils.time.TimeConverterProvider;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.function.FunctionExpressionEvaluator;
-
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -77,7 +76,7 @@ public class PlainFieldExtractor implements FieldExtractor {
   private String _outgoingTimeColumnName;
   private TimeConverter _timeConverter;
   private Map<String, FunctionExpressionEvaluator> _functionEvaluatorMap;
-  
+
   public PlainFieldExtractor(Schema schema) {
     _schema = schema;
     initErrorCount();
@@ -121,7 +120,7 @@ public class PlainFieldExtractor implements FieldExtractor {
     }
   }
 
-  private void initFunctionEvaluators(){
+  private void initFunctionEvaluators() {
     _functionEvaluatorMap = new HashMap<>();
     for (String column : _schema.getColumnNames()) {
       FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
@@ -137,7 +136,7 @@ public class PlainFieldExtractor implements FieldExtractor {
       }
     }
   }
-  
+
   @Override
   public Schema getSchema() {
     return _schema;
@@ -178,12 +177,12 @@ public class PlainFieldExtractor implements FieldExtractor {
           }
         }
       } else if (fieldSpec.getTransformFunction() != null) {
-         FunctionExpressionEvaluator functionEvaluator = _functionEvaluatorMap.get(column);
-         value = functionEvaluator.evaluate(row);
+        FunctionExpressionEvaluator functionEvaluator = _functionEvaluatorMap.get(column);
+        value = functionEvaluator.evaluate(row);
       } else {
         value = row.getValue(column);
       }
-      
+
       if (value == null) {
         hasNull = true;
         _totalNullCols++;

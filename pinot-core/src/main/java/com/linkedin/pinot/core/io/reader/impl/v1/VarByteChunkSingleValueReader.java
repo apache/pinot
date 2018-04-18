@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.io.reader.impl.v1;
 import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
 import com.linkedin.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 
@@ -38,7 +37,6 @@ public class VarByteChunkSingleValueReader extends BaseChunkSingleValueReader {
    * Constructor for the class.
    *
    * @param pinotDataBuffer Data buffer to read from
-   * @throws IOException
    */
   public VarByteChunkSingleValueReader(PinotDataBuffer pinotDataBuffer) {
     super(pinotDataBuffer);
@@ -58,29 +56,65 @@ public class VarByteChunkSingleValueReader extends BaseChunkSingleValueReader {
     ByteBuffer chunkBuffer = getChunkForRow(row, context);
 
     int rowOffset = chunkBuffer.getInt(chunkRowId * INT_SIZE);
-    int nextRowOffset;
-
-    if (chunkRowId == _numDocsPerChunk - 1) {
-      // Last row in this trunk.
-      nextRowOffset = chunkBuffer.limit();
-    } else {
-      nextRowOffset = chunkBuffer.getInt((chunkRowId + 1) * INT_SIZE);
-      // For incomplete chunks, the next string's offset will be 0 as row offset for absent rows are 0.
-      if (nextRowOffset == 0) {
-        nextRowOffset = chunkBuffer.limit();
-      }
-    }
+    int nextRowOffset = getNextRowOffset(chunkRowId, chunkBuffer);
 
     int length = nextRowOffset - rowOffset;
-    chunkBuffer.position(rowOffset);
-
     byte[] bytes = _reusableBytes.get();
+
+    chunkBuffer.position(rowOffset);
     chunkBuffer.get(bytes, 0, length);
+
     return new String(bytes, 0, length, UTF_8);
+  }
+
+  @Override
+  public byte[] getBytes(int row) {
+    return getBytes(row, createContext());
+  }
+
+  @Override
+  public byte[] getBytes(int row, ChunkReaderContext context) {
+    int chunkRowId = row % _numDocsPerChunk;
+    ByteBuffer chunkBuffer = getChunkForRow(row, context);
+
+    int rowOffset = chunkBuffer.getInt(chunkRowId * INT_SIZE);
+    int nextRowOffset = getNextRowOffset(chunkRowId, chunkBuffer);
+
+    int length = nextRowOffset - rowOffset;
+    byte[] bytes = new byte[length];
+
+    chunkBuffer.position(rowOffset);
+    chunkBuffer.get(bytes, 0, length);
+    return bytes;
   }
 
   @Override
   public ChunkReaderContext createContext() {
     return new ChunkReaderContext(_maxChunkSize);
+  }
+
+  /**
+   * Helper method to compute the offset of next row in the chunk buffer.
+   *
+   * @param currentRowId Current row id within the chunk buffer.
+   * @param chunkBuffer Chunk buffer containing the rows.
+   *
+   * @return Offset of next row within the chunk buffer. If current row is the last one,
+   * chunkBuffer.limit() is returned.
+   */
+  private int getNextRowOffset(int currentRowId, ByteBuffer chunkBuffer) {
+    int nextRowOffset;
+
+    if (currentRowId == _numDocsPerChunk - 1) {
+      // Last row in this trunk.
+      nextRowOffset = chunkBuffer.limit();
+    } else {
+      nextRowOffset = chunkBuffer.getInt((currentRowId + 1) * INT_SIZE);
+      // For incomplete chunks, the next string's offset will be 0 as row offset for absent rows are 0.
+      if (nextRowOffset == 0) {
+        nextRowOffset = chunkBuffer.limit();
+      }
+    }
+    return nextRowOffset;
   }
 }

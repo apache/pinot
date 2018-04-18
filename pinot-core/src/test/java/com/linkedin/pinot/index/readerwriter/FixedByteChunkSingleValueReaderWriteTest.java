@@ -26,8 +26,10 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.channels.FileChannel;
+import java.nio.charset.Charset;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.RandomStringUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -43,11 +45,13 @@ import org.testng.annotations.Test;
  *
  */
 public class FixedByteChunkSingleValueReaderWriteTest {
+  private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   private static final int NUM_VALUES = 10009;
   private static final int NUM_DOCS_PER_CHUNK = 5003;
   private static final String TEST_FILE = System.getProperty("java.io.tmpdir") + File.separator + "FixedByteSVRTest";
   private static final Random _random = new Random();
+  private static final int BYTES_LENGTH = 101;
 
   @Test
   public void testWithCompression()
@@ -57,6 +61,7 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     testLong(compressionType);
     testFloat(compressionType);
     testDouble(compressionType);
+    testBytes(compressionType);
   }
 
   @Test
@@ -67,6 +72,7 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     testLong(compressionType);
     testFloat(compressionType);
     testDouble(compressionType);
+    testBytes(compressionType);
   }
 
   public void testInt(ChunkCompressorFactory.CompressionType compressionType)
@@ -221,6 +227,42 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     FileUtils.deleteQuietly(outFile);
   }
 
+  public void testBytes(ChunkCompressorFactory.CompressionType compressionType)
+      throws Exception {
+    byte[][] expected = new byte[NUM_VALUES][BYTES_LENGTH];
+    for (int i = 0; i < NUM_VALUES; i++) {
+      expected[i] = RandomStringUtils.randomAscii(50).getBytes(UTF_8);
+    }
+
+    File outFile = new File(TEST_FILE);
+    FileUtils.deleteQuietly(outFile);
+
+    FixedByteChunkSingleValueWriter writer =
+        new FixedByteChunkSingleValueWriter(outFile, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, 50);
+
+    for (int i = 0; i < NUM_VALUES; i++) {
+      writer.setBytes(i, expected[i]);
+    }
+    writer.close();
+
+    PinotDataBuffer pinotDataBuffer =
+        PinotDataBuffer.fromFile(outFile, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, getClass().getName());
+
+    FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(pinotDataBuffer);
+    ChunkReaderContext context = reader.createContext();
+
+    for (int i = 0; i < NUM_VALUES; i++) {
+      byte[] actual = reader.getBytes(i, context);
+      Assert.assertEquals(actual, expected[i]);
+
+      if (compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH)) {
+        actual = reader.getBytes(i);
+        Assert.assertEquals(actual, expected[i]);
+      }
+    }
+    reader.close();
+    FileUtils.deleteQuietly(outFile);
+  }
   /**
    * This test ensures that the reader can read in an data file from version 1.
    * @throws IOException

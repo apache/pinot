@@ -95,6 +95,16 @@ public class PinotSegmentColumnReader {
     }
   }
 
+  Object readBytes(int docId) {
+    SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
+    if (_dictionary != null) {
+      int dictId = svReader.getInt(docId, _readerContext);
+      return _dictionary.get(dictId);
+    } else {
+      return svReader.getBytes(docId, _readerContext);
+    }
+  }
+
   Object[] readMV(int docId) {
     SingleColumnMultiValueReader mvReader = (SingleColumnMultiValueReader) _reader;
     int numValues = mvReader.getIntArray(docId, _mvBuffer, _readerContext);

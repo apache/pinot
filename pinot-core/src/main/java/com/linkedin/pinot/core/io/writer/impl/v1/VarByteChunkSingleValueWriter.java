@@ -80,24 +80,22 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
   @Override
   public void setString(int row, String string) {
     byte[] bytes = string.getBytes(UTF_8);
-    int length = bytes.length;
+    setBytes(row, bytes);
+  }
 
+  @Override
+  public void setBytes(int row, byte[] bytes) {
     _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
     _chunkHeaderOffset += INT_SIZE;
 
     _chunkBuffer.position(_chunkDataOffSet);
     _chunkBuffer.put(bytes);
-    _chunkDataOffSet += length;
+    _chunkDataOffSet += bytes.length;
 
     // If buffer filled, then compress and write to file.
     if (_chunkHeaderOffset == _chunkHeaderSize) {
       writeChunk();
     }
-  }
-
-  @Override
-  public void setBytes(int row, byte[] bytes) {
-    throw new UnsupportedOperationException();
   }
 
   @Override
