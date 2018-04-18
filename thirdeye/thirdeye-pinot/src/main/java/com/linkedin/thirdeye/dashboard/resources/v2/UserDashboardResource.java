@@ -1,16 +1,19 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.SetMultimap;
 import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalySummary;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
+import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
@@ -29,6 +32,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import org.apache.commons.lang.StringUtils;
 
 
 /**
@@ -176,9 +180,7 @@ public class UserDashboardResource {
     });
 
     // limit result size
-    if (limit != null) {
-      anomalies = anomalies.subList(0, limit);
-    }
+    anomalies = anomalies.subList(0, Math.min(anomalies.size(), limit));
 
     //
     // fetch functions
