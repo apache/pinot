@@ -43,7 +43,7 @@ public class RealtimeSegmentConverter {
   private String outputPath;
   private Schema dataSchema;
   private String tableName;
-  private String timeColumnName;
+  private String timeColumnName; // TODO: use this to set time column in segment generator config
   private String segmentName;
   private String sortedColumn;
   private List<String> invertedIndexColumns;
