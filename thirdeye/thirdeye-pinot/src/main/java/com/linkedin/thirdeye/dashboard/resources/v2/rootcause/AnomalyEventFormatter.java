@@ -102,8 +102,39 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
 
     // dimensions as attributes
     List<String> dimensionStrings = new ArrayList<>();
+
+    // anomaly function filters
+    // NOTE: this should not need to be here. filters should be stored in the anomaly unconditionally
+    for (String filterString : function.getFilters().split(";")) {
+      try {
+        String[] filter = filterString.split("=", 2);
+        String dimName = filter[0];
+        String dimValue = filter[1];
+
+        if (!dataset.getDimensionsHaveNoPreAggregation().contains(dimName) &&
+            Objects.equals(dimValue, dataset.getPreAggregatedKeyword())) {
+          // NOTE: workaround for anomaly detection inserting pre-aggregated keyword as dimension
+          continue;
+        }
+
+        if (anomaly.getDimensions().containsKey(dimName)) {
+          // avoid duplication of explored dimensions
+          continue;
+        }
+
+        dimensionStrings.add(dimValue);
+        attributes.put(ATTR_DIMENSIONS, dimName);
+        attributes.put(dimName, dimValue);
+
+      } catch(Exception ignore) {
+        // left blank
+      }
+    }
+
+    // anomaly dimensions
     for (Map.Entry<String, String> entry : anomaly.getDimensions().entrySet()) {
-      if (Objects.equals(entry.getValue(), dataset.getPreAggregatedKeyword())) {
+      if (!dataset.getDimensionsHaveNoPreAggregation().contains(entry.getKey()) &&
+          Objects.equals(entry.getValue(), dataset.getPreAggregatedKeyword())) {
         // NOTE: workaround for anomaly detection inserting pre-aggregated keyword as dimension
         continue;
       }
