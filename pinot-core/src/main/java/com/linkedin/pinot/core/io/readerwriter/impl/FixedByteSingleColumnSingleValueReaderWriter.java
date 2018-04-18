@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This class implements reader as well as writer interfaces for fixed-byte single column and single value data.
+ * Thread-safe for one-writer and multiple readers.
  * <ul>
  *   <li> Auto expands memory allocation on-demand. </li>
  *   <li> Supports random reads and writes. </li>
@@ -39,11 +40,19 @@ import org.slf4j.LoggerFactory;
  * </ul>
  */
 public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColumnSingleValueReaderWriter {
+  // A class to hold the reader and writer objects, so that we can swap the reference
+  // to this class into a volatile variable. A volatile variable guarantees the updates to readers and writers
+  // list is made atomically (as long as we construct new lists during expansion
+  private class ReaderWriterHolder {
+    private List<WriterWithOffset> _writers = new ArrayList<>();
+    private List<ReaderWithOffset> _readers = new ArrayList<>();
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteSingleColumnSingleValueReaderWriter.class);
 
-  private List<WriterWithOffset> _writers = new ArrayList<>();
-  private List<ReaderWithOffset> _readers = new ArrayList<>();
-  private List<PinotDataBuffer> _dataBuffers = new ArrayList<>();
+  private volatile ReaderWriterHolder _readerWriterHolder = new ReaderWriterHolder();
+
+  private volatile List<PinotDataBuffer> _dataBuffers = new ArrayList<>();
 
   private final long _chunkSizeInBytes;
   private final int _numRowsPerChunk;
@@ -72,10 +81,11 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   @Override
   public void close()
       throws IOException {
-    for (ReaderWithOffset reader : _readers) {
+    ReaderWriterHolder holder = _readerWriterHolder;
+    for (ReaderWithOffset reader : holder._readers) {
       reader.close();
     }
-    for (WriterWithOffset writer : _writers) {
+    for (WriterWithOffset writer : holder._writers) {
       writer.close();
     }
     for (PinotDataBuffer buffer : _dataBuffers) {
@@ -108,31 +118,31 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   }
 
   private WriterWithOffset getWriterForRow(int row) {
-    return _writers.get(getBufferId(row));
+    return _readerWriterHolder._writers.get(getBufferId(row));
   }
 
   @Override
   public int getInt(int row) {
     int bufferId = getBufferId(row);
-    return _readers.get(bufferId).getInt(row);
+    return _readerWriterHolder._readers.get(bufferId).getInt(row);
   }
 
   @Override
   public long getLong(int row) {
     int bufferId = getBufferId(row);
-    return _readers.get(bufferId).getLong(row);
+    return _readerWriterHolder._readers.get(bufferId).getLong(row);
   }
 
   @Override
   public float getFloat(int row) {
     int bufferId = getBufferId(row);
-    return _readers.get(bufferId).getFloat(row);
+    return _readerWriterHolder._readers.get(bufferId).getFloat(row);
   }
 
   @Override
   public double getDouble(int row) {
     int bufferId = getBufferId(row);
-    return _readers.get(bufferId).getDouble(row);
+    return _readerWriterHolder._readers.get(bufferId).getDouble(row);
   }
 
   @Override
@@ -146,14 +156,15 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
      * An alternative is to not have multiple _dataBuffers, but just copy the values from one buffer to next as we
      * increase the number of rows.
      */
-    if (_readers.size() == 1) {
-      _readers.get(0).getReader().readIntValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
+    List<ReaderWithOffset> readers = _readerWriterHolder._readers;
+    if (readers.size() == 1) {
+      readers.get(0).getReader().readIntValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
     } else {
       for (int rowIter = rowStartPos, valueIter = valuesStartPos; rowIter < rowStartPos + rowSize;
           rowIter++, valueIter++) {
         int row = rows[rowIter];
         int bufferId = getBufferId(row);
-        values[valueIter] = _readers.get(bufferId).getInt(row);
+        values[valueIter] = readers.get(bufferId).getInt(row);
       }
     }
   }
@@ -176,8 +187,27 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
         new FixedByteSingleValueMultiColWriter(buffer, _numRowsPerChunk, /*cols=*/1, new int[]{_columnSizesInBytes});
 
     final int startRowId = _numRowsPerChunk * (_dataBuffers.size() - 1);
-    _writers.add(new WriterWithOffset(writer, startRowId));
-    _readers.add(new ReaderWithOffset(reader, startRowId));
+    updateHolder(new WriterWithOffset(writer, startRowId), new ReaderWithOffset(reader, startRowId));
+  }
+
+  private void updateHolder(WriterWithOffset newWriter, ReaderWithOffset newReader) {
+    ReaderWriterHolder prevHolder = _readerWriterHolder;
+    ReaderWriterHolder newHolder = new ReaderWriterHolder();
+
+    List<WriterWithOffset> writers = new ArrayList<>(prevHolder._writers.size()+1);
+    for (WriterWithOffset writer : prevHolder._writers) {
+      writers.add(writer);
+    }
+    writers.add(newWriter);
+    newHolder._writers = writers;
+
+    List<ReaderWithOffset> readers = new ArrayList<>(prevHolder._readers.size()+1);
+    for (ReaderWithOffset reader : prevHolder._readers) {
+      readers.add(reader);
+    }
+    readers.add(newReader);
+    newHolder._readers = readers;
+    _readerWriterHolder = newHolder;
   }
 
   /**
