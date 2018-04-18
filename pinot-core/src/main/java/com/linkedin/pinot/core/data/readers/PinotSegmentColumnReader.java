@@ -114,4 +114,20 @@ public class PinotSegmentColumnReader {
     }
     return values;
   }
+
+  public int getDictionaryId(int docId) {
+    if (_mvBuffer != null) {
+      throw new IllegalStateException("Multi value column is not supported");
+    }
+    SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
+    if (_dictionary != null) {
+      return svReader.getInt(docId, _readerContext);
+    } else {
+      throw new IllegalStateException("No dictionary column is not supported");
+    }
+  }
+
+  public boolean hasDictionary() {
+    return _dictionary != null;
+  }
 }

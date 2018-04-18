@@ -109,7 +109,7 @@ public class PinotOutputFormatTest {
         }
 
         File outputDir = new File(untarOutput, PinotOutputFormat.getSegmentName(fakeTaskAttemptContext));
-        RecordReader recordReader = new PinotSegmentRecordReader(outputDir, Schema.fromString(getSchema()));
+        RecordReader recordReader = new PinotSegmentRecordReader(outputDir, Schema.fromString(getSchema()), null);
         Map<Integer, GenericRow> resultMap = new HashMap<>();
         while (recordReader.hasNext()) {
             GenericRow row = recordReader.next();

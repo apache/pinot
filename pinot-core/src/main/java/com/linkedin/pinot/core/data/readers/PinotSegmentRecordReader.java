@@ -23,10 +23,15 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import com.linkedin.pinot.core.data.readers.sort.PinotSegmentSorter;
+import com.linkedin.pinot.core.data.readers.sort.SegmentSorter;
 import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 
 /**
@@ -39,21 +44,53 @@ public class PinotSegmentRecordReader implements RecordReader {
   private final Map<String, PinotSegmentColumnReader> _columnReaderMap;
 
   private int _nextDocId = 0;
+  private int[] _docIdsInSortedColumnOrder;
 
   /**
-   * Read records using the segment schema.
+   * Read records using the segment schema
+   * @param indexDir input path for the segment index
    */
-  public PinotSegmentRecordReader(File indexDir) throws Exception {
+  public PinotSegmentRecordReader(@Nonnull File indexDir) throws Exception {
+    this(indexDir, null, null);
+  }
+
+  /**
+   * Read records using the segment schema with the given schema and sort order
+   * <p>Passed in schema must be a subset of the segment schema.
+   *
+   * @param indexDir input path for the segment index
+   * @param schema input schema that is a subset of the segment schema
+   * @param sortOrder a list of column names that represent the sorting order
+   */
+  public PinotSegmentRecordReader(@Nonnull File indexDir, @Nullable Schema schema, @Nullable List<String> sortOrder)
+      throws Exception {
     _immutableSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     try {
       SegmentMetadata segmentMetadata = _immutableSegment.getSegmentMetadata();
       _numDocs = segmentMetadata.getTotalRawDocs();
-      _schema = segmentMetadata.getSchema();
-      Collection<String> columnNames = _schema.getColumnNames();
-      _columnReaderMap = new HashMap<>(columnNames.size());
-      for (String columnName : columnNames) {
-        _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_immutableSegment, columnName));
+      if (schema == null) {
+        _schema = segmentMetadata.getSchema();
+        Collection<String> columnNames = _schema.getColumnNames();
+        _columnReaderMap = new HashMap<>(columnNames.size());
+        for (String columnName : columnNames) {
+          _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_immutableSegment, columnName));
+        }
+      } else {
+        _schema = schema;
+        Schema segmentSchema = segmentMetadata.getSchema();
+        Collection<FieldSpec> fieldSpecs = _schema.getAllFieldSpecs();
+        _columnReaderMap = new HashMap<>(fieldSpecs.size());
+        for (FieldSpec fieldSpec : fieldSpecs) {
+          String columnName = fieldSpec.getName();
+          FieldSpec segmentFieldSpec = segmentSchema.getFieldSpecFor(columnName);
+          Preconditions.checkState(fieldSpec.equals(segmentFieldSpec),
+              "Field spec mismatch for column: %s, in the given schema: %s, in the segment schema: %s", columnName,
+              fieldSpec, segmentFieldSpec);
+          _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_immutableSegment, columnName));
+        }
       }
+      // Initialize sorted doc ids
+      initializeSortedDocIds(_schema, sortOrder);
     } catch (Exception e) {
       _immutableSegment.destroy();
       throw e;
@@ -61,29 +98,12 @@ public class PinotSegmentRecordReader implements RecordReader {
   }
 
   /**
-   * Read records using the passed in schema.
-   * <p>Passed in schema must be a subset of the segment schema.
+   * Prepare sorted docIds in order of the given sort order columns
    */
-  public PinotSegmentRecordReader(File indexDir, Schema schema) throws Exception {
-    _immutableSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
-    _schema = schema;
-    try {
-      SegmentMetadata segmentMetadata = _immutableSegment.getSegmentMetadata();
-      _numDocs = segmentMetadata.getTotalRawDocs();
-      Schema segmentSchema = segmentMetadata.getSchema();
-      Collection<FieldSpec> fieldSpecs = _schema.getAllFieldSpecs();
-      _columnReaderMap = new HashMap<>(fieldSpecs.size());
-      for (FieldSpec fieldSpec : fieldSpecs) {
-        String columnName = fieldSpec.getName();
-        FieldSpec segmentFieldSpec = segmentSchema.getFieldSpecFor(columnName);
-        Preconditions.checkState(fieldSpec.equals(segmentFieldSpec),
-            "Field spec mismatch for column: %s, in the given schema: %s, in the segment schema: %s", columnName,
-            fieldSpec, segmentFieldSpec);
-        _columnReaderMap.put(columnName, new PinotSegmentColumnReader(_immutableSegment, columnName));
-      }
-    } catch (Exception e) {
-      _immutableSegment.destroy();
-      throw e;
+  private void initializeSortedDocIds(Schema schema, List<String> sortOrder) {
+    if (sortOrder != null && !sortOrder.isEmpty()) {
+      SegmentSorter sorter = new PinotSegmentSorter(_numDocs, schema, _columnReaderMap);
+      _docIdsInSortedColumnOrder = sorter.getSortedDocIds(sortOrder);
     }
   }
 
@@ -99,36 +119,49 @@ public class PinotSegmentRecordReader implements RecordReader {
 
   @Override
   public GenericRow next(GenericRow reuse) {
+    if (_docIdsInSortedColumnOrder == null) {
+      reuse = getRecord(reuse, _nextDocId);
+    } else {
+      reuse = getRecord(reuse, _docIdsInSortedColumnOrder[_nextDocId]);
+    }
+    _nextDocId++;
+    return reuse;
+  }
+
+  /**
+   * Return the row given a docId
+   */
+  private GenericRow getRecord(GenericRow reuse, int docId) {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String fieldName = fieldSpec.getName();
       if (fieldSpec.isSingleValueField()) {
         switch (fieldSpec.getDataType()) {
           case INT:
-            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readInt(_nextDocId));
+            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readInt(docId));
             break;
           case LONG:
-            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readLong(_nextDocId));
+            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readLong(docId));
             break;
           case FLOAT:
-            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readFloat(_nextDocId));
+            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readFloat(docId));
             break;
           case DOUBLE:
-            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readDouble(_nextDocId));
+            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readDouble(docId));
             break;
           case STRING:
-            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readString(_nextDocId));
+            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readString(docId));
             break;
           default:
             throw new IllegalStateException(
                 "Field: " + fieldName + " has illegal data type: " + fieldSpec.getDataType());
         }
       } else {
-        reuse.putField(fieldName, _columnReaderMap.get(fieldName).readMV(_nextDocId));
+        reuse.putField(fieldName, _columnReaderMap.get(fieldName).readMV(docId));
       }
     }
-    _nextDocId++;
     return reuse;
   }
+
 
   @Override
   public void rewind() {
