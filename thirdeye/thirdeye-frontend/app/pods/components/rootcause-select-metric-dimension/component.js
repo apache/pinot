@@ -101,8 +101,13 @@ export default Component.extend({
 
       const baseUrn = metricUrns[0];
 
-      this.setProperties({ baseUrn });
-      this.send('onSelect');
+      const { selectedUrn, baseUrnCache } = this.getProperties('selectedUrn', 'baseUrnCache');
+      const filterMap = toFilterMap(toFilters(selectedUrn));
+
+      if (!_.isEqual(baseUrn, baseUrnCache)) {
+        this.setProperties({ baseUrn, baseUrnCache: baseUrn });
+        this._fetchFilters(baseUrn, filterMap);
+      }
     },
 
     onFilters(filters) {
