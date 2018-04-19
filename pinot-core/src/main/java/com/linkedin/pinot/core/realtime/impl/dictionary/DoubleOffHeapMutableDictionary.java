@@ -71,31 +71,10 @@ public class DoubleOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   @Override
   public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
       boolean includeUpper) {
-    double lowerDouble = Double.parseDouble(lower);
-    double upperDouble = Double.parseDouble(upper);
+    Double lowerDouble = Double.parseDouble(lower);
+    Double upperDouble = Double.parseDouble(upper);
     double valueToCompare = (Double) get(dictIdToCompare);
-
-    if (includeLower) {
-      if (valueToCompare < lowerDouble) {
-        return false;
-      }
-    } else {
-      if (valueToCompare <= lowerDouble) {
-        return false;
-      }
-    }
-
-    if (includeUpper) {
-      if (valueToCompare > upperDouble) {
-        return false;
-      }
-    } else {
-      if (valueToCompare >= upperDouble) {
-        return false;
-      }
-    }
-
-    return true;
+    return valueInRange(lowerDouble, upperDouble, includeLower, includeUpper, valueToCompare);
   }
 
   @Nonnull

@@ -146,7 +146,7 @@ public class LoaderTest {
     SegmentDirectory.Reader reader = segmentDir.createReader();
     PinotDataBuffer dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
     StringDictionary dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(),
-        columnMetadata.getStringColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter());
+        columnMetadata.getColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter());
     Assert.assertEquals(dict.getStringValue(0), "lynda 2.0");
     Assert.assertEquals(dict.getStringValue(1), "lynda");
     Assert.assertEquals(dict.get(0), "lynda 2.0");
@@ -166,7 +166,7 @@ public class LoaderTest {
     reader = segmentDir.createReader();
     dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
     dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(),
-        columnMetadata.getStringColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter());
+        columnMetadata.getColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter());
     Assert.assertEquals(dict.getStringValue(0), "lynda 2.0");
     Assert.assertEquals(dict.getStringValue(1), "lynda");
     Assert.assertEquals(dict.get(0), "lynda 2.0");
@@ -186,7 +186,7 @@ public class LoaderTest {
     reader = segmentDir.createReader();
     dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
     dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(),
-        columnMetadata.getStringColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter());
+        columnMetadata.getColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter());
     Assert.assertEquals(dict.getStringValue(0), "lynda");
     Assert.assertEquals(dict.getStringValue(1), "lynda 2.0");
     Assert.assertEquals(dict.get(0), "lynda");

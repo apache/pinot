@@ -48,7 +48,13 @@ public interface ColumnStatistics {
 
     /**
      *
-     * @return For string objects, returns the length of the longest string value. For others, returns -1.
+     * @return For variable length objects, returns the length of the smallest value. For others, returns -1.
+     */
+    int getLengthOfSmallestElement();
+
+    /**
+     *
+     * @return For variable length objects, returns the length of the longest value. For others, returns -1.
      */
     int getLengthOfLargestElement();
 

@@ -83,7 +83,7 @@ public class ColumnMetadataTest {
     Assert.assertEquals(col7Meta.getTotalAggDocs(), 0);
     Assert.assertEquals(col7Meta.getDataType(), FieldSpec.DataType.INT);
     Assert.assertEquals(col7Meta.getBitsPerElement(), 9);
-    Assert.assertEquals(col7Meta.getStringColumnMaxLength(), 0);
+    Assert.assertEquals(col7Meta.getColumnMaxLength(), 0);
     Assert.assertEquals(col7Meta.getFieldType(), FieldSpec.FieldType.DIMENSION);
     Assert.assertFalse(col7Meta.isSorted());
     Assert.assertFalse(col7Meta.hasNulls());
@@ -104,7 +104,7 @@ public class ColumnMetadataTest {
     Assert.assertEquals(col3Meta.getTotalAggDocs(), 0);
     Assert.assertEquals(col3Meta.getDataType(), FieldSpec.DataType.STRING);
     Assert.assertEquals(col3Meta.getBitsPerElement(), 3);
-    Assert.assertEquals(col3Meta.getStringColumnMaxLength(), 4);
+    Assert.assertEquals(col3Meta.getColumnMaxLength(), 4);
     Assert.assertEquals(col3Meta.getFieldType(), FieldSpec.FieldType.DIMENSION);
     Assert.assertFalse(col3Meta.isSorted());
     Assert.assertFalse(col3Meta.hasNulls());
@@ -125,7 +125,7 @@ public class ColumnMetadataTest {
     Assert.assertEquals(timeColumn.getTotalAggDocs(), 0);
     Assert.assertEquals(timeColumn.getDataType(), FieldSpec.DataType.INT);
     Assert.assertEquals(timeColumn.getBitsPerElement(), 1);
-    Assert.assertEquals(timeColumn.getStringColumnMaxLength(), 0);
+    Assert.assertEquals(timeColumn.getColumnMaxLength(), 0);
     Assert.assertEquals(timeColumn.getFieldType(), FieldSpec.FieldType.DIMENSION);
     Assert.assertTrue(timeColumn.isSorted());
     Assert.assertFalse(timeColumn.hasNulls());

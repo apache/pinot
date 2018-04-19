@@ -158,18 +158,13 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
   }
 
   @Override
+  public int getLengthOfSmallestElement() {
+    return lengthOfDataType(); // Only fixed length data types supported.
+  }
+
+  @Override
   public int getLengthOfLargestElement() {
-    switch (_blockValSet.getValueType()) {
-      case INT:
-        return V1Constants.Numbers.INTEGER_SIZE;
-      case LONG:
-        return V1Constants.Numbers.LONG_SIZE;
-      case FLOAT:
-        return V1Constants.Numbers.FLOAT_SIZE;
-      case DOUBLE:
-        return V1Constants.Numbers.DOUBLE_SIZE;
-    }
-    throw new UnsupportedOperationException();
+    return lengthOfDataType(); // Only fixed length data types supported.
   }
 
   @Override
@@ -210,5 +205,20 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
   @Override
   public int getPartitionRangeWidth() {
     return 0;
+  }
+
+  private int lengthOfDataType() {
+    switch (_blockValSet.getValueType()) {
+      case INT:
+        return V1Constants.Numbers.INTEGER_SIZE;
+      case LONG:
+        return V1Constants.Numbers.LONG_SIZE;
+      case FLOAT:
+        return V1Constants.Numbers.FLOAT_SIZE;
+      case DOUBLE:
+        return V1Constants.Numbers.DOUBLE_SIZE;
+      default:
+        throw new UnsupportedOperationException();
+    }
   }
 }

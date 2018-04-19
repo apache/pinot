@@ -15,69 +15,65 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
+import com.linkedin.pinot.common.utils.primitive.Bytes;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
 
 
-public class FloatOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
-  private float _min = Float.MAX_VALUE;
-  private float _max = Float.MIN_VALUE;
+/**
+ * OnHeap mutable dictionary of Bytes type.
+ */
+public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
+  private Bytes _min = null;
+  private Bytes _max = null;
 
   @Override
   public int indexOf(Object rawValue) {
-    if (rawValue instanceof String) {
-      return getDictId(Float.valueOf((String) rawValue));
-    } else {
-      return getDictId(rawValue);
-    }
+    return getDictId(rawValue);
   }
 
   @Override
   public void index(@Nonnull Object rawValue) {
-    if (rawValue instanceof Float) {
+    if (rawValue instanceof Bytes) {
       // Single value
       indexValue(rawValue);
-      updateMinMax((Float) rawValue);
+      updateMinMax((Bytes) rawValue);
     } else {
       // Multi value
       Object[] values = (Object[]) rawValue;
       for (Object value : values) {
         indexValue(value);
-        updateMinMax((Float) value);
+        updateMinMax((Bytes) value);
       }
     }
   }
 
-  @SuppressWarnings("Duplicates")
   @Override
   public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
       boolean includeUpper) {
-    Float lowerFloat = Float.parseFloat(lower);
-    Float upperFloat = Float.parseFloat(upper);
-    Float valueToCompare = (Float) get(dictIdToCompare);
-    return valueInRange(lowerFloat, upperFloat, includeLower, includeUpper, valueToCompare);
+    throw new UnsupportedOperationException("In-range not supported for Bytes data type.");
   }
 
   @Nonnull
   @Override
-  public Float getMinVal() {
+  public Bytes getMinVal() {
     return _min;
   }
 
   @Nonnull
   @Override
-  public Float getMaxVal() {
+  public Bytes getMaxVal() {
     return _max;
   }
 
   @Nonnull
   @Override
-  public float[] getSortedValues() {
+  public Bytes[] getSortedValues() {
     int numValues = length();
-    float[] sortedValues = new float[numValues];
+    Bytes[] sortedValues = new Bytes[numValues];
 
     for (int i = 0; i < numValues; i++) {
-      sortedValues[i] = (Float) get(i);
+      sortedValues[i] = (Bytes) get(i);
     }
 
     Arrays.sort(sortedValues);
@@ -86,30 +82,35 @@ public class FloatOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
   @Override
   public int getIntValue(int dictId) {
-    return ((Float) get(dictId)).intValue();
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public long getLongValue(int dictId) {
-    return ((Float) get(dictId)).longValue();
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public float getFloatValue(int dictId) {
-    return (Float) get(dictId);
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public double getDoubleValue(int dictId) {
-    return (Float) get(dictId);
+    throw new UnsupportedOperationException();
   }
 
-  private void updateMinMax(float value) {
-    if (value < _min) {
+  private void updateMinMax(Bytes value) {
+    if (_min == null) {
       _min = value;
-    }
-    if (value > _max) {
       _max = value;
+    } else {
+      if (value.compareTo(_min) < 0) {
+        _min = value;
+      }
+      if (value.compareTo(_max) > 0) {
+        _max = value;
+      }
     }
   }
 }

@@ -69,6 +69,15 @@ public final class FixedByteValueReaderWriter implements Closeable {
     return new String(buffer, UTF_8);
   }
 
+  public byte[] getBytes(int index, int numBytesPerValue, byte[] output) {
+    assert output.length == numBytesPerValue;
+    int startOffset = index * numBytesPerValue;
+    for (int i = 0; i < output.length; i++) {
+      output[i] = _dataBuffer.getByte(startOffset + i);
+    }
+    return output;
+  }
+
   public void writeInt(int index, int value) {
     _dataBuffer.putInt(index * INT_SIZE_IN_BYTES, value);
   }
@@ -85,7 +94,7 @@ public final class FixedByteValueReaderWriter implements Closeable {
     _dataBuffer.putDouble(index * DOUBLE_SIZE_IN_BYTES, value);
   }
 
-  public void writeUnpaddedString(int index, int numBytesPerValue, byte[] value) {
+  public void writeUnpaddedBytes(int index, int numBytesPerValue, byte[] value) {
     int startIndex = index * numBytesPerValue;
     int endIndex = startIndex + numBytesPerValue;
 

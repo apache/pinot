@@ -18,9 +18,12 @@ package com.linkedin.pinot.core.segment.index.readers;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
-public class StringDictionary extends ImmutableDictionaryReader {
+/**
+ * Extension of {@link ImmutableDictionaryReader} that implements immutable dictionary for byte[] type.
+ */
+public class BytesDictionary extends ImmutableDictionaryReader {
 
-  public StringDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
+  public BytesDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
     super(dataBuffer, length, numBytesPerValue, paddingByte);
   }
 
@@ -32,25 +35,24 @@ public class StringDictionary extends ImmutableDictionaryReader {
 
   @Override
   public int insertionIndexOf(Object rawValue) {
-    return binarySearch((String) rawValue);
+    return binarySearch((byte[]) rawValue);
   }
 
   @Override
-  public String get(int dictId) {
-    return getUnpaddedString(dictId, getBuffer());
+  public byte[] get(int dictId) {
+    return getBytes(dictId, getBuffer());
   }
 
   @Override
-  public String getStringValue(int dictId) {
-    return getUnpaddedString(dictId, getBuffer());
+  public byte[] getBytesValue(int dictId) {
+    return getBytes(dictId, getBuffer());
   }
 
   @Override
-  public void readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos) {
-    byte[] buffer = getBuffer();
+  public void readBytesValues(int[] dictIds, int inStartPos, int length, byte[][] outValues, int outStartPos) {
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++) {
-      outValues[outStartPos++] = getUnpaddedString(dictIds[i], buffer);
+      outValues[outStartPos++] = getBytes(dictIds[i], getBuffer());
     }
   }
 }

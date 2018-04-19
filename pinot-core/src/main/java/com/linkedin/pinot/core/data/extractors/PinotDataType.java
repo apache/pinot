@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.data.extractors;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.primitive.Bytes;
 
 
 /**
@@ -83,6 +84,17 @@ public enum PinotDataType {
     @Override
     public Byte convert(Object value, PinotDataType sourceType) {
       throw new UnsupportedOperationException("Cannot convert value: " + value + "from: " + sourceType + " to: BYTE");
+    }
+  },
+
+  BYTES {
+    @Override
+    public Object convert(Object value, PinotDataType sourceType) {
+      if (value instanceof byte[] && sourceType.equals(BYTES)) {
+        return new Bytes((byte[]) value);
+      } else {
+        throw new UnsupportedOperationException("Cannot convert value: " + value + "from: " + sourceType + " to: BYTES");
+      }
     }
   },
 
@@ -513,6 +525,10 @@ public enum PinotDataType {
         return fieldSpec.isSingleValueField() ? PinotDataType.DOUBLE : PinotDataType.DOUBLE_ARRAY;
       case STRING:
         return fieldSpec.isSingleValueField() ? PinotDataType.STRING : PinotDataType.STRING_ARRAY;
+      case BYTES:
+        if (fieldSpec.isSingleValueField()) {
+          return PinotDataType.BYTES;
+        } // Else fall down to default.
       default:
         throw new UnsupportedOperationException(
             "Unsupported data type: " + dataType + " in field: " + fieldSpec.getName());

@@ -26,6 +26,7 @@ import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.BytesDictionary;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
@@ -140,10 +141,16 @@ public final class ColumnIndexContainer {
             : new DoubleDictionary(dictionaryBuffer, length);
 
       case STRING:
-        int numBytesPerValue = metadata.getStringColumnMaxLength();
+        int numBytesPerValue = metadata.getColumnMaxLength();
         byte paddingByte = (byte) metadata.getPaddingCharacter();
         return loadOnHeap ? new OnHeapStringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte)
             : new StringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
+
+      case BYTES:
+        numBytesPerValue = metadata.getColumnMaxLength();
+        paddingByte = (byte) metadata.getPaddingCharacter();
+        return new BytesDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
+
       default:
         throw new IllegalStateException("Illegal data type for dictionary: " + dataType);
     }
@@ -159,6 +166,7 @@ public final class ColumnIndexContainer {
       case DOUBLE:
         return new FixedByteChunkSingleValueReader(forwardIndexBuffer);
       case STRING:
+      case BYTES:
         return new VarByteChunkSingleValueReader(forwardIndexBuffer);
       default:
         throw new IllegalStateException("Illegal data type for raw forward index: " + dataType);

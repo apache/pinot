@@ -71,31 +71,10 @@ public class FloatOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   @Override
   public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
       boolean includeUpper) {
-    float lowerFloat = Float.parseFloat(lower);
-    float upperFloat = Float.parseFloat(upper);
-    float valueToCompare = (Float) get(dictIdToCompare);
-
-    if (includeLower) {
-      if (valueToCompare < lowerFloat) {
-        return false;
-      }
-    } else {
-      if (valueToCompare <= lowerFloat) {
-        return false;
-      }
-    }
-
-    if (includeUpper) {
-      if (valueToCompare > upperFloat) {
-        return false;
-      }
-    } else {
-      if (valueToCompare >= upperFloat) {
-        return false;
-      }
-    }
-
-    return true;
+    Float lowerFloat = Float.parseFloat(lower);
+    Float upperFloat = Float.parseFloat(upper);
+    Float valueToCompare = (Float) get(dictIdToCompare);
+    return valueInRange(lowerFloat, upperFloat, includeLower, includeUpper, valueToCompare);
   }
 
   @Nonnull

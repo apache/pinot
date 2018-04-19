@@ -71,31 +71,10 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   @Override
   public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
       boolean includeUpper) {
-    long lowerLong = Long.parseLong(lower);
-    long upperLong = Long.parseLong(upper);
-    long valueToCompare = (Long) get(dictIdToCompare);
-
-    if (includeLower) {
-      if (valueToCompare < lowerLong) {
-        return false;
-      }
-    } else {
-      if (valueToCompare <= lowerLong) {
-        return false;
-      }
-    }
-
-    if (includeUpper) {
-      if (valueToCompare > upperLong) {
-        return false;
-      }
-    } else {
-      if (valueToCompare >= upperLong) {
-        return false;
-      }
-    }
-
-    return true;
+    Long lowerLong = Long.parseLong(lower);
+    Long upperLong = Long.parseLong(upper);
+    Long valueToCompare = (Long) get(dictIdToCompare);
+    return valueInRange(lowerLong, upperLong, includeLower, includeUpper, valueToCompare);
   }
 
   @Nonnull

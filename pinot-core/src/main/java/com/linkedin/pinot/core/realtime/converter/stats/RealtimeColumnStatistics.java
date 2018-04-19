@@ -29,24 +29,21 @@ import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang.math.IntRange;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Column statistics for a column coming from an in-memory realtime segment.
  */
 public class RealtimeColumnStatistics implements ColumnStatistics {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeColumnStatistics.class);
 
   private final ColumnDataSource _dataSource;
   private final int[] _sortedDocIdIterationOrder;
   private final MutableDictionary _dictionaryReader;
   private final Block _block;
-  private PartitionFunction partitionFunction;
-  private int numPartitions;
-  private int partitionRangeStart = Integer.MAX_VALUE;
-  private int partitionRangeEnd = Integer.MIN_VALUE;
+  private PartitionFunction _partitionFunction;
+  private int _numPartitions;
+  private int _partitionRangeStart = Integer.MAX_VALUE;
+  private int _partitionRangeEnd = Integer.MIN_VALUE;
 
   public RealtimeColumnStatistics(ColumnDataSource dataSource, int[] sortedDocIdIterationOrder,
       ColumnPartitionConfig columnPartitionConfig) {
@@ -56,10 +53,10 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
     _block = dataSource.nextBlock();
     if (columnPartitionConfig != null) {
       String functionName = columnPartitionConfig.getFunctionName();
-      numPartitions = columnPartitionConfig.getNumPartitions();
-      partitionFunction =
-          (functionName != null) ? PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions) : null;
-      if (partitionFunction != null) {
+      _numPartitions = columnPartitionConfig.getNumPartitions();
+      _partitionFunction =
+          (functionName != null) ? PartitionFunctionFactory.getPartitionFunction(functionName, _numPartitions) : null;
+      if (_partitionFunction != null) {
         updatePartition();
       }
     }
@@ -86,15 +83,43 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
   }
 
   @Override
+  public int getLengthOfSmallestElement() {
+    // Length of longest string
+    int minStringLength = Integer.MAX_VALUE;
+
+    // If this column is a string/bytes column, iterate over the dictionary to find the maximum length
+    FieldSpec.DataType dataType = _dataSource.getDataSourceMetadata().getDataType();
+    final int length = _dictionaryReader.length();
+
+    if (dataType.equals(FieldSpec.DataType.STRING)) {
+      for (int i = 0; i < length; i++) {
+        minStringLength = Math.min(_dictionaryReader.getStringValue(i).length(), minStringLength);
+      }
+    } else if (dataType.equals(FieldSpec.DataType.BYTES)) {
+      for (int i = 0; i < length; i++) {
+        minStringLength = Math.min(_dictionaryReader.getBytesValue(i).length, minStringLength);
+      }
+    }
+
+    return minStringLength;
+  }
+
+  @Override
   public int getLengthOfLargestElement() {
     // Length of longest string
     int maximumStringLength = 0;
 
-    // If this column is a string column, iterate over the dictionary to find the maximum length
-    if (_dataSource.getDataSourceMetadata().getDataType() == FieldSpec.DataType.STRING) {
-      final int length = _dictionaryReader.length();
+    // If this column is a string/bytes column, iterate over the dictionary to find the maximum length
+    FieldSpec.DataType dataType = _dataSource.getDataSourceMetadata().getDataType();
+    final int length = _dictionaryReader.length();
+
+    if (dataType.equals(FieldSpec.DataType.STRING)) {
       for (int i = 0; i < length; i++) {
         maximumStringLength = Math.max(_dictionaryReader.getStringValue(i).length(), maximumStringLength);
+      }
+    } else if (dataType.equals(FieldSpec.DataType.BYTES)) {
+      for (int i = 0; i < length; i++) {
+        maximumStringLength = Math.max(_dictionaryReader.getBytesValue(i).length, maximumStringLength);
       }
     }
 
@@ -166,18 +191,18 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
 
   @Override
   public PartitionFunction getPartitionFunction() {
-    return partitionFunction;
+    return _partitionFunction;
   }
 
   @Override
   public int getNumPartitions() {
-    return numPartitions;
+    return _numPartitions;
   }
 
   @Override
   public List<IntRange> getPartitionRanges() {
-    if (partitionRangeStart <= partitionRangeEnd) {
-      return Arrays.asList(new IntRange(partitionRangeStart, partitionRangeEnd));
+    if (_partitionRangeStart <= _partitionRangeEnd) {
+      return Arrays.asList(new IntRange(_partitionRangeStart, _partitionRangeEnd));
     } else {
       return null;
     }
@@ -191,20 +216,20 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
     // Iterate over the dictionary to check the partitioning
     final int length = _dictionaryReader.length();
     for (int i = 0; i < length; i++) {
-      int partition = partitionFunction.getPartition(_dictionaryReader.get(i));
+      int partition = _partitionFunction.getPartition(_dictionaryReader.get(i));
 
-      if (partition < partitionRangeStart) {
-        partitionRangeStart = partition;
+      if (partition < _partitionRangeStart) {
+        _partitionRangeStart = partition;
       }
 
-      if (partition > partitionRangeEnd) {
-        partitionRangeEnd = partition;
+      if (partition > _partitionRangeEnd) {
+        _partitionRangeEnd = partition;
       }
     }
   }
 
   @Override
   public int getPartitionRangeWidth() {
-    return partitionRangeEnd - partitionRangeStart + 1;
+    return _partitionRangeEnd - _partitionRangeStart + 1;
   }
 }

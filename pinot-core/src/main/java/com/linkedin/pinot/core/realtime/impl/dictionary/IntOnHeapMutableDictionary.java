@@ -52,31 +52,10 @@ public class IntOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   @Override
   public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
       boolean includeUpper) {
-    int lowerInt = Integer.parseInt(lower);
-    int upperInt = Integer.parseInt(upper);
-    int valueToCompare = (Integer) get(dictIdToCompare);
-
-    if (includeLower) {
-      if (valueToCompare < lowerInt) {
-        return false;
-      }
-    } else {
-      if (valueToCompare <= lowerInt) {
-        return false;
-      }
-    }
-
-    if (includeUpper) {
-      if (valueToCompare > upperInt) {
-        return false;
-      }
-    } else {
-      if (valueToCompare >= upperInt) {
-        return false;
-      }
-    }
-
-    return true;
+    Integer lowerInt = Integer.parseInt(lower);
+    Integer upperInt = Integer.parseInt(upper);
+    Integer valueToCompare = (Integer) get(dictIdToCompare);
+    return valueInRange(lowerInt, upperInt, includeLower, includeUpper, valueToCompare);
   }
 
   @Nonnull

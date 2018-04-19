@@ -120,7 +120,7 @@ public class ImmutableDictionaryReaderTest {
     try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(_stringValues,
         new DimensionFieldSpec(STRING_COLUMN_NAME, FieldSpec.DataType.STRING, true), TEMP_DIR)) {
       dictionaryCreator.build();
-      _numBytesPerStringValue = dictionaryCreator.getNumBytesPerString();
+      _numBytesPerStringValue = dictionaryCreator.getNumBytesPerEntry();
     }
   }
 
