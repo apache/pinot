@@ -354,30 +354,6 @@ public class DataTableImplV2 implements DataTable {
   }
 
   @Override
-  public boolean getBoolean(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.get() == 1;
-  }
-
-  @Override
-  public char getChar(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.getChar();
-  }
-
-  @Override
-  public byte getByte(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.get();
-  }
-
-  @Override
-  public short getShort(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.getShort();
-  }
-
-  @Override
   public int getInt(int rowId, int colId) {
     _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
     return _fixedSizeData.getInt();
@@ -421,39 +397,6 @@ public class DataTableImplV2 implements DataTable {
     } catch (IOException e) {
       throw new RuntimeException("Caught exception while de-serializing object.", e);
     }
-  }
-
-  @Nonnull
-  @Override
-  public byte[] getByteArray(int rowId, int colId) {
-    int length = positionCursorInVariableBuffer(rowId, colId);
-    byte[] bytes = new byte[length];
-    for (int i = 0; i < length; i++) {
-      bytes[i] = _variableSizeData.get();
-    }
-    return bytes;
-  }
-
-  @Nonnull
-  @Override
-  public char[] getCharArray(int rowId, int colId) {
-    int length = positionCursorInVariableBuffer(rowId, colId);
-    char[] chars = new char[length];
-    for (int i = 0; i < length; i++) {
-      chars[i] = _variableSizeData.getChar();
-    }
-    return chars;
-  }
-
-  @Nonnull
-  @Override
-  public short[] getShortArray(int rowId, int colId) {
-    int length = positionCursorInVariableBuffer(rowId, colId);
-    short[] shorts = new short[length];
-    for (int i = 0; i < length; i++) {
-      shorts[i] = _variableSizeData.getShort();
-    }
-    return shorts;
   }
 
   @Nonnull
@@ -531,19 +474,7 @@ public class DataTableImplV2 implements DataTable {
     _fixedSizeData.position(0);
     for (int rowId = 0; rowId < _numRows; rowId++) {
       for (int colId = 0; colId < _numColumns; colId++) {
-        switch (_dataSchema.getColumnType(colId)) {
-          case BOOLEAN:
-            stringBuilder.append(_fixedSizeData.get());
-            break;
-          case BYTE:
-            stringBuilder.append(_fixedSizeData.get());
-            break;
-          case CHAR:
-            stringBuilder.append(_fixedSizeData.getChar());
-            break;
-          case SHORT:
-            stringBuilder.append(_fixedSizeData.getShort());
-            break;
+        switch (_dataSchema.getColumnDataType(colId)) {
           case INT:
             stringBuilder.append(_fixedSizeData.getInt());
             break;

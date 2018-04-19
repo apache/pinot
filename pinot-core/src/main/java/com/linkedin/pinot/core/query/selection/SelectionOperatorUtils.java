@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.query.selection;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.response.ServerInstance;
@@ -145,20 +144,17 @@ public class SelectionOperatorUtils {
     }
 
     int numColumns = columnList.size();
-    String[] columns = new String[numColumns];
-    DataType[] dataTypes = new DataType[numColumns];
+    String[] columnNames = new String[numColumns];
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
     for (int i = 0; i < numColumns; i++) {
-      String column = columnList.get(i);
-      columns[i] = column;
-      DataSourceMetadata columnMetadata = indexSegment.getDataSource(column).getDataSourceMetadata();
-      if (columnMetadata.isSingleValue()) {
-        dataTypes[i] = columnMetadata.getDataType();
-      } else {
-        dataTypes[i] = columnMetadata.getDataType().toMultiValue();
-      }
+      String columnName = columnList.get(i);
+      columnNames[i] = columnName;
+      DataSourceMetadata columnMetadata = indexSegment.getDataSource(columnName).getDataSourceMetadata();
+      columnDataTypes[i] =
+          DataSchema.ColumnDataType.fromDataType(columnMetadata.getDataType(), columnMetadata.isSingleValue());
     }
 
-    return new DataSchema(columns, dataTypes);
+    return new DataSchema(columnNames, columnDataTypes);
   }
 
   /**
@@ -235,8 +231,8 @@ public class SelectionOperatorUtils {
       dataTableBuilder.startRow();
       for (int i = 0; i < numColumns; i++) {
         Serializable columnValue = row[i];
-        DataType columnType = dataSchema.getColumnType(i);
-        switch (columnType) {
+        DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
+        switch (columnDataType) {
           // Single-value column.
           case INT:
             dataTableBuilder.setColumn(i, ((Number) columnValue).intValue());
@@ -311,7 +307,7 @@ public class SelectionOperatorUtils {
 
           default:
             throw new UnsupportedOperationException(
-                "Unsupported data type: " + columnType + " for column: " + dataSchema.getColumnName(i));
+                "Unsupported data type: " + columnDataType + " for column: " + dataSchema.getColumnName(i));
         }
       }
       dataTableBuilder.finishRow();
@@ -334,8 +330,8 @@ public class SelectionOperatorUtils {
 
     Serializable[] row = new Serializable[numColumns];
     for (int i = 0; i < numColumns; i++) {
-      DataType columnType = dataSchema.getColumnType(i);
-      switch (columnType) {
+      DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
+      switch (columnDataType) {
         // Single-value column.
         case INT:
           row[i] = dataTable.getInt(rowId, i);
@@ -372,7 +368,7 @@ public class SelectionOperatorUtils {
 
         default:
           throw new UnsupportedOperationException(
-              "Unsupported data type: " + columnType + " for column: " + dataSchema.getColumnName(i));
+              "Unsupported column data type: " + columnDataType + " for column: " + dataSchema.getColumnName(i));
       }
     }
 
@@ -451,7 +447,7 @@ public class SelectionOperatorUtils {
   private static void formatRowWithoutOrdering(@Nonnull Serializable[] row, @Nonnull DataSchema dataSchema) {
     int numColumns = row.length;
     for (int i = 0; i < numColumns; i++) {
-      row[i] = getFormattedValue(row[i], dataSchema.getColumnType(i));
+      row[i] = getFormattedValue(row[i], dataSchema.getColumnDataType(i));
     }
   }
 
@@ -463,7 +459,7 @@ public class SelectionOperatorUtils {
     for (int i = 0; i < numColumns; i++) {
       int columnIndex = columnIndices[i];
       formattedRow[i] =
-          SelectionOperatorUtils.getFormattedValue(row[columnIndex], dataSchema.getColumnType(columnIndex));
+          SelectionOperatorUtils.getFormattedValue(row[columnIndex], dataSchema.getColumnDataType(columnIndex));
     }
     return formattedRow;
   }
@@ -478,7 +474,8 @@ public class SelectionOperatorUtils {
    * @return formatted value.
    */
   @Nonnull
-  public static Serializable getFormattedValue(@Nonnull Serializable value, @Nonnull DataType dataType) {
+  public static Serializable getFormattedValue(@Nonnull Serializable value,
+      @Nonnull DataSchema.ColumnDataType dataType) {
     switch (dataType) {
       // Single-value column.
       case INT:

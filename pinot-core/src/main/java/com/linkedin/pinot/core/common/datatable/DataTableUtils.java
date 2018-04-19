@@ -41,19 +41,7 @@ public class DataTableUtils {
     int rowSizeInBytes = 0;
     for (int i = 0; i < numColumns; i++) {
       columnOffsets[i] = rowSizeInBytes;
-      switch (dataSchema.getColumnType(i)) {
-        case BOOLEAN:
-          rowSizeInBytes += 1;
-          break;
-        case BYTE:
-          rowSizeInBytes += 1;
-          break;
-        case CHAR:
-          rowSizeInBytes += 2;
-          break;
-        case SHORT:
-          rowSizeInBytes += 2;
-          break;
+      switch (dataSchema.getColumnDataType(i)) {
         case INT:
           rowSizeInBytes += 4;
           break;

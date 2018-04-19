@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.DoubleAggregationResultHolder;
@@ -127,8 +127,8 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Nonnull
   @Override
-  public FieldSpec.DataType getIntermediateResultDataType() {
-    return FieldSpec.DataType.DOUBLE;
+  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
+    return DataSchema.ColumnDataType.DOUBLE;
   }
 
   @Nonnull

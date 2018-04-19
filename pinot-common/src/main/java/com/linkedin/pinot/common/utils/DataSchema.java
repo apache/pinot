@@ -33,11 +33,11 @@ public class DataSchema {
   private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   private String[] _columnNames;
-  private FieldSpec.DataType[] _columnTypes;
+  private ColumnDataType[] _columnDataTypes;
 
-  public DataSchema(@Nonnull String[] columnNames, @Nonnull FieldSpec.DataType[] columnTypes) {
+  public DataSchema(@Nonnull String[] columnNames, @Nonnull ColumnDataType[] columnDataTypes) {
     _columnNames = columnNames;
-    _columnTypes = columnTypes;
+    _columnDataTypes = columnDataTypes;
   }
 
   public int size() {
@@ -50,20 +50,20 @@ public class DataSchema {
   }
 
   @Nonnull
-  public FieldSpec.DataType getColumnType(int index) {
-    return _columnTypes[index];
+  public ColumnDataType getColumnDataType(int index) {
+    return _columnDataTypes[index];
   }
 
   /**
-   * Indicates whether the given {@link DataSchema} is type compatible with this one.
+   * Returns whether the given data schema is type compatible with this one.
    * <ul>
-   *   <li>All numbers are type compatible.</li>
-   *   <li>Number is not type compatible with String.</li>
-   *   <li>Single-value is not type compatible with multi-value.</li>
+   *   <li>All numbers are type compatible with each other</li>
+   *   <li>Numbers are not type compatible with string</li>
+   *   <li>Non-array types are not type compatible with array types</li>
    * </ul>
    *
-   * @param anotherDataSchema data schema to compare.
-   * @return whether the two data schemas are type compatible.
+   * @param anotherDataSchema Data schema to compare with
+   * @return Whether the two data schemas are type compatible
    */
   public boolean isTypeCompatibleWith(@Nonnull DataSchema anotherDataSchema) {
     if (!Arrays.equals(_columnNames, anotherDataSchema._columnNames)) {
@@ -71,7 +71,7 @@ public class DataSchema {
     }
     int numColumns = _columnNames.length;
     for (int i = 0; i < numColumns; i++) {
-      if (!_columnTypes[i].isCompatible(anotherDataSchema._columnTypes[i])) {
+      if (!_columnDataTypes[i].isCompatible(anotherDataSchema._columnDataTypes[i])) {
         return false;
       }
     }
@@ -79,31 +79,31 @@ public class DataSchema {
   }
 
   /**
-   * Upgrade the current data schema to cover the column types in the given data schema.
-   * <p>Type <code>long</code> can cover <code>int</code> and <code>long</code>.
-   * <p>Type <code>double</code> can cover all numbers, but with potential precision loss when use it to cover
-   * <code>long</code>.
-   * <p>The given data schema should be type compatible with this one.
+   * Upgrade the current data schema to cover the column data types in the given data schema.
+   * <p>Data type <code>LONG</code> can cover <code>INT</code> and <code>LONG</code>.
+   * <p>Data type <code>DOUBLE</code> can cover all numbers, but with potential precision loss when use it to cover
+   * <code>LONG</code>.
+   * <p>NOTE: The given data schema should be type compatible with this one.
    *
-   * @param anotherDataSchema data schema to be covered.
+   * @param anotherDataSchema Data schema to cover
    */
   public void upgradeToCover(@Nonnull DataSchema anotherDataSchema) {
-    int numColumns = _columnTypes.length;
+    int numColumns = _columnDataTypes.length;
     for (int i = 0; i < numColumns; i++) {
-      FieldSpec.DataType thisColumnType = _columnTypes[i];
-      FieldSpec.DataType thatColumnType = anotherDataSchema._columnTypes[i];
-      if (thisColumnType != thatColumnType) {
-        if (thisColumnType.isSingleValue()) {
-          if (thisColumnType.isInteger() && thatColumnType.isInteger()) {
-            _columnTypes[i] = FieldSpec.DataType.LONG;
+      ColumnDataType thisColumnDataType = _columnDataTypes[i];
+      ColumnDataType thatColumnDataType = anotherDataSchema._columnDataTypes[i];
+      if (thisColumnDataType != thatColumnDataType) {
+        if (thisColumnDataType.isArray()) {
+          if (thisColumnDataType.isWholeNumberArray() && thatColumnDataType.isWholeNumberArray()) {
+            _columnDataTypes[i] = ColumnDataType.LONG_ARRAY;
           } else {
-            _columnTypes[i] = FieldSpec.DataType.DOUBLE;
+            _columnDataTypes[i] = ColumnDataType.DOUBLE_ARRAY;
           }
         } else {
-          if (thisColumnType.toSingleValue().isInteger() && thatColumnType.toSingleValue().isInteger()) {
-            _columnTypes[i] = FieldSpec.DataType.LONG_ARRAY;
+          if (thisColumnDataType.isWholeNumber() && thatColumnDataType.isWholeNumber()) {
+            _columnDataTypes[i] = ColumnDataType.LONG;
           } else {
-            _columnTypes[i] = FieldSpec.DataType.DOUBLE_ARRAY;
+            _columnDataTypes[i] = ColumnDataType.DOUBLE;
           }
         }
       }
@@ -111,8 +111,7 @@ public class DataSchema {
   }
 
   @Nonnull
-  public byte[] toBytes()
-      throws IOException {
+  public byte[] toBytes() throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
     int length = _columnNames.length;
@@ -128,10 +127,10 @@ public class DataSchema {
     }
 
     // Write the column types.
-    for (FieldSpec.DataType columnType : _columnTypes) {
+    for (ColumnDataType columnDataType : _columnDataTypes) {
       // We don't want to use ordinal of the enum since adding a new data type will break things if server and broker
       // use different versions of DataType class.
-      byte[] bytes = columnType.name().getBytes(UTF_8);
+      byte[] bytes = columnDataType.name().getBytes(UTF_8);
       dataOutputStream.writeInt(bytes.length);
       dataOutputStream.write(bytes);
     }
@@ -139,15 +138,14 @@ public class DataSchema {
   }
 
   @Nonnull
-  public static DataSchema fromBytes(@Nonnull byte[] buffer)
-      throws IOException {
+  public static DataSchema fromBytes(@Nonnull byte[] buffer) throws IOException {
     ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
     DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
 
     // Read the number of columns.
     int numColumns = dataInputStream.readInt();
     String[] columnNames = new String[numColumns];
-    FieldSpec.DataType[] columnTypes = new FieldSpec.DataType[numColumns];
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
 
     // Read the column names.
     int readLength;
@@ -165,16 +163,16 @@ public class DataSchema {
       byte[] bytes = new byte[length];
       readLength = dataInputStream.read(bytes);
       assert readLength == length;
-      columnTypes[i] = FieldSpec.DataType.valueOf(new String(bytes, UTF_8));
+      columnDataTypes[i] = ColumnDataType.valueOf(new String(bytes, UTF_8));
     }
 
-    return new DataSchema(columnNames, columnTypes);
+    return new DataSchema(columnNames, columnDataTypes);
   }
 
   @SuppressWarnings("CloneDoesntCallSuperClone")
   @Override
   public DataSchema clone() {
-    return new DataSchema(_columnNames.clone(), _columnTypes.clone());
+    return new DataSchema(_columnNames.clone(), _columnDataTypes.clone());
   }
 
   @Override
@@ -183,7 +181,7 @@ public class DataSchema {
     stringBuilder.append('[');
     int numColumns = _columnNames.length;
     for (int i = 0; i < numColumns; i++) {
-      stringBuilder.append(_columnNames[i]).append('(').append(_columnTypes[i]).append(')').append(',');
+      stringBuilder.append(_columnNames[i]).append('(').append(_columnDataTypes[i]).append(')').append(',');
     }
     stringBuilder.setCharAt(stringBuilder.length() - 1, ']');
     return stringBuilder.toString();
@@ -196,16 +194,62 @@ public class DataSchema {
     }
     if (anObject instanceof DataSchema) {
       DataSchema anotherDataSchema = (DataSchema) anObject;
-      return Arrays.equals(_columnNames, anotherDataSchema._columnNames) && Arrays.equals(_columnTypes,
-          anotherDataSchema._columnTypes);
+      return Arrays.equals(_columnNames, anotherDataSchema._columnNames) && Arrays.equals(_columnDataTypes,
+          anotherDataSchema._columnDataTypes);
     }
     return false;
   }
 
   @Override
   public int hashCode() {
-    int hashCode = EqualityUtils.hashCodeOf(_columnNames);
-    hashCode = EqualityUtils.hashCodeOf(hashCode, _columnTypes);
-    return hashCode;
+    return EqualityUtils.hashCodeOf(Arrays.hashCode(_columnNames), Arrays.hashCode(_columnDataTypes));
+  }
+
+  public enum ColumnDataType {
+    INT, LONG, FLOAT, DOUBLE, STRING, OBJECT, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY;
+
+    public boolean isNumber() {
+      return this == INT || this == LONG || this == FLOAT || this == DOUBLE;
+    }
+
+    public boolean isWholeNumber() {
+      return this == INT || this == LONG;
+    }
+
+    public boolean isArray() {
+      return this == INT_ARRAY || this == LONG_ARRAY || this == FLOAT_ARRAY || this == DOUBLE_ARRAY
+          || this == STRING_ARRAY;
+    }
+
+    public boolean isNumberArray() {
+      return this == INT_ARRAY || this == LONG_ARRAY || this == FLOAT_ARRAY || this == DOUBLE_ARRAY;
+    }
+
+    public boolean isWholeNumberArray() {
+      return this == INT_ARRAY || this == LONG_ARRAY;
+    }
+
+    public boolean isCompatible(ColumnDataType anotherColumnDataType) {
+      // All numbers are compatible with each other
+      return this == anotherColumnDataType || (this.isNumber() && anotherColumnDataType.isNumber()) || (
+          this.isNumberArray() && anotherColumnDataType.isNumberArray());
+    }
+
+    public static ColumnDataType fromDataType(FieldSpec.DataType dataType, boolean isSingleValue) {
+      switch (dataType) {
+        case INT:
+          return isSingleValue ? INT : INT_ARRAY;
+        case LONG:
+          return isSingleValue ? LONG : LONG_ARRAY;
+        case FLOAT:
+          return isSingleValue ? FLOAT : FLOAT_ARRAY;
+        case DOUBLE:
+          return isSingleValue ? DOUBLE : DOUBLE_ARRAY;
+        case STRING:
+          return isSingleValue ? STRING : STRING_ARRAY;
+        default:
+          throw new UnsupportedOperationException("Unsupported data type: " + dataType);
+      }
+    }
   }
 }

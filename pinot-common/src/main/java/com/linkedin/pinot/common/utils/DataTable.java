@@ -19,7 +19,6 @@ import com.linkedin.pinot.common.response.ProcessingException;
 import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 
 /**
@@ -38,24 +37,14 @@ public interface DataTable {
   void addException(@Nonnull ProcessingException processingException);
 
   @Nonnull
-  byte[] toBytes()
-      throws IOException;
+  byte[] toBytes() throws IOException;
 
   @Nonnull
   Map<String, String> getMetadata();
 
-  @Nullable
   DataSchema getDataSchema();
 
   int getNumberOfRows();
-
-  boolean getBoolean(int rowId, int colId);
-
-  char getChar(int rowId, int colId);
-
-  byte getByte(int rowId, int colId);
-
-  short getShort(int rowId, int colId);
 
   int getInt(int rowId, int colId);
 
@@ -70,15 +59,6 @@ public interface DataTable {
 
   @Nonnull
   <T> T getObject(int rowId, int colId);
-
-  @Nonnull
-  byte[] getByteArray(int rowId, int colId);
-
-  @Nonnull
-  char[] getCharArray(int rowId, int colId);
-
-  @Nonnull
-  short[] getShortArray(int rowId, int colId);
 
   @Nonnull
   int[] getIntArray(int rowId, int colId);

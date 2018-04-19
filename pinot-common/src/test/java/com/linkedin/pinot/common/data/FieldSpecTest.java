@@ -75,16 +75,6 @@ public class FieldSpecTest {
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), -0.1F);
 
-    // Short type metric field.
-    fieldSpec1 = new MetricFieldSpec();
-    fieldSpec1.setName("metric");
-    fieldSpec1.setDataType(DataType.SHORT);
-    fieldSpec2 = new MetricFieldSpec("metric", DataType.SHORT);
-    Assert.assertEquals(fieldSpec1, fieldSpec2);
-    Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
-    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
-    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), 0);
-
     // Metric field with default null value.
     fieldSpec1 = new MetricFieldSpec();
     fieldSpec1.setName("metric");
@@ -303,12 +293,6 @@ public class FieldSpecTest {
   public void testSerializeDeserialize() throws Exception {
     FieldSpec first;
     FieldSpec second;
-
-    // Short type Metric field.
-    String[] metricFields = {"\"name\":\"metric\"", "\"dataType\":\"SHORT\""};
-    first = MAPPER.readValue(getRandomOrderJsonString(metricFields), MetricFieldSpec.class);
-    second = MAPPER.readValue(first.toJsonObject().toString(), MetricFieldSpec.class);
-    Assert.assertEquals(first, second, ERROR_MESSAGE);
 
     // Single-value boolean type dimension field with default null value.
     String[] dimensionFields = {"\"name\":\"dimension\"", "\"dataType\":\"BOOLEAN\"", "\"defaultNullValue\":false"};
