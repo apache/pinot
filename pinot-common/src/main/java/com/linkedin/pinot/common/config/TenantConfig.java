@@ -26,7 +26,12 @@ import org.slf4j.LoggerFactory;
 public class TenantConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(TenantConfig.class);
 
+  @ConfigKey("brokerTenant")
+  @ConfigDoc("Broker tenant used by this table")
   private String broker;
+
+  @ConfigKey("serverTenant")
+  @ConfigDoc("Server tenant used by this table")
   private String server;
 
   public String getBroker() {
