@@ -30,6 +30,7 @@ public class AnomalyFunctionBean extends AbstractBean {
   private MetricAggFunction metricFunction;
 
   private String type;
+  private String ruleBasedAnomalyFunctionType;
 
   private boolean isActive = true;
 
@@ -82,6 +83,13 @@ public class AnomalyFunctionBean extends AbstractBean {
    */
   private boolean requiresCompletenessCheck = true;
 
+  public String getRuleBasedAnomalyFunctionType() {
+    return ruleBasedAnomalyFunctionType;
+  }
+
+  public void setRuleBasedAnomalyFunctionType(String ruleBasedAnomalyFunctionType) {
+    this.ruleBasedAnomalyFunctionType = ruleBasedAnomalyFunctionType;
+  }
 
   public long getMetricId() {
     return metricId;

@@ -61,4 +61,19 @@ public class AnomalyFunctionFactory {
     anomalyFunction.init(functionSpec);
     return anomalyFunction;
   }
+
+  public BaseAnomalyFunction getRuleBasedAnomalyFunction(AnomalyFunctionDTO functionSpec) throws Exception {
+    BaseAnomalyFunction anomalyFunction;
+    String ruleBasedAnomalyFunctionType = functionSpec.getRuleBasedAnomalyFunctionType();
+    if (ruleBasedAnomalyFunctionType == null || !props.containsKey(ruleBasedAnomalyFunctionType)) {
+      LOGGER.error("Unsupported rule based anomaly function type " + ruleBasedAnomalyFunctionType);
+      return null;
+    }
+    String className = props.getProperty(ruleBasedAnomalyFunctionType);
+    anomalyFunction = (BaseAnomalyFunction) Class.forName(className).newInstance();
+
+    anomalyFunction.init(functionSpec);
+    return anomalyFunction;
+  }
+
 }
