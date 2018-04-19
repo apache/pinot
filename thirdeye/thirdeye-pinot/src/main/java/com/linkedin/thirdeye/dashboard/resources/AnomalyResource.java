@@ -470,7 +470,7 @@ public class AnomalyResource {
    *      the Map that maps dimension string to the AnomalyTimelinesView
    * @throws Exception
    */
-  private static final Period DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD = Weeks.weeks(8).toPeriod();
+  private static final Period DEFAULT_MINIMUM_REQUIRE_TRAINING_PERIOD = Weeks.weeks(8).toPeriod();
   @GET
   @Path(value = "/anomaly-function/{id}/baseline")
   @Produces(MediaType.APPLICATION_JSON)
