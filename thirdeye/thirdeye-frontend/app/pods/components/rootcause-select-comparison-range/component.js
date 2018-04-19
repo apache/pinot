@@ -24,8 +24,6 @@ export default Component.extend({
   },
 
   compareModeOptions: [
-    'none',
-    'predicted',
     'WoW',
     'Wo2W',
     'Wo3W',
@@ -33,7 +31,9 @@ export default Component.extend({
     'mean4w',
     'median4w',
     'min4w',
-    'max4w'
+    'max4w',
+    'predicted',
+    'none'
   ],
 
   maxDateFormatted: computed({

@@ -7,7 +7,6 @@ import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-rout
 import {
   toCurrentUrn,
   toBaselineUrn,
-  filterPrefix,
   dateFormatFull,
   appendFilters
 } from 'thirdeye-frontend/utils/rca-utils';
@@ -18,16 +17,52 @@ const ROOTCAUSE_SETUP_MODE_CONTEXT = "context";
 const ROOTCAUSE_SETUP_MODE_SELECTED = "selected";
 const ROOTCAUSE_SETUP_MODE_NONE = "none";
 
+const UNIT_MAPPING = {
+  NANOSECONDS: 'nanosecond',
+  MILLISECONDS: 'millisecond',
+  SECONDS: 'second',
+  MINUTES: 'minute',
+  HOURS: 'hour',
+  DAYS: 'day'
+};
+
+/**
+ * adjusts RCA backend granularity to a sane scale
+ */
+const adjustGranularity = (attrGranularity) => {
+  const [count, unit] = attrGranularity.split('_');
+  const granularity = [parseInt(count, 10), unit];
+
+  if (['NANOSECONDS', 'MILLISECONDS', 'SECONDS'].includes(granularity[1])) {
+    granularity[0] = 5;
+    granularity[1] = 'MINUTES';
+  }
+
+  if (['MINUTES'].includes(granularity[1])) {
+    granularity[0] = Math.max(granularity[0], 5);
+    granularity[1] = 'MINUTES';
+  }
+
+  return granularity[0] + "_" + granularity[1];
+};
+
+/**
+ * adjusts metric max time based on metric granularity
+ */
+const adjustMaxTime = (maxTime, metricGranularity) => {
+  const time = moment(parseInt(maxTime, 10));
+  const [count, unit] = metricGranularity;
+
+  const start = time.startOf(unit);
+  const remainder = start.get(unit) % count;
+
+  return start.add(-1 * remainder, unit);
+};
+
 /**
  * converts RCA backend granularity strings into units understood by moment.js
  */
 const toMetricGranularity = (attrGranularity) => {
-  const UNIT_MAPPING = {
-    MINUTES: 'minute',
-    HOURS: 'hour',
-    DAYS: 'day'
-  };
-
   const [count, unit] = attrGranularity.split('_');
   return [parseInt(count, 10), UNIT_MAPPING[unit]];
 };
@@ -188,9 +223,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
     // metric-initialized context
     if (metricId && metricUrn) {
       if (!_.isEmpty(metricEntity)) {
-        const maxTime = parseInt(metricEntity.attributes.maxTime[0], 10);
-        const granularity = metricEntity.attributes.granularity[0];
+        const granularity = adjustGranularity(metricEntity.attributes.granularity[0]);
         const metricGranularity = toMetricGranularity(granularity);
+        const maxTime = adjustMaxTime(metricEntity.attributes.maxTime[0], metricGranularity);
 
         const anomalyRangeEnd = moment(maxTime).startOf(metricGranularity[1]).valueOf();
         const anomalyRangeStartOffset = toAnomalyOffset(metricGranularity);
@@ -219,7 +254,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     // anomaly-initialized context
     if (anomalyId && anomalyUrn) {
       if (!_.isEmpty(anomalyEntity)) {
-        const granularity = anomalyEntity.attributes.metricGranularity[0];
+        const granularity = adjustGranularity(anomalyEntity.attributes.metricGranularity[0]);
         const metricGranularity = toMetricGranularity(granularity);
 
         const anomalyRange = [parseInt(anomalyEntity.start, 10), parseInt(anomalyEntity.end, 10)];
@@ -244,7 +279,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
           anomalyRange,
           analysisRange,
           granularity,
-          compareMode: 'predicted',
+          compareMode: 'WoW',
           anomalyUrns: new Set([anomalyUrn, anomalyMetricUrn, anomalyFunctionUrn])
         };
 
@@ -301,32 +336,5 @@ export default Route.extend(AuthenticatedRouteMixin, {
       setupMode,
       context
     });
-  },
-
-  actions: {
-    /**
-     * transition from the new rootcause to legacy rca details
-     * @param {Number} id metric Id
-     */
-    transitionToRcaDetails(id) {
-      this.transitionTo('rca.details', id, {
-        queryParams: {
-          startDate: undefined,
-          endDate: undefined,
-          analysisStart: undefined,
-          analysisEnd: undefined,
-          granularity: undefined,
-          filters: JSON.stringify({}),
-          compareMode: 'WoW'
-        }
-      });
-    },
-
-    /**
-     * transition from the new rootcause to legacy rca
-     */
-    transitionToRca() {
-      this.transitionTo('rca');
-    }
   }
 });
