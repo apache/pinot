@@ -20,7 +20,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.apache.avro.Schema.Type;
 
 
@@ -329,6 +328,8 @@ public abstract class FieldSpec {
         case STRING:
         case ENUM:
           return STRING;
+        case BYTES:
+          return BYTES;
         default:
           throw new UnsupportedOperationException("Unsupported Avro type: " + avroType);
       }
@@ -340,13 +341,13 @@ public abstract class FieldSpec {
     public int size() {
       switch (this) {
         case INT:
-          return 4;
+          return Integer.BYTES;
         case LONG:
-          return 8;
+          return Long.BYTES;
         case FLOAT:
-          return 4;
+          return Float.BYTES;
         case DOUBLE:
-          return 8;
+          return Double.BYTES;
         default:
           throw new IllegalStateException("Cannot get number of bytes for: " + this);
       }
