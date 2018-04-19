@@ -136,9 +136,7 @@ public class DataFrameUtils {
   }
 
   /**
-   * Returns the DataFrame with timestamps aligned to a start offset and an interval. Also, missing
-   * rows (between {@code start} and {@code end} in {@code interval} steps) are fill in with NULL
-   * values.
+   * Returns the DataFrame with timestamps aligned to a start offset and an interval.
    *
    * @param df thirdeye response dataframe
    * @param start start offset
@@ -147,17 +145,12 @@ public class DataFrameUtils {
    * @return dataframe with modified timestamps
    */
   public static DataFrame alignTimestamps(DataFrame df, final long start, final long end, final long interval) {
-    int count = (int)((end - start) / interval);
-    LongSeries timestamps = LongSeries.sequence(start, count, interval);
-    DataFrame dfTime = new DataFrame(COL_TIME, timestamps);
-    DataFrame dfOffset = new DataFrame(df).mapInPlace(new Series.LongFunction() {
+    return new DataFrame(df).mapInPlace(new Series.LongFunction() {
       @Override
       public long apply(long... values) {
         return (values[0] * interval) + start;
       }
     }, COL_TIME);
-
-    return dfTime.joinLeft(dfOffset);
   }
 
   /**
