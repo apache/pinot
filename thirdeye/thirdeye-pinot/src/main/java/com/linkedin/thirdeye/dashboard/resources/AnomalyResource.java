@@ -510,12 +510,12 @@ public class AnomalyResource {
           break;
         case HOURS:
           if (Hours.hoursBetween(startTime, endTime).getHours() < DEFAULT_MINIMUM_REQUIRE_TRAINING_PERIOD.toStandardDuration().getStandardHours()) {
-            startTime = startTime.minus(DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD);
+            startTime = startTime.minus(DEFAULT_MINIMUM_REQUIRE_TRAINING_PERIOD);
           }
           break;
         case DAYS:
           if (Days.daysBetween(startTime, endTime).getDays() < DEFAULT_MINIMUM_REQUIRE_TRAINING_PERIOD.toStandardDuration().getStandardDays()) {
-            startTime = startTime.minus(DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD);
+            startTime = startTime.minus(DEFAULT_MINIMUM_REQUIRE_TRAINING_PERIOD);
           }
           break;
       }
