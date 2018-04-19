@@ -136,9 +136,7 @@ public class DataFrameUtils {
   }
 
   /**
-   * Returns the DataFrame with timestamps aligned to a start offset and an interval. Also, missing
-   * rows (between {@code start} and {@code end} in {@code interval} steps) are fill in with NULL
-   * values.
+   * Returns the DataFrame with timestamps aligned to a start offset and an interval.
    *
    * @param df thirdeye response dataframe
    * @param start start offset
