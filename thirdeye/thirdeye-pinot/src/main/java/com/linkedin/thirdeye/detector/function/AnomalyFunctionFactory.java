@@ -28,7 +28,6 @@ public class AnomalyFunctionFactory {
     } catch (FileNotFoundException e) {
       LOGGER.error("File {} not found", functionConfigPath, e);
     }
-
   }
 
   public AnomalyFunctionFactory(InputStream input) {
@@ -75,7 +74,7 @@ public class AnomalyFunctionFactory {
     List<BaseAnomalyFunction> baseAnomalyFunctions = new ArrayList<>();
     for (String secondaryAnomalyFunctionType : secondaryAnomalyFunctionsType) {
       if (secondaryAnomalyFunctionType == null || !props.containsKey(secondaryAnomalyFunctionType)) {
-        LOGGER.info("Unsupported rule based anomaly function type " + secondaryAnomalyFunctionType);
+        LOGGER.error("Unsupported secondary anomaly function type " + secondaryAnomalyFunctionType);
         continue;
       }
       String className = props.getProperty(secondaryAnomalyFunctionType);
