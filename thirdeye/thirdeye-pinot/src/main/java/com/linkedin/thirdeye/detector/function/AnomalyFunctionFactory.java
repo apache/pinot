@@ -4,6 +4,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.Properties;
 
@@ -62,18 +64,26 @@ public class AnomalyFunctionFactory {
     return anomalyFunction;
   }
 
-  public BaseAnomalyFunction getRuleBasedAnomalyFunction(AnomalyFunctionDTO functionSpec) throws Exception {
-    BaseAnomalyFunction anomalyFunction;
-    String ruleBasedAnomalyFunctionType = functionSpec.getRuleBasedAnomalyFunctionType();
-    if (ruleBasedAnomalyFunctionType == null || !props.containsKey(ruleBasedAnomalyFunctionType)) {
-      LOGGER.error("Unsupported rule based anomaly function type " + ruleBasedAnomalyFunctionType);
+  public List<BaseAnomalyFunction> getSecondaryAnomalyFunctions(AnomalyFunctionDTO functionSpec) throws Exception {
+    List<String> secondaryAnomalyFunctionsType = functionSpec.getSecondaryAnomalyFunctionsType();
+
+    if (secondaryAnomalyFunctionsType == null) {
+      LOGGER.info("null secondary anomaly function");
       return null;
     }
-    String className = props.getProperty(ruleBasedAnomalyFunctionType);
-    anomalyFunction = (BaseAnomalyFunction) Class.forName(className).newInstance();
 
-    anomalyFunction.init(functionSpec);
-    return anomalyFunction;
+    List<BaseAnomalyFunction> baseAnomalyFunctions = new ArrayList<>();
+    for (String secondaryAnomalyFunctionType : secondaryAnomalyFunctionsType) {
+      if (secondaryAnomalyFunctionType == null || !props.containsKey(secondaryAnomalyFunctionType)) {
+        LOGGER.info("Unsupported rule based anomaly function type " + secondaryAnomalyFunctionType);
+        continue;
+      }
+      String className = props.getProperty(secondaryAnomalyFunctionType);
+      BaseAnomalyFunction anomalyFunction = (BaseAnomalyFunction) Class.forName(className).newInstance();
+      anomalyFunction.init(functionSpec);
+      baseAnomalyFunctions.add(anomalyFunction);
+    }
+
+    return baseAnomalyFunctions;
   }
-
 }

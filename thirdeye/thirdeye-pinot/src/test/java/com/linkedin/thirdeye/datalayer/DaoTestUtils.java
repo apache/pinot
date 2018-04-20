@@ -65,7 +65,7 @@ public class DaoTestUtils {
     functionSpec.setProperties("baseline=w/w;changeThreshold=0.001;min=100;max=900");
     functionSpec.setIsActive(true);
     functionSpec.setRequiresCompletenessCheck(false);
-    functionSpec.setRuleBasedAnomalyFunctionType("MIN_MAX_THRESHOLD");
+    functionSpec.setSecondaryAnomalyFunctionsType(Arrays.asList("MIN_MAX_THRESHOLD"));
     return functionSpec;
   }
 
