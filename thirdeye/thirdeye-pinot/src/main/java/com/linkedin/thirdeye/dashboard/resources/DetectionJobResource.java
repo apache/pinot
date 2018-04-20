@@ -3,10 +3,13 @@ package com.linkedin.thirdeye.dashboard.resources;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
+import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
 import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiOperation;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -68,6 +71,7 @@ import static com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO.*;
 
 
 @Path("/detection-job")
+@Api(tags = {Constants.DASHBOARD_TAG} )
 @Produces(MediaType.APPLICATION_JSON)
 public class DetectionJobResource {
   private final DetectionJobScheduler detectionJobScheduler;
@@ -238,6 +242,8 @@ public class DetectionJobResource {
      */
   @POST
   @Path("/{id}/replay")
+  @ApiOperation(" Breaks down the given range into consecutive monitoring windows as per function definition\n "
+      + "Regenerates anomalies for each window separately")
   public Response generateAnomaliesInRange(@PathParam("id") @NotNull final long id,
       @QueryParam("start") @NotNull String startTimeIso, @QueryParam("end") @NotNull String endTimeIso,
       @QueryParam("force") @DefaultValue("false") String isForceBackfill,
