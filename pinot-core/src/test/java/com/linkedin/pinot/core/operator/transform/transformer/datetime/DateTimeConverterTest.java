@@ -48,7 +48,12 @@ public class DateTimeConverterTest {
         new Object[]{"5:MINUTES:EPOCH", "1:HOURS:EPOCH", "1:HOURS", new long[]{5019661L}, new long[1], new long[]{418305L}},
         new Object[]{"1:MILLISECONDS:EPOCH", "1:WEEKS:EPOCH", "1:MILLISECONDS", new long[]{1505898000000L}, new long[1], new long[]{2489L}},
         new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS", "15:MINUTES", new long[]{1523560598233L}, new String[1], new String[]{"2018-04-12 19:15:00.000"}},
-        new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "15:SECONDS", new long[]{1523560598233L}, new String[1], new String[]{"2018-04-12 13:16:30.000"}}
+        new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "15:SECONDS", new long[]{1523560598233L}, new String[1], new String[]{"2018-04-12 13:16:30.000"}},
+        new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "3:MINUTES", new long[]{1523560598233L}, new String[1], new String[]{"2018-04-12 13:15:00.000"}},
+        new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "12:HOURS", new long[]{1523560598233L}, new String[1], new String[]{"2018-04-12 12:00:00.000"}},
+        new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "5:DAYS", new long[]{1523560598233L}, new String[1], new String[]{"2018-04-10 00:00:00.000"}},
+        new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Los_Angeles)", "1:DAYS", new long[]{1524045600000L}, new String[1], new String[]{"2018-04-18 00:00:00.000"}},
+        new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Los_Angeles)", "1:DAYS", new long[]{1524013200000L}, new String[1], new String[]{"2018-04-17 00:00:00.000"}}
     };
   }
 }

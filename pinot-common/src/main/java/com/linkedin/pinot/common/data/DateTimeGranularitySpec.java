@@ -15,14 +15,12 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import java.util.Objects;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.lang3.EnumUtils;
-
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.utils.EqualityUtils;
+import org.apache.commons.lang3.EnumUtils;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * Class to represent granularity from {@link DateTimeFieldSpec}
@@ -43,25 +41,45 @@ public class DateTimeGranularitySpec {
   public static final int MAX_GRANULARITY_TOKENS = 2;
 
   private String _granularity;
+  private int _size;
+  private TimeUnit _timeUnit;
 
+  /**
+   * Constructs a dateTimeGranularitySpec granularity from a string
+   * @param granularity
+   * @return
+   */
   public DateTimeGranularitySpec(String granularity) {
     _granularity = granularity;
     isValidGranularity(granularity);
+    String[] granularityTokens = _granularity.split(COLON_SEPARATOR);
+    _size = Integer.valueOf(granularityTokens[GRANULARITY_SIZE_POSITION]);
+    _timeUnit = TimeUnit.valueOf(granularityTokens[GRANULARITY_UNIT_POSITION]);
   }
 
   /**
-   * Constructs a dateTimeSpec granularity given the components of a granularity
+   * Constructs a dateTimeGranularitySpec granularity given the components of a granularity
    * @param columnSize
    * @param columnUnit
    * @return
    */
   public DateTimeGranularitySpec(int columnSize, TimeUnit columnUnit) {
     _granularity = Joiner.on(COLON_SEPARATOR).join(columnSize, columnUnit);
+    _size = columnSize;
+    _timeUnit = columnUnit;
     isValidGranularity(_granularity);
   }
 
   public String getGranularity() {
     return _granularity;
+  }
+
+  public int getSize() {
+    return _size;
+  }
+
+  public TimeUnit getTimeUnit() {
+    return _timeUnit;
   }
 
 
@@ -79,17 +97,7 @@ public class DateTimeGranularitySpec {
    * @return
    */
   public Long granularityToMillis() {
-
-    long granularityInMillis = 0;
-
-    String[] granularityTokens = _granularity.split(COLON_SEPARATOR);
-    if (granularityTokens.length == MAX_GRANULARITY_TOKENS) {
-      granularityInMillis =
-          TimeUnit.MILLISECONDS.convert(
-              Integer.valueOf(granularityTokens[GRANULARITY_SIZE_POSITION]),
-              TimeUnit.valueOf(granularityTokens[GRANULARITY_UNIT_POSITION]));
-    }
-    return granularityInMillis;
+    return TimeUnit.MILLISECONDS.convert(_size, _timeUnit);
   }
 
 
