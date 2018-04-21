@@ -144,11 +144,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
 
   private List<PinotDataBuffer> _dataBuffers = new ArrayList<>();
   private List<PinotDataBuffer> _headerBuffers = new ArrayList<>();
-//  private List<FixedByteSingleValueMultiColReader> _headerReaders = new ArrayList<>();
-//  private List<FixedByteSingleValueMultiColWriter> _headerWriters = new ArrayList<>();
   private FixedByteSingleValueMultiColWriter _curHeaderWriter;
-//  private List<FixedByteSingleValueMultiColWriter> _dataWriters = new ArrayList<>();
-//  private List<FixedByteSingleValueMultiColReader> _dataReaders = new ArrayList<>();
   private volatile ReadersAndWriters _readersAndWriters = new ReadersAndWriters();
   private FixedByteSingleValueMultiColWriter _currentDataWriter;
   private int _currentDataWriterIndex = -1;
@@ -178,7 +174,6 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
     //at least create space for million entries, which for INT translates into 4mb buffer
     _incrementalCapacity = incrementalCapacity;
     addDataBuffers(initialCapacity);
-    //init(_rowCountPerChunk, _columnSizeInBytes, _maxNumberOfMultiValuesPerRow, initialCapacity, _incrementalCapacity);
   }
 
   private void addHeaderBuffers() {
@@ -195,8 +190,6 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
             new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT});
     _headerBuffers.add(headerBuffer);
 
-//    _readersAndWriters._headerWriters.add(_curHeaderWriter);
-//    _readersAndWriters._headerReaders.add(curHeaderReader);
     ReadersAndWriters rw = _readersAndWriters.withNewHeaderReadersAndWriters(headerReader, _curHeaderWriter);
     _readersAndWriters = rw;
   }
@@ -220,8 +213,6 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
 
       FixedByteSingleValueMultiColReader dataFileReader =
           new FixedByteSingleValueMultiColReader(dataBuffer, rowCapacity, new int[]{_columnSizeInBytes});
-//      _readersAndWriters._dataWriters.add(_currentDataWriter);
-//      _readersAndWriters._dataReaders.add(dataFileReader);
       ReadersAndWriters rw = _readersAndWriters.withNewDataReadersAndWriters(dataFileReader, _currentDataWriter);
       _readersAndWriters = rw;
       //update the capacity
