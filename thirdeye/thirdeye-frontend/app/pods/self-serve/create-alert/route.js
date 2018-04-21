@@ -125,30 +125,21 @@ export default Route.extend({
     * @method triggerReplaySequence
     */
     triggerOnboardingJob(data) {
-      const { jobName, payload } = data;
-      const newName = payload.functionName;
-      let onboardStartTime = moment();
-      let newFunctionId = null;
+      const { ignore, payload } = data;
+      const jobName = payload.functionName;
 
-      fetch(selfServeApiOnboard.createAlert(newName), postProps('')).then(checkStatus)
-        .then((result) => {
-          newFunctionId = result.id;
-          return fetch(selfServeApiOnboard.updateAlert(jobName), postProps(payload)).then(checkStatus);
-        })
+      fetch(selfServeApiOnboard.updateAlert(jobName), postProps(payload))
+        .then(checkStatus)
         .then((result) => {
           if (result.jobStatus && result.jobStatus.toLowerCase() === 'failed') {
             throw new Error(result);
           } else {
-            this.get('checkJobCreateStatus').perform(result.jobId, newName, newFunctionId);
+            this.get('checkJobCreateStatus').perform(result.jobId, jobName, result.jobId);
           }
         })
         .catch((err) => {
-          // Remove incomplete alert (created but not updated)
-          if (newFunctionId) {
-            this.removeThirdEyeFunction(newFunctionId);
-          }
           // Error state will be handled on alert page
-          this.jumpToAlertPage(-1, -1, newName);
+          this.jumpToAlertPage(-1, -1, jobName);
         });
     }
   }
