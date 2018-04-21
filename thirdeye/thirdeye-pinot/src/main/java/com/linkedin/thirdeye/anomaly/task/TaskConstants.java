@@ -10,7 +10,8 @@ public class TaskConstants {
     ALERT2,
     MONITOR,
     DATA_COMPLETENESS,
-    CLASSIFICATION
+    CLASSIFICATION,
+    REPLAY
   }
 
   public enum TaskStatus {

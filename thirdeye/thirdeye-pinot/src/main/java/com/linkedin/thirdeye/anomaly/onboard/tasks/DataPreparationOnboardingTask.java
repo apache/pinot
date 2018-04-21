@@ -1,9 +1,9 @@
 package com.linkedin.thirdeye.anomaly.onboard.tasks;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardTask;
-import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardExecutionContext;
-import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardTaskContext;
+import com.linkedin.thirdeye.anomaly.onboard.framework.BaseDetectionOnboardTask;
+import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardExecutionContext;
+import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardTaskContext;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;

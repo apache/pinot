@@ -10,7 +10,6 @@ public class ThirdEyeDashboardConfiguration extends ThirdEyeConfiguration {
   AuthConfiguration authConfig;
   RootCauseConfiguration rootCause;
   List<ResourceConfiguration> resourceConfig;
-  String onboardingHost;
 
   public List<ResourceConfiguration> getResourceConfig() {
     return resourceConfig;
@@ -34,13 +33,5 @@ public class ThirdEyeDashboardConfiguration extends ThirdEyeConfiguration {
 
   public void setAuthConfig(AuthConfiguration authConfig) {
     this.authConfig = authConfig;
-  }
-
-  public String getOnboardingHost() {
-    return onboardingHost;
-  }
-
-  public void setOnboardingHost(String onboardingHost) {
-    this.onboardingHost = onboardingHost;
   }
 }

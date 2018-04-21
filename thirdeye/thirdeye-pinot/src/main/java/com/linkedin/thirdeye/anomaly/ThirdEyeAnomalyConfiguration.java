@@ -12,7 +12,6 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean autoload = false;
   private boolean classifier = false;
   private boolean dataCompleteness = false;
-  private boolean detectionOnboard = false;
   private boolean holidayEventsLoader = false;
   private boolean monitor = false;
   private boolean pinotProxy = false;
@@ -152,14 +151,6 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setPinotProxy(boolean pinotProxy) {
     this.pinotProxy = pinotProxy;
-  }
-
-  public boolean isDetectionOnboard() {
-    return detectionOnboard;
-  }
-
-  public void setDetectionOnboard(boolean detectionOnboard) {
-    this.detectionOnboard = detectionOnboard;
   }
 
   public void setSmtpConfiguration(SmtpConfiguration smtpConfiguration) {

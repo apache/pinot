@@ -3,7 +3,7 @@ package com.linkedin.thirdeye.dashboard;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.cache.CacheBuilder;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
-import com.linkedin.thirdeye.anomaly.onboard.FunctionOnboardingResource;
+import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardResource;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.auth.AuthCookieSerializer;
@@ -74,9 +74,7 @@ import java.util.concurrent.TimeUnit;
 import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
-import javax.servlet.ServletRegistration;
 import org.codehaus.jackson.map.ObjectMapper;
-import org.eclipse.jetty.proxy.ProxyServlet;
 import org.eclipse.jetty.servlets.CrossOriginFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -152,24 +150,16 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new OnboardDatasetMetricResource());
     env.jersey().register(new AutoOnboardResource(config));
     env.jersey().register(new ConfigResource(DAO_REGISTRY.getConfigDAO()));
-    env.jersey().register(new FunctionOnboardingResource());
     env.jersey().register(new CustomizedEventResource(DAO_REGISTRY.getEventDAO()));
     env.jersey().register(new TimeSeriesResource());
     env.jersey().register(new UserDashboardResource(DAO_REGISTRY.getMergedAnomalyResultDAO(), DAO_REGISTRY.getAnomalyFunctionDAO(), DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO()));
+    env.jersey().register(new DetectionOnboardResource(DAO_REGISTRY.getTaskDAO(), DAO_REGISTRY.getAnomalyFunctionDAO()));
 
     TimeSeriesLoader timeSeriesLoader = new DefaultTimeSeriesLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache());
     AggregationLoader aggregationLoader = new DefaultAggregationLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
 
     env.jersey().register(new RootCauseSessionResource(DAO_REGISTRY.getRootcauseSessionDAO(), new ObjectMapper()));
     env.jersey().register(new RootCauseMetricResource(Executors.newCachedThreadPool(), aggregationLoader, timeSeriesLoader, DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO()));
-
-    if (config.getOnboardingHost() != null) {
-      LOG.info("Setting up onboarding proxy for '{}'", config.getOnboardingHost());
-      ServletRegistration.Dynamic proxy = env.servlets().addServlet("detection-onboard", ProxyServlet.Transparent.class);
-      proxy.setInitParameter("proxyTo", config.getOnboardingHost());
-      proxy.setInitParameter("prefix", "/detection-onboard");
-      proxy.addMapping("/detection-onboard/*");
-    }
 
     env.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
