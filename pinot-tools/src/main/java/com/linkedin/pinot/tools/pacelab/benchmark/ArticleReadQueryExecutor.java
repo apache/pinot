@@ -31,10 +31,10 @@ public class ArticleReadQueryExecutor extends QueryExecutor{
                     " WHERE ReadStartTime > %d AND ReadStartTime < %d AND ArticleID = '%s'",
                 "SELECT ArticleTopic, COUNT(*), AVG(TimeSpent), AVG(ReaderStrength) FROM ArticleRead" +
                     " WHERE ReadStartTime > %d AND ReadStartTime < %d" +
-                    " GROUP BY ArticleTopic ORDER BY COUNT(*) desc LIMIT %d",
+                    " GROUP BY ArticleTopic TOP %d",
                 "SELECT ArticleAuthor, ArticleTitle, ReaderStrength, COUNT(*) FROM ArticleRead" +
                     " WHERE ReadStartTime > %d AND ReadStartTime < %d" +
-                    " GROUP BY ArticleAuthor, ArticleTitle, ReaderStrength ORDER BY COUNT(*) desc LIMIT %d"
+                    " GROUP BY ArticleAuthor, ArticleTitle, ReaderStrength TOP %d"
         };
         return queries;
     }

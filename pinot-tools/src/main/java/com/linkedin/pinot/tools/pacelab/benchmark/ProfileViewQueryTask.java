@@ -109,7 +109,7 @@ public class ProfileViewQueryTask extends QueryTask {
                 query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomProfile.getValue("ID"), groupByLimit);
                 runQuery(query);
                 break;
-
+            /*
             case 4:
                 query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), groupByLimit);
                 runQuery(query);
@@ -117,7 +117,7 @@ public class ProfileViewQueryTask extends QueryTask {
             case 5:
                 query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), groupByLimit);
                 runQuery(query);
-                break;
+                break;*/
         }
 
     }

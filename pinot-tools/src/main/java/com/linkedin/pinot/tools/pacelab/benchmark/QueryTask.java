@@ -61,41 +61,6 @@ public class QueryTask implements Runnable{
             try
             {
 
-                /*if(ignoreQPS != 1)
-                {
-                    long intervalStart = System.currentTimeMillis();
-                    for (int q = 0; q < QPS; q++)
-                    {
-                        float randomLikelihood = rand.nextFloat();
-                        for (int i = 0; i < likelihood.length; i++)
-                        {
-                            if (randomLikelihood <= likelihood[i])
-                            {
-                                generateAndRunQuery(i);
-                                break;
-                            }
-                        }
-                    }
-                    long intervalEnd = System.currentTimeMillis();
-                    long timeDistance = intervalEnd-intervalStart;
-                    if (timeDistance<1000)
-                    {
-                        Thread.sleep(1000-timeDistance);
-                    }
-                }
-                else
-                {
-                    float randomLikelihood = rand.nextFloat();
-                    for (int i = 0; i < likelihood.length; i++)
-                    {
-                        if (randomLikelihood <= likelihood[i])
-                        {
-                            generateAndRunQuery(i);
-                            break;
-                        }
-                    }
-                }*/
-
                 float randomLikelihood = rand.nextFloat();
                 for (int i = 0; i < likelihood.length; i++)
                 {

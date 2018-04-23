@@ -31,10 +31,10 @@ public class CompanySearchQueryExecutor extends QueryExecutor{
                         " WHERE SearchTime > %d AND SearchTime < %d AND ViewedProfileId = '%s'",
                 "SELECT CompanyDomain,COUNT(*), AVG(TimeSpent) FROM CompanySearchAppearance" +
                         " WHERE SearchTime > %d AND SearchTime < %d" +
-                        " GROUP BY CompanyDomain LIMIT %d",
+                        " GROUP BY CompanyDomain TOP %d",
                 "SELECT CompanyDomain, Location, CompanySize,COUNT(*),AVG(TimeSpent) FROM CompanySearchAppearance" +
                         " WHERE SearchTime > %d AND SearchTime < %d"+
-                        " GROUP BY CompanyDomain, Location, CompanySize LIMIT %d"
+                        " GROUP BY CompanyDomain, Location, CompanySize TOP %d"
         };
         return queries;
     }
