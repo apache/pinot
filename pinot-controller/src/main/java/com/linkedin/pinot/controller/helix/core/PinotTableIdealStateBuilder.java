@@ -296,7 +296,10 @@ public class PinotTableIdealStateBuilder {
       final String bootstrapHosts = _streamMetadata.getBootstrapHosts();
       final String kafkaTopicName = _streamMetadata.getKafkaTopicName();
       if (bootstrapHosts == null || bootstrapHosts.isEmpty()) {
-        throw new RuntimeException("Invalid value for " + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
+        LOGGER.warn("Could not get partition count for topic {}. Invalid config for bootstrap hosts:'{}'",
+            kafkaTopicName, bootstrapHosts);
+        throw new RuntimeException("Invalid value for " + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST + ":'"
+            + bootstrapHosts + "'");
       }
       PinotStreamConsumerFactory pinotStreamConsumerFactory = PinotStreamConsumerFactory.create(_streamMetadata);
       PinotStreamConsumer consumerWrapper = pinotStreamConsumerFactory.buildMetadataFetcher(
@@ -305,14 +308,15 @@ public class PinotTableIdealStateBuilder {
         _partitionCount = consumerWrapper.getPartitionCount(kafkaTopicName, /*maxWaitTimeMs=*/5000L);
         if (_exception != null) {
           // We had at least one failure, but succeeded now. Log an info
-          LOGGER.info("Successfully retrieved partition count as {} for {}", _partitionCount, kafkaTopicName);
+          LOGGER.info("Successfully retrieved partition count as {} for topic {}", _partitionCount, kafkaTopicName);
         }
         return Boolean.TRUE;
       } catch (SimpleConsumerWrapper.TransientConsumerException e) {
-        LOGGER.warn("Could not get Kafka partition count for {}:{}", kafkaTopicName, e.getMessage());
+        LOGGER.warn("Could not get Kafka partition count for topic {}:{}", kafkaTopicName, e);
         _exception = e;
         return Boolean.FALSE;
       } catch (Exception e) {
+        LOGGER.warn("Could not get Kafka partition count for topic {}:{}", kafkaTopicName, e);
         _exception = e;
         throw e;
       } finally {
