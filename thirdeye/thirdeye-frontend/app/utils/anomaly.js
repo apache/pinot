@@ -52,7 +52,7 @@ export function updateAnomalyFeedback(anomalyId, feedbackType) {
  * @return {Ember.RSVP.Promise}
  */
 export function verifyAnomalyFeedback(anomalyId) {
-  const url = `anomalyApiUrls.getAnomalyDataUrl()${anomalyId}`;
+  const url = `${anomalyApiUrls.getAnomalyDataUrl()}${anomalyId}`;
   return fetch(url).then(checkStatus);
 }
 
@@ -71,7 +71,7 @@ export function getAnomaliesByAppName(appName, startTime) {
   if (!startTime) {
     return Promise.reject(new Error('startTime param is required.'));
   }
-  const url = anomalyApiUrls.getAnomaliesByAppNameUrl(appName, startTime) ;
+  const url = anomalyApiUrls.getAnomaliesByAppNameUrl(appName, startTime);
   return fetch(url).then(checkStatus).catch(() => {});
 }
 
