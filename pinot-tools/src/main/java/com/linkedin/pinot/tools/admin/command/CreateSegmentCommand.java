@@ -282,9 +282,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
 
     String configDateTimeColumnName = segmentGeneratorConfig.getTimeColumnName();
     if (_timeColumnName == null) {
-      if (configDateTimeColumnName == null) {
-        throw new RuntimeException("Must specify dateTimeColumnName.");
-      }
       _timeColumnName = configDateTimeColumnName;
     } else {
       if (configDateTimeColumnName != null && !configDateTimeColumnName.equals(_timeColumnName)) {

@@ -43,7 +43,7 @@ public class RealtimeSegmentConverter {
   private String outputPath;
   private Schema dataSchema;
   private String tableName;
-  private String timeColumnName; // TODO: use this to set time column in segment generator config
+  private String timeColumnName;
   private String segmentName;
   private String sortedColumn;
   private List<String> invertedIndexColumns;
@@ -122,7 +122,9 @@ public class RealtimeSegmentConverter {
       genConfig.enableStarTreeIndex(starTreeIndexSpec);
     }
 
+    // TODO: use timeColumnName field
     genConfig.setTimeColumnName(dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName());
+    // TODO: find timeColumnName in schema.getDateTimeFieldSpec, in order to get the timeUnit
     genConfig.setSegmentTimeUnit(dataSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType());
     if (segmentVersion != null) {
       genConfig.setSegmentVersion(segmentVersion);

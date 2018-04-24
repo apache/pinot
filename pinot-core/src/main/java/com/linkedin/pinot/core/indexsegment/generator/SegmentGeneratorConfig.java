@@ -308,6 +308,7 @@ public class SegmentGeneratorConfig {
     if (_segmentTimeColumnName != null) {
       return _segmentTimeColumnName;
     }
+    // TODO: if segmentTimeColumnName is null, getQualifyingFields DATETIME. If multiple found, throw exception "must specify primary timeColumnName"
     return getQualifyingFields(FieldType.TIME);
   }
 
