@@ -128,21 +128,22 @@ export function setUpTimeRangeOptions(datesKeys, duration) {
   };
 
   const dateKeyMap = new Map([
-    [ '1m', ['Last 30 Days', 1, 'month'] ],
-    [ '3m', ['3 Months', 3, 'month'] ],
-    [ '2w', ['Last 2 Weeks', 2, 'week'] ],
-    [ '1w', ['Last Week', 1, 'week'] ],
-    [ '2d', ['Yesterday', 2, 'day'] ],
-    [ '1d', ['Today', 1, 'day'] ],
-  ]);
+   [ '1m', ['Last 30 Days', 1, 'month'] ],
+   [ '3m', ['3 Months', 3, 'month'] ],
+   [ '2w', ['Last 2 Weeks', 2, 'week'] ],
+   [ '1w', ['Last Week', 1, 'week'] ],
+   [ '2d', ['Yesterday', 2, 'day'] ],
+   [ '1d', ['Last 24 hours', 1, 'day'] ],
+   [ 'today', ['Today'] ]
+   ]);
 
-  datesKeys.forEach((value) => {
-    let currVal = dateKeyMap.get(value);
-    let name = currVal[0];
-    let start = moment().subtract(currVal[1], currVal[2]).endOf('day').utc();
-    let isActive = duration === value;
-    newRangeArr.push({ name, value, start, isActive });
-  });
+   datesKeys.forEach((value) => {
+     const currVal = dateKeyMap.get(value);
+     const label = currVal[0];
+     const start = (label === 'Today') ? moment().startOf('day') : moment().subtract(currVal[1], currVal[2]).startOf('hour').utc();
+     const isActive = duration === value;
+     newRangeArr.push({ name: label, value, start, isActive });
+   });
 
   newRangeArr.push(defaultCustomRange);
 
