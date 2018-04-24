@@ -1,6 +1,9 @@
 import Service from '@ember/service';
 import { inject as service } from '@ember/service';
 import { assert } from '@ember/debug';
+
+  // set expiration to 7 days
+  const EXPIRATION = 60 * 60 * 24 * 7;
 /**
  * @type {Ember.Service}
  * @summary This service is to also cached the query response data for `this.get('store').query()` calls. In general,
@@ -21,7 +24,7 @@ import { assert } from '@ember/debug';
  */
 export default Service.extend({
   init() {
-    this._super();
+    this._super(...arguments);
     this._cache = Object.create(null);//create our cache
   },
 
@@ -31,7 +34,7 @@ export default Service.extend({
    * @summary  This query method is a wrapper of the ember store `query`. It will add the dictionary caching that we need.
    * @method query
    * @param {String} type - modelName
-   * @param {Object} query - query object
+   * @param {Object} query - query object used to generate the
    * @param {Object} adapterOptions - adapter options object
    * @example
        const query = { application: appName, start };
@@ -51,8 +54,8 @@ export default Service.extend({
   },
 
   /**
-   * @summary  We can use the `url` as the `cacheKey` in the `query` hook.
-     which would be different with each change in query params.
+   * @summary  We can use the request query object as the `cacheKey` in the `query` hook.
+     The cacheKey should be uniqued, which would be different with each change in query request params (Note: this is not the url query).
    * @method urlForQueryKey
    * @param {String} modelName
    * @param {Object} query

@@ -28,7 +28,7 @@ export default Route.extend({
   appName: null,
   startDate: moment().startOf('day').utc().valueOf(),
   endDate: moment().utc().valueOf(),
-  duration: '1d',
+  duration: null,
 
   /**
    * Returns a mapping of anomalies by metric and functionName (aka alert), performance stats for anomalies by

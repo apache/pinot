@@ -5,16 +5,10 @@ import moment from 'moment';
 import { setUpTimeRangeOptions } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly to display time
-const ACTIVE_DURATION = '1d'; // setting this date range selection as default (today)
+const DEFAULT_ACTIVE_DURATION = '1d'; // setting this date range selection as default (Last 24 Hours)
 const UI_DATE_FORMAT = 'MMM D, YYYY hh:mm a'; // format for date picker to use (usually varies by route or metric)
 const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently across app to display custom date range
-const TODAY = moment().startOf('day').add(1, 'days');
-const TWO_WEEKS_AGO = moment().subtract(13, 'days').startOf('day');
-const PRESET_RANGES = {
-  'Today': [moment(), TODAY],
-  'Last 2 weeks': [TWO_WEEKS_AGO, TODAY]
-};
-const TIME_RANGE_OPTIONS = ['1d', '2d', '1w'];
+const TIME_RANGE_OPTIONS = ['today', '1d', '1w'];
 
 export default Controller.extend({
   queryParams: ['appName', 'startDate', 'endDate', 'duration'],
@@ -40,16 +34,14 @@ export default Controller.extend({
       const appName = this.get('model.appName');
       const startDate = Number(this.get('model.startDate'));
       const endDate = Number(this.get('model.endDate'));
-      const duration = this.get('model.duration') || ACTIVE_DURATION;
-
+      const duration = this.get('model.duration') || DEFAULT_ACTIVE_DURATION;
       return {
         appName,
         uiDateFormat: UI_DATE_FORMAT,
         activeRangeStart: moment(startDate).format(DISPLAY_DATE_FORMAT),
         activeRangeEnd: moment(endDate).format(DISPLAY_DATE_FORMAT),
         timeRangeOptions: setUpTimeRangeOptions(TIME_RANGE_OPTIONS, duration),
-        timePickerIncrement: TIME_PICKER_INCREMENT,
-        predefinedRanges: PRESET_RANGES
+        timePickerIncrement: TIME_PICKER_INCREMENT
       };
     }
   ),
@@ -96,12 +88,13 @@ export default Controller.extend({
      * @method onRangeSelection
      * @param {Object} rangeOption - the user-selected time range to load
      */
-    onRangeSelection(rangeOption) {
+    onRangeSelection(timeRangeOptions) {
       const {
         start,
         end,
         value: duration
-      } = rangeOption;
+      } = timeRangeOptions;
+
       const startDate = moment(start).valueOf();
       const endDate = moment(end).valueOf();
       const appName = this.get('appName');
