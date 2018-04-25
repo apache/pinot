@@ -115,7 +115,7 @@ public class PinotSchemaRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully updated schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
-      FormDataMultiPart multiPart) {
+      @ApiParam(value = "Schema", required = true) FormDataMultiPart multiPart) {
     return addOrUpdateSchema(schemaName, multiPart);
   }
 
@@ -124,8 +124,9 @@ public class PinotSchemaRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/schemas")
   @ApiOperation(value = "Add a new schema", notes = "Adds a new schema")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully deleted schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
-  public SuccessResponse addSchema(FormDataMultiPart multiPart) {
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully added schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
+  public SuccessResponse addSchema(
+      @ApiParam(value = "Schema", required = true)  FormDataMultiPart multiPart) {
     return addOrUpdateSchema(null, multiPart);
   }
 
@@ -135,7 +136,8 @@ public class PinotSchemaRestletResource {
   @ApiOperation(value = "Validate schema", notes = "This API returns the schema that matches the one you get "
       + "from 'GET /schema/{schemaName}'. This allows us to validate schema before apply.")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully validated schema"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
-  public String validateSchema(FormDataMultiPart multiPart) {
+  public String validateSchema(
+      @ApiParam(value = "Schema", required = true) FormDataMultiPart multiPart) {
     Schema schema = getSchemaFromMultiPart(multiPart);
     if (!schema.validate(LOGGER)) {
       throw new ControllerApplicationException(LOGGER, "Invalid schema. Check controller logs",
