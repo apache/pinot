@@ -1043,12 +1043,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // Read the max number of rows
     int segmentMaxRowCount = kafkaStreamProviderConfig.getSizeThresholdToFlushSegment();
-
     if (0 < segmentZKMetadata.getSizeThresholdToFlushSegment()) {
       segmentMaxRowCount = segmentZKMetadata.getSizeThresholdToFlushSegment();
     }
-
     _segmentMaxRowCount = segmentMaxRowCount;
+
     _isOffHeap = indexLoadingConfig.isRealtimeOffheapAllocation();
 
     // Start new realtime segment
@@ -1094,9 +1093,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _resourceTmpDir.mkdirs();
     }
     _state = State.INITIAL_CONSUMING;
+
     long now = now();
     _consumeStartTime = now;
-    _consumeEndTime = now + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
+    long flushThresholdMillis = kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
+    if (segmentZKMetadata.getTimeThresholdToFlushSegmentMillis() > 0) {
+      flushThresholdMillis = segmentZKMetadata.getTimeThresholdToFlushSegmentMillis();
+    }
+    _consumeEndTime = now + flushThresholdMillis;
+
     LOGGER.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
         _segmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC).toString());
     start();

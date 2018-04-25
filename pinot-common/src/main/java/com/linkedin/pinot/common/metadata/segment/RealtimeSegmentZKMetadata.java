@@ -32,6 +32,7 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
 
   private Status _status = null;
   private int _sizeThresholdToFlushSegment = -1;
+  private long _timeThresholdToFlushSegmentMillis = -1;
 
   public RealtimeSegmentZKMetadata() {
     setSegmentType(SegmentType.REALTIME);
@@ -42,6 +43,7 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     setSegmentType(SegmentType.REALTIME);
     _status = Status.valueOf(znRecord.getSimpleField(CommonConstants.Segment.Realtime.STATUS));
     _sizeThresholdToFlushSegment = znRecord.getIntField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, -1);
+    _timeThresholdToFlushSegmentMillis = znRecord.getIntField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME_MILLIS, -1);
   }
 
   public Status getStatus() {
@@ -72,6 +74,7 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     ZNRecord znRecord = super.toZNRecord();
     znRecord.setSimpleField(CommonConstants.Segment.Realtime.STATUS, _status.toString());
     znRecord.setLongField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, _sizeThresholdToFlushSegment);
+    znRecord.setLongField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME_MILLIS, _timeThresholdToFlushSegmentMillis);
     return znRecord;
   }
 
@@ -88,7 +91,8 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     RealtimeSegmentZKMetadata metadata = (RealtimeSegmentZKMetadata) segmentMetadata;
     return super.equals(metadata) &&
         isEqual(_status, metadata._status) &&
-        isEqual(_sizeThresholdToFlushSegment, metadata._sizeThresholdToFlushSegment);
+        isEqual(_sizeThresholdToFlushSegment, metadata._sizeThresholdToFlushSegment) &&
+        isEqual(_timeThresholdToFlushSegmentMillis, metadata._timeThresholdToFlushSegmentMillis);
   }
 
   @Override
@@ -96,6 +100,7 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     int result = super.hashCode();
     result = hashCodeOf(result, _status);
     result = hashCodeOf(result, _sizeThresholdToFlushSegment);
+    result = hashCodeOf(result, _timeThresholdToFlushSegmentMillis);
     return result;
   }
 
@@ -105,6 +110,8 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     configMap.put(CommonConstants.Segment.Realtime.STATUS, _status.toString());
     configMap.put(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.REALTIME.toString());
     configMap.put(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, Integer.toString(_sizeThresholdToFlushSegment));
+    configMap.put(CommonConstants.Segment.FLUSH_THRESHOLD_TIME_MILLIS,
+        Long.toString(_timeThresholdToFlushSegmentMillis));
     return configMap;
   }
 
@@ -114,5 +121,13 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
 
   public int getSizeThresholdToFlushSegment() {
     return _sizeThresholdToFlushSegment;
+  }
+
+  public long getTimeThresholdToFlushSegmentMillis() {
+    return _timeThresholdToFlushSegmentMillis;
+  }
+
+  public void setTimeThresholdToFlushSegmentMillis(long timeThresholdToFlushSegmentMillis) {
+    _timeThresholdToFlushSegmentMillis = timeThresholdToFlushSegmentMillis;
   }
 }
