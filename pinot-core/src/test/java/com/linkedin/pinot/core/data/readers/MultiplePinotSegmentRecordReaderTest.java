@@ -91,7 +91,7 @@ public class MultiplePinotSegmentRecordReaderTest {
     }
 
     Assert.assertEquals(outputRows.size(), NUM_SEGMENTS * NUM_ROWS,
-        "Number of rows returned by PinotSegmentRecordReader is incorrect");
+        "Number of rows returned by MultiplePinotSegmentRecordReader is incorrect");
 
     int outputRowIndex = 0;
     for (List<GenericRow> rows : _rowsList) {
@@ -122,7 +122,7 @@ public class MultiplePinotSegmentRecordReaderTest {
     }
 
     Assert.assertEquals(outputRows.size(), NUM_SEGMENTS * NUM_ROWS,
-        "Number of rows returned by PinotSegmentRecordReader is incorrect");
+        "Number of rows returned by MultiplePinotSegmentRecordReader is incorrect");
     GenericRow prev = outputRows.get(0);
     for (int i = 1; i < outputRows.size(); i++) {
       GenericRow current = outputRows.get(i);
