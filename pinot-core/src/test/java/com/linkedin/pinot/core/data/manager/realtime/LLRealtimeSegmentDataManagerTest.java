@@ -784,7 +784,7 @@ public class LLRealtimeSegmentDataManagerTest {
         return null;
       }
       if (!forCommit) {
-        return new SegmentBuildDescriptor(null, getCurrentOffset(), _segmentDir, 0, 0);
+        return new SegmentBuildDescriptor(null, getCurrentOffset(), _segmentDir, 0, 0, -1);
       }
       final String segTarFileName =  _segmentDir + "/" + "segmentFile";
       File segmentTgzFile = new File(segTarFileName);
@@ -793,7 +793,7 @@ public class LLRealtimeSegmentDataManagerTest {
       } catch (IOException e) {
         Assert.fail("Could not create file " + segmentTgzFile);
       }
-      return new SegmentBuildDescriptor(segTarFileName, getCurrentOffset(), null, 0, 0);
+      return new SegmentBuildDescriptor(segTarFileName, getCurrentOffset(), null, 0, 0, -1);
     }
 
     @Override
