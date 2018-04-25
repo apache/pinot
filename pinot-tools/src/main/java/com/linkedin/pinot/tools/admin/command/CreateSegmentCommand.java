@@ -67,6 +67,9 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-segmentName", metaVar = "<string>", usage = "Name of the segment.")
   private String _segmentName;
 
+  @Option(name = "-timeColumnName", metaVar = "<string>", usage = "Primary time column.")
+  private String _timeColumnName;
+
   @Option(name = "-schemaFile", metaVar = "<string>", usage = "File containing schema for data.")
   private String _schemaFile;
 
@@ -130,6 +133,11 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     return this;
   }
 
+  public CreateSegmentCommand setTimeColumnName(String timeColumnName) {
+    _timeColumnName = timeColumnName;
+    return this;
+  }
+
   public CreateSegmentCommand setSchemaFile(String schemaFile) {
     _schemaFile = schemaFile;
     return this;
@@ -171,10 +179,10 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   public String toString() {
     return ("CreateSegment  -generatorConfigFile " + _generatorConfigFile + " -dataDir " + _dataDir + " -format "
         + _format + " -outDir " + _outDir + " -overwrite " + _overwrite + " -tableName " + _tableName + " -segmentName "
-        + _segmentName + " -schemaFile " + _schemaFile + " -readerConfigFile " + _readerConfigFile
-        + " -enableStarTreeIndex " + _enableStarTreeIndex + " -starTreeIndexSpecFile " + _starTreeIndexSpecFile
-        + " -hllSize " + _hllSize + " -hllColumns " + _hllColumns + " -hllSuffix " + _hllSuffix + " -numThreads "
-        + _numThreads);
+        + _segmentName + " -timeColumnName " + _timeColumnName + " -schemaFile " + _schemaFile
+        + " -readerConfigFile " + _readerConfigFile + " -enableStarTreeIndex " + _enableStarTreeIndex
+        + " -starTreeIndexSpecFile " + _starTreeIndexSpecFile + " -hllSize " + _hllSize + " -hllColumns "
+        + _hllColumns + " -hllSuffix " + _hllSuffix + " -numThreads " + _numThreads);
   }
 
   @Override
@@ -272,6 +280,16 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
       }
     }
 
+    String configDateTimeColumnName = segmentGeneratorConfig.getTimeColumnName();
+    if (_timeColumnName == null) {
+      _timeColumnName = configDateTimeColumnName;
+    } else {
+      if (configDateTimeColumnName != null && !configDateTimeColumnName.equals(_timeColumnName)) {
+        LOGGER.warn("Found dateTimeColumnName conflict in command line and config file, using config in command line: {}",
+            _segmentName);
+      }
+    }
+
     // Filter out all input files.
     File dir = new File(_dataDir);
     if (!dir.exists() || !dir.isDirectory()) {
@@ -309,6 +327,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     segmentGeneratorConfig.setOverwrite(_overwrite);
     segmentGeneratorConfig.setTableName(_tableName);
     segmentGeneratorConfig.setSegmentName(_segmentName);
+    segmentGeneratorConfig.setTimeColumnName(_timeColumnName);
     if (_schemaFile != null) {
       if (segmentGeneratorConfig.getSchemaFile() != null && !segmentGeneratorConfig.getSchemaFile()
           .equals(_schemaFile)) {

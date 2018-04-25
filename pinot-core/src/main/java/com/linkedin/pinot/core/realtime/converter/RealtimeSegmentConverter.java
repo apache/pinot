@@ -43,6 +43,7 @@ public class RealtimeSegmentConverter {
   private String outputPath;
   private Schema dataSchema;
   private String tableName;
+  private String timeColumnName;
   private String segmentName;
   private String sortedColumn;
   private List<String> invertedIndexColumns;
@@ -50,7 +51,7 @@ public class RealtimeSegmentConverter {
   private StarTreeIndexSpec starTreeIndexSpec;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
-      String tableName, String segmentName, String sortedColumn, List<String> invertedIndexColumns,
+      String tableName, String timeColumnName, String segmentName, String sortedColumn, List<String> invertedIndexColumns,
       List<String> noDictionaryColumns, StarTreeIndexSpec starTreeIndexSpec) {
     if (new File(outputPath).exists()) {
       throw new IllegalAccessError("path already exists:" + outputPath);
@@ -85,9 +86,9 @@ public class RealtimeSegmentConverter {
   }
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
-      String tableName, String segmentName, String sortedColumn) {
-    this(realtimeSegment, outputPath, schema, tableName, segmentName, sortedColumn, new ArrayList<String>(),
-        new ArrayList<String>(), null/*StarTreeIndexSpec*/);
+      String tableName, String timeColumnName, String segmentName, String sortedColumn) {
+    this(realtimeSegment, outputPath, schema, tableName, timeColumnName, segmentName, sortedColumn, new ArrayList<>(),
+        new ArrayList<>(), null/*StarTreeIndexSpec*/);
   }
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics) throws Exception {
@@ -121,7 +122,9 @@ public class RealtimeSegmentConverter {
       genConfig.enableStarTreeIndex(starTreeIndexSpec);
     }
 
+    // TODO: use timeColumnName field
     genConfig.setTimeColumnName(dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName());
+    // TODO: find timeColumnName in schema.getDateTimeFieldSpec, in order to get the timeUnit
     genConfig.setSegmentTimeUnit(dataSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType());
     if (segmentVersion != null) {
       genConfig.setSegmentVersion(segmentVersion);

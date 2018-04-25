@@ -213,6 +213,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private PinotStreamConsumer _consumerWrapper = null;
   private final File _resourceTmpDir;
   private final String _tableName;
+  private final String _timeColumnName;
   private final List<String> _invertedIndexColumns;
   private final List<String> _noDictionaryColumns;
   private final StarTreeIndexSpec _starTreeIndexSpec;
@@ -631,7 +632,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // lets convert the segment now
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
-              _segmentZKMetadata.getTableName(), _segmentZKMetadata.getSegmentName(), _sortedColumn,
+              _segmentZKMetadata.getTableName(), _timeColumnName, _segmentZKMetadata.getSegmentName(), _sortedColumn,
               _invertedIndexColumns, _noDictionaryColumns, _starTreeIndexSpec);
       logStatistics();
       segmentLogger.info("Trying to build segment");
@@ -973,6 +974,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentName = new LLCSegmentName(_segmentNameStr);
     _kafkaPartitionId = _segmentName.getPartitionId();
     _tableName = _tableConfig.getTableName();
+    _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     _metricKeyName = _tableName + "-" + _kafkaTopic + "-" + _kafkaPartitionId;
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() +
         "_" + _segmentNameStr);
