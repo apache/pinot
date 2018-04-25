@@ -24,6 +24,6 @@ import io.vavr.collection.Map;
  * of configuration keys.
  */
 public interface ChildKeyTransformer {
-  Map<String, ?> transformChildKeys(Map<String, ?> childKeys, String pathPrefix);
-  Map<String, ?> untransformChildKeys(Map<String, ?> childKeys, String pathPrefix);
+  Map<String, ?> apply(Map<String, ?> childKeys, String pathPrefix);
+  Map<String, ?> unapply(Map<String, ?> childKeys, String pathPrefix);
 }
