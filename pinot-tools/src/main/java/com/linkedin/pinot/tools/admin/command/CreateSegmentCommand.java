@@ -280,16 +280,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
       }
     }
 
-    String configDateTimeColumnName = segmentGeneratorConfig.getTimeColumnName();
-    if (_timeColumnName == null) {
-      _timeColumnName = configDateTimeColumnName;
-    } else {
-      if (configDateTimeColumnName != null && !configDateTimeColumnName.equals(_timeColumnName)) {
-        LOGGER.warn("Found dateTimeColumnName conflict in command line and config file, using config in command line: {}",
-            _segmentName);
-      }
-    }
-
     // Filter out all input files.
     File dir = new File(_dataDir);
     if (!dir.exists() || !dir.isDirectory()) {
@@ -327,7 +317,9 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     segmentGeneratorConfig.setOverwrite(_overwrite);
     segmentGeneratorConfig.setTableName(_tableName);
     segmentGeneratorConfig.setSegmentName(_segmentName);
-    segmentGeneratorConfig.setTimeColumnName(_timeColumnName);
+    if (_timeColumnName != null) {
+      segmentGeneratorConfig.setTimeColumnName(_timeColumnName);
+    }
     if (_schemaFile != null) {
       if (segmentGeneratorConfig.getSchemaFile() != null && !segmentGeneratorConfig.getSchemaFile()
           .equals(_schemaFile)) {
