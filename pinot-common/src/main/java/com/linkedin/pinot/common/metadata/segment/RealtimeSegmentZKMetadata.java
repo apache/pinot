@@ -15,31 +15,16 @@
  */
 package com.linkedin.pinot.common.metadata.segment;
 
-import java.util.Map;
-
-import org.apache.helix.ZNRecord;
-
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import org.joda.time.Duration;
-import org.joda.time.Period;
-import org.joda.time.format.PeriodFormatter;
-import org.joda.time.format.PeriodFormatterBuilder;
+import java.util.Map;
+import org.apache.helix.ZNRecord;
 
-import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
-import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
+import static com.linkedin.pinot.common.utils.EqualityUtils.*;
 
 
 public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
-
-  private static final PeriodFormatter PERIOD_FORMATTER = new PeriodFormatterBuilder()
-      .appendHours().appendSuffix("h")
-      .appendMinutes().appendSuffix("m")
-      .appendSeconds().appendSuffix("s")
-      .toFormatter();
 
   private Status _status = null;
   private int _sizeThresholdToFlushSegment = -1;
@@ -138,35 +123,18 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
   }
 
   /**
-   * Converts the period string to millis before returning
-   * @return time threshold value in millis
+   * Gets the time threshold as a  period string
+   * @return
    */
-  public Long getTimeThresholdToFlushSegmentMillis() {
-    return convertToMillis(_timeThresholdToFlushSegment);
+  public String getTimeThresholdToFlushSegment() {
+    return _timeThresholdToFlushSegment;
   }
 
   /**
-   * Converts the millis value of threshold into a readable period string before setting
-   * @param timeThresholdToFlushSegmentMillis
+   * Sets the time threshold to the given period string
+   * @param timeThresholdPeriodString
    */
-  public void setTimeThresholdToFlushSegmentMillis(Long timeThresholdToFlushSegmentMillis) {
-    _timeThresholdToFlushSegment = convertToPeriod(timeThresholdToFlushSegmentMillis);
-  }
-
-  private Long convertToMillis(String timeStr) {
-    if (timeStr == null) {
-      return null;
-    }
-    try {
-      Period p = PERIOD_FORMATTER.parsePeriod(timeStr);
-      return p.toStandardDuration().getStandardSeconds() * 1000L;
-    } catch (Exception e) {
-      throw new RuntimeException("Invalid time spec '" + timeStr + "' (Valid examples: '3h', '4h30m')", e);
-    }
-  }
-
-  private String convertToPeriod(Long millis) {
-    Period p = new Period(new Duration(millis));
-    return PERIOD_FORMATTER.print(p);
+  public void setTimeThresholdToFlushSegment(String timeThresholdPeriodString) {
+    _timeThresholdToFlushSegment = timeThresholdPeriodString;
   }
 }

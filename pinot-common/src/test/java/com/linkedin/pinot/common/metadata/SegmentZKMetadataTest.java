@@ -60,37 +60,6 @@ public class SegmentZKMetadataTest {
   }
 
   @Test
-  public void testFlushThresholdTimeConversion() {
-    RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = new RealtimeSegmentZKMetadata();
-    Assert.assertNull(realtimeSegmentZKMetadata.getTimeThresholdToFlushSegmentMillis());
-
-    realtimeSegmentZKMetadata = getTestInProgressRealtimeSegmentMetadata();
-    Long millis = 21600000L;
-    Assert.assertEquals(realtimeSegmentZKMetadata.toZNRecord().getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME), "6h");
-    Assert.assertEquals(realtimeSegmentZKMetadata.getTimeThresholdToFlushSegmentMillis(), millis);
-
-    millis = 10 * 1000L;
-    realtimeSegmentZKMetadata.setTimeThresholdToFlushSegmentMillis(millis);
-    Assert.assertEquals(realtimeSegmentZKMetadata.toZNRecord().getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME), "10s");
-    Assert.assertEquals(realtimeSegmentZKMetadata.getTimeThresholdToFlushSegmentMillis(), millis);
-
-    millis = 50 * 60 * 1000L;
-    realtimeSegmentZKMetadata.setTimeThresholdToFlushSegmentMillis(50 * 60 * 1000L);
-    Assert.assertEquals(realtimeSegmentZKMetadata.toZNRecord().getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME), "50m");
-    Assert.assertEquals(realtimeSegmentZKMetadata.getTimeThresholdToFlushSegmentMillis(), millis);
-
-    millis = 4*60*60*1000L + 31*60*1000L;
-    realtimeSegmentZKMetadata.setTimeThresholdToFlushSegmentMillis(millis);
-    Assert.assertEquals(realtimeSegmentZKMetadata.toZNRecord().getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME), "4h31m");
-    Assert.assertEquals(realtimeSegmentZKMetadata.getTimeThresholdToFlushSegmentMillis(), millis);
-
-    millis = 4*60*60*1000L + 31*60*1000L + 46*1000L;
-    realtimeSegmentZKMetadata.setTimeThresholdToFlushSegmentMillis(millis);
-    Assert.assertEquals(realtimeSegmentZKMetadata.toZNRecord().getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME), "4h31m46s");
-    Assert.assertEquals(realtimeSegmentZKMetadata.getTimeThresholdToFlushSegmentMillis(), millis);
-  }
-
-  @Test
   public void offlineSegmentZKMetadataConvertionTest() {
     ZNRecord offlineZNRecord = getTestOfflineSegmentZNRecord();
     OfflineSegmentZKMetadata offlineSegmentMetadata = getTestOfflineSegmentMetadata();
@@ -168,7 +137,7 @@ public class SegmentZKMetadataTest {
     realtimeSegmentMetadata.setCrc(1234);
     realtimeSegmentMetadata.setCreationTime(3000);
     realtimeSegmentMetadata.setSizeThresholdToFlushSegment(1234);
-    realtimeSegmentMetadata.setTimeThresholdToFlushSegmentMillis(21600000L);
+    realtimeSegmentMetadata.setTimeThresholdToFlushSegment("6h");
     return realtimeSegmentMetadata;
   }
 
@@ -205,7 +174,7 @@ public class SegmentZKMetadataTest {
     realtimeSegmentMetadata.setCrc(-1);
     realtimeSegmentMetadata.setCreationTime(1000);
     realtimeSegmentMetadata.setSizeThresholdToFlushSegment(1234);
-    realtimeSegmentMetadata.setTimeThresholdToFlushSegmentMillis(21600000L);
+    realtimeSegmentMetadata.setTimeThresholdToFlushSegment("6h");
     return realtimeSegmentMetadata;
   }
 
