@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.common.datatable;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.quantile.TDigest;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.AvgPair;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
@@ -71,6 +72,8 @@ public class ObjectCustomSerDe {
       return serializeHashMap((HashMap<Object, Object>) object);
     } else if (object instanceof IntOpenHashSet) {
       return serializeIntOpenHashSet((IntOpenHashSet) object);
+    } else if (object instanceof TDigest) {
+      return serializeTDigest((TDigest) object);
     } else {
       throw new IllegalArgumentException("Illegal class for serialization: " + object.getClass().getName());
     }
@@ -104,6 +107,8 @@ public class ObjectCustomSerDe {
         return (T) deserializeHashMap(bytes);
       case IntOpenHashSet:
         return (T) deserializeIntOpenHashSet(bytes);
+      case TDigest:
+        return (T) TDigest.fromBytes(ByteBuffer.wrap(bytes));
       default:
         throw new IllegalArgumentException("Illegal object type for de-serialization: " + objectType);
     }
@@ -140,6 +145,8 @@ public class ObjectCustomSerDe {
         return (T) deserializeHashMap(byteBuffer);
       case IntOpenHashSet:
         return (T) deserializeIntOpenHashSet(byteBuffer);
+      case TDigest:
+        return (T) TDigest.fromBytes(byteBuffer);
       default:
         throw new IllegalArgumentException("Illegal object type for de-serialization: " + objectType);
     }
@@ -182,6 +189,8 @@ public class ObjectCustomSerDe {
       return ObjectType.HashMap;
     } else if (object instanceof IntOpenHashSet) {
       return ObjectType.IntOpenHashSet;
+    } else if (object instanceof TDigest) {
+      return ObjectType.TDigest;
     } else {
       throw new IllegalArgumentException("No object type matches class: " + object.getClass().getName());
     }
@@ -359,6 +368,12 @@ public class ObjectCustomSerDe {
     }
 
     return byteArrayOutputStream.toByteArray();
+  }
+
+  private static byte[] serializeTDigest(TDigest tDigest) {
+    ByteBuffer byteBuffer = ByteBuffer.allocate(tDigest.byteSize());
+    tDigest.asBytes(byteBuffer);
+    return byteBuffer.array(); // Only works since the byte-buffer is on-heap.
   }
 
   /**

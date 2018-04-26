@@ -94,6 +94,17 @@ public interface BlockValSet {
   void getStringValues(int[] inDocIds, int inStartPos, int inDocIdsSize, String[] outValues, int outStartPos);
 
   /**
+   * Get byte[[] values for the given docIds.
+   *
+   * @param inDocIds Input docIds
+   * @param inStartPos Start index in inDocIds
+   * @param inDocIdsSize Number of input doc ids
+   * @param outValues Output array
+   * @param outStartPos Start position in outValues
+   */
+  void getBytesValues(int[] inDocIds, int inStartPos, int inDocIdsSize, byte[][] outValues, int outStartPos);
+
+  /**
    * SINGLE-VALUED COLUMN APIs
    */
 
@@ -138,6 +149,13 @@ public interface BlockValSet {
    * @return Array of string values
    */
   String[] getStringValuesSV();
+
+  /**
+   * Returns the byte[] values for a single-valued column.
+   *
+   * @return Array of string values
+   */
+  byte[][] getBytesValuesSV();
 
   /**
    * MULTI-VALUED COLUMN APIs

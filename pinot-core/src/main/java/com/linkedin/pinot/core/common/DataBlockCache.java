@@ -185,6 +185,26 @@ public class DataBlockCache {
   }
 
   /**
+   * Get byte[] values for the given single-valued column.
+   *
+   * @param column Column to read.
+   * @return byte[] for the column.
+   */
+  public byte[][] getBytesValuesForSVColumn(String column) {
+    ColumnTypePair key = new ColumnTypePair(column, FieldSpec.DataType.BYTES);
+    byte[][] bytesValues = (byte[][]) _valuesMap.get(key);
+
+    if (_columnValueLoaded.add(key)) {
+      if (bytesValues == null) {
+        bytesValues = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        _valuesMap.put(key, bytesValues);
+      }
+      _dataFetcher.fetchBytesValues(column, _docIds, _length, bytesValues);
+    }
+    return bytesValues;
+  }
+
+  /**
    * MULTI-VALUED COLUMN API
    */
 

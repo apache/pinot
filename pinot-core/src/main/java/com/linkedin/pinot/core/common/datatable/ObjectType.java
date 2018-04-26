@@ -33,7 +33,8 @@ public enum ObjectType {
   HyperLogLog(6),
   QuantileDigest(7),
   HashMap(8),
-  IntOpenHashSet(9);
+  IntOpenHashSet(9),
+  TDigest(10);
 
   // Map from type value to type.
   private static Map<Integer, ObjectType> _objectTypeMap = new HashMap<>();

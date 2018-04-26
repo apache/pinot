@@ -206,7 +206,7 @@ public class DataSchema {
   }
 
   public enum ColumnDataType {
-    INT, LONG, FLOAT, DOUBLE, STRING, OBJECT, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY;
+    INT, LONG, FLOAT, DOUBLE, STRING, BYTES, OBJECT, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY;
 
     public boolean isNumber() {
       return this == INT || this == LONG || this == FLOAT || this == DOUBLE;
@@ -247,6 +247,10 @@ public class DataSchema {
           return isSingleValue ? DOUBLE : DOUBLE_ARRAY;
         case STRING:
           return isSingleValue ? STRING : STRING_ARRAY;
+        case BYTES:
+          if (isSingleValue) {
+            return BYTES;
+          } // else, fall down to default.
         default:
           throw new UnsupportedOperationException("Unsupported data type: " + dataType);
       }

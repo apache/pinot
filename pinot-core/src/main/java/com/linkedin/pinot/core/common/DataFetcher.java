@@ -186,6 +186,25 @@ public class DataFetcher {
   }
 
   /**
+   * Fetch byte[] values for a single-valued column.
+   *
+   * @param column Column to read.
+   * @param inDocIds Input document id's buffer.
+   * @param length Number of input document id's.
+   * @param outValues Buffer for output.
+   */
+  public void fetchBytesValues(String column, int[] inDocIds, int length, byte[][] outValues) {
+    Dictionary dictionary = _dictionaryMap.get(column);
+    if (dictionary != null) {
+      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
+      fetchDictIds(column, inDocIds, length, dictIds);
+      dictionary.readBytesValues(dictIds, 0, length, outValues, 0);
+    } else {
+      _singleValueSetMap.get(column).getBytesValues(inDocIds, 0, length, outValues, 0);
+    }
+  }
+
+  /**
    * MULTI-VALUED COLUMN API
    */
 

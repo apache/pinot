@@ -64,6 +64,11 @@ public abstract class BaseBlockValSet implements BlockValSet {
   }
 
   @Override
+  public void getBytesValues(int[] inDocIds, int inStartPos, int inDocIdsSize, byte[][] outValues, int outStartPos) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public int[] getDictionaryIdsSV() {
     throw new UnsupportedOperationException();
   }
@@ -90,6 +95,11 @@ public abstract class BaseBlockValSet implements BlockValSet {
 
   @Override
   public String[] getStringValuesSV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public byte[][] getBytesValuesSV() {
     throw new UnsupportedOperationException();
   }
 
