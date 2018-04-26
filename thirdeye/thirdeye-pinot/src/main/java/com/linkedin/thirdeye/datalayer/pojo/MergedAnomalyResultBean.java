@@ -32,10 +32,18 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   private boolean notified;
 
   private String message;
+  private Long detectionConfigId;
   // TODO: Remove raw anomaly id list after old merged anomalies are cleaned up
   @Deprecated
   private List<Long> rawAnomalyIdList;
 
+  public Long getDetectionConfigId() {
+    return detectionConfigId;
+  }
+
+  public void setDetectionConfigId(Long detectionConfigId) {
+    this.detectionConfigId = detectionConfigId;
+  }
 
   public Long getFunctionId() {
     return functionId;

@@ -92,6 +92,7 @@ create index raw_anomaly_result_base_id_idx on raw_anomaly_result_index(base_id)
 
 create table if not exists merged_anomaly_result_index (
     function_id bigint(20),
+    detection_config_id bigint(20),
     anomaly_feedback_id bigint(20),
     metric_id bigint(20),
     start_time bigint(20) not null,
@@ -110,6 +111,7 @@ create index merged_anomaly_result_feedback_idx on merged_anomaly_result_index(a
 create index merged_anomaly_result_metric_idx on merged_anomaly_result_index(metric_id);
 create index merged_anomaly_result_start_time_idx on merged_anomaly_result_index(start_time);
 create index merged_anomaly_result_base_id_idx on merged_anomaly_result_index(base_id);
+create index merged_anomaly_result_detection_config_id_idx on merged_anomaly_result_index(detection_config_id);
 
 create table if not exists dataset_config_index (
     dataset varchar(200) not null,
@@ -364,3 +366,16 @@ ALTER TABLE `session_index` ADD UNIQUE `session_unique_index`(session_key);
 create index session_base_id_idx ON session_index(base_id);
 create index session_key_idx ON session_index(session_key);
 create index session_principal_type_idx ON session_index(principal_type);
+
+create table if not exists detection_config_index (
+    base_id bigint(20) not null,
+    `name` VARCHAR(256) not null,
+    className VARCHAR(1023) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+ALTER TABLE `detection_config_index` ADD UNIQUE `detection_config_unique_index`(`name`);
+create index detection_config_base_id_idx ON detection_config_index(base_id);
+create index detection_config_name_idx ON detection_config_index(`name`);
+create index detection_config_class_name_idx ON detection_config_index(className);

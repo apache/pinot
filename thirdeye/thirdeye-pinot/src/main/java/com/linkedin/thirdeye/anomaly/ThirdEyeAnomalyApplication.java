@@ -20,6 +20,7 @@ import com.linkedin.thirdeye.dashboard.resources.EmailResource;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.pinot.resources.PinotDataSourceResource;
+import com.linkedin.thirdeye.detection.DetectionPipelineScheduler;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.tracking.RequestStatisticsLogger;
@@ -50,6 +51,7 @@ public class ThirdEyeAnomalyApplication
   private EmailResource emailResource = null;
   private HolidayEventsLoader holidayEventsLoader = null;
   private RequestStatisticsLogger requestStatisticsLogger = null;
+  private DetectionPipelineScheduler detectionPipelineScheduler = null;
 
   public static void main(final String[] args) throws Exception {
 
@@ -148,6 +150,10 @@ public class ThirdEyeAnomalyApplication
         if (config.isPinotProxy()) {
           environment.jersey().register(new PinotDataSourceResource());
         }
+        if (config.isDetectionPipeline()) {
+          detectionPipelineScheduler = new DetectionPipelineScheduler(DAORegistry.getInstance().getDetectionConfigManager());
+          detectionPipelineScheduler.start();
+        }
       }
 
       @Override
@@ -179,8 +185,8 @@ public class ThirdEyeAnomalyApplication
         if (classificationJobScheduler != null) {
           classificationJobScheduler.shutdown();
         }
-        if (config.isPinotProxy()) {
-          // Do nothing
+        if (detectionPipelineScheduler != null) {
+          detectionPipelineScheduler.shutdown();
         }
       }
     });

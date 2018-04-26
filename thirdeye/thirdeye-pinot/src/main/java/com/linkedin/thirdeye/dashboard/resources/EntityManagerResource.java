@@ -9,7 +9,9 @@ import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ApplicationManager;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.SessionManager;
@@ -19,14 +21,15 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.SessionDTO;
 import com.linkedin.thirdeye.datalayer.pojo.SessionBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.DAORegistry;
-
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import java.io.IOException;
@@ -35,7 +38,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -46,9 +48,9 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 @Path("thirdeye/entity")
 @Produces(MediaType.APPLICATION_JSON)
@@ -64,6 +66,8 @@ public class EntityManagerResource {
   private final ApplicationManager applicationManager;
   private final EntityToEntityMappingManager entityToEntityMappingManager;
   private final SessionManager sessionManager;
+  private final DetectionConfigManager detectionConfigManager;
+  private final MergedAnomalyResultManager mergedAnomalyResultManager;
   private final ThirdEyeConfiguration config;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
@@ -81,12 +85,23 @@ public class EntityManagerResource {
     this.applicationManager = DAO_REGISTRY.getApplicationDAO();
     this.entityToEntityMappingManager = DAO_REGISTRY.getEntityToEntityMappingDAO();
     this.sessionManager = DAO_REGISTRY.getSessionDAO();
+    this.detectionConfigManager = DAO_REGISTRY.getDetectionConfigManager();
+    this.mergedAnomalyResultManager = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.config = configuration;
   }
 
   private enum EntityType {
-    ANOMALY_FUNCTION, DATASET_CONFIG, METRIC_CONFIG,
-    OVERRIDE_CONFIG, ALERT_CONFIG, CLASSIFICATION_CONFIG, APPLICATION, ENTITY_MAPPING, SESSION
+    ANOMALY_FUNCTION,
+    DATASET_CONFIG,
+    METRIC_CONFIG,
+    OVERRIDE_CONFIG,
+    ALERT_CONFIG,
+    CLASSIFICATION_CONFIG,
+    APPLICATION,
+    ENTITY_MAPPING,
+    DETECTION_CONFIG,
+    MERGED_ANOMALY,
+    SESSION
   }
 
   @GET
@@ -101,46 +116,52 @@ public class EntityManagerResource {
     EntityType entityType = EntityType.valueOf(entityTypeStr);
     List<AbstractDTO> results = new ArrayList<>();
     switch (entityType) {
-    case ANOMALY_FUNCTION:
-      results.addAll(anomalyFunctionManager.findAll());
-      break;
-    case DATASET_CONFIG:
-      List<DatasetConfigDTO> allDatasets = datasetConfigManager.findAll();
-      Collections.sort(allDatasets, new Comparator<DatasetConfigDTO>() {
+      case ANOMALY_FUNCTION:
+        results.addAll(anomalyFunctionManager.findAll());
+        break;
+      case DATASET_CONFIG:
+        List<DatasetConfigDTO> allDatasets = datasetConfigManager.findAll();
+        Collections.sort(allDatasets, new Comparator<DatasetConfigDTO>() {
 
-        @Override
-        public int compare(DatasetConfigDTO o1, DatasetConfigDTO o2) {
-          return o1.getDataset().compareTo(o2.getDataset());
-        }
-      });
-      results.addAll(allDatasets);
-      break;
-    case METRIC_CONFIG:
-      List<MetricConfigDTO> allMetrics = metricConfigManager.findAll();
-      Collections.sort(allMetrics, new Comparator<MetricConfigDTO>() {
+          @Override
+          public int compare(DatasetConfigDTO o1, DatasetConfigDTO o2) {
+            return o1.getDataset().compareTo(o2.getDataset());
+          }
+        });
+        results.addAll(allDatasets);
+        break;
+      case METRIC_CONFIG:
+        List<MetricConfigDTO> allMetrics = metricConfigManager.findAll();
+        Collections.sort(allMetrics, new Comparator<MetricConfigDTO>() {
 
-        @Override
-        public int compare(MetricConfigDTO o1, MetricConfigDTO o2) {
-          return o1.getDataset().compareTo(o2.getDataset());
-        }
-      });
-      results.addAll(allMetrics);
-      break;
-    case OVERRIDE_CONFIG:
-      results.addAll(overrideConfigManager.findAll());
-      break;
-    case ALERT_CONFIG:
-      results.addAll(alertConfigManager.findAll());
-      break;
-    case CLASSIFICATION_CONFIG:
-      results.addAll(classificationConfigManager.findAll());
-      break;
-    case APPLICATION:
-      results.addAll(applicationManager.findAll());
-      break;
-    case ENTITY_MAPPING:
-      results.addAll(entityToEntityMappingManager.findAll());
-      break;
+          @Override
+          public int compare(MetricConfigDTO o1, MetricConfigDTO o2) {
+            return o1.getDataset().compareTo(o2.getDataset());
+          }
+        });
+        results.addAll(allMetrics);
+        break;
+      case OVERRIDE_CONFIG:
+        results.addAll(overrideConfigManager.findAll());
+        break;
+      case ALERT_CONFIG:
+        results.addAll(alertConfigManager.findAll());
+        break;
+      case CLASSIFICATION_CONFIG:
+        results.addAll(classificationConfigManager.findAll());
+        break;
+      case APPLICATION:
+        results.addAll(applicationManager.findAll());
+        break;
+      case ENTITY_MAPPING:
+        results.addAll(entityToEntityMappingManager.findAll());
+        break;
+      case DETECTION_CONFIG:
+        results.addAll(detectionConfigManager.findAll());
+        break;
+      case MERGED_ANOMALY:
+        results.addAll(mergedAnomalyResultManager.findByPredicate(Predicate.GT("detectionConfigId", 0)));
+        break;
     case SESSION:
         results.addAll(sessionManager.findByPredicate(Predicate.EQ("principalType", SessionBean.PrincipalType.SERVICE)));
         break;
@@ -158,78 +179,56 @@ public class EntityManagerResource {
     EntityType entityType = EntityType.valueOf(entityTypeStr);
     try {
       switch (entityType) {
-
-      // Update Only end point for these
-      case DATASET_CONFIG:
-        DatasetConfigDTO datasetConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, DatasetConfigDTO.class);
-        datasetConfigManager.update(datasetConfigDTO);
-        break;
-      case METRIC_CONFIG:
-        MetricConfigDTO metricConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, MetricConfigDTO.class);
-        metricConfigManager.update(metricConfigDTO);
-        break;
-
-      // Create new entity when id is null
-      case ANOMALY_FUNCTION:
-        AnomalyFunctionDTO anomalyFunctionDTO = OBJECT_MAPPER.readValue(jsonPayload, AnomalyFunctionDTO.class);
-        if (anomalyFunctionDTO.getId() == null) {
-          anomalyFunctionManager.save(anomalyFunctionDTO);
-        } else {
-          anomalyFunctionManager.update(anomalyFunctionDTO);
-        }
-        break;
-      case OVERRIDE_CONFIG:
-        OverrideConfigDTO overrideConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, OverrideConfigDTO.class);
-        if (overrideConfigDTO.getId() == null) {
-          overrideConfigManager.save(overrideConfigDTO);
-        } else {
-          overrideConfigManager.update(overrideConfigDTO);
-        }
-        break;
-      case ALERT_CONFIG:
-        AlertConfigDTO alertConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, AlertConfigDTO.class);
-        if (Strings.isNullOrEmpty(alertConfigDTO.getFromAddress())) {
-          alertConfigDTO.setFromAddress(config.getFailureToAddress());
-        }
-        if (alertConfigDTO.getId() == null) {
-          alertConfigManager.save(alertConfigDTO);
-        } else {
-          alertConfigManager.update(alertConfigDTO);
-        }
-        break;
-      case CLASSIFICATION_CONFIG:
-        ClassificationConfigDTO classificationConfigDTO =
-            OBJECT_MAPPER.readValue(jsonPayload, ClassificationConfigDTO.class);
-        if (classificationConfigDTO.getId() == null) {
-          classificationConfigManager.save(classificationConfigDTO);
-        } else {
-          classificationConfigManager.update(classificationConfigDTO);
-        }
-        break;
-      case APPLICATION:
-        ApplicationDTO applicationDTO = OBJECT_MAPPER.readValue(jsonPayload, ApplicationDTO.class);
-        if (applicationDTO.getId() == null) {
-          applicationManager.save(applicationDTO);
-        } else {
-          applicationManager.update(applicationDTO);
-        }
-        break;
-      case ENTITY_MAPPING:
-        EntityToEntityMappingDTO mappingDTODTO = OBJECT_MAPPER.readValue(jsonPayload, EntityToEntityMappingDTO.class);
-        if (mappingDTODTO.getId() == null) {
-          entityToEntityMappingManager.save(mappingDTODTO);
-        } else {
-          entityToEntityMappingManager.update(mappingDTODTO);
-        }
-        break;
-      case SESSION:
-          SessionDTO sessionDTO = OBJECT_MAPPER.readValue(jsonPayload, SessionDTO.class);
-          if (sessionDTO.getId() == null) {
-            sessionManager.save(sessionDTO);
-          } else {
-            sessionManager.update(sessionDTO);
-          }
+        case DATASET_CONFIG:
+          datasetConfigManager.update(OBJECT_MAPPER.readValue(jsonPayload, DatasetConfigDTO.class));
           break;
+
+        case METRIC_CONFIG:
+          metricConfigManager.save(OBJECT_MAPPER.readValue(jsonPayload, MetricConfigDTO.class));
+          break;
+
+        case ANOMALY_FUNCTION:
+          anomalyFunctionManager.save(OBJECT_MAPPER.readValue(jsonPayload, AnomalyFunctionDTO.class));
+          break;
+
+        case OVERRIDE_CONFIG:
+          overrideConfigManager.save(OBJECT_MAPPER.readValue(jsonPayload, OverrideConfigDTO.class));
+          break;
+
+        case ALERT_CONFIG:
+          AlertConfigDTO alertConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, AlertConfigDTO.class);
+          if (Strings.isNullOrEmpty(alertConfigDTO.getFromAddress())) {
+            alertConfigDTO.setFromAddress(config.getFailureToAddress());
+          }
+          alertConfigManager.save(alertConfigDTO);
+          break;
+
+        case CLASSIFICATION_CONFIG:
+          classificationConfigManager.save(OBJECT_MAPPER.readValue(jsonPayload, ClassificationConfigDTO.class));
+          break;
+
+        case APPLICATION:
+          applicationManager.save(OBJECT_MAPPER.readValue(jsonPayload, ApplicationDTO.class));
+          break;
+
+        case ENTITY_MAPPING:
+          entityToEntityMappingManager.save(OBJECT_MAPPER.readValue(jsonPayload, EntityToEntityMappingDTO.class));
+          break;
+
+        case DETECTION_CONFIG:
+          detectionConfigManager.save(OBJECT_MAPPER.readValue(jsonPayload, DetectionConfigDTO.class));
+          break;
+
+        case MERGED_ANOMALY:
+          mergedAnomalyResultManager.save(OBJECT_MAPPER.readValue(jsonPayload, MergedAnomalyResultDTO.class));
+          break;
+
+        case SESSION:
+          sessionManager.save(OBJECT_MAPPER.readValue(jsonPayload, SessionDTO.class));
+          break;
+
+        default:
+          throw new WebApplicationException("Unknown entity type : " + entityType);
       }
     } catch (IOException e) {
       LOG.error("Error saving the entity with payload : " + jsonPayload, e);
