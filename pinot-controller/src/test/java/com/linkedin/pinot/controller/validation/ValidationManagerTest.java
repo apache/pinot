@@ -27,7 +27,6 @@ import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
 import java.util.ArrayList;
@@ -64,7 +63,6 @@ public class ValidationManagerTest {
 
   private PinotHelixResourceManager _pinotHelixResourceManager;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
-  private PinotLLCRealtimeSegmentManager _segmentManager;
   private TableConfig _offlineTableConfig;
   private HelixManager _helixManager;
 
