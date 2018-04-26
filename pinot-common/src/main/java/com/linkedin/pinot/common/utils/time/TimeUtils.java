@@ -20,6 +20,10 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Duration;
+import org.joda.time.Period;
+import org.joda.time.format.PeriodFormatter;
+import org.joda.time.format.PeriodFormatterBuilder;
 
 
 public class TimeUtils {
@@ -87,5 +91,34 @@ public class TimeUtils {
    */
   public static long getValidMaxTimeMillis() {
     return VALID_MAX_TIME_MILLIS;
+  }
+
+  private static final PeriodFormatter PERIOD_FORMATTER = new PeriodFormatterBuilder()
+      .appendDays().appendSuffix("d")
+      .appendHours().appendSuffix("h")
+      .appendMinutes().appendSuffix("m")
+      .appendSeconds().appendSuffix("s")
+      .toFormatter();
+
+  public static Long convertPeriodToMillis(String timeStr) {
+    Long millis = 0L;
+    if (timeStr != null) {
+      try {
+        Period p = PERIOD_FORMATTER.parsePeriod(timeStr);
+        millis = p.toStandardDuration().getStandardSeconds() * 1000L;
+      } catch (Exception e) {
+        throw new RuntimeException("Invalid time spec '" + timeStr + "' (Valid examples: '3h', '4h30m')", e);
+      }
+    }
+    return millis;
+  }
+
+  public static  String convertMillisToPeriod(Long millis) {
+    String periodStr = null;
+    if (millis != null) {
+      Period p = new Period(new Duration(millis));
+      periodStr = PERIOD_FORMATTER.print(p);
+    }
+    return periodStr;
   }
 }
