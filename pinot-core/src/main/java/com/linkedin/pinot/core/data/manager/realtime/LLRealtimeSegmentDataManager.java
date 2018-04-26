@@ -1108,9 +1108,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         _segmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC).toString());
     start();
   }
-
-
-
+  
   private void logStatistics() {
     int numErrors, numConversions, numNulls, numNullCols;
     if ((numErrors = _fieldExtractor.getTotalErrors()) > 0) {
