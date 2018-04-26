@@ -80,9 +80,9 @@ public class UtilsTest {
     Assert.assertEquals(periodStr, "6h");
     periodStr = TimeUtils.convertMillisToPeriod(6*60*60*1000L + 20*60*1000 + 10*1000);
     Assert.assertEquals(periodStr, "6h20m10s");
-    periodStr = TimeUtils.convertMillisToPeriod(8*24*60*60*1000L);
+    periodStr = TimeUtils.convertMillisToPeriod(TimeUnit.MILLISECONDS.convert(8, TimeUnit.DAYS));
     Assert.assertEquals(periodStr, "192h");
-    periodStr = TimeUtils.convertMillisToPeriod(8*24*60*60*1000L + 10*60*1000);
+    periodStr = TimeUtils.convertMillisToPeriod(TimeUnit.MILLISECONDS.convert(8, TimeUnit.DAYS) + 10*60*1000);
     Assert.assertEquals(periodStr, "192h10m");
     periodStr = TimeUtils.convertMillisToPeriod(0L);
     Assert.assertEquals(periodStr, "0s");
