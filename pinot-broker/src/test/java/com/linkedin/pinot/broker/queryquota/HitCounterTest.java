@@ -82,7 +82,7 @@ public class HitCounterTest {
   @Test
   public void testConcurrency() {
     Random random = new Random();
-    // Run the test 5 times
+    // Run the test 3 times
     for (int k = 0; k < 3; k++) {
       long startTime = System.currentTimeMillis();
       int numThreads = 30;

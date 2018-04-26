@@ -23,7 +23,7 @@ import com.linkedin.pinot.common.Utils;
 *
 */
 public enum BrokerGauge implements AbstractMetrics.Gauge {
-  ;
+  QUERY_QUOTA_CAPACITY_UTILIZATION_RATE("tables", false);
 
   private final String brokerGaugeName;
   private final String unit;

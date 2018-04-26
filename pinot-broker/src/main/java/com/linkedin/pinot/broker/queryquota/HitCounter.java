@@ -16,9 +16,7 @@
 package com.linkedin.pinot.broker.queryquota;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicIntegerArray;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
 
 
@@ -27,23 +25,22 @@ import java.util.concurrent.atomic.AtomicLongArray;
  * In order to save the space and time, we store the number of hits over the last 100 time buckets. When the method hit
  * gets called, we put the timestamp to the specified bucket. When the method getHitCount gets called, we sum all the number
  * of hits within the last 100 time buckets.
- * */
+ */
 public class HitCounter {
-
   private static int BUCKET_COUNT = 100;
-  private int _timeBucketWidthMs;
+  private final int _timeBucketWidthMs;
   private final AtomicLongArray _bucketStartTime;
   private AtomicIntegerArray _bucketHitCount;
 
-  public HitCounter(int timeRangeInSecond) {
-    _timeBucketWidthMs = timeRangeInSecond * 1000 / BUCKET_COUNT;
+  public HitCounter(int timeRangeInSeconds) {
+    _timeBucketWidthMs = timeRangeInSeconds * 1000 / BUCKET_COUNT;
     _bucketStartTime = new AtomicLongArray(BUCKET_COUNT);
     _bucketHitCount = new AtomicIntegerArray(BUCKET_COUNT);
   }
 
   /**
    * Increase the hit count in the current bucket.
-   * */
+   */
   public void hit() {
     hit(System.currentTimeMillis());
   }
@@ -68,7 +65,7 @@ public class HitCounter {
 
   /**
    * Get the total hit count within a time range.
-   * */
+   */
   public int getHitCount() {
     return getHitCount(System.currentTimeMillis());
   }

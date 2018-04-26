@@ -83,8 +83,7 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   GROUP_BY_SIZE("queries", false),
   TOTAL_SERVER_RESPONSE_SIZE("queries", false),
 
-  QUERY_QUOTA_EXCEEDED("exceptions", false),
-  QUERY_QUOTA_CAPACITY_UTILIZATION_RATE("tables", false);
+  QUERY_QUOTA_EXCEEDED("exceptions", false);
 
 
   private final String brokerMeterName;

@@ -226,7 +226,7 @@ public class BrokerRequestHandler {
     }
 
     // Validate qps quota.
-    if (!_tableQueryQuotaManager.acquire(tableName, offlineTableName, realtimeTableName)) {
+    if (!_tableQueryQuotaManager.acquire(tableName)) {
       String msg = String.format("Query quota exceeded on requestId %d. TableName: %s. Broker Id: %s", requestId, rawTableName, _brokerId);
       LOGGER.error(msg);
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1L);

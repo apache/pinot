@@ -109,12 +109,8 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
       try {
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeOfflineFromOnline() : " + message);
         String tableName = message.getPartitionName();
-        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableName);
-
         _helixExternalViewBasedRouting.markDataResourceOffline(tableName);
-        _tableQueryQuotaManager.dropTableQueryQuota(
-            tableConfig,
-            HelixHelper.getExternalViewForResource(_helixAdmin, _helixManager.getClusterName(), BROKER_RESOURCE_INSTANCE));
+        _tableQueryQuotaManager.dropTableQueryQuota(tableName);
       } catch (Exception e) {
         LOGGER.error("Caught exception during ONLINE -> OFFLINE transition", e);
         Utils.rethrowException(e);
@@ -127,12 +123,8 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
       try {
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
         String tableName = message.getPartitionName();
-        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableName);
-
         _helixExternalViewBasedRouting.markDataResourceOffline(tableName);
-        _tableQueryQuotaManager.dropTableQueryQuota(
-            tableConfig,
-            HelixHelper.getExternalViewForResource(_helixAdmin, _helixManager.getClusterName(), BROKER_RESOURCE_INSTANCE));
+        _tableQueryQuotaManager.dropTableQueryQuota(tableName);
       } catch (Exception e) {
         LOGGER.error("Caught exception during OFFLINE -> DROPPED transition", e);
         Utils.rethrowException(e);
@@ -145,12 +137,8 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
       try {
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeDroppedFromOnline() : " + message);
         String tableName = message.getPartitionName();
-        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableName);
-
         _helixExternalViewBasedRouting.markDataResourceOffline(tableName);
-        _tableQueryQuotaManager.dropTableQueryQuota(
-            tableConfig,
-            HelixHelper.getExternalViewForResource(_helixAdmin, _helixManager.getClusterName(), BROKER_RESOURCE_INSTANCE));
+        _tableQueryQuotaManager.dropTableQueryQuota(tableName);
       } catch (Exception e) {
         LOGGER.error("Caught exception during ONLINE -> DROPPED transition", e);
         Utils.rethrowException(e);
