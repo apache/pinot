@@ -370,7 +370,7 @@ create index session_principal_type_idx ON session_index(principal_type);
 create table if not exists detection_config_index (
     base_id bigint(20) not null,
     `name` VARCHAR(256) not null,
-    className VARCHAR(1023) not null,
+    className VARCHAR(256) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
     version int(10)
