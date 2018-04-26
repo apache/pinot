@@ -5,6 +5,9 @@ import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 
 
+/**
+ * Selector for events based on (optionally) start time, end time, and dimension filters.
+ */
 class EventSlice {
   final long start;
   final long end;

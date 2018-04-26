@@ -23,6 +23,11 @@ import org.apache.commons.collections.MapUtils;
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
+/**
+ * Detection pipeline for dimension exploration with a configurable nested detection pipeline.
+ * Loads and prunes a metric's dimensions and sequentially retrieves data to run detection on
+ * each filtered time series.
+ */
 public class DimensionWrapper extends DetectionPipeline {
 
   // exploration

@@ -11,6 +11,10 @@ import java.util.Map;
 import java.util.Objects;
 
 
+/**
+ * DetectionPipeline forms the root of the detection class hierarchy. It represents a wireframe
+ * for implementing (intermittently stateful) executable pipelines on top of it.
+ */
 public abstract class DetectionPipeline {
   protected final DataProvider provider;
   protected final DetectionConfigDTO config;
@@ -24,8 +28,21 @@ public abstract class DetectionPipeline {
     this.endTime = endTime;
   }
 
+  /**
+   * Returns a detection result for the time range between {@code startTime} and {@code endTime}.
+   *
+   * @return detection result
+   * @throws Exception
+   */
   public abstract DetectionPipelineResult run() throws Exception;
 
+  /**
+   * Helper for creating an anomaly for a given metric slice. Injects properties such as
+   * metric name, filter dimensions, etc.
+   *
+   * @param slice metric slice
+   * @return anomaly template
+   */
   protected final MergedAnomalyResultDTO makeAnomaly(MetricSlice slice) {
     Map<Long, MetricConfigDTO> metrics = this.provider.fetchMetrics(Collections.singleton(slice.getMetricId()));
     if (!metrics.containsKey(slice.getMetricId())) {

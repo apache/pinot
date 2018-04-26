@@ -20,6 +20,9 @@ import org.apache.commons.collections.MapUtils;
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
+/**
+ * Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.
+ */
 public class ThresholdAlgorithm extends StaticDetectionPipeline {
   private final String COL_TOO_HIGH = "tooHigh";
   private final String COL_TOO_LOW = "tooLow";

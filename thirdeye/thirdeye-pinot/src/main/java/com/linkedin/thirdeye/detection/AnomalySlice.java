@@ -5,6 +5,10 @@ import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
 
+/**
+ * Selector for anomalies based on (optionally) detector id, start time, end time, and
+ * dimension filters.
+ */
 class AnomalySlice {
   final long configId;
   final long start;

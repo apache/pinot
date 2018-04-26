@@ -28,6 +28,8 @@ import java.util.concurrent.TimeUnit;
 
 
 public class DefaultDataProvider implements DataProvider {
+  private static final long TIMEOUT = 60000;
+
   private final ExecutorService executor = Executors.newCachedThreadPool();
 
   private final MetricConfigManager metricDAO;
@@ -49,7 +51,27 @@ public class DefaultDataProvider implements DataProvider {
 
   @Override
   public Map<MetricSlice, DataFrame> fetchTimeseries(Collection<MetricSlice> slices) {
-    throw new IllegalStateException("not implemented yet");
+    try {
+      Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
+      for (final MetricSlice slice : slices) {
+        futures.put(slice, this.executor.submit(new Callable<DataFrame>() {
+          @Override
+          public DataFrame call() throws Exception {
+            return DefaultDataProvider.this.timeseriesLoader.load(slice);
+          }
+        }));
+      }
+
+      final long deadline = System.currentTimeMillis() + TIMEOUT;
+      Map<MetricSlice, DataFrame> output = new HashMap<>();
+      for (MetricSlice slice : slices) {
+        output.put(slice, futures.get(slice).get(makeTimeout(deadline), TimeUnit.MILLISECONDS));
+      }
+      return output;
+
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
@@ -65,7 +87,7 @@ public class DefaultDataProvider implements DataProvider {
         }));
       }
 
-      final long deadline = System.currentTimeMillis();
+      final long deadline = System.currentTimeMillis() + TIMEOUT;
       Map<MetricSlice, DataFrame> output = new HashMap<>();
       for (MetricSlice slice : slices) {
         output.put(slice, futures.get(slice).get(makeTimeout(deadline), TimeUnit.MILLISECONDS));
