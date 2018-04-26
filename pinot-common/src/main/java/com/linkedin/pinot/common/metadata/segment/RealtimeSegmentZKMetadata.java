@@ -22,6 +22,11 @@ import org.apache.helix.ZNRecord;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import org.joda.time.Duration;
+import org.joda.time.Period;
+import org.joda.time.format.PeriodFormatter;
+import org.joda.time.format.PeriodFormatterBuilder;
+
 import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
 import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
@@ -30,9 +35,15 @@ import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass
 
 public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
 
+  private static final PeriodFormatter PERIOD_FORMATTER = new PeriodFormatterBuilder()
+      .appendHours().appendSuffix("h")
+      .appendMinutes().appendSuffix("m")
+      .appendSeconds().appendSuffix("s")
+      .toFormatter();
+
   private Status _status = null;
   private int _sizeThresholdToFlushSegment = -1;
-  private long _timeThresholdToFlushSegmentMillis = -1;
+  private String _timeThresholdToFlushSegment = null; // store as period string for readability
 
   public RealtimeSegmentZKMetadata() {
     setSegmentType(SegmentType.REALTIME);
@@ -43,15 +54,11 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     setSegmentType(SegmentType.REALTIME);
     _status = Status.valueOf(znRecord.getSimpleField(CommonConstants.Segment.Realtime.STATUS));
     _sizeThresholdToFlushSegment = znRecord.getIntField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, -1);
-    _timeThresholdToFlushSegmentMillis = znRecord.getIntField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME_MILLIS, -1);
-  }
+    String flushThresholdTime = znRecord.getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME);
+    if (flushThresholdTime != null && !flushThresholdTime.equals(NULL)) {
+      _timeThresholdToFlushSegment = znRecord.getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME);
+    }
 
-  public Status getStatus() {
-    return _status;
-  }
-
-  public void setStatus(Status status) {
-    _status = status;
   }
 
   @Override
@@ -74,7 +81,7 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     ZNRecord znRecord = super.toZNRecord();
     znRecord.setSimpleField(CommonConstants.Segment.Realtime.STATUS, _status.toString());
     znRecord.setLongField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, _sizeThresholdToFlushSegment);
-    znRecord.setLongField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME_MILLIS, _timeThresholdToFlushSegmentMillis);
+    znRecord.setSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME, _timeThresholdToFlushSegment);
     return znRecord;
   }
 
@@ -92,7 +99,7 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     return super.equals(metadata) &&
         isEqual(_status, metadata._status) &&
         isEqual(_sizeThresholdToFlushSegment, metadata._sizeThresholdToFlushSegment) &&
-        isEqual(_timeThresholdToFlushSegmentMillis, metadata._timeThresholdToFlushSegmentMillis);
+        isEqual(_timeThresholdToFlushSegment, metadata._timeThresholdToFlushSegment);
   }
 
   @Override
@@ -100,7 +107,7 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     int result = super.hashCode();
     result = hashCodeOf(result, _status);
     result = hashCodeOf(result, _sizeThresholdToFlushSegment);
-    result = hashCodeOf(result, _timeThresholdToFlushSegmentMillis);
+    result = hashCodeOf(result, _timeThresholdToFlushSegment);
     return result;
   }
 
@@ -110,9 +117,16 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     configMap.put(CommonConstants.Segment.Realtime.STATUS, _status.toString());
     configMap.put(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.REALTIME.toString());
     configMap.put(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, Integer.toString(_sizeThresholdToFlushSegment));
-    configMap.put(CommonConstants.Segment.FLUSH_THRESHOLD_TIME_MILLIS,
-        Long.toString(_timeThresholdToFlushSegmentMillis));
+    configMap.put(CommonConstants.Segment.FLUSH_THRESHOLD_TIME, _timeThresholdToFlushSegment);
     return configMap;
+  }
+
+  public Status getStatus() {
+    return _status;
+  }
+
+  public void setStatus(Status status) {
+    _status = status;
   }
 
   public void setSizeThresholdToFlushSegment(int sizeThresholdToFlushSegment) {
@@ -123,11 +137,36 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     return _sizeThresholdToFlushSegment;
   }
 
-  public long getTimeThresholdToFlushSegmentMillis() {
-    return _timeThresholdToFlushSegmentMillis;
+  /**
+   * Converts the period string to millis before returning
+   * @return time threshold value in millis
+   */
+  public Long getTimeThresholdToFlushSegmentMillis() {
+    return convertToMillis(_timeThresholdToFlushSegment);
   }
 
-  public void setTimeThresholdToFlushSegmentMillis(long timeThresholdToFlushSegmentMillis) {
-    _timeThresholdToFlushSegmentMillis = timeThresholdToFlushSegmentMillis;
+  /**
+   * Converts the millis value of threshold into a readable period string before setting
+   * @param timeThresholdToFlushSegmentMillis
+   */
+  public void setTimeThresholdToFlushSegmentMillis(Long timeThresholdToFlushSegmentMillis) {
+    _timeThresholdToFlushSegment = convertToPeriod(timeThresholdToFlushSegmentMillis);
+  }
+
+  private Long convertToMillis(String timeStr) {
+    if (timeStr == null) {
+      return null;
+    }
+    try {
+      Period p = PERIOD_FORMATTER.parsePeriod(timeStr);
+      return p.toStandardDuration().getStandardSeconds() * 1000L;
+    } catch (Exception e) {
+      throw new RuntimeException("Invalid time spec '" + timeStr + "' (Valid examples: '3h', '4h30m')", e);
+    }
+  }
+
+  private String convertToPeriod(Long millis) {
+    Period p = new Period(new Duration(millis));
+    return PERIOD_FORMATTER.print(p);
   }
 }

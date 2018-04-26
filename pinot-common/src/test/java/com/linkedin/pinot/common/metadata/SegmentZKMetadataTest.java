@@ -37,7 +37,7 @@ import org.testng.annotations.Test;
 public class SegmentZKMetadataTest {
 
   @Test
-  public void realtimeSegmentZKMetadataConvertionTest() {
+  public void realtimeSegmentZKMetadataConversionTest() {
 
     ZNRecord inProgressZnRecord = getTestInProgressRealtimeSegmentZNRecord();
     ZNRecord doneZnRecord = getTestDoneRealtimeSegmentZNRecord();
@@ -57,6 +57,37 @@ public class SegmentZKMetadataTest {
     Assert.assertTrue(inProgressSegmentMetadata.equals(new RealtimeSegmentZKMetadata(inProgressSegmentMetadata.toZNRecord())));
     Assert.assertTrue(doneSegmentMetadata.equals(new RealtimeSegmentZKMetadata(doneSegmentMetadata.toZNRecord())));
 
+  }
+
+  @Test
+  public void testFlushThresholdTimeConversion() {
+    RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = new RealtimeSegmentZKMetadata();
+    Assert.assertNull(realtimeSegmentZKMetadata.getTimeThresholdToFlushSegmentMillis());
+
+    realtimeSegmentZKMetadata = getTestInProgressRealtimeSegmentMetadata();
+    Long millis = 21600000L;
+    Assert.assertEquals(realtimeSegmentZKMetadata.toZNRecord().getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME), "6h");
+    Assert.assertEquals(realtimeSegmentZKMetadata.getTimeThresholdToFlushSegmentMillis(), millis);
+
+    millis = 10 * 1000L;
+    realtimeSegmentZKMetadata.setTimeThresholdToFlushSegmentMillis(millis);
+    Assert.assertEquals(realtimeSegmentZKMetadata.toZNRecord().getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME), "10s");
+    Assert.assertEquals(realtimeSegmentZKMetadata.getTimeThresholdToFlushSegmentMillis(), millis);
+
+    millis = 50 * 60 * 1000L;
+    realtimeSegmentZKMetadata.setTimeThresholdToFlushSegmentMillis(50 * 60 * 1000L);
+    Assert.assertEquals(realtimeSegmentZKMetadata.toZNRecord().getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME), "50m");
+    Assert.assertEquals(realtimeSegmentZKMetadata.getTimeThresholdToFlushSegmentMillis(), millis);
+
+    millis = 4*60*60*1000L + 31*60*1000L;
+    realtimeSegmentZKMetadata.setTimeThresholdToFlushSegmentMillis(millis);
+    Assert.assertEquals(realtimeSegmentZKMetadata.toZNRecord().getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME), "4h31m");
+    Assert.assertEquals(realtimeSegmentZKMetadata.getTimeThresholdToFlushSegmentMillis(), millis);
+
+    millis = 4*60*60*1000L + 31*60*1000L + 46*1000L;
+    realtimeSegmentZKMetadata.setTimeThresholdToFlushSegmentMillis(millis);
+    Assert.assertEquals(realtimeSegmentZKMetadata.toZNRecord().getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME), "4h31m46s");
+    Assert.assertEquals(realtimeSegmentZKMetadata.getTimeThresholdToFlushSegmentMillis(), millis);
   }
 
   @Test
@@ -119,6 +150,7 @@ public class SegmentZKMetadataTest {
     record.setLongField(CommonConstants.Segment.CRC, 1234);
     record.setLongField(CommonConstants.Segment.CREATION_TIME, 3000);
     record.setIntField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, 1234);
+    record.setSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME, "6h");
     return record;
   }
 
@@ -136,6 +168,7 @@ public class SegmentZKMetadataTest {
     realtimeSegmentMetadata.setCrc(1234);
     realtimeSegmentMetadata.setCreationTime(3000);
     realtimeSegmentMetadata.setSizeThresholdToFlushSegment(1234);
+    realtimeSegmentMetadata.setTimeThresholdToFlushSegmentMillis(21600000L);
     return realtimeSegmentMetadata;
   }
 
@@ -154,6 +187,7 @@ public class SegmentZKMetadataTest {
     record.setLongField(CommonConstants.Segment.CRC, -1);
     record.setLongField(CommonConstants.Segment.CREATION_TIME, 1000);
     record.setIntField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, 1234);
+    record.setSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME, "6h");
     return record;
   }
 
@@ -171,6 +205,7 @@ public class SegmentZKMetadataTest {
     realtimeSegmentMetadata.setCrc(-1);
     realtimeSegmentMetadata.setCreationTime(1000);
     realtimeSegmentMetadata.setSizeThresholdToFlushSegment(1234);
+    realtimeSegmentMetadata.setTimeThresholdToFlushSegmentMillis(21600000L);
     return realtimeSegmentMetadata;
   }
 

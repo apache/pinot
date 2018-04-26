@@ -36,7 +36,7 @@ import static com.linkedin.pinot.common.utils.EqualityUtils.*;
 public abstract class SegmentZKMetadata implements ZKMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentZKMetadata.class);
 
-  private static final String NULL = "null";
+  protected static final String NULL = "null";
 
   private String _segmentName;
   private String _tableName;

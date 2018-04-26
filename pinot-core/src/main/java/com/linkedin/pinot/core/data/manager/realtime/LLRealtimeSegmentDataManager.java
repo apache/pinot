@@ -1096,16 +1096,19 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     long now = now();
     _consumeStartTime = now;
-    long flushThresholdMillis = kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
-    if (segmentZKMetadata.getTimeThresholdToFlushSegmentMillis() > 0) {
-      flushThresholdMillis = segmentZKMetadata.getTimeThresholdToFlushSegmentMillis();
+    long flushThresholdTimeMillis = kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
+    Long flushThresholdTimeFromSegment = segmentZKMetadata.getTimeThresholdToFlushSegmentMillis();
+    if (flushThresholdTimeFromSegment != null) {
+      flushThresholdTimeMillis = flushThresholdTimeFromSegment;
     }
-    _consumeEndTime = now + flushThresholdMillis;
+    _consumeEndTime = now + flushThresholdTimeMillis;
 
     LOGGER.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
         _segmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC).toString());
     start();
   }
+
+
 
   private void logStatistics() {
     int numErrors, numConversions, numNulls, numNullCols;
