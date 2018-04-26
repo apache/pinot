@@ -45,7 +45,13 @@ public class UtilsTest {
   @Test
   public void testFlushThresholdTimeConversion() {
 
-    Long millis = TimeUtils.convertPeriodToMillis("6h");
+    Long millis = TimeUtils.convertPeriodToMillis("8d");
+    Assert.assertEquals(millis.longValue(), 8*24*60*60*1000L);
+    millis = TimeUtils.convertPeriodToMillis("8d6h");
+    Assert.assertEquals(millis.longValue(), 8*24*60*60*1000L + 6*60*60*1000L);
+    millis = TimeUtils.convertPeriodToMillis("8d10m");
+    Assert.assertEquals(millis.longValue(), 8*24*60*60*1000L + 10*60*1000L);
+    millis = TimeUtils.convertPeriodToMillis("6h");
     Assert.assertEquals(millis.longValue(), 6*60*60*1000L);
     millis = TimeUtils.convertPeriodToMillis("6h30m");
     Assert.assertEquals(millis.longValue(), 6*60*60*1000L + 30*60*1000);
@@ -74,6 +80,10 @@ public class UtilsTest {
     Assert.assertEquals(periodStr, "6h");
     periodStr = TimeUtils.convertMillisToPeriod(6*60*60*1000L + 20*60*1000 + 10*1000);
     Assert.assertEquals(periodStr, "6h20m10s");
+    periodStr = TimeUtils.convertMillisToPeriod(8*24*60*60*1000L);
+    Assert.assertEquals(periodStr, "192h");
+    periodStr = TimeUtils.convertMillisToPeriod(8*24*60*60*1000L + 10*60*1000);
+    Assert.assertEquals(periodStr, "192h10m");
     periodStr = TimeUtils.convertMillisToPeriod(0L);
     Assert.assertEquals(periodStr, "0s");
     periodStr = TimeUtils.convertMillisToPeriod(null);
