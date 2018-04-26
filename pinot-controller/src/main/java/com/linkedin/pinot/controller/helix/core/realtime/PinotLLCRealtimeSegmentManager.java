@@ -647,7 +647,7 @@ public class PinotLLCRealtimeSegmentManager {
    * @param committingSegmentNameStr Committing segment name
    * @param nextOffset The offset with which the next segment should start.
    * @param memoryUsedBytes The memory used by committing segment
-   * @return
+   * @return boolean
    */
   public boolean commitSegmentMetadata(String rawTableName, final String committingSegmentNameStr, long nextOffset,
       long memoryUsedBytes) {
@@ -802,6 +802,7 @@ public class PinotLLCRealtimeSegmentManager {
         partitionAssignment.getNumPartitions());
     final LLCRealtimeSegmentZKMetadata newSegmentZKMetadata = new LLCRealtimeSegmentZKMetadata(newZnRecord);
 
+    // TODO: move the logic to update flush thresholds (rows and time) into implementations such as segment size based, memory based, default, etc
     updateFlushThresholdForSegmentMetadata(newSegmentZKMetadata, partitionAssignment,
         getRealtimeTableFlushSizeForTable(rawTableName));
     newZnRecord = newSegmentZKMetadata.toZNRecord();
