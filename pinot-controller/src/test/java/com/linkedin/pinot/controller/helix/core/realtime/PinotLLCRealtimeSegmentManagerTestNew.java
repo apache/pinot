@@ -42,7 +42,6 @@ import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentStrategyEnum;
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -1193,18 +1192,6 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
   ////////////////////////////////////////////////////////////////////////////
   // Fake makers
   ///////////////////////////////////////////////////////////////////////////
-  private StreamMetadata makeKafkaStreamMetadata(String topicName, String autoOffsetReset, String bootstrapHosts) {
-    StreamMetadata streamMetadata = mock(StreamMetadata.class);
-    Map<String, String> consumerPropertiesMap = new HashMap<>();
-    consumerPropertiesMap.put(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET, autoOffsetReset);
-    consumerPropertiesMap.put(CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE, "simple");
-    consumerPropertiesMap.put(CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST, bootstrapHosts);
-    when(streamMetadata.getKafkaConsumerProperties()).thenReturn(consumerPropertiesMap);
-    when(streamMetadata.getKafkaTopicName()).thenReturn(topicName);
-    when(streamMetadata.getBootstrapHosts()).thenReturn(bootstrapHosts);
-    when(streamMetadata.getConsumerFactoryName()).thenReturn(SimpleConsumerFactory.class.getName());
-    return streamMetadata;
-  }
 
   private TableConfig makeTableConfig(String tableName, int nReplicas, String autoOffsetReset, String bootstrapHosts,
       String serverTenant, StreamPartitionAssignmentStrategyEnum strategy) {
@@ -1269,30 +1256,17 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     private static final ControllerConf CONTROLLER_CONF = new ControllerConf();
     private List<String> _existingLLCSegments = new ArrayList<>(1);
 
-    public String _realtimeTableName;
-    public Map<String, List<String>> _idealStateEntries = new HashMap<>(1);
     public List<String> _paths = new ArrayList<>(16);
     public List<ZNRecord> _records = new ArrayList<>(16);
-    public String _startOffset;
-    public boolean _createNew;
-    public int _nReplicas;
     public Map<String, LLCRealtimeSegmentZKMetadata> _metadataMap = new HashMap<>(4);
     private FakePartitionAssignmentGenerator _partitionAssignmentGenerator;
-    public PartitionAssignment _currentTablePartitionAssignment;
-
-    public List<String> _newInstances;
-    public List<String> _oldSegmentNameStr = new ArrayList<>(16);
-    public List<String> _newSegmentNameStr = new ArrayList<>(16);
 
     public long _kafkaLargestOffsetToReturn;
     public long _kafkaSmallestOffsetToReturn;
 
-    public List<ZNRecord> _existingSegmentMetadata;
-
     public int _nCallsToUpdateHelix = 0;
     public int _nCallsToCreateNewSegmentMetadata = 0;
     public IdealState _tableIdealState;
-    public List<String> _currentInstanceList;
     public String _currentTable;
 
     public static final String CRC = "5680988776500";
@@ -1352,11 +1326,6 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
 
     void removeTableFromStore(String tableName) {
       _tableConfigStore.removeTable(tableName);
-    }
-
-    @Override
-    protected List<String> getRealtimeTablesWithServerTenant(String serverTenantName) {
-      return _tableConfigStore.getAllRealtimeTablesWithServerTenant(serverTenantName);
     }
 
     @Override
@@ -1502,11 +1471,6 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     }
 
     @Override
-    protected List<ZNRecord> getExistingSegmentMetadata(String realtimeTableName) {
-      return _existingSegmentMetadata;
-    }
-
-    @Override
     protected int getRealtimeTableFlushSizeForTable(String tableName) {
       return 1000;
     }
@@ -1525,11 +1489,6 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     public void setupNewTable(TableConfig tableConfig, IdealState emptyIdealState) throws InvalidConfigException {
       _currentTable = tableConfig.getTableName();
       super.setupNewTable(tableConfig, emptyIdealState);
-    }
-
-    @Override
-    protected List<String> getInstances(String tenantName) {
-      return _currentInstanceList;
     }
 
     @Override

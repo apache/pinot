@@ -18,7 +18,6 @@ package com.linkedin.pinot.controller.validation;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
@@ -47,9 +46,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.*;
 
 
 /**
@@ -93,12 +89,6 @@ public class ValidationManagerTest {
     final String instanceId = "localhost_helixController";
     _helixManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, ZK_STR, instanceId, /*isUpdateStateModel=*/false);
     _pinotHelixResourceManager.addTable(_offlineTableConfig);
-  }
-
-  private void makeMockPinotLLCRealtimeSegmentManager(PartitionAssignment kafkaPartitionAssignment) {
-    _segmentManager = mock(PinotLLCRealtimeSegmentManager.class);
-    Mockito.doNothing().when(_segmentManager).updateKafkaPartitionsIfNecessary(Mockito.any(TableConfig.class));
-    when(_segmentManager.getStreamPartitionAssignment(anyString())).thenReturn(kafkaPartitionAssignment);
   }
 
   @Test
