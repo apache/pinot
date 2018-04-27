@@ -541,7 +541,7 @@ export default Controller.extend({
       const groupsWithAppName = activeGroups.filter(group => isPresent(group.application));
 
       if (isPresent(appName)) {
-        return groupsWithAppName.filter(group => group.application.toLowerCase().includes(appName));
+        return groupsWithAppName.filter(group => group.application.toLowerCase().includes(appName.toLowerCase()));
       } else {
         return activeGroups;
       }
