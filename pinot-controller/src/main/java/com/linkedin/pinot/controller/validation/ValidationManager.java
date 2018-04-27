@@ -20,33 +20,24 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -176,82 +167,6 @@ public class ValidationManager {
     // Update the gauge to contain the total document count in the segments
     _validationMetrics.updateTotalDocumentCountGauge(tableConfig.getTableName(),
           computeRealtimeTotalDocumentInSegments(metadataList, countHLCSegments));
-  }
-
-  // For LLC segments, validate that there is at least one segment in CONSUMING state for every partition.
-  @Deprecated
-  void validateLLCSegments(TableConfig tableConfig, List<RealtimeSegmentZKMetadata> metadataList) {
-    final String realtimeTableName = tableConfig.getTableName();
-    LOGGER.info("Validating LLC Segments for {}", realtimeTableName);
-
-    _llcRealtimeSegmentManager.validateLLCSegments(tableConfig);
-
-    IdealState idealState =
-        HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), realtimeTableName);
-
-    PartitionAssignment partitionAssignment = _llcRealtimeSegmentManager.getStreamPartitionAssignment(realtimeTableName);
-    if (partitionAssignment == null) {
-      LOGGER.warn("No partition assignment found for table {}", realtimeTableName);
-      return;
-    }
-    Map<String, List<String>> partitionToHostsMap = partitionAssignment.getPartitionToInstances();
-    // Keep a set of kafka partitions, and remove the partition when we find a segment in CONSUMING state in
-    // that partition.
-    Set<Integer> nonConsumingKafkaPartitions = new HashSet<>(partitionToHostsMap.size());
-    for (String partitionStr : partitionToHostsMap.keySet()) {
-      nonConsumingKafkaPartitions.add(Integer.valueOf(partitionStr));
-    }
-
-    if (!idealState.isEnabled()) {
-      // No validation to be done.
-      LOGGER.info("Skipping validation for {} since it is disabled", realtimeTableName);
-      return;
-    }
-    // Walk through all segments in the idealState, looking for one instance that is in CONSUMING state. If we find one
-    // remove the kafka partition that the segment belongs to, from the kafka partition set.
-    // Make sure that there are at least some LLC segments in place. If there are no LLC segments, it is possible
-    // that this table is in the process of being disabled for LLC
-    Set<String> segmentIds = idealState.getPartitionSet();
-    List<String> llcSegments = new ArrayList<>(segmentIds.size());
-    for (String segmentId : segmentIds) {
-      if (SegmentName.isLowLevelConsumerSegmentName(segmentId)) {
-        llcSegments.add(segmentId);
-        Map<String, String> stateMap = idealState.getInstanceStateMap(segmentId);
-        Iterator<String> iterator = stateMap.values().iterator();
-        // If there is at least one instance in CONSUMING state, we are good.
-        boolean foundConsuming = false;
-        while (iterator.hasNext() && !foundConsuming) {
-          String stateString = iterator.next();
-          if (stateString.equals(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE)) {
-            LOGGER.info("Found CONSUMING segment {}", segmentId);
-            foundConsuming = true;
-          }
-        }
-        if (foundConsuming) {
-          LLCSegmentName llcSegmentName = new LLCSegmentName(segmentId);
-          nonConsumingKafkaPartitions.remove(llcSegmentName.getPartitionId());
-        }
-      }
-    }
-
-    // Kafka partition set now has all the partitions that do not have any segments in CONSUMING state.
-    if (!llcSegments.isEmpty()) {
-      // Raise the metric only if there is at least one llc segment in the idealstate.
-      _validationMetrics.updateNonConsumingPartitionCountMetric(realtimeTableName, nonConsumingKafkaPartitions.size());
-      // Recreate a segment for the partitions that are missing one.
-      for (Integer kafkaPartition : nonConsumingKafkaPartitions) {
-        LOGGER.warn("Table {}, kafka partition {} has no segments in CONSUMING state (out of {} llc segments)",
-            realtimeTableName, kafkaPartition, llcSegments.size());
-      }
-      if (_autoCreateOnError) {
-        _llcRealtimeSegmentManager.createConsumingSegment(realtimeTableName, nonConsumingKafkaPartitions, llcSegments,
-            tableConfig);
-        _llcRealtimeSegmentManager.completeCommittingSegments(realtimeTableName);
-      }
-    }
-    // Make this call after other validations (so that we verify that we are consistent against the existing partition
-    // assignment). This call may end up changing the kafka partition assignment for the table.
-    _llcRealtimeSegmentManager.updateKafkaPartitionsIfNecessary(tableConfig);
   }
 
   // For offline segment pushes, validate that there are no missing segments, and update metrics
