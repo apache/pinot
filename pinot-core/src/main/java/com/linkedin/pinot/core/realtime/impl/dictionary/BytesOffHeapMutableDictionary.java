@@ -16,7 +16,7 @@
 
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
-import com.linkedin.pinot.common.utils.primitive.Bytes;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
 import java.io.IOException;
@@ -30,8 +30,8 @@ import javax.annotation.Nonnull;
 public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
 
   private final MutableOffHeapByteArrayStore _byteStore;
-  private Bytes _min = null;
-  private Bytes _max = null;
+  private ByteArray _min = null;
+  private ByteArray _max = null;
 
   /**
    * Constructor the class.
@@ -66,16 +66,16 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
 
   @Override
   public void index(@Nonnull Object rawValue) {
-    if (rawValue instanceof Bytes) {
+    if (rawValue instanceof ByteArray) {
       // Single value
-      Bytes bytes = (Bytes) rawValue;
+      ByteArray bytes = (ByteArray) rawValue;
       indexValue(rawValue, bytes.getBytes());
       updateMinMax(bytes);
     } else if (rawValue instanceof Object[]) {
       // Multi value
       Object[] values = (Object[]) rawValue;
       for (Object value : values) {
-        Bytes bytesValue = ((Bytes) value);
+        ByteArray bytesValue = ((ByteArray) value);
         indexValue(value, bytesValue.getBytes());
         updateMinMax(bytesValue);
       }
@@ -94,8 +94,8 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   @Override
   public int indexOf(Object rawValue) {
     byte[] value;
-    if (rawValue instanceof Bytes) {
-      value = ((Bytes) rawValue).getBytes();
+    if (rawValue instanceof ByteArray) {
+      value = ((ByteArray) rawValue).getBytes();
     } else if (rawValue instanceof byte[]) {
       value = (byte[]) rawValue;
     } else {
@@ -119,9 +119,9 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
 
   @Nonnull
   @Override
-  public Bytes[] getSortedValues() {
+  public ByteArray[] getSortedValues() {
     int numValues = length();
-    Bytes[] sortedValues = new Bytes[numValues];
+    ByteArray[] sortedValues = new ByteArray[numValues];
 
     for (int i = 0; i < numValues; i++) {
       sortedValues[i] = getInternal(i);
@@ -131,15 +131,15 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
     return sortedValues;
   }
 
-  private Bytes getInternal(int dictId) {
-    return new Bytes(_byteStore.get(dictId));
+  private ByteArray getInternal(int dictId) {
+    return new ByteArray(_byteStore.get(dictId));
   }
 
   protected boolean equalsValueAt(int dictId, Object value, byte[] serializedValue) {
     return _byteStore.equalsValueAt(serializedValue, dictId);
   }
 
-  private void updateMinMax(Bytes value) {
+  private void updateMinMax(ByteArray value) {
     if (_min == null) {
       _min = value;
       _max = value;

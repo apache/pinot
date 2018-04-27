@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.segment.index.readers;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.utils.primitive.Bytes;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.nio.charset.Charset;
@@ -177,7 +177,7 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
     while (low <= high) {
       int mid = (low + high) >>> 1;
       byte[] midValue = _valueReader.getBytes(mid, _numBytesPerValue, buffer);
-      int compareResult = Bytes.compare(midValue, value);
+      int compareResult = ByteArray.compare(midValue, value);
       if (compareResult < 0) {
         low = mid + 1;
       } else if (compareResult > 0) {

@@ -48,9 +48,9 @@ public interface ColumnStatistics {
 
     /**
      *
-     * @return For variable length objects, returns the length of the smallest value. For others, returns -1.
+     * @return For variable length objects, returns the length of the shortest value. For others, returns -1.
      */
-    int getLengthOfSmallestElement();
+    int getLengthOfShortestElement();
 
     /**
      *

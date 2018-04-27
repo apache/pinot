@@ -27,10 +27,10 @@ import org.apache.commons.codec.binary.Hex;
  *   <li> Implements equals() and hashCode(), so it can be used as key for HashMap/Set. </li>
  * </ul>
  */
-public class Bytes implements Comparable<Bytes> {
-  private byte[] _bytes;
+public class ByteArray implements Comparable<ByteArray> {
+  private final byte[] _bytes;
 
-  public Bytes(byte[] bytes) {
+  public ByteArray(byte[] bytes) {
     _bytes = bytes;
   }
 
@@ -42,9 +42,19 @@ public class Bytes implements Comparable<Bytes> {
     return _bytes.length;
   }
 
+  /**
+   * Static utility function to convert a byte[] to Hex string.
+   *
+   * @param bytes byte[] to convert
+   * @return Equivalent Hex String.
+   */
+  public static String toHexString(byte[] bytes) {
+    return Hex.encodeHexString(bytes);
+  }
+
   @Override
   public String toString() {
-    return Hex.encodeHexString(_bytes);
+    return toHexString(_bytes);
   }
 
   @Override
@@ -56,7 +66,7 @@ public class Bytes implements Comparable<Bytes> {
       return false;
     }
 
-    Bytes bytes = (Bytes) o;
+    ByteArray bytes = (ByteArray) o;
 
     return Arrays.equals(_bytes, bytes._bytes);
   }
@@ -67,7 +77,7 @@ public class Bytes implements Comparable<Bytes> {
   }
 
   @Override
-  public int compareTo(@Nonnull Bytes that) {
+  public int compareTo(@Nonnull ByteArray that) {
     if (this == that) {
       return 0;
     }
@@ -93,15 +103,13 @@ public class Bytes implements Comparable<Bytes> {
     int len2 = bytes2.length;
     int lim = Math.min(len1, len2);
 
-    int k = 0;
-    while (k < lim) {
+    for (int k = 0; k < lim; k++) {
       // Java byte is always signed, but we need to perform unsigned comparison.
       int ai = Byte.toUnsignedInt(bytes1[k]);
       int bi = Byte.toUnsignedInt(bytes2[k]);
       if (ai != bi) {
         return ai - bi;
       }
-      k++;
     }
     return len1 - len2;
   }

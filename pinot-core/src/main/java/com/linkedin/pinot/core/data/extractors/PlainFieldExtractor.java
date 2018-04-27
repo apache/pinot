@@ -26,7 +26,7 @@ import com.linkedin.pinot.common.utils.time.TimeConverter;
 import com.linkedin.pinot.common.utils.time.TimeConverterProvider;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.function.FunctionExpressionEvaluator;
-import com.linkedin.pinot.common.utils.primitive.Bytes;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -241,7 +241,7 @@ public class PlainFieldExtractor implements FieldExtractor {
         // Wrap primitive byte[] into Bytes, this is required as the value read has to be Comparable,
         // as well as have equals() and hashCode() methods so it can be a key in a Map/Set.
         if (dest == PinotDataType.BYTES) {
-          value = new Bytes((byte[]) value);
+          value = new ByteArray((byte[]) value);
         }
       }
 

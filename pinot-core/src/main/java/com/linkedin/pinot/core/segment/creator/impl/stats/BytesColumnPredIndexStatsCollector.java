@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
-import com.linkedin.pinot.common.utils.primitive.Bytes;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
@@ -31,13 +31,13 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
   private byte[] _min = EMPTY_BYTE_ARRAY;
   private byte[] _max = EMPTY_BYTE_ARRAY;
 
-  private int _lengthOfSmallestEntry = Integer.MAX_VALUE;
+  private int _lengthOfShortestEntry = Integer.MAX_VALUE;
   private int _lengthOfLongestEntry = 0;
 
-  private final ObjectSet<Bytes> _rawBytesSet;
-  private final ObjectSet<Bytes> _aggregateBytesSet;
+  private final ObjectSet<ByteArray> _rawBytesSet;
+  private final ObjectSet<ByteArray> _aggregateBytesSet;
 
-  private Bytes[] _sortedBytesList;
+  private ByteArray[] _sortedBytesList;
   private boolean _sealed = false;
 
   public BytesColumnPredIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
@@ -56,13 +56,13 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
    * @param entry Entry value
    * @param set Set containing entries
    */
-  private void collectEntry(Object entry, ObjectSet<Bytes> set) {
+  private void collectEntry(Object entry, ObjectSet<ByteArray> set) {
     if (entry instanceof Object[]) {
       for (final Object e : (Object[]) entry) {
         byte[] value = (byte[]) e;
-        set.add(new Bytes(value));
+        set.add(new ByteArray(value));
 
-        _lengthOfSmallestEntry = Math.min(_lengthOfSmallestEntry, value.length);
+        _lengthOfShortestEntry = Math.min(_lengthOfShortestEntry, value.length);
         _lengthOfLongestEntry = Math.max(_lengthOfLongestEntry, value.length);
       }
 
@@ -71,11 +71,11 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
       }
       updateTotalNumberOfEntries((Object[]) entry);
     } else {
-      Bytes value;
+      ByteArray value;
       if (entry != null) {
-        value = (Bytes) entry;
+        value = (ByteArray) entry;
       } else {
-        value = (Bytes) fieldSpec.getDefaultNullValue();
+        value = (ByteArray) fieldSpec.getDefaultNullValue();
       }
 
       addressSorted(value);
@@ -83,7 +83,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
       set.add(value);
 
       int valueLength = value.length();
-      _lengthOfSmallestEntry = Math.min(_lengthOfSmallestEntry, valueLength);
+      _lengthOfShortestEntry = Math.min(_lengthOfShortestEntry, valueLength);
       _lengthOfLongestEntry = Math.max(_lengthOfLongestEntry, valueLength);
 
       totalNumberOfEntries++;
@@ -130,7 +130,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
   }
 
   @Override
-  public Bytes[] getUniqueValuesSet() {
+  public ByteArray[] getUniqueValuesSet() {
     if (_sealed) {
       return _sortedBytesList;
     }
@@ -138,8 +138,8 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
   }
 
   @Override
-  public int getLengthOfSmallestElement() {
-    return _lengthOfSmallestEntry;
+  public int getLengthOfShortestElement() {
+    return _lengthOfShortestEntry;
   }
 
   @Override
@@ -166,7 +166,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
   @Override
   public void seal() {
     _sealed = true;
-    _sortedBytesList = new Bytes[_rawBytesSet.size()];
+    _sortedBytesList = new ByteArray[_rawBytesSet.size()];
     _rawBytesSet.toArray(_sortedBytesList);
 
     Arrays.sort(_sortedBytesList);
@@ -185,7 +185,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
     int numAggregated = _aggregateBytesSet.size();
     if (numAggregated > 0) {
       _rawBytesSet.addAll(_aggregateBytesSet);
-      _sortedBytesList = new Bytes[_rawBytesSet.size()];
+      _sortedBytesList = new ByteArray[_rawBytesSet.size()];
       _rawBytesSet.toArray(_sortedBytesList);
       Arrays.sort(_sortedBytesList);
     }

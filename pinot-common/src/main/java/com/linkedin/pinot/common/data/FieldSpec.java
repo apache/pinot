@@ -21,7 +21,7 @@ import com.google.gson.JsonPrimitive;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.ConfigKey;
 import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.primitive.Bytes;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import java.nio.charset.Charset;
 import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Type;
@@ -47,14 +47,15 @@ public abstract class FieldSpec {
   private static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
   private static final Float DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
   private static final Double DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
-  private static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
+  private static final ByteArray DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new ByteArray(new byte[0]);
 
+  private static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
   private static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
   private static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
   private static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = 0.0F;
   private static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
   private static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
-  private static final Bytes DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new Bytes(new byte[0]);
+  private static final ByteArray DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new ByteArray(new byte[0]);
 
   @ConfigKey("name")
   protected String _name;
@@ -155,7 +156,7 @@ public abstract class FieldSpec {
           return stringDefaultNullValue;
         case BYTES:
           try {
-            return new Bytes(Hex.decodeHex(stringDefaultNullValue.toCharArray()));
+            return new ByteArray(Hex.decodeHex(stringDefaultNullValue.toCharArray()));
           } catch (DecoderException e) {
             Utils.rethrowException(e); // Re-throw to avoid handling exceptions in all callers.
           }
@@ -177,7 +178,7 @@ public abstract class FieldSpec {
             case STRING:
               return DEFAULT_METRIC_NULL_VALUE_OF_STRING;
             case BYTES:
-              return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
+              return DEFAULT_METRIC_NULL_VALUE_OF_BYTES;
             default:
               throw new UnsupportedOperationException(
                   "Unknown default null value for metric field of data type: " + dataType);

@@ -187,8 +187,8 @@ public class DataBlockCache {
   /**
    * Get byte[] values for the given single-valued column.
    *
-   * @param column Column to read.
-   * @return byte[] for the column.
+   * @param column Column to read
+   * @return byte[] for the column
    */
   public byte[][] getBytesValuesForSVColumn(String column) {
     ColumnTypePair key = new ColumnTypePair(column, FieldSpec.DataType.BYTES);

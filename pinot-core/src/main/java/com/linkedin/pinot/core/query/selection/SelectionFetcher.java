@@ -59,6 +59,7 @@ public class SelectionFetcher {
           case FLOAT:
           case DOUBLE:
           case STRING:
+          case BYTES:
             _selectionColumnIterators[i] = new SelectionSingleValueColumnWithDictIterator(block);
             break;
           // Multi value
@@ -97,6 +98,7 @@ public class SelectionFetcher {
             _selectionColumnIterators[i] = new DoubleSelectionColumnIterator(block);
             break;
           case STRING:
+          case BYTES:
             _selectionColumnIterators[i] = new StringSelectionColumnIterator(block);
             break;
           // TODO: add multi value support

@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.utils.primitive.Bytes;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import java.util.ArrayList;
@@ -243,7 +243,7 @@ public class MutableDictionaryTest {
       case BYTES:
         byte[] bytes = new byte[RANDOM.nextInt(100) + 1];
         RANDOM.nextBytes(bytes);
-        return new Bytes(bytes);
+        return new ByteArray(bytes);
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }

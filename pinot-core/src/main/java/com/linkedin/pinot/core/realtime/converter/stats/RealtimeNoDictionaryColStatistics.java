@@ -158,7 +158,7 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
   }
 
   @Override
-  public int getLengthOfSmallestElement() {
+  public int getLengthOfShortestElement() {
     return lengthOfDataType(); // Only fixed length data types supported.
   }
 

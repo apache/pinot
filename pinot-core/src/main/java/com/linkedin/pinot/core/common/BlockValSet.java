@@ -94,7 +94,7 @@ public interface BlockValSet {
   void getStringValues(int[] inDocIds, int inStartPos, int inDocIdsSize, String[] outValues, int outStartPos);
 
   /**
-   * Get byte[[] values for the given docIds.
+   * Get byte[] values for the given docIds.
    *
    * @param inDocIds Input docIds
    * @param inStartPos Start index in inDocIds

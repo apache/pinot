@@ -83,7 +83,7 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
   }
 
   @Override
-  public int getLengthOfSmallestElement() {
+  public int getLengthOfShortestElement() {
     // Length of longest string
     int minStringLength = Integer.MAX_VALUE;
 

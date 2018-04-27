@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.segment.creator.impl;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.primitive.Bytes;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import it.unimi.dsi.fastutil.doubles.Double2IntOpenHashMap;
@@ -50,7 +50,7 @@ public class SegmentDictionaryCreator implements Closeable {
   private Float2IntOpenHashMap _floatValueToIndexMap;
   private Double2IntOpenHashMap _doubleValueToIndexMap;
   private Object2IntOpenHashMap<String> _stringValueToIndexMap;
-  private Object2IntOpenHashMap<Bytes> _bytesValueToIndexMap;
+  private Object2IntOpenHashMap<ByteArray> _bytesValueToIndexMap;
   private int _numBytesPerEntry = 0;
 
   public SegmentDictionaryCreator(Object sortedValues, FieldSpec fieldSpec, File indexDir) throws IOException {
@@ -159,7 +159,7 @@ public class SegmentDictionaryCreator implements Closeable {
             FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
           for (int i = 0; i < numValues; i++) {
             byte[] value = sortedStringBytes[i];
-            writer.writeUnpaddedBytes(i, _numBytesPerEntry, value);
+            writer.writeUnpaddedString(i, _numBytesPerEntry, value);
           }
         }
         LOGGER.info(
@@ -168,7 +168,7 @@ public class SegmentDictionaryCreator implements Closeable {
         return;
 
       case BYTES:
-        Bytes[] sortedBytes = (Bytes[]) _sortedValues;
+        ByteArray[] sortedBytes = (ByteArray[]) _sortedValues;
         numValues = sortedBytes.length;
 
         Preconditions.checkState(numValues > 0);
@@ -178,7 +178,7 @@ public class SegmentDictionaryCreator implements Closeable {
         byte[][] sortedValues = new byte[numValues][];
 
         for (int i = 0; i < numValues; i++) {
-          Bytes value = sortedBytes[i];
+          ByteArray value = sortedBytes[i];
           _bytesValueToIndexMap.put(value, i);
           byte[] valueBytes = value.getBytes();
           sortedValues[i] = valueBytes;
@@ -190,7 +190,7 @@ public class SegmentDictionaryCreator implements Closeable {
             FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
           for (int i = 0; i < numValues; i++) {
             byte[] value = sortedBytes[i].getBytes();
-            writer.writeUnpaddedBytes(i, _numBytesPerEntry, value);
+            writer.writeUnpaddedString(i, _numBytesPerEntry, value);
           }
         }
         LOGGER.info(

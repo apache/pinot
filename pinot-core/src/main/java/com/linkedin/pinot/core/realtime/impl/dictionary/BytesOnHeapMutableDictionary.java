@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
-import com.linkedin.pinot.common.utils.primitive.Bytes;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
 
@@ -24,8 +24,8 @@ import javax.annotation.Nonnull;
  * OnHeap mutable dictionary of Bytes type.
  */
 public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
-  private Bytes _min = null;
-  private Bytes _max = null;
+  private ByteArray _min = null;
+  private ByteArray _max = null;
 
   @Override
   public int indexOf(Object rawValue) {
@@ -34,16 +34,16 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
   @Override
   public void index(@Nonnull Object rawValue) {
-    if (rawValue instanceof Bytes) {
+    if (rawValue instanceof ByteArray) {
       // Single value
       indexValue(rawValue);
-      updateMinMax((Bytes) rawValue);
+      updateMinMax((ByteArray) rawValue);
     } else {
       // Multi value
       Object[] values = (Object[]) rawValue;
       for (Object value : values) {
         indexValue(value);
-        updateMinMax((Bytes) value);
+        updateMinMax((ByteArray) value);
       }
     }
   }
@@ -56,24 +56,24 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
   @Nonnull
   @Override
-  public Bytes getMinVal() {
+  public ByteArray getMinVal() {
     return _min;
   }
 
   @Nonnull
   @Override
-  public Bytes getMaxVal() {
+  public ByteArray getMaxVal() {
     return _max;
   }
 
   @Nonnull
   @Override
-  public Bytes[] getSortedValues() {
+  public ByteArray[] getSortedValues() {
     int numValues = length();
-    Bytes[] sortedValues = new Bytes[numValues];
+    ByteArray[] sortedValues = new ByteArray[numValues];
 
     for (int i = 0; i < numValues; i++) {
-      sortedValues[i] = (Bytes) get(i);
+      sortedValues[i] = (ByteArray) get(i);
     }
 
     Arrays.sort(sortedValues);
@@ -100,7 +100,7 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
     throw new UnsupportedOperationException();
   }
 
-  private void updateMinMax(Bytes value) {
+  private void updateMinMax(ByteArray value) {
     if (_min == null) {
       _min = value;
       _max = value;

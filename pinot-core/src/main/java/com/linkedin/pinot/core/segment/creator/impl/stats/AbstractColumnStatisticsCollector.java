@@ -117,7 +117,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
 
   public abstract int getCardinality();
 
-  public int getLengthOfSmallestElement() {
+  public int getLengthOfShortestElement() {
     return -1;
   }
 

@@ -20,7 +20,7 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.primitive.Bytes;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
@@ -114,7 +114,7 @@ public class SegmentGenerationWithBytesTypeTest {
         byte[] actual = (byte[]) actualRow.getValue(column);
         byte[] expected = (byte[]) expectedRow.getValue(column);
 
-        if (Bytes.compare(actual, expected) != 0) {
+        if (ByteArray.compare(actual, expected) != 0) {
           Assert.assertEquals(actualRow.getValue(column), expectedRow.getValue(column));
         }
       }
