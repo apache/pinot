@@ -24,11 +24,10 @@ export default Service.extend({
   setDuration(newDuration) {
     const propsObj = this.get('durationTypes');
     const requiredKeys = Object.keys(propsObj);
-
+    // Check each required property for presence and type
     requiredKeys.forEach((key) => {
       assert(`you must pass ${key} param as ${propsObj[key]}.`, typeof newDuration[key] === propsObj[key]);
     });
-
     this.set('durationObj', newDuration);
   },
 
