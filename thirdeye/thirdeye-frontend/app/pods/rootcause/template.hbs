@@ -152,50 +152,18 @@
       </div>
 
       {{#if context.urns.size}}
-        <div class="card-container__header rootcause-tabs">
-          <div class="card-container__subnav">
-            <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "metrics") "thirdeye-link--active "}}" {{action (mut activeTab)
-              "metrics"}}>
-              Metrics
-            </a>
-          </div>
-          <div class="card-container__subnav">
-            <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "dimensions") "thirdeye-link--active"}}" {{action (mut activeTab) "dimensions"}}>
-              Dimensions
-            </a>
-          </div>
-          <div class="card-container__subnav">
-            <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "events") "thirdeye-link--active"}}" {{action (mut activeTab) "events"}}>
-              Events
-            </a>
-          </div>
-          <div class="card-container__subnav">
-            <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "trend") "thirdeye-link--active"}}" {{action (mut activeTab) "trend"}}>
-              Trend
-            </a>
-          </div>
-        </div>
+        <div class="card-container__row card-container__row--flex row">
+          <div class="col-xs-12 rootcause-tabs card-container__row--bg-color">
+            {{#shared/common-tabs selection=activeTab activeTab=activeTab as |tabs|}}
+              {{#tabs.tablist as |tablist|}}
+                {{#tablist.tab name="metrics"}}Metrics{{/tablist.tab}}
+                {{#tablist.tab name="dimensions"}}Dimensions{{/tablist.tab}}
+                {{#tablist.tab name="events"}}Events{{/tablist.tab}}
+                {{#tablist.tab name="trend"}}Trend{{/tablist.tab}}
+              {{/tabs.tablist}}
 
-        <div class="card-container__body card-container__body--padding-md">
-          <div class="row">
-            <div class="col-xs-12">
-              {{#if (eq activeTab "dimensions")}}
-                {{#if isLoadingBreakdowns}}
-                  <div class="spinner-wrapper spinner-wrapper--card">
-                    {{ember-spinner}}
-                  </div>
-                {{/if}}
-
-                {{rootcause-heatmap
-                  entities=entities
-                  breakdowns=breakdowns
-                  selectedUrn=metricUrn
-                  isLoadingBreakdowns=isLoadingBreakdowns
-                  onSelection=(action "heatmapOnSelection")
-                }}
-              {{/if}}
-
-              {{#if (eq activeTab "metrics")}}
+              {{!-- metrics --}}
+              {{#tabs.tabpanel name="metrics"}}
                 {{#if (set-has loadingFrameworks "metricRelated")}}
                   <div class="spinner-wrapper spinner-wrapper--card">
                     {{ember-spinner}}
@@ -221,28 +189,48 @@
                   isLoading=(or isLoadingAggregates isLoadingScores)
                   onSelection=(action "onSelection")
                 }}
-              {{/if}}
+              {{/tabs.tabpanel}}
 
-              {{#if (eq activeTab "events")}}
+              {{!-- dimensions --}}
+              {{#tabs.tabpanel name="dimensions"}}
+                {{#if isLoadingBreakdowns}}
+                  <div class="spinner-wrapper spinner-wrapper--card">
+                    {{ember-spinner}}
+                  </div>
+                {{/if}}
+
+                {{rootcause-heatmap
+                  entities=entities
+                  breakdowns=breakdowns
+                  selectedUrn=metricUrn
+                  isLoadingBreakdowns=isLoadingBreakdowns
+                  onSelection=(action "heatmapOnSelection")
+                }}
+              {{/tabs.tabpanel}}
+
+              {{!-- events --}}
+              {{#tabs.tabpanel name="events"}}
                 <div class="row">
+                  <div class="col-xs-12">
+                    <div class="pull-right">
+                      <a {{action "onCreateEventClick"}} class="thirdeye-link thirdeye-link--settings">
+                        + add event
+                      </a>
+                      <span class="te-tooltip-wrapper">
+                        <i class="glyphicon glyphicon-question-sign">
+                          {{#tooltip-on-element class="te-tooltip"}}
+                            Can't find your event? Click here to add a new event.
+                          {{/tooltip-on-element}}
+                        </i>
+                      </span>
+                    </div>
+                  </div>
                   <div class="col-xs-3">
                     {{filter-bar
                       config=filterConfig
                       entities=eventFilterEntities
                       loadingFrameworks=loadingFrameworks
                       onFilter=(action "onFilter")}}
-                  </div>
-                  <div class="pull-right">
-                    <a {{action "onCreateEventClick"}} class="thirdeye-link thirdeye-link--settings">
-                      + add event
-                    </a>
-                    <span class="te-tooltip-wrapper">
-                    <i class="glyphicon glyphicon-question-sign">
-                      {{#tooltip-on-element class="te-tooltip"}}
-                        Can't find your event? Click here to add a new event.
-                      {{/tooltip-on-element}}
-                    </i>
-                  </span>
                   </div>
                   <div class="col-xs-9">
                     {{rootcause-table
@@ -253,9 +241,10 @@
                     }}
                   </div>
                 </div>
-              {{/if}}
+              {{/tabs.tabpanel}}
 
-              {{#if (eq activeTab "trend")}}
+              {{!-- trend --}}
+              {{#tabs.tabpanel name="trend"}}
                 {{#if (set-has loadingFrameworks "metricRelated")}}
                   <div class="spinner-wrapper spinner-wrapper--card">
                     {{ember-spinner}}
@@ -281,9 +270,8 @@
                   isLoading=isLoadingTimeseries
                   onSelection=(action "onSelection")
                 }}
-              {{/if}}
-
-            </div>
+              {{/tabs.tabpanel}}
+            {{/shared/common-tabs}}
           </div>
         </div>
       {{/if}}
