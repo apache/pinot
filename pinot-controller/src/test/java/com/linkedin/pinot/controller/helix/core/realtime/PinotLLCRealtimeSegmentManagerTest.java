@@ -75,7 +75,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.*;
 
 
-public class PinotLLCRealtimeSegmentManagerTestNew {
+public class PinotLLCRealtimeSegmentManagerTest {
   private static final String clusterName = "testCluster";
   private static final String DUMMY_HOST = "dummyHost:1234";
   private static final String KAFKA_OFFSET = "testDummy";
@@ -101,7 +101,7 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
   public void setUp() {
     // Printing out the random seed to console so that we can use the seed to reproduce failure conditions
     long seed = new Random().nextLong();
-    System.out.println("Random seed for " + PinotLLCRealtimeSegmentManagerTestNew.class.getSimpleName() + " is " + seed);
+    System.out.println("Random seed for " + PinotLLCRealtimeSegmentManagerTest.class.getSimpleName() + " is " + seed);
     random = new Random(seed);
 
     final int maxInstances = 20;
