@@ -3,7 +3,6 @@ import { assert } from '@ember/debug';
 import { isPresent } from "@ember/utils";
 
 export default Service.extend({
-  durationObj: null,
   durationTypes: {
     duration: 'string',
     startDate: 'number',
@@ -24,10 +23,13 @@ export default Service.extend({
   setDuration(newDuration) {
     const propsObj = this.get('durationTypes');
     const requiredKeys = Object.keys(propsObj);
-    // Check each required property for presence and type
+
+    // Check each required param property for presence and expected type
     requiredKeys.forEach((key) => {
       assert(`you must pass ${key} param as ${propsObj[key]}.`, typeof newDuration[key] === propsObj[key]);
     });
+
+    // Cache new incoming duration object
     this.set('durationObj', newDuration);
   },
 
@@ -39,6 +41,9 @@ export default Service.extend({
    * @return {Object}
    */
   getDuration(queryParams, defaultDurationObj) {
+    assert('you must pass queryParams param as an required argument.', queryParams);
+    assert('you must pass defaultDurationObj param as an required argument.', defaultDurationObj);
+
     const cachedDuration = this.get('durationObj');
     const isDurationCached = Object.keys(cachedDuration).length > 0;
     // Check for presence of each time range key in qeury params
