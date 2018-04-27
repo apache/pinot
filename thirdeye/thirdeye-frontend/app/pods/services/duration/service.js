@@ -61,10 +61,10 @@ export default Service.extend({
 
   /**
    * Clears the cached duration object (reset)
-   * @method removeDuration
+   * @method resetDuration
    * @return {undefined}
    */
-  removeDuration() {
+  resetDuration() {
     this.set('durationObj', {});
   }
 });

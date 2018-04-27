@@ -64,7 +64,7 @@ export default Route.extend({
      * @method willTransition
      */
     willTransition(transition) {
-      this.get('durationCache').removeDuration();
+      this.get('durationCache').resetDuration();
     },
 
     /**
