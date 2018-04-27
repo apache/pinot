@@ -55,6 +55,14 @@ export default Route.extend({
 
   actions: {
     /**
+     * Clear duration cache (time range is reset to default when entering new alert page from index)
+     * @method willTransition
+     */
+    willTransition(transition) {
+      sessionStorage.removeItem('duration');
+    },
+
+    /**
     * Refresh route's model.
     * @method refreshModel
     */
