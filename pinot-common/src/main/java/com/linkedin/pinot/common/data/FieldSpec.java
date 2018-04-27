@@ -18,6 +18,8 @@ package com.linkedin.pinot.common.data;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import com.linkedin.pinot.common.config.ConfigKey;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Type;
@@ -47,15 +49,22 @@ public abstract class FieldSpec {
   private static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
   private static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
 
+  @ConfigKey("name")
   protected String _name;
-  protected DataType _dataType;
-  protected boolean _isSingleValueField = true;
-  protected Object _defaultNullValue;
-  // Transform function to generate this column, can be based on other columns
-  protected String _transformFunction;
 
+  @ConfigKey("dataType")
+  protected DataType _dataType;
+
+  @ConfigKey("singleValue")
+  protected boolean _isSingleValueField = true;
+
+  protected Object _defaultNullValue;
+
+  @ConfigKey("defaultNullValue")
   private transient String _stringDefaultNullValue;
 
+  // Transform function to generate this column, can be based on other columns
+  protected String _transformFunction;
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public FieldSpec() {
@@ -182,6 +191,10 @@ public abstract class FieldSpec {
     }
   }
 
+  /**
+   * Transform function if defined else null.
+   * @return
+   */
   public String getTransformFunction() {
     return _transformFunction;
   }
@@ -209,6 +222,10 @@ public abstract class FieldSpec {
   }
 
   protected void appendDefaultNullValue(@Nonnull JsonObject jsonObject) {
+    if (_defaultNullValue == null) {
+      return;
+    }
+
     if (!_defaultNullValue.equals(getDefaultNullValue(getFieldType(), _dataType, null))) {
       if (_defaultNullValue instanceof Number) {
         jsonObject.add("defaultNullValue", new JsonPrimitive((Number) _defaultNullValue));

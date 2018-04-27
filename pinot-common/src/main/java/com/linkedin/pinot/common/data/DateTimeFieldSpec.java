@@ -17,6 +17,7 @@ package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
 import com.google.gson.JsonObject;
+import com.linkedin.pinot.common.config.ConfigKey;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nonnull;
 import org.codehaus.jackson.annotate.JsonIgnore;
@@ -26,7 +27,10 @@ import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class DateTimeFieldSpec extends FieldSpec {
+  @ConfigKey("format")
   private String _format;
+
+  @ConfigKey("granularity")
   private String _granularity;
 
   public enum TimeFormat {

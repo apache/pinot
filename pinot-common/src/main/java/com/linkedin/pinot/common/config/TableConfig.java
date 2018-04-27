@@ -25,6 +25,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.helix.ZNRecord;
@@ -33,6 +35,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 
+@ConfigDoc(value = "Configuration for a table", mandatory = true)
+@ConfigKey("table")
 public class TableConfig {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -46,15 +50,37 @@ public class TableConfig {
   private static final String TASK_CONFIG_KEY = "task";
   private static final String ROUTING_CONFIG_KEY = "routing";
 
+  @ConfigKey("name")
+  @ConfigDoc(value = "The name for the table.", mandatory = true, exampleValue = "myTable")
   private String _tableName;
+
+  @ConfigKey("type")
+  @ConfigDoc(value = "The type of the table, either realtime or offline", mandatory = true)
   private TableType _tableType;
+
+  @NestedConfig
   private SegmentsValidationAndRetentionConfig _validationConfig;
+
+  @NestedConfig
   private TenantConfig _tenantConfig;
+
+  @NestedConfig
   private IndexingConfig _indexingConfig;
+
+  @NestedConfig
   private TableCustomConfig _customConfig;
+
+  @ConfigKey("quota")
+  @ConfigDoc("Resource quota associated with this table")
   private QuotaConfig _quotaConfig;
+
+  @NestedConfig
   private TableTaskConfig _taskConfig;
+
+  @NestedConfig
   private RoutingConfig _routingConfig;
+
+  public TableConfig() {}
 
   private TableConfig(@Nonnull String tableName, @Nonnull TableType tableType,
       @Nonnull SegmentsValidationAndRetentionConfig validationConfig, @Nonnull TenantConfig tenantConfig,
@@ -306,11 +332,12 @@ public class TableConfig {
         EqualityUtils.isEqual(_validationConfig, that._validationConfig) &&
         EqualityUtils.isEqual(_tenantConfig, that._tenantConfig) &&
         EqualityUtils.isEqual(_indexingConfig, that._indexingConfig) &&
-        EqualityUtils.isEqual( _customConfig, that._customConfig) &&
+        EqualityUtils.isEqual(_customConfig, that._customConfig) &&
         EqualityUtils.isEqual(_quotaConfig, that._quotaConfig) &&
         EqualityUtils.isEqual(_taskConfig, that._taskConfig) &&
         EqualityUtils.isEqual(_routingConfig, that._routingConfig);
   }
+
 
   @Override
   public int hashCode() {

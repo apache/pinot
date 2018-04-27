@@ -31,8 +31,14 @@ public class ColumnPartitionConfig {
   public static final String PARTITION_VALUE_DELIMITER = ",";
   public static final String PARTITIONER_DELIMITER = "\t\t";
 
-  private final String _functionName;
+  @ConfigKey("functionName")
+  private String _functionName;
+
+  @ConfigKey("numPartitions")
   private int _numPartitions;
+
+  public ColumnPartitionConfig() {
+  }
 
   /**
    * Constructor for the class.
@@ -147,5 +153,11 @@ public class ColumnPartitionConfig {
     int hashCode = EqualityUtils.hashCodeOf(_functionName);
     hashCode = EqualityUtils.hashCodeOf(hashCode, _numPartitions);
     return hashCode;
+  }
+
+  @Override
+  public String toString() {
+    return "ColumnPartitionConfig{" + "_functionName='" + _functionName + '\'' + ", _numPartitions=" + _numPartitions
+        + '}';
   }
 }
