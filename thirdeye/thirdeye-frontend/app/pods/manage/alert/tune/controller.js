@@ -8,8 +8,9 @@ import Controller from '@ember/controller';
 import moment from 'moment';
 import { isPresent } from "@ember/utils";
 import { computed, set } from '@ember/object';
+import { inject as service } from '@ember/service';
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
-import { buildAnomalyStats, setDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { buildAnomalyStats } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Controller.extend({
   /**
@@ -19,6 +20,11 @@ export default Controller.extend({
   duration: null,
   startDate: null,
   endDate: null,
+
+  /**
+   * Make duration service accessible
+   */
+  durationCache: service('services/duration'),
 
   /**
    * Set initial view values
@@ -308,11 +314,14 @@ export default Controller.extend({
         end,
         value: duration
       } = rangeOption;
-      const startDate = moment(start).valueOf();
-      const endDate = moment(end).valueOf();
+      const durationObj = {
+        duration,
+        startDate: moment(start).valueOf(),
+        endDate: moment(end).valueOf()
+      };
       // Cache the new time range and update page with it
-      setDuration(duration, startDate, endDate);
-      this.transitionToRoute({ queryParams: { duration, startDate, endDate }});
+      this.get('durationCache').setDuration(durationObj);
+      this.transitionToRoute({ queryParams: durationObj });
     },
 
     /**

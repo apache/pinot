@@ -8,8 +8,8 @@ import fetch from 'fetch';
 import moment from 'moment';
 import { isPresent } from "@ember/utils";
 import Route from '@ember/routing/route';
+import { inject as service } from '@ember/service';
 import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
-import { setDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 // Setup for query param behavior
 const queryParamsConfig = {
@@ -21,6 +21,8 @@ export default Route.extend({
   queryParams: {
     jobId: queryParamsConfig
   },
+
+  durationCache: service('services/duration'),
 
   beforeModel(transition) {
     const id = transition.params['manage.alert'].alert_id;
@@ -39,8 +41,9 @@ export default Route.extend({
         functionName: null,
         jobId
       }});
-      // Save duration to sessionStorage for guaranteed availability
-      setDuration(durationDefault, startDateDefault, endDateDefault);
+
+      // Save duration to service object for session availability
+      this.get('durationCache').setDuration({ durationDefault, startDateDefault, endDateDefault });
     }
   },
 

@@ -293,52 +293,6 @@ export function formatConfigGroupProps(alertData, alertIndex) {
 }
 
 /**
- * Caches duration data to local storage in order to persist it across pages
- * TODO: Move this to self-serve services
- * @method setDuration
- * @param {String} duration - qualifies duration set as 'custom' or a range key like '3m'
- * @param {Number} startDate - start date for alert page (and list of anomalies)
- * @param {Number} endDate - end date for alert page (and list of anomalies)
- * @return {undefined}
- */
-export function setDuration(duration, startDate, endDate) {
-  sessionStorage.setItem('duration', JSON.stringify({ duration, startDate, endDate }));
-}
-
-/**
- * Retrieves duration data from local storage in order to persist it across pages
- * TODO: Move this to self-serve services
- * @method getDuration
- * @return {Object}
- */
-export function getDuration() {
-  return JSON.parse(sessionStorage.getItem('duration'));
-}
-
-/**
- * Decides which time range to load as default (query params, default set, or locally cached)
- * @method prepareTimeRange
- * @param {Object} queryParams - range-related properties in querystring
- * @param {Object} defaultDurationObj - basic default time range setting
- * @return {Object}
- */
-export function prepareTimeRange(queryParams, defaultDurationObj) {
-  const durationCached = sessionStorage.getItem('duration') !== null;
-  // Check for presence of each time range key in qeury params
-  const isDurationInQuery = isPresent(queryParams.duration) && isPresent(queryParams.startDate) && isPresent(queryParams.endDate);
-  // Use querystring time range if present. Else, use preset defaults
-  const defaultDuration = isDurationInQuery ? queryParams : defaultDurationObj;
-  // Prefer cached time range if present. Else, load from defaults
-  const durationObj = durationCached ? getDuration() : defaultDuration;
-  // If no time range is cached for the session, cache the new one
-  if (!durationCached) {
-    const { duration, startDate, endDate } = durationObj;
-    setDuration(duration, startDate, endDate);
-  }
-  return durationObj;
-}
-
-/**
  * When fetching current and projected MTTD (minimum time to detect) data, we need to supply the
  * endpoint with a severity threshold. This decides whether to use the default or not.
  * @method extractSeverity
@@ -363,9 +317,6 @@ export default {
   formatConfigGroupProps,
   buildAnomalyStats,
   buildMetricDataUrl,
-  prepareTimeRange,
   extractSeverity,
-  setDuration,
-  getDuration,
   evalObj
 };

@@ -17,10 +17,7 @@ import {
   buildDateEod
 } from 'thirdeye-frontend/utils/utils';
 import { isPresent } from '@ember/utils';
-import {
-  setUpTimeRangeOptions,
-  prepareTimeRange
-} from 'thirdeye-frontend/utils/manage-alert-utils';
+import { setUpTimeRangeOptions } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 /**
  * If true, this reduces the list of alerts per app to 2 for a quick demo.

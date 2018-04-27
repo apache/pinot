@@ -1,8 +1,13 @@
 import { hash } from 'rsvp';
 import Route from '@ember/routing/route';
 import fetch from 'fetch';
+import { inject as service } from '@ember/service';
 
 export default Route.extend({
+
+  // Make duration service accessible
+  durationCache: service('services/duration'),
+
   model() {
     return hash({
       alerts: fetch('/thirdeye/entity/ANOMALY_FUNCTION').then(res => res.json()),
@@ -56,10 +61,12 @@ export default Route.extend({
   actions: {
     /**
      * Clear duration cache (time range is reset to default when entering new alert page from index)
+     * TODO:
      * @method willTransition
      */
     willTransition(transition) {
       sessionStorage.removeItem('duration');
+      this.get('durationCache').removeDuration();
     },
 
     /**
