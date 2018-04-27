@@ -23,9 +23,9 @@ import {
 } from 'thirdeye-frontend/utils/utils';
 import {
   buildAnomalyStats,
-  extractSeverity,
-  setDuration
+  extractSeverity
 } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { inject as service } from '@ember/service';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
 
@@ -48,6 +48,11 @@ export default Controller.extend({
     change: 'changeRate',
     resolution: 'anomalyFeedback'
   },
+
+  /**
+   * Make duration service accessible
+   */
+  durationCache: service('services/duration'),
 
   /**
    * Date format for date range picker
@@ -641,11 +646,14 @@ export default Controller.extend({
         end,
         value: duration
       } = rangeOption;
-      const startDate = moment(start).valueOf();
-      const endDate = moment(end).valueOf();
+      const durationObj = {
+        duration,
+        startDate: moment(start).valueOf(),
+        endDate: moment(end).valueOf()
+      };
       // Cache the new time range and update page with it
-      setDuration(duration, startDate, endDate);
-      this.transitionToRoute({ queryParams: { duration, startDate, endDate }});
+      this.get('durationCache').setDuration(durationObj);
+      this.transitionToRoute({ queryParams: durationObj });
     },
 
 

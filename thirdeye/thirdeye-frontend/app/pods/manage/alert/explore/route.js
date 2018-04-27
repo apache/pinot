@@ -9,6 +9,7 @@ import moment from 'moment';
 import Route from '@ember/routing/route';
 import { later } from "@ember/runloop";
 import { task, timeout } from 'ember-concurrency';
+import { inject as service } from '@ember/service';
 import { isPresent } from "@ember/utils";
 import {
   set,
@@ -21,7 +22,6 @@ import {
   enhanceAnomalies,
   toIdGroups,
   setUpTimeRangeOptions,
-  prepareTimeRange,
   getTopDimensions,
   buildMetricDataUrl,
   extractSeverity
@@ -115,6 +115,11 @@ export default Route.extend({
     repRunStatus: queryParamsConfig
   },
 
+  /**
+   * Make duration service accessible
+   */
+  durationCache: service('services/duration'),
+
   beforeModel(transition) {
     const { duration, startDate } = transition.queryParams;
     // Default to 1 month of anomalies to show if no dates present in query params
@@ -127,12 +132,12 @@ export default Route.extend({
     const { id, alertData, jobId } = this.modelFor('manage.alert');
     if (!id) { return; }
 
-    // Get duration data
+    // Get duration data from service
     const {
       duration,
       startDate,
       endDate
-    } = prepareTimeRange(transition.queryParams, defaultDurationObj);
+    } = this.get('durationCache').getDuration(transition.queryParams, defaultDurationObj);
 
     // Prepare endpoints for eval, mttd, projected metrics calls
     const dateParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;

@@ -2,9 +2,14 @@ import _ from 'lodash';
 import moment from 'moment';
 import { computed, set } from '@ember/object';
 import Controller from '@ember/controller';
-import { setDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { inject as service } from '@ember/service';
 
 export default Controller.extend({
+
+  /**
+   * Make duration service accessible
+   */
+  durationCache: service('services/duration'),
 
   /**
    * Active class appendage of 'view totals' link
@@ -69,11 +74,14 @@ export default Controller.extend({
         end,
         value: duration
       } = rangeOption;
-      const startDate = moment(start).valueOf();
-      const endDate = moment(end).valueOf();
+      const durationObj = {
+        duration,
+        startDate: moment(start).valueOf(),
+        endDate: moment(end).valueOf()
+      };
       // Cache the new time range and update page with it
-      setDuration(duration, startDate, endDate);
-      this.transitionToRoute({ queryParams: { duration, startDate, endDate }});
+      this.get('durationCache').setDuration(durationObj);
+      this.transitionToRoute({ queryParams: durationObj });
     },
 
     /**

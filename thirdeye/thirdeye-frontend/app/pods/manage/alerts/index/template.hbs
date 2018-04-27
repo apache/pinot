@@ -122,9 +122,9 @@
                 <span class="te-search-results__tag te-search-results__tag--list {{if alert.isActive "te-search-results__tag--active"}}">
                   {{if alert.isActive "Active" "Inactive"}}
                 </span>
-                <a href="#" {{action "navigateToAlertPage" alert.id}}>
+                {{#link-to "manage.alert" alert.id}}
                   <div class="te-search-results__title-name" title={{alert.functionName}}>{{alert.functionName}}</div>
-                </a>
+                {{/link-to}}
               </div>
             </div>
               <div class="te-search-results__edit-button">

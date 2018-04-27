@@ -20,11 +20,10 @@ import {
 import {
   enhanceAnomalies,
   setUpTimeRangeOptions,
-  prepareTimeRange,
   toIdGroups,
-  extractSeverity,
-  getDuration
+  extractSeverity
 } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { inject as service } from '@ember/service';
 
 /**
  * Basic alert page defaults
@@ -245,6 +244,11 @@ export default Route.extend({
     endDate: queryParamsConfig
   },
 
+  /**
+   * Make duration service accessible
+   */
+  durationCache: service('services/duration'),
+
   beforeModel(transition) {
     const { duration, startDate } = transition.queryParams;
 
@@ -263,7 +267,7 @@ export default Route.extend({
       duration,
       startDate,
       endDate
-    } = prepareTimeRange(transition.queryParams, defaultDurationObj);
+    } = this.get('durationCache').getDuration(transition.queryParams, defaultDurationObj);
 
     // Prepare endpoints for the initial eval, mttd, projected metrics calls
     const tuneParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
