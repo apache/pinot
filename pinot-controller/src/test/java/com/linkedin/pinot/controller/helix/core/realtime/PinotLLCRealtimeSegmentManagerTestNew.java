@@ -40,6 +40,8 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.resources.LLCSegmentCompletionHandlers;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentStrategyEnum;
+import com.linkedin.pinot.controller.helix.core.realtime.segment.DefaultFlushThresholdUpdater;
+import com.linkedin.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdater;
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
@@ -308,7 +310,7 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
         segmentManager._partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
     for (int p = 0; p < 2; p++) {
       String segmentName = idealStateBuilder.getSegment(p, 0);
-      advanceASeqForPartition(idealState, segmentManager, partitionAssignment, segmentName, p, 1, 100, tableName);
+      advanceASeqForPartition(idealState, segmentManager, partitionAssignment, segmentName, p, 1, 100, tableConfig);
     }
     idealState = idealStateBuilder.build();
     validateLLCPartitionsIncrease(segmentManager, idealState, tableConfig, nPartitions, nReplicas, instances,
@@ -343,13 +345,14 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
 
   private void advanceASeqForPartition(IdealState idealState, FakePinotLLCRealtimeSegmentManager segmentManager,
       PartitionAssignment partitionAssignment, String segmentName, int partition, int nextSeqNum, long nextOffset,
-      String tableName) {
+      TableConfig tableConfig) {
+    String tableName = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
     segmentManager.updateOldSegmentMetadataZNRecord(tableName, llcSegmentName, nextOffset);
     LLCSegmentName newLlcSegmentName =
         new LLCSegmentName(rawTableName, partition, nextSeqNum, System.currentTimeMillis());
-    segmentManager.createNewSegmentMetadataZNRecord(tableName, newLlcSegmentName, nextOffset, partitionAssignment);
+    segmentManager.createNewSegmentMetadataZNRecord(tableConfig, newLlcSegmentName, nextOffset, partitionAssignment);
     segmentManager.updateIdealStateOnSegmentCompletion(idealState, segmentName, newLlcSegmentName.getSegmentName(),
         partitionAssignment);
   }
@@ -549,7 +552,7 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
           LLCSegmentName newLlcSegmentName =
               new LLCSegmentName(rawTableName, randomlySelectedPartition, latestSegment.getSequenceNumber() + 1,
                   System.currentTimeMillis());
-          segmentManager.createNewSegmentMetadataZNRecord(tableName, newLlcSegmentName,
+          segmentManager.createNewSegmentMetadataZNRecord(tableConfig, newLlcSegmentName,
               latestMetadata.getStartOffset() + 100, expectedPartitionAssignment);
 
           // get old state
@@ -778,7 +781,6 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
 
   private IdealState clearAndSetupHappyPathIdealState(IdealStateBuilderUtil idealStateBuilder,
       FakePinotLLCRealtimeSegmentManager segmentManager, TableConfig tableConfig, int nPartitions) {
-    String tableName = tableConfig.getTableName();
     IdealState idealState = idealStateBuilder.clear().build();
     segmentManager._metadataMap.clear();
 
@@ -787,7 +789,7 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
         segmentManager._partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
     for (int p = 0; p < nPartitions; p++) {
       String segmentName = idealStateBuilder.getSegment(p, 0);
-      advanceASeqForPartition(idealState, segmentManager, partitionAssignment, segmentName, p, 1, 100, tableName);
+      advanceASeqForPartition(idealState, segmentManager, partitionAssignment, segmentName, p, 1, 100, tableConfig);
     }
     return idealStateBuilder.build();
   }
@@ -1112,82 +1114,6 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     Assert.assertFalse(new File(temporaryDirectory, extraSegmentLocation).exists());
   }
 
-  @Test
-  public void testUpdateFlushThresholdForSegmentMetadata() {
-    PinotLLCRealtimeSegmentManager realtimeSegmentManager =
-        new FakePinotLLCRealtimeSegmentManager(Collections.<String>emptyList());
-
-    PartitionAssignment partitionAssignment = new PartitionAssignment("fakeTable_REALTIME");
-    // 4 partitions assigned to 4 servers, 4 replicas => the segments should have 250k rows each (1M / 4)
-    for (int segmentId = 1; segmentId <= 4; ++segmentId) {
-      List<String> instances = new ArrayList<>();
-
-      for (int replicaId = 1; replicaId <= 4; ++replicaId) {
-        instances.add("Server_1.2.3.4_123" + replicaId);
-      }
-
-      partitionAssignment.addPartition(Integer.toString(segmentId), instances);
-    }
-
-    // Check that each segment has 250k rows each
-    for (int segmentId = 1; segmentId <= 4; ++segmentId) {
-      LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
-      metadata.setSegmentName(makeFakeSegmentName(segmentId));
-      realtimeSegmentManager.updateFlushThresholdForSegmentMetadata(metadata, partitionAssignment, 1000000);
-      Assert.assertEquals(metadata.getSizeThresholdToFlushSegment(), 250000);
-    }
-
-    // 4 partitions assigned to 4 servers, 2 partitions/server => the segments should have 500k rows each (1M / 2)
-    partitionAssignment.getPartitionToInstances().clear();
-    for (int segmentId = 1; segmentId <= 4; ++segmentId) {
-      List<String> instances = new ArrayList<>();
-
-      for (int replicaId = 1; replicaId <= 2; ++replicaId) {
-        instances.add("Server_1.2.3.4_123" + ((replicaId + segmentId) % 4));
-      }
-
-      partitionAssignment.addPartition(Integer.toString(segmentId), instances);
-    }
-
-    // Check that each segment has 500k rows each
-    for (int segmentId = 1; segmentId <= 4; ++segmentId) {
-      LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
-      metadata.setSegmentName(makeFakeSegmentName(segmentId));
-      realtimeSegmentManager.updateFlushThresholdForSegmentMetadata(metadata, partitionAssignment, 1000000);
-      Assert.assertEquals(metadata.getSizeThresholdToFlushSegment(), 500000);
-    }
-
-    // 4 partitions assigned to 4 servers, 1 partition/server => the segments should have 1M rows each (1M / 1)
-    partitionAssignment.getPartitionToInstances().clear();
-    for (int segmentId = 1; segmentId <= 4; ++segmentId) {
-      List<String> instances = new ArrayList<>();
-      instances.add("Server_1.2.3.4_123" + segmentId);
-      partitionAssignment.addPartition(Integer.toString(segmentId), instances);
-    }
-
-    // Check that each segment has 1M rows each
-    for (int segmentId = 1; segmentId <= 4; ++segmentId) {
-      LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
-      metadata.setSegmentName(makeFakeSegmentName(segmentId));
-      realtimeSegmentManager.updateFlushThresholdForSegmentMetadata(metadata, partitionAssignment, 1000000);
-      Assert.assertEquals(metadata.getSizeThresholdToFlushSegment(), 1000000);
-    }
-
-    // Assign another partition to all servers => the servers should have 500k rows each (1M / 2)
-    List<String> instances = new ArrayList<>();
-    for (int replicaId = 1; replicaId <= 4; ++replicaId) {
-      instances.add("Server_1.2.3.4_123" + replicaId);
-    }
-    partitionAssignment.addPartition("5", instances);
-
-    // Check that each segment has 500k rows each
-    for (int segmentId = 1; segmentId <= 4; ++segmentId) {
-      LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
-      metadata.setSegmentName(makeFakeSegmentName(segmentId));
-      realtimeSegmentManager.updateFlushThresholdForSegmentMetadata(metadata, partitionAssignment, 1000000);
-      Assert.assertEquals(metadata.getSizeThresholdToFlushSegment(), 500000);
-    }
-  }
 
   ////////////////////////////////////////////////////////////////////////////
   // Fake makers
@@ -1241,10 +1167,6 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     streamPropMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
         CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST), "host:1234");
     return streamPropMap;
-  }
-
-  private String makeFakeSegmentName(int id) {
-    return new LLCSegmentName("fakeTable_REALTIME", id, 0, 1234L).getSegmentName();
   }
 
   //////////////////////////////////////////////////////////////////////////////////
@@ -1399,10 +1321,10 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     }
 
     @Override
-    protected boolean createNewSegmentMetadataZNRecord(String realtimeTableName, LLCSegmentName newLLCSegmentName,
+    protected boolean createNewSegmentMetadataZNRecord(TableConfig realtimeTableConfig, LLCSegmentName newLLCSegmentName,
         long nextOffset, PartitionAssignment partitionAssignment) {
       _nCallsToCreateNewSegmentMetadata++;
-      return super.createNewSegmentMetadataZNRecord(realtimeTableName, newLLCSegmentName, nextOffset,
+      return super.createNewSegmentMetadataZNRecord(realtimeTableConfig, newLLCSegmentName, nextOffset,
           partitionAssignment);
     }
 
@@ -1471,8 +1393,8 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     }
 
     @Override
-    protected int getRealtimeTableFlushSizeForTable(String tableName) {
-      return 1000;
+    protected FlushThresholdUpdater getFlushThresholdUpdater(TableConfig realtimeTableConfig) {
+      return new FakeFlushThresholdUpdater(realtimeTableConfig);
     }
 
     @Override
@@ -1494,6 +1416,18 @@ public class PinotLLCRealtimeSegmentManagerTestNew {
     @Override
     protected int getKafkaPartitionCount(StreamMetadata metadata) {
       return _tableConfigStore.getNKafkaPartitions(_currentTable);
+    }
+  }
+
+  static class FakeFlushThresholdUpdater extends DefaultFlushThresholdUpdater {
+
+    public FakeFlushThresholdUpdater(TableConfig realtimeTableConfig) {
+      super(realtimeTableConfig);
+    }
+
+    @Override
+    protected int getRealtimeTableFlushSizeForTable(TableConfig tableConfig) {
+      return 1000;
     }
   }
 
