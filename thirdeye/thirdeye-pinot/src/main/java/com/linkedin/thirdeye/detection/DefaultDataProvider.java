@@ -110,7 +110,6 @@ public class DefaultDataProvider implements DataProvider {
         predicates.add(Predicate.EQ("endTime", slice.end));
       if (slice.configId >= 0)
         predicates.add(Predicate.EQ("detectionConfigId", slice.configId));
-
       List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByPredicate(AND(predicates));
       Iterator<MergedAnomalyResultDTO> itAnomaly = anomalies.iterator();
       while (itAnomaly.hasNext()) {

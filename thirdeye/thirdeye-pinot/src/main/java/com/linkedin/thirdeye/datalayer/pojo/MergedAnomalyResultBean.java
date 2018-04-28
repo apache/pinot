@@ -33,6 +33,26 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
 
   private String message;
   private Long detectionConfigId;
+  private Integer parentCount; // number of anomalies this anomaly has been merged into
+  private List<Long> children; // ids of the anomalies this anomaly merged from
+
+  public Integer getParentCount() {
+    return parentCount;
+  }
+
+  public void setParentCount(Integer parentCount) {
+    this.parentCount = parentCount;
+  }
+
+  public List<Long>
+  getChildren() {
+    return children;
+  }
+
+  public void setChildren(List<Long> children) {
+    this.children = children;
+  }
+
   // TODO: Remove raw anomaly id list after old merged anomalies are cleaned up
   @Deprecated
   private List<Long> rawAnomalyIdList;

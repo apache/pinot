@@ -9,7 +9,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
  * Selector for anomalies based on (optionally) detector id, start time, end time, and
  * dimension filters.
  */
-class AnomalySlice {
+public class AnomalySlice {
   final long configId;
   final long start;
   final long end;

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detection;
 
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionOutputContext;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
@@ -14,6 +15,7 @@ import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import java.util.Collections;
@@ -66,7 +68,9 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
     config.setLastTimestamp(result.getLastTimestamp());
     detectionDAO.update(config);
 
-    // TODO process results
+    for (MergedAnomalyResultDTO mergedAnomalyResultDTO: result.getAnomalies()){
+      anomalyDAO.update(mergedAnomalyResultDTO);
+    }
 
     return Collections.emptyList();
   }
