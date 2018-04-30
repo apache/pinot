@@ -174,7 +174,7 @@ const adjustInformedLabel = (event) => {
 const adjustAnomalyLink = (event) => {
   if (event.eventType === 'anomaly') {
     const anomalyId = event.urn.split(':')[3];
-    const link = `/thirdeye#investigate?anomalyId=${anomalyId}`;
+    const link = `/app/#/rootcause?anomalyId=${anomalyId}`;
     return Object.assign(event, { link });
   }
   return event;
