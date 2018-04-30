@@ -63,6 +63,7 @@ public class RootCauseMetricResource {
   private static final String COL_VALUE = TimeSeriesLoader.COL_VALUE;
   private static final String COL_DIMENSION_NAME = AggregationLoader.COL_DIMENSION_NAME;
   private static final String COL_DIMENSION_VALUE = AggregationLoader.COL_DIMENSION_VALUE;
+  public static final String TOP_K_POSTFIX = "_topk";
 
   private static final long TIMEOUT = 60000;
 
@@ -360,7 +361,10 @@ public class RootCauseMetricResource {
       final String dimName = data.getString(COL_DIMENSION_NAME, i);
       final String dimValue = data.getString(COL_DIMENSION_VALUE, i);
       final double value = data.getDouble(COL_VALUE, i);
-
+      // remove group by dimensions which also have topk
+      if (data.getStrings(COL_DIMENSION_NAME).contains(dimName + TOP_K_POSTFIX)) {
+        continue;
+      }
       if (!output.containsKey(dimName)) {
         output.put(dimName, new HashMap<String, Double>());
       }
