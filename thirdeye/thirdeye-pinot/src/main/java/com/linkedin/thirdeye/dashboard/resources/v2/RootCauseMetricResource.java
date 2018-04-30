@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoade
 import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.TimeSeriesLoader;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.LongSeries;
+import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -357,12 +358,13 @@ public class RootCauseMetricResource {
 
     data = data.dropNull();
 
+    StringSeries dimNames = data.getStrings(COL_DIMENSION_NAME);
     for (int i = 0; i < data.size(); i++) {
       final String dimName = data.getString(COL_DIMENSION_NAME, i);
       final String dimValue = data.getString(COL_DIMENSION_VALUE, i);
       final double value = data.getDouble(COL_VALUE, i);
       // remove group by dimensions which also have topk
-      if (data.getStrings(COL_DIMENSION_NAME).contains(dimName + TOP_K_POSTFIX)) {
+      if (dimNames.contains(dimName + TOP_K_POSTFIX)) {
         continue;
       }
       if (!output.containsKey(dimName)) {
