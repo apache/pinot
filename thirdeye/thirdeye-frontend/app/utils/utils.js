@@ -66,9 +66,9 @@ export function humanizeFloat(f) {
 export function humanizeChange(f) {
   if (!isValidForDisplay(f)) { return '-'; }
   if (f > 10) {
-    return '+1000%+'
+    return '+1000%+';
   } else if (f < -10) {
-    return '-1000%+'
+    return '-1000%+';
   }
   return `${f > 0 ? '+' : ''}${Math.round(f * 100).toFixed(1)}%`;
 }

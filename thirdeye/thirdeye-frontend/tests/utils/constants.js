@@ -77,7 +77,7 @@ export const selfServeConst = {
  */
 export const rootCauseConst = {
   PLACEHOLDER: '.rootcause-placeholder',
-  TABS: '.rootcause-tabs',
+  TABS: '.common-tabs',
   LABEL: '.rootcause-legend__label',
   SELECTED_METRIC: '.rootcause-select-metric-dimension',
   ROOTCAUSE_HEADER: 'rootcause-header',
