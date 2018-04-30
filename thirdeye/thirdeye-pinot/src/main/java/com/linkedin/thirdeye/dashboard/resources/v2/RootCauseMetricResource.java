@@ -21,10 +21,10 @@ import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -39,7 +39,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTimeZone;
-import org.joda.time.Period;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
@@ -354,7 +353,7 @@ public class RootCauseMetricResource {
    * @return map of maps of value (keyed by dimension name, keyed by dimension value)
    */
   private static Map<String, Map<String, Double>> makeBreakdownMap(DataFrame data) {
-    Map<String, Map<String, Double>> output = new HashMap<>();
+    Map<String, Map<String, Double>> output = new TreeMap<>();
 
     data = data.dropNull();
 
