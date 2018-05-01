@@ -17,17 +17,32 @@
 package com.linkedin.pinot.controller.helix.core.realtime.segment;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 
-public class FlushThresholdUpdaterFactory {
+/**
+ * Manager which maintains the flush threshold update objects for each table
+ */
+public class FlushThresholdUpdateManager {
 
-  public static FlushThresholdUpdater getFlushThresholdUpdater(TableConfig realtimeTableConfig) {
-    if (realtimeTableConfig.getIndexingConfig() == null || realtimeTableConfig.getIndexingConfig().getStreamConsumptionConfig() == null) {
+  private ConcurrentMap<String, FlushThresholdUpdater> _flushThresholdUpdaterMap = new ConcurrentHashMap<>();
+
+  public FlushThresholdUpdater getFlushThresholdUpdater(TableConfig realtimeTableConfig) {
+    String tableName = realtimeTableConfig.getTableName();
+    return _flushThresholdUpdaterMap.computeIfAbsent(tableName, k -> createFlushThresholdUpdater(realtimeTableConfig));
+  }
+
+  private FlushThresholdUpdater createFlushThresholdUpdater(TableConfig realtimeTableConfig) {
+    if (realtimeTableConfig.getIndexingConfig() == null
+        || realtimeTableConfig.getIndexingConfig().getStreamConsumptionConfig() == null) {
       return new DefaultFlushThresholdUpdater(realtimeTableConfig);
     }
     String flushThresholdUpdaterStrategy =
         realtimeTableConfig.getIndexingConfig().getStreamConsumptionConfig().getFlushThresholdUpdateStrategy();
-    // TODO: return right updater based on flushThresholdUpdaterStrategy
+    if (SegmentSizeBasedFlushThresholdUpdater.class.getSimpleName().equals(flushThresholdUpdaterStrategy)) {
+      return new SegmentSizeBasedFlushThresholdUpdater(realtimeTableConfig);
+    }
     return new DefaultFlushThresholdUpdater(realtimeTableConfig);
   }
 }

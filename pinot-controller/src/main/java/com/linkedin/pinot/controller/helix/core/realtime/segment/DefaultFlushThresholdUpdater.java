@@ -37,7 +37,7 @@ public class DefaultFlushThresholdUpdater extends FlushThresholdUpdater {
 
   @Override
   public void updateFlushThreshold(LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
-      PartitionAssignment partitionAssignment) {
+      FlushThresholdUpdaterParams params) {
 
     int tableFlushSize = getRealtimeTableFlushSizeForTable(_realtimeTableConfig);
 
@@ -47,6 +47,7 @@ public class DefaultFlushThresholdUpdater extends FlushThresholdUpdater {
     }
 
     // Gather list of instances for this partition
+    PartitionAssignment partitionAssignment = params.getPartitionAssignment();
     String partitionId = new LLCSegmentName(newSegmentZKMetadata.getSegmentName()).getPartitionRange();
     List<String> instancesListForPartition = partitionAssignment.getInstancesListForPartition(partitionId);
     Map<String, Integer> partitionCountForInstance = new HashMap<>(instancesListForPartition.size());

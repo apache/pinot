@@ -18,7 +18,6 @@ package com.linkedin.pinot.controller.helix.core.realtime.segment;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -29,7 +28,6 @@ import org.slf4j.LoggerFactory;
  * Base abstract class for the flush threshold updation strategies
  * These implementations are responsible for updating the flush threshold (rows/time) in the given segment metadata
  */
-// TODO: introduce more implememtations such as segment size based threshold tuning, memory based etc.
 public abstract class FlushThresholdUpdater {
 
   protected TableConfig _realtimeTableConfig;
@@ -41,14 +39,11 @@ public abstract class FlushThresholdUpdater {
 
   /**
    * Updated the flush threshold of the segment metadata
-   * @param newSegmentZKMetadata
-   * @param partitionAssignment
+   * @param newSegmentZKMetadata - new segment metadata for which the thresholds need to be set
+   * @param flushThresholdUpdaterParams
    */
-  // TODO: we can add more parameters to this definition as we introduce more updation strategies.
-  // For now, these two are sufficient
-  // We could introduce a FlushThresholdUpdateConfig to hold all the inputs required eg. partitions assignment, segment size, latest metadata e
   public abstract void updateFlushThreshold(LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
-      PartitionAssignment partitionAssignment);
+      FlushThresholdUpdaterParams flushThresholdUpdaterParams);
 
 
   protected int getRealtimeTableFlushSizeForTable(TableConfig tableConfig) {

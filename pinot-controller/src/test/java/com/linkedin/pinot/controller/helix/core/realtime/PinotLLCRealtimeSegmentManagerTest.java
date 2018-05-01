@@ -352,7 +352,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager.updateOldSegmentMetadataZNRecord(tableName, llcSegmentName, nextOffset);
     LLCSegmentName newLlcSegmentName =
         new LLCSegmentName(rawTableName, partition, nextSeqNum, System.currentTimeMillis());
-    segmentManager.createNewSegmentMetadataZNRecord(tableConfig, newLlcSegmentName, nextOffset, partitionAssignment);
+    segmentManager.createNewSegmentMetadataZNRecord(tableConfig, llcSegmentName, newLlcSegmentName, nextOffset,
+        partitionAssignment, 0);
     segmentManager.updateIdealStateOnSegmentCompletion(idealState, segmentName, newLlcSegmentName.getSegmentName(),
         partitionAssignment);
   }
@@ -552,8 +553,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
           LLCSegmentName newLlcSegmentName =
               new LLCSegmentName(rawTableName, randomlySelectedPartition, latestSegment.getSequenceNumber() + 1,
                   System.currentTimeMillis());
-          segmentManager.createNewSegmentMetadataZNRecord(tableConfig, newLlcSegmentName,
-              latestMetadata.getStartOffset() + 100, expectedPartitionAssignment);
+          segmentManager.createNewSegmentMetadataZNRecord(tableConfig, latestSegment, newLlcSegmentName,
+              latestMetadata.getStartOffset() + 100, expectedPartitionAssignment, 0);
 
           // get old state
           Assert.assertNull(idealState.getRecord().getMapFields().get(newLlcSegmentName.getSegmentName()));
@@ -835,6 +836,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final int nReplicas = 3;
     List<String> instances = getInstanceList(nInstances);
     final long memoryUsedBytes = 1000;
+    final long segmentSizeBytes = 100000;
     TableConfig tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
         DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
     segmentManager.addTableToStore(tableName, tableConfig, nPartitions);
@@ -853,20 +855,20 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager.IS_CONNECTED = false;
     boolean status =
         segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-            memoryUsedBytes);
+            memoryUsedBytes, segmentSizeBytes);
     Assert.assertFalse(status);
     Assert.assertEquals(segmentManager._nCallsToUpdateHelix, 0);  // Idealstate not updated
     Assert.assertEquals(segmentManager._paths.size(), 0);   // propertystore not updated
     segmentManager.IS_CONNECTED = true;
     segmentManager.IS_LEADER = false;
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-        memoryUsedBytes);
+        memoryUsedBytes, segmentSizeBytes);
     Assert.assertFalse(status);
     Assert.assertEquals(segmentManager._nCallsToUpdateHelix, 0);  // Idealstate not updated
     Assert.assertEquals(segmentManager._paths.size(), 0);   // propertystore not updated
     segmentManager.IS_LEADER = true;
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-        memoryUsedBytes);
+        memoryUsedBytes, segmentSizeBytes);
     Assert.assertTrue(status);
     Assert.assertEquals(segmentManager._nCallsToUpdateHelix, 1);  // Idealstate updated
     Assert.assertEquals(segmentManager._paths.size(), 2);   // propertystore updated
@@ -888,6 +890,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final int nReplicas = 2;
     List<String> instances = getInstanceList(nInstances);
     final long memoryUsed = 1000;
+    final long segmentSizeBytes = 100000;
     TableConfig tableConfig = makeTableConfig(rtTableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
         DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
 
@@ -910,7 +913,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Set<String> prevInstances = idealState.getInstanceSet(committingSegmentMetadata.getSegmentName());
     boolean status =
         segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-            memoryUsed);
+            memoryUsed, segmentSizeBytes);
     segmentManager.verifyMetadataInteractions();
     Assert.assertTrue(status);
     Assert.assertEquals(segmentManager._paths.size(), 2);
@@ -932,7 +935,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._records.clear();
     prevInstances = idealState.getInstanceSet(committingSegmentMetadata.getSegmentName());
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-        memoryUsed);
+        memoryUsed, segmentSizeBytes);
     segmentManager.verifyMetadataInteractions();
     Assert.assertTrue(status);
     Assert.assertEquals(segmentManager._paths.size(), 2);
@@ -949,7 +952,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._paths.clear();
     segmentManager._records.clear();
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-        memoryUsed);
+        memoryUsed, segmentSizeBytes);
     segmentManager.verifyMetadataInteractions();
     Assert.assertFalse(status);
 
@@ -964,7 +967,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._paths.clear();
     segmentManager._records.clear();
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-        memoryUsed);
+        memoryUsed, segmentSizeBytes);
     segmentManager.verifyMetadataInteractions();
     Assert.assertFalse(status);
 
@@ -978,7 +981,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     committingSegmentMetadata = new LLCRealtimeSegmentZKMetadata(newZnRec);
     prevInstances = idealState.getInstanceSet(committingSegmentMetadata.getSegmentName());
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-        memoryUsed);
+        memoryUsed, segmentSizeBytes);
     segmentManager.verifyMetadataInteractions();
     Assert.assertTrue(status);
     Assert.assertEquals(segmentManager._paths.size(), 2);
@@ -1041,20 +1044,21 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final int committingPartition = 6;
     final long nextOffset = 3425666L;
     final long memoryUsed = 1000;
+    final long segmentSizeBytes = 1000000;
     LLCRealtimeSegmentZKMetadata committingSegmentMetadata =
         new LLCRealtimeSegmentZKMetadata(segmentManager2._records.get(committingPartition));
 
     boolean status =
         segmentManager1.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-            memoryUsed);
+            memoryUsed, segmentSizeBytes);
     Assert.assertTrue(status);  // Committing segment metadata succeeded.
 
     status = segmentManager2.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-        memoryUsed);
+        memoryUsed, segmentSizeBytes);
     Assert.assertFalse(status); // Committing segment metadata failed.
 
     status = segmentManager3.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-        memoryUsed);
+        memoryUsed, segmentSizeBytes);
     Assert.assertFalse(status); // Committing segment metadata failed.
   }
 
@@ -1321,11 +1325,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected boolean createNewSegmentMetadataZNRecord(TableConfig realtimeTableConfig, LLCSegmentName newLLCSegmentName,
-        long nextOffset, PartitionAssignment partitionAssignment) {
+    protected boolean createNewSegmentMetadataZNRecord(TableConfig realtimeTableConfig,
+        LLCSegmentName committingSegmentName, LLCSegmentName newLLCSegmentName, long nextOffset,
+        PartitionAssignment partitionAssignment, long segmentSizeBytes) {
       _nCallsToCreateNewSegmentMetadata++;
-      return super.createNewSegmentMetadataZNRecord(realtimeTableConfig, newLLCSegmentName, nextOffset,
-          partitionAssignment);
+      return super.createNewSegmentMetadataZNRecord(realtimeTableConfig, committingSegmentName, newLLCSegmentName,
+          nextOffset, partitionAssignment, segmentSizeBytes);
     }
 
     @Override

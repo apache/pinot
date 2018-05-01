@@ -50,11 +50,13 @@ public class FlushThresholdUpdaterTest {
     }
 
     FlushThresholdUpdater flushThresholdUpdater = new FakeFlushThresholdUpdater(tableConfig, 1000000);
+    FlushThresholdUpdaterParams params = new FlushThresholdUpdaterParams();
+    params.setPartitionAssignment(partitionAssignment);
     // Check that each segment has 250k rows each
     for (int segmentId = 1; segmentId <= 4; ++segmentId) {
       LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
       metadata.setSegmentName(makeFakeSegmentName(segmentId));
-      flushThresholdUpdater.updateFlushThreshold(metadata, partitionAssignment);
+      flushThresholdUpdater.updateFlushThreshold(metadata, params);
       Assert.assertEquals(metadata.getSizeThresholdToFlushSegment(), 250000);
     }
 
@@ -74,7 +76,7 @@ public class FlushThresholdUpdaterTest {
     for (int segmentId = 1; segmentId <= 4; ++segmentId) {
       LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
       metadata.setSegmentName(makeFakeSegmentName(segmentId));
-      flushThresholdUpdater.updateFlushThreshold(metadata, partitionAssignment);
+      flushThresholdUpdater.updateFlushThreshold(metadata, params);
       Assert.assertEquals(metadata.getSizeThresholdToFlushSegment(), 500000);
     }
 
@@ -90,7 +92,7 @@ public class FlushThresholdUpdaterTest {
     for (int segmentId = 1; segmentId <= 4; ++segmentId) {
       LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
       metadata.setSegmentName(makeFakeSegmentName(segmentId));
-      flushThresholdUpdater.updateFlushThreshold(metadata, partitionAssignment);
+      flushThresholdUpdater.updateFlushThreshold(metadata, params);
       Assert.assertEquals(metadata.getSizeThresholdToFlushSegment(), 1000000);
     }
 
@@ -105,7 +107,7 @@ public class FlushThresholdUpdaterTest {
     for (int segmentId = 1; segmentId <= 4; ++segmentId) {
       LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
       metadata.setSegmentName(makeFakeSegmentName(segmentId));
-      flushThresholdUpdater.updateFlushThreshold(metadata, partitionAssignment);
+      flushThresholdUpdater.updateFlushThreshold(metadata, params);
       Assert.assertEquals(metadata.getSizeThresholdToFlushSegment(), 500000);
     }
   }

@@ -48,8 +48,9 @@ import com.linkedin.pinot.controller.api.events.MetadataEventNotifierFactory;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import com.linkedin.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdateManager;
 import com.linkedin.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdater;
-import com.linkedin.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdaterFactory;
+import com.linkedin.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdaterParams;
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.realtime.segment.ConsumingSegmentAssignmentStrategy;
@@ -113,7 +114,7 @@ public class PinotLLCRealtimeSegmentManager {
   /**
    * After step 1 of segment completion is done,
    * this is the max time until which step 3 is allowed to complete.
-   * See {@link PinotLLCRealtimeSegmentManager#commitSegmentMetadata(String, String, long, long)} for explanation of steps 1 2 3
+   * See {@link PinotLLCRealtimeSegmentManager#commitSegmentMetadata(String, String, long, long, long)} for explanation of steps 1 2 3
    * This includes any backoffs and retries for the steps 2 and 3
    * The segment will be eligible for repairs by the validation manager, if the time  exceeds this value
    */
@@ -132,6 +133,7 @@ public class PinotLLCRealtimeSegmentManager {
   private final Lock[] _idealstateUpdateLocks;
   private final TableConfigCache _tableConfigCache;
   private final PartitionAssignmentGenerator _partitionAssignmentGenerator;
+  private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
 
   public boolean getIsSplitCommitEnabled() {
     return _controllerConf.getAcceptSplitCommit();
@@ -184,6 +186,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
     _tableConfigCache = new TableConfigCache(_propertyStore);
     _partitionAssignmentGenerator = new PartitionAssignmentGenerator(_helixManager);
+    _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
   }
 
   public static PinotLLCRealtimeSegmentManager getInstance() {
@@ -411,10 +414,11 @@ public class PinotLLCRealtimeSegmentManager {
    * @param committingSegmentNameStr Committing segment name
    * @param nextOffset The offset with which the next segment should start.
    * @param memoryUsedBytes The memory used by committing segment
+   * @param segmentSizeBytes The size of the committing segment
    * @return boolean
    */
   public boolean commitSegmentMetadata(String rawTableName, final String committingSegmentNameStr, long nextOffset,
-      long memoryUsedBytes) {
+      long memoryUsedBytes, long segmentSizeBytes) {
     final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     TableConfig tableConfig = getRealtimeTableConfig(realtimeTableName);
     if (tableConfig == null) {
@@ -434,6 +438,7 @@ public class PinotLLCRealtimeSegmentManager {
     final int partitionId = committingLLCSegmentName.getPartitionId();
     final int newSeqNum = committingLLCSegmentName.getSequenceNumber() + 1;
     final long now = System.currentTimeMillis();
+
     LLCSegmentName newLLCSegmentName = new LLCSegmentName(committingLLCSegmentName.getTableName(), partitionId, newSeqNum, now);
     String newSegmentNameStr = newLLCSegmentName.getSegmentName();
 
@@ -464,7 +469,8 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     // Step-2
-    success = createNewSegmentMetadataZNRecord(tableConfig, newLLCSegmentName, nextOffset, partitionAssignment);
+    success = createNewSegmentMetadataZNRecord(tableConfig, committingLLCSegmentName, newLLCSegmentName, nextOffset,
+        partitionAssignment, segmentSizeBytes);
     if (!success) {
       return false;
     }
@@ -493,6 +499,7 @@ public class PinotLLCRealtimeSegmentManager {
     return true;
   }
 
+
   /**
    * Update segment metadata of committing segment
    * @param realtimeTableName - table name for which segment is being committed
@@ -503,34 +510,34 @@ public class PinotLLCRealtimeSegmentManager {
   protected boolean updateOldSegmentMetadataZNRecord(String realtimeTableName, LLCSegmentName committingLLCSegmentName,
       long nextOffset) {
 
-    Stat stat = new Stat();
     String committingSegmentNameStr = committingLLCSegmentName.getSegmentName();
-    final LLCRealtimeSegmentZKMetadata oldSegMetadata = getRealtimeSegmentZKMetadata(realtimeTableName,
+    Stat stat = new Stat();
+    final LLCRealtimeSegmentZKMetadata committingSegmentMetadata = getRealtimeSegmentZKMetadata(realtimeTableName,
         committingSegmentNameStr, stat);
 
-    if (oldSegMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+    if (committingSegmentMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
       LOGGER.warn("Status of segment metadata {} has already been changed by other controller for table {}: Status={}",
-          committingSegmentNameStr, realtimeTableName, oldSegMetadata.getStatus());
+          committingSegmentNameStr, realtimeTableName, committingSegmentMetadata.getStatus());
       return false;
     }
 
     // TODO: set number of rows to end consumption in new segment metadata, based on memory used and number of rows from old segment
-    oldSegMetadata.setEndOffset(nextOffset);
-    oldSegMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    committingSegmentMetadata.setEndOffset(nextOffset);
+    committingSegmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
-    oldSegMetadata.setDownloadUrl(
+    committingSegmentMetadata.setDownloadUrl(
         ControllerConf.constructDownloadUrl(rawTableName, committingSegmentNameStr, _controllerConf.generateVipUrl()));
     // Pull segment metadata from incoming segment and set it in zk segment metadata
     SegmentMetadataImpl segmentMetadata = extractSegmentMetadata(rawTableName, committingSegmentNameStr);
-    oldSegMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
-    oldSegMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
-    oldSegMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
-    oldSegMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
-    oldSegMetadata.setIndexVersion(segmentMetadata.getVersion());
-    oldSegMetadata.setTotalRawDocs(segmentMetadata.getTotalRawDocs());
-    oldSegMetadata.setPartitionMetadata(getPartitionMetadataFromSegmentMetadata(segmentMetadata));
+    committingSegmentMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
+    committingSegmentMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
+    committingSegmentMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
+    committingSegmentMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
+    committingSegmentMetadata.setIndexVersion(segmentMetadata.getVersion());
+    committingSegmentMetadata.setTotalRawDocs(segmentMetadata.getTotalRawDocs());
+    committingSegmentMetadata.setPartitionMetadata(getPartitionMetadataFromSegmentMetadata(segmentMetadata));
 
-    final ZNRecord oldZnRecord = oldSegMetadata.toZNRecord();
+    final ZNRecord oldZnRecord = committingSegmentMetadata.toZNRecord();
     final String oldZnodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, committingSegmentNameStr);
 
     if (!isConnected() || !isLeader()) {
@@ -554,13 +561,22 @@ public class PinotLLCRealtimeSegmentManager {
    * @param newLLCSegmentName - new segment name
    * @param nextOffset - start offset for new segment
    * @param partitionAssignment - stream partition assignment for this table
+   * @param committingSegmentSizeBytes - size of the committing segment
    * @return
    */
-  protected boolean createNewSegmentMetadataZNRecord(TableConfig realtimeTableConfig, LLCSegmentName newLLCSegmentName,
-      long nextOffset, PartitionAssignment partitionAssignment) {
+  protected boolean createNewSegmentMetadataZNRecord(TableConfig realtimeTableConfig,
+      LLCSegmentName committingLLCSegmentName, LLCSegmentName newLLCSegmentName, long nextOffset,
+      PartitionAssignment partitionAssignment, long committingSegmentSizeBytes) {
 
     String realtimeTableName = realtimeTableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
+
+    LLCRealtimeSegmentZKMetadata committingSegmentMetadata = null;
+    if (committingLLCSegmentName != null) {
+      committingSegmentMetadata =
+          getRealtimeSegmentZKMetadata(realtimeTableName, committingLLCSegmentName.getSegmentName(), null);
+    }
+
     int partitionId = newLLCSegmentName.getPartitionId();
     int numReplicas = partitionAssignment.getInstancesListForPartition(String.valueOf(partitionId)).size();
     ZNRecord newZnRecord = makeZnRecordForNewSegment(rawTableName, numReplicas, nextOffset, newLLCSegmentName,
@@ -568,7 +584,11 @@ public class PinotLLCRealtimeSegmentManager {
     final LLCRealtimeSegmentZKMetadata newSegmentZKMetadata = new LLCRealtimeSegmentZKMetadata(newZnRecord);
 
     FlushThresholdUpdater flushThresholdUpdater = getFlushThresholdUpdater(realtimeTableConfig);
-    flushThresholdUpdater.updateFlushThreshold(newSegmentZKMetadata, partitionAssignment);
+    FlushThresholdUpdaterParams params = new FlushThresholdUpdaterParams();
+    params.setCommittingSegmentSizeBytes(committingSegmentSizeBytes);
+    params.setPartitionAssignment(partitionAssignment);
+    params.setCommittingSegmentZkMetadata(committingSegmentMetadata);
+    flushThresholdUpdater.updateFlushThreshold(newSegmentZKMetadata, params);
 
     newZnRecord = newSegmentZKMetadata.toZNRecord();
 
@@ -593,7 +613,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   protected FlushThresholdUpdater getFlushThresholdUpdater(TableConfig realtimeTableConfig) {
-    return FlushThresholdUpdaterFactory.getFlushThresholdUpdater(realtimeTableConfig);
+    return _flushThresholdUpdateManager.getFlushThresholdUpdater(realtimeTableConfig);
   }
 
   /**
@@ -1106,8 +1126,8 @@ public class PinotLLCRealtimeSegmentManager {
             LOGGER.info("{}: Creating new segment metadata for {}", tableNameWithType,
                 newLLCSegmentName.getSegmentName());
 
-            createNewSegmentMetadataZNRecord(tableConfig, newLLCSegmentName, metadata.getEndOffset(),
-                partitionAssignment);
+            createNewSegmentMetadataZNRecord(tableConfig, segmentName, newLLCSegmentName, metadata.getEndOffset(),
+                partitionAssignment, 0);
 
             onlineSegments.add(segmentId);
             consumingSegments.add(newLLCSegmentName.getSegmentName());
@@ -1128,7 +1148,8 @@ public class PinotLLCRealtimeSegmentManager {
           LLCSegmentName newLLCSegmentName =
               new LLCSegmentName(segmentName.getTableName(), partition, nextSeqNum, now);
 
-          createNewSegmentMetadataZNRecord(tableConfig, newLLCSegmentName, startOffset, partitionAssignment);
+          createNewSegmentMetadataZNRecord(tableConfig, segmentName, newLLCSegmentName, startOffset,
+              partitionAssignment, 0);
 
           consumingSegments.add(newLLCSegmentName.getSegmentName());
         }
@@ -1243,7 +1264,7 @@ public class PinotLLCRealtimeSegmentManager {
       LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableName, partition);
 
       LLCSegmentName newLLCSegmentName = new LLCSegmentName(rawTableName, partition, nextSeqNum, now);
-      createNewSegmentMetadataZNRecord(tableConfig, newLLCSegmentName, startOffset, partitionAssignment);
+      createNewSegmentMetadataZNRecord(tableConfig, null, newLLCSegmentName, startOffset, partitionAssignment, 0);
 
       newSegmentNames.add(newLLCSegmentName.getSegmentName());
     }
