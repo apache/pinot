@@ -89,10 +89,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.math.IntRange;
 import org.apache.helix.AccessOption;
-import org.apache.helix.ControllerChangeListener;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
-import org.apache.helix.NotificationContext;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -114,7 +112,7 @@ public class PinotLLCRealtimeSegmentManager {
   /**
    * After step 1 of segment completion is done,
    * this is the max time until which step 3 is allowed to complete.
-   * See {@link PinotLLCRealtimeSegmentManager#commitSegmentMetadata(String, String, long, long, long)} for explanation of steps 1 2 3
+   * See {@link PinotLLCRealtimeSegmentManager#commitSegmentMetadata(String, String, long, SegmentCompletionProtocol.Request.Params)} for explanation of steps 1 2 3
    * This includes any backoffs and retries for the steps 2 and 3
    * The segment will be eligible for repairs by the validation manager, if the time  exceeds this value
    */
@@ -162,12 +160,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   public void start() {
-    _helixManager.addControllerListener(new ControllerChangeListener() {
-      @Override
-      public void onControllerChange(NotificationContext changeContext) {
-        onBecomeLeader();
-      }
-    });
+    _helixManager.addControllerListener(changeContext -> onBecomeLeader());
   }
 
   protected PinotLLCRealtimeSegmentManager(HelixAdmin helixAdmin, String clusterName, HelixManager helixManager,
@@ -264,21 +257,6 @@ public class PinotLLCRealtimeSegmentManager {
     LOGGER.info("Attempting to remove {} LLC segments of table {}", removeCount, realtimeTableName);
 
     _helixResourceManager.deleteSegments(realtimeTableName, segmentsToRemove);
-  }
-
-  private IdealState addLLCRealtimeSegmentsInIdealState(final IdealState idealState, Map<String, List<String>> idealStateEntries) {
-    for (Map.Entry<String, List<String>> entry : idealStateEntries.entrySet()) {
-      final String segmentId = entry.getKey();
-      final Map<String, String> stateMap = idealState.getInstanceStateMap(segmentId);
-      if (stateMap != null) {
-        // Replace the segment if it already exists
-        stateMap.clear();
-      }
-      for (String instanceName : entry.getValue()) {
-        idealState.setPartitionState(segmentId, instanceName, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-      }
-    }
-    return idealState;
   }
 
   private SegmentPartitionMetadata getPartitionMetadataFromTableConfig(String tableName, int numPartitions, int partitionId) {
@@ -413,12 +391,11 @@ public class PinotLLCRealtimeSegmentManager {
    * @param rawTableName Raw table name
    * @param committingSegmentNameStr Committing segment name
    * @param nextOffset The offset with which the next segment should start.
-   * @param memoryUsedBytes The memory used by committing segment
-   * @param segmentSizeBytes The size of the committing segment
+   * @param reqParams
    * @return boolean
    */
   public boolean commitSegmentMetadata(String rawTableName, final String committingSegmentNameStr, long nextOffset,
-      long memoryUsedBytes, long segmentSizeBytes) {
+      SegmentCompletionProtocol.Request.Params reqParams) {
     final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     TableConfig tableConfig = getRealtimeTableConfig(realtimeTableName);
     if (tableConfig == null) {
@@ -470,7 +447,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     // Step-2
     success = createNewSegmentMetadataZNRecord(tableConfig, committingLLCSegmentName, newLLCSegmentName, nextOffset,
-        partitionAssignment, segmentSizeBytes);
+        partitionAssignment, reqParams.getSegmentSizeBytes());
     if (!success) {
       return false;
     }

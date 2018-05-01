@@ -33,6 +33,7 @@ import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.partition.IdealStateBuilderUtil;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.partition.PartitionAssignmentGenerator;
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.StringUtil;
@@ -835,8 +836,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final int nPartitions = 16;
     final int nReplicas = 3;
     List<String> instances = getInstanceList(nInstances);
-    final long memoryUsedBytes = 1000;
-    final long segmentSizeBytes = 100000;
+    SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
     TableConfig tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
         DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
     segmentManager.addTableToStore(tableName, tableConfig, nPartitions);
@@ -855,20 +855,20 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager.IS_CONNECTED = false;
     boolean status =
         segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-            memoryUsedBytes, segmentSizeBytes);
+            reqParams);
     Assert.assertFalse(status);
     Assert.assertEquals(segmentManager._nCallsToUpdateHelix, 0);  // Idealstate not updated
     Assert.assertEquals(segmentManager._paths.size(), 0);   // propertystore not updated
     segmentManager.IS_CONNECTED = true;
     segmentManager.IS_LEADER = false;
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-        memoryUsedBytes, segmentSizeBytes);
+        reqParams);
     Assert.assertFalse(status);
     Assert.assertEquals(segmentManager._nCallsToUpdateHelix, 0);  // Idealstate not updated
     Assert.assertEquals(segmentManager._paths.size(), 0);   // propertystore not updated
     segmentManager.IS_LEADER = true;
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-        memoryUsedBytes, segmentSizeBytes);
+        reqParams);
     Assert.assertTrue(status);
     Assert.assertEquals(segmentManager._nCallsToUpdateHelix, 1);  // Idealstate updated
     Assert.assertEquals(segmentManager._paths.size(), 2);   // propertystore updated
@@ -889,8 +889,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final int nPartitions = 16;
     final int nReplicas = 2;
     List<String> instances = getInstanceList(nInstances);
-    final long memoryUsed = 1000;
-    final long segmentSizeBytes = 100000;
+    SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
     TableConfig tableConfig = makeTableConfig(rtTableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
         DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
 
@@ -913,7 +912,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Set<String> prevInstances = idealState.getInstanceSet(committingSegmentMetadata.getSegmentName());
     boolean status =
         segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-            memoryUsed, segmentSizeBytes);
+            reqParams);
     segmentManager.verifyMetadataInteractions();
     Assert.assertTrue(status);
     Assert.assertEquals(segmentManager._paths.size(), 2);
@@ -935,7 +934,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._records.clear();
     prevInstances = idealState.getInstanceSet(committingSegmentMetadata.getSegmentName());
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-        memoryUsed, segmentSizeBytes);
+        reqParams);
     segmentManager.verifyMetadataInteractions();
     Assert.assertTrue(status);
     Assert.assertEquals(segmentManager._paths.size(), 2);
@@ -952,7 +951,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._paths.clear();
     segmentManager._records.clear();
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-        memoryUsed, segmentSizeBytes);
+        reqParams);
     segmentManager.verifyMetadataInteractions();
     Assert.assertFalse(status);
 
@@ -967,7 +966,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._paths.clear();
     segmentManager._records.clear();
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-        memoryUsed, segmentSizeBytes);
+        reqParams);
     segmentManager.verifyMetadataInteractions();
     Assert.assertFalse(status);
 
@@ -981,7 +980,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     committingSegmentMetadata = new LLCRealtimeSegmentZKMetadata(newZnRec);
     prevInstances = idealState.getInstanceSet(committingSegmentMetadata.getSegmentName());
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-        memoryUsed, segmentSizeBytes);
+        reqParams);
     segmentManager.verifyMetadataInteractions();
     Assert.assertTrue(status);
     Assert.assertEquals(segmentManager._paths.size(), 2);
@@ -1043,22 +1042,21 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // Now commit the first segment of partition 6.
     final int committingPartition = 6;
     final long nextOffset = 3425666L;
-    final long memoryUsed = 1000;
-    final long segmentSizeBytes = 1000000;
+    SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
     LLCRealtimeSegmentZKMetadata committingSegmentMetadata =
         new LLCRealtimeSegmentZKMetadata(segmentManager2._records.get(committingPartition));
 
     boolean status =
         segmentManager1.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-            memoryUsed, segmentSizeBytes);
+            reqParams);
     Assert.assertTrue(status);  // Committing segment metadata succeeded.
 
     status = segmentManager2.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-        memoryUsed, segmentSizeBytes);
+        reqParams);
     Assert.assertFalse(status); // Committing segment metadata failed.
 
     status = segmentManager3.commitSegmentMetadata(rawTableName, committingSegmentMetadata.getSegmentName(), nextOffset,
-        memoryUsed, segmentSizeBytes);
+        reqParams);
     Assert.assertFalse(status); // Committing segment metadata failed.
   }
 

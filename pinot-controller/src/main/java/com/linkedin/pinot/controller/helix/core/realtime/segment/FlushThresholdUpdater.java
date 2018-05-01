@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.Map;
+import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +32,7 @@ import org.slf4j.LoggerFactory;
 public abstract class FlushThresholdUpdater {
 
   protected TableConfig _realtimeTableConfig;
-  public FlushThresholdUpdater(TableConfig realtimeTableConfig) {
+  protected FlushThresholdUpdater(TableConfig realtimeTableConfig) {
     _realtimeTableConfig = realtimeTableConfig;
   }
 
@@ -42,8 +43,8 @@ public abstract class FlushThresholdUpdater {
    * @param newSegmentZKMetadata - new segment metadata for which the thresholds need to be set
    * @param flushThresholdUpdaterParams
    */
-  public abstract void updateFlushThreshold(LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
-      FlushThresholdUpdaterParams flushThresholdUpdaterParams);
+  public abstract void updateFlushThreshold(@Nonnull LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
+      @Nonnull FlushThresholdUpdaterParams flushThresholdUpdaterParams);
 
 
   protected int getRealtimeTableFlushSizeForTable(TableConfig tableConfig) {

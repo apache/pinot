@@ -31,7 +31,7 @@ import java.util.Map;
  */
 public class DefaultFlushThresholdUpdater extends FlushThresholdUpdater {
 
-  public DefaultFlushThresholdUpdater(TableConfig realtimeTableConfig) {
+  protected DefaultFlushThresholdUpdater(TableConfig realtimeTableConfig) {
     super(realtimeTableConfig);
   }
 
