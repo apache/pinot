@@ -17,7 +17,6 @@
 package com.linkedin.pinot.controller.helix.core.realtime.segment;
 
 import com.google.common.util.concurrent.AtomicDouble;
-import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import javax.annotation.Nonnull;
@@ -32,24 +31,20 @@ import org.slf4j.LoggerFactory;
  * where a = 0.25, b = 0.75
  * This ensures that we take into account the history of the segment size and number rows
  */
-public class SegmentSizeBasedFlushThresholdUpdater extends FlushThresholdUpdater {
+public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpdater {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentSizeBasedFlushThresholdUpdater.class);
 
   static final long IDEAL_SEGMENT_SIZE_BYTES = 500 * 1024 * 1024;
-  static final double MIN_ALLOWED_SEGMENT_SIZE_BYTES = 250 * 1024 * 1024;
-  static final double MAX_ALLOWED_SEGMENT_SIZE_BYTES = 750 * 1024 * 1024;
+  private static final double MIN_ALLOWED_SEGMENT_SIZE_BYTES = 250 * 1024 * 1024;
+  private static final double MAX_ALLOWED_SEGMENT_SIZE_BYTES = 750 * 1024 * 1024;
   static final int INITIAL_ROWS_THRESHOLD = 100_000;
   static final String MAX_TIME_THRESHOLD = "24h";
 
-  private static final double CURRENT_SEGMENT_RATIO_WEIGHT = 0.25;
-  private static final double PREVIOUS_SEGMENT_RATIO_WEIGHT = 0.75;
+  static final double CURRENT_SEGMENT_RATIO_WEIGHT = 0.25;
+  static final double PREVIOUS_SEGMENT_RATIO_WEIGHT = 0.75;
 
   private AtomicDouble _latestSegmentRowsToSizeRatio = new AtomicDouble();
-
-  protected SegmentSizeBasedFlushThresholdUpdater(TableConfig realtimeTableConfig) {
-    super(realtimeTableConfig);
-  }
 
   @Override
   public void updateFlushThreshold(@Nonnull LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
@@ -79,6 +74,7 @@ public class SegmentSizeBasedFlushThresholdUpdater extends FlushThresholdUpdater
           newSegmentZKMetadata.getSegmentName(), committingSegmentZkMetadata.getSegmentName());
       newSegmentZKMetadata.setSizeThresholdToFlushSegment(committingSegmentZkMetadata.getSizeThresholdToFlushSegment());
       newSegmentZKMetadata.setTimeThresholdToFlushSegment(committingSegmentZkMetadata.getTimeThresholdToFlushSegment());
+      return;
     }
 
     // time taken by committing segment

@@ -15,11 +15,9 @@
  */
 package com.linkedin.pinot.controller.helix.core.realtime.segment;
 
-import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,22 +27,17 @@ import java.util.Map;
  * The default flush threshold updation strategy, which computes the flush threshold size of the segment
  * by dividing the flush threshold of the table by the max number of partitions consuming on an instance
  */
-public class DefaultFlushThresholdUpdater extends FlushThresholdUpdater {
+public class DefaultFlushThresholdUpdater implements FlushThresholdUpdater {
 
-  protected DefaultFlushThresholdUpdater(TableConfig realtimeTableConfig) {
-    super(realtimeTableConfig);
+  private int _tableFlushSize;
+
+  DefaultFlushThresholdUpdater(int tableFlushSize) {
+    _tableFlushSize = tableFlushSize;
   }
 
   @Override
   public void updateFlushThreshold(LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
       FlushThresholdUpdaterParams params) {
-
-    int tableFlushSize = getRealtimeTableFlushSizeForTable(_realtimeTableConfig);
-
-    // If config does not have a flush threshold, use the default.
-    if (tableFlushSize < 1) {
-      tableFlushSize = KafkaHighLevelStreamProviderConfig.getDefaultMaxRealtimeRowsCount();
-    }
 
     // Gather list of instances for this partition
     PartitionAssignment partitionAssignment = params.getPartitionAssignment();
@@ -69,7 +62,7 @@ public class DefaultFlushThresholdUpdater extends FlushThresholdUpdater {
     }
 
     // Configure the segment size flush limit based on the maximum number of partitions allocated to a replica
-    int segmentFlushSize = (int) (((float) tableFlushSize) / maxPartitionCountPerInstance);
+    int segmentFlushSize = (int) (((float) _tableFlushSize) / maxPartitionCountPerInstance);
     newSegmentZKMetadata.setSizeThresholdToFlushSegment(segmentFlushSize);
   }
 

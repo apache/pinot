@@ -560,7 +560,8 @@ public class PinotLLCRealtimeSegmentManager {
         partitionAssignment.getNumPartitions());
     final LLCRealtimeSegmentZKMetadata newSegmentZKMetadata = new LLCRealtimeSegmentZKMetadata(newZnRecord);
 
-    FlushThresholdUpdater flushThresholdUpdater = getFlushThresholdUpdater(realtimeTableConfig);
+    FlushThresholdUpdater flushThresholdUpdater =
+        _flushThresholdUpdateManager.getFlushThresholdUpdater(realtimeTableConfig);
     FlushThresholdUpdaterParams params = new FlushThresholdUpdaterParams();
     params.setCommittingSegmentSizeBytes(committingSegmentSizeBytes);
     params.setPartitionAssignment(partitionAssignment);
@@ -587,10 +588,6 @@ public class PinotLLCRealtimeSegmentManager {
           newSegmentNameStr, rawTableName, isLeader(), isConnected());
     }
     return success;
-  }
-
-  protected FlushThresholdUpdater getFlushThresholdUpdater(TableConfig realtimeTableConfig) {
-    return _flushThresholdUpdateManager.getFlushThresholdUpdater(realtimeTableConfig);
   }
 
   /**

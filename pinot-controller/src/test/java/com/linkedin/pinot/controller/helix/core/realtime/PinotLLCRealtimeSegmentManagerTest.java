@@ -41,8 +41,6 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.resources.LLCSegmentCompletionHandlers;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentStrategyEnum;
-import com.linkedin.pinot.controller.helix.core.realtime.segment.DefaultFlushThresholdUpdater;
-import com.linkedin.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdater;
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
@@ -1130,7 +1128,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(mockValidationConfig.getReplicasPerPartitionNumber()).thenReturn(nReplicas);
     when(mockTableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
     Map<String, String> streamConfigMap = new HashMap<>(1);
-
+    streamConfigMap.put(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_SIZE,
+        "100000");
     streamConfigMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
         CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), "simple");
     streamConfigMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
@@ -1396,11 +1395,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected FlushThresholdUpdater getFlushThresholdUpdater(TableConfig realtimeTableConfig) {
-      return new FakeFlushThresholdUpdater(realtimeTableConfig);
-    }
-
-    @Override
     protected IdealState getTableIdealState(String realtimeTableName) {
       return _tableIdealState;
     }
@@ -1419,18 +1413,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     @Override
     protected int getKafkaPartitionCount(StreamMetadata metadata) {
       return _tableConfigStore.getNKafkaPartitions(_currentTable);
-    }
-  }
-
-  static class FakeFlushThresholdUpdater extends DefaultFlushThresholdUpdater {
-
-    public FakeFlushThresholdUpdater(TableConfig realtimeTableConfig) {
-      super(realtimeTableConfig);
-    }
-
-    @Override
-    protected int getRealtimeTableFlushSizeForTable(TableConfig tableConfig) {
-      return 1000;
     }
   }
 

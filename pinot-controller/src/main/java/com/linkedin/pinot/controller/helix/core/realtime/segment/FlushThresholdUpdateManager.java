@@ -17,14 +17,20 @@
 package com.linkedin.pinot.controller.helix.core.realtime.segment;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Manager which maintains the flush threshold update objects for each table
  */
 public class FlushThresholdUpdateManager {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(FlushThresholdUpdateManager.class);
 
   private ConcurrentMap<String, FlushThresholdUpdater> _flushThresholdUpdaterMap = new ConcurrentHashMap<>();
 
@@ -34,15 +40,51 @@ public class FlushThresholdUpdateManager {
   }
 
   private FlushThresholdUpdater createFlushThresholdUpdater(TableConfig realtimeTableConfig) {
-    if (realtimeTableConfig.getIndexingConfig() == null
-        || realtimeTableConfig.getIndexingConfig().getStreamConsumptionConfig() == null) {
-      return new DefaultFlushThresholdUpdater(realtimeTableConfig);
+    int tableFlushSize = getLLCRealtimeTableFlushSize(realtimeTableConfig);
+    if (tableFlushSize <= 0) {
+      return new SegmentSizeBasedFlushThresholdUpdater();
+    } else {
+      return new DefaultFlushThresholdUpdater(tableFlushSize);
     }
-    String flushThresholdUpdaterStrategy =
-        realtimeTableConfig.getIndexingConfig().getStreamConsumptionConfig().getFlushThresholdUpdateStrategy();
-    if (SegmentSizeBasedFlushThresholdUpdater.class.getSimpleName().equals(flushThresholdUpdaterStrategy)) {
-      return new SegmentSizeBasedFlushThresholdUpdater(realtimeTableConfig);
-    }
-    return new DefaultFlushThresholdUpdater(realtimeTableConfig);
   }
+
+  /**
+   * Returns the max number of rows that a host holds across all consuming LLC partitions.
+   * This number should be divided by the number of partitions on the host, so as to get
+   * the flush limit for each segment.
+   *
+   * If flush threshold is configured for LLC, return it, otherwise, if flush threshold is
+   * configured for HLC, then return that value, else return -1.
+   *
+   * Flush threshold will be set to 0 for autotuning the thresholds
+   *
+   * @param tableConfig
+   * @return -1 if tableConfig is null, or neither value is configured
+   */
+  private int getLLCRealtimeTableFlushSize(TableConfig tableConfig) {
+    final Map<String, String> streamConfigs = tableConfig.getIndexingConfig().getStreamConfigs();
+    String flushSizeStr;
+    if (streamConfigs == null) {
+      return -1;
+    }
+    if (streamConfigs.containsKey(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_SIZE)) {
+      flushSizeStr = streamConfigs.get(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_SIZE);
+      try {
+        return Integer.parseInt(flushSizeStr);
+      } catch (Exception e) {
+        LOGGER.warn("Failed to parse LLC flush size of {} for table {}", flushSizeStr, tableConfig.getTableName(), e);
+      }
+    }
+
+    if (streamConfigs.containsKey(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE)) {
+      flushSizeStr = streamConfigs.get(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE);
+      try {
+        return Integer.parseInt(flushSizeStr);
+      } catch (Exception e) {
+        LOGGER.warn("Failed to parse flush size of {} for table {}", flushSizeStr, tableConfig.getTableName(), e);
+      }
+    }
+    return -1;
+  }
+
 }
