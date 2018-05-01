@@ -15,22 +15,43 @@
  */
 package com.linkedin.pinot.minion.events;
 
+import com.linkedin.pinot.common.config.PinotTaskConfig;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+
 /**
- * Emits events that provide information about the state of minion tasks.
+ * The <code>MinionEventObserver</code> interface provides call backs for Minion events.
  */
 public interface MinionEventObserver {
 
   /**
-   * Invoked when a minion job begins
-   * @param taskInformation
-   * @param taskType
+   * Invoked when a minion task starts.
+   *
+   * @param pinotTaskConfig Pinot task config
    */
-  void notifyMinionJobStart(Object taskInformation, String taskType);
+  void notifyTaskStart(@Nonnull PinotTaskConfig pinotTaskConfig);
 
   /**
-   * Invoked when a minion job ends
-   * @param taskInformation
-   * @param taskType
+   * Invoked when a minion task succeeds.
+   *
+   * @param pinotTaskConfig Pinot task config
+   * @param executionResult Execution result
    */
-  void notifyMinionJobEnd(Object taskInformation, String taskType);
+  void notifyTaskSuccess(@Nonnull PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult);
+
+  /**
+   * Invoked when a minion task gets cancelled.
+   *
+   * @param pinotTaskConfig Pinot task config
+   */
+  void notifyTaskCancelled(@Nonnull PinotTaskConfig pinotTaskConfig);
+
+  /**
+   * Invoked when a minion task encounters exception.
+   *
+   * @param pinotTaskConfig Pinot task config
+   * @param exception Exception encountered during execution
+   */
+  void notifyTaskError(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull Exception exception);
 }

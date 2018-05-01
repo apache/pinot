@@ -15,11 +15,29 @@
  */
 package com.linkedin.pinot.minion.events;
 
+import com.linkedin.pinot.common.config.PinotTaskConfig;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+
+/**
+ * Default no-op minion event observer which can be extended.
+ */
 public class DefaultMinionEventObserver implements MinionEventObserver {
-  public void notifyMinionJobStart(Object taskInformation, String taskType) {
-    // Nothing to do
+
+  @Override
+  public void notifyTaskStart(@Nonnull PinotTaskConfig pinotTaskConfig) {
   }
-  public void notifyMinionJobEnd(Object segmentConversionInfo, String taskType) {
-    // Nothing to do
+
+  @Override
+  public void notifyTaskSuccess(@Nonnull PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
+  }
+
+  @Override
+  public void notifyTaskCancelled(@Nonnull PinotTaskConfig pinotTaskConfig) {
+  }
+
+  @Override
+  public void notifyTaskError(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull Exception exception) {
   }
 }

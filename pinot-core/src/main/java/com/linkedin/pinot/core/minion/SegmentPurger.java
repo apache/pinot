@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.minion;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
@@ -100,12 +99,10 @@ public class SegmentPurger {
     return _recordModifier;
   }
 
-  @VisibleForTesting
   public int getNumRecordsPurged() {
     return _numRecordsPurged;
   }
 
-  @VisibleForTesting
   public int getNumRecordsModified() {
     return _numRecordsModified;
   }
@@ -158,15 +155,16 @@ public class SegmentPurger {
     }
 
     @Override
-    public GenericRow next() throws IOException {
+    public GenericRow next() {
       return next(new GenericRow());
     }
 
     @Override
-    public GenericRow next(GenericRow reuse) throws IOException {
+    public GenericRow next(GenericRow reuse) {
       if (_recordPurger == null) {
         reuse = _recordReader.next(reuse);
       } else {
+        Preconditions.checkState(!_nextRowReturned);
         for (Map.Entry<String, Object> entry : _nextRow.getEntrySet()) {
           reuse.putField(entry.getKey(), entry.getValue());
         }
@@ -183,7 +181,7 @@ public class SegmentPurger {
     }
 
     @Override
-    public void rewind() throws IOException {
+    public void rewind() {
       _recordReader.rewind();
       _nextRowReturned = true;
       _finished = false;
@@ -211,7 +209,7 @@ public class SegmentPurger {
     /**
      * Get the {@link RecordPurger} for the given table.
      */
-    RecordPurger getRecordPurger(@Nonnull String tableName);
+    RecordPurger getRecordPurger(@Nonnull String rawTableName);
   }
 
   /**
@@ -233,7 +231,7 @@ public class SegmentPurger {
     /**
      * Get the {@link RecordModifier} for the given table.
      */
-    RecordModifier getRecordModifier(@Nonnull String tableName);
+    RecordModifier getRecordModifier(@Nonnull String rawTableName);
   }
 
   /**

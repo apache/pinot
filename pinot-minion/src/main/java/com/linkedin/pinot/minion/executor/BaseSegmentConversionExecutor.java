@@ -28,7 +28,6 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import com.linkedin.pinot.core.common.MinionConstants;
-import com.linkedin.pinot.minion.events.MinionEventObserverFactory;
 import com.linkedin.pinot.minion.exception.TaskCancelledException;
 import java.io.File;
 import java.net.URI;
@@ -36,7 +35,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import javax.annotation.Nonnull;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.Configuration;
@@ -62,52 +60,50 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
 
   private static final int DEFAULT_MAX_NUM_ATTEMPTS = 5;
   private static final long DEFAULT_INITIAL_RETRY_DELAY_MS = 1000L; // 1 second
-  private static final float DEFAULT_RETRY_SCALE_FACTOR = 2f;
-  private static final String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "enabled";
+  private static final double DEFAULT_RETRY_SCALE_FACTOR = 2.0;
   private static final String HTTPS_PROTOCOL = "https";
+  private static final String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "enabled";
 
   private static SSLContext _sslContext;
 
-  private static MinionEventObserverFactory _minionEventObserverFactory;
-
-  public static void init(Configuration uploaderConfig, Configuration observerConfig) {
+  public static void init(Configuration uploaderConfig) {
     Configuration httpsConfig = uploaderConfig.subset(HTTPS_PROTOCOL);
     if (httpsConfig.getBoolean(CONFIG_OF_CONTROLLER_HTTPS_ENABLED, false)) {
       _sslContext = new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
     }
-    _minionEventObserverFactory = MinionEventObserverFactory.loadFactory(observerConfig);
   }
 
   /**
-   * Convert the segment based on the given {@link PinotTaskConfig}.
+   * Converts the segment based on the given {@link PinotTaskConfig}.
    *
    * @param pinotTaskConfig Task config
    * @param originalIndexDir Index directory for the original segment
    * @param workingDir Working directory for the converted segment
-   * @return Index directory for the converted segment
+   * @return Segment conversion result
    * @throws Exception
    */
-  protected abstract SegmentConversionInfo convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
-      @Nonnull File workingDir) throws Exception;
+  protected abstract SegmentConversionResult convert(@Nonnull PinotTaskConfig pinotTaskConfig,
+      @Nonnull File originalIndexDir, @Nonnull File workingDir) throws Exception;
 
-  protected abstract SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier() throws Exception;
-
-  protected void runOnSuccess(MinionEventObserverFactory minionEventObserverFactory, SegmentConversionInfo segmentConversionInfo) {
-
-  }
+  /**
+   * Returns the segment ZK metadata custom map modifier.
+   *
+   * @return Segment ZK metadata custom map modifier
+   */
+  protected abstract SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier();
 
   @Override
-  public void executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) throws Exception {
+  public SegmentConversionResult executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) throws Exception {
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
-    final String tableName = configs.get(MinionConstants.TABLE_NAME_KEY);
+    final String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     final String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
     String downloadURL = configs.get(MinionConstants.DOWNLOAD_URL_KEY);
     final String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
     String originalSegmentCrc = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
 
-    LOGGER.info("Start executing {} on table: {}, segment: {} with downloadURL: {}, uploadURL: {}", taskType, tableName,
-        segmentName, downloadURL, uploadURL);
+    LOGGER.info("Start executing {} on table: {}, segment: {} with downloadURL: {}, uploadURL: {}", taskType,
+        tableNameWithType, segmentName, downloadURL, uploadURL);
 
     File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + System.nanoTime());
     Preconditions.checkState(tempDataDir.mkdirs());
@@ -128,8 +124,8 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       // Convert the segment
       File workingDir = new File(tempDataDir, "workingDir");
       Preconditions.checkState(workingDir.mkdir());
-      SegmentConversionInfo segmentConversionInfo = convert(pinotTaskConfig, indexDir, workingDir);
-      File convertedIndexDir = segmentConversionInfo.getFile();
+      SegmentConversionResult segmentConversionResult = convert(pinotTaskConfig, indexDir, workingDir);
+      File convertedIndexDir = segmentConversionResult.getFile();
 
       // Tar the converted segment
       File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
@@ -140,9 +136,9 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
 
       // Check whether the task get cancelled before uploading the segment
       if (_cancelled) {
-        LOGGER.info("{} on table: {}, segment: {} got cancelled", taskType, tableName, segmentName);
+        LOGGER.info("{} on table: {}, segment: {} got cancelled", taskType, tableNameWithType, segmentName);
         throw new TaskCancelledException(
-            taskType + " on table: " + tableName + ", segment: " + segmentName + " got cancelled");
+            taskType + " on table: " + tableNameWithType + ", segment: " + segmentName + " got cancelled");
       }
 
       // Set original segment CRC into HTTP IF-MATCH header to check whether the original segment get refreshed, so that
@@ -158,7 +154,7 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       final List<Header> httpHeaders = Arrays.asList(ifMatchHeader, segmentZKMetadataCustomMapModifierHeader);
 
       // Set query parameters
-      final List<NameValuePair> parameters = Collections.<NameValuePair>singletonList(
+      final List<NameValuePair> parameters = Collections.singletonList(
           new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION, "true"));
 
       String maxNumAttemptsConfig = configs.get(MinionConstants.MAX_NUM_ATTEMPTS_KEY);
@@ -168,58 +164,42 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       long initialRetryDelayMs = initialRetryDelayMsConfig != null ? Long.parseLong(initialRetryDelayMsConfig)
           : DEFAULT_INITIAL_RETRY_DELAY_MS;
       String retryScaleFactorConfig = configs.get(MinionConstants.RETRY_SCALE_FACTOR_KEY);
-      float retryScaleFactor =
-          retryScaleFactorConfig != null ? Float.parseFloat(retryScaleFactorConfig) : DEFAULT_RETRY_SCALE_FACTOR;
+      double retryScaleFactor =
+          retryScaleFactorConfig != null ? Double.parseDouble(retryScaleFactorConfig) : DEFAULT_RETRY_SCALE_FACTOR;
       RetryPolicy retryPolicy =
           RetryPolicies.exponentialBackoffRetryPolicy(maxNumAttempts, initialRetryDelayMs, retryScaleFactor);
 
-      try (FileUploadDownloadClient fileUploadDownloadClient = constructFileUploadDownloadClient()) {
-        retryPolicy.attempt(new Callable<Boolean>() {
-          @Override
-          public Boolean call() throws Exception {
-            try {
-              SimpleHttpResponse response =
-                  fileUploadDownloadClient.uploadSegment(new URI(uploadURL), segmentName, convertedTarredSegmentFile,
-                      httpHeaders, parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
-              LOGGER.info("Got response {}: {} while uploading table: {}, segment: {} with uploadURL: {}",
-                  response.getStatusCode(), response.getResponse(), tableName, segmentName, uploadURL);
-              return true;
-            } catch (HttpErrorStatusException e) {
-              int statusCode = e.getStatusCode();
-              if (statusCode == HttpStatus.SC_CONFLICT || statusCode >= 500) {
-                // Temporary exception
-                LOGGER.warn("Caught temporary exception while uploading segment: {}, will retry", segmentName, e);
-                return false;
-              } else {
-                // Permanent exception
-                LOGGER.error("Caught permanent exception while uploading segment: {}, won't retry", segmentName, e);
-                throw e;
-              }
-            } catch (Exception e) {
+      try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(_sslContext)) {
+        retryPolicy.attempt(() -> {
+          try {
+            SimpleHttpResponse response =
+                fileUploadDownloadClient.uploadSegment(new URI(uploadURL), segmentName, convertedTarredSegmentFile,
+                    httpHeaders, parameters, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+            LOGGER.info("Got response {}: {} while uploading table: {}, segment: {} with uploadURL: {}",
+                response.getStatusCode(), response.getResponse(), tableNameWithType, segmentName, uploadURL);
+            return true;
+          } catch (HttpErrorStatusException e) {
+            int statusCode = e.getStatusCode();
+            if (statusCode == HttpStatus.SC_CONFLICT || statusCode >= 500) {
+              // Temporary exception
               LOGGER.warn("Caught temporary exception while uploading segment: {}, will retry", segmentName, e);
               return false;
+            } else {
+              // Permanent exception
+              LOGGER.error("Caught permanent exception while uploading segment: {}, won't retry", segmentName, e);
+              throw e;
             }
+          } catch (Exception e) {
+            LOGGER.warn("Caught temporary exception while uploading segment: {}, will retry", segmentName, e);
+            return false;
           }
         });
       }
 
-      try {
-        runOnSuccess(_minionEventObserverFactory, segmentConversionInfo);
-      } catch(Exception e) {
-        LOGGER.error("Could not send minion observer event with segmentName {}, tableName {}", segmentName, tableName);
-      }
-
-      LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableName, segmentName);
+      LOGGER.info("Done executing {} on table: {}, segment: {}", taskType, tableNameWithType, segmentName);
+      return segmentConversionResult;
     } finally {
       FileUtils.deleteQuietly(tempDataDir);
-    }
-  }
-
-  private FileUploadDownloadClient constructFileUploadDownloadClient() {
-    if (_sslContext != null) {
-      return new FileUploadDownloadClient(_sslContext);
-    } else {
-      return new FileUploadDownloadClient();
     }
   }
 }

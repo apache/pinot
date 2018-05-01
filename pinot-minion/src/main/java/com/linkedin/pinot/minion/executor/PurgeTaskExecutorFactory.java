@@ -13,15 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.minion.events;
+package com.linkedin.pinot.minion.executor;
 
-public class PurgeMinionEventObserver implements MinionEventObserver {
+public class PurgeTaskExecutorFactory implements PinotTaskExecutorFactory {
 
-  public void notifyMinionJobStart(Object taskInformation, String taskType) {
-    // do nothing
-  }
-
-  public void notifyMinionJobEnd(Object taskInformation, String taskType) {
-    // do nothing
+  @Override
+  public PinotTaskExecutor create() {
+    return new PurgeTaskExecutor();
   }
 }
