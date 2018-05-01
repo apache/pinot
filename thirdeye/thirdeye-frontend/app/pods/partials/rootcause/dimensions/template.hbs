@@ -1,0 +1,35 @@
+{{#shared/common-tabs selection=activeSubTabs.dimensions activeTab=activeSubTabs.dimensions as |subtab|}}
+  {{#subtab.tablist as |subtablist|}}
+    {{#subtablist.tab name="table"}}Table{{/subtablist.tab}}
+    {{#subtablist.tab name="heatmap"}}Heatmap{{/subtablist.tab}}
+  {{/subtab.tablist}}
+
+  {{#subtab.tabpanel name="table"}}
+    {{models-table
+      data=model.advancedDimensionList
+      columns=model.advancedDimensionColumns
+      showColumnsDropdown=false
+      showGlobalFilter=false
+      filteringIgnoreCase=true
+      multipleExpand=true
+      pageSize=15
+      showComponentFooter=true
+    }}
+  {{/subtab.tabpanel}}
+
+  {{#subtab.tabpanel name="heatmap"}}
+    {{#if isLoadingBreakdowns}}
+      <div class="spinner-wrapper spinner-wrapper--card">
+        {{ember-spinner}}
+      </div>
+    {{/if}}
+
+    {{rootcause-heatmap
+      entities=entities
+      breakdowns=breakdowns
+      selectedUrn=metricUrn
+      isLoadingBreakdowns=isLoadingBreakdowns
+      onSelection=(action "heatmapOnSelection")
+    }}
+  {{/subtab.tabpanel}}
+{{/shared/common-tabs}}
