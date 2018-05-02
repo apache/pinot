@@ -15,32 +15,35 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
-import java.nio.charset.Charset;
 import java.util.Arrays;
 
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
+/**
+ * Extension of {@link AbstractColumnStatisticsCollector} for byte[] column type.
+ */
+public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatisticsCollector {
+  private static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
 
-public class StringColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
+  private byte[] _min = EMPTY_BYTE_ARRAY;
+  private byte[] _max = EMPTY_BYTE_ARRAY;
 
-  private String min = V1Constants.Str.NULL_STRING;
-  private String max = V1Constants.Str.NULL_STRING;
+  private int _lengthOfShortestEntry = Integer.MAX_VALUE;
+  private int _lengthOfLongestEntry = 0;
 
-  private int smallestStringLength = Integer.MAX_VALUE;
-  private int longestStringLength = 0;
-  private final ObjectSet<String> rawStringSet;
-  private final ObjectSet<String> aggregatedStringSet;
-  private String[] sortedStringList;
-  private boolean sealed = false;
+  private final ObjectSet<ByteArray> _rawBytesSet;
+  private final ObjectSet<ByteArray> _aggregateBytesSet;
 
-  public StringColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
+  private ByteArray[] _sortedBytesList;
+  private boolean _sealed = false;
+
+  public BytesColumnPredIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
-    rawStringSet = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
-    aggregatedStringSet = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
+    _rawBytesSet = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
+    _aggregateBytesSet = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
   }
 
   /**
@@ -49,39 +52,40 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
    * - Update maximum number of values for Multi-valued entries
    * - Update Total number of entries
    * - Check if entry is sorted.
-   * @param entry
-   * @param set
+   *
+   * @param entry Entry value
+   * @param set Set containing entries
    */
-  private void collectEntry(Object entry, ObjectSet<String> set) {
-
+  private void collectEntry(Object entry, ObjectSet<ByteArray> set) {
     if (entry instanceof Object[]) {
       for (final Object e : (Object[]) entry) {
-        String value = e.toString();
-        set.add(value);
+        byte[] value = (byte[]) e;
+        set.add(new ByteArray(value));
 
-        int valueLength = value.getBytes(UTF_8).length;
-        smallestStringLength = Math.min(smallestStringLength, valueLength);
-        longestStringLength = Math.max(longestStringLength, valueLength);
+        _lengthOfShortestEntry = Math.min(_lengthOfShortestEntry, value.length);
+        _lengthOfLongestEntry = Math.max(_lengthOfLongestEntry, value.length);
       }
+
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;
       }
       updateTotalNumberOfEntries((Object[]) entry);
     } else {
-
-      String value;
+      ByteArray value;
       if (entry != null) {
-        value = entry.toString();
+        value = (ByteArray) entry;
       } else {
-        value = fieldSpec.getDefaultNullValue().toString();
+        value = (ByteArray) fieldSpec.getDefaultNullValue();
       }
+
       addressSorted(value);
       updatePartition(value);
       set.add(value);
 
-      int valueLength = value.getBytes(UTF_8).length;
-      smallestStringLength = Math.min(smallestStringLength, valueLength);
-      longestStringLength = Math.max(longestStringLength, valueLength);
+      int valueLength = value.length();
+      _lengthOfShortestEntry = Math.min(_lengthOfShortestEntry, valueLength);
+      _lengthOfLongestEntry = Math.max(_lengthOfLongestEntry, valueLength);
+
       totalNumberOfEntries++;
     }
   }
@@ -94,9 +98,9 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   @Override
   public void collect(Object entry, boolean isAggregated) {
     if (isAggregated) {
-      collectEntry(entry, aggregatedStringSet);
+      collectEntry(entry, _aggregateBytesSet);
     } else {
-      collectEntry(entry, rawStringSet);
+      collectEntry(entry, _rawBytesSet);
     }
   }
 
@@ -109,43 +113,47 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
     collect(entry, false /* isAggregated */);
   }
 
-
   @Override
-  public String getMinValue() {
-    if (sealed) {
-      return min;
+  public byte[] getMinValue() {
+    if (_sealed) {
+      return _min;
     }
     throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
 
   @Override
-  public String getMaxValue() {
-    if (sealed) {
-      return max;
+  public byte[] getMaxValue() {
+    if (_sealed) {
+      return _max;
     }
     throw new IllegalStateException("you must seal the collector first before asking for max value");
   }
 
   @Override
-  public Object[] getUniqueValuesSet() {
-    if (sealed) {
-      return sortedStringList;
+  public ByteArray[] getUniqueValuesSet() {
+    if (_sealed) {
+      return _sortedBytesList;
     }
     throw new IllegalStateException("you must seal the collector first before asking for unique values set");
   }
 
   @Override
+  public int getLengthOfShortestElement() {
+    return _lengthOfShortestEntry;
+  }
+
+  @Override
   public int getLengthOfLargestElement() {
-    if (sealed) {
-      return longestStringLength;
+    if (_sealed) {
+      return _lengthOfLongestEntry;
     }
     throw new IllegalStateException("you must seal the collector first before asking for longest value");
   }
 
   @Override
   public int getCardinality() {
-    if (sealed) {
-      return sortedStringList.length;
+    if (_sealed) {
+      return _sortedBytesList.length;
     }
     throw new IllegalStateException("you must seal the collector first before asking for cardinality");
   }
@@ -157,29 +165,29 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public void seal() {
-    sealed = true;
-    sortedStringList = new String[rawStringSet.size()];
-    rawStringSet.toArray(sortedStringList);
+    _sealed = true;
+    _sortedBytesList = new ByteArray[_rawBytesSet.size()];
+    _rawBytesSet.toArray(_sortedBytesList);
 
-    Arrays.sort(sortedStringList);
+    Arrays.sort(_sortedBytesList);
 
-    if (sortedStringList.length == 0) {
-      min = null;
-      max = null;
+    if (_sortedBytesList.length == 0) {
+      _min = null;
+      _max = null;
       return;
     }
 
     // Update min/max based on raw docs.
-    min = sortedStringList[0];
-    max = sortedStringList[sortedStringList.length - 1];
+    _min = _sortedBytesList[0].getBytes();
+    _max = _sortedBytesList[_sortedBytesList.length - 1].getBytes();
 
     // Merge the raw and aggregated docs, so stats for dictionary creation are collected correctly.
-    int numAggregated = aggregatedStringSet.size();
+    int numAggregated = _aggregateBytesSet.size();
     if (numAggregated > 0) {
-      rawStringSet.addAll(aggregatedStringSet);
-      sortedStringList = new String[rawStringSet.size()];
-      rawStringSet.toArray(sortedStringList);
-      Arrays.sort(sortedStringList);
+      _rawBytesSet.addAll(_aggregateBytesSet);
+      _sortedBytesList = new ByteArray[_rawBytesSet.size()];
+      _rawBytesSet.toArray(_sortedBytesList);
+      Arrays.sort(_sortedBytesList);
     }
   }
 }

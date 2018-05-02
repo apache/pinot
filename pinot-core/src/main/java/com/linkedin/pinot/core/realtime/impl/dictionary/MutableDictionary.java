@@ -17,10 +17,12 @@
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
 import com.linkedin.pinot.core.segment.index.readers.BaseDictionary;
+import java.nio.charset.Charset;
 import javax.annotation.Nonnull;
 
 
 public abstract class MutableDictionary extends BaseDictionary {
+  protected static final Charset UTF_8 = Charset.forName("UTF-8");
 
   @Override
   public String getStringValue(int dictId) {
@@ -49,4 +51,38 @@ public abstract class MutableDictionary extends BaseDictionary {
 
   public abstract boolean isEmpty();
 
+  /**
+   * Helper method to identify if given (Comparable) value is in provided range.
+   *
+   * @param lower Lower value of range
+   * @param upper Upper value of range
+   * @param includeLower Include lower value in range
+   * @param includeUpper Include upper value in range
+   * @param value Value to compare
+   * @param <T> Extends Comparable
+   * @return True if value in range, false otherwise.
+   */
+  protected <T extends Comparable<T>> boolean valueInRange(@Nonnull T lower, @Nonnull T upper, boolean includeLower,
+      boolean includeUpper, T value) {
+    if (includeLower) {
+      if (value.compareTo(lower) < 0) {
+        return false;
+      }
+    } else {
+      if (value.compareTo(lower) <= 0) {
+        return false;
+      }
+    }
+
+    if (includeUpper) {
+      if (value.compareTo(upper) > 0) {
+        return false;
+      }
+    } else {
+      if (value.compareTo(upper) >= 0) {
+        return false;
+      }
+    }
+    return true;
+  }
 }

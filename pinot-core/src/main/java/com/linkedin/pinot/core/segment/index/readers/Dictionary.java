@@ -42,6 +42,8 @@ public interface Dictionary extends Closeable {
 
   String getStringValue(int dictId);
 
+  byte[] getBytesValue(int dictId);
+
   int length();
 
   boolean isSorted();
@@ -57,5 +59,7 @@ public interface Dictionary extends Closeable {
   void readDoubleValues(int[] dictIds, int inStartPos, int length, double[] outValues, int outStartPos);
 
   void readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos);
+
+  void readBytesValues(int[] dictIds, int inStartPos, int length, byte[][] outValues, int outStartPos);
 
 }

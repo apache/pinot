@@ -59,6 +59,19 @@ public class AggregationFunctionFactory {
     PERCENTILEEST90("percentileEst90"),
     PERCENTILEEST95("percentileEst95"),
     PERCENTILEEST99("percentileEst99"),
+    PERCENTILETDIGEST10("percentileTDigest10"),
+    PERCENTILETDIGEST25("percentileTDigest20"),
+    PERCENTILETDIGEST20("percentileTDigest25"),
+    PERCENTILETDIGEST30("percentileTDigest30"),
+    PERCENTILETDIGEST40("percentileTDigest40"),
+    PERCENTILETDIGEST50("percentileTDigest50"),
+    PERCENTILETDIGEST60("percentileTDigest60"),
+    PERCENTILETDIGEST75("percentileTDigest70"),
+    PERCENTILETDIGEST70("percentileTDigest75"),
+    PERCENTILETDIGEST80("percentileTDigest80"),
+    PERCENTILETDIGEST90("percentileTDigest90"),
+    PERCENTILETDIGEST95("percentileTDigest95"),
+    PERCENTILETDIGEST99("percentileTDigest99"),
     // Multi-value aggregation functions.
     COUNTMV("countMV"),
     MINMV("minMV"),
@@ -187,6 +200,32 @@ public class AggregationFunctionFactory {
         return new PercentileEstAggregationFunction(95);
       case PERCENTILEEST99:
         return new PercentileEstAggregationFunction(99);
+      case PERCENTILETDIGEST10:
+        return new PercentileTDigestAggregationFunction(10);
+      case PERCENTILETDIGEST20:
+        return new PercentileTDigestAggregationFunction(20);
+      case PERCENTILETDIGEST25:
+        return new PercentileTDigestAggregationFunction(25);
+      case PERCENTILETDIGEST30:
+        return new PercentileTDigestAggregationFunction(30);
+      case PERCENTILETDIGEST40:
+        return new PercentileTDigestAggregationFunction(40);
+      case PERCENTILETDIGEST50:
+        return new PercentileTDigestAggregationFunction(50);
+      case PERCENTILETDIGEST60:
+        return new PercentileTDigestAggregationFunction(60);
+      case PERCENTILETDIGEST70:
+        return new PercentileTDigestAggregationFunction(70);
+      case PERCENTILETDIGEST75:
+        return new PercentileTDigestAggregationFunction(75);
+      case PERCENTILETDIGEST80:
+        return new PercentileTDigestAggregationFunction(80);
+      case PERCENTILETDIGEST90:
+        return new PercentileTDigestAggregationFunction(90);
+      case PERCENTILETDIGEST95:
+        return new PercentileTDigestAggregationFunction(95);
+      case PERCENTILETDIGEST99:
+        return new PercentileTDigestAggregationFunction(99);
       case COUNTMV:
         return new CountMVAggregationFunction();
       case MINMV:

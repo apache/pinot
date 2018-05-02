@@ -103,6 +103,11 @@ public class ProjectionBlockValSet extends BaseBlockValSet {
   }
 
   @Override
+  public byte[][] getBytesValuesSV() {
+    return _dataBlockCache.getBytesValuesForSVColumn(_column);
+  }
+
+  @Override
   public String[][] getStringValuesMV() {
     return _dataBlockCache.getStringValuesForMVColumn(_column);
   }

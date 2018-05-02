@@ -116,7 +116,7 @@ public class ColumnMinMaxValueGenerator {
         break;
       case STRING:
         try (StringDictionary stringDictionary = new StringDictionary(dictionaryBuffer, length,
-            columnMetadata.getStringColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter())) {
+            columnMetadata.getColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter())) {
           SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, stringDictionary.get(0),
               stringDictionary.get(length - 1));
         }

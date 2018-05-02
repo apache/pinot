@@ -247,6 +247,7 @@ public class SelectionOperatorUtils {
             dataTableBuilder.setColumn(i, ((Number) columnValue).doubleValue());
             break;
           case STRING:
+          case BYTES: // BYTES are already converted to String for Selection, before reaching this layer.
             dataTableBuilder.setColumn(i, ((String) columnValue));
             break;
 
@@ -346,6 +347,10 @@ public class SelectionOperatorUtils {
           row[i] = dataTable.getDouble(rowId, i);
           break;
         case STRING:
+          row[i] = dataTable.getString(rowId, i);
+          break;
+
+        case BYTES:
           row[i] = dataTable.getString(rowId, i);
           break;
 

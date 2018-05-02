@@ -24,7 +24,7 @@ public class MutableDictionaryFactory {
   }
 
   public static MutableDictionary getMutableDictionary(FieldSpec.DataType dataType, boolean isOffHeapAllocation,
-      PinotDataBufferMemoryManager memoryManager, int avgStringLen, int cardinality, String allocationContext) {
+      PinotDataBufferMemoryManager memoryManager, int avgLength, int cardinality, String allocationContext) {
     if (isOffHeapAllocation) {
       // OnHeap allocation
       int maxOverflowSize = cardinality / 10;
@@ -39,7 +39,10 @@ public class MutableDictionaryFactory {
           return new DoubleOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext);
         case STRING:
           return new StringOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext,
-              avgStringLen);
+              avgLength);
+        case BYTES:
+          return new BytesOffHeapMutableDictionary(cardinality, maxOverflowSize, memoryManager, allocationContext,
+              avgLength);
         default:
           throw new UnsupportedOperationException();
       }
@@ -56,6 +59,8 @@ public class MutableDictionaryFactory {
           return new DoubleOnHeapMutableDictionary();
         case STRING:
           return new StringOnHeapMutableDictionary();
+        case BYTES:
+          return new BytesOnHeapMutableDictionary();
         default:
           throw new UnsupportedOperationException();
       }

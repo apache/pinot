@@ -16,29 +16,41 @@
 
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
 
 
-public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
+/**
+ * OffHeap mutable dictionary for Bytes data type.
+ */
+public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
 
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
   private final MutableOffHeapByteArrayStore _byteStore;
-  private String _min = null;
-  private String _max = null;
+  private ByteArray _min = null;
+  private ByteArray _max = null;
 
-  public StringOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize,
-      PinotDataBufferMemoryManager memoryManager, String allocationContext, int avgStringLen) {
+  /**
+   * Constructor the class.
+   *
+   * @param estimatedCardinality Estimated cardinality for the column.
+   * @param maxOverflowHashSize Max size for in-memory hash.
+   * @param memoryManager Memory manager
+   * @param allocationContext Context for allocation
+   * @param avgLength Estimated average Length of entry
+   */
+  public BytesOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize,
+      PinotDataBufferMemoryManager memoryManager, String allocationContext, int avgLength) {
     super(estimatedCardinality, maxOverflowHashSize, memoryManager, allocationContext);
-    _byteStore = new MutableOffHeapByteArrayStore(memoryManager, allocationContext, estimatedCardinality, avgStringLen);
+    _byteStore = new MutableOffHeapByteArrayStore(memoryManager, allocationContext, estimatedCardinality, avgLength);
   }
 
   @Override
-  public void doClose() throws IOException {
+  public void doClose()
+      throws IOException {
     _byteStore.close();
   }
 
@@ -49,42 +61,48 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Override
   public Object get(int dictionaryId) {
-    return new String(_byteStore.get(dictionaryId), UTF_8);
+    return _byteStore.get(dictionaryId);
   }
 
   @Override
   public void index(@Nonnull Object rawValue) {
-    if (rawValue instanceof String) {
+    if (rawValue instanceof ByteArray) {
       // Single value
-      byte[] serializedValue =  ((String) rawValue).getBytes(UTF_8);
-      indexValue(rawValue, serializedValue);
-      updateMinMax((String) rawValue);
-    } else {
+      ByteArray bytes = (ByteArray) rawValue;
+      indexValue(rawValue, bytes.getBytes());
+      updateMinMax(bytes);
+    } else if (rawValue instanceof Object[]) {
       // Multi value
       Object[] values = (Object[]) rawValue;
       for (Object value : values) {
-        byte[] serializedValue =  ((String) value).getBytes(UTF_8);
-        indexValue(value, serializedValue);
-        updateMinMax((String) value);
+        ByteArray bytesValue = ((ByteArray) value);
+        indexValue(value, bytesValue.getBytes());
+        updateMinMax(bytesValue);
       }
+    } else {
+      throw new IllegalArgumentException(
+          "Illegal argument type for BytesOffHeapMutableDictionary: " + rawValue.getClass().getName());
     }
-  }
-
-  private String getInternal(int dictId) {
-    return new String(_byteStore.get(dictId), UTF_8);
   }
 
   @Override
   public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
       boolean includeUpper) {
-    String valueToCompare = getInternal(dictIdToCompare);
-    return valueInRange(lower, upper, includeLower, includeUpper, valueToCompare);
+    throw new UnsupportedOperationException("In-range not supported for Bytes data type.");
   }
 
   @Override
   public int indexOf(Object rawValue) {
-    byte[] serializedValue = ((String) rawValue).getBytes(UTF_8);
-    return getDictId(rawValue, serializedValue);
+    byte[] value;
+    if (rawValue instanceof ByteArray) {
+      value = ((ByteArray) rawValue).getBytes();
+    } else if (rawValue instanceof byte[]) {
+      value = (byte[]) rawValue;
+    } else {
+      throw new IllegalArgumentException(
+          "Illegal data type for BytesOffHeapMutableDictionary: " + rawValue.getClass().getSimpleName());
+    }
+    return getDictId(rawValue, value);
   }
 
   @Nonnull
@@ -101,9 +119,9 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Nonnull
   @Override
-  public Object getSortedValues() {
+  public ByteArray[] getSortedValues() {
     int numValues = length();
-    String[] sortedValues = new String[numValues];
+    ByteArray[] sortedValues = new ByteArray[numValues];
 
     for (int i = 0; i < numValues; i++) {
       sortedValues[i] = getInternal(i);
@@ -113,11 +131,15 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
     return sortedValues;
   }
 
+  private ByteArray getInternal(int dictId) {
+    return new ByteArray(_byteStore.get(dictId));
+  }
+
   protected boolean equalsValueAt(int dictId, Object value, byte[] serializedValue) {
     return _byteStore.equalsValueAt(serializedValue, dictId);
   }
 
-  private void updateMinMax(String value) {
+  private void updateMinMax(ByteArray value) {
     if (_min == null) {
       _min = value;
       _max = value;

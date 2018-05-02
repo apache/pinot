@@ -87,11 +87,6 @@ public class OnHeapLongDictionary extends OnHeapDictionary {
   }
 
   @Override
-  public int getIntValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public long getLongValue(int dictId) {
     return _dictIdToVal[dictId];
   }

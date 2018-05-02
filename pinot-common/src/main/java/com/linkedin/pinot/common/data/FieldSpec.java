@@ -18,11 +18,15 @@ package com.linkedin.pinot.common.data;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.ConfigKey;
-import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
+import java.nio.charset.Charset;
 import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Type;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 
 
 /**
@@ -37,17 +41,21 @@ import org.apache.avro.Schema.Type;
  */
 @SuppressWarnings("unused")
 public abstract class FieldSpec {
+  private static final Charset UTF_8 = Charset.forName("UTF-8");
+
   private static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
   private static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
   private static final Float DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
   private static final Double DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
-  private static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
+  private static final ByteArray DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new ByteArray(new byte[0]);
 
+  private static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
   private static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
   private static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
   private static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = 0.0F;
   private static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
   private static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
+  private static final ByteArray DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new ByteArray(new byte[0]);
 
   @ConfigKey("name")
   protected String _name;
@@ -146,6 +154,12 @@ public abstract class FieldSpec {
           return Double.valueOf(stringDefaultNullValue);
         case STRING:
           return stringDefaultNullValue;
+        case BYTES:
+          try {
+            return new ByteArray(Hex.decodeHex(stringDefaultNullValue.toCharArray()));
+          } catch (DecoderException e) {
+            Utils.rethrowException(e); // Re-throw to avoid handling exceptions in all callers.
+          }
         default:
           throw new UnsupportedOperationException("Unsupported data type: " + dataType);
       }
@@ -163,6 +177,8 @@ public abstract class FieldSpec {
               return DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
             case STRING:
               return DEFAULT_METRIC_NULL_VALUE_OF_STRING;
+            case BYTES:
+              return DEFAULT_METRIC_NULL_VALUE_OF_BYTES;
             default:
               throw new UnsupportedOperationException(
                   "Unknown default null value for metric field of data type: " + dataType);
@@ -181,6 +197,8 @@ public abstract class FieldSpec {
               return DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE;
             case STRING:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
+            case BYTES:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
             default:
               throw new UnsupportedOperationException(
                   "Unknown default null value for dimension/time field of data type: " + dataType);

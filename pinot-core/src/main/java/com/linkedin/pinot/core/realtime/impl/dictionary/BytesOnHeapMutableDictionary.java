@@ -15,13 +15,17 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
 
 
-public class StringOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
-  private String _min = null;
-  private String _max = null;
+/**
+ * OnHeap mutable dictionary of Bytes type.
+ */
+public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
+  private ByteArray _min = null;
+  private ByteArray _max = null;
 
   @Override
   public int indexOf(Object rawValue) {
@@ -30,16 +34,16 @@ public class StringOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
   @Override
   public void index(@Nonnull Object rawValue) {
-    if (rawValue instanceof String) {
+    if (rawValue instanceof ByteArray) {
       // Single value
       indexValue(rawValue);
-      updateMinMax((String) rawValue);
+      updateMinMax((ByteArray) rawValue);
     } else {
       // Multi value
       Object[] values = (Object[]) rawValue;
       for (Object value : values) {
         indexValue(value);
-        updateMinMax((String) value);
+        updateMinMax((ByteArray) value);
       }
     }
   }
@@ -47,30 +51,29 @@ public class StringOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   @Override
   public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
       boolean includeUpper) {
-    String valueToCompare = (String) get(dictIdToCompare);
-    return valueInRange(lower, upper, includeLower, includeUpper, valueToCompare);
+    throw new UnsupportedOperationException("In-range not supported for Bytes data type.");
   }
 
   @Nonnull
   @Override
-  public String getMinVal() {
+  public ByteArray getMinVal() {
     return _min;
   }
 
   @Nonnull
   @Override
-  public String getMaxVal() {
+  public ByteArray getMaxVal() {
     return _max;
   }
 
   @Nonnull
   @Override
-  public String[] getSortedValues() {
+  public ByteArray[] getSortedValues() {
     int numValues = length();
-    String[] sortedValues = new String[numValues];
+    ByteArray[] sortedValues = new ByteArray[numValues];
 
     for (int i = 0; i < numValues; i++) {
-      sortedValues[i] = (String) get(i);
+      sortedValues[i] = (ByteArray) get(i);
     }
 
     Arrays.sort(sortedValues);
@@ -97,7 +100,7 @@ public class StringOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
     throw new UnsupportedOperationException();
   }
 
-  private void updateMinMax(String value) {
+  private void updateMinMax(ByteArray value) {
     if (_min == null) {
       _min = value;
       _max = value;
