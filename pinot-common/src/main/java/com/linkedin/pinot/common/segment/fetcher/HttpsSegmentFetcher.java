@@ -23,6 +23,7 @@ import java.util.Set;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.Configuration;
 
+
 /*
  * The following links are useful to understand some of the SSL terminology (key store, trust store, algorithms,
  * architecture, etc.)
@@ -50,9 +51,11 @@ import org.apache.commons.configuration.Configuration;
  * server is presenting an X509 certificate.
  */
 public class HttpsSegmentFetcher extends HttpSegmentFetcher {
+
   @Override
   protected void initHttpClient(Configuration configs) {
-    SSLContext sslContext = new ClientSSLContextGenerator(configs.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
+    SSLContext sslContext =
+        new ClientSSLContextGenerator(configs.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
     _httpClient = new FileUploadDownloadClient(sslContext);
   }
 
@@ -60,5 +63,4 @@ public class HttpsSegmentFetcher extends HttpSegmentFetcher {
   public Set<String> getProtectedConfigKeys() {
     return ClientSSLContextGenerator.getProtectedConfigKeys();
   }
-
 }

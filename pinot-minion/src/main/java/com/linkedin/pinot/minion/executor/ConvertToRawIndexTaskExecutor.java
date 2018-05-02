@@ -21,21 +21,26 @@ import com.linkedin.pinot.core.common.MinionConstants;
 import com.linkedin.pinot.core.minion.RawIndexConverter;
 import java.io.File;
 import java.util.Collections;
+import java.util.Map;
 import javax.annotation.Nonnull;
 
 
 public class ConvertToRawIndexTaskExecutor extends BaseSegmentConversionExecutor {
 
   @Override
-  protected SegmentConversionInfo convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
+  protected SegmentConversionResult convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
       @Nonnull File workingDir) throws Exception {
+    Map<String, String> configs = pinotTaskConfig.getConfigs();
     new RawIndexConverter(originalIndexDir, workingDir,
-        pinotTaskConfig.getConfigs().get(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY)).convert();
-    return new SegmentConversionInfo.SegmentConversionInfoBuilder().setFile(workingDir).build();
+        configs.get(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY)).convert();
+    return new SegmentConversionResult.Builder().setFile(workingDir)
+        .setTableNameWithType(configs.get(MinionConstants.TABLE_NAME_KEY))
+        .setSegmentName(configs.get(MinionConstants.SEGMENT_NAME_KEY))
+        .build();
   }
 
   @Override
-  protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier() throws Exception {
+  protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier() {
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
         Collections.singletonMap(MinionConstants.ConvertToRawIndexTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
             String.valueOf(System.currentTimeMillis())));

@@ -26,8 +26,12 @@ public interface PinotTaskExecutor {
 
   /**
    * Execute the task based on the given {@link PinotTaskConfig}.
+   *
+   * @param pinotTaskConfig Pinot task config
+   * @return Execution result
+   * @throws Exception
    */
-  void executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) throws Exception;
+  Object executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) throws Exception;
 
   /**
    * Try to cancel the task.

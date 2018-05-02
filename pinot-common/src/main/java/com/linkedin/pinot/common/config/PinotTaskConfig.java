@@ -16,14 +16,16 @@
 package com.linkedin.pinot.common.config;
 
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.helix.task.TaskConfig;
 
 
 public class PinotTaskConfig {
-  public static final String TASK_COMMAND_KEY = "TASK_COMMAND";
-  public static final String TASK_ID_KEY = "TASK_ID";
+  private static final String TASK_ID_KEY = "TASK_ID";
+  private static final String TASK_COMMAND_KEY = "TASK_COMMAND";
+  private static final String TASK_TARGET_PARTITION_KEY = "TASK_TARGET_PARTITION";
 
   private final String _taskType;
   private final Map<String, String> _configs;
@@ -33,43 +35,31 @@ public class PinotTaskConfig {
     _configs = configs;
   }
 
+  @Nonnull
   public String getTaskType() {
     return _taskType;
   }
 
+  @Nonnull
   public Map<String, String> getConfigs() {
     return _configs;
   }
 
   @Nonnull
   public TaskConfig toHelixTaskConfig(@Nonnull String taskName) {
-    return new TaskConfig(_taskType, _configs, taskName, null);
+    return new TaskConfig(_taskType, new HashMap<>(_configs), taskName, null);
   }
 
   @Nonnull
   public static PinotTaskConfig fromHelixTaskConfig(@Nonnull TaskConfig helixTaskConfig) {
-    Map<String, String> configs = helixTaskConfig.getConfigMap();
+    Map<String, String> configs = new HashMap<>(helixTaskConfig.getConfigMap());
 
-    // Inside Helix task configs, there are two extra fields: TASK_COMMAND, TASK_ID which need to be removed
-    // TASK_COMMAND field stores the task type
-    String taskType = configs.remove(TASK_COMMAND_KEY);
+    // Inside Helix task config map, there are 3 extra Helix properties: TASK_COMMAND, TASK_ID, TASK_TARGET_PARTITION
     configs.remove(TASK_ID_KEY);
-    return new PinotTaskConfig(taskType, configs);
-  }
+    configs.remove(TASK_COMMAND_KEY);
+    configs.remove(TASK_TARGET_PARTITION_KEY);
 
-  @Override
-  public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
-      return true;
-    }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
-      return false;
-    }
-
-    PinotTaskConfig that = (PinotTaskConfig) o;
-
-    return EqualityUtils.isEqual(_taskType, that._taskType) && EqualityUtils.isEqual(_configs, that._configs);
+    return new PinotTaskConfig(helixTaskConfig.getCommand(), configs);
   }
 
   @Override
@@ -77,6 +67,18 @@ public class PinotTaskConfig {
     int result = EqualityUtils.hashCodeOf(_taskType);
     result = EqualityUtils.hashCodeOf(result, _configs);
     return result;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (obj instanceof PinotTaskConfig) {
+      PinotTaskConfig that = (PinotTaskConfig) obj;
+      return this._taskType.equals(that._taskType) && this._configs.equals(that._configs);
+    }
+    return false;
   }
 
   @Override

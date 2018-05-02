@@ -15,17 +15,19 @@
  */
 package com.linkedin.pinot.minion.events;
 
-import org.apache.commons.configuration.Configuration;
+public class DefaultMinionEventObserverFactory implements MinionEventObserverFactory {
+  private static final MinionEventObserver DEFAULT_EVENT_OBSERVER = new DefaultMinionEventObserver();
+  private static final DefaultMinionEventObserverFactory INSTANCE = new DefaultMinionEventObserverFactory();
 
+  private DefaultMinionEventObserverFactory() {
+  }
 
-public class DefaultMinionEventObserverFactory extends MinionEventObserverFactory {
+  public static DefaultMinionEventObserverFactory getInstance() {
+    return INSTANCE;
+  }
 
+  @Override
   public MinionEventObserver create() {
-    return new DefaultMinionEventObserver();
+    return DEFAULT_EVENT_OBSERVER;
   }
-
-  public void init(Configuration configuration) {
-
-  }
-
 }

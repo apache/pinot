@@ -13,17 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.minion.events;
+package com.linkedin.pinot.minion.executor;
 
-/**
- * Factory for {@link MinionEventObserver}.
- */
-public interface MinionEventObserverFactory {
+public class ConvertToRawIndexTaskExecutorFactory implements PinotTaskExecutorFactory {
 
-  /**
-   * Creates an new instance of {@link MinionEventObserver}.
-   *
-   * @return Minion event observer
-   */
-  MinionEventObserver create();
+  @Override
+  public PinotTaskExecutor create() {
+    return new ConvertToRawIndexTaskExecutor();
+  }
 }
