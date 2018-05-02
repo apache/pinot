@@ -21,9 +21,8 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 public class ThresholdAlgorithmTest {
-
-  DataProvider testDataProvider;
-  StaticDetectionPipeline thresholdAlgorithm;
+  private DataProvider testDataProvider;
+  private StaticDetectionPipeline thresholdAlgorithm;
 
   @BeforeMethod
   public void beforeMethod() {
@@ -47,7 +46,7 @@ public class ThresholdAlgorithmTest {
     this.testDataProvider = new MockDataProvider()
         .setMetrics(Collections.singletonList(metricConfigDTO))
         .setTimeseries(timeSeries);
-    this.thresholdAlgorithm = new ThresholdAlgorithm(testDataProvider, detectionConfigDTO, 0, 5);
+    this.thresholdAlgorithm = new ThresholdAlgorithm(this.testDataProvider, detectionConfigDTO, 0, 5);
   }
 
   @Test

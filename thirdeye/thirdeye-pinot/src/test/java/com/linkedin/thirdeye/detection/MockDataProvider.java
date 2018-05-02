@@ -19,28 +19,16 @@ import static com.linkedin.thirdeye.dashboard.resources.v2.aggregation.Aggregati
 
 
 public class MockDataProvider implements DataProvider {
-  Map<MetricSlice, DataFrame> timeseries;
-  Map<MetricSlice, DataFrame> breakdowns;
-  Map<MetricSlice, DataFrame> aggregates;
-  List<EventDTO> events;
-  List<MergedAnomalyResultDTO> anomalies;
-  List<MetricConfigDTO> metrics;
-  DetectionPipelineLoader loader;
+  private Map<MetricSlice, DataFrame> timeseries;
+  private Map<MetricSlice, DataFrame> breakdowns;
+  private Map<MetricSlice, DataFrame> aggregates;
+  private List<EventDTO> events;
+  private List<MergedAnomalyResultDTO> anomalies;
+  private List<MetricConfigDTO> metrics;
+  private DetectionPipelineLoader loader;
 
   public MockDataProvider() {
     // left blank
-  }
-
-  public MockDataProvider(Map<MetricSlice, DataFrame> timeseries, Map<MetricSlice, DataFrame> breakdowns,
-      Map<MetricSlice, DataFrame> aggregates, List<EventDTO> events, List<MergedAnomalyResultDTO> anomalies,
-      List<MetricConfigDTO> metrics, DetectionPipelineLoader loader) {
-    this.timeseries = timeseries;
-    this.breakdowns = breakdowns;
-    this.aggregates = aggregates;
-    this.events = events;
-    this.anomalies = anomalies;
-    this.metrics = metrics;
-    this.loader = loader;
   }
 
   @Override

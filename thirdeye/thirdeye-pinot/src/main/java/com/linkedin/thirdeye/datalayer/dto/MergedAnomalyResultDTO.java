@@ -5,6 +5,9 @@ import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
+import java.util.HashSet;
+import java.util.Set;
+
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements AnomalyResult {
@@ -12,6 +15,8 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements A
   private AnomalyFeedbackDTO feedback;
 
   private AnomalyFunctionDTO function;
+
+  private Set<MergedAnomalyResultDTO> children = new HashSet<>();
 
   public MergedAnomalyResultDTO() {
     setCreatedTime(System.currentTimeMillis());
@@ -56,5 +61,13 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements A
 
   public void setFunction(AnomalyFunctionDTO function) {
     this.function = function;
+  }
+
+  public Set<MergedAnomalyResultDTO> getChildren() {
+    return children;
+  }
+
+  public void setChildren(Set<MergedAnomalyResultDTO> children) {
+    this.children = children;
   }
 }

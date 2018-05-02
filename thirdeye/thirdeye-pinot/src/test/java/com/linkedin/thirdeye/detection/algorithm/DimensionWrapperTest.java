@@ -40,13 +40,13 @@ public class DimensionWrapperTest {
   private static final String PROP_CLASS_NAME_VALUE = "MyClassName";
   private static final String PROP_TARGET_VALUE = "myMetricUrn";
 
-  DataProvider provider;
-  DimensionWrapper wrapper;
+  private DataProvider provider;
+  private DimensionWrapper wrapper;
 
-  List<MockDetectionPipeline> runs;
+  private List<MockDetectionPipeline> runs;
 
-  DetectionConfigDTO config;
-  Map<String, Object> properties;
+  private DetectionConfigDTO config;
+  private Map<String, Object> properties;
 
   @BeforeMethod
   public void beforeMethod() {

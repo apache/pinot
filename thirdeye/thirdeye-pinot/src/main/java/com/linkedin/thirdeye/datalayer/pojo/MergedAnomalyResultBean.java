@@ -3,9 +3,11 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.commons.lang.ObjectUtils;
 
 
@@ -32,25 +34,25 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   private boolean notified;
 
   private String message;
+
   private Long detectionConfigId;
-  private Integer parentCount; // number of anomalies this anomaly has been merged into
-  private List<Long> children; // ids of the anomalies this anomaly merged from
+  private Set<Long> childIds; // ids of the anomalies this anomaly merged from
+  private boolean isChild;
 
-  public Integer getParentCount() {
-    return parentCount;
+  public Set<Long> getChildIds() {
+    return childIds;
   }
 
-  public void setParentCount(Integer parentCount) {
-    this.parentCount = parentCount;
+  public void setChildIds(Set<Long> childIds) {
+    this.childIds = childIds;
   }
 
-  public List<Long>
-  getChildren() {
-    return children;
+  public boolean isChild() {
+    return isChild;
   }
 
-  public void setChildren(List<Long> children) {
-    this.children = children;
+  public void setChild(boolean child) {
+    isChild = child;
   }
 
   // TODO: Remove raw anomaly id list after old merged anomalies are cleaned up
