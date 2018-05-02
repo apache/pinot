@@ -1031,7 +1031,8 @@ public class PinotHelixResourceManager {
    * @throws TableAlreadyExistsException for offline tables only if the table already exists
    */
   public void addTable(@Nonnull TableConfig tableConfig) throws IOException {
-    String tableNameWithType = tableConfig.getTableName();
+    final String tableName = tableConfig.getTableName();
+
     TenantConfig tenantConfig;
     if (isSingleTenantCluster()) {
       tenantConfig = new TenantConfig();
@@ -1041,7 +1042,7 @@ public class PinotHelixResourceManager {
     } else {
       tenantConfig = tableConfig.getTenantConfig();
       if (tenantConfig.getBroker() == null || tenantConfig.getServer() == null) {
-        throw new InvalidTableConfigException("Tenant is not configured for table: " + tableNameWithType);
+        throw new InvalidTableConfigException("Tenant is not configured for table: " + tableName);
       }
     }
 
@@ -1051,46 +1052,49 @@ public class PinotHelixResourceManager {
     List<String> brokersForTenant = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenantName);
     if (brokersForTenant.isEmpty()) {
       throw new InvalidTableConfigException(
-          "Broker tenant: " + brokerTenantName + " does not exist for table: " + tableNameWithType);
+          "Broker tenant: " + brokerTenantName + " does not exist for table: " + tableName);
     }
     String serverTenantName =
         ControllerTenantNameBuilder.getTenantName(tenantConfig.getServer(), tableType.getServerType());
     if (_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, serverTenantName).isEmpty()) {
       throw new InvalidTableConfigException(
-          "Server tenant: " + serverTenantName + " does not exist for table: " + tableNameWithType);
+          "Server tenant: " + serverTenantName + " does not exist for table: " + tableName);
     }
 
     SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
     switch (tableType) {
       case OFFLINE:
-        final String offlineTableName = tableConfig.getTableName();
         // existing tooling relies on this check not existing for realtime table (to migrate to LLC)
         // So, we avoid adding that for REALTIME just yet
-        if (getAllTables().contains(offlineTableName)) {
-          throw new TableAlreadyExistsException("Table " + offlineTableName + " already exists");
+        if (getAllTables().contains(tableName)) {
+          throw new TableAlreadyExistsException("Table " + tableName + " already exists");
         }
         // now lets build an ideal state
-        LOGGER.info("building empty ideal state for table : " + offlineTableName);
-        final IdealState offlineIdealState = PinotTableIdealStateBuilder.buildEmptyIdealStateFor(offlineTableName,
+        LOGGER.info("building empty ideal state for table : " + tableName);
+        final IdealState offlineIdealState = PinotTableIdealStateBuilder.buildEmptyIdealStateFor(tableName,
             Integer.parseInt(segmentsConfig.getReplication()));
         LOGGER.info("adding table via the admin");
-        _helixAdmin.addResource(_helixClusterName, offlineTableName, offlineIdealState);
-        LOGGER.info("successfully added the table : " + offlineTableName + " to the cluster");
+        _helixAdmin.addResource(_helixClusterName, tableName, offlineIdealState);
+        LOGGER.info("successfully added the table : " + tableName + " to the cluster");
 
         // lets add table configs
-        ZKMetadataProvider.setOfflineTableConfig(_propertyStore, offlineTableName, TableConfig.toZnRecord(tableConfig));
+        ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableName, TableConfig.toZnRecord(tableConfig));
 
-        _propertyStore.create(ZKMetadataProvider.constructPropertyStorePathForResource(offlineTableName),
-            new ZNRecord(offlineTableName), AccessOption.PERSISTENT);
+        _propertyStore.create(ZKMetadataProvider.constructPropertyStorePathForResource(tableName),
+            new ZNRecord(tableName), AccessOption.PERSISTENT);
 
         // Update replica group partition assignment to the property store if applicable
         updateReplicaGroupPartitionAssignment(tableConfig);
         break;
       case REALTIME:
-        final String realtimeTableName = tableConfig.getTableName();
-        // lets add table configs
+        // Ensure that realtime table is not created for the realtime table
+        Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableName);
+        if (schema == null) {
+          throw new InvalidTableConfigException("No schema defined for realtime table: " + tableName);
+        }
 
-        ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, realtimeTableName,
+        // lets add table configs
+        ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableName,
             TableConfig.toZnRecord(tableConfig));
         /*
          * PinotRealtimeSegmentManager sets up watches on table and segment path. When a table gets created,
@@ -1105,15 +1109,15 @@ public class PinotHelixResourceManager {
          * the low-level consumers.
          */
         IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-        ensureRealtimeClusterIsSetUp(tableConfig, realtimeTableName, indexingConfig);
+        ensureRealtimeClusterIsSetUp(tableConfig, tableName, indexingConfig);
 
-        LOGGER.info("Successfully added or updated the table {} ", realtimeTableName);
+        LOGGER.info("Successfully added or updated the table {} ", tableName);
         break;
       default:
         throw new InvalidTableConfigException("UnSupported table type: " + tableType);
     }
 
-    handleBrokerResource(tableNameWithType, brokersForTenant);
+    handleBrokerResource(tableName, brokersForTenant);
   }
 
   /**
