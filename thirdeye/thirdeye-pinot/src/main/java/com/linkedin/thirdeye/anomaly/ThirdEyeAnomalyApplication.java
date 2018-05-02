@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import com.linkedin.thirdeye.anomaly.classification.ClassificationJobScheduler;
 import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
+import com.linkedin.thirdeye.anomaly.events.HolidayEventResource;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardResource;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardServiceExecutor;
@@ -138,6 +139,7 @@ public class ThirdEyeAnomalyApplication
               new HolidayEventsLoader(config.getHolidayEventsLoaderConfiguration(), config.getCalendarApiKeyPath(),
                   DAORegistry.getInstance().getEventDAO());
           holidayEventsLoader.start();
+          environment.jersey().register(new HolidayEventResource(holidayEventsLoader));
         }
         if (config.isDataCompleteness()) {
           dataCompletenessScheduler = new DataCompletenessScheduler();
@@ -172,6 +174,9 @@ public class ThirdEyeAnomalyApplication
         }
         if (monitorJobScheduler != null) {
           monitorJobScheduler.shutdown();
+        }
+        if (holidayEventsLoader != null) {
+          holidayEventsLoader.shutdown();
         }
         if (alertJobSchedulerV2 != null) {
           alertJobSchedulerV2.shutdown();
