@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.time.TimeUtils;
 import java.util.ArrayList;
 import java.util.List;
 import org.testng.Assert;
@@ -254,8 +255,22 @@ public class FlushThresholdUpdaterTest {
     Assert.assertEquals(segmentMetadata_p1_3.getSizeThresholdToFlushSegment(), expectedNumRows);
     prevRatio = currentRatio;
 
-    // TODO: time threshold reached
-
+    // partition:0 segment:4 commits, time threshold reached
+    segmentSizeBytes = 310 * 1024 * 1024;
+    startOffset_p0 += segmentMetadata_p0_4.getSizeThresholdToFlushSegment() - 2000;
+    updateCommittingSegmentMetadata(segmentMetadata_p0_4, startOffset_p0);
+    segmentMetadata_p0_4.setStartTime(segmentMetadata_p0_4.getEndTime() - TimeUtils.convertPeriodToMillis(
+        SegmentSizeBasedFlushThresholdUpdater.MAX_TIME_THRESHOLD));
+    LLCRealtimeSegmentZKMetadata segmentMetadata_p0_5 =
+        getNextSegmentMetadata(tableName, startOffset_p0, partitionId_0, seqNum_p0++);
+    params = new FlushThresholdUpdaterParams();
+    params.setCommittingSegmentZkMetadata(segmentMetadata_p0_4);
+    params.setCommittingSegmentSizeBytes(segmentSizeBytes);
+    updater.updateFlushThreshold(segmentMetadata_p0_5, params);
+    currentRatio = (double) (segmentMetadata_p0_4.getEndOffset() - segmentMetadata_p0_4.getStartOffset()) / segmentSizeBytes;
+    expectedNumRows = getTargetNumRows(currentRatio, prevRatio);
+    Assert.assertEquals(segmentMetadata_p0_5.getSizeThresholdToFlushSegment(), expectedNumRows);
+    prevRatio = currentRatio;
   }
 
   private int getTargetNumRows(double currentRatio, double prevRatio) {
