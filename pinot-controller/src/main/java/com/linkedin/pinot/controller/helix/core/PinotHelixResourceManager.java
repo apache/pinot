@@ -1032,6 +1032,7 @@ public class PinotHelixResourceManager {
    */
   public void addTable(@Nonnull TableConfig tableConfig) throws IOException {
     String tableNameWithType = tableConfig.getTableName();
+
     TenantConfig tenantConfig;
     if (isSingleTenantCluster()) {
       tenantConfig = new TenantConfig();
@@ -1088,8 +1089,14 @@ public class PinotHelixResourceManager {
         break;
       case REALTIME:
         final String realtimeTableName = tableConfig.getTableName();
-        // lets add table configs
 
+        // Ensure that realtime table is not created for the realtime table
+        Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, realtimeTableName);
+        if (schema == null) {
+          throw new InvalidTableConfigException("No schema defined for realtime table: " + tableNameWithType);
+        }
+
+        // lets add table configs
         ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, realtimeTableName,
             TableConfig.toZnRecord(tableConfig));
         /*
