@@ -12,8 +12,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -23,8 +25,10 @@ public class MergeWrapperTest {
   private DetectionConfigDTO config;
   private MergeWrapper wrapper;
   private Map<String, Object> properties;
+  private Map<String, Map<String, Object>> nestedPropertiesMap;
   private DataProvider provider;
   private List<MockMergerPipeline> runs;
+  private List<MockMergerPipelineOutput> outputs;
 
   private static final Long PROP_ID_VALUE = 1000L;
   private static final String PROP_NAME_VALUE = "myName";
@@ -54,9 +58,9 @@ public class MergeWrapperTest {
     nestedPropertiesTwo.put(PROP_TARGET, PROP_TARGET_VALUE);
     nestedPropertiesTwo.put(PROP_METRIC_URN, "thirdeye:metric:2");
 
-    Map<String, Map<String, Object>> nestedPropertiesMap = new HashMap<>();
-    nestedPropertiesMap.put("one", nestedPropertiesOne);
-    nestedPropertiesMap.put("two", nestedPropertiesTwo);
+    this.nestedPropertiesMap = new HashMap<>();
+    this.nestedPropertiesMap.put("one", nestedPropertiesOne);
+    this.nestedPropertiesMap.put("two", nestedPropertiesTwo);
 
     this.properties.put(PROP_PROPERTIES_MAP, nestedPropertiesMap);
 
@@ -69,19 +73,19 @@ public class MergeWrapperTest {
     existing.add(makeAnomaly(PROP_ID_VALUE,    0, 1000, Collections.<String, String>emptyMap()));
     existing.add(makeAnomaly(PROP_ID_VALUE, 1500, 2000, Collections.<String, String>emptyMap()));
 
-    List<MockMergerPipelineOutput> outputs = new ArrayList<>();
+    this.outputs = new ArrayList<>();
 
-    outputs.add(new MockMergerPipelineOutput(Arrays.asList(
+    this.outputs.add(new MockMergerPipelineOutput(Arrays.asList(
         makeAnomaly(PROP_ID_VALUE, 1100, 1200, Collections.<String, String>emptyMap()),
         makeAnomaly(PROP_ID_VALUE, 2200, 2300, Collections.<String, String>emptyMap())
     ), 2900));
 
-    outputs.add(new MockMergerPipelineOutput(Arrays.asList(
+    this.outputs.add(new MockMergerPipelineOutput(Arrays.asList(
         makeAnomaly(PROP_ID_VALUE, 1150, 1250, Collections.<String, String>emptyMap()),
         makeAnomaly(PROP_ID_VALUE, 2400, 2800, Collections.<String, String>emptyMap())
     ), 3000));
 
-    MockMergerLoader mockLoader = new MockMergerLoader(this.runs, outputs);
+    MockMergerLoader mockLoader = new MockMergerLoader(this.runs, this.outputs);
 
     this.provider = new MockDataProvider()
         .setAnomalies(existing)
@@ -128,7 +132,57 @@ public class MergeWrapperTest {
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(PROP_ID_VALUE, 2400, 2800, Collections.<String, String>emptyMap())));
   }
 
-  // TODO dimension tests
+  @Test
+  public void testMergerExecution() throws Exception {
+    this.wrapper = new MergeWrapper(this.provider, this.config, 1000, 3000);
+    this.wrapper.run();
+
+    Assert.assertEquals(this.runs.size(), 2);
+
+    Set<String> metrics = new HashSet<>();
+    for (MockMergerPipeline run : this.runs) {
+      metrics.add(run.getConfig().getProperties().get(PROP_METRIC_URN).toString());
+    }
+
+    Assert.assertEquals(metrics, new HashSet<>(Arrays.asList("thirdeye:metric:1", "thirdeye:metric:2")));
+  }
+
+  @Test
+  public void testMergerDimensions() throws Exception {
+    this.config.getProperties().put(PROP_MAX_GAP, 200);
+    this.config.getProperties().put(PROP_MAX_DURATION, 1250);
+
+    this.outputs.add(new MockMergerPipelineOutput(Arrays.asList(
+        makeAnomaly(PROP_ID_VALUE, 1150, 1250, Collections.singletonMap("key", "value")),
+        makeAnomaly(PROP_ID_VALUE, 2400, 2800, Collections.singletonMap("otherKey", "value"))
+    ), 3000));
+
+    this.outputs.add(new MockMergerPipelineOutput(Arrays.asList(
+        makeAnomaly(PROP_ID_VALUE, 1250, 1300, Collections.singletonMap("key", "value")),
+        makeAnomaly(PROP_ID_VALUE, 2700, 2900, Collections.singletonMap("otherKey", "otherValue"))
+    ), 3000));
+
+    Map<String, Object> nestedPropertiesThree = new HashMap<>();
+    nestedPropertiesThree.put(PROP_TARGET, PROP_TARGET_VALUE);
+    nestedPropertiesThree.put(PROP_METRIC_URN, "thirdeye:metric:1");
+
+    Map<String, Object> nestedPropertiesFour = new HashMap<>();
+    nestedPropertiesFour.put(PROP_TARGET, PROP_TARGET_VALUE);
+    nestedPropertiesFour.put(PROP_METRIC_URN, "thirdeye:metric:1");
+
+    this.nestedPropertiesMap.put("three", nestedPropertiesThree);
+    this.nestedPropertiesMap.put("four", nestedPropertiesFour);
+
+    this.wrapper = new MergeWrapper(this.provider, this.config, 1000, 3000);
+    DetectionPipelineResult output = this.wrapper.run();
+
+    Assert.assertEquals(output.getAnomalies().size(), 13);
+    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(PROP_ID_VALUE, 0, 1250, Collections.<String, String>emptyMap())));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(PROP_ID_VALUE, 1500, 2300, Collections.<String, String>emptyMap())));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(PROP_ID_VALUE, 2400, 2800, Collections.<String, String>emptyMap())));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(PROP_ID_VALUE, 1150, 1300, Collections.singletonMap("key", "value"))));
+  }
 
   static MergedAnomalyResultDTO makeAnomaly(long configId, long start, long end, Map<String, String> dimensions) {
     MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();

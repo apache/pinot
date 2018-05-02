@@ -170,6 +170,14 @@ public class MergeWrapper extends DetectionPipeline {
 
   private MergedAnomalyResultDTO findParent(List<MergedAnomalyResultDTO> parents, MergedAnomalyResultDTO candidate) {
     for (MergedAnomalyResultDTO parent : parents) {
+      if (!Objects.equals(candidate.getMetric(), parent.getMetric())) {
+        continue;
+      }
+
+      if (!Objects.equals(candidate.getCollection(), parent.getCollection())) {
+        continue;
+      }
+
       if (!Objects.equals(candidate.getDimensions(), parent.getDimensions())) {
         continue;
       }
