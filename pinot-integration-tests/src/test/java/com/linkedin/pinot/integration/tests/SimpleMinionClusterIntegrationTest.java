@@ -216,6 +216,11 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       }
       return taskConfigs;
     }
+
+    @Override
+    public int getNumConcurrentTasksPerInstance() {
+      return DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
+    }
   }
 
   public static class TestTaskExecutorFactory implements PinotTaskExecutorFactory {

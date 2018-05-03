@@ -136,4 +136,9 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
 
     return pinotTaskConfigs;
   }
+
+  @Override
+  public int getNumConcurrentTasksPerInstance() {
+    return DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
+  }
 }
