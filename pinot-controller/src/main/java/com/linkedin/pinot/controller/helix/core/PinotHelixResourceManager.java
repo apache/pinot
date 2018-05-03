@@ -20,6 +20,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
@@ -547,23 +548,23 @@ public class PinotHelixResourceManager {
     return res;
   }
 
-  public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(@Nonnull final String tableNameWithType) {
+  public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(@Nonnull final String tableNameWithType)
+      throws Exception {
     // Get the broker tag for this table
     String brokerTag;
-    TenantConfig tenantConfig;
+    TableConfig tableConfig;
 
     try {
-      TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-      if (tableConfig == null) {
-        return new PinotResourceManagerResponse("Table " + tableNameWithType + " does not exist", false);
-      }
-      tenantConfig = tableConfig.getTenantConfig();
+      tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while getting tenant config for table {}", tableNameWithType, e);
-      return new PinotResourceManagerResponse(
-          "Failed to fetch broker tag for table " + tableNameWithType + " due to exception: " + e.getMessage(), false);
+      LOGGER.warn("Caught exception while getting table config for table {}", tableNameWithType, e);
+      throw new InvalidTableConfigException("Failed to fetch broker tag for table " + tableNameWithType + " due to exception: " + e.getMessage());
     }
-
+    if (tableConfig == null) {
+      LOGGER.warn("Table " + tableNameWithType + " does not exist");
+      throw new InvalidConfigException("Invalid table configuration for table " + tableNameWithType + ". Table does not exist");
+    }
+    TenantConfig tenantConfig = tableConfig.getTenantConfig();
     brokerTag = tenantConfig.getBroker();
 
     // Look for all instances tagged with this broker tag
@@ -577,8 +578,7 @@ public class PinotHelixResourceManager {
     Set<String> idealStateBrokerInstances = brokerIdealState.getInstanceSet(tableNameWithType);
 
     if (idealStateBrokerInstances.equals(brokerInstances)) {
-      return new PinotResourceManagerResponse(
-          "Broker resource is not rebuilt because ideal state is the same for table {} " + tableNameWithType, false);
+      return new PinotResourceManagerResponse("Broker resource is not rebuilt because ideal state is the same for table: " + tableNameWithType, true);
     }
 
     // Reset ideal state with the instance list
@@ -606,9 +606,7 @@ public class PinotHelixResourceManager {
     } catch (Exception e) {
       LOGGER.warn("Caught exception while rebuilding broker resource from Helix tags for table {}", e,
           tableNameWithType);
-      return new PinotResourceManagerResponse(
-          "Failed to rebuild brokerResource for table " + tableNameWithType + " due to exception: " + e.getMessage(),
-          false);
+      throw e;
     }
   }
 

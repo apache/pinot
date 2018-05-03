@@ -17,6 +17,7 @@ package com.linkedin.pinot.controller.validation;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -127,29 +128,25 @@ public class ValidationManager {
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
 
     for (String tableNameWithType : allTableNames) {
-      _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(tableNameWithType);
-      LOGGER.info("Starting to validate table: {}", tableNameWithType);
+      try {
+        _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(tableNameWithType);
+        LOGGER.info("Starting to validate table: {}", tableNameWithType);
 
-      // For each table, fetch the metadata for all its segments
-      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      if (tableType == TableType.OFFLINE) {
-        validateOfflineSegmentPush(propertyStore, tableNameWithType);
-      } else {
-        TableConfig tableConfig = null;
-        try {
-          tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableNameWithType);
+        // For each table, fetch the metadata for all its segments
+        TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+        if (tableType == TableType.OFFLINE) {
+          validateOfflineSegmentPush(propertyStore, tableNameWithType);
+        } else {
+          TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableNameWithType);
           if (tableConfig == null) {
+            LOGGER.warn("Table config not found for table: {}. Skipping validation.", tableNameWithType);
             continue;
           }
           updateRealtimeDocumentCount(propertyStore, tableConfig);
           _llcRealtimeSegmentManager.validateLLCSegments(tableConfig);
-        } catch (Exception e) {
-          if (tableConfig == null) {
-            LOGGER.warn("Cannot get realtime table config for table: {}", tableNameWithType);
-          } else {
-            LOGGER.error("Exception while validating table: {}", tableNameWithType, e);
-          }
         }
+      } catch (Exception e) {
+        LOGGER.warn("Exception validating table: {}", tableNameWithType, e);
       }
     }
     LOGGER.info("Validation completed");
