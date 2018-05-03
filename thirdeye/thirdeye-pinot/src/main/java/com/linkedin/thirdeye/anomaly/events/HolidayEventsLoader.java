@@ -239,7 +239,7 @@ public class HolidayEventsLoader implements Runnable {
     try {
       newHolidays = getAllHolidays(start, end);
     } catch (Exception e) {
-      LOG.error("Fetch holidays failed. Aborting.");
+      LOG.error("Fetch holidays failed. Aborting.", e);
       return;
     }
     Map<HolidayEvent, Set<String>> newHolidayEventToCountryCodes = aggregateCountryCodesGroupByHolidays(newHolidays);
@@ -356,7 +356,7 @@ public class HolidayEventsLoader implements Runnable {
       try {
         events.addAll(this.getCalendarEvents(calendar, start, end));
       } catch (GoogleJsonResponseException e) {
-        LOG.warn("Fetch holiday events failed in calendar {}. {}", calendar, e.getDetails());
+        LOG.warn("Fetch holiday events failed in calendar {}.", calendar, e);
       }
     }
     return events;
