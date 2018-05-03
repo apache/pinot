@@ -162,6 +162,12 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     return convertMergedAnomalyBean2DTO(list);
   }
 
+  @Override
+  public List<MergedAnomalyResultDTO> findByDetectionConfigAndIdGreaterThan(Long detectionConfigId, Long anomalyId) {
+    Predicate predicate = Predicate.AND(Predicate.EQ("detectionConfigId", detectionConfigId), Predicate.GT("baseId", anomalyId));
+    List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
+    return convertMergedAnomalyBean2DTO(list);
+  }
 
   @Override
   public List<MergedAnomalyResultDTO> findByStartTimeInRangeAndFunctionId(long startTime, long endTime,

@@ -161,7 +161,8 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       anomalyFeed.init(alertFilterFactory, anomalyFeedConfig);
       Collection<MergedAnomalyResultDTO> anaomalyAlertCandidates = anomalyFeed.getAnomalyFeed();
       mergedAnomaliesAllResults.addAll(anaomalyAlertCandidates);
-    } else if (emailConfig != null && emailConfig.getFunctionIds() != null) {
+    } else if (emailConfig != null && emailConfig.getFunctionIds() != null
+        && CollectionUtils.isNotEmpty(emailConfig.getFunctionIds())) {
       LOG.info("Use Email Config for alert {}", alertConfig.getId());
       List<Long> functionIds = alertConfig.getEmailConfig().getFunctionIds();
       long lastNotifiedAnomaly = emailConfig.getAnomalyWatermark();
@@ -180,9 +181,23 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           mergedAnomaliesAllResults.addAll(filteredAnomalies);
         }
       }
+    } else if (emailConfig != null && emailConfig.getDetectionConfigIds() != null) {
+      LOG.info("Use Detection Config for alert {}", alertConfig.getId());
+      List<Long> detectionConfigIds = emailConfig.getDetectionConfigIds();
+      long lastNotifiedAnomaly = emailConfig.getAnomalyWatermark();
+      for (Long configId : detectionConfigIds) {
+        mergedAnomaliesAllResults.addAll(anomalyMergedResultDAO.findByDetectionConfigAndIdGreaterThan(configId, lastNotifiedAnomaly));
+      }
     }
-    // apply filtration rule
-    results = AlertFilterHelper.applyFiltrationRule(mergedAnomaliesAllResults, alertFilterFactory);
+
+
+    if (emailConfig != null && emailConfig.getDetectionConfigIds() != null && CollectionUtils.isNotEmpty(emailConfig.getDetectionConfigIds())){
+      // turn off alert filter for detection pipelines
+      results = mergedAnomaliesAllResults;
+    } else {
+      // apply filtration rule
+      results = AlertFilterHelper.applyFiltrationRule(mergedAnomaliesAllResults, alertFilterFactory);
+    }
 
     // only anomalies detected by default scheduler are sent; the anomalies detected during replay or given by users will not be sent
     Iterator<MergedAnomalyResultDTO> mergedAnomalyIterator = results.iterator();
