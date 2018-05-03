@@ -566,7 +566,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   public static PinotThirdEyeDataSource getDefaultTestDataSource() {
     // TODO REPLACE WITH CONFIGS
     String controllerHost = "localhost";
-    int controllerPort = 11984;
+    int controllerPort = 10611;
     String zkUrl = "localhost:12913/pinot-cluster";
     return fromZookeeper(controllerHost, controllerPort, zkUrl);
   }
