@@ -46,14 +46,21 @@ const deleteAlert = functionId => `/dashboard/anomaly-function?id=${functionId}`
  * @param {String} metricName: metric name
  * @see {@link https://tinyurl.com/y7hhzm33|class DataResource}
  */
-const metricAutoComplete = metricName => `/data/autocomplete/metric?name=${metricName}`;
+const metricAutoComplete = metricName => `/data/autocomplete/metric?name=${encodeURIComponent(metricName)}`;
 
 /**
  * GET autocomplete request for alert by name
  * @param {String} functionName: alert name
  * @see {@link https://tinyurl.com/ybelagey|class DataResource}
  */
-const alertAutoComplete = functionName => `/data/autocomplete/functionByName?name=${functionName}`;
+const alertFunctionByName = functionName => `/data/autocomplete/functionByName?name=${encodeURIComponent(functionName)}`;
+
+/**
+ * GET autocomplete request for alert by app name
+ * @param {String} appName: application name
+ * @see {@link https://tinyurl.com/ybelagey|class DataResource}
+ */
+const alertFunctionByAppName = appName => `/data/autocomplete/functionByAppname?appname=${encodeURIComponent(appName)}`;
 
 /**
  * GET a single function record by id
@@ -119,12 +126,14 @@ const createNewDataset = '/onboard/create';
 
 /**
  * General self-serve endpoints
+ * TODO: rename these API utils according to entity, not UI features (self-serve, rca)
  */
 export const selfServeApiCommon = {
   alertById,
   allConfigGroups,
   allApplications,
-  alertAutoComplete,
+  alertFunctionByName,
+  alertFunctionByAppName,
   metricAutoComplete
 };
 
