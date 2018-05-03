@@ -66,9 +66,9 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
 
   @Test
   public void testBadContentType() throws JSONException, JsonProcessingException {
-    JSONObject schema = createDefaultSchema();
+    Schema schema = createDummySchema("testSchema");
     try {
-      sendPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.toString());
+      sendPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.getJSONSchema());
     } catch (IOException e) {
       // TODO The Jersey API returns 400, so we need to check return code here not a string.
 //      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 415"), e.getMessage());
@@ -80,19 +80,16 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
 
   @Test
   public void testCreateUpdateSchema() throws JSONException, IOException {
-    JSONObject schema = createDefaultSchema();
+    String schemaName = "testSchema";
+    Schema schema = createDummySchema(schemaName);
     String url = _controllerRequestURLBuilder.forSchemaCreate();
     PostMethod postMethod = sendMultipartPostRequest(url, schema.toString());
     Assert.assertEquals(postMethod.getStatusCode(), 200);
 
-    JSONArray dimSpecs = schema.getJSONArray("dimensionFieldSpecs");
-    DimensionFieldSpec df = new DimensionFieldSpec("NewColumn", FieldSpec.DataType.STRING, true);
-    dimSpecs.put(new JSONObject(OBJECT_MAPPER.writeValueAsString(df)));
-
+    schema.addField(new DimensionFieldSpec("NewColumn", FieldSpec.DataType.STRING, true));
     postMethod = sendMultipartPostRequest(url, schema.toString());
     Assert.assertEquals(postMethod.getStatusCode(), 200);
 
-    final String schemaName = schema.getString("schemaName");
     String schemaStr = sendGetRequest(_controllerRequestURLBuilder.forSchemaGet(schemaName));
     Schema readSchema = Schema.fromString(schemaStr);
     Schema inputSchema = Schema.fromString(schema.toString());
@@ -101,8 +98,7 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
 
     final String yetAnotherColumn = "YetAnotherColumn";
     Assert.assertFalse(readSchema.getFieldSpecMap().containsKey(yetAnotherColumn));
-    df = new DimensionFieldSpec(yetAnotherColumn, FieldSpec.DataType.STRING, true);
-    dimSpecs.put(new JSONObject(OBJECT_MAPPER.writeValueAsString(df)));
+    schema.addField(new DimensionFieldSpec(yetAnotherColumn, FieldSpec.DataType.STRING, true));
     PutMethod putMethod =
         sendMultipartPutRequest(_controllerRequestURLBuilder.forSchemaUpdate(schemaName), schema.toString());
     Assert.assertEquals(putMethod.getStatusCode(), 200);
@@ -119,7 +115,7 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
     // invalid json
     Assert.assertEquals(putMethod.getStatusCode(), 400);
 
-    schema.put("schemaName", "differentSchemaName");
+    schema.setSchemaName("differentSchemaName");
     putMethod = sendMultipartPutRequest(_controllerRequestURLBuilder.forSchemaUpdate(schemaName), schema.toString());
     Assert.assertEquals(putMethod.getStatusCode(), 400);
   }

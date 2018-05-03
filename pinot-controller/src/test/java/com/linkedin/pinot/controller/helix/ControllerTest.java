@@ -15,6 +15,11 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
@@ -28,7 +33,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLConnection;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
@@ -41,6 +45,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.json.JSONException;
 import org.testng.Assert;
 
 
@@ -49,6 +54,7 @@ import org.testng.Assert;
  */
 public abstract class ControllerTest {
   public static final String LOCAL_HOST = "localhost";
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private static final int DEFAULT_CONTROLLER_PORT = 8998;
   private static final String DEFAULT_DATA_DIR =
@@ -135,6 +141,32 @@ public abstract class ControllerTest {
     _controllerStarter = null;
     FileUtils.deleteQuietly(new File(_controllerDataDir));
     _zkClient.close();
+  }
+
+  protected Schema createDummySchema(String tableName) throws JSONException {
+    Schema schema = new Schema();
+    schema.setSchemaName(tableName);
+    schema.addField(new DimensionFieldSpec("dimA", FieldSpec.DataType.STRING, true, ""));
+    schema.addField(new DimensionFieldSpec("dimB", FieldSpec.DataType.STRING, true, 0));
+
+    schema.addField(new MetricFieldSpec("metricA", FieldSpec.DataType.INT, 0));
+    schema.addField(new MetricFieldSpec("metricB", FieldSpec.DataType.DOUBLE, -1));
+
+    return schema;
+  }
+
+  protected void addDummySchema(String tableName) throws JSONException, IOException {
+    addSchema(createDummySchema(tableName).getJSONSchema());
+  }
+
+  /**
+   * Add a schema to the controller.
+   * @param schemaJson the json string representing the schema
+   */
+  protected void addSchema(String schemaJson) throws IOException {
+    String url = _controllerRequestURLBuilder.forSchemaCreate();
+    PostMethod postMethod = sendMultipartPostRequest(url, schemaJson);
+    Assert.assertEquals(postMethod.getStatusCode(), 200);
   }
 
   public static String sendGetRequest(String urlString) throws IOException {
