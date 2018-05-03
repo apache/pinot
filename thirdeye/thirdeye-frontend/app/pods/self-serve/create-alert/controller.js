@@ -245,7 +245,7 @@ export default Controller.extend({
    * @return {Promise}
    */
   fetchAlertsByName(functionName) {
-    const url = selfServeApiCommon.alertAutoComplete(functionName);
+    const url = selfServeApiCommon.alertFunctionByName(functionName);
     return fetch(url).then(checkStatus);
   },
 

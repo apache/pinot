@@ -27,6 +27,10 @@ import {
   buildMetricDataUrl,
   extractSeverity
 } from 'thirdeye-frontend/utils/manage-alert-utils';
+import {
+  selfServeApiCommon,
+  selfServeApiGraph
+} from 'thirdeye-frontend/utils/api/self-serve';
 import { anomalyResponseObj } from 'thirdeye-frontend/utils/anomaly';
 import { getAnomalyDataUrl } from 'thirdeye-frontend/utils/api/anomaly';
 
@@ -226,7 +230,7 @@ export default Route.extend({
     // Load endpoints for projected metrics. TODO: consolidate into CP if duplicating this logic
     const qsParams = `start=${baseStart.utc().format(dateFormat)}&end=${baseEnd.utc().format(dateFormat)}&useNotified=true`;
     const anomalyDataUrl = getAnomalyDataUrl(startStamp, endStamp);
-    const metricsUrl = `/data/autocomplete/metric?name=${dataset}::${metricName}`;
+    const metricsUrl = selfServeApiCommon.metricAutoComplete(metricName);
     const anomaliesUrl = `/dashboard/anomaly-function/${alertId}/anomalies?${qsParams}`;
     let anomalyPromiseHash = {
       projectedMttd: 0,
@@ -257,7 +261,7 @@ export default Route.extend({
           anomaliesUrl,
           config
         });
-        const maxTimeUrl = `/data/maxDataTime/metricId/${metricId}`;
+        const maxTimeUrl = selfServeApiGraph.maxDataTime(metricId);
         const maxTime = isReplayDone ? await fetch(maxTimeUrl).then(checkStatus) : moment().valueOf();
         Object.assign(model, { metricDataUrl: buildMetricDataUrl({
           maxTime,
