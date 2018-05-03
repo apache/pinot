@@ -2,17 +2,17 @@ package com.linkedin.thirdeye.anomaly.onboard;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
-import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
+import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardJobStatus;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import com.linkedin.thirdeye.api.Constants;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.GET;
@@ -21,12 +21,14 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
+/**
+ * NOTE: This resource was re-written for backwards-compatibility with existing UI code.
+ */
 @Path("/detection-onboard")
 @Produces(MediaType.APPLICATION_JSON)
 @Api(tags = {Constants.ONBOARD_TAG})
@@ -34,23 +36,21 @@ public class DetectionOnboardResource {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionOnboardResource.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private DetectionOnboardService detectionOnboardService;
-  private Configuration systemConfig;
+  private final TaskManager taskDAO;
+  private final AnomalyFunctionManager anomalyDAO;
 
-  public DetectionOnboardResource(DetectionOnboardService detectionOnboardService, Configuration systemConfig) {
-    Preconditions.checkNotNull(detectionOnboardService);
-    Preconditions.checkNotNull(systemConfig);
-    this.systemConfig = systemConfig;
-    this.detectionOnboardService = detectionOnboardService;
+  public DetectionOnboardResource(TaskManager taskDAO, AnomalyFunctionManager anomalyDAO) {
+    this.taskDAO = taskDAO;
+    this.anomalyDAO = anomalyDAO;
   }
 
   /**
    * Create a job with the given name and properties.
    *
-   * @param jobName     the unique name for the job.
+   * @param jobName     the unique name for the job. Must be equal to anomaly function name.
    * @param jsonPayload a map of properties in JSON string.
    *
-   * @return Job status in JSON string.
+   * @return Job name
    */
   @POST
   @Path("/create-job")
@@ -58,39 +58,59 @@ public class DetectionOnboardResource {
   public String createDetectionOnboardingJob(@ApiParam(required = true) @NotNull @QueryParam("jobName") String jobName,
       @ApiParam("jsonPayload") String jsonPayload) {
 
-    // Check user's input
+    // Check user input
     if (jsonPayload == null) {
       jsonPayload = "";
     }
 
-    // Invoke backend function
-    DetectionOnboardJobStatus detectionOnboardingJobStatus;
+    long anomalyFunctionId;
+    Map<String, String> properties;
+
     try {
-      Map<String, String> properties = OBJECT_MAPPER.readValue(jsonPayload, Map.class);
+      properties = OBJECT_MAPPER.readValue(jsonPayload, Map.class);
 
-      // Put System Configuration into properties
-      Iterator<String> systemConfigKeyIterator = systemConfig.getKeys();
-      while (systemConfigKeyIterator.hasNext()) {
-        String systemConfigKey = systemConfigKeyIterator.next();
-        properties.put(systemConfigKey, systemConfig.getString(systemConfigKey));
-      }
+      // create minimal anomaly function
+      AnomalyFunctionDTO function = new AnomalyFunctionDTO();
+      function.setFunctionName(jobName);
+      function.setMetricId(-1);
+      function.setIsActive(false);
+      anomalyFunctionId = anomalyDAO.save(function);
 
-      // TODO: Dynamically create different type of Detection Onboard Job?
-      long jobId =
-          detectionOnboardService.createDetectionOnboardingJob(new DefaultDetectionOnboardJob(jobName, properties));
-      detectionOnboardingJobStatus = detectionOnboardService.getDetectionOnboardingJobStatus(jobId);
     } catch (Exception e) {
-      detectionOnboardingJobStatus = new DetectionOnboardJobStatus(-1, jobName, JobConstants.JobStatus.FAILED,
-          String.format("Failed to create job %s. %s", jobName, ExceptionUtils.getStackTrace(e)));
+      return makeErrorStatus(-1, jobName, JobConstants.JobStatus.FAILED);
     }
 
-    return detectionOnboardJobStatusToJsonString(detectionOnboardingJobStatus);
+    try {
+      // launch minimal task (with job id == anomalyFunctionId)
+      // NOTE: the existing task framework is an incredible hack
+
+      ReplayTaskInfo taskInfo = new ReplayTaskInfo();
+      taskInfo.setJobName(jobName);
+      taskInfo.setProperties(properties);
+
+      String taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);
+
+      TaskDTO task = new TaskDTO();
+      task.setTaskType(TaskConstants.TaskType.REPLAY);
+      task.setJobName(jobName);
+      task.setStatus(TaskConstants.TaskStatus.WAITING);
+      task.setStartTime(System.currentTimeMillis());
+      task.setTaskInfo(taskInfoJson);
+      task.setJobId(anomalyFunctionId);
+      this.taskDAO.save(task);
+
+      return detectionOnboardJobStatusToJsonString(new DetectionOnboardJobStatus(anomalyFunctionId, jobName, JobConstants.JobStatus.SCHEDULED, ""));
+    } catch (Exception e) {
+      this.anomalyDAO.deleteById(anomalyFunctionId);
+      return makeErrorStatus(-1, jobName, JobConstants.JobStatus.FAILED);
+    }
+
   }
 
   /**
    * Returns the job status in JSON string.
    *
-   * @param jobId the id of the job.
+   * @param jobId the name of the job.
    *
    * @return the job status in JSON string.
    */
@@ -98,14 +118,30 @@ public class DetectionOnboardResource {
   @Path("/get-status")
   @ApiOperation("GET request for job status (a sequence of events including create, replay, autotune)")
   public String getDetectionOnboardingJobStatus(@QueryParam("jobId") long jobId) {
-    DetectionOnboardJobStatus detectionOnboardingJobStatus =
-        detectionOnboardService.getDetectionOnboardingJobStatus(jobId);
-    // Create StatusNotFound message
-    if (detectionOnboardingJobStatus == null) {
-      detectionOnboardingJobStatus = new DetectionOnboardJobStatus(jobId, "Unknown Job", JobConstants.JobStatus.UNKNOWN,
-          String.format("Unable to find job id: %d", jobId));
+    AnomalyFunctionDTO anomalyFunction = this.anomalyDAO.findById(jobId);
+    if (anomalyFunction == null) {
+      return makeErrorStatus(jobId, "Unknown Job", JobConstants.JobStatus.UNKNOWN);
     }
+
+    DetectionOnboardJobStatus detectionOnboardingJobStatus = anomalyFunction.getOnboardJobStatus();
+    if (detectionOnboardingJobStatus == null) {
+      return makeErrorStatus(jobId, anomalyFunction.getFunctionName(), JobConstants.JobStatus.SCHEDULED);
+    }
+
     return detectionOnboardJobStatusToJsonString(detectionOnboardingJobStatus);
+  }
+
+  /**
+   * Helper. Returns serialized job status
+   *
+   * @param jobId job id
+   * @param jobName job name
+   * @param jobStatus job status
+   * @return
+   */
+  private String makeErrorStatus(long jobId, String jobName, JobConstants.JobStatus jobStatus) {
+    return detectionOnboardJobStatusToJsonString(
+        new DetectionOnboardJobStatus(jobId, jobName, jobStatus, String.format("Job %d", jobId)));
   }
 
   /**
@@ -125,23 +161,4 @@ public class DetectionOnboardResource {
     }
   }
 
-  public static Configuration toSystemConfiguration(ThirdEyeAnomalyConfiguration thirdeyeConfigs) {
-    Preconditions.checkNotNull(thirdeyeConfigs);
-    SmtpConfiguration smtpConfiguration = thirdeyeConfigs.getSmtpConfiguration();
-    Preconditions.checkNotNull(smtpConfiguration);
-
-    Map<String, String> systemConfig = new HashMap<>();
-    systemConfig.put(DefaultDetectionOnboardJob.FUNCTION_FACTORY_CONFIG_PATH, thirdeyeConfigs.getFunctionConfigPath());
-    systemConfig.put(DefaultDetectionOnboardJob.ALERT_FILTER_FACTORY_CONFIG_PATH, thirdeyeConfigs.getAlertFilterConfigPath());
-    systemConfig.put(DefaultDetectionOnboardJob.ALERT_FILTER_AUTOTUNE_FACTORY_CONFIG_PATH, thirdeyeConfigs.getFilterAutotuneConfigPath());
-    systemConfig.put(DefaultDetectionOnboardJob.SMTP_HOST, smtpConfiguration.getSmtpHost());
-    systemConfig.put(DefaultDetectionOnboardJob.SMTP_PORT, Integer.toString(smtpConfiguration.getSmtpPort()));
-    systemConfig.put(DefaultDetectionOnboardJob.THIRDEYE_DASHBOARD_HOST, thirdeyeConfigs.getDashboardHost());
-    systemConfig.put(DefaultDetectionOnboardJob.PHANTON_JS_PATH, thirdeyeConfigs.getPhantomJsPath());
-    systemConfig.put(DefaultDetectionOnboardJob.ROOT_DIR, thirdeyeConfigs.getRootDir());
-    systemConfig.put(DefaultDetectionOnboardJob.DEFAULT_ALERT_SENDER_ADDRESS, thirdeyeConfigs.getFailureFromAddress());
-    systemConfig.put(DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER_ADDRESS, thirdeyeConfigs.getFailureToAddress());
-
-    return new MapConfiguration(systemConfig);
-  }
 }

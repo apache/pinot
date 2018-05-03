@@ -9,8 +9,8 @@ import com.linkedin.thirdeye.alert.content.OnboardingNotificationEmailContentFor
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
-import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardTask;
-import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardExecutionContext;
+import com.linkedin.thirdeye.anomaly.onboard.framework.BaseDetectionOnboardTask;
+import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardExecutionContext;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;

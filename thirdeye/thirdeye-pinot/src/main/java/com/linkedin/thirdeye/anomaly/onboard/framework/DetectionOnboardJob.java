@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.onboard;
+package com.linkedin.thirdeye.anomaly.onboard.framework;
 
 import java.util.List;
 import org.apache.commons.configuration.Configuration;

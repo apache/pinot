@@ -18,7 +18,7 @@ import { equal, reads } from '@ember/object/computed';
 
 const ROOTCAUSE_HIDDEN_DEFAULT = 'default';
 
-const OFFSETS = ['current', 'predicted', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
+const OFFSETS = ['current', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
 
 /**
  * Maps the status from the db to something human readable to display on the form

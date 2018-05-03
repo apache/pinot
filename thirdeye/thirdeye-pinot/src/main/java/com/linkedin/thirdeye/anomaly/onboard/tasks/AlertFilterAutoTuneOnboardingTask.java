@@ -3,14 +3,11 @@ package com.linkedin.thirdeye.anomaly.onboard.tasks;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
-import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardTask;
-import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardExecutionContext;
+import com.linkedin.thirdeye.anomaly.onboard.framework.BaseDetectionOnboardTask;
+import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardExecutionContext;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.util.StringUtils;
-import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.io.IOException;
 import java.util.List;
@@ -18,11 +15,8 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.Configuration;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.joda.time.DateTime;
-import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static com.linkedin.thirdeye.dataframe.StringSeries.*;
 
 
 /**

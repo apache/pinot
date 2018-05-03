@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.onboard;
+package com.linkedin.thirdeye.anomaly.onboard.framework;
 
 
 public interface DetectionOnboardTask {

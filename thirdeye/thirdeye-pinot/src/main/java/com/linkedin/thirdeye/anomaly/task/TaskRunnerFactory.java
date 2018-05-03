@@ -1,9 +1,10 @@
 package com.linkedin.thirdeye.anomaly.task;
 
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
-import com.linkedin.thirdeye.anomaly.detection.DetectionTaskRunner;
 import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
+import com.linkedin.thirdeye.anomaly.detection.DetectionTaskRunner;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskRunner;
+import com.linkedin.thirdeye.anomaly.onboard.ReplayTaskRunner;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskRunner;
 
@@ -34,6 +35,8 @@ public class TaskRunnerFactory {
       case CLASSIFICATION:
         taskRunner = new ClassificationTaskRunner();
         break;
+      case REPLAY:
+        taskRunner = new ReplayTaskRunner();
       default:
     }
     return taskRunner;

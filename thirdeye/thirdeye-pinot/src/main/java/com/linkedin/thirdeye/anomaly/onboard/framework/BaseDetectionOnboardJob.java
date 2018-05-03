@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.onboard;
+package com.linkedin.thirdeye.anomaly.onboard.framework;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;

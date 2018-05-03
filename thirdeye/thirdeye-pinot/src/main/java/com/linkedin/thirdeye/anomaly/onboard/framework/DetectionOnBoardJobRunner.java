@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.onboard;
+package com.linkedin.thirdeye.anomaly.onboard.framework;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
 
 public class DetectionOnBoardJobRunner implements Runnable {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionOnBoardJobRunner.class);
-  private final ExecutorService executorService = Executors.newSingleThreadExecutor();
+  private final ExecutorService executorService = Executors.newCachedThreadPool();
   private final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   public static final String ABORT_ON_FAILURE= "abortOnFailure";

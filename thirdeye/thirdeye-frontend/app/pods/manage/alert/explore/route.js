@@ -3,20 +3,21 @@
  * @module manage/alert/edit/explore
  * @exports manage/alert/edit/explore
  */
-import RSVP from "rsvp";
+import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
-import { later } from "@ember/runloop";
+import { isArray } from '@ember/array';
+import { later } from '@ember/runloop';
 import { task, timeout } from 'ember-concurrency';
 import { inject as service } from '@ember/service';
-import { isPresent } from "@ember/utils";
 import {
   set,
   get,
   setProperties,
   getWithDefault
 } from '@ember/object';
+import { isPresent, isNone } from '@ember/utils';
 import { checkStatus, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
 import {
   enhanceAnomalies,
@@ -39,7 +40,6 @@ const displayDateFormat = 'YYYY-MM-DD HH:mm';
  * Basic alert page constants
  */
 const DEFAULT_SEVERITY = 0.3;
-const PAGINATION_DEFAULT = 10;
 const DIMENSION_COUNT = 7;
 const METRIC_DATA_COLOR = 'blue';
 
@@ -72,7 +72,7 @@ const newWowList = wowOptions.map((item) => {
  * @param {String} end - the model's processed query parameter for endDate
  * @returns {Object}
  */
-const processRangeParams = (bucketUnit, duration, start, end) => {
+const processRangeParams = (bucketUnit = 'DAYS', duration, start, end) => {
   // To avoid loading too much data, override our time span defaults based on whether the metric is 'minutely'
   const isMetricMinutely = bucketUnit.toLowerCase().includes('minute');
   const defaultQueryUnit = isMetricMinutely ? 'week' : 'month';
@@ -130,6 +130,7 @@ export default Route.extend({
 
   model(params, transition) {
     const { id, alertData, jobId } = this.modelFor('manage.alert');
+    const isReplayDone = isNone(jobId) && jobId !== -1;
     if (!id) { return; }
 
     // Get duration data from service
@@ -143,11 +144,20 @@ export default Route.extend({
     const dateParams = `start=${toIso(startDate)}&end=${toIso(endDate)}`;
     const evalUrl = `/detection-job/eval/filter/${id}?${dateParams}`;
     const mttdUrl = `/detection-job/eval/mttd/${id}?severity=${extractSeverity(alertData, DEFAULT_SEVERITY)}`;
-    const performancePromiseHash = {
-      current: fetch(`${evalUrl}&isProjected=FALSE`).then(checkStatus),
-      projected: fetch(`${evalUrl}&isProjected=TRUE`).then(checkStatus),
-      mttd: fetch(mttdUrl).then(checkStatus)
+    let performancePromiseHash = {
+      current: {},
+      projected: {},
+      mttd: ''
     };
+
+    // Once replay is done or timed out, this route loads all needed data. We load placeholders first.
+    if (isReplayDone) {
+      performancePromiseHash = {
+        current: fetch(`${evalUrl}&isProjected=FALSE`).then(checkStatus),
+        projected: fetch(`${evalUrl}&isProjected=TRUE`).then(checkStatus),
+        mttd: fetch(mttdUrl).then(checkStatus)
+      };
+    }
 
     return RSVP.hash(performancePromiseHash)
       .then((alertEvalMetrics) => {
@@ -160,7 +170,8 @@ export default Route.extend({
           startDate,
           evalUrl,
           endDate,
-          alertEvalMetrics
+          alertEvalMetrics,
+          isReplayDone
         };
       })
       // Catch is not mandatory here due to our error action, but left it to add more context.
@@ -175,7 +186,7 @@ export default Route.extend({
     const {
       id: alertId,
       alertData,
-      jobId,
+      isReplayDone,
       startDate,
       endDate,
       duration,
@@ -217,18 +228,27 @@ export default Route.extend({
     const anomalyDataUrl = getAnomalyDataUrl(startStamp, endStamp);
     const metricsUrl = `/data/autocomplete/metric?name=${dataset}::${metricName}`;
     const anomaliesUrl = `/dashboard/anomaly-function/${alertId}/anomalies?${qsParams}`;
-
-    const anomalyPromiseHash = {
-      projectedMttd: 0, // In overview mode, no projected MTTD value is needed
-      metricsByName: fetch(metricsUrl).then(checkStatus),
-      anomalyIds: fetch(anomaliesUrl).then(checkStatus)
+    let anomalyPromiseHash = {
+      projectedMttd: 0,
+      metricsByName: '',
+      anomalyIds: []
     };
 
+    // If replay still pending, load placeholders for this data.
+    if (isReplayDone) {
+      anomalyPromiseHash = {
+        projectedMttd: 0, // In overview mode, no projected MTTD value is needed
+        metricsByName: fetch(metricsUrl).then(checkStatus),
+        anomalyIds: fetch(anomaliesUrl).then(checkStatus)
+      };
+    }
+
     return RSVP.hash(anomalyPromiseHash)
-      .then((data) => {
+      .then(async (data) => {
+        const metricId = isArray(data.metricsByName) ? data.metricsByName[0].id || 0 : 0;
         const totalAnomalies = data.anomalyIds.length;
         Object.assign(alertEvalMetrics.projected, { mttd: data.projectedMttd });
-        Object.assign(config, { id: data.metricsByName.length ? data.metricsByName.pop().id : '' });
+        Object.assign(config, { id: metricId });
         Object.assign(model, {
           anomalyIds: data.anomalyIds,
           exploreDimensions,
@@ -237,13 +257,11 @@ export default Route.extend({
           anomaliesUrl,
           config
         });
-        fetch(`/data/maxDataTime/metricId/${config.id}`).then(checkStatus);
-      })
-      // Note: In the event of custom date selection, the end date might be less than maxTime
-      .then((maxTime) => {
+        const maxTimeUrl = `/data/maxDataTime/metricId/${metricId}`;
+        const maxTime = isReplayDone ? await fetch(maxTimeUrl).then(checkStatus) : moment().valueOf();
         Object.assign(model, { metricDataUrl: buildMetricDataUrl({
           maxTime,
-          id: config.id,
+          id: metricId,
           filters: config.filters,
           granularity: config.bucketUnit,
           dimension: config.exploreDimensions ? config.exploreDimensions.split(',')[0] : 'All'
@@ -263,20 +281,14 @@ export default Route.extend({
       jobId,
       alertData,
       anomalyIds,
-      email,
-      filters,
       duration,
       config,
       loadError,
+      isReplayDone,
       metricDataUrl,
       anomalyDataUrl,
-      topDimensionsUrl,
       exploreDimensions,
-      totalAnomalies,
-      alertEvalMetrics,
-      allConfigGroups,
-      allAppNames,
-      rawAnomalyData
+      alertEvalMetrics
     } = model;
 
     // Prime the controller
@@ -311,11 +323,11 @@ export default Route.extend({
       });
     });
 
-    // Begin loading anomaly and graph data as concurrency tasks
+    // Once replay is finished, begin loading anomaly and graph data as concurrency tasks
     // See https://github.com/linkedin/pinot/pull/2518#discussion-diff-169751380R366
-    if (jobId !== -1) {
-      this.get('loadAnomalyData').perform(anomalyIds, exploreDimensions);
-      this.get('loadGraphData').perform(metricDataUrl, exploreDimensions);
+    if (isReplayDone) {
+      get(this, 'loadAnomalyData').perform(anomalyIds, exploreDimensions);
+      get(this, 'loadGraphData').perform(metricDataUrl, exploreDimensions);
     }
   },
 
@@ -324,8 +336,8 @@ export default Route.extend({
 
     // Cancel all pending concurrency tasks in controller
     if (isExiting) {
-      this.get('loadAnomalyData').cancelAll();
-      this.get('loadGraphData').cancelAll();
+      get(this, 'loadAnomalyData').cancelAll();
+      get(this, 'loadGraphData').cancelAll();
       controller.clearAll();
     }
   },
@@ -371,7 +383,7 @@ export default Route.extend({
       const anomalyPromiseHash = idGroups.map((group, index) => {
         let idStringParams = `anomalyIds=${encodeURIComponent(idGroups[index].toString())}`;
         let url = `/anomalies/search/anomalyIds/0/0/${index + 1}?${idStringParams}`;
-        let getAnomalies = this.get('fetchAnomalyEntity').perform(url);
+        let getAnomalies = get(this, 'fetchAnomalyEntity').perform(url);
         return RSVP.resolve(getAnomalies);
       });
       return RSVP.all(anomalyPromiseHash);
@@ -392,7 +404,7 @@ export default Route.extend({
 
     anomalyData.forEach((anomaly) => {
       let id = anomaly.anomalyId;
-      promises[id] = this.get('fetchAnomalyEntity').perform(`/anomalies/${id}`);
+      promises[id] = get(this, 'fetchAnomalyEntity').perform(`/anomalies/${id}`);
     });
 
     return RSVP.hash(promises);
@@ -410,7 +422,7 @@ export default Route.extend({
       const anomalyPromiseHash = anomalyIds.map((id) => {
         return RSVP.hash({
           id,
-          score: this.get('fetchAnomalyEntity').perform(`/dashboard/anomalies/score/${id}`)
+          score: get(this, 'fetchAnomalyEntity').perform(`/dashboard/anomalies/score/${id}`)
         });
       });
       return RSVP.allSettled(anomalyPromiseHash);
@@ -440,13 +452,13 @@ export default Route.extend({
   loadAnomalyData: task(function * (anomalyIds, exploreDimensions) {
     const hasDimensions = exploreDimensions && exploreDimensions.length;
     // Load data for each anomaly Id
-    const rawAnomalies = yield this.get('fetchCombinedAnomalies').perform(anomalyIds);
+    const rawAnomalies = yield get(this, 'fetchCombinedAnomalies').perform(anomalyIds);
     // Fetch and append severity score to each anomaly record
-    const severityScores = yield this.get('fetchSeverityScores').perform(anomalyIds);
+    const severityScores = yield get(this, 'fetchSeverityScores').perform(anomalyIds);
     // Process anomaly records to make them template-ready
     const anomalyData = yield enhanceAnomalies(rawAnomalies, severityScores);
     // Prepare de-duped power-select option array for anomaly feedback
-    //resolutionOptions.push(...new Set(anomalyData.map(record => record.anomalyFeedback)));
+    resolutionOptions.push(...new Set(anomalyData.map(record => record.anomalyFeedback)));
     // Populate dimensions power-select options if dimensions exist
     if (hasDimensions) {
       dimensionOptions.push(...new Set(anomalyData.map(anomaly => anomaly.dimensionString)));
@@ -460,7 +472,7 @@ export default Route.extend({
       baselineOptionsLoading: false
     });
     // Fetch and append extra WoW data for each anomaly record
-    const wowData = yield this.get('fetchCombinedAnomalyChangeData').perform(anomalyData);
+    const wowData = yield get(this, 'fetchCombinedAnomalyChangeData').perform(anomalyData);
     anomalyData.forEach((anomaly) => {
       anomaly.wowData = wowData[anomaly.anomalyId] || {};
     });
@@ -483,7 +495,6 @@ export default Route.extend({
    */
   loadGraphData: task(function * (metricDataUrl, exploreDimensions) {
     try {
-      const metricId = getWithDefault(this, 'currentModel.config.id', null);
       // Fetch and load graph metric data from either local store or API
       const metricData = yield fetch(metricDataUrl).then(checkStatus);
       // Load graph with metric data from timeseries API
@@ -511,7 +522,7 @@ export default Route.extend({
     refreshAnomalyTable() {
       const { anomalyIds, exploreDimensions } = this.currentModel;
       if (anomalyIds && anomalyIds.length) {
-        this.get('loadAnomalyData').perform(anomalyIds, exploreDimensions);
+        get(this, 'loadAnomalyData').perform(anomalyIds, exploreDimensions);
       }
     },
 
@@ -524,8 +535,8 @@ export default Route.extend({
         isEditModeActive: true
       });
       // Cancel route's main concurrency tasks
-      this.get('loadAnomalyData').cancelAll();
-      this.get('loadGraphData').cancelAll();
+      get(this, 'loadAnomalyData').cancelAll();
+      get(this, 'loadGraphData').cancelAll();
     },
 
     /**
@@ -533,7 +544,7 @@ export default Route.extend({
      * https://www.emberjs.com/api/ember/2.16/classes/Route/events/error?anchor=error
      * https://guides.emberjs.com/v2.18.0/routing/loading-and-error-substates/#toc_the-code-error-code-event
      */
-    error(error, transition) {
+    error() {
       return true;
     }
   }

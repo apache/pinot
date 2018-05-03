@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.task;
 
 import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskInfo;
+import com.linkedin.thirdeye.anomaly.onboard.ReplayTaskInfo;
 import java.io.IOException;
 
 import org.slf4j.Logger;
@@ -46,6 +47,9 @@ public class TaskInfoFactory {
           break;
         case CLASSIFICATION:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, ClassificationTaskInfo.class);
+          break;
+        case REPLAY:
+          taskInfo = OBJECT_MAPPER.readValue(taskInfoString, ReplayTaskInfo.class);
           break;
         default:
           LOG.error("TaskType must be one of ANOMALY_DETECTION, MONITOR, ALERT, ALERT2, DATA_COMPLETENESS, CLASSIFICATION");
