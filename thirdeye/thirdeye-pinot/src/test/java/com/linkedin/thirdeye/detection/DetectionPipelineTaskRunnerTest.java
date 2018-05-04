@@ -1,12 +1,15 @@
 package com.linkedin.thirdeye.detection;
 
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,7 +20,8 @@ import org.testng.annotations.Test;
 
 
 public class DetectionPipelineTaskRunnerTest {
-  private List<MockDetectionPipeline> runs;
+  private List<MockPipeline> runs;
+  private List<MockPipelineOutput> outputs;
 
   private DetectionPipelineTaskRunner runner;
   private DetectionPipelineTaskInfo info;
@@ -36,10 +40,12 @@ public class DetectionPipelineTaskRunnerTest {
   public void beforeMethod() {
     this.runs = new ArrayList<>();
 
+    this.outputs = new ArrayList<>();
+
     this.testDAOProvider = DAOTestBase.getInstance();
     this.detectionDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
-    this.loader = new MockDetectionPipelineLoader(this.runs);
+    this.loader = new MockPipelineLoader(this.runs, this.outputs);
     this.provider = new MockDataProvider();
 
     this.properties = new HashMap<>();
@@ -87,6 +93,20 @@ public class DetectionPipelineTaskRunnerTest {
 
   @Test
   public void testTaskRunnerPersistence() throws Exception {
-    Assert.fail("not implemented yet");
+    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(this.detectorId, 1300, 1400, Collections.singletonMap("myKey", "myValue"));
+
+    this.outputs.add(new MockPipelineOutput(Collections.singletonList(anomaly), -1));
+
+    this.runner.execute(this.info, this.context);
+
+    Assert.assertNotNull(anomaly.getId());
+
+    MergedAnomalyResultDTO readAnomaly = this.anomalyDAO.findById(anomaly.getId());
+    Assert.assertEquals(readAnomaly.getDetectionConfigId(), Long.valueOf(this.detectorId));
+    Assert.assertEquals(readAnomaly.getStartTime(), 1300);
+    Assert.assertEquals(readAnomaly.getEndTime(), 1400);
+    Assert.assertEquals(readAnomaly.getDimensions(), new DimensionMap("{\"myKey\":\"myValue\"}"));
   }
+
+
 }

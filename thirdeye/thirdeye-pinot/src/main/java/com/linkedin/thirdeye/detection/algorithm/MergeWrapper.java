@@ -10,9 +10,9 @@ import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipeline;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,10 +27,8 @@ import org.apache.commons.collections.MapUtils;
  * Forward scan only, greedy clustering. Does not merge clusters that converge.
  */
 public class MergeWrapper extends DetectionPipeline {
-  private static final String PROP_PROPERTIES_MAP = "propertiesMap";
-  private static final String PROP_TARGET = "target";
-  private static final String PROP_TARGET_DEFAULT = "metricUrn";
-  private static final String PROP_METRIC_URN = "metricUrn";
+  private static final String PROP_NESTED = "nested";
+  private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_MAX_GAP = "maxGap";
   private static final long PROP_MAX_GAP_DEFAULT = 0;
   private static final String PROP_MAX_DURATION = "maxDuration";
@@ -45,15 +43,13 @@ public class MergeWrapper extends DetectionPipeline {
     }
   };
 
-  private final Map<String, Map<String, Object>> nestedPropertiesMap;
-  private final String nestedTarget;
-  private final String metricUrn;
+  private final List<Map<String, Object>> nestedProperties;
   private final long maxGap; // max time gap for merge
   private final long maxDuration; // max overall duration of merged anomaly
   private final AnomalySlice slice;
 
   /**
-   * Instantiates a new Merge wrapper.
+   * Instantiates a new merge wrapper.
    *
    * @param provider the provider
    * @param config the config
@@ -63,16 +59,12 @@ public class MergeWrapper extends DetectionPipeline {
   public MergeWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
 
-    Preconditions.checkArgument(config.getProperties().containsKey(PROP_PROPERTIES_MAP), "Missing " + PROP_PROPERTIES_MAP);
-    Preconditions.checkArgument(config.getProperties().containsKey(PROP_METRIC_URN), "Missing " + PROP_METRIC_URN);
-
-    this.metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
-    this.nestedPropertiesMap = MapUtils.getMap(config.getProperties(), PROP_PROPERTIES_MAP);
-    this.nestedTarget = MapUtils.getString(config.getProperties(), PROP_TARGET, PROP_TARGET_DEFAULT);
     this.maxGap = MapUtils.getLongValue(config.getProperties(), PROP_MAX_GAP, PROP_MAX_GAP_DEFAULT);
     this.maxDuration = MapUtils.getLongValue(config.getProperties(), PROP_MAX_DURATION, PROP_MAX_DURATION_DEFAULT);
-
     this.slice = new AnomalySlice().withStart(startTime - this.maxGap).withEnd(endTime + this.maxGap).withConfigId(config.getId());
+    this.nestedProperties = config.getProperties().containsKey(PROP_NESTED) ?
+        new ArrayList<>((Collection<Map<String, Object>>) config.getProperties().get(PROP_NESTED)) :
+        Collections.<Map<String,Object>>emptyList();
   }
 
   @Override
@@ -81,15 +73,14 @@ public class MergeWrapper extends DetectionPipeline {
 
     long overallLastTimeStamp = Long.MAX_VALUE;
 
-    for (String className : this.nestedPropertiesMap.keySet()) {
-      Map<String, Object> properties = new HashMap<>(this.nestedPropertiesMap.get(className));
-      properties.put(this.nestedTarget, metricUrn);
-
+    for (Map<String, Object> properties : this.nestedProperties) {
       DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
+
+      Preconditions.checkArgument(properties.containsKey(PROP_CLASS_NAME), "Nested missing " + PROP_CLASS_NAME);
 
       nestedConfig.setId(this.config.getId());
       nestedConfig.setName(this.config.getName());
-      nestedConfig.setClassName(className);
+      nestedConfig.setClassName(properties.get(PROP_CLASS_NAME).toString());
       nestedConfig.setProperties(properties);
 
       DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);

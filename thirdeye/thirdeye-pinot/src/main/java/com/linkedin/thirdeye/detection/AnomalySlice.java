@@ -49,6 +49,10 @@ public class AnomalySlice {
     return new AnomalySlice(configId, this.start, this.end, this.filters);
   }
 
+  public AnomalySlice withConfigId(Long configId) {
+    return new AnomalySlice(configId != null ? configId : -1, this.start, this.end, this.filters);
+  }
+
   public AnomalySlice withStart(long start) {
     return new AnomalySlice(this.configId, start, this.end, this.filters);
   }

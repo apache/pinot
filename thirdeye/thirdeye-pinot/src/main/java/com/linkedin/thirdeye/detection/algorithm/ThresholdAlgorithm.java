@@ -36,10 +36,11 @@ public class ThresholdAlgorithm extends StaticDetectionPipeline {
   private final String PROP_MAX = "max";
   private final double PROP_MAX_DEFAULT = Double.NaN;
 
+  // TODO granularity (+ timezone?)
+
   private final double min;
   private final double max;
   private final MetricSlice slice;
-
 
   public ThresholdAlgorithm(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);

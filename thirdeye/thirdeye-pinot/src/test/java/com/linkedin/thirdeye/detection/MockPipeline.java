@@ -1,19 +1,20 @@
 package com.linkedin.thirdeye.detection;
 
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import java.util.Collections;
 import java.util.Objects;
 
 
-public class MockDetectionPipeline extends DetectionPipeline {
-  public MockDetectionPipeline(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
+public class MockPipeline extends DetectionPipeline {
+  private final MockPipelineOutput output;
+
+  public MockPipeline(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime, MockPipelineOutput output) {
     super(provider, config, startTime, endTime);
+    this.output = output;
   }
 
   @Override
   public DetectionPipelineResult run() {
-    return new DetectionPipelineResult(Collections.<MergedAnomalyResultDTO>emptyList(), -1);
+    return new DetectionPipelineResult(this.output.anomalies, this.output.lastTimestamp);
   }
 
   @Override
@@ -24,13 +25,13 @@ public class MockDetectionPipeline extends DetectionPipeline {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    DetectionPipeline that = (DetectionPipeline) o;
+    MockPipeline that = (MockPipeline) o;
     return startTime == that.startTime && endTime == that.endTime && Objects.equals(provider, that.provider)
-        && Objects.equals(config, that.config);
+        && Objects.equals(config, that.config) && Objects.equals(output, that.output);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(provider, config, startTime, endTime);
+    return Objects.hash(provider, config, startTime, endTime, output);
   }
 }

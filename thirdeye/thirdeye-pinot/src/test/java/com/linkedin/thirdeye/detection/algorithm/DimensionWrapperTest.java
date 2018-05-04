@@ -5,10 +5,12 @@ import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.MockDataProvider;
-import com.linkedin.thirdeye.detection.MockDetectionPipeline;
-import com.linkedin.thirdeye.detection.MockDetectionPipelineLoader;
+import com.linkedin.thirdeye.detection.MockPipeline;
+import com.linkedin.thirdeye.detection.MockPipelineLoader;
+import com.linkedin.thirdeye.detection.MockPipelineOutput;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -30,28 +32,32 @@ public class DimensionWrapperTest {
   private static final String PROP_K = "k";
 
   // prototyping
-  private static final String PROP_PROPERTIES = "properties";
+  private static final String PROP_NESTED = "nested";
+  private static final String PROP_NESTED_METRIC_URN = "nestedMetricUrn";
+  private static final String PROP_NESTED_METRIC_URN_KEY = "nestedMetricUrnKey";
   private static final String PROP_CLASS_NAME = "className";
-  private static final String PROP_TARGET = "target";
 
   // values
   private static final Long PROP_ID_VALUE = 1000L;
   private static final String PROP_NAME_VALUE = "myName";
   private static final String PROP_CLASS_NAME_VALUE = "MyClassName";
-  private static final String PROP_TARGET_VALUE = "myMetricUrn";
+  private static final String PROP_NESTED_METRIC_URN_VALUE = "thirdeye:metric:2";
+  private static final String PROP_NESTED_METRIC_URN_KEY_VALUE = "myMetricUrn";
 
   private DataProvider provider;
   private DimensionWrapper wrapper;
 
-  private List<MockDetectionPipeline> runs;
+  private List<MockPipeline> runs;
+  private List<MockPipelineOutput> outputs;
 
   private DetectionConfigDTO config;
   private Map<String, Object> properties;
+  private Map<String, Object> nestedProperties;
 
   @BeforeMethod
   public void beforeMethod() {
-    Map<MetricSlice, DataFrame> breakdowns = new HashMap<>();
-    breakdowns.put(MetricSlice.from(1, 10, 15),
+    Map<MetricSlice, DataFrame> aggregates = new HashMap<>();
+    aggregates.put(MetricSlice.from(1, 10, 15),
         new DataFrame()
             .addSeries("a", StringSeries.buildFrom("1", "1", "1", "1", "1", "2", "2", "2", "2", "2"))
             .addSeries("b", StringSeries.buildFrom("1", "2", "1", "2", "3", "1", "2", "1", "2", "3"))
@@ -59,16 +65,22 @@ public class DimensionWrapperTest {
 
     this.runs = new ArrayList<>();
 
+    this.outputs = new ArrayList<>();
+
     this.provider = new MockDataProvider()
-        .setBreakdowns(breakdowns)
-        .setLoader(new MockDetectionPipelineLoader(this.runs));
+        .setAggregates(aggregates)
+        .setLoader(new MockPipelineLoader(this.runs, this.outputs));
+
+    this.nestedProperties = new HashMap<>();
+    this.nestedProperties.put(PROP_CLASS_NAME, PROP_CLASS_NAME_VALUE);
+    this.nestedProperties.put("key", "value");
 
     this.properties = new HashMap<>();
     this.properties.put(PROP_METRIC_URN, "thirdeye:metric:1");
     this.properties.put(PROP_DIMENSIONS, Arrays.asList("a", "b"));
-    this.properties.put(PROP_CLASS_NAME, PROP_CLASS_NAME_VALUE);
-    this.properties.put(PROP_TARGET, PROP_TARGET_VALUE);
-    this.properties.put(PROP_PROPERTIES, Collections.singletonMap("key", "value"));
+    this.properties.put(PROP_NESTED_METRIC_URN_KEY, PROP_NESTED_METRIC_URN_KEY_VALUE);
+    this.properties.put(PROP_NESTED_METRIC_URN, PROP_NESTED_METRIC_URN_VALUE);
+    this.properties.put(PROP_NESTED, Collections.singletonList(this.nestedProperties));
 
     this.config = new DetectionConfigDTO();
     this.config.setId(PROP_ID_VALUE);
@@ -84,9 +96,9 @@ public class DimensionWrapperTest {
     this.wrapper.run();
 
     Assert.assertEquals(this.runs.size(), 3);
-    assertEquals(this.runs.get(0), makePipeline("thirdeye:metric:1:b%3D1"));
-    assertEquals(this.runs.get(1), makePipeline("thirdeye:metric:1:b%3D2"));
-    assertEquals(this.runs.get(2), makePipeline("thirdeye:metric:1:b%3D3"));
+    assertEquals(this.runs.get(0), makePipeline("thirdeye:metric:2:b%3D1"));
+    assertEquals(this.runs.get(1), makePipeline("thirdeye:metric:2:b%3D2"));
+    assertEquals(this.runs.get(2), makePipeline("thirdeye:metric:2:b%3D3"));
   }
 
   @Test
@@ -97,12 +109,12 @@ public class DimensionWrapperTest {
     this.wrapper.run();
 
     Assert.assertEquals(this.runs.size(), 6);
-    assertEquals(this.runs.get(0), makePipeline("thirdeye:metric:1:a%3D1:b%3D1"));
-    assertEquals(this.runs.get(1), makePipeline("thirdeye:metric:1:a%3D1:b%3D2"));
-    assertEquals(this.runs.get(2), makePipeline("thirdeye:metric:1:a%3D1:b%3D3"));
-    assertEquals(this.runs.get(3), makePipeline("thirdeye:metric:1:a%3D2:b%3D1"));
-    assertEquals(this.runs.get(4), makePipeline("thirdeye:metric:1:a%3D2:b%3D2"));
-    assertEquals(this.runs.get(5), makePipeline("thirdeye:metric:1:a%3D2:b%3D3"));
+    assertEquals(this.runs.get(0), makePipeline("thirdeye:metric:2:a%3D1:b%3D1"));
+    assertEquals(this.runs.get(1), makePipeline("thirdeye:metric:2:a%3D1:b%3D2"));
+    assertEquals(this.runs.get(2), makePipeline("thirdeye:metric:2:a%3D1:b%3D3"));
+    assertEquals(this.runs.get(3), makePipeline("thirdeye:metric:2:a%3D2:b%3D1"));
+    assertEquals(this.runs.get(4), makePipeline("thirdeye:metric:2:a%3D2:b%3D2"));
+    assertEquals(this.runs.get(5), makePipeline("thirdeye:metric:2:a%3D2:b%3D3"));
   }
 
   @Test
@@ -114,8 +126,8 @@ public class DimensionWrapperTest {
     this.wrapper.run();
 
     Assert.assertEquals(this.runs.size(), 2);
-    assertEquals(this.runs.get(0), makePipeline("thirdeye:metric:1:b%3D1"));
-    assertEquals(this.runs.get(1), makePipeline("thirdeye:metric:1:b%3D2"));
+    assertEquals(this.runs.get(0), makePipeline("thirdeye:metric:2:b%3D1"));
+    assertEquals(this.runs.get(1), makePipeline("thirdeye:metric:2:b%3D2"));
   }
 
   @Test
@@ -127,7 +139,7 @@ public class DimensionWrapperTest {
     this.wrapper.run();
 
     Assert.assertEquals(this.runs.size(), 1);
-    assertEquals(this.runs.get(0), makePipeline("thirdeye:metric:1:b%3D2"));
+    assertEquals(this.runs.get(0), makePipeline("thirdeye:metric:2:b%3D2"));
   }
 
   @Test
@@ -139,15 +151,15 @@ public class DimensionWrapperTest {
     this.wrapper.run();
 
     Assert.assertEquals(this.runs.size(), 4);
-    assertEquals(this.runs.get(0), makePipeline("thirdeye:metric:1:a%3D2:b%3D2"));
-    assertEquals(this.runs.get(1), makePipeline("thirdeye:metric:1:a%3D2:b%3D1"));
-    assertEquals(this.runs.get(2), makePipeline("thirdeye:metric:1:a%3D2:b%3D3"));
-    assertEquals(this.runs.get(3), makePipeline("thirdeye:metric:1:a%3D1:b%3D2"));
+    assertEquals(this.runs.get(0), makePipeline("thirdeye:metric:2:a%3D2:b%3D2"));
+    assertEquals(this.runs.get(1), makePipeline("thirdeye:metric:2:a%3D2:b%3D1"));
+    assertEquals(this.runs.get(2), makePipeline("thirdeye:metric:2:a%3D2:b%3D3"));
+    assertEquals(this.runs.get(3), makePipeline("thirdeye:metric:2:a%3D1:b%3D2"));
   }
 
   private DetectionConfigDTO makeConfig(String metricUrn) {
-    Map<String, Object> properties = new HashMap<>((Map<String, Object>) this.properties.get(PROP_PROPERTIES));
-    properties.put(PROP_TARGET_VALUE, metricUrn);
+    Map<String, Object> properties = new HashMap<>(this.nestedProperties);
+    properties.put(PROP_NESTED_METRIC_URN_KEY_VALUE, metricUrn);
 
     DetectionConfigDTO config = new DetectionConfigDTO();
     config.setId(this.config.getId());
@@ -158,11 +170,12 @@ public class DimensionWrapperTest {
     return config;
   }
 
-  private MockDetectionPipeline makePipeline(String metricUrn) {
-    return new MockDetectionPipeline(this.provider, makeConfig(metricUrn), 10, 15);
+  private MockPipeline makePipeline(String metricUrn) {
+    return new MockPipeline(this.provider, makeConfig(metricUrn), 10, 15,
+        new MockPipelineOutput(Collections.<MergedAnomalyResultDTO>emptyList(), -1));
   }
 
-  private static void assertEquals(MockDetectionPipeline a, MockDetectionPipeline b) {
+  private static void assertEquals(MockPipeline a, MockPipeline b) {
     Assert.assertEquals(a, b);
   }
 }

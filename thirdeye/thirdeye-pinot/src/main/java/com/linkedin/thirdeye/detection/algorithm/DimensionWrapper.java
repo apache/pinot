@@ -45,12 +45,14 @@ public class DimensionWrapper extends DetectionPipeline {
   private static final int PROP_K_DEFAULT = -1;
 
   // prototyping
-  private static final String PROP_PROPERTIES = "properties";
+  private static final String PROP_NESTED = "nested";
+
+  private static final String PROP_NESTED_METRIC_URN_KEY = "nestedMetricUrnKey";
+  private static final String PROP_NESTED_METRIC_URN_KEY_DEFAULT = "metricUrn";
+
+  private static final String PROP_NESTED_METRIC_URN = "nestedMetricUrn";
 
   private static final String PROP_CLASS_NAME = "className";
-
-  private static final String PROP_TARGET = "target";
-  private static final String PROP_TARGET_DEFAULT = "metricUrn";
 
   private final String metricUrn;
   private final List<String> dimensions;
@@ -58,30 +60,32 @@ public class DimensionWrapper extends DetectionPipeline {
   private final double minValue;
   private final double minContribution;
 
-  private final String nestedTarget;
-  private final String nestedClassName;
-  private final Map<String, Object> nestedProperties;
+  private final String nestedMetricUrn;
+  private final String nestedMetricUrnKey;
+  private final List<Map<String, Object>> nestedProperties;
 
   public DimensionWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
 
     // exploration
     Preconditions.checkArgument(config.getProperties().containsKey(PROP_METRIC_URN), "Missing " + PROP_METRIC_URN);
-    Preconditions.checkArgument(config.getProperties().containsKey(PROP_DIMENSIONS), "Missing " + PROP_DIMENSIONS);
 
     this.metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
-    this.dimensions = new ArrayList<>((Collection<String>) config.getProperties().get(PROP_DIMENSIONS));
     this.minValue = MapUtils.getDoubleValue(config.getProperties(), PROP_MIN_VALUE, PROP_MIN_VALUE_DEFAULT);
     this.minContribution = MapUtils.getDoubleValue(config.getProperties(), PROP_MIN_CONTRIBUTION, PROP_MIN_CONTRIBUTION_DEFAULT);
     this.k = MapUtils.getIntValue(config.getProperties(), PROP_K, PROP_K_DEFAULT);
+    this.dimensions = config.getProperties().containsKey(PROP_DIMENSIONS) ?
+        new ArrayList<>((Collection<String>) config.getProperties().get(PROP_DIMENSIONS)) :
+        Collections.<String>emptyList();
 
     // prototyping
-    Preconditions.checkArgument(config.getProperties().containsKey(PROP_CLASS_NAME), "Missing " + PROP_CLASS_NAME);
-    Preconditions.checkArgument(config.getProperties().containsKey(PROP_PROPERTIES), "Missing " + PROP_PROPERTIES);
+    Preconditions.checkArgument(config.getProperties().containsKey(PROP_NESTED), "Missing " + PROP_NESTED);
 
-    this.nestedClassName = MapUtils.getString(config.getProperties(), PROP_CLASS_NAME);
-    this.nestedProperties = (Map<String, Object>) config.getProperties().get(PROP_PROPERTIES);
-    this.nestedTarget = MapUtils.getString(config.getProperties(), PROP_TARGET, PROP_TARGET_DEFAULT);
+    this.nestedMetricUrn = MapUtils.getString(config.getProperties(), PROP_NESTED_METRIC_URN, this.metricUrn);
+    this.nestedMetricUrnKey = MapUtils.getString(config.getProperties(), PROP_NESTED_METRIC_URN_KEY, PROP_NESTED_METRIC_URN_KEY_DEFAULT);
+    this.nestedProperties = config.getProperties().containsKey(PROP_NESTED) ?
+        new ArrayList<>((Collection<Map<String, Object>>) config.getProperties().get(PROP_NESTED)) :
+        Collections.<Map<String,Object>>emptyList();
   }
 
   @Override
@@ -135,22 +139,29 @@ public class DimensionWrapper extends DetectionPipeline {
         filters.put(dimName, breakdown.getString(dimName, i));
       }
 
-      DetectionPipelineResult intermediate = this.runNested(metric.withFilters(filters));
-      lastTimestamp = Math.min(lastTimestamp, intermediate.getLastTimestamp());
-      anomalies.addAll(intermediate.getAnomalies());
+      MetricEntity targetMetric = MetricEntity.fromURN(this.nestedMetricUrn, 1.0).withFilters(filters);
+
+      for (Map<String, Object> properties : this.nestedProperties) {
+        DetectionPipelineResult intermediate = this.runNested(targetMetric, properties);
+        lastTimestamp = Math.min(lastTimestamp, intermediate.getLastTimestamp());
+        anomalies.addAll(intermediate.getAnomalies());
+      }
     }
 
     return new DetectionPipelineResult(anomalies, lastTimestamp);
   }
 
-  private DetectionPipelineResult runNested(MetricEntity metric) throws Exception {
-    Map<String, Object> properties = new HashMap<>(this.nestedProperties);
-    properties.put(this.nestedTarget, metric.getUrn());
+  private DetectionPipelineResult runNested(MetricEntity metric, Map<String, Object> template) throws Exception {
+    Preconditions.checkArgument(template.containsKey(PROP_CLASS_NAME), "Nested missing " + PROP_CLASS_NAME);
+
+    Map<String, Object> properties = new HashMap<>(template);
+
+    properties.put(this.nestedMetricUrnKey, metric.getUrn());
 
     DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
     nestedConfig.setId(this.config.getId());
     nestedConfig.setName(this.config.getName());
-    nestedConfig.setClassName(this.nestedClassName);
+    nestedConfig.setClassName(properties.get(PROP_CLASS_NAME).toString());
     nestedConfig.setProperties(properties);
 
     DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
