@@ -20,6 +20,7 @@ import org.apache.commons.configuration.Configuration;
 
 import java.io.File;
 
+
 public interface SegmentFetcher {
 
   void init(Configuration configs);
@@ -27,8 +28,9 @@ public interface SegmentFetcher {
   void fetchSegmentToLocal(String uri, File tempFile) throws Exception;
 
   /**
-   * @return a list of config keys whose value should not be logged.
+   * Returns a list of config keys whose value should not be logged.
+   *
+   * @return List of protected config keys
    */
   Set<String> getProtectedConfigKeys();
-
 }

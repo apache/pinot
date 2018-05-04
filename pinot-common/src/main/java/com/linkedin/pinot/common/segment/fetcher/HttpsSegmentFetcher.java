@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.Configuration;
 
@@ -61,6 +62,9 @@ public class HttpsSegmentFetcher extends HttpSegmentFetcher {
 
   @Override
   public Set<String> getProtectedConfigKeys() {
-    return ClientSSLContextGenerator.getProtectedConfigKeys();
+    return ClientSSLContextGenerator.getProtectedConfigKeys()
+        .stream()
+        .map(s -> CommonConstants.PREFIX_OF_SSL_SUBSET + "." + s)
+        .collect(Collectors.toSet());
   }
 }
