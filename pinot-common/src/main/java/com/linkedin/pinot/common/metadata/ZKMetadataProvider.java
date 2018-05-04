@@ -26,6 +26,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.SchemaUtils;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.sun.istack.internal.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
@@ -83,6 +84,7 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_SCHEMAS_PREFIX, schemaName);
   }
 
+  @Deprecated
   public static String constructPropertyStorePathForKafkaPartitions(String realtimeTableName) {
     return StringUtil.join("/", PROPERTYSTORE_KAFKA_PARTITIONS_PREFIX, realtimeTableName);
   }
@@ -323,7 +325,7 @@ public class ZKMetadataProvider {
     return resultList;
   }
 
-  public static List<LLCRealtimeSegmentZKMetadata> getLLCRealtimeSegmentZKMetadataListForTable(
+  public static @NotNull List<LLCRealtimeSegmentZKMetadata> getLLCRealtimeSegmentZKMetadataListForTable(
       ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
     List<LLCRealtimeSegmentZKMetadata> resultList = new ArrayList<>();
     if (propertyStore == null) {
