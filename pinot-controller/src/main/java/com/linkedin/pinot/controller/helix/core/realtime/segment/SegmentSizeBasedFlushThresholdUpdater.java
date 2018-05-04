@@ -44,6 +44,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   static final double CURRENT_SEGMENT_RATIO_WEIGHT = 0.25;
   static final double PREVIOUS_SEGMENT_RATIO_WEIGHT = 0.75;
 
+  // num rows to segment size ratio of last committed segment for this table
   private AtomicDouble _latestSegmentRowsToSizeRatio = new AtomicDouble();
 
   @Override
@@ -51,9 +52,9 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
       @Nonnull FlushThresholdUpdaterParams params) {
 
     LLCRealtimeSegmentZKMetadata committingSegmentZkMetadata = params.getCommittingSegmentZkMetadata();
-    if (committingSegmentZkMetadata == null) { // first segment of the partition
+    if (committingSegmentZkMetadata == null) { // first segment of the partition, hence committing segment is null
       double prevRatio = _latestSegmentRowsToSizeRatio.get();
-      if (prevRatio > 0) {
+      if (prevRatio > 0) { // new partition added case
         LOGGER.info(
             "Committing segment zk metadata is not available, setting rows threshold for segment using previous segments ratio {}",
             newSegmentZKMetadata.getSegmentName());
@@ -69,7 +70,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     }
 
     long committingSegmentSizeBytes = params.getCommittingSegmentSizeBytes();
-    if (committingSegmentSizeBytes <= 0) { // repair segment
+    if (committingSegmentSizeBytes <= 0) { // repair segment case
       LOGGER.info(
           "Committing segment size is not available, setting thresholds for segment {} from previous segment {}",
           newSegmentZKMetadata.getSegmentName(), committingSegmentZkMetadata.getSegmentName());
@@ -78,14 +79,8 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
       return;
     }
 
-    // time taken by committing segment
     long timeConsumed = System.currentTimeMillis() - committingSegmentZkMetadata.getCreationTime();
-
-    // rows consumed by committing segment
-    // TODO: will this being an integer cause problems??
     int numRowsConsumed = (int) (committingSegmentZkMetadata.getTotalRawDocs());
-
-    // rows threshold for committing segment
     int numRowsThreshold = committingSegmentZkMetadata.getSizeThresholdToFlushSegment();
     LOGGER.info(
         "Time consumed:{} Time threshold:{} Num rows consumed:{} Num rows threshold:{} Committing segment size bytes:{}",
@@ -100,15 +95,17 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
           committingSegmentZkMetadata.getSegmentName());
     }
 
+    /**
+     * TODO: {@link LLCRealtimeSegmentZKMetadata.getSizeThresholdToFlushSegment()} is an int. Auto tuning the size could cause overflow.
+     * Need to fix it. Will do so in an upcoming PR, as change touches multiple files
+     */
     double currentRatio = (double) numRowsConsumed / committingSegmentSizeBytes;
     double prevRatio = _latestSegmentRowsToSizeRatio.getAndSet(currentRatio);
     if (committingSegmentSizeBytes < MIN_ALLOWED_SEGMENT_SIZE_BYTES) {
-      // double the number of rows
       newSegmentZKMetadata.setSizeThresholdToFlushSegment(numRowsConsumed * 2);
       LOGGER.info("Committing segment size is less than min segment size {}, doubling rows threshold to : {}",
           MIN_ALLOWED_SEGMENT_SIZE_BYTES, newSegmentZKMetadata.getSizeThresholdToFlushSegment());
     } else if (committingSegmentSizeBytes > MAX_ALLOWED_SEGMENT_SIZE_BYTES) {
-      // half it
       newSegmentZKMetadata.setSizeThresholdToFlushSegment(numRowsConsumed / 2);
       LOGGER.info("Committing segment size is greater than max segment size {}, halving rows threshold {}",
           MAX_ALLOWED_SEGMENT_SIZE_BYTES, newSegmentZKMetadata.getSizeThresholdToFlushSegment());
