@@ -3,6 +3,7 @@ import Route from '@ember/routing/route';
 import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
+import config from 'thirdeye-frontend/config/environment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 import {
   toCurrentUrn,
@@ -125,6 +126,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
   model(params) {
     const { metricId, sessionId, anomalyId } = params;
+    const isDevEnv = config.environment === 'development';
 
     // Add simulated dynamic dimension analysis records to mocked table data
     const advancedDimensionList = processedAdvancedDimensions(advancedDimensionRawData);
@@ -147,6 +149,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     }
 
     return RSVP.hash({
+      isDevEnv,
       metricId,
       metricUrn,
       metricEntity,

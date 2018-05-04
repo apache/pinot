@@ -148,7 +148,7 @@ export default Controller.extend({
    * @type {Object}
    */
   activeSubTabs: {
-    dimensions: 'table'
+    dimensions: 'heatmap'
   },
 
   /**
