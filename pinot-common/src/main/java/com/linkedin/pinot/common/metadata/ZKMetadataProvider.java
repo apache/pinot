@@ -26,7 +26,6 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.SchemaUtils;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.StringUtil;
-import com.sun.istack.internal.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
@@ -325,7 +324,8 @@ public class ZKMetadataProvider {
     return resultList;
   }
 
-  public static @NotNull List<LLCRealtimeSegmentZKMetadata> getLLCRealtimeSegmentZKMetadataListForTable(
+  @Nonnull
+  public static List<LLCRealtimeSegmentZKMetadata> getLLCRealtimeSegmentZKMetadataListForTable(
       ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
     List<LLCRealtimeSegmentZKMetadata> resultList = new ArrayList<>();
     if (propertyStore == null) {
