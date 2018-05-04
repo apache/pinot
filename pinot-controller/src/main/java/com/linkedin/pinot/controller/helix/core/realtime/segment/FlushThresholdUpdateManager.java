@@ -18,6 +18,7 @@ package com.linkedin.pinot.controller.helix.core.realtime.segment;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -34,16 +35,26 @@ public class FlushThresholdUpdateManager {
 
   private ConcurrentMap<String, FlushThresholdUpdater> _flushThresholdUpdaterMap = new ConcurrentHashMap<>();
 
+  /**
+   * Check table config for flush size.
+   *
+   * If flush size < 0, create a new DefaultFlushThresholdUpdater with default flush size
+   * If flush size > 0, create a new DefaultFlushThresholdUpdater with given flush size.
+   * If flush size == 0, create new SegmentSizeBasedFlushThresholdUpdater if not already created. Create only 1 per table, because we want to maintain tuning information for the table in the updater
+   * @param realtimeTableConfig
+   * @return
+   */
   public FlushThresholdUpdater getFlushThresholdUpdater(TableConfig realtimeTableConfig) {
     String tableName = realtimeTableConfig.getTableName();
-    return _flushThresholdUpdaterMap.computeIfAbsent(tableName, k -> createFlushThresholdUpdater(realtimeTableConfig));
-  }
 
-  private FlushThresholdUpdater createFlushThresholdUpdater(TableConfig realtimeTableConfig) {
     int tableFlushSize = getLLCRealtimeTableFlushSize(realtimeTableConfig);
-    if (tableFlushSize <= 0) {
-      return new SegmentSizeBasedFlushThresholdUpdater();
+    if (tableFlushSize < 0) {
+      tableFlushSize = KafkaHighLevelStreamProviderConfig.getDefaultMaxRealtimeRowsCount();
+    }
+    if (tableFlushSize == 0) {
+      return _flushThresholdUpdaterMap.computeIfAbsent(tableName, k -> new SegmentSizeBasedFlushThresholdUpdater());
     } else {
+      _flushThresholdUpdaterMap.remove(tableName);
       return new DefaultFlushThresholdUpdater(tableFlushSize);
     }
   }

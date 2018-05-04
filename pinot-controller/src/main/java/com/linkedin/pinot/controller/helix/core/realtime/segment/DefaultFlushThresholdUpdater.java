@@ -66,4 +66,8 @@ public class DefaultFlushThresholdUpdater implements FlushThresholdUpdater {
     newSegmentZKMetadata.setSizeThresholdToFlushSegment(segmentFlushSize);
   }
 
+  int getTableFlushSize() {
+    return _tableFlushSize;
+  }
+
 }
