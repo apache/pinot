@@ -23,6 +23,7 @@ import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 // This class is provided as a means to override any standard fetchers that will not be used
 // in a given Pinot installation.
 public class NoOpFetcher implements SegmentFetcher {
@@ -34,12 +35,12 @@ public class NoOpFetcher implements SegmentFetcher {
   }
 
   @Override
-  public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
+  public void fetchSegmentToLocal(String uri, File tempFile) {
     throw new RuntimeException("NoOpFetcher cannot fetch any segments");
   }
 
   @Override
   public Set<String> getProtectedConfigKeys() {
-    return Collections.<String>emptySet();
+    return Collections.emptySet();
   }
 }

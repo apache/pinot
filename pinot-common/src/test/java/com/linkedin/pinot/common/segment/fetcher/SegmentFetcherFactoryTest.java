@@ -98,7 +98,7 @@ public class SegmentFetcherFactoryTest {
     }
 
     @Override
-    public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
+    public void fetchSegmentToLocal(String uri, File tempFile) {
     }
 
     @Override
