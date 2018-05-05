@@ -36,8 +36,10 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentSizeBasedFlushThresholdUpdater.class);
 
   static final long IDEAL_SEGMENT_SIZE_BYTES = 500 * 1024 * 1024;
-  private static final double MIN_ALLOWED_SEGMENT_SIZE_BYTES = 250 * 1024 * 1024;
-  private static final double MAX_ALLOWED_SEGMENT_SIZE_BYTES = 750 * 1024 * 1024;
+  /** Below this size, we double the rows threshold */
+  private static final double MIN_ALLOWED_SEGMENT_SIZE_BYTES = IDEAL_SEGMENT_SIZE_BYTES / 2;
+  /** Above this size we half the row threshold */
+  private static final double MAX_ALLOWED_SEGMENT_SIZE_BYTES = IDEAL_SEGMENT_SIZE_BYTES + IDEAL_SEGMENT_SIZE_BYTES / 2;
   static final int INITIAL_ROWS_THRESHOLD = 100_000;
 
   static final double CURRENT_SEGMENT_RATIO_WEIGHT = 0.25;
