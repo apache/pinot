@@ -227,7 +227,6 @@ export default Controller.extend({
       hoverUrns: new Set(),
       filteredUrns: new Set()
     });
-
     // This is a flag for the acceptance test for rootcause to prevent it from timing out because of this run loop
     if (config.environment !== 'test') {
       later(this, this._onCheckSessionTimer, ROOTCAUSE_SESSION_TIMER_INTERVAL);
@@ -877,6 +876,13 @@ export default Controller.extend({
         sessionText: text,
         sessionModified: true
       });
+      const { sessionid, anomalyId } = this.getProperties('sessionid', 'anomalyId');
+
+      if(!sessionid){
+        debugger;
+        const jsonString = JSON.stringify({ feedbackType: null, comment: text });
+        fetch(`/dashboard/anomaly-merged-result/feedback/${anomalyId}`, { method: 'POST', body: jsonString });
+      }
     },
 
     /**
@@ -930,7 +936,7 @@ export default Controller.extend({
     },
 
     /**
-     * Saves the anomaly feedback o the backend. Overrides existing feedback, if any.
+     * Saves the anomaly feedback to the backend. Overrides existing feedback, if any.
      *
      * @param {String} anomalyUrn anomaly entity urn
      * @param {String} feedback anomaly feedback type string
@@ -938,8 +944,8 @@ export default Controller.extend({
      */
     onFeedback(anomalyUrn, feedback, comment) {
       const id = anomalyUrn.split(':')[3];
-      const jsonString = JSON.stringify({ feedbackType: feedback, comment });
-
+      const { sessionText } = this.getProperties('sessionText');
+      const jsonString = JSON.stringify({ feedbackType: feedback, comment: sessionText });
       return fetch(`/dashboard/anomaly-merged-result/feedback/${id}`, { method: 'POST', body: jsonString });
     },
 
