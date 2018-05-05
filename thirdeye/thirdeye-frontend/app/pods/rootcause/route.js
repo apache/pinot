@@ -3,6 +3,7 @@ import Route from '@ember/routing/route';
 import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
+import config from 'thirdeye-frontend/config/environment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 import {
   toCurrentUrn,
@@ -10,6 +11,8 @@ import {
   dateFormatFull,
   appendFilters
 } from 'thirdeye-frontend/utils/rca-utils';
+import advancedDimensionRawData from 'thirdeye-frontend/mocks/rcaDimensions';
+import advancedDimensionColumns from 'thirdeye-frontend/shared/dimensionAnalysisTableColumns';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
 
@@ -24,6 +27,18 @@ const UNIT_MAPPING = {
   MINUTES: 'minute',
   HOURS: 'hour',
   DAYS: 'day'
+};
+
+/**
+ * Placeholder for dynamic dimension analysis table data (to clarify once we have reliable mock data - SM)
+ */
+const processedAdvancedDimensions = (dimensionList) => {
+  dimensionList.forEach((record) => {
+    record.cob = `${record.current || 0} / ${record.baseline || 0}`;
+    record.country = record.names[0];
+    record.platform = record.names[1];
+  });
+  return dimensionList;
 };
 
 /**
@@ -111,6 +126,10 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
   model(params) {
     const { metricId, sessionId, anomalyId } = params;
+    const isDevEnv = config.environment === 'development';
+
+    // Add simulated dynamic dimension analysis records to mocked table data
+    const advancedDimensionList = processedAdvancedDimensions(advancedDimensionRawData);
 
     let metricUrn, metricEntity, session, anomalyUrn, anomalyEntity, anomalySessions;
 
@@ -130,6 +149,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     }
 
     return RSVP.hash({
+      isDevEnv,
       metricId,
       metricUrn,
       metricEntity,
@@ -138,7 +158,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
       anomalyId,
       anomalyUrn,
       anomalyEntity,
-      anomalySessions
+      anomalySessions,
+      advancedDimensionList,
+      advancedDimensionColumns
     });
   },
 

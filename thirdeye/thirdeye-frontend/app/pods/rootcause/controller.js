@@ -144,6 +144,14 @@ export default Controller.extend({
   activeTab: ROOTCAUSE_TAB_METRICS,
 
   /**
+   * displayed investigation sub-tabs
+   * @type {Object}
+   */
+  activeSubTabs: {
+    dimensions: 'heatmap'
+  },
+
+  /**
    * display mode for timeseries chart
    * @type {string}
    */

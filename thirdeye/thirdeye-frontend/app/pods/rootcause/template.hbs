@@ -161,115 +161,21 @@
                 {{#tablist.tab name="events"}}Events{{/tablist.tab}}
                 {{#tablist.tab name="trend"}}Trend{{/tablist.tab}}
               {{/tabs.tablist}}
-
               {{!-- metrics --}}
               {{#tabs.tabpanel name="metrics"}}
-                {{#if (set-has loadingFrameworks "metricRelated")}}
-                  <div class="spinner-wrapper spinner-wrapper--card">
-                    {{ember-spinner}}
-                  </div>
-                {{/if}}
-                <div class="pull-right">
-                  <a {{action "onEntityMappingClick"}} class="thirdeye-link thirdeye-link--settings">
-                    + add related metrics
-                  </a>
-                  <span class="te-tooltip-wrapper">
-                    <i class="glyphicon glyphicon-question-sign">
-                      {{#tooltip-on-element class="te-tooltip"}}
-                        Can't find your metric? Click here to add a new metric mapping.
-                      {{/tooltip-on-element}}
-                    </i>
-                  </span>
-                </div>
-                {{rootcause-metrics
-                  entities=entities
-                  aggregates=aggregates
-                  scores=scores
-                  selectedUrns=selectedUrns
-                  isLoading=(or isLoadingAggregates isLoadingScores)
-                  onSelection=(action "onSelection")
-                }}
+                {{partial 'partials/rootcause/metrics'}}
               {{/tabs.tabpanel}}
-
               {{!-- dimensions --}}
               {{#tabs.tabpanel name="dimensions"}}
-                {{#if isLoadingBreakdowns}}
-                  <div class="spinner-wrapper spinner-wrapper--card">
-                    {{ember-spinner}}
-                  </div>
-                {{/if}}
-
-                {{rootcause-heatmap
-                  entities=entities
-                  breakdowns=breakdowns
-                  selectedUrn=metricUrn
-                  isLoadingBreakdowns=isLoadingBreakdowns
-                  onSelection=(action "heatmapOnSelection")
-                }}
+                {{partial 'partials/rootcause/dimensions'}}
               {{/tabs.tabpanel}}
-
               {{!-- events --}}
               {{#tabs.tabpanel name="events"}}
-                <div class="row">
-                  <div class="col-xs-12">
-                    <div class="pull-right">
-                      <a {{action "onCreateEventClick"}} class="thirdeye-link thirdeye-link--settings">
-                        + add event
-                      </a>
-                      <span class="te-tooltip-wrapper">
-                        <i class="glyphicon glyphicon-question-sign">
-                          {{#tooltip-on-element class="te-tooltip"}}
-                            Can't find your event? Click here to add a new event.
-                          {{/tooltip-on-element}}
-                        </i>
-                      </span>
-                    </div>
-                  </div>
-                  <div class="col-xs-3">
-                    {{filter-bar
-                      config=filterConfig
-                      entities=eventFilterEntities
-                      loadingFrameworks=loadingFrameworks
-                      onFilter=(action "onFilter")}}
-                  </div>
-                  <div class="col-xs-9">
-                    {{rootcause-table
-                      entities=eventTableEntities
-                      columns=eventTableColumns
-                      selectedUrns=selectedUrns
-                      onSelection=(action "onSelection")
-                    }}
-                  </div>
-                </div>
+                {{partial 'partials/rootcause/events'}}
               {{/tabs.tabpanel}}
-
               {{!-- trend --}}
               {{#tabs.tabpanel name="trend"}}
-                {{#if (set-has loadingFrameworks "metricRelated")}}
-                  <div class="spinner-wrapper spinner-wrapper--card">
-                    {{ember-spinner}}
-                  </div>
-                {{/if}}
-                <div class="pull-right">
-                  <a {{action "onEntityMappingClick"}} class="thirdeye-link thirdeye-link--settings">
-                    + add related metrics
-                  </a>
-                  <span class="te-tooltip-wrapper">
-                    <i class="glyphicon glyphicon-question-sign">
-                      {{#tooltip-on-element class="te-tooltip"}}
-                        Can't find your metric? Click here to add a new metric mapping.
-                      {{/tooltip-on-element}}
-                    </i>
-                  </span>
-                </div>
-                {{rootcause-trend
-                  entities=entities
-                  timeseries=timeseries
-                  context=context
-                  selectedUrns=selectedUrns
-                  isLoading=isLoadingTimeseries
-                  onSelection=(action "onSelection")
-                }}
+                {{partial 'partials/rootcause/trend'}}
               {{/tabs.tabpanel}}
             {{/shared/common-tabs}}
           </div>
