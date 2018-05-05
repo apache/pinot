@@ -39,7 +39,6 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   private static final double MIN_ALLOWED_SEGMENT_SIZE_BYTES = 250 * 1024 * 1024;
   private static final double MAX_ALLOWED_SEGMENT_SIZE_BYTES = 750 * 1024 * 1024;
   static final int INITIAL_ROWS_THRESHOLD = 100_000;
-  static final String MAX_TIME_THRESHOLD = "24h";
 
   static final double CURRENT_SEGMENT_RATIO_WEIGHT = 0.25;
   static final double PREVIOUS_SEGMENT_RATIO_WEIGHT = 0.75;
@@ -56,7 +55,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
       double prevRatio = _latestSegmentRowsToSizeRatio.get();
       if (prevRatio > 0) { // new partition added case
         LOGGER.info(
-            "Committing segment zk metadata is not available, setting rows threshold for segment using previous segments ratio {}",
+            "Committing segment zk metadata is not available, setting rows threshold for segment {} using previous segments ratio",
             newSegmentZKMetadata.getSegmentName());
         newSegmentZKMetadata.setSizeThresholdToFlushSegment((int) (IDEAL_SEGMENT_SIZE_BYTES * prevRatio));
       } else {
@@ -64,8 +63,6 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
             newSegmentZKMetadata.getSegmentName());
         newSegmentZKMetadata.setSizeThresholdToFlushSegment(INITIAL_ROWS_THRESHOLD);
       }
-      newSegmentZKMetadata.setTimeThresholdToFlushSegment(MAX_TIME_THRESHOLD);
-      LOGGER.info("newSegmentSizeThreshold : {}", newSegmentZKMetadata.getSizeThresholdToFlushSegment());
       return;
     }
 
@@ -75,25 +72,14 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
           "Committing segment size is not available, setting thresholds for segment {} from previous segment {}",
           newSegmentZKMetadata.getSegmentName(), committingSegmentZkMetadata.getSegmentName());
       newSegmentZKMetadata.setSizeThresholdToFlushSegment(committingSegmentZkMetadata.getSizeThresholdToFlushSegment());
-      newSegmentZKMetadata.setTimeThresholdToFlushSegment(committingSegmentZkMetadata.getTimeThresholdToFlushSegment());
       return;
     }
 
     long timeConsumed = System.currentTimeMillis() - committingSegmentZkMetadata.getCreationTime();
     int numRowsConsumed = (int) (committingSegmentZkMetadata.getTotalRawDocs());
     int numRowsThreshold = committingSegmentZkMetadata.getSizeThresholdToFlushSegment();
-    LOGGER.info(
-        "Time consumed:{} Time threshold:{} Num rows consumed:{} Num rows threshold:{} Committing segment size bytes:{}",
-        TimeUtils.convertMillisToPeriod(timeConsumed), MAX_TIME_THRESHOLD, numRowsConsumed, numRowsThreshold,
-        committingSegmentSizeBytes);
-
-    if (timeConsumed >= TimeUtils.convertPeriodToMillis(MAX_TIME_THRESHOLD)) {
-      LOGGER.info("Time threshold {} reached for committing segment {}", MAX_TIME_THRESHOLD,
-          committingSegmentZkMetadata.getSegmentName());
-    } else if (numRowsConsumed >= numRowsThreshold) {
-      LOGGER.info("Number of rows threshold {} reached for segment {}", numRowsThreshold,
-          committingSegmentZkMetadata.getSegmentName());
-    }
+    LOGGER.info("Time consumed:{}  Num rows consumed:{} Num rows threshold:{} Committing segment size bytes:{}",
+        TimeUtils.convertMillisToPeriod(timeConsumed), numRowsConsumed, numRowsThreshold, committingSegmentSizeBytes);
 
     /**
      * TODO: {@link LLCRealtimeSegmentZKMetadata.getSizeThresholdToFlushSegment()} is an int. Auto tuning the size could cause overflow.
@@ -120,6 +106,5 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
       newSegmentZKMetadata.setSizeThresholdToFlushSegment(targetSegmentNumRows);
       LOGGER.info("Setting new rows threshold : {}", newSegmentZKMetadata.getSizeThresholdToFlushSegment());
     }
-    newSegmentZKMetadata.setTimeThresholdToFlushSegment(MAX_TIME_THRESHOLD);
   }
 }

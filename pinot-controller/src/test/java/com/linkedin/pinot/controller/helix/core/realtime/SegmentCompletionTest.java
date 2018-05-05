@@ -1099,12 +1099,11 @@ public class SegmentCompletionTest {
     }
 
     @Override
-         public boolean commitSegmentMetadata(String rawTableName, String committingSegmentName, long nextOffset,
-        SegmentCompletionProtocol.Request.Params reqParams) {
+         public boolean commitSegmentMetadata(String rawTableName, SegmentCompletionProtocol.Request.Params reqParams) {
       _segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-      _segmentMetadata.setEndOffset(nextOffset);
+      _segmentMetadata.setEndOffset(reqParams.getOffset());
       _segmentMetadata.setDownloadUrl(
-          ControllerConf.constructDownloadUrl(rawTableName, committingSegmentName, CONTROLLER_CONF.generateVipUrl()));
+          ControllerConf.constructDownloadUrl(rawTableName, reqParams.getSegmentName(), CONTROLLER_CONF.generateVipUrl()));
       _segmentMetadata.setEndTime(_segmentCompletionMgr.getCurrentTimeMs());
       return true;
     }

@@ -389,13 +389,10 @@ public class PinotLLCRealtimeSegmentManager {
    * records for new segments, and puts them in idealstate in CONSUMING state.
    *
    * @param rawTableName Raw table name
-   * @param committingSegmentNameStr Committing segment name
-   * @param nextOffset The offset with which the next segment should start.
    * @param reqParams
    * @return boolean
    */
-  public boolean commitSegmentMetadata(String rawTableName, final String committingSegmentNameStr, long nextOffset,
-      SegmentCompletionProtocol.Request.Params reqParams) {
+  public boolean commitSegmentMetadata(String rawTableName, SegmentCompletionProtocol.Request.Params reqParams) {
     final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     TableConfig tableConfig = getRealtimeTableConfig(realtimeTableName);
     if (tableConfig == null) {
@@ -411,6 +408,8 @@ public class PinotLLCRealtimeSegmentManager {
      * Step 3: Update IDEALSTATES to include new segment in CONSUMING state, and change old segment to ONLINE state.
      */
 
+    final String committingSegmentNameStr = reqParams.getSegmentName();
+    final long nextOffset = reqParams.getOffset();
     final LLCSegmentName committingLLCSegmentName = new LLCSegmentName(committingSegmentNameStr);
     final int partitionId = committingLLCSegmentName.getPartitionId();
     final int newSeqNum = committingLLCSegmentName.getSequenceNumber() + 1;

@@ -604,8 +604,7 @@ public class SegmentCompletionManager {
           LOGGER.error("Segment upload failed");
           return abortAndReturnFailed();
         }
-        SegmentCompletionProtocol.Response response =
-            commitSegment(reqParams, isSplitCommit);
+        SegmentCompletionProtocol.Response response = commitSegment(reqParams, isSplitCommit);
         if (!response.equals(SegmentCompletionProtocol.RESP_COMMIT_SUCCESS)) {
           return abortAndReturnFailed();
         } else {
@@ -1001,8 +1000,7 @@ public class SegmentCompletionManager {
           return SegmentCompletionProtocol.RESP_FAILED;
         }
       }
-      success = _segmentManager.commitSegmentMetadata(_segmentName.getTableName(), _segmentName.getSegmentName(),
-          _winningOffset, reqParams);
+      success = _segmentManager.commitSegmentMetadata(_segmentName.getTableName(), reqParams);
       if (success) {
         _state = State.COMMITTED;
         LOGGER.info("Committed segment {} at offset {} winner {}", _segmentName.getSegmentName(), offset, instanceId);

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core.realtime.segment;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
@@ -66,6 +67,7 @@ public class DefaultFlushThresholdUpdater implements FlushThresholdUpdater {
     newSegmentZKMetadata.setSizeThresholdToFlushSegment(segmentFlushSize);
   }
 
+  @VisibleForTesting
   int getTableFlushSize() {
     return _tableFlushSize;
   }
