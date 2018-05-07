@@ -885,7 +885,7 @@ export default Controller.extend({
     },
 
     /**
-     * Saves the session to the backegnd. Overrides existing session, if any.
+     * Saves the session to the backend. Overrides existing session, if any.
      *
      * @returns {undefined}
      */
