@@ -165,7 +165,6 @@ public class DimensionWrapperTest {
     config.setId(this.config.getId());
     config.setName(this.config.getName());
     config.setProperties(properties);
-    config.setClassName(PROP_CLASS_NAME_VALUE);
 
     return config;
   }

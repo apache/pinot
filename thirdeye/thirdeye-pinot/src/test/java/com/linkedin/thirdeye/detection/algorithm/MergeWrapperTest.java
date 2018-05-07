@@ -69,19 +69,19 @@ public class MergeWrapperTest {
     this.config.setProperties(this.properties);
 
     List<MergedAnomalyResultDTO> existing = new ArrayList<>();
-    existing.add(DetectionTestUtils.makeAnomaly(PROP_ID_VALUE,    0, 1000, Collections.<String, String>emptyMap()));
-    existing.add(DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 1500, 2000, Collections.<String, String>emptyMap()));
+    existing.add(makeAnomaly(0, 1000));
+    existing.add(makeAnomaly(1500, 2000));
 
     this.outputs = new ArrayList<>();
 
     this.outputs.add(new MockPipelineOutput(Arrays.asList(
-        DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 1100, 1200, Collections.<String, String>emptyMap()),
-        DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 2200, 2300, Collections.<String, String>emptyMap())
+        makeAnomaly(1100, 1200),
+        makeAnomaly(2200, 2300)
     ), 2900));
 
     this.outputs.add(new MockPipelineOutput(Arrays.asList(
-        DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 1150, 1250, Collections.<String, String>emptyMap()),
-        DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 2400, 2800, Collections.<String, String>emptyMap())
+        makeAnomaly(1150, 1250),
+        makeAnomaly(2400, 2800)
     ), 3000));
 
     MockPipelineLoader mockLoader = new MockPipelineLoader(this.runs, this.outputs);
@@ -111,9 +111,9 @@ public class MergeWrapperTest {
 
     Assert.assertEquals(output.getAnomalies().size(), 8);
     Assert.assertEquals(output.getLastTimestamp(), 2900);
-    Assert.assertTrue(output.getAnomalies().contains(DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 0, 1250, Collections.<String, String>emptyMap())));
-    Assert.assertTrue(output.getAnomalies().contains(DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 1500, 2000, Collections.<String, String>emptyMap())));
-    Assert.assertTrue(output.getAnomalies().contains(DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 2200, 2800, Collections.<String, String>emptyMap())));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2000)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2200, 2800)));
   }
 
   @Test
@@ -126,9 +126,9 @@ public class MergeWrapperTest {
 
     Assert.assertEquals(output.getAnomalies().size(), 8);
     Assert.assertEquals(output.getLastTimestamp(), 2900);
-    Assert.assertTrue(output.getAnomalies().contains(DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 0, 1250, Collections.<String, String>emptyMap())));
-    Assert.assertTrue(output.getAnomalies().contains(DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 1500, 2300, Collections.<String, String>emptyMap())));
-    Assert.assertTrue(output.getAnomalies().contains(DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 2400, 2800, Collections.<String, String>emptyMap())));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800)));
   }
 
   @Test
@@ -162,13 +162,13 @@ public class MergeWrapperTest {
     this.config.getProperties().put(PROP_MAX_DURATION, 1250);
 
     this.outputs.add(new MockPipelineOutput(Arrays.asList(
-        DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 1150, 1250, Collections.singletonMap("key", "value")),
-        DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 2400, 2800, Collections.singletonMap("otherKey", "value"))
+        makeAnomaly(1150, 1250, Collections.singletonMap("key", "value")),
+        makeAnomaly(2400, 2800, Collections.singletonMap("otherKey", "value"))
     ), 3000));
 
     this.outputs.add(new MockPipelineOutput(Arrays.asList(
-        DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 1250, 1300, Collections.singletonMap("key", "value")),
-        DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 2700, 2900, Collections.singletonMap("otherKey", "otherValue"))
+        makeAnomaly(1250, 1300, Collections.singletonMap("key", "value")),
+        makeAnomaly(2700, 2900, Collections.singletonMap("otherKey", "otherValue"))
     ), 3000));
 
     Map<String, Object> nestedPropertiesThree = new HashMap<>();
@@ -187,9 +187,18 @@ public class MergeWrapperTest {
 
     Assert.assertEquals(output.getAnomalies().size(), 13);
     Assert.assertEquals(output.getLastTimestamp(), 2900);
-    Assert.assertTrue(output.getAnomalies().contains(DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 0, 1250, Collections.<String, String>emptyMap())));
-    Assert.assertTrue(output.getAnomalies().contains(DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 1500, 2300, Collections.<String, String>emptyMap())));
-    Assert.assertTrue(output.getAnomalies().contains(DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 2400, 2800, Collections.<String, String>emptyMap())));
-    Assert.assertTrue(output.getAnomalies().contains(DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, 1150, 1300, Collections.singletonMap("key", "value"))));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1150, 1300, Collections.singletonMap("key", "value"))));
   }
+
+  private static MergedAnomalyResultDTO makeAnomaly(long start, long end) {
+    return DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, start, end, null, null, Collections.<String, String>emptyMap());
+  }
+
+  private static MergedAnomalyResultDTO makeAnomaly(long start, long end, Map<String, String> dimensions) {
+    return DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, start, end, null, null, dimensions);
+  }
+
 }

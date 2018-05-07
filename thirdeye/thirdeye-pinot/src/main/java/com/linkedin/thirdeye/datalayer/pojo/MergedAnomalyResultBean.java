@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -217,7 +216,7 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score, impactToGlobal, avgBaselineVal, avgCurrentVal, anomalyResultSource);
+    return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score, impactToGlobal, avgBaselineVal, avgCurrentVal, anomalyResultSource, detectionConfigId, childIds, isChild);
   }
 
   @Override
@@ -231,7 +230,8 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
         .equals(metric, m.getMetric()) && Objects.equals(dimensions, m.getDimensions()) && Objects
         .equals(score, m.getScore()) && Objects.equals(avgBaselineVal, m.getAvgBaselineVal()) && Objects
         .equals(avgCurrentVal, m.getAvgCurrentVal()) && Objects.equals(impactToGlobal, m.getImpactToGlobal()) &&
-        Objects.equals(anomalyResultSource, m.getAnomalyResultSource());
+        Objects.equals(anomalyResultSource, m.getAnomalyResultSource()) && Objects.equals(detectionConfigId,
+        m.getDetectionConfigId()) && Objects.equals(childIds, m.getChildIds()) && Objects.equals(isChild, m.isChild());
   }
 
   @Override

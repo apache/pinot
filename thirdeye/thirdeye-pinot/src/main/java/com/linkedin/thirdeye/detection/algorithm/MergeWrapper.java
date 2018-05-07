@@ -80,7 +80,6 @@ public class MergeWrapper extends DetectionPipeline {
 
       nestedConfig.setId(this.config.getId());
       nestedConfig.setName(this.config.getName());
-      nestedConfig.setClassName(properties.get(PROP_CLASS_NAME).toString());
       nestedConfig.setProperties(properties);
 
       DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);

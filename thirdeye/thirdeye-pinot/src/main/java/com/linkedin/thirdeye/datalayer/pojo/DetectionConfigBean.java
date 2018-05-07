@@ -14,7 +14,6 @@ import java.util.Objects;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class DetectionConfigBean extends AbstractBean {
-  String className;
   String cron;
   String name;
   long lastTimestamp;
@@ -26,14 +25,6 @@ public class DetectionConfigBean extends AbstractBean {
 
   public void setName(String name) {
     this.name = name;
-  }
-
-  public String getClassName() {
-    return className;
-  }
-
-  public void setClassName(String className) {
-    this.className = className;
   }
 
   public String getCron() {
@@ -69,12 +60,12 @@ public class DetectionConfigBean extends AbstractBean {
       return false;
     }
     DetectionConfigBean that = (DetectionConfigBean) o;
-    return lastTimestamp == that.lastTimestamp && Objects.equals(className, that.className) && Objects.equals(cron,
-        that.cron) && Objects.equals(name, that.name) && Objects.equals(properties, that.properties);
+    return lastTimestamp == that.lastTimestamp && Objects.equals(cron, that.cron)
+        && Objects.equals(name, that.name) && Objects.equals(properties, that.properties);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(className, cron, name, lastTimestamp, properties);
+    return Objects.hash(cron, name, lastTimestamp, properties);
   }
 }

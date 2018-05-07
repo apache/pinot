@@ -50,11 +50,11 @@ public class DetectionPipelineTaskRunnerTest {
 
     this.properties = new HashMap<>();
     this.properties.put("metricUrn", "thirdeye:metric:1");
+    this.properties.put("className", "myClassName");
 
     DetectionConfigDTO detector = new DetectionConfigDTO();
     detector.setProperties(this.properties);
     detector.setName("myName");
-    detector.setClassName("myClassName");
     detector.setCron("myCron");
     this.detectorId = this.detectionDAO.save(detector);
 
@@ -87,13 +87,13 @@ public class DetectionPipelineTaskRunnerTest {
     Assert.assertEquals(this.runs.get(0).getStartTime(), 1250);
     Assert.assertEquals(this.runs.get(0).getEndTime(), 1500);
     Assert.assertEquals(this.runs.get(0).getConfig().getName(), "myName");
-    Assert.assertEquals(this.runs.get(0).getConfig().getClassName(), "myClassName");
+    Assert.assertEquals(this.runs.get(0).getConfig().getProperties().get("className"), "myClassName");
     Assert.assertEquals(this.runs.get(0).getConfig().getCron(), "myCron");
   }
 
   @Test
   public void testTaskRunnerPersistence() throws Exception {
-    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(this.detectorId, 1300, 1400, Collections.singletonMap("myKey", "myValue"));
+    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(this.detectorId, 1300, 1400, null, null, Collections.singletonMap("myKey", "myValue"));
 
     this.outputs.add(new MockPipelineOutput(Collections.singletonList(anomaly), -1));
 

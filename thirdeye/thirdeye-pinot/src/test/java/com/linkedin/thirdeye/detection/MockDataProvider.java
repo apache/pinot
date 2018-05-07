@@ -63,13 +63,15 @@ public class MockDataProvider implements DataProvider {
             }
             return true;
           }
-        }, arrCols).filter(new Series.LongConditional() {
-          @Override
-          public boolean apply(long... values) {
-            return values[0] >= slice.getStart() && values[0] < slice.getEnd();
-          }
-        }, COL_TIME).dropNull();
+        }, arrCols);
       }
+
+      out = out.filter(new Series.LongConditional() {
+        @Override
+        public boolean apply(long... values) {
+          return values[0] >= slice.getStart() && values[0] < slice.getEnd();
+        }
+      }, COL_TIME).dropNull();
 
       result.put(slice, out.groupByValue(groupBy).aggregate(groupByExpr));
     }

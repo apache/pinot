@@ -6,11 +6,13 @@ import java.util.Map;
 
 
 public class DetectionTestUtils {
-  public static MergedAnomalyResultDTO makeAnomaly(Long configId, long start, long end, Map<String, String> dimensions) {
+  public static MergedAnomalyResultDTO makeAnomaly(Long configId, long start, long end, String metric, String dataset, Map<String, String> dimensions) {
     MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
     anomaly.setDetectionConfigId(configId);
     anomaly.setStartTime(start);
     anomaly.setEndTime(end);
+    anomaly.setMetric(metric);
+    anomaly.setCollection(dataset);
 
     DimensionMap dimMap = new DimensionMap();
     dimMap.putAll(dimensions);

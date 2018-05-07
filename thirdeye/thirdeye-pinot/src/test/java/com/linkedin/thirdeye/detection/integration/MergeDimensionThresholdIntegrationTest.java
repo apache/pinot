@@ -29,6 +29,8 @@ import org.testng.annotations.Test;
 public class MergeDimensionThresholdIntegrationTest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
+  private static final String METRIC = "myMetric2";
+  private static final String DATASET = "myDataset2";
   private static final Map<String, String> ONE_TWO = new HashMap<>();
   static {
     ONE_TWO.put("a", "1");
@@ -54,11 +56,13 @@ public class MergeDimensionThresholdIntegrationTest {
     URL url = this.getClass().getResource("mergeDimensionThresholdProperties.json");
     this.properties = MAPPER.readValue(url, Map.class);
 
-    Reader dataReader1 = new InputStreamReader(this.getClass().getResourceAsStream("timeseries1.csv"));
-    this.data1 = DataFrame.fromCsv(dataReader1);
+    try (Reader dataReader = new InputStreamReader(this.getClass().getResourceAsStream("timeseries.csv"))) {
+      this.data1 = DataFrame.fromCsv(dataReader);
+    }
 
-    Reader dataReader2 = new InputStreamReader(this.getClass().getResourceAsStream("timeseries2.csv"));
-    this.data2 = DataFrame.fromCsv(dataReader2);
+    try (Reader dataReader = new InputStreamReader(this.getClass().getResourceAsStream("timeseries.csv"))) {
+      this.data2 = DataFrame.fromCsv(dataReader);
+    }
 
     this.loader = new DetectionPipelineLoader();
 
@@ -70,8 +74,8 @@ public class MergeDimensionThresholdIntegrationTest {
 
     this.metric2 = new MetricConfigDTO();
     this.metric2.setId(2L);
-    this.metric2.setName("myMetric2");
-    this.metric2.setDataset("myDataset2");
+    this.metric2.setName(METRIC);
+    this.metric2.setDataset(DATASET);
 
     this.metrics = new ArrayList<>();
     this.metrics.add(this.metric2);
@@ -86,29 +90,31 @@ public class MergeDimensionThresholdIntegrationTest {
         .setAnomalies(this.anomalies);
 
     this.config = new DetectionConfigDTO();
-    this.config.setClassName("com.linkedin.thirdeye.detection.algorithm.MergeWrapper");
     this.config.setProperties(this.properties);
   }
 
-  @Test(enabled = false)
+  @Test
   public void testMergeDimensionThreshold() throws Exception {
     DetectionPipeline pipeline = this.loader.from(this.provider, this.config, 0, 18000);
     DetectionPipelineResult result = pipeline.run();
 
-    // TODO debug and complete this test
-
-    Assert.assertTrue(result.getAnomalies().contains(
-        DetectionTestUtils.makeAnomaly(null, 10800, 14400, Collections.<String, String>emptyMap())));
-    Assert.assertTrue(result.getAnomalies().contains(
-        DetectionTestUtils.makeAnomaly(null, 0, 3600, ONE_TWO)));
-    Assert.assertTrue(result.getAnomalies().contains(
-        DetectionTestUtils.makeAnomaly(null, 3600, 7200, ONE_TWO)));
-    Assert.assertTrue(result.getAnomalies().contains(
-        DetectionTestUtils.makeAnomaly(null, 14400, 14401, ONE_TWO)));
-
+    Assert.assertEquals(result.getAnomalies().size(), 5);
     Assert.assertEquals(result.getLastTimestamp(), 14400);
 
-    Assert.fail("not implemented yet");
+    Assert.assertTrue(result.getAnomalies().contains(
+        makeAnomaly(10800, 14400, Collections.<String, String>emptyMap())));
+    Assert.assertTrue(result.getAnomalies().contains(
+        makeAnomaly(14400, 14401, Collections.<String, String>emptyMap())));
+
+    Assert.assertTrue(result.getAnomalies().contains(
+        makeAnomaly(0, 3600, ONE_TWO)));
+    Assert.assertTrue(result.getAnomalies().contains(
+        makeAnomaly(3600, 7200, ONE_TWO)));
+    Assert.assertTrue(result.getAnomalies().contains(
+        makeAnomaly(14400, 14401, ONE_TWO)));
   }
 
+  private static MergedAnomalyResultDTO makeAnomaly(long start, long end, Map<String, String> dimensions) {
+    return DetectionTestUtils.makeAnomaly(null, start, end, METRIC, DATASET, dimensions);
+  }
 }
