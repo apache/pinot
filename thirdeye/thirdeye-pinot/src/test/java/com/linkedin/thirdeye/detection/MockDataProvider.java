@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.detection;
 
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.Series;
@@ -20,6 +21,8 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 public class MockDataProvider implements DataProvider {
+  private static final Multimap<String, String> NO_FILTERS = HashMultimap.create();
+
   private Map<MetricSlice, DataFrame> timeseries;
   private Map<MetricSlice, DataFrame> aggregates;
   private List<EventDTO> events;
@@ -47,20 +50,25 @@ public class MockDataProvider implements DataProvider {
       }
       groupByExpr.add(COL_VALUE + ":sum");
 
-      DataFrame out = this.timeseries.get(slice);
+      DataFrame out = this.timeseries.get(slice.withFilters(NO_FILTERS));
 
       if (!filters.isEmpty()) {
         out = out.filter(new Series.StringConditional() {
           @Override
           public boolean apply(String... values) {
             for (int i = 0; i < arrCols.length; i++) {
-              if (!slice.getFilters().containsEntry(arrCols[i], values[0])) {
+              if (!slice.getFilters().containsEntry(arrCols[i], values[i])) {
                 return false;
               }
             }
             return true;
           }
-        }, arrCols).dropNull();
+        }, arrCols).filter(new Series.LongConditional() {
+          @Override
+          public boolean apply(long... values) {
+            return values[0] >= slice.getStart() && values[0] < slice.getEnd();
+          }
+        }, COL_TIME).dropNull();
       }
 
       result.put(slice, out.groupByValue(groupBy).aggregate(groupByExpr));
@@ -78,7 +86,7 @@ public class MockDataProvider implements DataProvider {
       }
       expr.add(COL_VALUE + ":sum");
 
-      result.put(slice, this.aggregates.get(slice).groupByValue(new ArrayList<>(dimensions)).aggregate(expr));
+      result.put(slice, this.aggregates.get(slice.withFilters(NO_FILTERS)).groupByValue(new ArrayList<>(dimensions)).aggregate(expr));
     }
     return result;
   }

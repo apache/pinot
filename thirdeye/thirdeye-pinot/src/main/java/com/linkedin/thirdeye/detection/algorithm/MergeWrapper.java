@@ -86,7 +86,11 @@ public class MergeWrapper extends DetectionPipeline {
       DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
 
       DetectionPipelineResult intermediate = pipeline.run();
-      overallLastTimeStamp = Math.min(intermediate.getLastTimestamp(), overallLastTimeStamp);
+
+      if (intermediate.getLastTimestamp() >= 0) {
+        overallLastTimeStamp = Math.min(intermediate.getLastTimestamp(), overallLastTimeStamp);
+      }
+
       allAnomalies.addAll(intermediate.getAnomalies());
     }
 

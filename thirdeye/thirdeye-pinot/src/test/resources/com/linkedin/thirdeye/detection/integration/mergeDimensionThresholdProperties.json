@@ -1,0 +1,30 @@
+{
+  "className": "com.linkedin.thirdeye.detection.algorithm.MergeWrapper",
+  "maxGap": 100,
+  "maxDuration": 1000,
+  "nested": [
+    {
+      "className": "com.linkedin.thirdeye.detection.algorithm.DimensionWrapper",
+      "metricUrn": "thirdeye:metric:1:a%3D1:a%3D2",
+      "nestedMetricUrn": "thirdeye:metric:2",
+      "dimensions": ["a", "b"],
+      "minValue": 10,
+      "k": 3,
+      "nested": [
+        {
+          "className": "com.linkedin.thirdeye.detection.algorithm.ThresholdAlgorithm",
+          "min": 15
+        },
+        {
+          "className": "com.linkedin.thirdeye.detection.algorithm.ThresholdAlgorithm",
+          "max": 20
+        }
+      ]
+    },
+    {
+      "className": "com.linkedin.thirdeye.detection.algorithm.ThresholdAlgorithm",
+      "metricUrn": "thirdeye:metric:2",
+      "max": 70
+    }
+  ]
+}

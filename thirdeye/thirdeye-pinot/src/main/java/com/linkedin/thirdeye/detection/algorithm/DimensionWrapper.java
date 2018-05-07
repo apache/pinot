@@ -93,17 +93,17 @@ public class DimensionWrapper extends DetectionPipeline {
     MetricEntity metric = MetricEntity.fromURN(this.metricUrn, 1.0);
     MetricSlice slice = MetricSlice.from(metric.getId(), this.startTime, this.endTime, metric.getFilters());
 
-    DataFrame breakdown = this.provider.fetchAggregates(Collections.singletonList(slice), this.dimensions).get(slice);
+    DataFrame aggregates = this.provider.fetchAggregates(Collections.singletonList(slice), this.dimensions).get(slice);
 
-    if (breakdown.isEmpty()) {
+    if (aggregates.isEmpty()) {
       return new DetectionPipelineResult(Collections.<MergedAnomalyResultDTO>emptyList(), -1);
     }
 
-    final double total = breakdown.getDoubles(COL_VALUE).sum().fillNull().doubleValue();
+    final double total = aggregates.getDoubles(COL_VALUE).sum().fillNull().doubleValue();
 
     // min value
     if (!Double.isNaN(this.minValue)) {
-      breakdown = breakdown.filter(new Series.DoubleConditional() {
+      aggregates = aggregates.filter(new Series.DoubleConditional() {
         @Override
         public boolean apply(double... values) {
           return values[0] >= DimensionWrapper.this.minValue;
@@ -113,7 +113,7 @@ public class DimensionWrapper extends DetectionPipeline {
 
     // min contribution
     if (!Double.isNaN(this.minContribution)) {
-      breakdown = breakdown.filter(new Series.DoubleConditional() {
+      aggregates = aggregates.filter(new Series.DoubleConditional() {
         @Override
         public boolean apply(double... values) {
           return values[0] / total >= DimensionWrapper.this.minContribution;
@@ -123,27 +123,32 @@ public class DimensionWrapper extends DetectionPipeline {
 
     // top k
     if (this.k > 0) {
-      breakdown = breakdown.sortedBy(COL_VALUE).tail(this.k).reverse();
+      aggregates = aggregates.sortedBy(COL_VALUE).tail(this.k).reverse();
     }
 
-    if (breakdown.isEmpty()) {
+    if (aggregates.isEmpty()) {
       return new DetectionPipelineResult(Collections.<MergedAnomalyResultDTO>emptyList(), -1);
     }
 
     long lastTimestamp = Long.MAX_VALUE;
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
 
-    for (int i = 0; i < breakdown.size(); i++) {
+    for (int i = 0; i < aggregates.size(); i++) {
       Multimap<String, String> filters = ArrayListMultimap.create(metric.getFilters());
       for (String dimName : this.dimensions) {
-        filters.put(dimName, breakdown.getString(dimName, i));
+        filters.removeAll(dimName); // clear any filters for explored dimension
+        filters.put(dimName, aggregates.getString(dimName, i));
       }
 
       MetricEntity targetMetric = MetricEntity.fromURN(this.nestedMetricUrn, 1.0).withFilters(filters);
 
       for (Map<String, Object> properties : this.nestedProperties) {
         DetectionPipelineResult intermediate = this.runNested(targetMetric, properties);
-        lastTimestamp = Math.min(lastTimestamp, intermediate.getLastTimestamp());
+
+        if (intermediate.getLastTimestamp() >= 0) {
+          lastTimestamp = Math.min(lastTimestamp, intermediate.getLastTimestamp());
+        }
+
         anomalies.addAll(intermediate.getAnomalies());
       }
     }
