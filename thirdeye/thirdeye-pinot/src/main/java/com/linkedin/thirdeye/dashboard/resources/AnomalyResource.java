@@ -865,7 +865,9 @@ public class AnomalyResource {
         result.setFeedback(feedback);
       }
       feedback.setComment(feedbackRequest.getComment());
-      feedback.setFeedbackType(feedbackRequest.getFeedbackType());
+      if (feedbackRequest.getFeedbackType() != null){
+        feedback.setFeedbackType(feedbackRequest.getFeedbackType());
+      }
       anomalyMergedResultDAO.updateAnomalyFeedback(result);
     } catch (IOException e) {
       throw new IllegalArgumentException("Invalid payload " + payload, e);

@@ -308,7 +308,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
         selectedUrns = new Set([anomalyUrn, anomalyMetricUrn]);
         sessionName = 'New Investigation of #' + anomalyId + ' (' + moment().format(dateFormatFull) + ')';
         setupMode = ROOTCAUSE_SETUP_MODE_SELECTED;
-
+        sessionText = anomalyEntity.attributes.comment[0];
       } else {
         routeErrors.add(`Could not find anomalyId ${anomalyId}`);
       }
