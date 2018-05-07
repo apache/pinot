@@ -68,6 +68,8 @@ public class TableViewsTest extends ControllerTest {
         .build();
     _helixResourceManager.addTable(tableConfig);
 
+    // add schema for realtime table
+    addDummySchema(HYBRID_TABLE_NAME);
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.CONSUMER_TYPE,
         DataSource.Realtime.Kafka.ConsumerType.highLevel.toString());
