@@ -879,14 +879,13 @@ export default Controller.extend({
       const { sessionid, anomalyId } = this.getProperties('sessionid', 'anomalyId');
 
       if(!sessionid){
-        debugger;
         const jsonString = JSON.stringify({ feedbackType: null, comment: text });
         fetch(`/dashboard/anomaly-merged-result/feedback/${anomalyId}`, { method: 'POST', body: jsonString });
       }
     },
 
     /**
-     * Saves the session to the backend. Overrides existing session, if any.
+     * Saves the session to the backegnd. Overrides existing session, if any.
      *
      * @returns {undefined}
      */
@@ -944,8 +943,7 @@ export default Controller.extend({
      */
     onFeedback(anomalyUrn, feedback, comment) {
       const id = anomalyUrn.split(':')[3];
-      const { sessionText } = this.getProperties('sessionText');
-      const jsonString = JSON.stringify({ feedbackType: feedback, comment: sessionText });
+      const jsonString = JSON.stringify({ feedbackType: feedback, comment });
       return fetch(`/dashboard/anomaly-merged-result/feedback/${id}`, { method: 'POST', body: jsonString });
     },
 
