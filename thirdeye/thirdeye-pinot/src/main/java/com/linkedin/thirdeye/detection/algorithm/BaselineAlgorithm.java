@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detection.algorithm;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.Series;
@@ -60,6 +61,8 @@ public class BaselineAlgorithm extends StaticDetectionPipeline {
 
   public BaselineAlgorithm(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
+
+    Preconditions.checkArgument(config.getProperties().containsKey(PROP_METRIC_URN));
 
     String metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
     MetricEntity me = MetricEntity.fromURN(metricUrn, 1.0);

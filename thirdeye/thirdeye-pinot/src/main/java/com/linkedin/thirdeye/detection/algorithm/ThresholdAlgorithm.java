@@ -71,7 +71,7 @@ public class ThresholdAlgorithm extends StaticDetectionPipeline {
         public boolean apply(double... values) {
           return values[0] > ThresholdAlgorithm.this.max;
         }
-      }, COL_TOO_HIGH, COL_VALUE);
+      }, COL_TOO_HIGH, COL_VALUE).fillNull(COL_TOO_HIGH);
     }
 
     if (!Double.isNaN(this.min)) {
@@ -80,7 +80,7 @@ public class ThresholdAlgorithm extends StaticDetectionPipeline {
         public boolean apply(double... values) {
           return values[0] < ThresholdAlgorithm.this.min;
         }
-      }, COL_TOO_LOW, COL_VALUE);
+      }, COL_TOO_LOW, COL_VALUE).fillNull(COL_TOO_LOW);
     }
 
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_TOO_HIGH, COL_TOO_LOW);

@@ -32,7 +32,7 @@ public class BaselineAlgorithmTest {
   private static final String PROP_TIMEZONE = "timezone";
 
   private DataProvider provider;
-  private StaticDetectionPipeline algorithm;
+  private BaselineAlgorithm algorithm;
   private DataFrame data;
   private Map<String, Object> properties;
   private DetectionConfigDTO config;
@@ -57,7 +57,7 @@ public class BaselineAlgorithmTest {
     timeseries.put(MetricSlice.from(1L, 1814400000L, 2419200000L), this.data);
 
     this.properties = new HashMap<>();
-    this.properties.put("metricUrn", "thirdeye:metric:1");
+    this.properties.put(PROP_METRIC_URN, "thirdeye:metric:1");
 
     this.config = new DetectionConfigDTO();
     this.config.setProperties(properties);
@@ -65,8 +65,6 @@ public class BaselineAlgorithmTest {
     this.provider = new MockDataProvider()
         .setTimeseries(timeseries)
         .setMetrics(Collections.singletonList(metricConfigDTO));
-
-    this.algorithm = new BaselineAlgorithm(this.provider, this.config, 1814400000L, 2419200000L);
   }
 
   @Test
