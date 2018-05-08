@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.minion;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -46,6 +47,7 @@ public class SegmentPurger {
   private final File _workingDir;
   private final RecordPurger _recordPurger;
   private final RecordModifier _recordModifier;
+  private final PurgeRecordReader _purgeRecordReader;
 
   private int _numRecordsPurged;
   private int _numRecordsModified;
@@ -58,6 +60,27 @@ public class SegmentPurger {
     _workingDir = workingDir;
     _recordPurger = recordPurger;
     _recordModifier = recordModifier;
+
+    try {
+      _purgeRecordReader = new PurgeRecordReader();
+    } catch (Exception e) {
+      LOGGER.error("Could not instantiate purge record reader", e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  public boolean willPurgeOrModifyRecords() {
+    try {
+      _purgeRecordReader.rewind();
+      while (_purgeRecordReader.hasNext()) {
+        _purgeRecordReader.next();
+      }
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while reading purged and modified records", e);
+      Utils.rethrowException(e);
+    }
+
+    return _numRecordsModified > 0 || _numRecordsPurged > 0;
   }
 
   public File purgeSegment() throws Exception {
@@ -66,29 +89,29 @@ public class SegmentPurger {
     String segmentName = segmentMetadata.getName();
     LOGGER.info("Start purging table: {}, segment: {}", tableName, segmentName);
 
-    try (PurgeRecordReader purgeRecordReader = new PurgeRecordReader()) {
-      SegmentGeneratorConfig config = new SegmentGeneratorConfig(purgeRecordReader.getSchema());
-      config.setOutDir(_workingDir.getPath());
-      config.setTableName(tableName);
-      config.setSegmentName(segmentName);
-      // Keep index creation time the same as original segment because both segments use the same raw data.
-      // This way, for REFRESH case, when new segment gets pushed to controller, we can use index creation time to
-      // identify if the new pushed segment has newer data than the existing one.
-      config.setCreationTime(String.valueOf(segmentMetadata.getIndexCreationTime()));
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_purgeRecordReader.getSchema());
+    config.setOutDir(_workingDir.getPath());
+    config.setTableName(tableName);
+    config.setSegmentName(segmentName);
+    // Keep index creation time the same as original segment because both segments use the same raw data.
+    // This way, for REFRESH case, when new segment gets pushed to controller, we can use index creation time to
+    // identify if the new pushed segment has newer data than the existing one.
+    config.setCreationTime(String.valueOf(segmentMetadata.getIndexCreationTime()));
 
-      StarTreeMetadata starTreeMetadata = segmentMetadata.getStarTreeMetadata();
-      if (starTreeMetadata != null) {
-        config.enableStarTreeIndex(StarTreeIndexSpec.fromStarTreeMetadata(starTreeMetadata));
-      }
-
-      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, purgeRecordReader);
-      driver.build();
-
-      LOGGER.info("Finish purging table: {}, segment: {}, purged {} records, modified {} records", tableName,
-          segmentName, _numRecordsPurged, _numRecordsModified);
-      return new File(_workingDir, segmentName);
+    StarTreeMetadata starTreeMetadata = segmentMetadata.getStarTreeMetadata();
+    if (starTreeMetadata != null) {
+      config.enableStarTreeIndex(StarTreeIndexSpec.fromStarTreeMetadata(starTreeMetadata));
     }
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    _purgeRecordReader.rewind();
+    driver.init(config, _purgeRecordReader);
+    driver.build();
+
+    LOGGER.info("Finish purging table: {}, segment: {}, purged {} records, modified {} records", tableName,
+        segmentName, _numRecordsPurged, _numRecordsModified);
+    return new File(_workingDir, segmentName);
+
   }
 
   public RecordPurger getRecordPurger() {
