@@ -47,9 +47,9 @@ public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
         recordModifierFactory != null ? recordModifierFactory.getRecordModifier(rawTableName) : null;
     SegmentPurger segmentPurger = new SegmentPurger(originalIndexDir, workingDir, recordPurger, recordModifier);
 
-    File purgedSegmentFile = originalIndexDir;
-    if (segmentPurger.willPurgeOrModifyRecords()) {
-      purgedSegmentFile = segmentPurger.purgeSegment();
+    File purgedSegmentFile = segmentPurger.purgeSegment();
+    if (purgedSegmentFile == null) {
+      purgedSegmentFile = originalIndexDir;
     }
 
     return new SegmentConversionResult.Builder().setFile(purgedSegmentFile)
