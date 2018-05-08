@@ -36,7 +36,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentSizeBasedFlushThresholdUpdater.class);
 
-  private static final long IDEAL_SEGMENT_SIZE_BYTES = 500 * 1024 * 1024;
+  private static final long IDEAL_SEGMENT_SIZE_BYTES = 200 * 1024 * 1024;
   /** Below this size, we double the rows threshold */
   private static final double OPTIMAL_SEGMENT_SIZE_BYTES_MIN = IDEAL_SEGMENT_SIZE_BYTES / 2;
   /** Above this size we half the row threshold */
@@ -103,6 +103,13 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
       } else {
         _latestSegmentRowsToSizeRatio = currentRatio;
       }
+    }
+
+    if (numRowsConsumed < numRowsThreshold) {
+      LOGGER.info("Segment {} reached time threshold, setting thresholds for segment {} from previous segment",
+          committingSegmentZkMetadata.getSegmentName(), newSegmentZKMetadata.getSegmentName());
+      newSegmentZKMetadata.setSizeThresholdToFlushSegment(committingSegmentZkMetadata.getSizeThresholdToFlushSegment());
+      return;
     }
 
     long targetSegmentNumRows;
