@@ -4,6 +4,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.Grouping;
 import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -21,6 +22,8 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 public class MockDataProvider implements DataProvider {
+  private static final String COL_KEY = Grouping.GROUP_KEY;
+
   private static final Multimap<String, String> NO_FILTERS = HashMultimap.create();
 
   private Map<MetricSlice, DataFrame> timeseries;
@@ -73,7 +76,7 @@ public class MockDataProvider implements DataProvider {
         }
       }, COL_TIME).dropNull();
 
-      result.put(slice, out.groupByValue(groupBy).aggregate(groupByExpr));
+      result.put(slice, out.groupByValue(groupBy).aggregate(groupByExpr).dropSeries(COL_KEY).setIndex(groupBy));
     }
     return result;
   }
@@ -88,7 +91,7 @@ public class MockDataProvider implements DataProvider {
       }
       expr.add(COL_VALUE + ":sum");
 
-      result.put(slice, this.aggregates.get(slice.withFilters(NO_FILTERS)).groupByValue(new ArrayList<>(dimensions)).aggregate(expr));
+      result.put(slice, this.aggregates.get(slice.withFilters(NO_FILTERS)).groupByValue(new ArrayList<>(dimensions)).aggregate(expr).dropSeries(COL_KEY).setIndex(dimensions));
     }
     return result;
   }

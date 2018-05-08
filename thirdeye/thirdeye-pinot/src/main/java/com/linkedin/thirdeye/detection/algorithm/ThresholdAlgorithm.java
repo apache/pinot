@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.detection.algorithm;
 
-import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.Series;
@@ -16,7 +15,6 @@ import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
