@@ -17,8 +17,8 @@
 package com.linkedin.pinot.controller.helix.core.realtime.segment;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.AtomicDouble;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import javax.annotation.Nonnull;
 import org.slf4j.Logger;
@@ -43,8 +43,8 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   private static final double OPTIMAL_SEGMENT_SIZE_BYTES_MAX = IDEAL_SEGMENT_SIZE_BYTES * 1.5;
   private static final int INITIAL_ROWS_THRESHOLD = 100_000;
 
-  private static final double CURRENT_SEGMENT_RATIO_WEIGHT = 0.25;
-  private static final double PREVIOUS_SEGMENT_RATIO_WEIGHT = 0.75;
+  private static final double CURRENT_SEGMENT_RATIO_WEIGHT = 0.1;
+  private static final double PREVIOUS_SEGMENT_RATIO_WEIGHT = 0.9;
 
   @VisibleForTesting
   long getIdealSegmentSizeBytes() {
@@ -57,7 +57,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   }
 
   // num rows to segment size ratio of last committed segment for this table
-  private AtomicDouble _latestSegmentRowsToSizeRatio = new AtomicDouble();
+  private double _latestSegmentRowsToSizeRatio = 0;
 
   @Override
   public void updateFlushThreshold(@Nonnull LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
@@ -65,12 +65,11 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
 
     LLCRealtimeSegmentZKMetadata committingSegmentZkMetadata = params.getCommittingSegmentZkMetadata();
     if (committingSegmentZkMetadata == null) { // first segment of the partition, hence committing segment is null
-      double prevRatio = _latestSegmentRowsToSizeRatio.get();
-      if (prevRatio > 0) { // new partition added case
+      if (_latestSegmentRowsToSizeRatio > 0) { // new partition added case
         LOGGER.info(
             "Committing segment zk metadata is not available, setting rows threshold for segment {} using previous segments ratio",
             newSegmentZKMetadata.getSegmentName());
-        long targetSegmentNumRows = (long) (IDEAL_SEGMENT_SIZE_BYTES * prevRatio);
+        long targetSegmentNumRows = (long) (IDEAL_SEGMENT_SIZE_BYTES * _latestSegmentRowsToSizeRatio);
         targetSegmentNumRows = capNumRowsIfOverflow(targetSegmentNumRows);
         newSegmentZKMetadata.setSizeThresholdToFlushSegment((int) targetSegmentNumRows);
       } else {
@@ -97,12 +96,12 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
         TimeUtils.convertMillisToPeriod(timeConsumed), numRowsConsumed, numRowsThreshold, committingSegmentSizeBytes);
 
     double currentRatio = (double) numRowsConsumed / committingSegmentSizeBytes;
-    synchronized (_latestSegmentRowsToSizeRatio) {
-      double prevRatio = _latestSegmentRowsToSizeRatio.get();
-      if (prevRatio > 0) {
-        _latestSegmentRowsToSizeRatio.set(CURRENT_SEGMENT_RATIO_WEIGHT * currentRatio + PREVIOUS_SEGMENT_RATIO_WEIGHT * prevRatio);
+    if (new LLCSegmentName(committingSegmentZkMetadata.getSegmentName()).getPartitionId() == 0) {
+      if (_latestSegmentRowsToSizeRatio > 0) {
+        _latestSegmentRowsToSizeRatio =
+            CURRENT_SEGMENT_RATIO_WEIGHT * currentRatio + PREVIOUS_SEGMENT_RATIO_WEIGHT * _latestSegmentRowsToSizeRatio;
       } else {
-        _latestSegmentRowsToSizeRatio.set(currentRatio);
+        _latestSegmentRowsToSizeRatio = currentRatio;
       }
     }
 
@@ -116,7 +115,11 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
       LOGGER.info("Committing segment size is greater than max segment size {}, halving rows threshold {}",
           OPTIMAL_SEGMENT_SIZE_BYTES_MAX, newSegmentZKMetadata.getSizeThresholdToFlushSegment());
     } else {
-      targetSegmentNumRows = (long) (IDEAL_SEGMENT_SIZE_BYTES * _latestSegmentRowsToSizeRatio.get());
+      if (_latestSegmentRowsToSizeRatio > 0) {
+        targetSegmentNumRows = (long) (IDEAL_SEGMENT_SIZE_BYTES * _latestSegmentRowsToSizeRatio);
+      } else {
+        targetSegmentNumRows = (long) (IDEAL_SEGMENT_SIZE_BYTES * currentRatio);
+      }
       LOGGER.info("Setting new rows threshold : {}", newSegmentZKMetadata.getSizeThresholdToFlushSegment());
     }
     targetSegmentNumRows = capNumRowsIfOverflow(targetSegmentNumRows);
