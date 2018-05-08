@@ -18,6 +18,7 @@ package com.linkedin.pinot.queries;
 import com.clearspring.analytics.stream.quantile.TDigest;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.response.broker.AggregationResult;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
@@ -129,7 +130,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
       throws Exception {
 
     Schema schema = new Schema();
-    schema.addField(new DimensionFieldSpec(TDIGEST_COLUMN, FieldSpec.DataType.BYTES, true));
+    schema.addField(new MetricFieldSpec(TDIGEST_COLUMN, FieldSpec.DataType.BYTES));
     schema.addField(new DimensionFieldSpec(GROUPBY_COLUMN, FieldSpec.DataType.STRING, true));
 
     _random = new Random(RANDOM_SEED);

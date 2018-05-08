@@ -146,6 +146,19 @@ public final class SingleValueSet extends BaseBlockValSet {
   }
 
   @Override
+  public void getBytesValues(int[] inDocIds, int inStartPos, int inDocIdsSize, byte[][] outValues, int outStartPos) {
+    int inEndPos = inStartPos + inDocIdsSize;
+    ReaderContext context = _reader.createContext();
+    if (_dataType.equals(DataType.BYTES)) {
+      for (int i = inStartPos; i < inEndPos; i++) {
+        outValues[outStartPos++] = _reader.getBytes(inDocIds[i], context);
+      }
+    } else {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  @Override
   public void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds,
       int outStartPos) {
     _reader.readValues(inDocIds, inStartPos, inDocIdsSize, outDictionaryIds, outStartPos);
