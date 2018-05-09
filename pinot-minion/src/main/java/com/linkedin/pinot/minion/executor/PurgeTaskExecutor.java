@@ -20,13 +20,10 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import com.linkedin.pinot.core.common.MinionConstants;
 import com.linkedin.pinot.core.minion.SegmentPurger;
-import com.linkedin.pinot.minion.events.MinionEventObserverFactory;
 import java.io.File;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nonnull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
@@ -49,7 +46,11 @@ public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
     SegmentPurger.RecordModifier recordModifier =
         recordModifierFactory != null ? recordModifierFactory.getRecordModifier(rawTableName) : null;
     SegmentPurger segmentPurger = new SegmentPurger(originalIndexDir, workingDir, recordPurger, recordModifier);
+
     File purgedSegmentFile = segmentPurger.purgeSegment();
+    if (purgedSegmentFile == null) {
+      purgedSegmentFile = originalIndexDir;
+    }
 
     return new SegmentConversionResult.Builder().setFile(purgedSegmentFile)
         .setTableNameWithType(tableNameWithType)

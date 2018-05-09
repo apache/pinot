@@ -67,6 +67,16 @@ public class SegmentPurger {
     LOGGER.info("Start purging table: {}, segment: {}", tableName, segmentName);
 
     try (PurgeRecordReader purgeRecordReader = new PurgeRecordReader()) {
+      // Make a first pass through the data to see if records need to be purged or modified
+      while (purgeRecordReader.hasNext()) {
+        purgeRecordReader.next();
+      }
+
+      if(_numRecordsModified == 0 && _numRecordsPurged == 0) {
+        // Returns null if no records to be modified or purged
+        return null;
+      }
+
       SegmentGeneratorConfig config = new SegmentGeneratorConfig(purgeRecordReader.getSchema());
       config.setOutDir(_workingDir.getPath());
       config.setTableName(tableName);
@@ -82,13 +92,15 @@ public class SegmentPurger {
       }
 
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      purgeRecordReader.rewind();
       driver.init(config, purgeRecordReader);
       driver.build();
-
-      LOGGER.info("Finish purging table: {}, segment: {}, purged {} records, modified {} records", tableName,
-          segmentName, _numRecordsPurged, _numRecordsModified);
-      return new File(_workingDir, segmentName);
     }
+
+    LOGGER.info("Finish purging table: {}, segment: {}, purged {} records, modified {} records", tableName,
+        segmentName, _numRecordsPurged, _numRecordsModified);
+    return new File(_workingDir, segmentName);
+
   }
 
   public RecordPurger getRecordPurger() {
