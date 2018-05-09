@@ -59,6 +59,11 @@ public final class SingleValueIterator extends BlockSingleValIterator {
   }
 
   @Override
+  public byte[] nextBytesVal() {
+    return _reader.getBytes(_nextDocId++, _context);
+  }
+
+  @Override
   public boolean hasNext() {
     return _nextDocId < _numDocs;
   }

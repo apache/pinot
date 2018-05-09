@@ -404,6 +404,7 @@ public final class Schema {
             case FLOAT:
             case DOUBLE:
             case STRING:
+            case BYTES:
               break;
             default:
               ctxLogger.info("Unsupported data type: {} in DIMENSION/TIME field: {}", dataType, fieldName);
@@ -416,6 +417,7 @@ public final class Schema {
             case LONG:
             case FLOAT:
             case DOUBLE:
+            case BYTES:
               break;
             case STRING:
               MetricFieldSpec metricFieldSpec = (MetricFieldSpec) fieldSpec;
