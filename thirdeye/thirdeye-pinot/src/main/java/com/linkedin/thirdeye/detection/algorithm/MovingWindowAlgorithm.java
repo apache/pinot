@@ -30,7 +30,7 @@ import org.joda.time.Period;
 import org.joda.time.PeriodType;
 
 
-public class MovingAverageAlgorithm extends StaticDetectionPipeline {
+public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private static final String COL_CURR = "current";
   private static final String COL_BASE = "baseline";
   private static final String COL_STD = "std";
@@ -69,7 +69,7 @@ public class MovingAverageAlgorithm extends StaticDetectionPipeline {
   private final boolean weekOverWeek;
   private final DateTimeZone timezone;
 
-  public MovingAverageAlgorithm(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
+  public MovingWindowAlgorithm(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
 
     Preconditions.checkArgument(config.getProperties().containsKey(PROP_METRIC_URN));
@@ -116,7 +116,7 @@ public class MovingAverageAlgorithm extends StaticDetectionPipeline {
       df.mapInPlace(new Series.DoubleConditional() {
         @Override
         public boolean apply(double... values) {
-          return Math.abs(values[0]) > MovingAverageAlgorithm.this.zscore;
+          return Math.abs(values[0]) > MovingWindowAlgorithm.this.zscore;
         }
       }, COL_ZSCORE_VIOLATION, COL_ZSCORE).fillNull(COL_ZSCORE_VIOLATION);
     }
@@ -127,7 +127,7 @@ public class MovingAverageAlgorithm extends StaticDetectionPipeline {
       df.mapInPlace(new Series.DoubleConditional() {
         @Override
         public boolean apply(double... values) {
-          return Math.abs(values[0]) > MovingAverageAlgorithm.this.zscore;
+          return Math.abs(values[0]) > MovingWindowAlgorithm.this.zscore;
         }
       }, COL_QUANTILE_VIOLATION, COL_QUANTILE).fillNull(COL_QUANTILE_VIOLATION);
     }
@@ -172,7 +172,7 @@ public class MovingAverageAlgorithm extends StaticDetectionPipeline {
     LongSeries timestamps = res.getLongs(COL_TIME).filter(new Series.LongConditional() {
       @Override
       public boolean apply(long... values) {
-        return values[0] >= MovingAverageAlgorithm.this.startTime;
+        return values[0] >= MovingWindowAlgorithm.this.startTime;
       }
     }).dropNull();
 
@@ -223,8 +223,8 @@ public class MovingAverageAlgorithm extends StaticDetectionPipeline {
     dfBase.mapInPlace(new Series.LongFunction() {
       @Override
       public long apply(long... values) {
-        return new DateTime(values[0], MovingAverageAlgorithm.this.timezone)
-            .plus(MovingAverageAlgorithm.this.lookback).getMillis();
+        return new DateTime(values[0], MovingWindowAlgorithm.this.timezone)
+            .plus(MovingWindowAlgorithm.this.lookback).getMillis();
       }
     }, COL_TIME);
     dfBase.renameSeries(COL_VALUE, COL_BASE);

@@ -4,18 +4,13 @@ import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detection.MockDataProvider;
-import com.linkedin.thirdeye.detection.StaticDetectionPipeline;
-import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.joda.time.DurationFieldType;
 import org.joda.time.Period;
@@ -27,7 +22,7 @@ import org.testng.annotations.Test;
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
-public class MovingAverageAlgorithmTest {
+public class MovingWindowAlgorithmTest {
   private static final String COL_CURR = "current";
   private static final String COL_BASE = "baseline";
   private static final String COL_STD = "std";
@@ -43,7 +38,7 @@ public class MovingAverageAlgorithmTest {
   private static final String PROP_TIMEZONE = "timezone";
 
   private DataProvider provider;
-  private MovingAverageAlgorithm algorithm;
+  private MovingWindowAlgorithm algorithm;
   private DataFrame data;
   private Map<String, Object> properties;
   private DetectionConfigDTO config;
@@ -84,7 +79,7 @@ public class MovingAverageAlgorithmTest {
   public void testWindow() {
     this.properties.put(PROP_LOOKBACK, "2hours");
     this.properties.put(PROP_QUANTILE, 0.75);
-    this.algorithm = new MovingAverageAlgorithm(this.provider, this.config, 3600000L, 9999999L);
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 3600000L, 9999999L);
 
     DataFrame input = new DataFrame(COL_TIME, LongSeries.buildFrom(0L, 3600000L, 7200000L, 14400000L))
         .addSeries(COL_VALUE, 1, 2, 3, 5);
@@ -102,44 +97,49 @@ public class MovingAverageAlgorithmTest {
 
   @Test
   public void testLookbackParser() {
-    Assert.assertEquals(MovingAverageAlgorithm.parseLookback("3600"), new Period().withField(DurationFieldType.millis(), 3600));
-    Assert.assertEquals(MovingAverageAlgorithm.parseLookback("1d"), new Period().withField(DurationFieldType.days(), 1));
-    Assert.assertEquals(MovingAverageAlgorithm.parseLookback("2hours"), new Period().withField(DurationFieldType.hours(), 2));
-    Assert.assertEquals(MovingAverageAlgorithm.parseLookback("24 hrs"), new Period().withField(DurationFieldType.hours(), 24));
-    Assert.assertEquals(MovingAverageAlgorithm.parseLookback("1 year"), new Period().withField(DurationFieldType.years(), 1));
-    Assert.assertEquals(MovingAverageAlgorithm.parseLookback("  3   w  "), new Period().withField(DurationFieldType.weeks(), 3));
+    Assert.assertEquals(
+        MovingWindowAlgorithm.parseLookback("3600"), new Period().withField(DurationFieldType.millis(), 3600));
+    Assert.assertEquals(MovingWindowAlgorithm.parseLookback("1d"), new Period().withField(DurationFieldType.days(), 1));
+    Assert.assertEquals(
+        MovingWindowAlgorithm.parseLookback("2hours"), new Period().withField(DurationFieldType.hours(), 2));
+    Assert.assertEquals(
+        MovingWindowAlgorithm.parseLookback("24 hrs"), new Period().withField(DurationFieldType.hours(), 24));
+    Assert.assertEquals(
+        MovingWindowAlgorithm.parseLookback("1 year"), new Period().withField(DurationFieldType.years(), 1));
+    Assert.assertEquals(
+        MovingWindowAlgorithm.parseLookback("  3   w  "), new Period().withField(DurationFieldType.weeks(), 3));
   }
 
   @Test
   public void testPeriodParser() {
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("ms"), PeriodType.millis());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("millis"), PeriodType.millis());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("s"), PeriodType.seconds());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("sec"), PeriodType.seconds());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("secs"), PeriodType.seconds());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("seconds"), PeriodType.seconds());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("m"), PeriodType.minutes());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("min"), PeriodType.minutes());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("mins"), PeriodType.minutes());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("minutes"), PeriodType.minutes());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("h"), PeriodType.hours());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("hour"), PeriodType.hours());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("hours"), PeriodType.hours());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("d"), PeriodType.days());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("day"), PeriodType.days());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("days"), PeriodType.days());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("w"), PeriodType.weeks());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("week"), PeriodType.weeks());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("weeks"), PeriodType.weeks());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("mon"), PeriodType.months());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("mons"), PeriodType.months());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("month"), PeriodType.months());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("months"), PeriodType.months());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("y"), PeriodType.years());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("year"), PeriodType.years());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("years"), PeriodType.years());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("a"), PeriodType.years());
-    Assert.assertEquals(MovingAverageAlgorithm.parsePeriodType("ans"), PeriodType.years());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("ms"), PeriodType.millis());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("millis"), PeriodType.millis());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("s"), PeriodType.seconds());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("sec"), PeriodType.seconds());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("secs"), PeriodType.seconds());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("seconds"), PeriodType.seconds());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("m"), PeriodType.minutes());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("min"), PeriodType.minutes());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("mins"), PeriodType.minutes());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("minutes"), PeriodType.minutes());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("h"), PeriodType.hours());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("hour"), PeriodType.hours());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("hours"), PeriodType.hours());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("d"), PeriodType.days());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("day"), PeriodType.days());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("days"), PeriodType.days());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("w"), PeriodType.weeks());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("week"), PeriodType.weeks());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("weeks"), PeriodType.weeks());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("mon"), PeriodType.months());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("mons"), PeriodType.months());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("month"), PeriodType.months());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("months"), PeriodType.months());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("y"), PeriodType.years());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("year"), PeriodType.years());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("years"), PeriodType.years());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("a"), PeriodType.years());
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("ans"), PeriodType.years());
   }
 
 //  @Test
