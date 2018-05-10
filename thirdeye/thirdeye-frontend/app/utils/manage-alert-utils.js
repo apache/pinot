@@ -140,7 +140,7 @@ export function setUpTimeRangeOptions(datesKeys, duration) {
    datesKeys.forEach((value) => {
      const currVal = dateKeyMap.get(value);
      const label = currVal[0];
-     const start = (label === 'Today') ? moment().startOf('day') : moment().subtract(currVal[1], currVal[2]).startOf('hour').utc();
+     const start = (label === 'Today') ? moment().startOf('day') : moment().subtract(currVal[1], currVal[2]).utc();
      const isActive = duration === value;
      newRangeArr.push({ name: label, value, start, isActive });
    });

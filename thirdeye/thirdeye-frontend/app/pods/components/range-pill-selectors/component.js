@@ -107,13 +107,14 @@ export default Component.extend({
      * @param {Object} rangeOption - the selected range object
      */
     async onRangeOptionClick(rangeOption) {
-      const { value, start, isActive } = rangeOption;
+      const { value, start, isActive, name } = rangeOption;
       // Handle as a 'range click' only if inactive and not a custom range
       if (value !== 'custom' && !isActive) {
         // Set date picker defaults to new start/end dates
+        const isLast24Hours = name === 'Last 24 hours';
         this.setProperties({
-          activeRangeStart: moment(rangeOption.start).format(RANGE_FORMAT),
-          activeRangeEnd: moment(DEFAULT_END_DATE).format(RANGE_FORMAT)
+          activeRangeStart:  isLast24Hours ? this.get('activeRangeStart') : moment(start).format(RANGE_FORMAT),
+          activeRangeEnd: isLast24Hours ? this.get('activeRangeEnd') : moment(DEFAULT_END_DATE).format(RANGE_FORMAT)
         });
         // Reset options and highlight selected one. Bubble selection to parent controller.
         this.set('timeRangeOptions', this.newTimeRangeOptions(value, start, DEFAULT_END_DATE));

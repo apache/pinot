@@ -5,7 +5,7 @@ import { isPresent } from "@ember/utils";
  */
 export const selfServeConst = {
   // Self-serve Nav Elements
-  NAV_MANAGE_ALERTS: '.te-nav__link:contains("Manage Alerts")',
+  NAV_MANAGE_ALERTS: '.te-nav__link:contains("Alerts")',
 
   // Onboard Alert Elements
   ALERT_NAME_INPUT: '#anomaly-form-function-name',
