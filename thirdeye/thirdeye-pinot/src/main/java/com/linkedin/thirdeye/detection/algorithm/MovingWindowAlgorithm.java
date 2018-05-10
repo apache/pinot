@@ -35,10 +35,13 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private static final String COL_BASE = "baseline";
   private static final String COL_STD = "std";
   private static final String COL_MEAN = "mean";
-  private static final String COL_QUANTILE = "quantile";
+  private static final String COL_QUANTILE_MIN = "quantileMin";
+  private static final String COL_QUANTILE_MAX = "quantileMax";
   private static final String COL_ZSCORE = "zscore";
-  private static final String COL_QUANTILE_VIOLATION = "quantile_violation";
-  private static final String COL_ZSCORE_VIOLATION = "zscore_violation";
+  private static final String COL_QUANTILE_MIN_VIOLATION = "quantileMinViolation";
+  private static final String COL_QUANTILE_MAX_VIOLATION = "quantileMaxViolation";
+  private static final String COL_ZSCORE_MIN_VIOLATION = "zscoreMinViolation";
+  private static final String COL_ZSCORE_MAX_VIOLATION = "zscoreMaxViolation";
   private static final String COL_ANOMALY = "anomaly";
   private static final String COL_TIME = DataFrameUtils.COL_TIME;
   private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
@@ -48,11 +51,17 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private static final String PROP_LOOKBACK = "lookback";
   private static final Period PROP_LOOKBACK_DEFAULT = new Period(7, PeriodType.days());
 
-  private static final String PROP_QUANTILE = "quantile";
-  private static final double PROP_QUANTILE_DEFAULT = Double.NaN;
+  private static final String PROP_QUANTILE_MIN = "quantileMin";
+  private static final double PROP_QUANTILE_MIN_DEFAULT = Double.NaN;
 
-  private static final String PROP_ZSCORE = "zscore";
-  private static final double PROP_ZSCORE_DEFAULT = Double.NaN;
+  private static final String PROP_QUANTILE_MAX = "quantileMax";
+  private static final double PROP_QUANTILE_MAX_DEFAULT = Double.NaN;
+
+  private static final String PROP_ZSCORE_MIN = "zscoreMin";
+  private static final double PROP_ZSCORE_MIN_DEFAULT = Double.NaN;
+
+  private static final String PROP_ZSCORE_MAX = "zscoreMax";
+  private static final double PROP_ZSCORE_MAX_DEFAULT = Double.NaN;
 
   private static final String PROP_WEEK_OVER_WEEK = "weekOverWeek";
   private static final boolean PROP_WEEK_OVER_WEEK_DEFAULT = false;
@@ -64,8 +73,10 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
   private final MetricSlice slice;
   private final Period lookback;
-  private final double zscore;
-  private final double quantile;
+  private final double zscoreMin;
+  private final double zscoreMax;
+  private final double quantileMin;
+  private final double quantileMax;
   private final boolean weekOverWeek;
   private final DateTimeZone timezone;
 
@@ -78,10 +89,15 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     MetricEntity me = MetricEntity.fromURN(metricUrn, 1.0);
 
     this.weekOverWeek = MapUtils.getBooleanValue(config.getProperties(), PROP_WEEK_OVER_WEEK, PROP_WEEK_OVER_WEEK_DEFAULT);
-    this.quantile = MapUtils.getDoubleValue(config.getProperties(), PROP_QUANTILE, PROP_QUANTILE_DEFAULT);
-    this.zscore = MapUtils.getDoubleValue(config.getProperties(), PROP_ZSCORE, PROP_ZSCORE_DEFAULT);
+    this.quantileMin = MapUtils.getDoubleValue(config.getProperties(), PROP_QUANTILE_MIN, PROP_QUANTILE_MIN_DEFAULT);
+    this.quantileMax = MapUtils.getDoubleValue(config.getProperties(), PROP_QUANTILE_MAX, PROP_QUANTILE_MAX_DEFAULT);
+    this.zscoreMin = MapUtils.getDoubleValue(config.getProperties(), PROP_ZSCORE_MIN, PROP_ZSCORE_MIN_DEFAULT);
+    this.zscoreMax = MapUtils.getDoubleValue(config.getProperties(), PROP_ZSCORE_MAX, PROP_ZSCORE_MAX_DEFAULT);
     this.lookback = parseLookback(config.getProperties().get(PROP_LOOKBACK).toString());
     this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), PROP_TIMEZONE, PROP_TIMEZONE_DEFAULT));
+
+    Preconditions.checkArgument(Double.isNaN(this.quantileMin) || (this.quantileMin >= 0 && this.quantileMin <= 1.0), PROP_QUANTILE_MIN + " must be between 0.0 and 1.0");
+    Preconditions.checkArgument(Double.isNaN(this.quantileMax) || (this.quantileMax >= 0 && this.quantileMax <= 1.0), PROP_QUANTILE_MAX + " must be between 0.0 and 1.0");
 
     DateTime trainStart = new DateTime(startTime, this.timezone).minus(this.lookback);
     if (this.weekOverWeek) {
@@ -108,32 +124,52 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     // potentially variable window size. manual iteration required.
     df = applyMovingWindow(df);
 
+    // zscore check
     df.addSeries(COL_ZSCORE, df.getDoubles(COL_VALUE).subtract(df.get(COL_MEAN)).divide(df.get(COL_STD)));
 
-    // zscore check
-    df.addSeries(COL_ZSCORE_VIOLATION, BooleanSeries.fillValues(df.size(), false));
-    if (!Double.isNaN(this.zscore)) {
+    df.addSeries(COL_ZSCORE_MIN_VIOLATION, BooleanSeries.fillValues(df.size(), false));
+    if (!Double.isNaN(this.zscoreMin)) {
       df.mapInPlace(new Series.DoubleConditional() {
         @Override
         public boolean apply(double... values) {
-          return Math.abs(values[0]) > MovingWindowAlgorithm.this.zscore;
+          return values[0] < MovingWindowAlgorithm.this.zscoreMin;
         }
-      }, COL_ZSCORE_VIOLATION, COL_ZSCORE).fillNull(COL_ZSCORE_VIOLATION);
+      }, COL_ZSCORE_MIN_VIOLATION, COL_ZSCORE).fillNull(COL_ZSCORE_MIN_VIOLATION);
+    }
+
+    df.addSeries(COL_ZSCORE_MAX_VIOLATION, BooleanSeries.fillValues(df.size(), false));
+    if (!Double.isNaN(this.zscoreMax)) {
+      df.mapInPlace(new Series.DoubleConditional() {
+        @Override
+        public boolean apply(double... values) {
+          return values[0] > MovingWindowAlgorithm.this.zscoreMax;
+        }
+      }, COL_ZSCORE_MAX_VIOLATION, COL_ZSCORE).fillNull(COL_ZSCORE_MAX_VIOLATION);
     }
 
     // quantile check
-    df.addSeries(COL_QUANTILE_VIOLATION, BooleanSeries.fillValues(df.size(), false));
-    if (!Double.isNaN(this.quantile)) {
+    df.addSeries(COL_QUANTILE_MIN_VIOLATION, BooleanSeries.fillValues(df.size(), false));
+    if (!Double.isNaN(this.quantileMin)) {
       df.mapInPlace(new Series.DoubleConditional() {
         @Override
         public boolean apply(double... values) {
-          return Math.abs(values[0]) > MovingWindowAlgorithm.this.zscore;
+          return values[0] < values[1];
         }
-      }, COL_QUANTILE_VIOLATION, COL_QUANTILE).fillNull(COL_QUANTILE_VIOLATION);
+      }, COL_QUANTILE_MIN_VIOLATION, COL_VALUE, COL_QUANTILE_MIN).fillNull(COL_QUANTILE_MIN_VIOLATION);
+    }
+
+    df.addSeries(COL_QUANTILE_MAX_VIOLATION, BooleanSeries.fillValues(df.size(), false));
+    if (!Double.isNaN(this.quantileMax)) {
+      df.mapInPlace(new Series.DoubleConditional() {
+        @Override
+        public boolean apply(double... values) {
+          return values[0] > values[1];
+        }
+      }, COL_QUANTILE_MAX_VIOLATION, COL_VALUE, COL_QUANTILE_MAX).fillNull(COL_QUANTILE_MAX_VIOLATION);
     }
 
     // anomalies
-    df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_ZSCORE_VIOLATION, COL_QUANTILE_VIOLATION);
+    df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_ZSCORE_MIN_VIOLATION, COL_ZSCORE_MAX_VIOLATION, COL_QUANTILE_MIN_VIOLATION, COL_QUANTILE_MAX_VIOLATION);
 
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     for (int i = 0; i < df.size(); i++) {
@@ -178,11 +214,13 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
     double[] std = new double[timestamps.size()];
     double[] mean = new double[timestamps.size()];
-    double[] quantile = new double[timestamps.size()];
+    double[] quantileMin = new double[timestamps.size()];
+    double[] quantileMax = new double[timestamps.size()];
 
     Arrays.fill(std, Double.NaN);
     Arrays.fill(mean, Double.NaN);
-    Arrays.fill(quantile, Double.NaN);
+    Arrays.fill(quantileMin, Double.NaN);
+    Arrays.fill(quantileMax, Double.NaN);
 
     for (int i = 0; i < timestamps.size(); i++) {
       DataFrame window = this.makeWindow(res, timestamps.getLong(i));
@@ -197,15 +235,20 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
         std[i] = window.getDoubles(COL_VALUE).std().doubleValue();
       }
 
-      if (!Double.isNaN(this.quantile)) {
-        quantile[i] = window.getDoubles(COL_VALUE).quantile(this.quantile).doubleValue();
+      if (!Double.isNaN(this.quantileMin)) {
+        quantileMin[i] = window.getDoubles(COL_VALUE).quantile(this.quantileMin).doubleValue();
+      }
+
+      if (!Double.isNaN(this.quantileMax)) {
+        quantileMax[i] = window.getDoubles(COL_VALUE).quantile(this.quantileMax).doubleValue();
       }
     }
 
     DataFrame output = new DataFrame(COL_TIME, timestamps)
         .addSeries(COL_STD, DoubleSeries.buildFrom(std))
         .addSeries(COL_MEAN, DoubleSeries.buildFrom(mean))
-        .addSeries(COL_QUANTILE, DoubleSeries.buildFrom(quantile));
+        .addSeries(COL_QUANTILE_MIN, DoubleSeries.buildFrom(quantileMin))
+        .addSeries(COL_QUANTILE_MAX, DoubleSeries.buildFrom(quantileMax));
 
     return res.addSeries(output);
   }

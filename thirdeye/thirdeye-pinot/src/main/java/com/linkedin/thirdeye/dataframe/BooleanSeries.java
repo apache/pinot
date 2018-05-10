@@ -640,7 +640,7 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     builder.append("BooleanSeries{");
     for(byte b : this.values) {
       if(isNull(b)) {
-        builder.append("null" );
+        builder.append("null ");
       } else {
         builder.append(isTrue(b) ? "true " : "false ");
       }

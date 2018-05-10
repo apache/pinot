@@ -4,8 +4,11 @@ import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
+import com.linkedin.thirdeye.detection.DetectionPipelineResult;
+import com.linkedin.thirdeye.detection.DetectionTestUtils;
 import com.linkedin.thirdeye.detection.MockDataProvider;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -23,17 +26,23 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 public class MovingWindowAlgorithmTest {
+  private static final String METRIC_NAME = "myMetric";
+  private static final String DATASET_NAME = "myDataset";
+
   private static final String COL_CURR = "current";
   private static final String COL_BASE = "baseline";
   private static final String COL_STD = "std";
   private static final String COL_MEAN = "mean";
-  private static final String COL_QUANTILE = "quantile";
+  private static final String COL_QUANTILE_MIN = "quantileMin";
+  private static final String COL_QUANTILE_MAX = "quantileMax";
   private static final String COL_ZSCORE = "zscore";
 
   private static final String PROP_METRIC_URN = "metricUrn";
   private static final String PROP_LOOKBACK = "lookback";
-  private static final String PROP_QUANTILE = "quantile";
-  private static final String PROP_ZSCORE = "zscore";
+  private static final String PROP_QUANTILE_MIN = "quantileMin";
+  private static final String PROP_QUANTILE_MAX = "quantileMax";
+  private static final String PROP_ZSCORE_MIN = "zscoreMin";
+  private static final String PROP_ZSCORE_MAX = "zscoreMax";
   private static final String PROP_WEEK_OVER_WEEK = "weekOverWeek";
   private static final String PROP_TIMEZONE = "timezone";
 
@@ -53,16 +62,18 @@ public class MovingWindowAlgorithmTest {
 
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
     metricConfigDTO.setId(1L);
-    metricConfigDTO.setName("thirdeye-test");
-    metricConfigDTO.setDataset("thirdeye-test-dataset");
+    metricConfigDTO.setName(METRIC_NAME);
+    metricConfigDTO.setDataset(DATASET_NAME);
 
     Map<MetricSlice, DataFrame> timeseries = new HashMap<>();
+    timeseries.put(MetricSlice.from(1L, 100000L, 300000L), this.data);
     timeseries.put(MetricSlice.from(1L, 0L, 2419200000L), this.data);
+    timeseries.put(MetricSlice.from(1L, 0L, 1209600000L), this.data);
     timeseries.put(MetricSlice.from(1L, 604800000L, 2419200000L), this.data);
 
     this.properties = new HashMap<>();
     this.properties.put(PROP_METRIC_URN, "thirdeye:metric:1");
-    this.properties.put(PROP_LOOKBACK, "2weeks");
+    this.properties.put(PROP_LOOKBACK, "1week");
 
     this.config = new DetectionConfigDTO();
     this.config.setProperties(properties);
@@ -73,12 +84,152 @@ public class MovingWindowAlgorithmTest {
 
   }
 
-  // TODO complete test with data
+  // TODO differentiation tests
+
+  //
+  // quantile min
+  //
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testQuantileMinTooLow() {
+    this.properties.put(PROP_QUANTILE_MIN, -0.001);
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 604800000L, 1209600000L);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testQuantileMinTooHigh() {
+    this.properties.put(PROP_QUANTILE_MIN, 1.001);
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 604800000L, 1209600000L);
+  }
+
+  @Test
+  public void testQuantileMinLimit() throws Exception {
+    this.properties.put(PROP_QUANTILE_MIN, 0.0);
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 604800000L, 2419200000L);
+    DetectionPipelineResult res = this.algorithm.run();
+
+    Assert.assertEquals(res.getAnomalies().size(), 7);
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(669600000L, 673200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(896400000L, 900000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(921600000L, 925200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(925200000L, 928800000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(954000000L, 957600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(957600000L, 961200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1767600000L, 1771200000L)));
+  }
+
+  //
+  // quantile max
+  //
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testQuantileMaxTooLow() {
+    this.properties.put(PROP_QUANTILE_MAX, -0.001);
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 604800000L, 1209600000L);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testQuantileMaxTooHigh() {
+    this.properties.put(PROP_QUANTILE_MAX, 1.001);
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 604800000L, 1209600000L);
+  }
+
+  @Test
+  public void testQuantileMax() throws Exception {
+    this.properties.put(PROP_QUANTILE_MAX, 0.975);
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 604800000L, 1209600000L);
+    DetectionPipelineResult res = this.algorithm.run();
+
+    Assert.assertEquals(res.getAnomalies().size(), 7);
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(626400000L, 630000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(705600000L, 709200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(846000000L, 849600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(892800000L, 896400000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(903600000L, 907200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(918000000L, 921600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(950400000L, 954000000L)));
+  }
+
+  @Test
+  public void testQuantileMaxLimit() throws Exception {
+    this.properties.put(PROP_QUANTILE_MAX, 1.0);
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 604800000L, 2419200000L);
+    DetectionPipelineResult res = this.algorithm.run();
+
+    Assert.assertEquals(res.getAnomalies().size(), 9);
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(626400000L, 630000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(846000000L, 849600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(892800000L, 896400000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(903600000L, 907200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(950400000L, 954000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1576800000L, 1580400000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1756800000L, 1760400000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1760400000L, 1764000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1764000000L, 1767600000L)));
+  }
+
+  //
+  // zscore min
+  //
+
+  @Test
+  public void testZScoreMin() throws Exception {
+    this.properties.put(PROP_ZSCORE_MIN, -2.5);
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 604800000L, 2419200000L);
+    DetectionPipelineResult res = this.algorithm.run();
+
+    Assert.assertEquals(res.getAnomalies().size(), 5);
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(925200000L, 928800000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(957600000L, 961200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1767600000L, 1771200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1771200000L, 1774800000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1792800000L, 1796400000L)));
+  }
+
+  //
+  // zscore max
+  //
+
+  @Test
+  public void testZScoreMax() throws Exception {
+    this.properties.put(PROP_ZSCORE_MAX, 2.5);
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 604800000L, 2419200000L);
+    DetectionPipelineResult res = this.algorithm.run();
+
+    Assert.assertEquals(res.getAnomalies().size(), 5);
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(903600000L, 907200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(918000000L, 921600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(950400000L, 954000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1764000000L, 1767600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1803600000L, 1807200000L)));
+  }
+
+  //
+  // edge cases
+  //
+
+  @Test
+  public void testNoData() throws Exception {
+    this.properties.put(PROP_QUANTILE_MIN, 0.0);
+    this.properties.put(PROP_QUANTILE_MAX, 1.0);
+    this.properties.put(PROP_ZSCORE_MIN, -3.0);
+    this.properties.put(PROP_ZSCORE_MAX, 3.0);
+    this.properties.put(PROP_LOOKBACK, "100secs");
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 200000L, 300000L);
+    DetectionPipelineResult res = this.algorithm.run();
+
+    Assert.assertEquals(res.getAnomalies().size(), 0);
+  }
+
+  //
+  // helper tests
+  //
 
   @Test
   public void testWindow() {
     this.properties.put(PROP_LOOKBACK, "2hours");
-    this.properties.put(PROP_QUANTILE, 0.75);
+    this.properties.put(PROP_QUANTILE_MIN, 0.25);
+    this.properties.put(PROP_QUANTILE_MAX, 0.75);
     this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 3600000L, 9999999L);
 
     DataFrame input = new DataFrame(COL_TIME, LongSeries.buildFrom(0L, 3600000L, 7200000L, 14400000L))
@@ -88,7 +239,8 @@ public class MovingWindowAlgorithmTest {
         .addSeries(COL_VALUE, 1, 2, 3, 5)
         .addSeries(COL_STD, Double.NaN, Double.NaN, 0.7071067811865476, Double.NaN) // TODO avoid exact double compare
         .addSeries(COL_MEAN, Double.NaN, 1, 1.5, 3)
-        .addSeries(COL_QUANTILE, Double.NaN, 1, 1.75, 3);
+        .addSeries(COL_QUANTILE_MIN, Double.NaN, 1, 1.25, 3)
+        .addSeries(COL_QUANTILE_MAX, Double.NaN, 1, 1.75, 3);
 
     DataFrame window = this.algorithm.applyMovingWindow(input);
 
@@ -97,17 +249,12 @@ public class MovingWindowAlgorithmTest {
 
   @Test
   public void testLookbackParser() {
-    Assert.assertEquals(
-        MovingWindowAlgorithm.parseLookback("3600"), new Period().withField(DurationFieldType.millis(), 3600));
+    Assert.assertEquals(MovingWindowAlgorithm.parseLookback("3600"), new Period().withField(DurationFieldType.millis(), 3600));
     Assert.assertEquals(MovingWindowAlgorithm.parseLookback("1d"), new Period().withField(DurationFieldType.days(), 1));
-    Assert.assertEquals(
-        MovingWindowAlgorithm.parseLookback("2hours"), new Period().withField(DurationFieldType.hours(), 2));
-    Assert.assertEquals(
-        MovingWindowAlgorithm.parseLookback("24 hrs"), new Period().withField(DurationFieldType.hours(), 24));
-    Assert.assertEquals(
-        MovingWindowAlgorithm.parseLookback("1 year"), new Period().withField(DurationFieldType.years(), 1));
-    Assert.assertEquals(
-        MovingWindowAlgorithm.parseLookback("  3   w  "), new Period().withField(DurationFieldType.weeks(), 3));
+    Assert.assertEquals(MovingWindowAlgorithm.parseLookback("2hours"), new Period().withField(DurationFieldType.hours(), 2));
+    Assert.assertEquals(MovingWindowAlgorithm.parseLookback("24 hrs"), new Period().withField(DurationFieldType.hours(), 24));
+    Assert.assertEquals(MovingWindowAlgorithm.parseLookback("1 year"), new Period().withField(DurationFieldType.years(), 1));
+    Assert.assertEquals(MovingWindowAlgorithm.parseLookback("  3   w  "), new Period().withField(DurationFieldType.weeks(), 3));
   }
 
   @Test
@@ -142,58 +289,11 @@ public class MovingWindowAlgorithmTest {
     Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("ans"), PeriodType.years());
   }
 
-//  @Test
-//  public void testWeekOverWeekDifference() throws Exception {
-//    this.properties.put(PROP_DIFFERENCE, 400);
-//    this.algorithm = new BaselineAlgorithm(this.provider, this.config, 1814400000L, 2419200000L);
-//
-//    DetectionPipelineResult result = this.algorithm.run();
-//
-//    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
-//    Assert.assertEquals(result.getLastTimestamp(), 2415600000L);
-//    Assert.assertEquals(anomalies.size(), 1);
-//    Assert.assertEquals(anomalies.get(0).getStartTime(), 2372400000L);
-//    Assert.assertEquals(anomalies.get(0).getEndTime(), 2376000000L);
-//  }
-//
-//  @Test
-//  public void testWeekOverWeekChange() throws Exception {
-//    this.properties.put(PROP_CHANGE, 0.4);
-//    this.algorithm = new BaselineAlgorithm(this.provider, this.config, 1814400000L, 2419200000L);
-//
-//    DetectionPipelineResult result = this.algorithm.run();
-//
-//    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
-//    Assert.assertEquals(result.getLastTimestamp(), 2415600000L);
-//    Assert.assertEquals(anomalies.size(), 2);
-//    Assert.assertEquals(anomalies.get(0).getStartTime(), 2372400000L);
-//    Assert.assertEquals(anomalies.get(0).getEndTime(), 2376000000L);
-//    Assert.assertEquals(anomalies.get(1).getStartTime(), 2379600000L);
-//    Assert.assertEquals(anomalies.get(1).getEndTime(), 2383200000L);
-//  }
-//
-//  @Test
-//  public void testThreeWeekMedianChange() throws Exception {
-//    this.properties.put(PROP_WEEKS, 3);
-//    this.properties.put(PROP_AGGREGATION, BaselineAggregateType.MEDIAN.toString());
-//    this.properties.put(PROP_CHANGE, 0.3);
-//    this.algorithm = new BaselineAlgorithm(this.provider, this.config, 1814400000L, 2419200000L);
-//
-//    DetectionPipelineResult result = this.algorithm.run();
-//
-//    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
-//    Assert.assertEquals(result.getLastTimestamp(), 2415600000L);
-//    Assert.assertEquals(anomalies.size(), 5);
-//    Assert.assertEquals(anomalies.get(0).getStartTime(), 2005200000L);
-//    Assert.assertEquals(anomalies.get(0).getEndTime(), 2008800000L);
-//    Assert.assertEquals(anomalies.get(1).getStartTime(), 2134800000L);
-//    Assert.assertEquals(anomalies.get(1).getEndTime(), 2138400000L);
-//    Assert.assertEquals(anomalies.get(2).getStartTime(), 2152800000L);
-//    Assert.assertEquals(anomalies.get(2).getEndTime(), 2156400000L);
-//    Assert.assertEquals(anomalies.get(3).getStartTime(), 2181600000L);
-//    Assert.assertEquals(anomalies.get(3).getEndTime(), 2185200000L);
-//    Assert.assertEquals(anomalies.get(4).getStartTime(), 2322000000L);
-//    Assert.assertEquals(anomalies.get(4).getEndTime(), 2325600000L);
-//  }
+  //
+  // utils
+  //
 
+  private static MergedAnomalyResultDTO makeAnomaly(long start, long end) {
+    return DetectionTestUtils.makeAnomaly(null, start, end, METRIC_NAME, DATASET_NAME, Collections.<String, String>emptyMap());
+  }
 }
