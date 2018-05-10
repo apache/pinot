@@ -74,7 +74,7 @@ public class DetectionPipelineTaskRunnerTest {
 
   }
 
-  @AfterMethod
+  @AfterMethod(alwaysRun = true)
   public void afterMethod() {
     this.testDAOProvider.cleanup();
   }
