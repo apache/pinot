@@ -42,6 +42,9 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
    */
   public PercentileTDigestAggregationFunction(int percentile) {
     switch (percentile) {
+      case 5:
+        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILETDIGEST5.getName();
+        break;
       case 10:
         _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILETDIGEST10.getName();
         break;
