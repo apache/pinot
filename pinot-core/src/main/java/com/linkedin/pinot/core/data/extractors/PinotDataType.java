@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.data.extractors;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.utils.primitive.ByteArray;
 
 
 /**

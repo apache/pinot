@@ -27,6 +27,7 @@ import com.linkedin.pinot.common.utils.time.TimeConverterProvider;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.function.FunctionExpressionEvaluator;
 import com.linkedin.pinot.common.utils.primitive.ByteArray;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -209,6 +210,15 @@ public class PlainFieldExtractor implements FieldExtractor {
             hasError = true;
             _errorCount.put(column, _errorCount.get(column) + 1);
           }
+        } else if (value instanceof ByteBuffer) { // TODO: Need better handle for ByteBuffers.
+          // ByteBuffer implementations are package private and cannot be put into TYPE_MAP.
+          ByteBuffer byteBuffer = (ByteBuffer) value;
+
+          // Assumes byte-buffer is ready to read. Also, avoid getting underlying array, as it may be over-sized.
+          byte[] bytes = new byte[byteBuffer.limit()];
+          byteBuffer.get(bytes);
+          value = bytes;
+          source = PinotDataType.BYTES;
         } else {
           // Single-value.
           source = SINGLE_VALUE_TYPE_MAP.get(value.getClass());
