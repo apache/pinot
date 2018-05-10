@@ -17,6 +17,7 @@ import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.wordnik.swagger.annotations.ApiParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
@@ -75,9 +76,29 @@ public class DetectionResource {
   }
 
   @POST
-  @Path("/replay")
-  public Response detectionReplay(@QueryParam("start") long start, @QueryParam("end") long end,
-      @QueryParam("configId") long configId) throws Exception {
+  @Path("/preview/{id}")
+  public Response detectionPreview(
+      @PathParam("id") long id,
+      @QueryParam("start") long start,
+      @QueryParam("end") long end) throws Exception {
+
+    DetectionConfigDTO config = configDAO.findById(id);
+    if (config == null) {
+      throw new IllegalArgumentException("Detection Config not exist");
+    }
+
+    DetectionPipeline pipeline = this.loader.from(this.provider, config, start, end);
+    DetectionPipelineResult result = pipeline.run();
+
+    return Response.ok(result.getAnomalies()).build();
+  }
+
+  @POST
+  @Path("/replay/{id}")
+  public Response detectionReplay(
+      @PathParam("id") long configId,
+      @QueryParam("start") long start,
+      @QueryParam("end") long end) throws Exception {
 
     DetectionConfigDTO config = this.configDAO.findById(configId);
     if (config == null) {

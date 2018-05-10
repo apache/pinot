@@ -144,29 +144,33 @@ public class AlertTaskRunnerV2 implements TaskRunner {
     AlertTaskInfo alertTaskInfo = (AlertTaskInfo) taskInfo;
     thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
 
-    alertConfig = alertTaskInfo.getAlertConfigDTO();
+    // Fetch the latest alert config instead of the one provided by task context, which could be out-of-dated.
+    alertConfig = alertConfigDAO.findById(alertTaskInfo.getAlertConfigDTO().getId());
     if (alertConfig.getProperties() != null && !alertConfig.getProperties().isEmpty()) {
       // if using new detection pipeline
-      long currentTimeStamp = System.currentTimeMillis();
       DetectionAlertFilter alertFilter =
-          this.alertFilterLoader.from(this.provider, alertConfig, alertConfig.getLastTimeStamp() + 1, currentTimeStamp);
-
-      alertConfig.setLastTimeStamp(currentTimeStamp);
-      alertConfigDAO.save(alertConfig);
+          this.alertFilterLoader.from(this.provider, alertConfig, alertConfig.getLastTimeStamp(),
+              System.currentTimeMillis());
 
       DetectionAlertFilterResult result = alertFilter.run();
 
-      if (result.getResult().isEmpty()){
+      if (result.getResult().isEmpty()) {
         LOG.info("Zero anomalies found, skipping sending email");
       } else {
         sendEmail(result);
+
+        // update time stamp after sending out the emails
+        long lastTimeStamp = 0;
+        for (MergedAnomalyResultDTO anomaly : result.getAllAnomalies()) {
+          lastTimeStamp = Math.max(anomaly.getEndTime(), lastTimeStamp);
+        }
+        alertConfig.setLastTimeStamp(lastTimeStamp);
+        alertConfigDAO.save(alertConfig);
       }
 
       return taskResult;
     }
 
-    // Fetch the latest alert config instead of the one provided by task context, which could be out-of-dated.
-    alertConfig = alertConfigDAO.findById(alertTaskInfo.getAlertConfigDTO().getId());
     alertFilterFactory = new AlertFilterFactory(thirdeyeConfig.getAlertFilterConfigPath());
     alertGroupAuxiliaryInfoProviderFactory =
         new AlertGroupRecipientProviderFactory(thirdeyeConfig.getAlertGroupRecipientProviderConfigPath());

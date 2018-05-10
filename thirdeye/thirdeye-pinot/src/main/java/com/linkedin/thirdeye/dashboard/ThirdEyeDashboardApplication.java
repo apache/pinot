@@ -48,6 +48,7 @@ import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.FormatterLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.DefaultTimeSeriesLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.TimeSeriesLoader;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.detection.DetectionResource;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
@@ -153,6 +154,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new TimeSeriesResource());
     env.jersey().register(new UserDashboardResource(DAO_REGISTRY.getMergedAnomalyResultDAO(), DAO_REGISTRY.getAnomalyFunctionDAO(), DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO()));
     env.jersey().register(new DetectionOnboardResource(DAO_REGISTRY.getTaskDAO(), DAO_REGISTRY.getAnomalyFunctionDAO()));
+    env.jersey().register(new DetectionResource());
 
     TimeSeriesLoader timeSeriesLoader = new DefaultTimeSeriesLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache());
     AggregationLoader aggregationLoader = new DefaultAggregationLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());

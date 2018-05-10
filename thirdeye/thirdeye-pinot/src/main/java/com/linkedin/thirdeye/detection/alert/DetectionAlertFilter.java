@@ -18,9 +18,9 @@ public abstract class DetectionAlertFilter {
   }
 
   /**
-   * Returns a detection result for the time range between {@code startTime} and {@code endTime}.
+   * Returns a detection alert filter result for the time range between {@code startTime} and {@code endTime}.
    *
-   * @return detection result
+   * @return alert filter result
    * @throws Exception
    */
   public abstract DetectionAlertFilterResult run() throws Exception;

@@ -131,6 +131,7 @@ public class MergeWrapper extends DetectionPipeline {
         if (parent.getChildren().isEmpty()) {
           // create new umbrella anomaly via copy
           parents.remove(parent);
+          parent.setChild(true);
 
           Set<MergedAnomalyResultDTO> children = new HashSet<>();
           children.add(parent);
@@ -148,6 +149,8 @@ public class MergeWrapper extends DetectionPipeline {
         parent.setStartTime(newStart);
         parent.setEndTime(newEnd);
         parent.getChildren().add(candidate);
+
+        candidate.setChild(true);
 
       } else {
         // potential umbrella anomaly

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detection.alert;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -16,11 +17,20 @@ public class DetectionAlertFilterResult {
   }
 
   public DetectionAlertFilterResult(Map<List<MergedAnomalyResultDTO>, List<String>> result, long lastTimestamp) {
+    Preconditions.checkNotNull(result);
     this.result = result;
   }
 
   public Map<List<MergedAnomalyResultDTO>, List<String>> getResult() {
     return result;
+  }
+
+  public List<MergedAnomalyResultDTO> getAllAnomalies() {
+    List<MergedAnomalyResultDTO> allAnomalies = new ArrayList<>();
+    for (List<MergedAnomalyResultDTO> anomalies: result.keySet()){
+      allAnomalies.addAll(anomalies);
+    }
+    return allAnomalies;
   }
 
   public DetectionAlertFilterResult addMapping(List<MergedAnomalyResultDTO> anomalies, Collection<String> recipients) {

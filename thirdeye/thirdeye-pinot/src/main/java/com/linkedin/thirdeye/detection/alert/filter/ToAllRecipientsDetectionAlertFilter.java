@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilter;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -32,8 +33,8 @@ public class ToAllRecipientsDetectionAlertFilter extends DetectionAlertFilter {
     Preconditions.checkNotNull(config.getProperties().get(PROP_DETECTION_CONFIG_IDS), "Detection config ids not found.");
     Preconditions.checkArgument(config.getProperties().get(PROP_DETECTION_CONFIG_IDS) instanceof List, "Read detection config ids failed.");
 
-    this.recipients = (List<String>) this.config.getProperties().get(PROP_RECIPIENTS);
-    this.detectionConfigIds = (List<Long>) this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS);
+    this.recipients = new ArrayList<>((Collection<String>) this.config.getProperties().get(PROP_RECIPIENTS));
+    this.detectionConfigIds = extractLongs((Collection<Number>) this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
   }
 
   @Override
@@ -54,10 +55,23 @@ public class ToAllRecipientsDetectionAlertFilter extends DetectionAlertFilter {
           }
         }));
 
+    Collections.sort(anomalies);
+
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
     if (CollectionUtils.isNotEmpty(anomalies)) {
       result.addMapping(anomalies, this.recipients);
     }
     return result;
+  }
+
+  private static List<Long> extractLongs(Collection<Number> numbers) {
+    List<Long> output = new ArrayList<>();
+    for (Number n : numbers) {
+      if (n == null) {
+        continue;
+      }
+      output.add(n.longValue());
+    }
+    return output;
   }
 }
