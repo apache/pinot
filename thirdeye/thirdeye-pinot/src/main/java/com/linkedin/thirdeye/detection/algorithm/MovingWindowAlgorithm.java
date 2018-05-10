@@ -26,6 +26,7 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.DurationFieldType;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
 
@@ -101,7 +102,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
     DateTime trainStart = new DateTime(startTime, this.timezone).minus(this.lookback);
     if (this.weekOverWeek) {
-      trainStart.minus(new Period(1, PeriodType.weeks()));
+      trainStart = trainStart.minus(new Period().withField(DurationFieldType.weeks(), 1));
     }
 
     this.slice = MetricSlice.from(me.getId(), trainStart.getMillis(), endTime, me.getFilters());

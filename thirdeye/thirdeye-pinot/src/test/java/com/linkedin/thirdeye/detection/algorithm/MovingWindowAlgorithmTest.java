@@ -84,8 +84,6 @@ public class MovingWindowAlgorithmTest {
 
   }
 
-  // TODO differentiation tests
-
   //
   // quantile min
   //
@@ -116,6 +114,21 @@ public class MovingWindowAlgorithmTest {
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(954000000L, 957600000L)));
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(957600000L, 961200000L)));
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1767600000L, 1771200000L)));
+  }
+
+  @Test
+  public void testQuantileDiffMin() throws Exception {
+    this.properties.put(PROP_WEEK_OVER_WEEK, true);
+    this.properties.put(PROP_QUANTILE_MIN, 0.01);
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 1209600000L, 2419200000L);
+    DetectionPipelineResult res = this.algorithm.run();
+
+    Assert.assertEquals(res.getAnomalies().size(), 5);
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1555200000L, 1558800000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1767600000L, 1771200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2181600000L, 2185200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2368800000L, 2372400000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2412000000L, 2415600000L)));
   }
 
   //
@@ -169,7 +182,7 @@ public class MovingWindowAlgorithmTest {
   }
 
   //
-  // zscore min
+  // zscore
   //
 
   @Test
@@ -186,10 +199,6 @@ public class MovingWindowAlgorithmTest {
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1792800000L, 1796400000L)));
   }
 
-  //
-  // zscore max
-  //
-
   @Test
   public void testZScoreMax() throws Exception {
     this.properties.put(PROP_ZSCORE_MAX, 2.5);
@@ -202,6 +211,24 @@ public class MovingWindowAlgorithmTest {
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(950400000L, 954000000L)));
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1764000000L, 1767600000L)));
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1803600000L, 1807200000L)));
+  }
+
+  @Test
+  public void testZScoreDiffMax() throws Exception {
+    this.properties.put(PROP_WEEK_OVER_WEEK, true);
+    this.properties.put(PROP_ZSCORE_MAX, 2.0);
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 1209600000L, 2419200000L);
+    DetectionPipelineResult res = this.algorithm.run();
+
+    Assert.assertEquals(res.getAnomalies().size(), 8);
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1274400000L, 1278000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1335600000L, 1339200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1551600000L, 1555200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1562400000L, 1566000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1580400000L, 1584000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1760400000L, 1764000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2372400000L, 2376000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2379600000L, 2383200000L)));
   }
 
   //
