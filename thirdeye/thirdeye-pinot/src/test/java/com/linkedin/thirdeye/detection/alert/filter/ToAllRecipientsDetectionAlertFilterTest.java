@@ -32,8 +32,8 @@ public class ToAllRecipientsDetectionAlertFilterTest {
   @BeforeMethod
   public void beforeMethod() {
     this.detectedAnomalies = new ArrayList<>();
-    this.detectedAnomalies.add(makeAnomaly(0, 1000));
     this.detectedAnomalies.add(makeAnomaly(1500, 2000));
+    this.detectedAnomalies.add(makeAnomaly(0, 1000));
 
     DataProvider mockDataProvider = new MockDataProvider().setAnomalies(this.detectedAnomalies);
 

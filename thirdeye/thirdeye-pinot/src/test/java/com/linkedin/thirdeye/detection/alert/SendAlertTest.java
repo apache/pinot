@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.detection.alert;
 
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
-import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
@@ -13,19 +12,15 @@ import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
-import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.mockito.Mockito;
-import org.testng.annotations.AfterClass;
+import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
-import static com.linkedin.thirdeye.anomaly.alert.util.EmailHelper.*;
 
 
 public class SendAlertTest {
@@ -47,6 +42,7 @@ public class SendAlertTest {
   private MergedAnomalyResultManager anomalyDAO;
   private DetectionConfigManager detectionDAO;
   private AlertConfigDTO alertConfigDTO;
+  private Long alertConfigId;
 
   @BeforeMethod
   public void beforeMethod() {
@@ -74,6 +70,7 @@ public class SendAlertTest {
     this.alertConfigDTO.setApplication(APPLICATION_VALUE);
     this.alertConfigDTO.setLastTimeStamp(0L);
 
+    this.alertConfigId = this.alertConfigDAO.save(this.alertConfigDTO);
     this.alertConfigDAO.save(this.alertConfigDTO);
 
     MergedAnomalyResultDTO anomalyResultDTO = new MergedAnomalyResultDTO();
@@ -103,5 +100,8 @@ public class SendAlertTest {
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeConfig);
 
     taskRunner.execute(alertTaskInfo, taskContext);
+
+    AlertConfigDTO alert = alertConfigDAO.findById(alertConfigId);
+    Assert.assertTrue(alert.getLastTimeStamp() == 2000L);
   }
 }
