@@ -24,33 +24,21 @@ import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
+import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class BrokerAdminApiApplication extends ResourceConfig {
-  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerAdminApiApplication.class);
-  public static final String RESOURCE_PACKAGE = "com.linkedin.pinot.broker.api.resources";
+  private static final String RESOURCE_PACKAGE = "com.linkedin.pinot.broker.api.resources";
 
-  private URI baseUri;
-  private boolean started = false;
-  private HttpServer httpServer;
-  private BrokerServerBuilder brokerServerBuilder;
-  private BrokerMetrics brokerMetrics;
-  private BrokerRequestHandler brokerRequestHandler;
-  private TimeBoundaryService timeBoundaryService;
+  private URI _baseUri;
+  private HttpServer _httpServer;
 
   public BrokerAdminApiApplication(final BrokerServerBuilder brokerServerBuilder, final BrokerMetrics brokerMetrics,
       final BrokerRequestHandler brokerRequestHandler, final TimeBoundaryService timeBoundaryService) {
-    this.brokerServerBuilder = brokerServerBuilder;
-    this.brokerMetrics = brokerMetrics;
-    this.brokerRequestHandler = brokerRequestHandler;
-    this.timeBoundaryService = timeBoundaryService;
-
     packages(RESOURCE_PACKAGE);
     register(new AbstractBinder() {
       @Override
@@ -61,51 +49,41 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(timeBoundaryService).to(TimeBoundaryService.class);
       }
     });
-
     registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);
     registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
   }
 
-  public boolean start(int httpPort) {
+  public void start(int httpPort) {
     Preconditions.checkArgument(httpPort > 0);
-    baseUri = URI.create("http://0.0.0.0:" + Integer.toString(httpPort) + "/");
-    httpServer = GrizzlyHttpServerFactory.createHttpServer(baseUri, this);
-    setupSwagger(httpServer);
-    started = true;
-    return true;
+    _baseUri = URI.create("http://0.0.0.0:" + httpPort + "/");
+    _httpServer = GrizzlyHttpServerFactory.createHttpServer(_baseUri, this);
+    setupSwagger();
   }
 
-  public URI getBaseUri() {
-    return baseUri;
-  }
-
-  private void setupSwagger(HttpServer httpServer) {
+  private void setupSwagger() {
     BeanConfig beanConfig = new BeanConfig();
     beanConfig.setTitle("Pinot Broker API");
     beanConfig.setDescription("APIs for accessing Pinot broker information");
     beanConfig.setContact("https://github.com/linkedin/pinot");
     beanConfig.setVersion("1.0");
     beanConfig.setSchemes(new String[]{"http"});
-    beanConfig.setBasePath(baseUri.getPath());
+    beanConfig.setBasePath(_baseUri.getPath());
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
 
-    CLStaticHttpHandler staticHttpHandler =
-        new CLStaticHttpHandler(BrokerAdminApiApplication.class.getClassLoader(), "/api/");
+    HttpHandler httpHandler = new CLStaticHttpHandler(BrokerAdminApiApplication.class.getClassLoader(), "/api/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
-    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/api");
-    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/help");
+    _httpServer.getServerConfiguration().addHttpHandler(httpHandler, "/api", "/help");
 
     URL swaggerDistLocation =
         BrokerAdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/2.2.2/");
     CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
-    httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
+    _httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
 
   public void stop() {
-    if (!started) {
-      return;
+    if (_httpServer != null) {
+      _httpServer.shutdownNow();
     }
-    httpServer.shutdownNow();
   }
 }
