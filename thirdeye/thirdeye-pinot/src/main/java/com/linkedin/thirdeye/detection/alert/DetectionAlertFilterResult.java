@@ -16,13 +16,22 @@ public class DetectionAlertFilterResult {
   /**
    * The Result.
    */
-  Map<List<MergedAnomalyResultDTO>, List<String>> result;
+  private Map<List<MergedAnomalyResultDTO>, List<String>> result;
 
+  Map<Long, Long> vectorClocks;
   /**
    * Instantiates a new Detection alert filter result.
    */
   public DetectionAlertFilterResult() {
     this.result = new HashMap<>();
+  }
+
+  public Map<Long, Long> getVectorClocks() {
+    return vectorClocks;
+  }
+
+  public void setVectorClocks(Map<Long, Long> vectorClock) {
+    this.vectorClocks = vectorClock;
   }
 
   /**

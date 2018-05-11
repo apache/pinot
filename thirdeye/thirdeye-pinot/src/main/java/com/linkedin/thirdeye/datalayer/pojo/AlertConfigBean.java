@@ -24,8 +24,6 @@ public class AlertConfigBean extends AbstractBean {
   EmailFormatterConfig emailFormatterConfig;
   String recipients;
   String fromAddress;
-  Map<String, Object> properties;
-  long lastTimeStamp;
 
   public String getApplication() {
     return application;
@@ -123,21 +121,6 @@ public class AlertConfigBean extends AbstractBean {
     this.emailFormatterConfig = emailFormatterConfig;
   }
 
-  public Map<String, Object> getProperties() {
-    return properties;
-  }
-
-  public void setProperties(Map<String, Object> properties) {
-    this.properties = properties;
-  }
-
-  public long getLastTimeStamp() {
-    return lastTimeStamp;
-  }
-
-  public void setLastTimeStamp(long lastTimeStamp) {
-    this.lastTimeStamp = lastTimeStamp;
-  }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class EmailConfig {

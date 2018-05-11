@@ -16,16 +16,15 @@ public class DetectionAlertFilterLoader {
    *
    * @param provider the provider
    * @param config the config
-   * @param start the start
-   * @param end the end
+   * @param endTime the end time stamp
    * @return the detection alert filter
    * @throws Exception the exception
    */
-  public DetectionAlertFilter from(DataProvider provider, DetectionAlertConfigDTO config, long start, long end)
+  public DetectionAlertFilter from(DataProvider provider, DetectionAlertConfigDTO config, long endTime)
       throws Exception {
     String className = config.getProperties().get(PROP_CLASS_NAME).toString();
     Constructor<?> constructor = Class.forName(className)
-        .getConstructor(DataProvider.class, DetectionAlertConfigDTO.class, long.class, long.class);
-    return (DetectionAlertFilter) constructor.newInstance(provider, config, start, end);
+        .getConstructor(DataProvider.class, DetectionAlertConfigDTO.class, long.class);
+    return (DetectionAlertFilter) constructor.newInstance(provider, config, endTime);
   }
 }

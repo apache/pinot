@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomaly.alert.v2;
 
-import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.alert.commons.AnomalyFeedConfig;
 import com.linkedin.thirdeye.alert.commons.AnomalyFeedFactory;
 import com.linkedin.thirdeye.alert.commons.EmailContentFormatterFactory;
@@ -14,12 +13,12 @@ import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
 import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouper;
 import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouperFactory;
 import com.linkedin.thirdeye.anomaly.alert.grouping.DummyAlertGrouper;
-import com.linkedin.thirdeye.anomaly.alert.grouping.SimpleGroupedAnomalyMerger;
-import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AlertGroupAuxiliaryInfoProvider;
-import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AlertGroupRecipientProviderFactory;
 import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AuxiliaryAlertGroupInfo;
 import com.linkedin.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilter;
 import com.linkedin.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilterFactory;
+import com.linkedin.thirdeye.anomaly.alert.grouping.SimpleGroupedAnomalyMerger;
+import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AlertGroupAuxiliaryInfoProvider;
+import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AlertGroupRecipientProviderFactory;
 import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.DataReportHelper;
@@ -32,41 +31,29 @@ import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
-import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoader;
-import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.DefaultAggregationLoader;
-import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.DefaultTimeSeriesLoader;
-import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.TimeSeriesLoader;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AlertSnapshotManager;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AlertSnapshotDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.AlertGroupConfig;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailFormatterConfig;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.AlertGroupConfig;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.ReportConfigCollection;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.ReportMetricConfig;
 import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.DefaultDataProvider;
-import com.linkedin.thirdeye.detection.DetectionPipelineLoader;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilter;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterLoader;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateExceptionHandler;
+
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -79,6 +66,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TimeZone;
+
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.StringUtils;
@@ -97,7 +85,6 @@ public class AlertTaskRunnerV2 implements TaskRunner {
   public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone("America/Los_Angeles");
   public static final String DEFAULT_EMAIL_FORMATTER_TYPE = "MultipleAnomaliesEmailContentFormatter";
   public static final String CHARSET = "UTF-8";
-  public static final String DETECTION_CONFIG_IDS = "DetectionConfigIds";
 
   private final MergedAnomalyResultManager anomalyMergedResultDAO;
   private final AlertConfigManager alertConfigDAO;
@@ -112,30 +99,12 @@ public class AlertTaskRunnerV2 implements TaskRunner {
   private final String MAX_ALLOWED_MERGE_GAP_KEY = "maxAllowedMergeGap";
   private final long DEFAULT_MAX_ALLOWED_MERGE_GAP = 14400000L;
 
-  private final DataProvider provider;
-  private final DetectionAlertFilterLoader alertFilterLoader;
-
   public AlertTaskRunnerV2() {
-    this.anomalyMergedResultDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
-    this.alertConfigDAO = DAORegistry.getInstance().getAlertConfigDAO();
-    this.alertSnapshotDAO = DAORegistry.getInstance().getAlertSnapshotDAO();
-    this.metricConfigManager = DAORegistry.getInstance().getMetricConfigDAO();
-    this.groupedAnomalyResultsDAO = DAORegistry.getInstance().getGroupedAnomalyResultsDAO();
-    this.alertFilterLoader = new DetectionAlertFilterLoader();
-
-    DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
-    MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
-    EventManager eventDAO = DAORegistry.getInstance().getEventDAO();
-    TimeSeriesLoader timeseriesLoader =
-        new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache());
-
-    AggregationLoader aggregationLoader =
-        new DefaultAggregationLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),
-            ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
-
-    this.provider =
-        new DefaultDataProvider(metricDAO, eventDAO, this.anomalyMergedResultDAO, timeseriesLoader, aggregationLoader,
-            new DetectionPipelineLoader());
+    anomalyMergedResultDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+    alertConfigDAO = DAORegistry.getInstance().getAlertConfigDAO();
+    alertSnapshotDAO = DAORegistry.getInstance().getAlertSnapshotDAO();
+    metricConfigManager = DAORegistry.getInstance().getMetricConfigDAO();
+    groupedAnomalyResultsDAO = DAORegistry.getInstance().getGroupedAnomalyResultsDAO();
   }
 
   @Override
@@ -143,35 +112,9 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       throws Exception {
     List<TaskResult> taskResult = new ArrayList<>();
     AlertTaskInfo alertTaskInfo = (AlertTaskInfo) taskInfo;
-    thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
-
     // Fetch the latest alert config instead of the one provided by task context, which could be out-of-dated.
     alertConfig = alertConfigDAO.findById(alertTaskInfo.getAlertConfigDTO().getId());
-    if (alertConfig.getProperties() != null && !alertConfig.getProperties().isEmpty()) {
-      // if using new detection pipeline
-      DetectionAlertFilter alertFilter =
-          this.alertFilterLoader.from(this.provider, new DetectionAlertConfigDTO(), alertConfig.getLastTimeStamp(),
-              System.currentTimeMillis());
-
-      DetectionAlertFilterResult result = alertFilter.run();
-
-      if (result.getResult().isEmpty()) {
-        LOG.info("Zero anomalies found, skipping sending email");
-      } else {
-        sendEmail(result);
-
-        // update time stamp after sending out the emails
-        long lastTimeStamp = 0;
-        for (MergedAnomalyResultDTO anomaly : result.getAllAnomalies()) {
-          lastTimeStamp = Math.max(anomaly.getEndTime(), lastTimeStamp);
-        }
-        alertConfig.setLastTimeStamp(lastTimeStamp);
-        alertConfigDAO.save(alertConfig);
-      }
-
-      return taskResult;
-    }
-
+    thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
     alertFilterFactory = new AlertFilterFactory(thirdeyeConfig.getAlertFilterConfigPath());
     alertGroupAuxiliaryInfoProviderFactory =
         new AlertGroupRecipientProviderFactory(thirdeyeConfig.getAlertGroupRecipientProviderConfigPath());
@@ -186,33 +129,6 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       throw t;
     }
     return taskResult;
-  }
-
-  private void sendEmail(DetectionAlertFilterResult detectionResult) throws Exception {
-    for (Map.Entry<List<MergedAnomalyResultDTO>, List<String>> entry : detectionResult.getResult().entrySet()) {
-      List<String> recipients = entry.getValue();
-      List<MergedAnomalyResultDTO> anomalies = entry.getKey();
-
-      // Construct email subject
-      StringBuilder emailSubjectBuilder = new StringBuilder("Thirdeye Alert : ");
-      emailSubjectBuilder.append(alertConfig.getName());
-
-      EmailContentFormatter emailContentFormatter =
-          EmailContentFormatterFactory.fromClassName(DEFAULT_EMAIL_FORMATTER_TYPE);
-
-      emailContentFormatter.init(new Properties(),
-          EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(thirdeyeConfig));
-
-      Joiner joiner = Joiner.on(",").skipNulls();
-
-      List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>();
-      anomalyResultListOfGroup.addAll(anomalies);
-
-      EmailEntity emailEntity =
-          emailContentFormatter.getEmailEntity(alertConfig, joiner.join(recipients), emailSubjectBuilder.toString(),
-              null, null, anomalyResultListOfGroup, new EmailContentFormatterContext());
-      EmailHelper.sendEmailWithEmailEntity(emailEntity, thirdeyeConfig.getSmtpConfiguration());
-    }
   }
 
   // TODO : separate code path for new vs old alert config !
@@ -245,8 +161,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       anomalyFeed.init(alertFilterFactory, anomalyFeedConfig);
       Collection<MergedAnomalyResultDTO> anaomalyAlertCandidates = anomalyFeed.getAnomalyFeed();
       mergedAnomaliesAllResults.addAll(anaomalyAlertCandidates);
-    } else if (emailConfig != null && emailConfig.getFunctionIds() != null
-        && CollectionUtils.isNotEmpty(emailConfig.getFunctionIds())) {
+    } else if (emailConfig != null && emailConfig.getFunctionIds() != null) {
       LOG.info("Use Email Config for alert {}", alertConfig.getId());
       List<Long> functionIds = alertConfig.getEmailConfig().getFunctionIds();
       long lastNotifiedAnomaly = emailConfig.getAnomalyWatermark();
@@ -265,23 +180,9 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           mergedAnomaliesAllResults.addAll(filteredAnomalies);
         }
       }
-    } else if (emailConfig != null && emailConfig.getDetectionConfigIds() != null) {
-      LOG.info("Use Detection Config for alert {}", alertConfig.getId());
-      List<Long> detectionConfigIds = emailConfig.getDetectionConfigIds();
-      long lastNotifiedAnomaly = emailConfig.getAnomalyWatermark();
-      for (Long configId : detectionConfigIds) {
-        mergedAnomaliesAllResults.addAll(anomalyMergedResultDAO.findByDetectionConfigAndIdGreaterThan(configId, lastNotifiedAnomaly));
-      }
     }
-
-
-    if (emailConfig != null && emailConfig.getDetectionConfigIds() != null && CollectionUtils.isNotEmpty(emailConfig.getDetectionConfigIds())){
-      // turn off alert filter for detection pipelines
-      results = mergedAnomaliesAllResults;
-    } else {
-      // apply filtration rule
-      results = AlertFilterHelper.applyFiltrationRule(mergedAnomaliesAllResults, alertFilterFactory);
-    }
+    // apply filtration rule
+    results = AlertFilterHelper.applyFiltrationRule(mergedAnomaliesAllResults, alertFilterFactory);
 
     // only anomalies detected by default scheduler are sent; the anomalies detected during replay or given by users will not be sent
     Iterator<MergedAnomalyResultDTO> mergedAnomalyIterator = results.iterator();

@@ -19,9 +19,12 @@ import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import java.util.Collections;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class DetectionPipelineTaskRunner implements TaskRunner {
+  private static final Logger LOG = LoggerFactory.getLogger(DetectionPipelineTaskRunner.class);
   private final DetectionConfigManager detectionDAO;
   private final MergedAnomalyResultManager anomalyDAO;
   private final DetectionPipelineLoader loader;

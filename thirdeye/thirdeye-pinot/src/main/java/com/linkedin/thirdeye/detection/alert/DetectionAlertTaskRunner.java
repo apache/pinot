@@ -87,7 +87,7 @@ public class DetectionAlertTaskRunner implements TaskRunner {
     }
 
     DetectionAlertFilter alertFilter = this.alertFilterLoader.from(this.provider, this.detectionAlertConfig,
-        this.detectionAlertConfig.getLastTimeStamp(), System.currentTimeMillis());
+        System.currentTimeMillis());
 
     DetectionAlertFilterResult result = alertFilter.run();
 
@@ -96,12 +96,7 @@ public class DetectionAlertTaskRunner implements TaskRunner {
     } else {
       sendEmail(result);
 
-      // update time stamp after sending out the emails
-      long lastTimeStamp = 0;
-      for (MergedAnomalyResultDTO anomaly : result.getAllAnomalies()) {
-        lastTimeStamp = Math.max(anomaly.getEndTime(), lastTimeStamp);
-      }
-      this.detectionAlertConfig.setLastTimeStamp(lastTimeStamp);
+      this.detectionAlertConfig.setVectorClocks(result.getVectorClocks());
       this.alertConfigDAO.save(this.detectionAlertConfig);
     }
     return taskResult;

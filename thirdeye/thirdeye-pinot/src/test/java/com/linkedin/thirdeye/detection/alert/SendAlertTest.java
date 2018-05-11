@@ -40,6 +40,7 @@ public class SendAlertTest {
   private DetectionConfigManager detectionDAO;
   private DetectionAlertConfigDTO alertConfigDTO;
   private Long alertConfigId;
+  private Long detectionConfigId;
 
   @BeforeMethod
   public void beforeMethod() {
@@ -52,26 +53,27 @@ public class SendAlertTest {
 
     DetectionConfigDTO detectionConfig = new DetectionConfigDTO();
     detectionConfig.setName(DETECTION_NAME_VALUE);
-    Long detectionConfigId = this.detectionDAO.save(detectionConfig);
+    this.detectionConfigId = this.detectionDAO.save(detectionConfig);
 
     this.alertConfigDTO = new DetectionAlertConfigDTO();
 
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_CLASS_NAME, "com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
     properties.put(PROP_RECIPIENTS, PROP_RECIPIENTS_VALUE);
-    properties.put(PROP_DETECTION_CONFIG_IDS, Collections.singletonList(detectionConfigId));
+    properties.put(PROP_DETECTION_CONFIG_IDS, Collections.singletonList(this.detectionConfigId));
 
     this.alertConfigDTO.setProperties(properties);
     this.alertConfigDTO.setFromAddress(FROM_ADDRESS_VALUE);
     this.alertConfigDTO.setName(ALERT_NAME_VALUE);
-    this.alertConfigDTO.setLastTimeStamp(0L);
+    Map<Long, Long> vectorClocks = new HashMap<>();
+    this.alertConfigDTO.setVectorClocks(vectorClocks);
 
     this.alertConfigId = this.alertConfigDAO.save(this.alertConfigDTO);
 
     MergedAnomalyResultDTO anomalyResultDTO = new MergedAnomalyResultDTO();
     anomalyResultDTO.setStartTime(1000L);
     anomalyResultDTO.setEndTime(2000L);
-    anomalyResultDTO.setDetectionConfigId(detectionConfigId);
+    anomalyResultDTO.setDetectionConfigId(this.detectionConfigId);
     anomalyResultDTO.setCollection(COLLECTION_VALUE);
     anomalyResultDTO.setMetric(METRIC_VALUE);
     this.anomalyDAO.save(anomalyResultDTO);
@@ -97,6 +99,6 @@ public class SendAlertTest {
     taskRunner.execute(alertTaskInfo, taskContext);
 
     DetectionAlertConfigDTO alert = alertConfigDAO.findById(this.alertConfigId);
-    Assert.assertTrue(alert.getLastTimeStamp() == 2000L);
+    Assert.assertTrue(alert.getVectorClocks().get(this.detectionConfigId) == 2000L);
   }
 }

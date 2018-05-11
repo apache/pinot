@@ -16,11 +16,11 @@ import java.util.Objects;
 public class DetectionAlertConfigBean extends AbstractBean {
 
   boolean active;
-  long lastTimeStamp;
   String name;
   String fromAddress;
   String cronExpression;
 
+  Map<Long, Long> vectorClocks;
   Map<String, Object> properties;
 
   public boolean isActive() {
@@ -55,20 +55,20 @@ public class DetectionAlertConfigBean extends AbstractBean {
     this.fromAddress = fromAddress;
   }
 
-  public long getLastTimeStamp() {
-    return lastTimeStamp;
-  }
-
-  public void setLastTimeStamp(long lastTimeStamp) {
-    this.lastTimeStamp = lastTimeStamp;
-  }
-
   public Map<String, Object> getProperties() {
     return properties;
   }
 
   public void setProperties(Map<String, Object> properties) {
     this.properties = properties;
+  }
+
+  public Map<Long, Long> getVectorClocks() {
+    return vectorClocks;
+  }
+
+  public void setVectorClocks(Map<Long, Long> vectorClocks) {
+    this.vectorClocks = vectorClocks;
   }
 
   @Override
@@ -80,14 +80,14 @@ public class DetectionAlertConfigBean extends AbstractBean {
       return false;
     }
     DetectionAlertConfigBean that = (DetectionAlertConfigBean) o;
-    return active == that.active && lastTimeStamp == that.lastTimeStamp && Objects.equals(name, that.name)
+    return active == that.active && Objects.equals(name, that.name)
         && Objects.equals(fromAddress, that.fromAddress) && Objects.equals(cronExpression, that.cronExpression)
-        && Objects.equals(properties, that.properties);
+        && Objects.equals(vectorClocks, that.vectorClocks) && Objects.equals(properties, that.properties);
   }
 
   @Override
   public int hashCode() {
 
-    return Objects.hash(active, lastTimeStamp, name, fromAddress, cronExpression, properties);
+    return Objects.hash(active, name, fromAddress, cronExpression, vectorClocks, properties);
   }
 }

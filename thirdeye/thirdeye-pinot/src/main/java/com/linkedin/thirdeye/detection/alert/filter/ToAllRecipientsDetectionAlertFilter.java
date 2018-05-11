@@ -13,8 +13,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -22,15 +25,16 @@ import org.apache.commons.collections.CollectionUtils;
  */
 public class ToAllRecipientsDetectionAlertFilter extends DetectionAlertFilter {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ToAllRecipientsDetectionAlertFilter.class);
   private static final String PROP_RECIPIENTS = "recipients";
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
 
   List<String> recipients;
   List<Long> detectionConfigIds;
+  Map<Long, Long> vectorClocks;
 
-  public ToAllRecipientsDetectionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long startTime,
-      long endTime) {
-    super(provider, config, startTime, endTime);
+  public ToAllRecipientsDetectionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
+    super(provider, config, endTime);
     Preconditions.checkNotNull(config.getProperties().get(PROP_RECIPIENTS), "Recipients not found.");
     Preconditions.checkArgument(config.getProperties().get(PROP_RECIPIENTS) instanceof List, "Read recipients failed.");
     Preconditions.checkNotNull(config.getProperties().get(PROP_DETECTION_CONFIG_IDS),
@@ -41,33 +45,50 @@ public class ToAllRecipientsDetectionAlertFilter extends DetectionAlertFilter {
     this.recipients = new ArrayList<>((Collection<String>) this.config.getProperties().get(PROP_RECIPIENTS));
     this.detectionConfigIds =
         extractLongs((Collection<Number>) this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
+    this.vectorClocks = this.config.getVectorClocks();
   }
 
   @Override
   public DetectionAlertFilterResult run() {
-    List<MergedAnomalyResultDTO> candidates = new ArrayList<>();
+    DetectionAlertFilterResult result = new DetectionAlertFilterResult();
 
     for (Long detectionConfigId : this.detectionConfigIds) {
+      Long startTime = this.vectorClocks.get(detectionConfigId);
+      if (startTime == null) {
+        LOG.warn(String.format("Missing vector clock for detection %d", detectionConfigId));
+        startTime = 0L;
+      }
+
+      List<MergedAnomalyResultDTO> candidates = new ArrayList<>();
       AnomalySlice slice =
-          new AnomalySlice().withConfigId(detectionConfigId).withStart(this.startTime).withEnd(this.endTime);
+          new AnomalySlice().withConfigId(detectionConfigId).withStart(startTime).withEnd(this.endTime);
       candidates.addAll(this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice));
+
+      List<MergedAnomalyResultDTO> anomalies =
+          new ArrayList<>(Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
+            @Override
+            public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomalyResultDTO) {
+              return mergedAnomalyResultDTO != null && !mergedAnomalyResultDTO.isChild();
+            }
+          }));
+
+      if (CollectionUtils.isNotEmpty(anomalies)) {
+        Collections.sort(anomalies);
+        result.addMapping(anomalies, this.recipients);
+        this.vectorClocks.put(detectionConfigId, getLastTimeStamp(anomalies));
+      }
     }
 
-    List<MergedAnomalyResultDTO> anomalies =
-        new ArrayList<>(Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
-          @Override
-          public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomalyResultDTO) {
-            return mergedAnomalyResultDTO != null && !mergedAnomalyResultDTO.isChild();
-          }
-        }));
-
-    Collections.sort(anomalies);
-
-    DetectionAlertFilterResult result = new DetectionAlertFilterResult();
-    if (CollectionUtils.isNotEmpty(anomalies)) {
-      result.addMapping(anomalies, this.recipients);
-    }
+    result.setVectorClocks(this.vectorClocks);
     return result;
+  }
+
+  private Long getLastTimeStamp(List<MergedAnomalyResultDTO> anomalies){
+    long lastTimeStamp = 0;
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      lastTimeStamp = Math.max(anomaly.getEndTime(), lastTimeStamp);
+    }
+    return lastTimeStamp;
   }
 
   private static List<Long> extractLongs(Collection<Number> numbers) {

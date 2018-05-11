@@ -17,10 +17,6 @@ public abstract class DetectionAlertFilter {
    */
   protected final DetectionAlertConfigDTO config;
   /**
-   * The Start time.
-   */
-  protected final long startTime;
-  /**
    * The End time.
    */
   protected final long endTime;
@@ -30,13 +26,11 @@ public abstract class DetectionAlertFilter {
    *
    * @param provider the provider
    * @param config the config
-   * @param startTime the start time
    * @param endTime the end time
    */
-  public DetectionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long startTime, long endTime) {
+  public DetectionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
     this.provider = provider;
     this.config = config;
-    this.startTime = startTime;
     this.endTime = endTime;
   }
 
