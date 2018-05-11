@@ -59,6 +59,7 @@ public class AggregationFunctionFactory {
     PERCENTILEEST90("percentileEst90"),
     PERCENTILEEST95("percentileEst95"),
     PERCENTILEEST99("percentileEst99"),
+    PERCENTILETDIGEST5("percentileTDigest5"),
     PERCENTILETDIGEST10("percentileTDigest10"),
     PERCENTILETDIGEST25("percentileTDigest20"),
     PERCENTILETDIGEST20("percentileTDigest25"),
@@ -200,6 +201,8 @@ public class AggregationFunctionFactory {
         return new PercentileEstAggregationFunction(95);
       case PERCENTILEEST99:
         return new PercentileEstAggregationFunction(99);
+      case PERCENTILETDIGEST5:
+        return new PercentileTDigestAggregationFunction(5);
       case PERCENTILETDIGEST10:
         return new PercentileTDigestAggregationFunction(10);
       case PERCENTILETDIGEST20:
