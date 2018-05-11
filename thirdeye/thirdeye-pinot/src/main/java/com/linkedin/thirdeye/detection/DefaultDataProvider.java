@@ -104,18 +104,25 @@ public class DefaultDataProvider implements DataProvider {
     Multimap<AnomalySlice, MergedAnomalyResultDTO> output = ArrayListMultimap.create();
     for (AnomalySlice slice : slices) {
       List<Predicate> predicates = new ArrayList<>();
-      if (slice.start >= 0)
-        predicates.add(Predicate.EQ("startTime", slice.start));
       if (slice.end >= 0)
-        predicates.add(Predicate.EQ("endTime", slice.end));
+        predicates.add(Predicate.LT("startTime", slice.end));
+      if (slice.start >= 0)
+        predicates.add(Predicate.GT("endTime", slice.start));
       if (slice.configId >= 0)
         predicates.add(Predicate.EQ("detectionConfigId", slice.configId));
+
+      if (predicates.isEmpty())
+        throw new IllegalArgumentException("Must provide at least one of start, end, or detectionConfigId");
+
       List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByPredicate(AND(predicates));
       Iterator<MergedAnomalyResultDTO> itAnomaly = anomalies.iterator();
       while (itAnomaly.hasNext()) {
-        if (!slice.match(itAnomaly.next()))
+        if (!slice.match(itAnomaly.next())) {
           itAnomaly.remove();
+        }
       }
+
+      output.putAll(slice, anomalies);
     }
     return output;
   }
@@ -125,16 +132,20 @@ public class DefaultDataProvider implements DataProvider {
     Multimap<EventSlice, EventDTO> output = ArrayListMultimap.create();
     for (EventSlice slice : slices) {
       List<Predicate> predicates = new ArrayList<>();
-      if (slice.start >= 0)
-        predicates.add(Predicate.EQ("startTime", slice.start));
       if (slice.end >= 0)
-        predicates.add(Predicate.EQ("endTime", slice.end));
+        predicates.add(Predicate.LT("startTime", slice.end));
+      if (slice.start >= 0)
+        predicates.add(Predicate.GT("endTime", slice.start));
+
+      if (predicates.isEmpty())
+        throw new IllegalArgumentException("Must provide at least one of start, or end");
 
       List<EventDTO> events = this.eventDAO.findByPredicate(AND(predicates));
       Iterator<EventDTO> itEvent = events.iterator();
       while (itEvent.hasNext()) {
-        if (!slice.match(itEvent.next()))
+        if (!slice.match(itEvent.next())) {
           itEvent.remove();
+        }
       }
 
       output.putAll(slice, events);
