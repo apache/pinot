@@ -1,10 +1,9 @@
 import $ from 'jquery';
-import moment from 'moment';
-import { module, test } from 'qunit';
-import { run } from "@ember/runloop";
+import { module, test, skip } from 'qunit';
 import { setupApplicationTest } from 'ember-qunit';
 import { selfServeConst } from 'thirdeye-frontend/tests/utils/constants';
-import { visit, focus, click, currentURL } from '@ember/test-helpers';
+import { visit, click, currentURL } from '@ember/test-helpers';
+import wait from 'ember-test-helpers/wait';
 
 module('Acceptance | verify time range consistency', function(hooks) {
   setupApplicationTest(hooks);
@@ -13,13 +12,13 @@ module('Acceptance | verify time range consistency', function(hooks) {
   const defaultDurationKey = '3m';
   let rangePickerCustomRange = '';
 
-  test(`going through alert page flow to test time range behavior`, async (assert) => {
+  skip(`going through alert page flow to test time range behavior`, async (assert) => {
     server.createList('alert', 2);
     await visit(`/manage/alert/1`);
 
     assert.ok(
       $(selfServeConst.RANGE_PILL_SELECTOR_ACTIVE).get(0).innerText.includes(defaultDurationLabel),
-      'Default time rage is active'
+      'Default time range is active'
     );
 
     // Clicking to activate date-range-picker modal
@@ -30,7 +29,9 @@ module('Acceptance | verify time range consistency', function(hooks) {
 
     // Cache value of new custom time range
     rangePickerCustomRange = $(selfServeConst.RANGE_PICKER_INPUT).val();
+    await wait(selfServeConst.RANGE_PILL_SELECTOR_ACTIVE);
 
+    await wait();
     assert.ok(
       $(selfServeConst.RANGE_PILL_SELECTOR_ACTIVE).get(0).innerText.includes('Custom'),
       'Custom time range pill selected'

@@ -6,7 +6,7 @@
       {{#if (eq range.name "Custom")}}
         : {{date-range-picker
             class="range-pill-selectors__range-picker range-pill-selectors__range-picker--explore"
-            timePicker=false
+            timePicker=true
             timePicker24Hour=true
             timePickerIncrement=timePickerIncrement
             maxDate=maxTime
@@ -14,8 +14,10 @@
             end=activeRangeEnd
             ranges=predefinedRanges
             showCustomRangeLabel=false
+            alwaysShowCalendars=true
             format=uiDateFormat
             serverFormat=serverFormat
+            open="left"
             applyAction=(action "onRangeSelection")
           }}
       {{/if}}

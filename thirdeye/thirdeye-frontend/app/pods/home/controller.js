@@ -16,7 +16,6 @@ export default Controller.extend({
   startDate: null,
   endDate: null,
   duration: null,
-
   /**
    * Overrides ember-models-table's css classes
    */
@@ -25,8 +24,8 @@ export default Controller.extend({
   },
 
   /**
-   * Stats to display in cards
-   * @type {Object[]} - array of objects, each of which represents a stats card
+   * Date types to display in the pills
+   * @type {Object[]} - array of objects, each of which represents each date pill
    */
   pill: computed(
     'model.{appName,startDate,endDate,duration}',
@@ -35,13 +34,20 @@ export default Controller.extend({
       const startDate = Number(this.get('model.startDate'));
       const endDate = Number(this.get('model.endDate'));
       const duration = this.get('model.duration') || DEFAULT_ACTIVE_DURATION;
+      const predefinedRanges = {
+        'Today': [moment().startOf('day'), moment()],
+        'Last  24 hours': [moment().subtract(1, 'day'), moment()],
+        'Last Week': [moment().subtract(1, 'week'), moment()]
+      };
+
       return {
         appName,
         uiDateFormat: UI_DATE_FORMAT,
         activeRangeStart: moment(startDate).format(DISPLAY_DATE_FORMAT),
         activeRangeEnd: moment(endDate).format(DISPLAY_DATE_FORMAT),
         timeRangeOptions: setUpTimeRangeOptions(TIME_RANGE_OPTIONS, duration),
-        timePickerIncrement: TIME_PICKER_INCREMENT
+        timePickerIncrement: TIME_PICKER_INCREMENT,
+        predefinedRanges
       };
     }
   ),
