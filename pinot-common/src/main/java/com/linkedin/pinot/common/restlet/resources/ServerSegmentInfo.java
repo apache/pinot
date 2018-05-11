@@ -28,6 +28,7 @@ public class ServerSegmentInfo {
   private long _segmentCount;
   private long _segmentSizeInBytes;
   //private List<SegmentMetadata> _segmentList;
+  private long _segmentsHitCount;
   private  double _segmentCPULoad;
 
   private  List<String> _tableList;
@@ -37,6 +38,7 @@ public class ServerSegmentInfo {
     this._serverName = serverName;
     //We set default value to -1 as indication of error (e.g., timeout) in returning segment info from a Pinot server
     _segmentCount = -1;
+    _segmentsHitCount = -1;
     _segmentSizeInBytes = -1;
     //_segmentList = new ArrayList <>();
     _segmentCPULoad = -1;
@@ -50,9 +52,15 @@ public class ServerSegmentInfo {
     return _segmentCount;
   }
 
+  public long getSegmentsHitCount() {return _segmentsHitCount;}
+
   public void setSegmentCount(long segmentCount) {
     _segmentCount = segmentCount;
   }
+
+  public void setSegmentsHitCount(long segmentHitCount) {
+      _segmentsHitCount = segmentHitCount;
+    }
 
   public long getSegmentSizeInBytes() {
     return _segmentSizeInBytes;

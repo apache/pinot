@@ -29,6 +29,7 @@ This class can be expanded to contain more load metrics
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ServerPerfMetrics {
   public long segmentCount = 0;
+  public long segmentsHitCount = 0;
   public long segmentDiskSizeInBytes = 0;
   public double segmentCPULoad = 0;
   public List<String> tableList;
@@ -38,6 +39,7 @@ public class ServerPerfMetrics {
 
   public ServerPerfMetrics() {
     segmentCount = 0;
+    segmentsHitCount = 0;
     segmentDiskSizeInBytes = 0;
     segmentCPULoad = 0;
 
@@ -49,7 +51,7 @@ public class ServerPerfMetrics {
   public long getSegmentCount() {
     return segmentCount;
   }
-
+  public long getSegmentsHitCount() { return segmentsHitCount; }
   public long getSegmentDiskSizeInBytes() {
     return segmentDiskSizeInBytes;
   }

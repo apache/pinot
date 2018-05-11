@@ -44,6 +44,8 @@ public class SegmentAssignmentStrategyFactory {
         return new BalanceCPULoadSegmentAssignmentStrategy();
       case DruidSegmentAssignmentStrategy:
         return  new DruidSegmentAssignmentStrategy();
+      case GetafixSegmentAssignmentStrategy:
+        return new GetafixSegmentAssignmentStrategy();
       default:
         return new BalanceNumSegmentAssignmentStrategy();
     }

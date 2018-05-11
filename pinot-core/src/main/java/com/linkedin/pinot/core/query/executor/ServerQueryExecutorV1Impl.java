@@ -134,6 +134,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       for(int i=0;i<numSegmentsMatched;i++)
       {
         selectedSegments.add(queryableSegmentDataManagerList.get(i).getSegmentName());
+
+        // increment the segment hit count by 1 for all queryable segments
+        queryableSegmentDataManagerList.get(i).getSegment().incrementSegmentHitCount();
       }
       queryRequest.setSegmentsAfterPruning(selectedSegments);
 

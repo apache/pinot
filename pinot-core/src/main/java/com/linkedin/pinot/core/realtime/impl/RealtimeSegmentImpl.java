@@ -75,6 +75,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private final boolean _aggregateMetrics;
 
   private volatile int _numDocsIndexed = 0;
+  private volatile long segmentHitCount = 0;
 
   // to compute the rolling interval
   private volatile long _minTime = Long.MAX_VALUE;
@@ -413,6 +414,22 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   @Override
   public long getDiskSizeBytes() {
     return 0;
+  }
+
+  @Override
+  public long getSegmentHitCount() {
+      return segmentHitCount;
+  }
+
+  @Override
+  public synchronized void incrementSegmentHitCount() {
+      segmentHitCount++;
+  }
+
+  // Synchronized avoided as everyone would be resetting to 0.
+  @Override
+  public void resetSegmentHitCount() {
+      this.segmentHitCount = 0;
   }
 
   @Override

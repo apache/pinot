@@ -94,6 +94,7 @@ public class ServerPerfMetricsReader {
       ServerPerfMetrics serverPerfMetrics =
           new ObjectMapper().readValue(getMethod.getResponseBodyAsString(), ServerPerfMetrics.class);
       serverSegmentInfo.setSegmentCount(serverPerfMetrics.segmentCount);
+      serverSegmentInfo.setSegmentsHitCount(serverPerfMetrics.segmentsHitCount);
       serverSegmentInfo.setSegmentSizeInBytes(serverPerfMetrics.segmentDiskSizeInBytes);
       //serverSegmentInfo.setSegmentList(serverPerfMetrics.segmentList);
       serverSegmentInfo.setSegmentCPULoad(serverPerfMetrics.segmentCPULoad);

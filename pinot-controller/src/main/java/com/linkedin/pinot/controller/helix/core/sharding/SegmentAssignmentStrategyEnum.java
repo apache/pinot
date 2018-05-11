@@ -28,6 +28,6 @@ public enum SegmentAssignmentStrategyEnum {
   BalanceSizeSegmentAssignmentStrategy,
   BalanceLatencySegmentAssignmentStrategy,
   BalanceCPULoadSegmentAssignmentStrategy,
-  DruidSegmentAssignmentStrategy
-
+  DruidSegmentAssignmentStrategy,
+  GetafixSegmentAssignmentStrategy
 }
