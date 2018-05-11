@@ -223,7 +223,7 @@ public class RunAdhocDatabaseQueriesTool {
 
   private void updateField(Long id) {
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(id);
-    //anomalyFunction.setCron("0/10 * * * * ?");
+    //anomalyFunction.setCronExpression("0/10 * * * * ?");
     anomalyFunction.setActive(true);
     anomalyFunctionDAO.update(anomalyFunction);
   }

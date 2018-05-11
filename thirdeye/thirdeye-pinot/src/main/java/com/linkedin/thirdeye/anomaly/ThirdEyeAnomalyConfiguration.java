@@ -18,6 +18,7 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean scheduler = false;
   private boolean worker = false;
   private boolean detectionPipeline = false;
+  private boolean detectionAlert = false;
 
   private long id;
   private String dashboardHost;
@@ -36,6 +37,14 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setHolidayEventsLoaderConfiguration(HolidayEventsLoaderConfiguration holidayEventsLoaderConfiguration) {
     this.holidayEventsLoaderConfiguration = holidayEventsLoaderConfiguration;
+  }
+
+  public boolean isDetectionAlert() {
+    return detectionAlert;
+  }
+
+  public void setDetectionAlert(boolean detectionAlert) {
+    this.detectionAlert = detectionAlert;
   }
 
   public boolean isDetectionPipeline() {

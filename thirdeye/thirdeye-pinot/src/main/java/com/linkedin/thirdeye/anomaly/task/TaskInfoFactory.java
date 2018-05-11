@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.anomaly.onboard.ReplayTaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskInfo;
 import com.linkedin.thirdeye.detection.DetectionPipelineTaskInfo;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertTaskInfo;
 import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,9 @@ public class TaskInfoFactory {
       switch(taskType) {
         case DETECTION:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DetectionPipelineTaskInfo.class);
+          break;
+        case DETECTION_ALERT:
+          taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DetectionAlertTaskInfo.class);
           break;
         case ANOMALY_DETECTION:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DetectionTaskInfo.class);

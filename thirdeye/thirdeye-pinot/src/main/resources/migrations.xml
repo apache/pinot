@@ -24,7 +24,7 @@
       <column name="is_active" type="boolean">
         <constraints nullable="false"/>
       </column>
-      <column name="cron" type="varchar(127)">
+      <column name="cronExpression" type="varchar(127)">
         <constraints nullable="false"/>
       </column>
       <column name="bucket_size" type="int">
@@ -130,7 +130,7 @@
       <column name="to_addresses" type="varchar(255)">
         <constraints nullable="false"/>
       </column>
-      <column name="cron" type="varchar(127)">
+      <column name="cronExpression" type="varchar(127)">
         <constraints nullable="false"/>
       </column>
       <column name="smtp_host" type="varchar(127)">

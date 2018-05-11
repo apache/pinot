@@ -377,3 +377,14 @@ create table if not exists detection_config_index (
 ALTER TABLE `detection_config_index` ADD UNIQUE `detection_config_unique_index`(`name`);
 create index detection_config_base_id_idx ON detection_config_index(base_id);
 create index detection_config_name_idx ON detection_config_index(`name`);
+
+create table if not exists detection_alert_config_index (
+    base_id bigint(20) not null,
+    `name` VARCHAR(256) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+ALTER TABLE `detection_alert_config_index` ADD UNIQUE `detection_alert_config_unique_index`(`name`);
+create index detection_alert_config_base_id_idx ON detection_alert_config_index(base_id);
+create index detection_alert_config_name_idx ON detection_alert_config_index(`name`);

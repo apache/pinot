@@ -1,16 +1,39 @@
 package com.linkedin.thirdeye.detection.alert;
 
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 
 
+/**
+ * The Detection alert filter.
+ */
 public abstract class DetectionAlertFilter {
+  /**
+   * The Provider.
+   */
   protected final DataProvider provider;
-  protected final AlertConfigDTO config;
+  /**
+   * The Config.
+   */
+  protected final DetectionAlertConfigDTO config;
+  /**
+   * The Start time.
+   */
   protected final long startTime;
+  /**
+   * The End time.
+   */
   protected final long endTime;
 
-  public DetectionAlertFilter(DataProvider provider, AlertConfigDTO config, long startTime, long endTime) {
+  /**
+   * Instantiates a new Detection alert filter.
+   *
+   * @param provider the provider
+   * @param config the config
+   * @param startTime the start time
+   * @param endTime the end time
+   */
+  public DetectionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long startTime, long endTime) {
     this.provider = provider;
     this.config = config;
     this.startTime = startTime;
@@ -21,7 +44,7 @@ public abstract class DetectionAlertFilter {
    * Returns a detection alert filter result for the time range between {@code startTime} and {@code endTime}.
    *
    * @return alert filter result
-   * @throws Exception
+   * @throws Exception the exception
    */
   public abstract DetectionAlertFilterResult run() throws Exception;
 }

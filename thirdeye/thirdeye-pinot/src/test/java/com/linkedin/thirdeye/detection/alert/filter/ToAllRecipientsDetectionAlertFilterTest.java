@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.detection.alert.filter;
 
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.MockDataProvider;
@@ -37,7 +37,7 @@ public class ToAllRecipientsDetectionAlertFilterTest {
 
     DataProvider mockDataProvider = new MockDataProvider().setAnomalies(this.detectedAnomalies);
 
-    AlertConfigDTO alertConfig = new AlertConfigDTO();
+    DetectionAlertConfigDTO alertConfig = new DetectionAlertConfigDTO();
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_RECIPIENTS, PROP_RECIPIENTS_VALUE);
     properties.put(PROP_DETECTION_CONFIG_IDS, PROP_ID_VALUE);

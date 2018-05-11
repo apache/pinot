@@ -46,6 +46,7 @@ import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AlertSnapshotDTO;
+import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -149,7 +150,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
     if (alertConfig.getProperties() != null && !alertConfig.getProperties().isEmpty()) {
       // if using new detection pipeline
       DetectionAlertFilter alertFilter =
-          this.alertFilterLoader.from(this.provider, alertConfig, alertConfig.getLastTimeStamp(),
+          this.alertFilterLoader.from(this.provider, new DetectionAlertConfigDTO(), alertConfig.getLastTimeStamp(),
               System.currentTimeMillis());
 
       DetectionAlertFilterResult result = alertFilter.run();
