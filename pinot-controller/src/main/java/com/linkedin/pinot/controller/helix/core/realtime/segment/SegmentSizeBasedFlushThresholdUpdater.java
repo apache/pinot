@@ -18,6 +18,7 @@ package com.linkedin.pinot.controller.helix.core.realtime.segment;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import javax.annotation.Nonnull;
@@ -61,9 +62,10 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
 
   @Override
   public void updateFlushThreshold(@Nonnull LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
-      @Nonnull FlushThresholdUpdaterParams params) {
+      @Nonnull CommittingSegmentDescriptor committingSegmentDescriptor, PartitionAssignment partitionAssignment) {
 
-    LLCRealtimeSegmentZKMetadata committingSegmentZkMetadata = params.getCommittingSegmentZkMetadata();
+    LLCRealtimeSegmentZKMetadata committingSegmentZkMetadata =
+        committingSegmentDescriptor.getCommittingSegmentZkMetadata();
     if (committingSegmentZkMetadata == null) { // first segment of the partition, hence committing segment is null
       if (_latestSegmentRowsToSizeRatio > 0) { // new partition added case
         LOGGER.info(
@@ -80,7 +82,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
       return;
     }
 
-    long committingSegmentSizeBytes = params.getCommittingSegmentSizeBytes();
+    long committingSegmentSizeBytes = committingSegmentDescriptor.getCommittingSegmentSizeBytes();
     if (committingSegmentSizeBytes <= 0) { // repair segment case
       LOGGER.info(
           "Committing segment size is not available, setting thresholds for segment {} from previous segment {}",
@@ -108,6 +110,8 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     if (numRowsConsumed < numRowsThreshold) {
       LOGGER.info("Segment {} reached time threshold, setting thresholds for segment {} from previous segment",
           committingSegmentZkMetadata.getSegmentName(), newSegmentZKMetadata.getSegmentName());
+      // TODO: add feature to adjust time threshold as well
+      // TODO: setting sizeThresholdToFlushSegment instead of numRowsConsumed, otherwise we can end up oscillating back and forth
       newSegmentZKMetadata.setSizeThresholdToFlushSegment(committingSegmentZkMetadata.getSizeThresholdToFlushSegment());
       return;
     }

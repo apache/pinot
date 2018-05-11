@@ -17,16 +17,14 @@
 package com.linkedin.pinot.controller.helix.core.realtime.segment;
 
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.partition.PartitionAssignment;
 
 
 /**
- * Class to hold params required by flush threshold updater strategies
+ * Class to hold properties of the committing segment
  */
-public class FlushThresholdUpdaterParams {
+public class CommittingSegmentDescriptor {
   private LLCRealtimeSegmentZKMetadata _committingSegmentZkMetadata;
   private long _committingSegmentSizeBytes;
-  private PartitionAssignment _partitionAssignment;
 
   public LLCRealtimeSegmentZKMetadata getCommittingSegmentZkMetadata() {
     return _committingSegmentZkMetadata;
@@ -42,13 +40,5 @@ public class FlushThresholdUpdaterParams {
 
   public void setCommittingSegmentSizeBytes(long segmentSize) {
     _committingSegmentSizeBytes = segmentSize;
-  }
-
-  public PartitionAssignment getPartitionAssignment() {
-    return _partitionAssignment;
-  }
-
-  public void setPartitionAssignment(PartitionAssignment partitionAssignment) {
-    _partitionAssignment = partitionAssignment;
   }
 }

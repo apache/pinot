@@ -17,6 +17,7 @@
 package com.linkedin.pinot.controller.helix.core.realtime.segment;
 
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.partition.PartitionAssignment;
 import javax.annotation.Nonnull;
 
 
@@ -29,9 +30,10 @@ public interface FlushThresholdUpdater {
   /**
    * Updated the flush threshold of the segment metadata
    * @param newSegmentZKMetadata - new segment metadata for which the thresholds need to be set
-   * @param flushThresholdUpdaterParams
+   * @param committingSegmentDescriptor
+   * @param partitionAssignment
    */
   void updateFlushThreshold(@Nonnull LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
-      @Nonnull FlushThresholdUpdaterParams flushThresholdUpdaterParams);
+      @Nonnull CommittingSegmentDescriptor committingSegmentDescriptor, PartitionAssignment partitionAssignment);
 
 }

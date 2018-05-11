@@ -50,7 +50,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineSt
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdateManager;
 import com.linkedin.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdater;
-import com.linkedin.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdaterParams;
+import com.linkedin.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.realtime.segment.ConsumingSegmentAssignmentStrategy;
@@ -112,7 +112,7 @@ public class PinotLLCRealtimeSegmentManager {
   /**
    * After step 1 of segment completion is done,
    * this is the max time until which step 3 is allowed to complete.
-   * See {@link PinotLLCRealtimeSegmentManager#commitSegmentMetadata(String, String, long, SegmentCompletionProtocol.Request.Params)} for explanation of steps 1 2 3
+   * See {@link PinotLLCRealtimeSegmentManager#commitSegmentMetadata(String, SegmentCompletionProtocol.Request.Params)} for explanation of steps 1 2 3
    * This includes any backoffs and retries for the steps 2 and 3
    * The segment will be eligible for repairs by the validation manager, if the time  exceeds this value
    */
@@ -561,11 +561,10 @@ public class PinotLLCRealtimeSegmentManager {
 
     FlushThresholdUpdater flushThresholdUpdater =
         _flushThresholdUpdateManager.getFlushThresholdUpdater(realtimeTableConfig);
-    FlushThresholdUpdaterParams params = new FlushThresholdUpdaterParams();
-    params.setCommittingSegmentSizeBytes(committingSegmentSizeBytes);
-    params.setPartitionAssignment(partitionAssignment);
-    params.setCommittingSegmentZkMetadata(committingSegmentMetadata);
-    flushThresholdUpdater.updateFlushThreshold(newSegmentZKMetadata, params);
+    CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor();
+    committingSegmentDescriptor.setCommittingSegmentSizeBytes(committingSegmentSizeBytes);
+    committingSegmentDescriptor.setCommittingSegmentZkMetadata(committingSegmentMetadata);
+    flushThresholdUpdater.updateFlushThreshold(newSegmentZKMetadata, committingSegmentDescriptor, partitionAssignment);
 
     newZnRecord = newSegmentZKMetadata.toZNRecord();
 
