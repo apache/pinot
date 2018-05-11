@@ -139,7 +139,6 @@ public class DefaultDataProvider implements DataProvider {
 
       if (predicates.isEmpty())
         throw new IllegalArgumentException("Must provide at least one of start, or end");
-
       List<EventDTO> events = this.eventDAO.findByPredicate(AND(predicates));
       Iterator<EventDTO> itEvent = events.iterator();
       while (itEvent.hasNext()) {

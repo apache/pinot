@@ -21,6 +21,8 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static com.linkedin.thirdeye.detection.DetectionTestUtils.*;
+
 
 public class MergeWrapperTest {
   private DetectionConfigDTO config;
@@ -193,12 +195,5 @@ public class MergeWrapperTest {
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1150, 1300, Collections.singletonMap("key", "value"))));
   }
 
-  private static MergedAnomalyResultDTO makeAnomaly(long start, long end) {
-    return DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, start, end, null, null, Collections.<String, String>emptyMap());
-  }
-
-  private static MergedAnomalyResultDTO makeAnomaly(long start, long end, Map<String, String> dimensions) {
-    return DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, start, end, null, null, dimensions);
-  }
 
 }
