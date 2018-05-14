@@ -118,10 +118,11 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
       // If we set new threshold to be committingSegmentZKMetadata.getSizeThresholdToFlushSegment(), we might end up using a lot more memory than required for the segment
       // Using a minor bump strategy, until we add feature to adjust time
       // We will only slightly bump the threshold based on numRowsConsumed
-      long targetSegmentNumRows = (long) (numRowsConsumed * 1.1);
+      long targetSegmentNumRows = (long) (numRowsConsumed * ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT);
       targetSegmentNumRows = capNumRowsIfOverflow(targetSegmentNumRows);
-      LOGGER.info("Segment {} reached time threshold, bumping segment size threshold 1.1 times to {} for segment {}",
-          committingSegmentZKMetadata.getSegmentName(), targetSegmentNumRows, newSegmentZKMetadata.getSegmentName());
+      LOGGER.info("Segment {} reached time threshold, bumping segment size threshold {} times to {} for segment {}",
+          committingSegmentZKMetadata.getSegmentName(), ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT, targetSegmentNumRows,
+          newSegmentZKMetadata.getSegmentName());
       newSegmentZKMetadata.setSizeThresholdToFlushSegment((int) targetSegmentNumRows);
       return;
     }
