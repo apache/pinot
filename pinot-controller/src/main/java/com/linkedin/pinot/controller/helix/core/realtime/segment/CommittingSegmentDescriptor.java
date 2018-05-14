@@ -16,29 +16,67 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime.segment;
 
-import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 
 
 /**
  * Class to hold properties of the committing segment
  */
 public class CommittingSegmentDescriptor {
-  private LLCRealtimeSegmentZKMetadata _committingSegmentZkMetadata;
-  private long _committingSegmentSizeBytes;
+  private String _segmentName;
+  private long _segmentSizeBytes;
+  private String _segmentLocation;
+  private long _nextOffset;
 
-  public LLCRealtimeSegmentZKMetadata getCommittingSegmentZkMetadata() {
-    return _committingSegmentZkMetadata;
+  public static CommittingSegmentDescriptor fromSegmentCompletionReqParams(
+      SegmentCompletionProtocol.Request.Params reqParams) {
+    CommittingSegmentDescriptor committingSegmentDescriptor =
+        new CommittingSegmentDescriptor(reqParams.getSegmentName(), reqParams.getOffset(),
+            reqParams.getSegmentSizeBytes());
+    committingSegmentDescriptor.setSegmentLocation(reqParams.getSegmentLocation());
+    return committingSegmentDescriptor;
   }
 
-  public void setCommittingSegmentZkMetadata(LLCRealtimeSegmentZKMetadata committingSegmentZkMetadata) {
-    _committingSegmentZkMetadata = committingSegmentZkMetadata;
+  public CommittingSegmentDescriptor(String segmentName, long nextOffset, long segmentSizeBytes) {
+    _segmentName = segmentName;
+    _nextOffset = nextOffset;
+    _segmentSizeBytes = segmentSizeBytes;
   }
 
-  public long getCommittingSegmentSizeBytes() {
-    return _committingSegmentSizeBytes;
+  public CommittingSegmentDescriptor(String segmentName, long nextOffset, long segmentSizeBytes, String segmentLocation) {
+    this(segmentName, nextOffset, segmentSizeBytes);
+    _segmentLocation = segmentLocation;
   }
 
-  public void setCommittingSegmentSizeBytes(long segmentSize) {
-    _committingSegmentSizeBytes = segmentSize;
+  public String getSegmentName() {
+    return _segmentName;
+  }
+
+  public void setSegmentName(String segmentName) {
+    _segmentName = segmentName;
+  }
+
+  public long getSegmentSizeBytes() {
+    return _segmentSizeBytes;
+  }
+
+  public void setSegmentSizeBytes(long segmentSizeBytes) {
+    _segmentSizeBytes = segmentSizeBytes;
+  }
+
+  public String getSegmentLocation() {
+    return _segmentLocation;
+  }
+
+  public void setSegmentLocation(String segmentLocation) {
+    _segmentLocation = segmentLocation;
+  }
+
+  public long getNextOffset() {
+    return _nextOffset;
+  }
+
+  public void setNextOffset(long nextOffset) {
+    _nextOffset = nextOffset;
   }
 }

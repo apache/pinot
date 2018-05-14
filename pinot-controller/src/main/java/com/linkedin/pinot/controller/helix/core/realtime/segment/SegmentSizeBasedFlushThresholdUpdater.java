@@ -62,11 +62,10 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
 
   @Override
   public void updateFlushThreshold(@Nonnull LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
+      LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata,
       @Nonnull CommittingSegmentDescriptor committingSegmentDescriptor, PartitionAssignment partitionAssignment) {
 
-    LLCRealtimeSegmentZKMetadata committingSegmentZkMetadata =
-        committingSegmentDescriptor.getCommittingSegmentZkMetadata();
-    if (committingSegmentZkMetadata == null) { // first segment of the partition, hence committing segment is null
+    if (committingSegmentZKMetadata == null) { // first segment of the partition, hence committing segment is null
       if (_latestSegmentRowsToSizeRatio > 0) { // new partition added case
         LOGGER.info(
             "Committing segment zk metadata is not available, setting rows threshold for segment {} using previous segments ratio",
@@ -82,23 +81,23 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
       return;
     }
 
-    long committingSegmentSizeBytes = committingSegmentDescriptor.getCommittingSegmentSizeBytes();
+    long committingSegmentSizeBytes = committingSegmentDescriptor.getSegmentSizeBytes();
     if (committingSegmentSizeBytes <= 0) { // repair segment case
       LOGGER.info(
           "Committing segment size is not available, setting thresholds for segment {} from previous segment {}",
-          newSegmentZKMetadata.getSegmentName(), committingSegmentZkMetadata.getSegmentName());
-      newSegmentZKMetadata.setSizeThresholdToFlushSegment(committingSegmentZkMetadata.getSizeThresholdToFlushSegment());
+          newSegmentZKMetadata.getSegmentName(), committingSegmentZKMetadata.getSegmentName());
+      newSegmentZKMetadata.setSizeThresholdToFlushSegment(committingSegmentZKMetadata.getSizeThresholdToFlushSegment());
       return;
     }
 
-    long timeConsumed = System.currentTimeMillis() - committingSegmentZkMetadata.getCreationTime();
-    long numRowsConsumed = committingSegmentZkMetadata.getTotalRawDocs();
-    int numRowsThreshold = committingSegmentZkMetadata.getSizeThresholdToFlushSegment();
+    long timeConsumed = System.currentTimeMillis() - committingSegmentZKMetadata.getCreationTime();
+    long numRowsConsumed = committingSegmentZKMetadata.getTotalRawDocs();
+    int numRowsThreshold = committingSegmentZKMetadata.getSizeThresholdToFlushSegment();
     LOGGER.info("Time consumed:{}  Num rows consumed:{} Num rows threshold:{} Committing segment size bytes:{}",
         TimeUtils.convertMillisToPeriod(timeConsumed), numRowsConsumed, numRowsThreshold, committingSegmentSizeBytes);
 
     double currentRatio = (double) numRowsConsumed / committingSegmentSizeBytes;
-    if (new LLCSegmentName(committingSegmentZkMetadata.getSegmentName()).getPartitionId() == 0) {
+    if (new LLCSegmentName(committingSegmentZKMetadata.getSegmentName()).getPartitionId() == 0) {
       if (_latestSegmentRowsToSizeRatio > 0) {
         _latestSegmentRowsToSizeRatio =
             CURRENT_SEGMENT_RATIO_WEIGHT * currentRatio + PREVIOUS_SEGMENT_RATIO_WEIGHT * _latestSegmentRowsToSizeRatio;
@@ -109,10 +108,10 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
 
     if (numRowsConsumed < numRowsThreshold) {
       LOGGER.info("Segment {} reached time threshold, setting thresholds for segment {} from previous segment",
-          committingSegmentZkMetadata.getSegmentName(), newSegmentZKMetadata.getSegmentName());
+          committingSegmentZKMetadata.getSegmentName(), newSegmentZKMetadata.getSegmentName());
       // TODO: add feature to adjust time threshold as well
       // TODO: setting sizeThresholdToFlushSegment instead of numRowsConsumed, otherwise we can end up oscillating back and forth
-      newSegmentZKMetadata.setSizeThresholdToFlushSegment(committingSegmentZkMetadata.getSizeThresholdToFlushSegment());
+      newSegmentZKMetadata.setSizeThresholdToFlushSegment(committingSegmentZKMetadata.getSizeThresholdToFlushSegment());
       return;
     }
 

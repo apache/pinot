@@ -30,10 +30,11 @@ public interface FlushThresholdUpdater {
   /**
    * Updated the flush threshold of the segment metadata
    * @param newSegmentZKMetadata - new segment metadata for which the thresholds need to be set
+   * @param committingSegmentZKMetadata - metadata of the committing segment
    * @param committingSegmentDescriptor
-   * @param partitionAssignment
+   * @param partitionAssignment - partition assignment for the table
    */
   void updateFlushThreshold(@Nonnull LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
-      @Nonnull CommittingSegmentDescriptor committingSegmentDescriptor, PartitionAssignment partitionAssignment);
-
+      LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata, CommittingSegmentDescriptor committingSegmentDescriptor,
+      PartitionAssignment partitionAssignment);
 }

@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import com.linkedin.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
@@ -1099,18 +1100,18 @@ public class SegmentCompletionTest {
     }
 
     @Override
-         public boolean commitSegmentMetadata(String rawTableName, SegmentCompletionProtocol.Request.Params reqParams) {
+         public boolean commitSegmentMetadata(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
       _segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-      _segmentMetadata.setEndOffset(reqParams.getOffset());
+      _segmentMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
       _segmentMetadata.setDownloadUrl(
-          ControllerConf.constructDownloadUrl(rawTableName, reqParams.getSegmentName(), CONTROLLER_CONF.generateVipUrl()));
+          ControllerConf.constructDownloadUrl(rawTableName, committingSegmentDescriptor.getSegmentName(), CONTROLLER_CONF.generateVipUrl()));
       _segmentMetadata.setEndTime(_segmentCompletionMgr.getCurrentTimeMs());
       return true;
     }
 
     @Override
-    public boolean commitSegmentFile(String rawTableName, String segmentLocation, String segmentName) {
-      if (segmentLocation.equals("doNotCommitMe")) {
+    public boolean commitSegmentFile(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
+      if (committingSegmentDescriptor.getSegmentLocation().equals("doNotCommitMe")) {
         return false;
       } else {
         return true;

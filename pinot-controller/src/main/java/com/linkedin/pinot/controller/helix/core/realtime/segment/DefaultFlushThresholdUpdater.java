@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.utils.LLCSegmentName;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nonnull;
 
 
 /**
@@ -37,8 +38,9 @@ public class DefaultFlushThresholdUpdater implements FlushThresholdUpdater {
   }
 
   @Override
-  public void updateFlushThreshold(LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
-      CommittingSegmentDescriptor committingSegmentDescriptor, PartitionAssignment partitionAssignment) {
+  public void updateFlushThreshold(@Nonnull LLCRealtimeSegmentZKMetadata newSegmentZKMetadata,
+      LLCRealtimeSegmentZKMetadata committingSegmentZKMetadata, CommittingSegmentDescriptor committingSegmentDescriptor,
+      @Nonnull PartitionAssignment partitionAssignment) {
 
     // Gather list of instances for this partition
     String partitionId = new LLCSegmentName(newSegmentZKMetadata.getSegmentName()).getPartitionRange();
