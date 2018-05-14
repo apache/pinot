@@ -94,6 +94,13 @@ public class DataFrameUtils {
       df.addSeries(mf.toString(), functionBuilders.get(j++).build());
     }
 
+    // compression
+    for (String name : df.getSeriesNames()) {
+      if (Series.SeriesType.STRING.equals(df.get(name).type())) {
+        df.addSeries(name, df.getStrings(name).compress());
+      }
+    }
+
     return df.sortedBy(COL_TIME);
   }
 
