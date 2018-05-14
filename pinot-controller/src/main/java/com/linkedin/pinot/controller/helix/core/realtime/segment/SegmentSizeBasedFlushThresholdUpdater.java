@@ -46,6 +46,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
 
   private static final double CURRENT_SEGMENT_RATIO_WEIGHT = 0.1;
   private static final double PREVIOUS_SEGMENT_RATIO_WEIGHT = 0.9;
+  private static final double ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT = 1.1;
 
   @VisibleForTesting
   long getIdealSegmentSizeBytes() {
@@ -55,6 +56,11 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   @VisibleForTesting
   int getInitialRowsThreshold() {
     return INITIAL_ROWS_THRESHOLD;
+  }
+
+  @VisibleForTesting
+  double getRowsMultiplierWhenTimeThresholdHit() {
+    return ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT;
   }
 
   // num rows to segment size ratio of last committed segment for this table
@@ -107,11 +113,16 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     }
 
     if (numRowsConsumed < numRowsThreshold) {
-      LOGGER.info("Segment {} reached time threshold, setting thresholds for segment {} from previous segment",
-          committingSegmentZKMetadata.getSegmentName(), newSegmentZKMetadata.getSegmentName());
       // TODO: add feature to adjust time threshold as well
-      // TODO: setting sizeThresholdToFlushSegment instead of numRowsConsumed, otherwise we can end up oscillating back and forth
-      newSegmentZKMetadata.setSizeThresholdToFlushSegment(committingSegmentZKMetadata.getSizeThresholdToFlushSegment());
+      // If we set new threshold to be numRowsConsumed, we might keep oscillating back and forth between doubling limit and time threshold being hit
+      // If we set new threshold to be committingSegmentZKMetadata.getSizeThresholdToFlushSegment(), we might end up using a lot more memory than required for the segment
+      // Using a minor bump strategy, until we add feature to adjust time
+      // We will only slightly bump the threshold based on numRowsConsumed
+      long targetSegmentNumRows = (long) (numRowsConsumed * 1.1);
+      targetSegmentNumRows = capNumRowsIfOverflow(targetSegmentNumRows);
+      LOGGER.info("Segment {} reached time threshold, bumping segment size threshold 1.1 times to {} for segment {}",
+          committingSegmentZKMetadata.getSegmentName(), targetSegmentNumRows, newSegmentZKMetadata.getSegmentName());
+      newSegmentZKMetadata.setSizeThresholdToFlushSegment((int) targetSegmentNumRows);
       return;
     }
 
