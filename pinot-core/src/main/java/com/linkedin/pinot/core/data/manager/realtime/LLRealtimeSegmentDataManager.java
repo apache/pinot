@@ -36,7 +36,6 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
@@ -1097,12 +1096,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     long now = now();
     _consumeStartTime = now;
-    long flushThresholdTimeMillis = kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
-    String flushThresholdTimeFromSegment = segmentZKMetadata.getTimeThresholdToFlushSegment();
-    if (flushThresholdTimeFromSegment != null) {
-      flushThresholdTimeMillis = TimeUtils.convertPeriodToMillis(flushThresholdTimeFromSegment);
-    }
-    _consumeEndTime = now + flushThresholdTimeMillis;
+    _consumeEndTime = now + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
 
     LOGGER.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
         _segmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC).toString());
