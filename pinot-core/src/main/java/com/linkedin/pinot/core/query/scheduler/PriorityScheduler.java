@@ -121,8 +121,8 @@ public abstract class PriorityScheduler extends QueryScheduler {
             request.getSchedulerGroup().startQuery();
             queryRequest.getTimerContext().getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT).stopAndRecord();
             resourceManager.getQueryRunners().submit(queryFutureTask);
-          } catch (Throwable t){
-            LOGGER.error("Error in scheduler thread. This is indicative of a bug. Please report this. Server will continue with errors", t);
+          } catch (Exception e){
+            LOGGER.error("Error in scheduler thread. This is indicative of a bug. Please report this. Server will continue with errors", e);
           }
         }
         if (isRunning) {

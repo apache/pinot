@@ -71,9 +71,9 @@ public class TableSize {
     try {
       tableSizeDetails = tableSizeReader.getTableSizeDetails(tableName,
           _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
-    } catch (Throwable t) {
+    } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, String.format("Failed to read table size for %s", tableName),
-          Response.Status.INTERNAL_SERVER_ERROR, t);
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
 
     if (tableSizeDetails == null) {

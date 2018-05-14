@@ -253,8 +253,8 @@ public class PinotSegmentUploadRestletResource {
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegmentInternal(multiPart, null, enableParallelPushProtection, headers, request));
-    } catch (Throwable t) {
-      asyncResponse.resume(t);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
     }
   }
 
@@ -270,8 +270,8 @@ public class PinotSegmentUploadRestletResource {
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegmentInternal(null, segmentJsonStr, enableParallelPushProtection, headers, request));
-    } catch (Throwable t) {
-      asyncResponse.resume(t);
+    } catch (Exception e) {
+      asyncResponse.resume(e);
     }
   }
 
