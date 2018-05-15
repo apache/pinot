@@ -89,6 +89,12 @@ public class PartitionAwareOfflineRoutingTableBuilder extends BasePartitionAware
     ReplicaGroupPartitionAssignment partitionAssignment =
         partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableName);
 
+    // Update numReplicas if the replica group partition assignment has been changed.
+    int numReplicas = partitionAssignment.getNumReplicaGroups();
+    if (_numReplicas != numReplicas) {
+      _numReplicas = numReplicas;
+    }
+
     // 1. Compute the partition id set by looking at the segment zk metadata and cache metadata when possible
     Set<Integer> partitionIds = new HashSet<>();
     for (String segmentName : segmentSet) {
