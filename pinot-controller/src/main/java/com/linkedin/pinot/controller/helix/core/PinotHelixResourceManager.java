@@ -20,7 +20,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
@@ -79,6 +78,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import joptsimple.internal.Strings;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
@@ -2154,8 +2154,13 @@ public class PinotHelixResourceManager {
       ZNRecord record = helixInstanceConfig.getRecord();
       String[] hostnameSplit = helixInstanceConfig.getHostName().split("_");
       Preconditions.checkState(hostnameSplit.length >= 2);
-      String port = record.getSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY);
-      endpointToInstance.put(instance, hostnameSplit[1] + ":" + port);
+      String adminPort = record.getSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY);
+      if (Strings.isNullOrEmpty(adminPort)) {
+        LOGGER.warn("Admin port is missing for host: {}. Using the default port: {}",
+            hostnameSplit[1], CommonConstants.Server.DEFAULT_ADMIN_API_PORT);
+        adminPort = Integer.toString(CommonConstants.Server.DEFAULT_ADMIN_API_PORT);
+      }
+      endpointToInstance.put(instance, hostnameSplit[1] + ":" + adminPort);
     }
     return endpointToInstance;
   }
