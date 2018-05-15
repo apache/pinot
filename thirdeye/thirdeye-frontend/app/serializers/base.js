@@ -23,6 +23,7 @@ export default DS.JSONAPISerializer.extend({
       data
     };
   }
+
   /*
    * serializing the data to send to the api server
    */

@@ -1007,7 +1007,7 @@ export default Controller.extend({
       if (analysisRange[0] >= start) {
         analysisRange[0] = moment(start).startOf('day').valueOf();
       }
-      if (analysisRange[1] <= end) {
+      if (analysisRange[1] <= end) {//not sure we need this now? -lohuynh
         analysisRange[1] = moment(end).startOf('day').add(1, 'days').valueOf();
       }
 
