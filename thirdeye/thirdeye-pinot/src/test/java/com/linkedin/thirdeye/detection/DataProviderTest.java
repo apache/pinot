@@ -6,8 +6,10 @@ import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,11 +28,13 @@ public class DataProviderTest {
   private DAOTestBase testBase;
   private EventManager eventDAO;
   private MergedAnomalyResultManager anomalyDAO;
+  private MetricConfigManager metricDAO;
 
   private DataProvider provider;
 
   private List<Long> eventIds;
   private List<Long> anomalyIds;
+  private List<Long> metricIds;
 
   @BeforeMethod
   public void beforeMethod() {
@@ -39,6 +43,7 @@ public class DataProviderTest {
     DAORegistry reg = DAORegistry.getInstance();
     this.eventDAO = reg.getEventDAO();
     this.anomalyDAO = reg.getMergedAnomalyResultDAO();
+    this.metricDAO = reg.getMetricConfigDAO();
 
     this.eventIds = new ArrayList<>();
     this.eventIds.add(this.eventDAO.save(makeEvent(3600000L, 7200000L)));
@@ -53,19 +58,18 @@ public class DataProviderTest {
     this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(null, 200L, 604800000L, 1209600000L, Collections.<String>emptyList())));
     this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(null, 200L, 14400000L, 18000000L, Arrays.asList("a=1", "c=3"))));
 
-    this.provider = new DefaultDataProvider(null, this.eventDAO, this.anomalyDAO, null, null, null);
+    this.metricIds = new ArrayList<>();
+    this.metricIds.add(this.metricDAO.save(makeMetric(null, "myMetric1", "myDataset1")));
+    this.metricIds.add(this.metricDAO.save(makeMetric(null, "myMetric2", "myDataset2")));
+    this.metricIds.add(this.metricDAO.save(makeMetric(null, "myMetric3", "myDataset1")));
+
+    this.provider = new DefaultDataProvider(this.metricDAO, this.eventDAO, this.anomalyDAO, null, null, null);
   }
 
   @AfterMethod(alwaysRun = true)
   public void afterMethod() {
     this.testBase.cleanup();
   }
-
-  //
-  // metric
-  //
-
-  // TODO fetch metric tests
 
   //
   // timeseries
@@ -78,7 +82,33 @@ public class DataProviderTest {
   //
 
   // TODO fetch aggregates tests
-  
+
+  //
+  // metric
+  //
+
+  @Test
+  public void testMetricInvalid() {
+    Assert.assertTrue(this.provider.fetchMetrics(Collections.singleton(-1L)).isEmpty());
+  }
+
+  @Test
+  public void testMetricSingle() {
+    MetricConfigDTO metric = this.provider.fetchMetrics(Collections.singleton(this.metricIds.get(1))).get(this.metricIds.get(1));
+
+    Assert.assertNotNull(metric);
+    Assert.assertEquals(metric, makeMetric(this.metricIds.get(1), "myMetric2", "myDataset2"));
+  }
+
+  @Test
+  public void testMetricMultiple() {
+    Collection<MetricConfigDTO> metrics = this.provider.fetchMetrics(Arrays.asList(this.metricIds.get(1), this.metricIds.get(2))).values();
+
+    Assert.assertEquals(metrics.size(), 2);
+    Assert.assertTrue(metrics.contains(makeMetric(this.metricIds.get(1), "myMetric2", "myDataset2")));
+    Assert.assertTrue(metrics.contains(makeMetric(this.metricIds.get(2), "myMetric3", "myDataset1")));
+  }
+
   //
   // events
   //
@@ -207,5 +237,15 @@ public class DataProviderTest {
       filters.put(parts[0], parts[1]);
     }
     return new AnomalySlice(configId, start, end, filters);
+  }
+
+  private static MetricConfigDTO makeMetric(Long id, String metric, String dataset) {
+    MetricConfigDTO metricDTO = new MetricConfigDTO();
+    metricDTO.setId(id);
+    metricDTO.setName(metric);
+    metricDTO.setDataset(dataset);
+    metricDTO.setAlias(dataset + "::" + metric);
+
+    return metricDTO;
   }
 }

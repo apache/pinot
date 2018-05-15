@@ -159,7 +159,9 @@ public class DefaultDataProvider implements DataProvider {
 
     Map<Long, MetricConfigDTO> output = new HashMap<>();
     for (MetricConfigDTO metric : metrics) {
-      output.put(metric.getId(), metric);
+      if (metric != null) {
+        output.put(metric.getId(), metric);
+      }
     }
     return output;
   }
