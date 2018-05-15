@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.TenantNameBuilder;
 import org.apache.helix.HelixManager;
 
 
@@ -33,8 +33,8 @@ public class RealtimeTagConfig extends TagConfig {
   public RealtimeTagConfig(TableConfig tableConfig, HelixManager helixManager) {
     super(tableConfig, helixManager);
 
-    _consumingRealtimeServerTag = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(_serverTenant);
-    _completedRealtimeServerTag = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(_serverTenant);
+    _consumingRealtimeServerTag = TenantNameBuilder.getRealtimeTenantNameForTenant(_serverTenant);
+    _completedRealtimeServerTag = TenantNameBuilder.getRealtimeTenantNameForTenant(_serverTenant);
     if (!_consumingRealtimeServerTag.equals(_completedRealtimeServerTag)) {
       _relocateCompletedSegments = true;
     }

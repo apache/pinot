@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.TenantNameBuilder;
 import org.apache.helix.HelixManager;
 
 
@@ -30,7 +30,7 @@ public class OfflineTagConfig extends TagConfig {
   public OfflineTagConfig(TableConfig tableConfig, HelixManager helixManager) {
     super(tableConfig, helixManager);
 
-    _offlineServerTag = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(_serverTenant);
+    _offlineServerTag = TenantNameBuilder.getOfflineTenantNameForTenant(_serverTenant);
   }
 
   public String getOfflineServerTag() {

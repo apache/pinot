@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.common.utils;
 
-public class ControllerTenantNameBuilder {
+public class TenantNameBuilder {
   public final static String DEFAULT_TENANT_NAME = "DefaultTenant";
 
   private static String buildRealtimeTenantName(String tenantName) {
@@ -52,34 +52,34 @@ public class ControllerTenantNameBuilder {
 
   public static String getRealtimeTenantNameForTenant(String tenantName) {
     if (tenantName == null) {
-      return ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(DEFAULT_TENANT_NAME);
+      return TenantNameBuilder.getRealtimeTenantNameForTenant(DEFAULT_TENANT_NAME);
     }
     if (tenantName.endsWith(ServerType.REALTIME.toString())) {
       return tenantName;
     } else {
-      return ControllerTenantNameBuilder.buildRealtimeTenantName(tenantName);
+      return TenantNameBuilder.buildRealtimeTenantName(tenantName);
     }
   }
 
   public static String getOfflineTenantNameForTenant(String tenantName) {
     if (tenantName == null) {
-      return ControllerTenantNameBuilder.getOfflineTenantNameForTenant(DEFAULT_TENANT_NAME);
+      return TenantNameBuilder.getOfflineTenantNameForTenant(DEFAULT_TENANT_NAME);
     }
     if (tenantName.endsWith(ServerType.OFFLINE.toString())) {
       return tenantName;
     } else {
-      return ControllerTenantNameBuilder.buildOfflineTenantName(tenantName);
+      return TenantNameBuilder.buildOfflineTenantName(tenantName);
     }
   }
 
   public static String getBrokerTenantNameForTenant(String tenantName) {
     if (tenantName == null) {
-      return ControllerTenantNameBuilder.getBrokerTenantNameForTenant(DEFAULT_TENANT_NAME);
+      return TenantNameBuilder.getBrokerTenantNameForTenant(DEFAULT_TENANT_NAME);
     }
     if (tenantName.endsWith(TenantRole.BROKER.toString())) {
       return tenantName;
     } else {
-      return ControllerTenantNameBuilder.buildBrokerTenantName(tenantName);
+      return TenantNameBuilder.buildBrokerTenantName(tenantName);
     }
   }
 
