@@ -3032,6 +3032,30 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testStringUncompressed() {
+    String[] values = new String[4];
+    for (int i = 0; i < values.length; i++) {
+      values[i] = "myString" + (i % 2);
+    }
+    StringSeries s = StringSeries.buildFrom(values);
+
+    Assert.assertNotSame(s.getString(0), s.getString(2));
+    Assert.assertNotSame(s.getString(1), s.getString(3));
+  }
+
+  @Test
+  public void testStringCompressed() {
+    String[] values = new String[4];
+    for (int i = 0; i < values.length; i++) {
+      values[i] = "myString" + (i % 2);
+    }
+    StringSeries s = StringSeries.buildFrom(values).compress();
+
+    Assert.assertSame(s.getString(0), s.getString(2));
+    Assert.assertSame(s.getString(1), s.getString(3));
+  }
+
+  @Test
   public void testBooleanOperationsSeries() {
     BooleanSeries base = DataFrame.toSeries(BNULL, TRUE, FALSE, TRUE, FALSE);
     BooleanSeries mod = DataFrame.toSeries(TRUE, TRUE, TRUE, FALSE, BNULL);
