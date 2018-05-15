@@ -715,7 +715,7 @@ export default Controller.extend({
 
       // Add speedup prop for minutely metrics
       if (selectedGranularity.toLowerCase().includes('minute')) {
-        Object.assign(newAlertObj, { speedup: true });
+        Object.assign(newAlertObj, { speedup: 'true' });
       }
 
       return {
