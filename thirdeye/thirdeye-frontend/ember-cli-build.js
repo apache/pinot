@@ -45,11 +45,23 @@ module.exports = function(defaults) {
     destDir: '/assets'
   });
 
-  app.import('bower_components/source-sans-pro/source-sans-pro.css')
+  app.import(app.bowerDirectory + '/source-sans-pro/source-sans-pro.css');
+  //ionRangeSlider assets - http://ionden.com/a/plugins/ion.rangeSlider/en.html
+  app.import('node_modules/ion-rangeslider/css/ion.rangeSlider.skinHTML5.css');
+  // app.import('node_modules/ion-rangeslider/img/sprite-skin-nice.png', {
+  //   destDir: 'img'
+  // });
+
+  app.import({
+    production: 'node_modules/ion-rangeslider/js/ion.rangeSlider.min.js',
+    development: 'node_modules/ion-rangeslider/js/ion.rangeSlider.js'
+  });
+  app.import('node_modules/ion-rangeslider/css/ion.rangeSlider.css');
+
 
   // Use `app.import` to add additional libraries to the generated
   // output files.
-  
+
   // If you need to use different assets in different
   // environments, specify an object as the first parameter. That
   // object's keys should be the environment name and the values

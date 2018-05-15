@@ -77,7 +77,9 @@
         </div>
         <div class="row rootcause-compare">
           {{rootcause-select-comparison-range
-            range=context.anomalyRange
+            granularity=context.granularity
+            anomalyRange=context.anomalyRange
+            displayRange=context.analysisRange
             compareMode=context.compareMode
             onChange=(action "onComparisonChange")
           }}
