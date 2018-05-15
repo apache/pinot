@@ -613,10 +613,12 @@ public final class Schema {
     }
 
     Schema that = (Schema) o;
-    return EqualityUtils.isEqual(_schemaName, that._schemaName) && EqualityUtils.isEqual(_dimensionFieldSpecs,
-        that._dimensionFieldSpecs) && EqualityUtils.isEqual(_metricFieldSpecs, that._metricFieldSpecs)
-        && EqualityUtils.isEqual(_timeFieldSpec, that._timeFieldSpec) && EqualityUtils.isEqual(_dateTimeFieldSpecs,
-        that._dateTimeFieldSpecs);
+
+    return EqualityUtils.isEqual(_schemaName, that._schemaName) &&
+        EqualityUtils.isEqualIgnoreOrder(_dimensionFieldSpecs, that._dimensionFieldSpecs) &&
+        EqualityUtils.isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs) &&
+        EqualityUtils.isEqual(_timeFieldSpec, that._timeFieldSpec) &&
+        EqualityUtils.isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs);
   }
 
   @Override

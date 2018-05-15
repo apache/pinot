@@ -17,6 +17,7 @@ package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
 import com.google.gson.JsonObject;
+import com.linkedin.pinot.common.config.ConfigKey;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nonnull;
 import org.codehaus.jackson.annotate.JsonIgnore;
@@ -37,6 +38,8 @@ public final class MetricFieldSpec extends FieldSpec {
 
   // These two fields are for derived metric fields.
   private int _fieldSize = UNDEFINED_METRIC_SIZE;
+
+  @ConfigKey("derivedMetricType")
   private DerivedMetricType _derivedMetricType = null;
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
@@ -48,7 +51,6 @@ public final class MetricFieldSpec extends FieldSpec {
     super(name, dataType, true);
     _fieldSize = _dataType.size();
   }
-
 
   public MetricFieldSpec(@Nonnull String name, @Nonnull DataType dataType, @Nonnull Object defaultNullValue) {
     super(name, dataType, true, defaultNullValue);
@@ -169,5 +171,11 @@ public final class MetricFieldSpec extends FieldSpec {
     int result = EqualityUtils.hashCodeOf(super.hashCode(), _fieldSize);
     result = EqualityUtils.hashCodeOf(result, _derivedMetricType);
     return result;
+  }
+
+  @Override
+  public void postInject() {
+    super.postInject();
+    _fieldSize = _dataType.size();
   }
 }
