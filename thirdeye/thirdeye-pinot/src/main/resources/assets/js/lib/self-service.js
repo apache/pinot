@@ -321,7 +321,7 @@ function addSelfServiceListeners() {
 
     });
 
-    /** Manage alerts tab related listeners **/
+    /** Alerts tab related listeners **/
     $("#main-view").on("click", "#configure-emails-form-table .dataset-option", function(){
        clear();
        $("#configure-emails-form-table #selected-metric").html("Select metric");

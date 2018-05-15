@@ -180,16 +180,20 @@
                 </div>
               </div>
 
+              <ul class="nav navbar-nav thirdeye-nav__tabs">
+                <li class="te-nav__link"><a href="app/#/home">Home</a></li>
+              </ul>
+
               <ul class="nav navbar-nav thirdeye-nav__tabs" id="main-tabs">
                 <li class="te-nav__link"><a href="#anomalies">Anomalies</a></li>
                 <li class="hidden"><a href="#investigate">Investigate</a></li>
               </ul>
 
               <ul class="nav navbar-nav thirdeye-nav__tabs">
+                <li class="te-nav__link"><a href="app/#/manage/alerts">Alerts</a></li>
                 <li class="te-nav__link">
                   <a href="app/#/rootcause">Root Cause Analysis</a>
                 </li>
-                <li class="te-nav__link"><a href="app/#/manage/alerts">Manage Alerts</a></li>
               </ul>
 
               <div class="te-nav__user" role="menu">
