@@ -3,14 +3,26 @@ package com.linkedin.thirdeye.detection;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.DefaultTimeSeriesLoader;
+import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.TimeSeriesLoader;
+import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
+import com.linkedin.thirdeye.datasource.cache.QueryCache;
+import com.linkedin.thirdeye.datasource.csv.CSVThirdEyeDataSource;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -18,17 +30,28 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
+
 
 public class DataProviderTest {
+  private static final double EPSILON_MEAN = 20.0;
+
   private DAOTestBase testBase;
   private EventManager eventDAO;
   private MergedAnomalyResultManager anomalyDAO;
   private MetricConfigManager metricDAO;
+  private DatasetConfigManager datasetDAO;
+  private QueryCache cache;
+  private TimeSeriesLoader timeseriesLoader;
+
+  private DataFrame data;
 
   private DataProvider provider;
 
@@ -37,14 +60,16 @@ public class DataProviderTest {
   private List<Long> metricIds;
 
   @BeforeMethod
-  public void beforeMethod() {
+  public void beforeMethod() throws Exception {
     this.testBase = DAOTestBase.getInstance();
 
     DAORegistry reg = DAORegistry.getInstance();
     this.eventDAO = reg.getEventDAO();
     this.anomalyDAO = reg.getMergedAnomalyResultDAO();
     this.metricDAO = reg.getMetricConfigDAO();
+    this.datasetDAO = reg.getDatasetConfigDAO();
 
+    // events
     this.eventIds = new ArrayList<>();
     this.eventIds.add(this.eventDAO.save(makeEvent(3600000L, 7200000L)));
     this.eventIds.add(this.eventDAO.save(makeEvent(10800000L, 14400000L)));
@@ -52,18 +77,51 @@ public class DataProviderTest {
     this.eventIds.add(this.eventDAO.save(makeEvent(604800000L, 1209600000L, Arrays.asList("b=2", "c=3"))));
     this.eventIds.add(this.eventDAO.save(makeEvent(1209800000L, 1210600000L, Collections.singleton("b=4"))));
 
+    // anomalies
     this.anomalyIds = new ArrayList<>();
     this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(null, 100L, 4000000L, 8000000L, Arrays.asList("a=1", "c=3", "b=2"))));
     this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(null, 100L, 8000000L, 12000000L, Arrays.asList("a=1", "c=4"))));
     this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(null, 200L, 604800000L, 1209600000L, Collections.<String>emptyList())));
     this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(null, 200L, 14400000L, 18000000L, Arrays.asList("a=1", "c=3"))));
 
+    // metrics
     this.metricIds = new ArrayList<>();
     this.metricIds.add(this.metricDAO.save(makeMetric(null, "myMetric1", "myDataset1")));
     this.metricIds.add(this.metricDAO.save(makeMetric(null, "myMetric2", "myDataset2")));
     this.metricIds.add(this.metricDAO.save(makeMetric(null, "myMetric3", "myDataset1")));
 
-    this.provider = new DefaultDataProvider(this.metricDAO, this.eventDAO, this.anomalyDAO, null, null, null);
+    // datasets
+    this.datasetDAO.save(makeDataset(null, "myDataset1"));
+    this.datasetDAO.save(makeDataset(null, "myDataset2"));
+
+    // data
+    try (Reader dataReader = new InputStreamReader(this.getClass().getResourceAsStream("algorithm/timeseries-4w.csv"))) {
+      this.data = DataFrame.fromCsv(dataReader);
+      this.data.setIndex(COL_TIME);
+      this.data.addSeries(COL_TIME, this.data.getLongs(COL_TIME).multiply(1000));
+    }
+
+    Map<String, DataFrame> datasets = new HashMap<>();
+    datasets.put("myDataset1", this.data);
+    datasets.put("myDataset2", this.data);
+
+    Map<Long, String> id2name = new HashMap<>();
+    id2name.put(this.metricIds.get(0), "value");
+    id2name.put(this.metricIds.get(1), "value");
+    id2name.put(this.metricIds.get(2), "value");
+
+    Map<String, ThirdEyeDataSource> dataSourceMap = new HashMap<>();
+    dataSourceMap.put("myDataSource", CSVThirdEyeDataSource.fromDataFrame(datasets, id2name));
+
+    this.cache = new QueryCache(dataSourceMap, Executors.newSingleThreadExecutor());
+    ThirdEyeCacheRegistry.getInstance().registerQueryCache(this.cache);
+    ThirdEyeCacheRegistry.initMetaDataCaches();
+
+    // loaders
+    this.timeseriesLoader = new DefaultTimeSeriesLoader(this.metricDAO, this.datasetDAO, this.cache);
+
+    // provider
+    this.provider = new DefaultDataProvider(this.metricDAO, this.eventDAO, this.anomalyDAO, this.timeseriesLoader, null, null);
   }
 
   @AfterMethod(alwaysRun = true)
@@ -75,7 +133,35 @@ public class DataProviderTest {
   // timeseries
   //
 
-  // TODO fetch timeseries tests
+  @Test
+  public void testTimeseriesSingle() {
+    MetricSlice slice = MetricSlice.from(this.metricIds.get(0), 604800000L, 1814400000L);
+
+    DataFrame df = this.provider.fetchTimeseries(Collections.singleton(slice)).get(slice);
+
+    Assert.assertEquals(df.size(), 336);
+
+    double mean = df.getDoubles(COL_VALUE).mean().doubleValue();
+    Assert.assertTrue(Math.abs(mean - 1000) < EPSILON_MEAN);
+  }
+
+  @Test
+  public void testTimeseriesMultiple() {
+    MetricSlice slice1 = MetricSlice.from(this.metricIds.get(0), 604800000L, 1814400000L);
+    MetricSlice slice2 = MetricSlice.from(this.metricIds.get(1), 604800000L, 1209600000L);
+
+    Map<MetricSlice, DataFrame> output = this.provider.fetchTimeseries(Arrays.asList(slice1, slice2));
+
+    Assert.assertEquals(output.size(), 2);
+
+    double mean1 = output.get(slice1).getDoubles(COL_VALUE).mean().doubleValue();
+    Assert.assertTrue(Math.abs(mean1 - 1000) < EPSILON_MEAN);
+
+    double mean2 = output.get(slice2).getDoubles(COL_VALUE).mean().doubleValue();
+    Assert.assertTrue(Math.abs(mean2 - 1000) < EPSILON_MEAN);
+
+    Assert.assertNotEquals(mean1, mean2);
+  }
 
   //
   // aggregates
@@ -245,7 +331,16 @@ public class DataProviderTest {
     metricDTO.setName(metric);
     metricDTO.setDataset(dataset);
     metricDTO.setAlias(dataset + "::" + metric);
-
     return metricDTO;
+  }
+
+  private static DatasetConfigDTO makeDataset(Long id, String dataset) {
+    DatasetConfigDTO datasetDTO = new DatasetConfigDTO();
+    datasetDTO.setId(id);
+    datasetDTO.setDataSource("myDataSource");
+    datasetDTO.setDataset(dataset);
+    datasetDTO.setTimeDuration(3600000);
+    datasetDTO.setTimeUnit(TimeUnit.MILLISECONDS);
+    return datasetDTO;
   }
 }
