@@ -364,10 +364,10 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
       List<String> enabledServingInstances) {
     String tag;
     if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
-      RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
+      RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
       tag = realtimeTagConfig.getCompletedServerTag();
     } else {
-      OfflineTagConfig offlineTagConfig = new OfflineTagConfig(tableConfig, _helixManager);
+      OfflineTagConfig offlineTagConfig = new OfflineTagConfig(tableConfig);
       tag = offlineTagConfig.getOfflineServerTag();
     }
     servingInstances.addAll(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, tag));

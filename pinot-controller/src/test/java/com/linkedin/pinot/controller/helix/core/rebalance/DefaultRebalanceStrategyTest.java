@@ -17,7 +17,6 @@ package com.linkedin.pinot.controller.helix.core.rebalance;
 
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.IndexingConfig;
-import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -622,12 +621,7 @@ public class DefaultRebalanceStrategyTest {
     }
 
     @Override
-    protected RealtimeTagConfig getRealtimeTagConfig(TableConfig tableConfig) {
-      return null;
-    }
-
-    @Override
-    protected List<String> getConsumingTaggedInstances(RealtimeTagConfig realtimeTagConfig) {
+    protected List<String> getConsumingTaggedInstances(TableConfig tableConfig) {
       return _consumingTaggedInstances;
     }
 

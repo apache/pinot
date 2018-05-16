@@ -16,7 +16,6 @@
 package com.linkedin.pinot.common.config;
 
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
-import org.apache.helix.HelixManager;
 
 
 /**
@@ -30,9 +29,10 @@ public class RealtimeTagConfig extends TagConfig {
 
   private boolean _relocateCompletedSegments = false;
 
-  public RealtimeTagConfig(TableConfig tableConfig, HelixManager helixManager) {
-    super(tableConfig, helixManager);
+  public RealtimeTagConfig(TableConfig tableConfig) {
+    super(tableConfig);
 
+    // TODO: after we introduce config to override tags, pick the right ones from config for consuming and completed
     _consumingRealtimeServerTag = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(_serverTenant);
     _completedRealtimeServerTag = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(_serverTenant);
     if (!_consumingRealtimeServerTag.equals(_completedRealtimeServerTag)) {

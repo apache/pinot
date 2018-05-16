@@ -118,7 +118,7 @@ public class RealtimeSegmentRelocator {
         LOGGER.info("Starting relocation of segments for table: {}", tableNameWithType);
 
         TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableNameWithType);
-        final RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
+        final RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
         if (!realtimeTagConfig.isRelocateCompletedSegments()) {
           LOGGER.info("Skipping relocation of segments for {}", tableNameWithType);
           return;
