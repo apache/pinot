@@ -23,7 +23,6 @@ import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import com.linkedin.pinot.common.config.StreamConsumptionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.TenantConfig;
@@ -40,7 +39,6 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.resources.LLCSegmentCompletionHandlers;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
-import com.linkedin.pinot.controller.helix.core.realtime.partition.StreamPartitionAssignmentStrategyEnum;
 import com.linkedin.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -80,7 +78,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
   private static final String DUMMY_HOST = "dummyHost:1234";
   private static final String KAFKA_OFFSET = "testDummy";
   private static final String DEFAULT_SERVER_TENANT = "freeTenant";
-  private static final StreamPartitionAssignmentStrategyEnum DEFAULT_STREAM_ASSIGNMENT_STRATEGY = null;
   private static final String SCHEME = LLCSegmentCompletionHandlers.getScheme();
   private String[] serverNames;
   private static File baseDir;
@@ -141,8 +138,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<String> instances = getInstanceList(1);
 
     // insufficient instances
-    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
-        DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
+    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     idealState = idealStateBuilder.build();
     nPartitions = 4;
     invalidConfig = true;
@@ -151,7 +147,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // bad stream configs
     badStream = true;
     tableConfig =
-        makeTableConfig(tableName, nReplicas, null, null, DEFAULT_SERVER_TENANT, DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
+        makeTableConfig(tableName, nReplicas, null, null, DEFAULT_SERVER_TENANT);
     idealState = idealStateBuilder.build();
     nPartitions = 4;
     instances = getInstanceList(3);
@@ -159,24 +155,21 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // noop path - 0 partitions
     badStream = false;
-    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
-        DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
+    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     idealState = idealStateBuilder.build();
     nPartitions = 0;
     invalidConfig = false;
     testSetupNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, invalidConfig, badStream);
 
     // noop path - ideal state disabled - this can happen in the code path only if there is already an idealstate with HLC segments in it, and it has been disabled.
-    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
-        DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
+    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     idealState = idealStateBuilder.disableIdealState().build();
     nPartitions = 4;
     invalidConfig = false;
     testSetupNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, invalidConfig, badStream);
 
     // happy paths - new table config with nPartitions and sufficient instances
-    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
-        DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
+    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     idealState = idealStateBuilder.build();
     nPartitions = 4;
     invalidConfig = false;
@@ -293,8 +286,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<String> instances = getInstanceList(5);
 
     // empty to 4 partitions
-    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
-        DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
+    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     idealState = idealStateBuilder.build();
     nPartitions = 4;
     validateLLCPartitionsIncrease(segmentManager, idealState, tableConfig, nPartitions, nReplicas, instances,
@@ -480,8 +472,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<String> instances = getInstanceList(5);
     final int[] numInstancesSet = new int[]{4, 6, 8, 10};
 
-    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
-        DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
+    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     nPartitions = 4;
     segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
     PartitionAssignment expectedPartitionAssignment =
@@ -816,8 +807,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     final String rtTableName = "testPreExistingLLCSegments_REALTIME";
 
-    TableConfig tableConfig = makeTableConfig(rtTableName, 3, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
-        DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
+    TableConfig tableConfig = makeTableConfig(rtTableName, 3, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     segmentManager.addTableToStore(rtTableName, tableConfig, 8);
     IdealState idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, 10);
     try {
@@ -840,8 +830,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final int nReplicas = 3;
     List<String> instances = getInstanceList(nInstances);
     SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
-    TableConfig tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
-        DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
+    TableConfig tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     segmentManager.addTableToStore(tableName, tableConfig, nPartitions);
 
     IdealState idealState =
@@ -892,8 +881,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final int nReplicas = 2;
     List<String> instances = getInstanceList(nInstances);
     SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
-    TableConfig tableConfig = makeTableConfig(rtTableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
-        DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
+    TableConfig tableConfig = makeTableConfig(rtTableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
 
     IdealStateBuilderUtil idealStateBuilder = new IdealStateBuilderUtil(rtTableName);
     IdealState idealState = idealStateBuilder.setNumReplicas(nReplicas).build();
@@ -1072,8 +1060,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final int nPartitions = 16;
     final int nReplicas = 3;
     List<String> instances = getInstanceList(nInstances);
-    TableConfig tableConfig = makeTableConfig(rtTableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT,
-        DEFAULT_STREAM_ASSIGNMENT_STRATEGY);
+    TableConfig tableConfig = makeTableConfig(rtTableName, nReplicas, KAFKA_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     IdealState idealState =
         PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, nReplicas);
 
@@ -1131,7 +1118,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
   ///////////////////////////////////////////////////////////////////////////
 
   private TableConfig makeTableConfig(String tableName, int nReplicas, String autoOffsetReset, String bootstrapHosts,
-      String serverTenant, StreamPartitionAssignmentStrategyEnum strategy) {
+      String serverTenant) {
     TableConfig mockTableConfig = mock(TableConfig.class);
     when(mockTableConfig.getTableName()).thenReturn(tableName);
     SegmentsValidationAndRetentionConfig mockValidationConfig = mock(SegmentsValidationAndRetentionConfig.class);
@@ -1153,13 +1140,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     IndexingConfig mockIndexConfig = mock(IndexingConfig.class);
     when(mockIndexConfig.getStreamConfigs()).thenReturn(streamConfigMap);
-    if (strategy != null) {
-      StreamConsumptionConfig mockStreamConsumptionConfig = mock(StreamConsumptionConfig.class);
-      when(mockStreamConsumptionConfig.getStreamPartitionAssignmentStrategy()).thenReturn(strategy.toString());
-      when(mockIndexConfig.getStreamConsumptionConfig()).thenReturn(mockStreamConsumptionConfig);
-    } else {
-      when(mockIndexConfig.getStreamConsumptionConfig()).thenReturn(null);
-    }
 
     when(mockTableConfig.getIndexingConfig()).thenReturn(mockIndexConfig);
     TenantConfig mockTenantConfig = mock(TenantConfig.class);
