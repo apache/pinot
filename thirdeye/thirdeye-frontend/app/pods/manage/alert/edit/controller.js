@@ -14,6 +14,7 @@ import { computed, set } from '@ember/object';
 import { getWithDefault } from '@ember/object';
 import { isEmpty, isPresent } from "@ember/utils";
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
 import { formatConfigGroupProps } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Controller.extend({
@@ -206,7 +207,7 @@ export default Controller.extend({
    * @return {Promise}
    */
   fetchAlertByName(functionName) {
-    const url = `/data/autocomplete/functionByName?name=${functionName}`;
+    const url = selfServeApiCommon.alertFunctionByName(functionName)
     return fetch(url).then(checkStatus);
   },
 
@@ -218,7 +219,7 @@ export default Controller.extend({
    * @return {Promise}
    */
   fetchFunctionById(functionId) {
-    const url = `/onboard/function/${functionId}`;
+    const url = selfServeApiCommon.alertById(functionId);
     return fetch(url).then(checkStatus);
   },
 

@@ -159,7 +159,7 @@ public class RawIndexConverter {
     // In bits
     int lengthOfEachEntry;
     if (dataType.equals(FieldSpec.DataType.STRING)) {
-      lengthOfEachEntry = columnMetadata.getStringColumnMaxLength() * Byte.SIZE;
+      lengthOfEachEntry = columnMetadata.getColumnMaxLength() * Byte.SIZE;
     } else {
       lengthOfEachEntry = dataType.size() * Byte.SIZE;
     }
@@ -190,7 +190,7 @@ public class RawIndexConverter {
     DataSource dataSource = _originalImmutableSegment.getDataSource(columnName);
     Dictionary dictionary = dataSource.getDictionary();
     FieldSpec.DataType dataType = fieldSpec.getDataType();
-    int lengthOfLongestEntry = _originalSegmentMetadata.getColumnMetadataFor(columnName).getStringColumnMaxLength();
+    int lengthOfLongestEntry = _originalSegmentMetadata.getColumnMetadataFor(columnName).getColumnMaxLength();
     try (SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(
         _convertedIndexDir, ChunkCompressorFactory.CompressionType.SNAPPY, columnName, dataType,
         _originalSegmentMetadata.getTotalDocs(), lengthOfLongestEntry)) {

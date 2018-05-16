@@ -16,15 +16,21 @@
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 import org.apache.commons.lang.RandomStringUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -40,7 +46,7 @@ public class MutableDictionaryTest {
   private static final int EST_CARDINALITY = NUM_ENTRIES / 3;
   private static final int NUM_READERS = 3;
   private static final FieldSpec.DataType[] DATA_TYPES =
-      {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.STRING};
+      {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.STRING, FieldSpec.DataType.BYTES};
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
 
@@ -154,8 +160,16 @@ public class MutableDictionaryTest {
   private void testMutableDictionary(MutableDictionary dictionary, FieldSpec.DataType dataType) {
     Map<Object, Integer> valueToDictId = new HashMap<>();
     int numEntries = 0;
+
+    Comparable expectedMin = null;
+    Comparable expectedMax = null;
+    List<Comparable> expectedSortedValues = new ArrayList<>();
+
     for (int i = 0; i < NUM_ENTRIES; i++) {
-      Object value = makeRandomObjectOfType(dataType);
+      // Special case first 'INT' type to be Integer.MIN_VALUE.
+      Comparable value =
+          (i == 0 && FieldSpec.DataType.INT.equals(dataType)) ? Integer.MIN_VALUE : makeRandomObjectOfType(dataType);
+
       if (valueToDictId.containsKey(value)) {
         Assert.assertEquals(dictionary.indexOf(value), (int) valueToDictId.get(value));
       } else {
@@ -163,17 +177,33 @@ public class MutableDictionaryTest {
         int dictId = dictionary.indexOf(value);
         Assert.assertEquals(dictId, numEntries++);
         valueToDictId.put(value, dictId);
+
+        if (expectedMin == null || value.compareTo(expectedMin) < 0) {
+          expectedMin = value;
+        }
+        if (expectedMax == null || value.compareTo(expectedMax) > 0) {
+          expectedMax = value;
+        }
+        expectedSortedValues.add(value);
       }
     }
-    if (dataType == FieldSpec.DataType.INT) {
-      Object value = new Integer(Integer.MIN_VALUE);
-      if (valueToDictId.containsKey(value)) {
-        Assert.assertEquals(dictionary.indexOf(value), (int) valueToDictId.get(value));
-      } else {
-        dictionary.index(value);
-        int dictId = dictionary.indexOf(value);
-        Assert.assertEquals(dictId, numEntries++);
-        valueToDictId.put(value, dictId);
+
+    // Test min/max values.
+    Assert.assertEquals(dictionary.getMinVal(), expectedMin);
+    Assert.assertEquals(dictionary.getMaxVal(), expectedMax);
+
+    // Test sorted values.
+    Collections.sort(expectedSortedValues);
+    Object sortedValues = dictionary.getSortedValues();
+    List<Comparable> actualSortedValues =
+        (dataType.equals(FieldSpec.DataType.STRING) || dataType.equals(FieldSpec.DataType.BYTES)) ? Arrays.asList(
+            (Comparable[]) dictionary.getSortedValues()) : primitiveArrayToList(dataType, sortedValues);
+    Assert.assertEquals(actualSortedValues, expectedSortedValues);
+
+    // Bytes do not support string comparison.
+    if (!dataType.equals(FieldSpec.DataType.BYTES)) {
+      for (int i = 0; i < dictionary.length(); i++) {
+        Assert.assertTrue(dictionary.inRange(expectedMin.toString(), expectedMax.toString(), i, true, true));
       }
     }
   }
@@ -191,12 +221,14 @@ public class MutableDictionaryTest {
         return new DoubleOffHeapMutableDictionary(estCardinality, maxOverflowSize, _memoryManager, "doubleColumn");
       case STRING:
         return new StringOffHeapMutableDictionary(estCardinality, maxOverflowSize, _memoryManager, "stringColumn", 32);
+      case BYTES:
+        return new BytesOffHeapMutableDictionary(estCardinality, maxOverflowSize, _memoryManager, "bytesColumn", 32);
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }
   }
 
-  private Object makeRandomObjectOfType(FieldSpec.DataType dataType) {
+  private Comparable makeRandomObjectOfType(FieldSpec.DataType dataType) {
     switch (dataType) {
       case INT:
         return RANDOM.nextInt();
@@ -208,6 +240,10 @@ public class MutableDictionaryTest {
         return RANDOM.nextDouble();
       case STRING:
         return RandomStringUtils.randomAscii(RANDOM.nextInt(1024));
+      case BYTES:
+        byte[] bytes = new byte[RANDOM.nextInt(100) + 1];
+        RANDOM.nextBytes(bytes);
+        return new ByteArray(bytes);
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }
@@ -224,9 +260,9 @@ public class MutableDictionaryTest {
    * <p>We can assume that we always first get the index of a value, then use the index to fetch the value.
    */
   private class Reader implements Callable<Void> {
+
     private final MutableDictionary _dictionary;
     private final FieldSpec.DataType _dataType;
-
     private Reader(MutableDictionary dictionary, FieldSpec.DataType dataType) {
       _dictionary = dictionary;
       _dataType = dataType;
@@ -247,15 +283,15 @@ public class MutableDictionaryTest {
       }
       return null;
     }
-  }
 
+  }
   /**
    * Writer to index value into dictionary, then check the index of the value.
    */
   private class Writer implements Callable<Void> {
+
     private final MutableDictionary _dictionary;
     private final FieldSpec.DataType _dataType;
-
     private Writer(MutableDictionary dictionary, FieldSpec.DataType dataType) {
       _dictionary = dictionary;
       _dataType = dataType;
@@ -273,8 +309,8 @@ public class MutableDictionaryTest {
       }
       return null;
     }
-  }
 
+  }
   /**
    * Helper method to return an <code>Integer</code> or <code>String</code> based on the given int value and data type.
    */
@@ -303,5 +339,35 @@ public class MutableDictionaryTest {
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType);
     }
+  }
+
+  private List<Comparable> primitiveArrayToList(FieldSpec.DataType dataType,
+      Object sortedValues) {
+    List<Comparable> valueList;
+    switch (dataType) {
+      case INT:
+        valueList = Arrays.stream((int[]) sortedValues).boxed().collect(Collectors.toList());
+        break;
+
+      case LONG:
+        valueList = Arrays.stream((long[]) sortedValues).boxed().collect(Collectors.toList());
+        break;
+
+      case FLOAT:
+        // Stream not available for float.
+        valueList = new ArrayList<>();
+        for (float value : ((float[]) sortedValues)) {
+          valueList.add(value);
+        }
+        break;
+
+      case DOUBLE:
+        valueList = Arrays.stream((double[]) sortedValues).boxed().collect(Collectors.toList());
+        break;
+
+      default:
+        throw new IllegalArgumentException("Illegal data type for mutable dictionary: " + dataType);
+    }
+    return valueList;
   }
 }

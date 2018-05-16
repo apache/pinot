@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.query.reduce;
 
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
@@ -39,7 +38,6 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUti
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -162,8 +160,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         List<String> selectionColumns =
             SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(),
                 cachedDataSchema);
-        brokerResponseNative.setSelectionResults(
-            new SelectionResults(selectionColumns, new ArrayList<Serializable[]>(0)));
+        brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, new ArrayList<>(0)));
       }
     } else {
       // Reduce server responses data and set query results into the broker response.
@@ -289,8 +286,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     for (DataTable dataTable : dataTableMap.values()) {
       for (int i = 0; i < numAggregationFunctions; i++) {
         Object intermediateResultToMerge;
-        FieldSpec.DataType columnType = dataSchema.getColumnType(i);
-        switch (columnType) {
+        DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
+        switch (columnDataType) {
           case LONG:
             intermediateResultToMerge = dataTable.getLong(0, i);
             break;
@@ -301,7 +298,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
             intermediateResultToMerge = dataTable.getObject(0, i);
             break;
           default:
-            throw new IllegalStateException("Illegal column type in aggregation results: " + columnType);
+            throw new IllegalStateException("Illegal column data type in aggregation results: " + columnDataType);
         }
         Object mergedIntermediateResult = intermediateResults[i];
         if (mergedIntermediateResult == null) {

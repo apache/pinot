@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources.v2.rootcause;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.SetMultimap;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.dashboard.resources.v2.ResourceUtils;
 import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEventEntityFormatter;
@@ -100,13 +101,11 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
       attributes.put(entry.getKey(), entry.getValue());
     }
 
-    // dimensions as attributes
+    // dimensions as attributes and label
+    SetMultimap<String, String> filters = ResourceUtils.getAnomalyFilters(anomaly, this.datasetDAO);
+
     List<String> dimensionStrings = new ArrayList<>();
-    for (Map.Entry<String, String> entry : anomaly.getDimensions().entrySet()) {
-      if (Objects.equals(entry.getValue(), dataset.getPreAggregatedKeyword())) {
-        // NOTE: workaround for anomaly detection inserting pre-aggregated keyword as dimension
-        continue;
-      }
+    for (Map.Entry<String, String> entry : filters.entries()) {
       dimensionStrings.add(entry.getValue());
       attributes.put(ATTR_DIMENSIONS, entry.getKey());
       attributes.put(entry.getKey(), entry.getValue());

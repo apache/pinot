@@ -16,9 +16,9 @@
 package com.linkedin.pinot.server.request;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
@@ -41,46 +41,33 @@ import io.netty.channel.ChannelHandlerContext;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import javax.annotation.Nullable;
+import javax.annotation.Nonnull;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.thrift.protocol.TCompactProtocol;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
 
 
 public class ScheduledRequestHandlerTest {
-
-  public static Logger LOGGER = LoggerFactory.getLogger(ScheduledRequestHandlerTest.class);
-
   private ServerMetrics serverMetrics;
   private ChannelHandlerContext channelHandlerContext;
   private QueryScheduler queryScheduler;
   private QueryExecutor queryExecutor;
   private UnboundedResourceManager resourceManager;
 
-  @BeforeTest
-  public void setupTestMethod() {
+  @BeforeClass
+  public void setUp() {
     serverMetrics = new ServerMetrics(new MetricsRegistry());
     channelHandlerContext = mock(ChannelHandlerContext.class, RETURNS_DEEP_STUBS);
-    when(channelHandlerContext.channel().remoteAddress())
-        .thenAnswer(new Answer<InetSocketAddress>() {
-          @Override
-          public InetSocketAddress answer(InvocationOnMock invocationOnMock)
-              throws Throwable {
-            return new InetSocketAddress("localhost", 60000);
-          }
-        });
+    when(channelHandlerContext.channel().remoteAddress()).thenAnswer(
+        (Answer<InetSocketAddress>) invocationOnMock -> new InetSocketAddress("localhost", 60000));
 
     queryScheduler = mock(QueryScheduler.class);
     queryExecutor = new ServerQueryExecutorV1Impl();
@@ -88,8 +75,7 @@ public class ScheduledRequestHandlerTest {
   }
 
   @Test
-  public void testBadRequest()
-      throws Exception {
+  public void testBadRequest() throws Exception {
     ScheduledRequestHandler handler = new ScheduledRequestHandler(queryScheduler, serverMetrics);
     String requestBadString = "foobar";
     byte[] requestData = requestBadString.getBytes();
@@ -118,41 +104,33 @@ public class ScheduledRequestHandlerTest {
   }
 
   @Test
-  public void testQueryProcessingException()
-      throws Exception {
-    ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics) {
-      @Override
-      public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
-        ListenableFuture<DataTable> dataTable = resourceManager.getQueryRunners().submit(new Callable<DataTable>() {
+  public void testQueryProcessingException() throws Exception {
+    ScheduledRequestHandler handler =
+        new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics) {
+          @Nonnull
           @Override
-          public DataTable call()
-              throws Exception {
-            throw new RuntimeException("query processing error");
-          }
-        });
-        ListenableFuture<DataTable> queryResponse =
-            Futures.catching(dataTable, Throwable.class, new Function<Throwable, DataTable>() {
-              @Nullable
-              @Override
-              public DataTable apply(@Nullable Throwable input) {
-                DataTable result = new DataTableImplV2();
-                result.addException(QueryException.INTERNAL_ERROR);
-                return result;
-              }
+          public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
+            ListenableFuture<DataTable> dataTable = resourceManager.getQueryRunners().submit(() -> {
+              throw new RuntimeException("query processing error");
             });
-        return serializeData(queryResponse);
-      }
+            ListenableFuture<DataTable> queryResponse = Futures.catching(dataTable, Throwable.class, input -> {
+              DataTable result = new DataTableImplV2();
+              result.addException(QueryException.INTERNAL_ERROR);
+              return result;
+            });
+            return serializeData(queryResponse);
+          }
 
-      @Override
-      public void start() {
+          @Override
+          public void start() {
 
-      }
+          }
 
-      @Override
-      public String name() {
-        return "test";
-      }
-    }, serverMetrics);
+          @Override
+          public String name() {
+            return "test";
+          }
+        }, serverMetrics);
 
     ByteBuf requestBuf = getSerializedInstanceRequest(getInstanceRequest());
     ListenableFuture<byte[]> responseFuture = handler.processRequest(channelHandlerContext, requestBuf);
@@ -165,44 +143,41 @@ public class ScheduledRequestHandlerTest {
   }
 
   @Test
-  public void testValidQueryResponse()
-      throws InterruptedException, ExecutionException, TimeoutException, IOException {
-    ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics) {
-      @Override
-      public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
-        ListenableFuture<DataTable> response = resourceManager.getQueryRunners().submit(new Callable<DataTable>() {
+  public void testValidQueryResponse() throws InterruptedException, ExecutionException, TimeoutException, IOException {
+    ScheduledRequestHandler handler =
+        new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics) {
+          @Nonnull
           @Override
-          public DataTable call()
-              throws Exception {
-            String[] columns = new String[]{"foo", "bar"};
-            FieldSpec.DataType[] columnTypes =
-                new FieldSpec.DataType[]{FieldSpec.DataType.STRING, FieldSpec.DataType.INT};
-            DataSchema dataSchema = new DataSchema(columns, columnTypes);
-            DataTableBuilder dtBuilder = new DataTableBuilder(dataSchema);
-            dtBuilder.startRow();
-            dtBuilder.setColumn(0, "mars");
-            dtBuilder.setColumn(1, 10);
-            dtBuilder.finishRow();
-            dtBuilder.startRow();
-            dtBuilder.setColumn(0, "jupiter");
-            dtBuilder.setColumn(1, 100);
-            dtBuilder.finishRow();
-            return dtBuilder.build();
+          public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
+            ListenableFuture<DataTable> response = resourceManager.getQueryRunners().submit(() -> {
+              String[] columnNames = new String[]{"foo", "bar"};
+              DataSchema.ColumnDataType[] columnDataTypes =
+                  new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT};
+              DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+              DataTableBuilder dtBuilder = new DataTableBuilder(dataSchema);
+              dtBuilder.startRow();
+              dtBuilder.setColumn(0, "mars");
+              dtBuilder.setColumn(1, 10);
+              dtBuilder.finishRow();
+              dtBuilder.startRow();
+              dtBuilder.setColumn(0, "jupiter");
+              dtBuilder.setColumn(1, 100);
+              dtBuilder.finishRow();
+              return dtBuilder.build();
+            });
+            return serializeData(response);
           }
-        });
-       return serializeData(response);
-      }
 
-      @Override
-      public void start() {
+          @Override
+          public void start() {
 
-      }
+          }
 
-      @Override
-      public String name() {
-        return "test";
-      }
-    }, serverMetrics);
+          @Override
+          public String name() {
+            return "test";
+          }
+        }, serverMetrics);
 
     ByteBuf requestBuf = getSerializedInstanceRequest(getInstanceRequest());
     ListenableFuture<byte[]> responseFuture = handler.processRequest(channelHandlerContext, requestBuf);
@@ -216,16 +191,12 @@ public class ScheduledRequestHandlerTest {
   }
 
   private ListenableFuture<byte[]> serializeData(ListenableFuture<DataTable> dataTable) {
-    return Futures.transform(dataTable, new Function<DataTable, byte[]>() {
-      @Nullable
-      @Override
-      public byte[] apply(@Nullable DataTable input) {
-        try {
-          return input.toBytes();
-        } catch (IOException e) {
-          LOGGER.error("Failed to transform");
-          return new byte[0];
-        }
+    return Futures.transform(dataTable, (Function<DataTable, byte[]>) input -> {
+      try {
+        Preconditions.checkNotNull(input);
+        return input.toBytes();
+      } catch (IOException e) {
+        return new byte[0];
       }
     });
   }

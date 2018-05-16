@@ -151,6 +151,9 @@ public class PinotSegmentRecordReader implements RecordReader {
           case STRING:
             reuse.putField(fieldName, _columnReaderMap.get(fieldName).readString(docId));
             break;
+          case BYTES:
+            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readBytes(docId));
+            break;
           default:
             throw new IllegalStateException(
                 "Field: " + fieldName + " has illegal data type: " + fieldSpec.getDataType());

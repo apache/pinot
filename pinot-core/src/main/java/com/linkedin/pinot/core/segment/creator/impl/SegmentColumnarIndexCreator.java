@@ -175,7 +175,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         // Initialize forward index creator
         _forwardIndexCreatorMap.put(columnName,
             getRawIndexCreatorForColumn(_indexDir, compressionType, columnName, fieldSpec.getDataType(), totalDocs,
-                indexCreationInfo.getLegnthOfLongestEntry()));
+                indexCreationInfo.getLengthOfLongestEntry()));
       }
     }
   }
@@ -204,6 +204,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         throw new RuntimeException(
             "Creation of indices without dictionaries is supported for single valued columns only.");
       }
+      return false;
+    } else if (spec.getDataType().equals(FieldSpec.DataType.BYTES) && !info.isFixedLength()) {
       return false;
     }
     return info.isCreateDictionary();
@@ -325,7 +327,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       String column = entry.getKey();
       ColumnIndexCreationInfo columnIndexCreationInfo = entry.getValue();
       SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(column);
-      int dictionaryElementSize = (dictionaryCreator != null) ? dictionaryCreator.getNumBytesPerString() : 0;
+      int dictionaryElementSize = (dictionaryCreator != null) ? dictionaryCreator.getNumBytesPerEntry() : 0;
 
       // TODO: after fixing the server-side dependency on HAS_INVERTED_INDEX and deployed, set HAS_INVERTED_INDEX properly
       // The hasInvertedIndex flag in segment metadata is picked up in ColumnMetadata, and will be used during the query
@@ -480,6 +482,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         break;
 
       case STRING:
+      case BYTES:
         indexCreator =
             new SingleValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, lengthOfLongestEntry);
         break;

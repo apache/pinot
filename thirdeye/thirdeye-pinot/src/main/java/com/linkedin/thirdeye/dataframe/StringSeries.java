@@ -5,8 +5,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.commons.lang.math.NumberUtils;
@@ -252,6 +254,27 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     Set<String> uniques = new HashSet<>(Arrays.asList(this.values));
     String[] values = new String[uniques.size()];
     return StringSeries.buildFrom(uniques.toArray(values));
+  }
+
+  /**
+   * Returns a compressed series via string de-duplication. After applying this method,
+   * equal strings in the series reference the same string instance.
+   *
+   * @return compressed string series
+   */
+  public StringSeries compress() {
+    Map<String, String> map = new HashMap<>();
+
+    String[] values = new String[this.values.length];
+    for (int i = 0; i < values.length; i++) {
+      String v = this.values[i];
+      if (!map.containsKey(v)) {
+        map.put(v, v);
+      }
+      values[i] = map.get(v);
+    }
+
+    return buildFrom(values);
   }
 
   /**

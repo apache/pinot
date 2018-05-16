@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 
 /**
@@ -65,7 +64,6 @@ public class TaskGeneratorRegistry {
    * @param taskType Task type
    * @return Task generator for the given task type
    */
-  @Nullable
   public PinotTaskGenerator getTaskGenerator(@Nonnull String taskType) {
     return _taskGeneratorRegistry.get(taskType);
   }

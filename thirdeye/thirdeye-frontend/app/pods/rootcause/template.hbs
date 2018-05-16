@@ -77,7 +77,9 @@
         </div>
         <div class="row rootcause-compare">
           {{rootcause-select-comparison-range
-            range=context.anomalyRange
+            granularity=context.granularity
+            anomalyRange=context.anomalyRange
+            displayRange=context.analysisRange
             compareMode=context.compareMode
             onChange=(action "onComparisonChange")
           }}
@@ -152,138 +154,32 @@
       </div>
 
       {{#if context.urns.size}}
-        <div class="card-container__header rootcause-tabs">
-          <div class="card-container__subnav">
-            <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "metrics") "thirdeye-link--active "}}" {{action (mut activeTab)
-              "metrics"}}>
-              Metrics
-            </a>
-          </div>
-          <div class="card-container__subnav">
-            <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "dimensions") "thirdeye-link--active"}}" {{action (mut activeTab) "dimensions"}}>
-              Dimensions
-            </a>
-          </div>
-          <div class="card-container__subnav">
-            <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "events") "thirdeye-link--active"}}" {{action (mut activeTab) "events"}}>
-              Events
-            </a>
-          </div>
-          <div class="card-container__subnav">
-            <a class="thirdeye-link thirdeye-link--nav {{if (eq activeTab "trend") "thirdeye-link--active"}}" {{action (mut activeTab) "trend"}}>
-              Trend
-            </a>
-          </div>
-        </div>
-
-        <div class="card-container__body card-container__body--padding-md">
-          <div class="row">
-            <div class="col-xs-12">
-              {{#if (eq activeTab "dimensions")}}
-                {{#if isLoadingBreakdowns}}
-                  <div class="spinner-wrapper spinner-wrapper--card">
-                    {{ember-spinner}}
-                  </div>
-                {{/if}}
-
-                {{rootcause-heatmap
-                  entities=entities
-                  breakdowns=breakdowns
-                  selectedUrn=metricUrn
-                  isLoadingBreakdowns=isLoadingBreakdowns
-                  onSelection=(action "heatmapOnSelection")
-                }}
-              {{/if}}
-
-              {{#if (eq activeTab "metrics")}}
-                {{#if (set-has loadingFrameworks "metricRelated")}}
-                  <div class="spinner-wrapper spinner-wrapper--card">
-                    {{ember-spinner}}
-                  </div>
-                {{/if}}
-                <div class="pull-right">
-                  <a {{action "onEntityMappingClick"}} class="thirdeye-link thirdeye-link--settings">
-                    + add related metrics
-                  </a>
-                  <span class="te-tooltip-wrapper">
-                    <i class="glyphicon glyphicon-question-sign">
-                      {{#tooltip-on-element class="te-tooltip"}}
-                        Can't find your metric? Click here to add a new metric mapping.
-                      {{/tooltip-on-element}}
-                    </i>
-                  </span>
-                </div>
-                {{rootcause-metrics
-                  entities=entities
-                  aggregates=aggregates
-                  scores=scores
-                  selectedUrns=selectedUrns
-                  isLoading=(or isLoadingAggregates isLoadingScores)
-                  onSelection=(action "onSelection")
-                }}
-              {{/if}}
-
-              {{#if (eq activeTab "events")}}
-                <div class="row">
-                  <div class="col-xs-3">
-                    {{filter-bar
-                      config=filterConfig
-                      entities=eventFilterEntities
-                      loadingFrameworks=loadingFrameworks
-                      onFilter=(action "onFilter")}}
-                  </div>
-                  <div class="pull-right">
-                    <a {{action "onCreateEventClick"}} class="thirdeye-link thirdeye-link--settings">
-                      + add event
-                    </a>
-                    <span class="te-tooltip-wrapper">
-                    <i class="glyphicon glyphicon-question-sign">
-                      {{#tooltip-on-element class="te-tooltip"}}
-                        Can't find your event? Click here to add a new event.
-                      {{/tooltip-on-element}}
-                    </i>
-                  </span>
-                  </div>
-                  <div class="col-xs-9">
-                    {{rootcause-table
-                      entities=eventTableEntities
-                      columns=eventTableColumns
-                      selectedUrns=selectedUrns
-                      onSelection=(action "onSelection")
-                    }}
-                  </div>
-                </div>
-              {{/if}}
-
-              {{#if (eq activeTab "trend")}}
-                {{#if (set-has loadingFrameworks "metricRelated")}}
-                  <div class="spinner-wrapper spinner-wrapper--card">
-                    {{ember-spinner}}
-                  </div>
-                {{/if}}
-                <div class="pull-right">
-                  <a {{action "onEntityMappingClick"}} class="thirdeye-link thirdeye-link--settings">
-                    + add related metrics
-                  </a>
-                  <span class="te-tooltip-wrapper">
-                    <i class="glyphicon glyphicon-question-sign">
-                      {{#tooltip-on-element class="te-tooltip"}}
-                        Can't find your metric? Click here to add a new metric mapping.
-                      {{/tooltip-on-element}}
-                    </i>
-                  </span>
-                </div>
-                {{rootcause-trend
-                  entities=entities
-                  timeseries=timeseries
-                  context=context
-                  selectedUrns=selectedUrns
-                  isLoading=isLoadingTimeseries
-                  onSelection=(action "onSelection")
-                }}
-              {{/if}}
-
-            </div>
+        <div class="card-container__row card-container__row--flex row">
+          <div class="col-xs-12 rootcause-tabs card-container__row--bg-color">
+            {{#shared/common-tabs selection=activeTab activeTab=activeTab as |tabs|}}
+              {{#tabs.tablist as |tablist|}}
+                {{#tablist.tab name="metrics"}}Metrics{{/tablist.tab}}
+                {{#tablist.tab name="dimensions"}}Dimensions{{/tablist.tab}}
+                {{#tablist.tab name="events"}}Events{{/tablist.tab}}
+                {{#tablist.tab name="trend"}}Trend{{/tablist.tab}}
+              {{/tabs.tablist}}
+              {{!-- metrics --}}
+              {{#tabs.tabpanel name="metrics"}}
+                {{partial 'partials/rootcause/metrics'}}
+              {{/tabs.tabpanel}}
+              {{!-- dimensions --}}
+              {{#tabs.tabpanel name="dimensions"}}
+                {{partial 'partials/rootcause/dimensions'}}
+              {{/tabs.tabpanel}}
+              {{!-- events --}}
+              {{#tabs.tabpanel name="events"}}
+                {{partial 'partials/rootcause/events'}}
+              {{/tabs.tabpanel}}
+              {{!-- trend --}}
+              {{#tabs.tabpanel name="trend"}}
+                {{partial 'partials/rootcause/trend'}}
+              {{/tabs.tabpanel}}
+            {{/shared/common-tabs}}
           </div>
         </div>
       {{/if}}

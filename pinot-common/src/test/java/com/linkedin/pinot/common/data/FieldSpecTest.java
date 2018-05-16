@@ -15,16 +15,18 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import org.apache.avro.Schema;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static com.linkedin.pinot.common.data.FieldSpec.DataType.*;
 
 
 /**
@@ -37,16 +39,44 @@ public class FieldSpecTest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   /**
-   * Test all {@link FieldSpec.FieldType} with different {@link DataType}.
+   * Test all {@link FieldSpec.DataType}.
+   */
+  @Test
+  public void testDataType() {
+    Assert.assertEquals(INT.getStoredType(), INT);
+    Assert.assertEquals(LONG.getStoredType(), LONG);
+    Assert.assertEquals(FLOAT.getStoredType(), FLOAT);
+    Assert.assertEquals(DOUBLE.getStoredType(), DOUBLE);
+    Assert.assertEquals(BOOLEAN.getStoredType(), STRING);
+    Assert.assertEquals(STRING.getStoredType(), STRING);
+    Assert.assertEquals(BYTES.getStoredType(), BYTES);
+
+    Assert.assertEquals(INT.size(), Integer.BYTES);
+    Assert.assertEquals(LONG.size(), Long.BYTES);
+    Assert.assertEquals(FLOAT.size(), Float.BYTES);
+    Assert.assertEquals(DOUBLE.size(), Double.BYTES);
+
+    Assert.assertEquals(FieldSpec.DataType.valueOf(Schema.Type.INT), INT);
+    Assert.assertEquals(FieldSpec.DataType.valueOf(Schema.Type.LONG), LONG);
+    Assert.assertEquals(FieldSpec.DataType.valueOf(Schema.Type.FLOAT), FLOAT);
+    Assert.assertEquals(FieldSpec.DataType.valueOf(Schema.Type.DOUBLE), DOUBLE);
+    Assert.assertEquals(FieldSpec.DataType.valueOf(Schema.Type.BOOLEAN), STRING);
+    Assert.assertEquals(FieldSpec.DataType.valueOf(Schema.Type.STRING), STRING);
+    Assert.assertEquals(FieldSpec.DataType.valueOf(Schema.Type.ENUM), STRING);
+    Assert.assertEquals(FieldSpec.DataType.valueOf(Schema.Type.BYTES), BYTES);
+  }
+
+  /**
+   * Test all {@link FieldSpec.FieldType} with different {@link FieldSpec.DataType}.
    */
   @Test
   public void testFieldSpec() {
     // Single-value boolean type dimension field with default null value.
     FieldSpec fieldSpec1 = new DimensionFieldSpec();
     fieldSpec1.setName("svDimension");
-    fieldSpec1.setDataType(DataType.BOOLEAN);
+    fieldSpec1.setDataType(BOOLEAN);
     fieldSpec1.setDefaultNullValue(false);
-    FieldSpec fieldSpec2 = new DimensionFieldSpec("svDimension", DataType.BOOLEAN, true, false);
+    FieldSpec fieldSpec2 = new DimensionFieldSpec("svDimension", BOOLEAN, true, false);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
@@ -55,9 +85,9 @@ public class FieldSpecTest {
     // Multi-value dimension field.
     fieldSpec1 = new DimensionFieldSpec();
     fieldSpec1.setName("mvDimension");
-    fieldSpec1.setDataType(DataType.INT);
+    fieldSpec1.setDataType(INT);
     fieldSpec1.setSingleValueField(false);
-    fieldSpec2 = new DimensionFieldSpec("mvDimension", DataType.INT, false);
+    fieldSpec2 = new DimensionFieldSpec("mvDimension", INT, false);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
@@ -66,31 +96,21 @@ public class FieldSpecTest {
     // Multi-value dimension field with default null value.
     fieldSpec1 = new DimensionFieldSpec();
     fieldSpec1.setName("mvDimension");
-    fieldSpec1.setDataType(DataType.FLOAT);
+    fieldSpec1.setDataType(FLOAT);
     fieldSpec1.setSingleValueField(false);
     fieldSpec1.setDefaultNullValue(-0.1);
-    fieldSpec2 = new DimensionFieldSpec("mvDimension", DataType.FLOAT, false, -0.1);
+    fieldSpec2 = new DimensionFieldSpec("mvDimension", FLOAT, false, -0.1);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
     Assert.assertEquals(fieldSpec1.getDefaultNullValue(), -0.1F);
 
-    // Short type metric field.
-    fieldSpec1 = new MetricFieldSpec();
-    fieldSpec1.setName("metric");
-    fieldSpec1.setDataType(DataType.SHORT);
-    fieldSpec2 = new MetricFieldSpec("metric", DataType.SHORT);
-    Assert.assertEquals(fieldSpec1, fieldSpec2);
-    Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
-    Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
-    Assert.assertEquals(fieldSpec1.getDefaultNullValue(), 0);
-
     // Metric field with default null value.
     fieldSpec1 = new MetricFieldSpec();
     fieldSpec1.setName("metric");
-    fieldSpec1.setDataType(DataType.LONG);
+    fieldSpec1.setDataType(LONG);
     fieldSpec1.setDefaultNullValue(1);
-    fieldSpec2 = new MetricFieldSpec("metric", DataType.LONG, 1);
+    fieldSpec2 = new MetricFieldSpec("metric", LONG, 1);
     Assert.assertEquals(fieldSpec1, fieldSpec2);
     Assert.assertEquals(fieldSpec1.toString(), fieldSpec2.toString());
     Assert.assertEquals(fieldSpec1.hashCode(), fieldSpec2.hashCode());
@@ -103,7 +123,7 @@ public class FieldSpecTest {
   @Test
   public void testDerivedMetricFieldSpec() throws Exception {
     MetricFieldSpec derivedMetricField =
-        new MetricFieldSpec("derivedMetric", DataType.STRING, 10, MetricFieldSpec.DerivedMetricType.HLL);
+        new MetricFieldSpec("derivedMetric", STRING, 10, MetricFieldSpec.DerivedMetricType.HLL);
     Assert.assertEquals(derivedMetricField.getFieldSize(), 10);
     Assert.assertTrue(derivedMetricField.isDerivedMetric());
     Assert.assertEquals(derivedMetricField.getDerivedMetricType(), MetricFieldSpec.DerivedMetricType.HLL);
@@ -121,13 +141,13 @@ public class FieldSpecTest {
   @Test
   public void testTimeFieldSpecConstructor() {
     String incomingName = "incoming";
-    DataType incomingDataType = DataType.LONG;
+    FieldSpec.DataType incomingDataType = LONG;
     TimeUnit incomingTimeUnit = TimeUnit.HOURS;
     int incomingTimeUnitSize = 1;
     TimeGranularitySpec incomingTimeGranularitySpec =
         new TimeGranularitySpec(incomingDataType, incomingTimeUnitSize, incomingTimeUnit, incomingName);
     String outgoingName = "outgoing";
-    DataType outgoingDataType = DataType.INT;
+    FieldSpec.DataType outgoingDataType = INT;
     TimeUnit outgoingTimeUnit = TimeUnit.DAYS;
     int outgoingTimeUnitSize = 1;
     TimeGranularitySpec outgoingTimeGranularitySpec =
@@ -200,16 +220,16 @@ public class FieldSpecTest {
     String format = "1:HOURS:EPOCH";
     String granularity = "1:HOURS";
 
-    DateTimeFieldSpec dateTimeFieldSpec1 = new DateTimeFieldSpec(name, DataType.LONG, format, granularity);
-    DateTimeFieldSpec dateTimeFieldSpec2 = new DateTimeFieldSpec(name, DataType.INT, format, granularity);
+    DateTimeFieldSpec dateTimeFieldSpec1 = new DateTimeFieldSpec(name, LONG, format, granularity);
+    DateTimeFieldSpec dateTimeFieldSpec2 = new DateTimeFieldSpec(name, INT, format, granularity);
     Assert.assertFalse(dateTimeFieldSpec1.equals(dateTimeFieldSpec2));
 
-    DateTimeFieldSpec dateTimeFieldSpec3 = new DateTimeFieldSpec(name, DataType.LONG, format, granularity);
+    DateTimeFieldSpec dateTimeFieldSpec3 = new DateTimeFieldSpec(name, LONG, format, granularity);
     Assert.assertEquals(dateTimeFieldSpec1, dateTimeFieldSpec3);
   }
 
   @Test(dataProvider = "testFormatDataProvider")
-  public void testDateTimeFormat(String name, DataType dataType, String format, String granularity,
+  public void testDateTimeFormat(String name, FieldSpec.DataType dataType, String format, String granularity,
       boolean exceptionExpected, DateTimeFieldSpec dateTimeFieldExpected) {
 
     DateTimeFieldSpec dateTimeFieldActual = null;
@@ -227,7 +247,7 @@ public class FieldSpecTest {
   public Object[][] provideTestFormatData() {
 
     String name = "Date";
-    DataType dataType = DataType.LONG;
+    FieldSpec.DataType dataType = LONG;
     String granularity = "1:HOURS";
 
     List<Object[]> entries = new ArrayList<>();
@@ -256,7 +276,7 @@ public class FieldSpecTest {
     // Metric field with default null value.
     String[] metricFields = {"\"name\":\"metric\"", "\"dataType\":\"INT\"", "\"defaultNullValue\":-1"};
     MetricFieldSpec metricFieldSpec1 = MAPPER.readValue(getRandomOrderJsonString(metricFields), MetricFieldSpec.class);
-    MetricFieldSpec metricFieldSpec2 = new MetricFieldSpec("metric", DataType.INT, -1);
+    MetricFieldSpec metricFieldSpec2 = new MetricFieldSpec("metric", INT, -1);
     Assert.assertEquals(metricFieldSpec1, metricFieldSpec2, ERROR_MESSAGE);
     Assert.assertEquals(metricFieldSpec1.getDefaultNullValue(), -1, ERROR_MESSAGE);
 
@@ -264,7 +284,7 @@ public class FieldSpecTest {
     String[] dimensionFields = {"\"name\":\"dimension\"", "\"dataType\":\"BOOLEAN\"", "\"defaultNullValue\":false"};
     DimensionFieldSpec dimensionFieldSpec1 =
         MAPPER.readValue(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
-    DimensionFieldSpec dimensionFieldSpec2 = new DimensionFieldSpec("dimension", DataType.BOOLEAN, true, false);
+    DimensionFieldSpec dimensionFieldSpec2 = new DimensionFieldSpec("dimension", BOOLEAN, true, false);
     Assert.assertEquals(dimensionFieldSpec1, dimensionFieldSpec2, ERROR_MESSAGE);
     Assert.assertEquals(dimensionFieldSpec1.getDefaultNullValue(), "false", ERROR_MESSAGE);
 
@@ -272,7 +292,7 @@ public class FieldSpecTest {
     dimensionFields =
         new String[]{"\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false", "\"defaultNullValue\":\"default\""};
     dimensionFieldSpec1 = MAPPER.readValue(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
-    dimensionFieldSpec2 = new DimensionFieldSpec("dimension", DataType.STRING, false, "default");
+    dimensionFieldSpec2 = new DimensionFieldSpec("dimension", STRING, false, "default");
     Assert.assertEquals(dimensionFieldSpec1, dimensionFieldSpec2, ERROR_MESSAGE);
     Assert.assertEquals(dimensionFieldSpec1.getDefaultNullValue(), "default", ERROR_MESSAGE);
 
@@ -281,8 +301,7 @@ public class FieldSpecTest {
         {"\"incomingGranularitySpec\":{\"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\",\"name\":\"incomingTime\"}", "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\",\"name\":\"outgoingTime\"}", "\"defaultNullValue\":-1"};
     TimeFieldSpec timeFieldSpec1 = MAPPER.readValue(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
     TimeFieldSpec timeFieldSpec2 =
-        new TimeFieldSpec("incomingTime", DataType.LONG, TimeUnit.MILLISECONDS, "outgoingTime", DataType.INT,
-            TimeUnit.SECONDS, -1);
+        new TimeFieldSpec("incomingTime", LONG, TimeUnit.MILLISECONDS, "outgoingTime", INT, TimeUnit.SECONDS, -1);
     Assert.assertEquals(timeFieldSpec1, timeFieldSpec2, ERROR_MESSAGE);
     Assert.assertEquals(timeFieldSpec1.getDefaultNullValue(), -1, ERROR_MESSAGE);
 
@@ -291,8 +310,7 @@ public class FieldSpecTest {
         {"\"name\":\"Date\"", "\"dataType\":\"LONG\"", "\"format\":\"1:MILLISECONDS:EPOCH\"", "\"granularity\":\"5:MINUTES\"", "\"dateTimeType\":\"PRIMARY\""};
     DateTimeFieldSpec dateTimeFieldSpec1 =
         MAPPER.readValue(getRandomOrderJsonString(dateTimeFields), DateTimeFieldSpec.class);
-    DateTimeFieldSpec dateTimeFieldSpec2 =
-        new DateTimeFieldSpec("Date", DataType.LONG, "1:MILLISECONDS:EPOCH", "5:MINUTES");
+    DateTimeFieldSpec dateTimeFieldSpec2 = new DateTimeFieldSpec("Date", LONG, "1:MILLISECONDS:EPOCH", "5:MINUTES");
     Assert.assertEquals(dateTimeFieldSpec1, dateTimeFieldSpec2, ERROR_MESSAGE);
   }
 
@@ -303,12 +321,6 @@ public class FieldSpecTest {
   public void testSerializeDeserialize() throws Exception {
     FieldSpec first;
     FieldSpec second;
-
-    // Short type Metric field.
-    String[] metricFields = {"\"name\":\"metric\"", "\"dataType\":\"SHORT\""};
-    first = MAPPER.readValue(getRandomOrderJsonString(metricFields), MetricFieldSpec.class);
-    second = MAPPER.readValue(first.toJsonObject().toString(), MetricFieldSpec.class);
-    Assert.assertEquals(first, second, ERROR_MESSAGE);
 
     // Single-value boolean type dimension field with default null value.
     String[] dimensionFields = {"\"name\":\"dimension\"", "\"dataType\":\"BOOLEAN\"", "\"defaultNullValue\":false"};

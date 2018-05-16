@@ -91,14 +91,15 @@ public class FileUploadDownloadClient implements Closeable {
    * Construct the client with default settings.
    */
   public FileUploadDownloadClient() {
-    _httpClient = HttpClients.createDefault();
+    this(null);
   }
 
   /**
-   * Construct the client with {@link SSLContext} to handle HTTPS request properly.
-   * @param sslContext
+   * Construct the client with optional {@link SSLContext} to handle HTTPS request properly.
+   *
+   * @param sslContext SSL context
    */
-  public FileUploadDownloadClient(SSLContext sslContext) {
+  public FileUploadDownloadClient(@Nullable SSLContext sslContext) {
     _httpClient = HttpClients.custom().setSSLContext(sslContext).build();
   }
 

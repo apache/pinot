@@ -131,13 +131,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     final long _waitTimeMillis;
     final long _buildTimeMillis;
     final String _segmentDirPath;
+    final long _segmentSizeBytes;
     SegmentBuildDescriptor(String segmentTarFilePath, long offset, String segmentDirPath, long buildTimeMillis,
-        long waitTimeMillis) {
+        long waitTimeMillis, long segmentSizeBytes) {
       _segmentTarFilePath = segmentTarFilePath;
       _offset = offset;
       _buildTimeMillis = buildTimeMillis;
       _waitTimeMillis = waitTimeMillis;
       _segmentDirPath = segmentDirPath;
+      _segmentSizeBytes = segmentSizeBytes;
     }
 
     public long getOffset() {
@@ -154,6 +156,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     public String getSegmentTarFilePath() {
       return _segmentTarFilePath;
+    }
+
+    public long getSegmentSizeBytes() {
+      return _segmentSizeBytes;
     }
 
     public void deleteSegmentFile() {
@@ -213,6 +219,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private PinotStreamConsumer _consumerWrapper = null;
   private final File _resourceTmpDir;
   private final String _tableName;
+  private final String _timeColumnName;
   private final List<String> _invertedIndexColumns;
   private final List<String> _noDictionaryColumns;
   private final StarTreeIndexSpec _starTreeIndexSpec;
@@ -232,6 +239,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private int _lastConsumedCount = 0;
   private String _stopReason = null;
   private final Semaphore _segBuildSemaphore;
+  private final boolean _isOffHeap;
 
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
@@ -631,7 +639,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // lets convert the segment now
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
-              _segmentZKMetadata.getTableName(), _segmentZKMetadata.getSegmentName(), _sortedColumn,
+              _segmentZKMetadata.getTableName(), _timeColumnName, _segmentZKMetadata.getSegmentName(), _sortedColumn,
               _invertedIndexColumns, _noDictionaryColumns, _starTreeIndexSpec);
       logStatistics();
       segmentLogger.info("Trying to build segment");
@@ -658,6 +666,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         FileUtils.deleteQuietly(tempSegmentFolder);
         return null;
       }
+      final long segmentSizeBytes = FileUtils.sizeOfDirectory(destDir);
       FileUtils.deleteQuietly(tempSegmentFolder);
 
       _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
@@ -668,10 +677,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       if (forCommit) {
         return new SegmentBuildDescriptor(
             destDir.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENTION, _currentOffset,
-            null, buildTimeMillis, waitTimeMillis);
+            null, buildTimeMillis, waitTimeMillis, segmentSizeBytes);
       }
       return new SegmentBuildDescriptor( null, _currentOffset, destDir.getAbsolutePath(),
-          buildTimeMillis, waitTimeMillis);
+          buildTimeMillis, waitTimeMillis, segmentSizeBytes);
     } catch (InterruptedException e) {
       segmentLogger.error("Interrupted while waiting for semaphore");
       return null;
@@ -687,9 +696,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
     params.withSegmentName(_segmentNameStr).withOffset(_currentOffset).withNumRows(_numRowsConsumed)
-        .withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes()).withInstanceId(_instanceId)
+        .withInstanceId(_instanceId)
         .withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
+        .withSegmentSizeBytes(_segmentBuildDescriptor.getSegmentSizeBytes())
         .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
+    if (_isOffHeap) {
+      params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
+    }
     SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(params);
     if (!segmentCommitStartResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
       segmentLogger.warn("CommitStart failed  with response {}", segmentCommitStartResponse.toJsonString());
@@ -708,9 +721,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     params = new SegmentCompletionProtocol.Request.Params();
     params.withInstanceId(_instanceId).withOffset(_currentOffset).withSegmentName(_segmentNameStr)
         .withSegmentLocation(segmentCommitUploadResponse.getSegmentLocation())
-        .withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes()).withNumRows(_numRowsConsumed)
+        .withNumRows(_numRowsConsumed)
         .withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
+        .withSegmentSizeBytes(_segmentBuildDescriptor.getSegmentSizeBytes())
         .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
+    if (_isOffHeap) {
+      params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
+    }
     SegmentCompletionProtocol.Response commitEndResponse =  _protocolHandler.segmentCommitEnd(params);
     if (!commitEndResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS))  {
       segmentLogger.warn("CommitEnd failed  with response {}", commitEndResponse.toJsonString());
@@ -747,9 +764,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     final File segmentTarFile = new File(_segmentBuildDescriptor.getSegmentTarFilePath());
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withInstanceId(_instanceId).withOffset(_currentOffset).withSegmentName(_segmentNameStr)
-        .withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes()).withNumRows(_numRowsConsumed)
+        .withNumRows(_numRowsConsumed)
         .withInstanceId(_instanceId).withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
+        .withSegmentSizeBytes(_segmentBuildDescriptor.getSegmentSizeBytes())
         .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
+    if (_isOffHeap) {
+      params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
+    }
     SegmentCompletionProtocol.Response response = _protocolHandler.segmentCommit(params, segmentTarFile);
     if (!response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
       segmentLogger.warn("Commit failed  with response {}", response.toJsonString());
@@ -795,8 +816,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Retry maybe once if leader is not found.
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withOffset(_currentOffset).withSegmentName(_segmentNameStr).withReason(_stopReason)
-      .withNumRows(_numRowsConsumed).withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes())
+      .withNumRows(_numRowsConsumed)
       .withInstanceId(_instanceId);
+    if (_isOffHeap) {
+      params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
+    }
     return _protocolHandler.segmentConsumed(params);
   }
 
@@ -973,6 +997,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentName = new LLCSegmentName(_segmentNameStr);
     _kafkaPartitionId = _segmentName.getPartitionId();
     _tableName = _tableConfig.getTableName();
+    _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     _metricKeyName = _tableName + "-" + _kafkaTopic + "-" + _kafkaPartitionId;
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() +
         "_" + _segmentNameStr);
@@ -1018,12 +1043,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // Read the max number of rows
     int segmentMaxRowCount = kafkaStreamProviderConfig.getSizeThresholdToFlushSegment();
-
     if (0 < segmentZKMetadata.getSizeThresholdToFlushSegment()) {
       segmentMaxRowCount = segmentZKMetadata.getSizeThresholdToFlushSegment();
     }
-
     _segmentMaxRowCount = segmentMaxRowCount;
+
+    _isOffHeap = indexLoadingConfig.isRealtimeOffheapAllocation();
 
     // Start new realtime segment
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
@@ -1035,7 +1060,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
             .setInvertedIndexColumns(invertedIndexColumns)
             .setRealtimeSegmentZKMetadata(segmentZKMetadata)
-            .setOffHeap(indexLoadingConfig.isRealtimeOffheapAllocation())
+            .setOffHeap(_isOffHeap)
             .setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.getAggregateMetrics());
@@ -1068,9 +1093,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _resourceTmpDir.mkdirs();
     }
     _state = State.INITIAL_CONSUMING;
+
     long now = now();
     _consumeStartTime = now;
     _consumeEndTime = now + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
+
     LOGGER.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
         _segmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC).toString());
     start();

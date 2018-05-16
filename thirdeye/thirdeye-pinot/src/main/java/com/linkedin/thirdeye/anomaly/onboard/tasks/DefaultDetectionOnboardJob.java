@@ -1,10 +1,9 @@
 package com.linkedin.thirdeye.anomaly.onboard.tasks;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
-import com.linkedin.thirdeye.anomaly.onboard.BaseDetectionOnboardJob;
-import com.linkedin.thirdeye.anomaly.onboard.DetectionOnBoardJobRunner;
-import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardTask;
+import com.linkedin.thirdeye.anomaly.onboard.framework.BaseDetectionOnboardJob;
+import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnBoardJobRunner;
+import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardTask;
 import com.linkedin.thirdeye.anomaly.onboard.utils.PropertyCheckUtils;
 import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
@@ -97,8 +96,9 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   @Override
   public Configuration getTaskConfiguration() {
     PropertyCheckUtils.checkNotNull(this.properties,
-        Arrays.asList(FUNCTION_FACTORY_CONFIG_PATH, ALERT_FILTER_AUTOTUNE_FACTORY_CONFIG_PATH,
+        Arrays.asList(FUNCTION_FACTORY_CONFIG_PATH,
             ALERT_FILTER_AUTOTUNE_FACTORY_CONFIG_PATH,
+            ALERT_FILTER_FACTORY_CONFIG_PATH,
             FUNCTION_NAME,
             COLLECTION_NAME,
             METRIC_NAME,

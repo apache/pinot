@@ -62,9 +62,10 @@ public class DaoTestUtils {
     functionSpec.setWindowDelayUnit(TimeUnit.HOURS);
     functionSpec.setWindowSize(1);
     functionSpec.setWindowUnit(TimeUnit.DAYS);
-    functionSpec.setProperties("baseline=w/w;changeThreshold=0.001");
+    functionSpec.setProperties("baseline=w/w;changeThreshold=0.001;min=100;max=900");
     functionSpec.setIsActive(true);
     functionSpec.setRequiresCompletenessCheck(false);
+    functionSpec.setSecondaryAnomalyFunctionsType(Arrays.asList("MIN_MAX_THRESHOLD"));
     return functionSpec;
   }
 

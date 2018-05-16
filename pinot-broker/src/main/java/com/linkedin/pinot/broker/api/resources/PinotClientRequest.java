@@ -25,7 +25,6 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import javax.inject.Inject;
-import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -37,6 +36,9 @@ import javax.ws.rs.core.Response;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.linkedin.pinot.common.utils.CommonConstants.Broker.Request.*;
+
 
 @Api(tags = "Query")
 @Path("/")
@@ -58,13 +60,23 @@ public class PinotClientRequest {
       @ApiResponse(code = 500, message = "Internal Server Error")
   })
   public String processQueryGet(
-      @ApiParam(value = "Name of the table", required = false) @QueryParam("bql") String query,
-      @ApiParam(value = "Trace enabled", required = false) @QueryParam("trace") @DefaultValue("false") String traceEnabled
+      // Query param "bql" is for backward compatibility
+      @ApiParam(value = "Query", required = true) @QueryParam("bql") String query,
+      @ApiParam(value = "Trace enabled") @QueryParam(TRACE) String traceEnabled,
+      @ApiParam(value = "Debug options") @QueryParam(DEBUG_OPTIONS) String debugOptions,
+      @ApiParam(value = "Query options") @QueryParam(QUERY_OPTIONS) String queryOptions
   ) {
     try {
-      JSONObject requestJson = new JSONObject().put("pql", query);
+      JSONObject requestJson = new JSONObject();
+      requestJson.put(PQL, query);
       if (traceEnabled != null) {
-        requestJson.put("trace", traceEnabled);
+        requestJson.put(TRACE, traceEnabled);
+      }
+      if (debugOptions != null) {
+        requestJson.put(DEBUG_OPTIONS, debugOptions);
+      }
+      if (queryOptions != null) {
+        requestJson.put(QUERY_OPTIONS, queryOptions);
       }
       BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, null);
       return brokerResponse.toJsonString();

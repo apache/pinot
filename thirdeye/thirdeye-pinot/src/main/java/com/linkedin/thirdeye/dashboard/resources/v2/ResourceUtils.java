@@ -1,21 +1,24 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.google.common.collect.SetMultimap;
+import com.google.common.collect.TreeMultimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.text.StrSubstitutor;
@@ -31,7 +34,6 @@ public class ResourceUtils {
     // left blank
   }
 
-
   /**
    * Return a list of parameters.
    * Support both multi-entity notations:
@@ -44,11 +46,73 @@ public class ResourceUtils {
 
   public static List<String> parseListParams(List<String> params) {
     if (params == null){
-      return new ArrayList<>();
+      return Collections.emptyList();
     }
     if(params.size() != 1)
       return params;
     return Arrays.asList(params.get(0).split(","));
+  }
+
+  /**
+   * Returns a filter multimap for a given anomaly, joining anomaly dimensions and function filters
+   *
+   * @param anomaly anomaly dto
+   * @param datasetDAO dataset config dao
+   * @return filter multimap
+   */
+  public static SetMultimap<String, String> getAnomalyFilters(MergedAnomalyResultDTO anomaly, DatasetConfigManager datasetDAO) {
+    SetMultimap<String, String> filters = TreeMultimap.create();
+
+    DatasetConfigDTO dataset = datasetDAO.findByDataset(anomaly.getCollection());
+    if (dataset == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for anomaly id %d", anomaly.getCollection(), anomaly.getId()));
+    }
+
+    AnomalyFunctionDTO function = anomaly.getFunction();
+    if (function == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve anomaly function %d for anomaly id %d", anomaly.getFunctionId(), anomaly.getId()));
+    }
+
+    // anomaly function filters
+    // NOTE: this should not need to be here. filters should be stored in the anomaly unconditionally
+    if (function.getFilters() != null) {
+      for (String filterString : function.getFilters().split(";")) {
+        try {
+          String[] filter = filterString.split("=", 2);
+          String dimName = filter[0];
+          String dimValue = filter[1];
+
+          if (!dataset.getDimensionsHaveNoPreAggregation().contains(dimName) &&
+              Objects.equals(dimValue, dataset.getPreAggregatedKeyword())) {
+            // NOTE: workaround for anomaly detection inserting pre-aggregated keyword as dimension
+            continue;
+          }
+
+          if (anomaly.getDimensions().containsKey(dimName)) {
+            // avoid duplication of explored dimensions
+            continue;
+          }
+
+          filters.put(dimName, dimValue);
+
+        } catch(Exception ignore) {
+          // left blank
+        }
+      }
+    }
+
+    // anomaly dimensions
+    for (Map.Entry<String, String> entry : anomaly.getDimensions().entrySet()) {
+      if (!dataset.getDimensionsHaveNoPreAggregation().contains(entry.getKey()) &&
+          Objects.equals(entry.getValue(), dataset.getPreAggregatedKeyword())) {
+        // NOTE: workaround for anomaly detection inserting pre-aggregated keyword as dimension
+        continue;
+      }
+
+      filters.put(entry.getKey(), entry.getValue());
+    }
+
+    return filters;
   }
 
   /**

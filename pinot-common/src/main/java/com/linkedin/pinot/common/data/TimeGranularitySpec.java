@@ -17,6 +17,7 @@ package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
 import com.google.gson.JsonObject;
+import com.linkedin.pinot.common.config.ConfigKey;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.concurrent.TimeUnit;
@@ -48,10 +49,19 @@ public class TimeGranularitySpec {
   private static final String DEFAULT_TIME_FORMAT = TimeFormat.EPOCH.toString();
   private static final String COLON_SEPARATOR = ":";
 
+  @ConfigKey("name")
   private String _name;
+
+  @ConfigKey("dataType")
   private DataType _dataType;
+
+  @ConfigKey("timeType")
   private TimeUnit _timeType;
+
+  @ConfigKey("timeUnitSize")
   private int _timeUnitSize = DEFAULT_TIME_UNIT_SIZE;
+
+  @ConfigKey("timeFormat")
   private String _timeFormat = DEFAULT_TIME_FORMAT;
 
   /*

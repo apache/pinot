@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoade
 import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.TimeSeriesLoader;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.LongSeries;
+import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -20,10 +21,10 @@ import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -38,7 +39,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTimeZone;
-import org.joda.time.Period;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
@@ -63,6 +63,7 @@ public class RootCauseMetricResource {
   private static final String COL_VALUE = TimeSeriesLoader.COL_VALUE;
   private static final String COL_DIMENSION_NAME = AggregationLoader.COL_DIMENSION_NAME;
   private static final String COL_DIMENSION_VALUE = AggregationLoader.COL_DIMENSION_VALUE;
+  public static final String TOP_K_POSTFIX = "_topk";
 
   private static final long TIMEOUT = 60000;
 
@@ -352,15 +353,19 @@ public class RootCauseMetricResource {
    * @return map of maps of value (keyed by dimension name, keyed by dimension value)
    */
   private static Map<String, Map<String, Double>> makeBreakdownMap(DataFrame data) {
-    Map<String, Map<String, Double>> output = new HashMap<>();
+    Map<String, Map<String, Double>> output = new TreeMap<>();
 
     data = data.dropNull();
 
+    StringSeries dimNames = data.getStrings(COL_DIMENSION_NAME);
     for (int i = 0; i < data.size(); i++) {
       final String dimName = data.getString(COL_DIMENSION_NAME, i);
       final String dimValue = data.getString(COL_DIMENSION_VALUE, i);
       final double value = data.getDouble(COL_VALUE, i);
-
+      // remove group by dimensions which also have topk
+      if (dimNames.contains(dimName + TOP_K_POSTFIX)) {
+        continue;
+      }
       if (!output.containsKey(dimName)) {
         output.put(dimName, new HashMap<String, Double>());
       }

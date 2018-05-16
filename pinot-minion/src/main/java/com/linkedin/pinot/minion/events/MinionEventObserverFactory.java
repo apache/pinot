@@ -15,34 +15,15 @@
  */
 package com.linkedin.pinot.minion.events;
 
-import org.apache.commons.configuration.Configuration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+/**
+ * Factory for {@link MinionEventObserver}.
+ */
+public interface MinionEventObserverFactory {
 
-
-public abstract class MinionEventObserverFactory {
-  public static final Logger LOGGER = LoggerFactory.getLogger(MinionEventObserverFactory.class);
-  public static final String METADATA_EVENT_CLASS_CONFIG = "factory.class";
-
-  public abstract void init(Configuration configuration);
-
-  public abstract MinionEventObserver create();
-
-  public static MinionEventObserverFactory loadFactory(Configuration configuration) {
-    MinionEventObserverFactory metadataEventNotifierFactory;
-    String metadataEventNotifierClassName = configuration.getString(METADATA_EVENT_CLASS_CONFIG);
-    if (metadataEventNotifierClassName == null) {
-      LOGGER.info("Metadata event notifier class name is null, setting to {}", DefaultMinionEventObserver.class);
-      metadataEventNotifierClassName = DefaultMinionEventObserverFactory.class.getName();
-    }
-    try {
-      LOGGER.info("Instantiating metadata event notifier factory class {}", metadataEventNotifierClassName);
-      metadataEventNotifierFactory =
-          (MinionEventObserverFactory) Class.forName(metadataEventNotifierClassName).newInstance();
-      metadataEventNotifierFactory.init(configuration);
-      return metadataEventNotifierFactory;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
+  /**
+   * Creates an new instance of {@link MinionEventObserver}.
+   *
+   * @return Minion event observer
+   */
+  MinionEventObserver create();
 }

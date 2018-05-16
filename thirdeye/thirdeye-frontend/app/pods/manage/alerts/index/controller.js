@@ -3,13 +3,13 @@
  * @module manage/alerts/controller
  * @exports alerts controller
  */
-import { computed, set } from '@ember/object';
-
-import Controller from '@ember/controller';
-import fetch from 'fetch';
 import _ from 'lodash';
+import fetch from 'fetch';
+import { computed, set } from '@ember/object';
+import Controller from '@ember/controller';
 import { task, timeout } from 'ember-concurrency';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
 
 export default Controller.extend({
   queryParams: ['selectedSearchMode', 'alertId', 'testMode'],
@@ -181,9 +181,7 @@ export default Controller.extend({
    */
   searchByFunctionName: task(function* (alert) {
     yield timeout(600);
-
-    const url = `/data/autocomplete/functionByName?name=${alert}`;
-    return fetch(url)
+    return fetch(selfServeApiCommon.alertFunctionByName(alert))
       .then(res => res.json());
   }),
 
@@ -194,12 +192,11 @@ export default Controller.extend({
   searchByApplicationName: task(function* (appName) {
     this.set('isLoading', true);
     yield timeout(600);
-    const url = `/data/autocomplete/functionByAppname?appname=${appName}`;
 
     this.set('selectedApplicationName', appName);
     this.set('currentPage', 1);
 
-    return fetch(url)
+    return fetch(selfServeApiCommon.alertFunctionByAppName(appName))
       .then(res => res.json())
       .then((alerts) => {
         this.set('isLoading', false);
@@ -218,8 +215,7 @@ export default Controller.extend({
     this.set('selectedsubscriberGroupNames', groupName);
     this.set('currentPage', 1);
 
-    const url = `/data/autocomplete/functionByAlertName?alertName=${groupName}`;
-    return fetch(url)
+    return fetch(selfServeApiCommon.alertFunctionByName(groupName))
       .then(res => res.json())
       .then((filters) => {
         this.set('isLoading', false);
@@ -234,14 +230,6 @@ export default Controller.extend({
       this.set('selectedAlerts', [alert]);
       this.set('primaryMetric', alert);
       this.set('resultsActive', true);
-    },
-
-    // Handle transition to alert page while refreshing the duration cache.
-    navigateToAlertPage(alertId) {
-      if (sessionStorage.getItem('duration') !== null) {
-        sessionStorage.removeItem('duration');
-      }
-      this.transitionToRoute('manage.alert', alertId);
     },
 
     // Handles filtering of alerts in response to filter selection
@@ -276,7 +264,7 @@ export default Controller.extend({
         method: 'delete',
         headers: { 'content-type': 'text/plain' }
       };
-      const url = '/dashboard/anomaly-function?id=' + functionId;
+      const url = selfServeApiCommon.deleteAlert(functionId);
       fetch(url, postProps).then(checkStatus).then(() => {
         this.send('refreshModel');
       });

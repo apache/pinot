@@ -269,7 +269,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       }
     } catch (Exception e) {
       _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.ROUTING_TABLE_REBUILD_FAILURES, 1L);
-      LOGGER.error("Failed to compute/update the routing table", e);
+      LOGGER.error("Failed to compute/update the routing table for {}", tableNameWithType, e);
 
       // Mark the routing table as needing a rebuild
       _lastKnownExternalViewVersionMap.put(tableNameWithType, INVALID_EXTERNAL_VIEW_VERSION);
@@ -312,7 +312,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
         LOGGER.info("No need to update time boundary for table {}", tableNameWithType);
       }
     } catch (Exception e) {
-      LOGGER.error("Failed to update the TimeBoundaryService", e);
+      LOGGER.error("Failed to update the TimeBoundaryService for {}", tableNameWithType, e);
     }
 
     long updateTime = System.currentTimeMillis() - startTimeMillis;

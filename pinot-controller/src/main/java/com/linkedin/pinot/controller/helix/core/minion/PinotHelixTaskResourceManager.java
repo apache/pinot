@@ -28,14 +28,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
-import org.apache.helix.AccessOption;
-import org.apache.helix.HelixManager;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobQueue;
 import org.apache.helix.task.TaskConfig;
-import org.apache.helix.task.TaskConstants;
 import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
@@ -56,11 +51,9 @@ public class PinotHelixTaskResourceManager {
   private static final String TASK_PREFIX = "Task" + TASK_NAME_SEPARATOR;
 
   private final TaskDriver _taskDriver;
-  private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
-  public PinotHelixTaskResourceManager(@Nonnull HelixManager helixManager) {
-    _taskDriver = new TaskDriver(helixManager);
-    _propertyStore = helixManager.getHelixPropertyStore();
+  public PinotHelixTaskResourceManager(@Nonnull TaskDriver taskDriver) {
+    _taskDriver = taskDriver;
   }
 
   /**
@@ -92,6 +85,7 @@ public class PinotHelixTaskResourceManager {
       LOGGER.info("Creating task queue: {} for task type: {}", helixJobQueueName, taskType);
 
       // Set full parallelism
+      // Don't allow overlap job assignment so that we can control number of concurrent tasks per instance
       JobQueue jobQueue = new JobQueue.Builder(helixJobQueueName).setWorkflowConfig(
           new WorkflowConfig.Builder().setParallelJobs(Integer.MAX_VALUE).build()).build();
       _taskDriver.createQueue(jobQueue);
@@ -109,25 +103,9 @@ public class PinotHelixTaskResourceManager {
    * @param taskType Task type
    */
   public synchronized void cleanUpTaskQueue(@Nonnull String taskType) {
-    // NOTE: There is a Helix bug that causes task contexts not removed properly. Need to explicitly remove them
-    // TODO: After Helix bug gets fixed, remove the extra logic
-
     String helixJobQueueName = getHelixJobQueueName(taskType);
-    Set<String> helixJobsBeforeCleaningUp = _taskDriver.getWorkflowConfig(helixJobQueueName).getJobDag().getAllNodes();
-    if (helixJobsBeforeCleaningUp.isEmpty()) {
-      return;
-    }
-
     LOGGER.info("Cleaning up task queue: {} for task type: {}", helixJobQueueName, taskType);
-    _taskDriver.cleanupJobQueue(helixJobQueueName);
-
-    // Explicitly remove the task contexts
-    Set<String> helixJobsAfterCleaningUp = _taskDriver.getWorkflowConfig(helixJobQueueName).getJobDag().getAllNodes();
-    for (String helixJobName : helixJobsBeforeCleaningUp) {
-      if (!helixJobsAfterCleaningUp.contains(helixJobName)) {
-        _propertyStore.remove(TaskConstants.REBALANCER_CONTEXT_ROOT + "/" + helixJobName, AccessOption.PERSISTENT);
-      }
-    }
+    _taskDriver.cleanupQueue(helixJobQueueName);
   }
 
   /**
@@ -186,11 +164,13 @@ public class PinotHelixTaskResourceManager {
    * Submit a list of child tasks with same task type to the Minion instances with the default tag.
    *
    * @param pinotTaskConfigs List of child task configs to be submitted
+   * @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
    * @return Name of the submitted parent task
    */
   @Nonnull
-  public synchronized String submitTask(@Nonnull List<PinotTaskConfig> pinotTaskConfigs) {
-    return submitTask(pinotTaskConfigs, CommonConstants.Minion.UNTAGGED_INSTANCE);
+  public synchronized String submitTask(@Nonnull List<PinotTaskConfig> pinotTaskConfigs,
+      int numConcurrentTasksPerInstance) {
+    return submitTask(pinotTaskConfigs, CommonConstants.Minion.UNTAGGED_INSTANCE, numConcurrentTasksPerInstance);
   }
 
   /**
@@ -198,16 +178,18 @@ public class PinotHelixTaskResourceManager {
    *
    * @param pinotTaskConfigs List of child task configs to be submitted
    * @param minionInstanceTag Tag of the Minion instances to submit the task to
+   * @param numConcurrentTasksPerInstance Maximum number of concurrent tasks allowed per instance
    * @return Name of the submitted parent task
    */
   @Nonnull
   public synchronized String submitTask(@Nonnull List<PinotTaskConfig> pinotTaskConfigs,
-      @Nonnull String minionInstanceTag) {
+      @Nonnull String minionInstanceTag, int numConcurrentTasksPerInstance) {
     int numChildTasks = pinotTaskConfigs.size();
     Preconditions.checkState(numChildTasks > 0);
+    Preconditions.checkState(numConcurrentTasksPerInstance > 0);
 
     String taskType = pinotTaskConfigs.get(0).getTaskType();
-    String parentTaskName = TASK_PREFIX + taskType + TASK_NAME_SEPARATOR + System.nanoTime();
+    String parentTaskName = TASK_PREFIX + taskType + TASK_NAME_SEPARATOR + System.currentTimeMillis();
     LOGGER.info(
         "Submitting parent task: {} of type: {} with {} child task configs: {} to Minion instances with tag: {}",
         parentTaskName, taskType, numChildTasks, pinotTaskConfigs, minionInstanceTag);
@@ -217,9 +199,16 @@ public class PinotHelixTaskResourceManager {
       Preconditions.checkState(pinotTaskConfig.getTaskType().equals(taskType));
       helixTaskConfigs.add(pinotTaskConfig.toHelixTaskConfig(parentTaskName + TASK_NAME_SEPARATOR + i));
     }
-    JobConfig.Builder jobBuilder = new JobConfig.Builder().setInstanceGroupTag(minionInstanceTag)
-        .addTaskConfigs(helixTaskConfigs)
-        .setNumConcurrentTasksPerInstance(Integer.MAX_VALUE);
+
+    // Run each task only once no matter whether it succeeds or not, and never fail the job
+    // The reason for this is that: we put multiple independent tasks into one job to get them run in parallel, so we
+    // don't want one task failure affects other tasks. Also, if one task failed, next time we will re-schedule it
+    JobConfig.Builder jobBuilder = new JobConfig.Builder().addTaskConfigs(helixTaskConfigs)
+        .setInstanceGroupTag(minionInstanceTag)
+        .setNumConcurrentTasksPerInstance(numConcurrentTasksPerInstance)
+        .setIgnoreDependentJobFailure(true)
+        .setMaxAttemptsPerTask(1)
+        .setFailureThreshold(Integer.MAX_VALUE);
     _taskDriver.enqueueJob(getHelixJobQueueName(taskType), parentTaskName, jobBuilder);
 
     // Wait until task state is available

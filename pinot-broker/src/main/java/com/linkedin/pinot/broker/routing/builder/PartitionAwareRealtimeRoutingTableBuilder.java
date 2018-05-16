@@ -48,7 +48,7 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
   @Override
   public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     super.init(configuration, tableConfig, propertyStore);
-    _numReplicas = Integer.valueOf(_tableConfig.getValidationConfig().getReplicasPerPartition());
+    _numReplicas = Integer.valueOf(tableConfig.getValidationConfig().getReplicasPerPartition());
   }
 
   @Override

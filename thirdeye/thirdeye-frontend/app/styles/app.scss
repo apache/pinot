@@ -50,6 +50,7 @@ body {
 @import 'components/rootcause-legend';
 @import 'components/rootcause-metric';
 @import 'components/rootcause-placeholder';
+@import 'components/rootcause-select-comparison-range';
 @import 'components/rootcause-chart';
 @import 'components/rootcause-trend';
 @import 'components/alert-report-modal';
@@ -59,6 +60,7 @@ body {
 @import 'components/te-anomaly-table';
 @import 'components/te-toggle';
 @import 'components/range-pill-selectors';
+@import 'components/shared/common-tabs';
 
 // Pod Pages
 @import 'ember-power-select/themes/bootstrap';

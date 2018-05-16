@@ -20,8 +20,10 @@ import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.Configuration;
+
 
 /*
  * The following links are useful to understand some of the SSL terminology (key store, trust store, algorithms,
@@ -50,15 +52,19 @@ import org.apache.commons.configuration.Configuration;
  * server is presenting an X509 certificate.
  */
 public class HttpsSegmentFetcher extends HttpSegmentFetcher {
+
   @Override
   protected void initHttpClient(Configuration configs) {
-    SSLContext sslContext = new ClientSSLContextGenerator(configs.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
+    SSLContext sslContext =
+        new ClientSSLContextGenerator(configs.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
     _httpClient = new FileUploadDownloadClient(sslContext);
   }
 
   @Override
   public Set<String> getProtectedConfigKeys() {
-    return ClientSSLContextGenerator.getProtectedConfigKeys();
+    return ClientSSLContextGenerator.getProtectedConfigKeys()
+        .stream()
+        .map(s -> CommonConstants.PREFIX_OF_SSL_SUBSET + "." + s)
+        .collect(Collectors.toSet());
   }
-
 }

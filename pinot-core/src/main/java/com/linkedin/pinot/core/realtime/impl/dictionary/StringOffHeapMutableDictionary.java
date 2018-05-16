@@ -78,28 +78,7 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
       boolean includeUpper) {
     String valueToCompare = getInternal(dictIdToCompare);
-
-    if (includeLower) {
-      if (valueToCompare.compareTo(lower) < 0) {
-        return false;
-      }
-    } else {
-      if (valueToCompare.compareTo(lower) <= 0) {
-        return false;
-      }
-    }
-
-    if (includeUpper) {
-      if (valueToCompare.compareTo(upper) > 0) {
-        return false;
-      }
-    } else {
-      if (valueToCompare.compareTo(upper) >= 0) {
-        return false;
-      }
-    }
-
-    return true;
+    return valueInRange(lower, upper, includeLower, includeUpper, valueToCompare);
   }
 
   @Override

@@ -28,6 +28,8 @@ import org.json.JSONObject;
 public class TableTaskConfig {
   private static final String TASK_TYPE_CONFIGS_MAP_KEY = "taskTypeConfigsMap";
 
+  @ConfigKey("taskConfig")
+  @UseChildKeyHandler(TaskConfigMapChildKeyHandler.class)
   private Map<String, Map<String, String>> _taskTypeConfigsMap;
 
   public void setTaskTypeConfigsMap(Map<String, Map<String, String>> taskTypeConfigsMap) {

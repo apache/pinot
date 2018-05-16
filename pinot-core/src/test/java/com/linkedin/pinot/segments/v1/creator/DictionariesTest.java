@@ -403,7 +403,7 @@ public class DictionariesTest {
     try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(new String[]{""}, fieldSpec,
         indexDir)) {
       dictionaryCreator.build();
-      Assert.assertEquals(dictionaryCreator.getNumBytesPerString(), 0);
+      Assert.assertEquals(dictionaryCreator.getNumBytesPerEntry(), 0);
       Assert.assertEquals(dictionaryCreator.indexOfSV(""), 0);
     }
 

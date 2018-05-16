@@ -18,7 +18,6 @@ package com.linkedin.pinot.common.config;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -34,7 +33,13 @@ public class SegmentPartitionConfig {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   public static final int INVALID_NUM_PARTITIONS = -1;
 
+  @ConfigKey("columnPartitionMap")
+  @UseChildKeyHandler(ColumnPartitionMapChildKeyHandler.class)
   private final Map<String, ColumnPartitionConfig> _columnPartitionMap;
+
+  public SegmentPartitionConfig() {
+    _columnPartitionMap = null;
+  }
 
   public SegmentPartitionConfig(
       @Nonnull @JsonProperty("columnPartitionMap") Map<String, ColumnPartitionConfig> columnPartitionMap) {
@@ -135,5 +140,10 @@ public class SegmentPartitionConfig {
   public int hashCode() {
     int result = EqualityUtils.hashCodeOf(_columnPartitionMap);
     return result;
+  }
+
+  @Override
+  public String toString() {
+    return "SegmentPartitionConfig{" + "_columnPartitionMap=" + _columnPartitionMap + '}';
   }
 }

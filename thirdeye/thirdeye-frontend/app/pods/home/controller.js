@@ -1,43 +1,56 @@
 import Controller from '@ember/controller';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
-import { computed, get, set } from '@ember/object';
+import { computed, set } from '@ember/object';
 import moment from 'moment';
-import { setUpTimeRangeOptions, setDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { setUpTimeRangeOptions } from 'thirdeye-frontend/utils/manage-alert-utils';
 
-const PILL_CLASS = '.range-pill-selectors';
-const START_DATE = 1513151999999; // arbitrary start date in milliseconds
-const END_DATE = 1520873345292; // arbitrary end date in milliseconds
 const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly to display time
-const ACTIVE_SELECTION = '1d'; // setting this date range selection as default
+const DEFAULT_ACTIVE_DURATION = '1d'; // setting this date range selection as default (Last 24 Hours)
 const UI_DATE_FORMAT = 'MMM D, YYYY hh:mm a'; // format for date picker to use (usually varies by route or metric)
 const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently across app to display custom date range
-const TODAY = moment().startOf('day').add(1, 'days');
-const TWO_WEEKS_AGO = moment().subtract(13, 'days').startOf('day');
-const PRESET_RANGES = {
-  'Today': [moment(), TODAY],
-  'Last 2 weeks': [TWO_WEEKS_AGO, TODAY]
-};
-const TIME_RANGE_OPTIONS = ['1d', '2d', '1w'];
+const TIME_RANGE_OPTIONS = ['today', '1d', '1w'];
 
 export default Controller.extend({
-  queryParams: ['appName', 'startDate', 'endDate'],
+  queryParams: ['appName', 'startDate', 'endDate', 'duration'],
   appName: null,
   startDate: null,
   endDate: null,
-
+  duration: null,
   /**
    * Overrides ember-models-table's css classes
    */
   classes: {
-    table: 'table-bordered table-condensed te-anomaly-table--no-margin'
+    table: 'table table-striped table-bordered table-condensed'
   },
 
-  uiDateFormat: UI_DATE_FORMAT,
-  activeRangeEnd: moment(END_DATE).format(DISPLAY_DATE_FORMAT),
-  activeRangeStart: moment(START_DATE).format(DISPLAY_DATE_FORMAT),
-  timeRangeOptions: setUpTimeRangeOptions(TIME_RANGE_OPTIONS, ACTIVE_SELECTION),
-  timePickerIncrement: TIME_PICKER_INCREMENT,
-  predefinedRanges: PRESET_RANGES,
+  /**
+   * Date types to display in the pills
+   * @type {Object[]} - array of objects, each of which represents each date pill
+   */
+  pill: computed(
+    'model.{appName,startDate,endDate,duration}',
+    function() {
+      const appName = this.get('model.appName');
+      const startDate = Number(this.get('model.startDate'));
+      const endDate = Number(this.get('model.endDate'));
+      const duration = this.get('model.duration') || DEFAULT_ACTIVE_DURATION;
+      const predefinedRanges = {
+        'Today': [moment().startOf('day'), moment()],
+        'Last  24 hours': [moment().subtract(1, 'day'), moment()],
+        'Last Week': [moment().subtract(1, 'week'), moment()]
+      };
+
+      return {
+        appName,
+        uiDateFormat: UI_DATE_FORMAT,
+        activeRangeStart: moment(startDate).format(DISPLAY_DATE_FORMAT),
+        activeRangeEnd: moment(endDate).format(DISPLAY_DATE_FORMAT),
+        timeRangeOptions: setUpTimeRangeOptions(TIME_RANGE_OPTIONS, duration),
+        timePickerIncrement: TIME_PICKER_INCREMENT,
+        predefinedRanges
+      };
+    }
+  ),
 
   /**
    * Stats to display in cards
@@ -46,7 +59,11 @@ export default Controller.extend({
   stats: computed(
     'model.anomalyPerformance',
     function() {
-      const { totalAlerts, responseRate, precision, recall } = get(this, 'model.anomalyPerformance');
+      if (!this.get('model.anomalyPerformance')) {
+        return {};
+      }
+
+      const { totalAlerts, responseRate, precision, recall } = this.get('model.anomalyPerformance').getProperties('totalAlerts', 'responseRate', 'precision', 'recall');
       const totalAlertsDescription = 'Total number of anomalies that occured over a period of time';
       const responseRateDescription = '% of anomalies that are reviewed';
       const precisionDescription = '% of all anomalies detected by the system that are true';
@@ -69,7 +86,7 @@ export default Controller.extend({
      * @return {undefined}
      */
     selectApplication(selectedApplication) {
-      set(this, 'appName', selectedApplication.application);
+      set(this, 'appName', selectedApplication.get('application'));
     },
 
     /**
@@ -77,18 +94,19 @@ export default Controller.extend({
      * @method onRangeSelection
      * @param {Object} rangeOption - the user-selected time range to load
      */
-    onRangeSelection(rangeOption) {
+    onRangeSelection(timeRangeOptions) {
       const {
         start,
         end,
         value: duration
-      } = rangeOption;
+      } = timeRangeOptions;
+
       const startDate = moment(start).valueOf();
       const endDate = moment(end).valueOf();
       const appName = this.get('appName');
       //Update the time range option selected
       this.set('timeRangeOptions', setUpTimeRangeOptions(TIME_RANGE_OPTIONS, duration));
       this.transitionToRoute({ queryParams: { appName, duration, startDate, endDate }});
-    },
+    }
   }
 });

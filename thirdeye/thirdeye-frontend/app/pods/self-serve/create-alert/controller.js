@@ -245,7 +245,7 @@ export default Controller.extend({
    * @return {Promise}
    */
   fetchAlertsByName(functionName) {
-    const url = selfServeApiCommon.alertAutoComplete(functionName);
+    const url = selfServeApiCommon.alertFunctionByName(functionName);
     return fetch(url).then(checkStatus);
   },
 
@@ -541,7 +541,7 @@ export default Controller.extend({
       const groupsWithAppName = activeGroups.filter(group => isPresent(group.application));
 
       if (isPresent(appName)) {
-        return groupsWithAppName.filter(group => group.application.toLowerCase().includes(appName));
+        return groupsWithAppName.filter(group => group.application.toLowerCase().includes(appName.toLowerCase()));
       } else {
         return activeGroups;
       }
@@ -715,7 +715,7 @@ export default Controller.extend({
 
       // Add speedup prop for minutely metrics
       if (selectedGranularity.toLowerCase().includes('minute')) {
-        Object.assign(newAlertObj, { speedup: true });
+        Object.assign(newAlertObj, { speedup: 'true' });
       }
 
       return {

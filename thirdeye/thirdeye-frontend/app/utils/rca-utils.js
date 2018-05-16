@@ -54,7 +54,7 @@ export function makeSortable(f) {
  * Returns true for collection-like objects with an iterator function, but treats strings as atomic item. Also null-safe.
  */
 export function isIterable(obj) {
-  if (obj === null || _.isString(obj)) {
+  if (typeof obj === 'undefined' || obj === null || _.isString(obj)) {
     return false;
   }
   return typeof obj[Symbol.iterator] === 'function';

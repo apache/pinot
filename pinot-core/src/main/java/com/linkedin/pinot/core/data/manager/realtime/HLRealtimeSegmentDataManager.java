@@ -63,6 +63,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String tableName;
   private final String segmentName;
   private final Schema schema;
+  private final String timeColumnName;
   private final PlainFieldExtractor extractor;
   private final RealtimeSegmentZKMetadata segmentMetatdaZk;
 
@@ -105,6 +106,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     this.serverMetrics =serverMetrics;
     this.segmentName = realtimeSegmentZKMetadata.getSegmentName();
     this.tableName = tableConfig.getTableName();
+    this.timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     if (sortedColumns.isEmpty()) {
@@ -279,7 +281,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           // lets convert the segment now
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
-                  realtimeSegmentZKMetadata.getTableName(), realtimeSegmentZKMetadata.getSegmentName(), sortedColumn,
+                  realtimeSegmentZKMetadata.getTableName(), timeColumnName, realtimeSegmentZKMetadata.getSegmentName(), sortedColumn,
                   HLRealtimeSegmentDataManager.this.invertedIndexColumns,
                   noDictionaryColumns, null/*StarTreeIndexSpec*/); // Star tree not supported for HLC.
 

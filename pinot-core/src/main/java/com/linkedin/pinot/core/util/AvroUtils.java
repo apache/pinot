@@ -160,6 +160,9 @@ public class AvroUtils {
           case STRING:
             fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().stringType().noDefault();
             break;
+          case BYTES:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().bytesType().noDefault();
+            break;
           default:
             throw new RuntimeException("Unsupported data type: " + dataType);
         }

@@ -25,7 +25,7 @@
               <div>&num;{{anomalyId}}</div>
             </div>
             <div id="investigate-button-{{anomalyIndex}}">
-              <a href="/thirdeye#investigate?anomalyId={{anomalyId}}" type="button" class="btn thirdeye-btn pull-right">Investigate</a>
+              <a href="/app/#/rootcause?anomalyId={{anomalyId}}" type="button" class="btn thirdeye-btn pull-right">Investigate</a>
             </div>
           </div>
 

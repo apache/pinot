@@ -41,26 +41,6 @@ public class StringDictionary extends ImmutableDictionaryReader {
   }
 
   @Override
-  public int getIntValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public long getLongValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public float getFloatValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public double getDoubleValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public String getStringValue(int dictId) {
     return getUnpaddedString(dictId, getBuffer());
   }

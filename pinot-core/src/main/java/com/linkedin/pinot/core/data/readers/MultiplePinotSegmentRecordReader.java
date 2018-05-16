@@ -121,12 +121,12 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next() throws IOException {
+  public GenericRow next() {
     return next(new GenericRow());
   }
 
   @Override
-  public GenericRow next(GenericRow reuse) throws IOException {
+  public GenericRow next(GenericRow reuse) {
     if (isSortedSegment()) {
       GenericRowWithReader genericRowComparable = _priorityQueue.poll();
       GenericRow currentRow = genericRowComparable.getRow();
@@ -160,7 +160,7 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public void rewind() throws IOException {
+  public void rewind() {
     for (PinotSegmentRecordReader recordReader : _pinotSegmentRecordReaders) {
       recordReader.rewind();
     }
@@ -183,7 +183,7 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     for (PinotSegmentRecordReader recordReader : _pinotSegmentRecordReaders) {
       recordReader.close();
     }

@@ -26,6 +26,8 @@ import com.linkedin.pinot.common.utils.time.TimeConverter;
 import com.linkedin.pinot.common.utils.time.TimeConverterProvider;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.function.FunctionExpressionEvaluator;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -51,6 +53,7 @@ public class PlainFieldExtractor implements FieldExtractor {
     SINGLE_VALUE_TYPE_MAP.put(Float.class, PinotDataType.FLOAT);
     SINGLE_VALUE_TYPE_MAP.put(Double.class, PinotDataType.DOUBLE);
     SINGLE_VALUE_TYPE_MAP.put(String.class, PinotDataType.STRING);
+    SINGLE_VALUE_TYPE_MAP.put(byte[].class, PinotDataType.BYTES);
 
     MULTI_VALUE_TYPE_MAP.put(Byte.class, PinotDataType.BYTE_ARRAY);
     MULTI_VALUE_TYPE_MAP.put(Character.class, PinotDataType.CHARACTER_ARRAY);
@@ -207,6 +210,15 @@ public class PlainFieldExtractor implements FieldExtractor {
             hasError = true;
             _errorCount.put(column, _errorCount.get(column) + 1);
           }
+        } else if (value instanceof ByteBuffer) { // TODO: Need better handle for ByteBuffers.
+          // ByteBuffer implementations are package private and cannot be put into TYPE_MAP.
+          ByteBuffer byteBuffer = (ByteBuffer) value;
+
+          // Assumes byte-buffer is ready to read. Also, avoid getting underlying array, as it may be over-sized.
+          byte[] bytes = new byte[byteBuffer.limit()];
+          byteBuffer.get(bytes);
+          value = bytes;
+          source = PinotDataType.BYTES;
         } else {
           // Single-value.
           source = SINGLE_VALUE_TYPE_MAP.get(value.getClass());
@@ -234,6 +246,12 @@ public class PlainFieldExtractor implements FieldExtractor {
             LOGGER.error("Input value: {} for column: {} contains null character", value, column);
             value = StringUtil.removeNullCharacters(value.toString());
           }
+        }
+
+        // Wrap primitive byte[] into Bytes, this is required as the value read has to be Comparable,
+        // as well as have equals() and hashCode() methods so it can be a key in a Map/Set.
+        if (dest == PinotDataType.BYTES) {
+          value = new ByteArray((byte[]) value);
         }
       }
 

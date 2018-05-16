@@ -136,7 +136,7 @@ public class BenchmarkOfflineIndexReader {
         segmentMetadata.getColumnMetadataFor(DOUBLE_COLUMN_NAME).getCardinality());
     ColumnMetadata stringColumnMetadata = segmentMetadata.getColumnMetadataFor(STRING_COLUMN_NAME);
     _stringDictionary = new StringDictionary(segmentReader.getIndexFor(STRING_COLUMN_NAME, ColumnIndexType.DICTIONARY),
-        stringColumnMetadata.getCardinality(), stringColumnMetadata.getStringColumnMaxLength(), (byte) 0);
+        stringColumnMetadata.getCardinality(), stringColumnMetadata.getColumnMaxLength(), (byte) 0);
   }
 
   @Benchmark

@@ -83,6 +83,7 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_SCHEMAS_PREFIX, schemaName);
   }
 
+  @Deprecated
   public static String constructPropertyStorePathForKafkaPartitions(String realtimeTableName) {
     return StringUtil.join("/", PROPERTYSTORE_KAFKA_PARTITIONS_PREFIX, realtimeTableName);
   }
@@ -323,6 +324,7 @@ public class ZKMetadataProvider {
     return resultList;
   }
 
+  @Nonnull
   public static List<LLCRealtimeSegmentZKMetadata> getLLCRealtimeSegmentZKMetadataListForTable(
       ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
     List<LLCRealtimeSegmentZKMetadata> resultList = new ArrayList<>();

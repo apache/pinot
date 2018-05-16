@@ -145,7 +145,7 @@ public class SelectionOperatorService {
           Serializable v2 = o2[i];
 
           // Only compare single-value columns.
-          switch (_dataSchema.getColumnType(i)) {
+          switch (_dataSchema.getColumnDataType(i)) {
             case INT:
               if (!selectionSort.isIsAsc()) {
                 ret = ((Integer) v1).compareTo((Integer) v2);
@@ -363,7 +363,7 @@ public class SelectionOperatorService {
     for (int i = 0; i < numColumns; i++) {
       int columnIndex = columnIndices[i];
       formattedRow[i] =
-          SelectionOperatorUtils.getFormattedValue(row[columnIndex], _dataSchema.getColumnType(columnIndex));
+          SelectionOperatorUtils.getFormattedValue(row[columnIndex], _dataSchema.getColumnDataType(columnIndex));
     }
     return formattedRow;
   }

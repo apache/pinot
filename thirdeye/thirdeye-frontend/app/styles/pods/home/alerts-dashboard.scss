@@ -2,8 +2,8 @@
   &__body {
     background-color: #FFF;
     margin-bottom: $te-default-element-spacing;
-    padding: 0 15px;
-    border: app-shade(black, 0.1);
+    padding: 0 15px 15px 15px;
+    border: 1px solid app-shade(black, 0.1);
   }
 
   &__title {
@@ -31,5 +31,20 @@
     border-top: none;
     padding-top: 10px;
     padding-bottom: 10px;
+  }
+
+  //dashboard table styles
+  .anomalies-table {
+    &__column {
+        &--small-width {
+          width: 60px;
+        }
+        &--med-width {
+          width: 120px;
+        }
+        &--large-width {
+          width: 250px;;
+        }
+    }
   }
 }

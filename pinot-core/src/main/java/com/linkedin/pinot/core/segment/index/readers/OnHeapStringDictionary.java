@@ -77,7 +77,7 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
       Integer id = _unPaddedStringToIdMap.get(rawValue);
       return (id != null) ? id : Arrays.binarySearch(_unpaddedStrings, rawValue);
     } else {
-      String paddedValue = addPadding((String) rawValue);
+      String paddedValue = padString((String) rawValue);
       return Arrays.binarySearch(_paddedStrings, paddedValue);
     }
   }

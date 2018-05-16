@@ -26,8 +26,13 @@ import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ReplicaGroupStrategyConfig {
 
+  @ConfigKey(value = "partitionColumn")
   private String _partitionColumn;
+
+  @ConfigKey(value = "numInstancesPerPartition")
   private int _numInstancesPerPartition;
+
+  @ConfigKey(value = "mirrorAssignmentAcrossReplicaGroups")
   private boolean _mirrorAssignmentAcrossReplicaGroups;
 
   /**

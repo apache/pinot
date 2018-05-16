@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly.events;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
@@ -230,7 +231,17 @@ public class HolidayEventsLoader implements Runnable {
     long start = System.currentTimeMillis();
     long end = start + holidayLoadRange;
 
-    List<Event> newHolidays = getAllHolidays(start, end);
+    loadHolidays(start, end);
+  }
+
+  public void loadHolidays(long start, long end) {
+    List<Event> newHolidays = null;
+    try {
+      newHolidays = getAllHolidays(start, end);
+    } catch (Exception e) {
+      LOG.error("Fetch holidays failed. Aborting.", e);
+      return;
+    }
     Map<HolidayEvent, Set<String>> newHolidayEventToCountryCodes = aggregateCountryCodesGroupByHolidays(newHolidays);
 
     Map<String, List<EventDTO>> holidayNameToHolidayEvent = getHolidayNameToEventDtoMap(newHolidayEventToCountryCodes);
@@ -339,13 +350,13 @@ public class HolidayEventsLoader implements Runnable {
    * @param start Lower bound (inclusive) for an holiday's end time to filter by.
    * @param end Upper bound (exclusive) for an holiday's start time to filter by.
    */
-  private List<Event> getAllHolidays(long start, long end) {
+  private List<Event> getAllHolidays(long start, long end) throws Exception {
     List<Event> events = new ArrayList<>();
     for (String calendar : calendarList) {
       try {
         events.addAll(this.getCalendarEvents(calendar, start, end));
-      } catch (Exception e) {
-        LOG.error("{} Fetch holiday events failed.", calendar);
+      } catch (GoogleJsonResponseException e) {
+        LOG.warn("Fetch holiday events failed in calendar {}.", calendar, e);
       }
     }
     return events;

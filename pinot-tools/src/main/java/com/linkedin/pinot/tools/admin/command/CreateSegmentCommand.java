@@ -67,6 +67,9 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-segmentName", metaVar = "<string>", usage = "Name of the segment.")
   private String _segmentName;
 
+  @Option(name = "-timeColumnName", metaVar = "<string>", usage = "Primary time column.")
+  private String _timeColumnName;
+
   @Option(name = "-schemaFile", metaVar = "<string>", usage = "File containing schema for data.")
   private String _schemaFile;
 
@@ -130,6 +133,11 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     return this;
   }
 
+  public CreateSegmentCommand setTimeColumnName(String timeColumnName) {
+    _timeColumnName = timeColumnName;
+    return this;
+  }
+
   public CreateSegmentCommand setSchemaFile(String schemaFile) {
     _schemaFile = schemaFile;
     return this;
@@ -171,10 +179,10 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   public String toString() {
     return ("CreateSegment  -generatorConfigFile " + _generatorConfigFile + " -dataDir " + _dataDir + " -format "
         + _format + " -outDir " + _outDir + " -overwrite " + _overwrite + " -tableName " + _tableName + " -segmentName "
-        + _segmentName + " -schemaFile " + _schemaFile + " -readerConfigFile " + _readerConfigFile
-        + " -enableStarTreeIndex " + _enableStarTreeIndex + " -starTreeIndexSpecFile " + _starTreeIndexSpecFile
-        + " -hllSize " + _hllSize + " -hllColumns " + _hllColumns + " -hllSuffix " + _hllSuffix + " -numThreads "
-        + _numThreads);
+        + _segmentName + " -timeColumnName " + _timeColumnName + " -schemaFile " + _schemaFile
+        + " -readerConfigFile " + _readerConfigFile + " -enableStarTreeIndex " + _enableStarTreeIndex
+        + " -starTreeIndexSpecFile " + _starTreeIndexSpecFile + " -hllSize " + _hllSize + " -hllColumns "
+        + _hllColumns + " -hllSuffix " + _hllSuffix + " -numThreads " + _numThreads);
   }
 
   @Override
@@ -309,6 +317,9 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     segmentGeneratorConfig.setOverwrite(_overwrite);
     segmentGeneratorConfig.setTableName(_tableName);
     segmentGeneratorConfig.setSegmentName(_segmentName);
+    if (_timeColumnName != null) {
+      segmentGeneratorConfig.setTimeColumnName(_timeColumnName);
+    }
     if (_schemaFile != null) {
       if (segmentGeneratorConfig.getSchemaFile() != null && !segmentGeneratorConfig.getSchemaFile()
           .equals(_schemaFile)) {

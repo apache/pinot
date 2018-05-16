@@ -10,17 +10,20 @@ import { selectChoose, clickTrigger } from 'thirdeye-frontend/tests/helpers/embe
 module('Acceptance | create alert', function(hooks) {
   setupApplicationTest(hooks);
 
-  const selectedConfigGroup = 'test_alert_1';
-  const selectedMetric = 'test_collection_1::test_metric_1';
+  const id = '1';
+  const selectedConfigGroup = `test_alert_${id}`;
+  const selectedMetric = `test_collection_${id}::test_metric_${id}`;
   const groupRecipient = 'simba@disney.com';
   const newRecipient = 'duane@therock.com';
   const selectedApp = 'the-lion-king';
+  const alertNameGeneric = `test_function_${id}`;
   const alertName = 'theLionKing_testMetric1_upDown_5Minutes';
 
   // Flatten filter object in order to easily compare it to the list of options rendered
   const filterArray = Object.values(filters).map(filterGroup => [...Object.values(filterGroup)]);
 
   test(`visiting alert creation page to test onboarding flow for self-serve`, async (assert) => {
+    server.createList('alert', 2);
     await visit(`/self-serve/create-alert`);
     const $granularityDropdown = $(selfServeConst.GRANULARITY_SELECT);
     const $graphContainer = $(selfServeConst.GRAPH_CONTAINER);
@@ -161,7 +164,7 @@ module('Acceptance | create alert', function(hooks) {
 
     assert.equal(
       $(selfServeConst.ALERT_TITLE).get(0).firstElementChild.innerText.trim(),
-      alertName,
+      alertNameGeneric,
       'Alert details header title is correct'
     );
 

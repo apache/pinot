@@ -494,7 +494,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
 
     return CacheBuilder.newBuilder()
         .removalListener(listener)
-        .expireAfterWrite(ThirdEyeCacheRegistry.CACHE_EXPIRATION_HOURS, TimeUnit.HOURS)
+        .expireAfterWrite(15, TimeUnit.MINUTES)
         .maximumWeight(maxBucketNumber)
         .weigher(new Weigher<PinotQuery, ThirdEyeResultSetGroup>() {
           @Override public int weigh(PinotQuery pinotQuery, ThirdEyeResultSetGroup resultSetGroup) {

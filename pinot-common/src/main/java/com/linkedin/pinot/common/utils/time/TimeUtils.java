@@ -20,6 +20,10 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Duration;
+import org.joda.time.Period;
+import org.joda.time.format.PeriodFormatter;
+import org.joda.time.format.PeriodFormatterBuilder;
 
 
 public class TimeUtils {
@@ -87,5 +91,51 @@ public class TimeUtils {
    */
   public static long getValidMaxTimeMillis() {
     return VALID_MAX_TIME_MILLIS;
+  }
+
+  private static final PeriodFormatter PERIOD_FORMATTER = new PeriodFormatterBuilder()
+      .appendDays().appendSuffix("d")
+      .appendHours().appendSuffix("h")
+      .appendMinutes().appendSuffix("m")
+      .appendSeconds().appendSuffix("s")
+      .toFormatter();
+
+  /**
+   * Converts a string representing a period/duration to corresponding milliseconds.
+   * For ex, input "1d" would return 86400000L. Supported units are days (d), hours (h),
+   * minutes (m) and seconds (s).
+   *
+   * @param timeStr string representing the duration
+   * @return the corresponding time coverted to milliseconds
+   * @throws IllegalArgumentException if the string does not conform to the expected format
+   */
+  public static Long convertPeriodToMillis(String timeStr) {
+    Long millis = 0L;
+    if (timeStr != null) {
+      try {
+        Period p = PERIOD_FORMATTER.parsePeriod(timeStr);
+        millis = p.toStandardDuration().getStandardSeconds() * 1000L;
+      } catch (IllegalArgumentException e) {
+        // rethrowing with more contextual information
+        throw new IllegalArgumentException("Invalid time spec '" + timeStr + "' (Valid examples: '3h', '4h30m')", e);
+      }
+    }
+    return millis;
+  }
+
+  /**
+   * Converts milliseconds into human readable duration string. For ex, input of 86400000L would
+   * return "1d".
+   *
+   * @param millis the value in milliseconds to be converted
+   * @return the corresponding human readable string or empty string if value cannot be converted
+   */
+  public static  String convertMillisToPeriod(Long millis) {
+    String periodStr = null;
+    if (millis != null) {
+      Period p = new Period(new Duration(millis));
+      periodStr = PERIOD_FORMATTER.print(p);
+    }
+    return periodStr;
   }
 }

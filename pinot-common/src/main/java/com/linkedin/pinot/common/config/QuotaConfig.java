@@ -34,6 +34,8 @@ public class QuotaConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuotaConfig.class);
   private static final String STORAGE_FIELD_NAME = "storage";
 
+  @ConfigKey("storage")
+  @ConfigDoc(value = "Storage allocated for this table", exampleValue = "10 GiB")
   private String _storage;
 
   @Nullable
