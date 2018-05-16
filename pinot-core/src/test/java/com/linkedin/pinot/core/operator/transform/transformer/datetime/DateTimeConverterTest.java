@@ -125,17 +125,17 @@ public class DateTimeConverterTest {
       // Test conversion from millis since epoch to simple date format (Pacific timezone)
       long[] input =
           {1505898000000L /* 20170920T02:00:00 */, 1505952000000L /* 20170920T17:00:00 */, 1505962800000L /* 20170920T20:00:00 */};
-      String[] expected = {"2017092000", "2017092000", "2017092000"};
+      String[] expected = {"2017092002", "2017092017", "2017092020"};
       entries.add(
-          new Object[]{"1:MILLISECONDS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/Los_Angeles)", "1:DAYS", input, expected});
+          new Object[]{"1:MILLISECONDS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/Los_Angeles)", "1:HOURS", input, expected});
     }
     {
       // Test conversion from millis since epoch to simple date format (East Coast timezone)
       long[] input =
           {1505898000000L /* 20170920T02:00:00 */, 1505941200000L /* 20170920T14:00:00 */, 1505970000000L /* 20170920T22:00:00 */};
-      String[] expected = {"2017092000", "2017092000", "2017092100"};
+      String[] expected = {"2017092005", "2017092017", "2017092101"};
       entries.add(
-          new Object[]{"1:MILLISECONDS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/New_York)", "1:DAYS", input, expected});
+          new Object[]{"1:MILLISECONDS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/New_York)", "1:HOURS", input, expected});
     }
 
     // additional granularity tests
