@@ -17,6 +17,7 @@ package com.linkedin.pinot.controller.helix.core;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.util.concurrent.Uninterruptibles;
@@ -78,7 +79,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import joptsimple.internal.Strings;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
@@ -2146,7 +2146,7 @@ public class PinotHelixResourceManager {
    * server instances. With BiMap, both mappings are easily available
    */
   public @Nonnull
-  BiMap<String, String> getDataInstanceAdminEndpoints(@Nonnull Set<String> instances) {
+  BiMap<String, String> getDataInstanceAdminEndpoints(@Nonnull Set<String> instances) throws InvalidConfigException {
     Preconditions.checkNotNull(instances);
     BiMap<String, String> endpointToInstance = HashBiMap.create(instances.size());
     for (String instance : instances) {
@@ -2155,10 +2155,12 @@ public class PinotHelixResourceManager {
       String[] hostnameSplit = helixInstanceConfig.getHostName().split("_");
       Preconditions.checkState(hostnameSplit.length >= 2);
       String adminPort = record.getSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY);
+      // If admin port is missing, there's no point to calculate the remaining table size.
+      // Thus, throwing an exception will be good here.
       if (Strings.isNullOrEmpty(adminPort)) {
-        LOGGER.warn("Admin port is missing for host: {}. Using the default port: {}",
-            hostnameSplit[1], CommonConstants.Server.DEFAULT_ADMIN_API_PORT);
-        adminPort = Integer.toString(CommonConstants.Server.DEFAULT_ADMIN_API_PORT);
+        String message = String.format("Admin port is missing for host: %s", helixInstanceConfig.getHostName());
+        LOGGER.error(message);
+        throw new InvalidConfigException(message);
       }
       endpointToInstance.put(instance, hostnameSplit[1] + ":" + adminPort);
     }

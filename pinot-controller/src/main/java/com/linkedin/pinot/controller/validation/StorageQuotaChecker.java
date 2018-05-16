@@ -19,6 +19,7 @@ package com.linkedin.pinot.controller.validation;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.QuotaConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.metrics.ControllerGauge;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.controller.util.TableSizeReader;
@@ -66,7 +67,7 @@ public class StorageQuotaChecker {
    */
   public QuotaCheckerResponse isSegmentStorageWithinQuota(@Nonnull File segmentFile, @Nonnull String tableNameWithType,
       @Nonnull String segmentName,
-      @Nonnegative int timeoutMsec) {
+      @Nonnegative int timeoutMsec) throws InvalidConfigException {
     Preconditions.checkNotNull(segmentFile);
     Preconditions.checkNotNull(tableNameWithType);
     Preconditions.checkNotNull(segmentName);
@@ -100,8 +101,13 @@ public class StorageQuotaChecker {
     long incomingSegmentSizeBytes = FileUtils.sizeOfDirectory(segmentFile);
 
     // read table size
-    TableSizeReader.TableSubTypeSizeDetails tableSubtypeSize =
-        _tableSizeReader.getTableSubtypeSize(tableNameWithType, timeoutMsec);
+    TableSizeReader.TableSubTypeSizeDetails tableSubtypeSize = null;
+    try {
+      tableSubtypeSize = _tableSizeReader.getTableSubtypeSize(tableNameWithType, timeoutMsec);
+    } catch (InvalidConfigException e) {
+      LOGGER.error("Failed to get table size for table {}", tableNameWithType, e);
+      throw e;
+    }
 
     // If the segment exists(refresh), get the existing size
     TableSizeReader.SegmentSizeDetails sizeDetails = tableSubtypeSize.segments.get(segmentName);
