@@ -34,7 +34,7 @@ import com.linkedin.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
-import com.linkedin.pinot.common.partition.PartitionAssignmentGenerator;
+import com.linkedin.pinot.common.partition.StreamPartitionAssignmentGenerator;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
@@ -130,7 +130,7 @@ public class PinotLLCRealtimeSegmentManager {
   private final ControllerMetrics _controllerMetrics;
   private final Lock[] _idealstateUpdateLocks;
   private final TableConfigCache _tableConfigCache;
-  private final PartitionAssignmentGenerator _partitionAssignmentGenerator;
+  private final StreamPartitionAssignmentGenerator _streamPartitionAssignmentGenerator;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
 
   public boolean getIsSplitCommitEnabled() {
@@ -178,7 +178,7 @@ public class PinotLLCRealtimeSegmentManager {
       _idealstateUpdateLocks[i] = new ReentrantLock();
     }
     _tableConfigCache = new TableConfigCache(_propertyStore);
-    _partitionAssignmentGenerator = new PartitionAssignmentGenerator(_helixManager);
+    _streamPartitionAssignmentGenerator = new StreamPartitionAssignmentGenerator(_helixManager);
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
   }
 
@@ -420,11 +420,11 @@ public class PinotLLCRealtimeSegmentManager {
     IdealState idealState = getTableIdealState(realtimeTableName);
     Preconditions.checkState(idealState.getInstanceStateMap(committingSegmentNameStr)
         .containsValue(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE));
-    int numPartitions = _partitionAssignmentGenerator.getNumPartitionsFromIdealState(idealState);
+    int numPartitions = _streamPartitionAssignmentGenerator.getNumPartitionsFromIdealState(idealState);
 
     PartitionAssignment partitionAssignment;
     try {
-      partitionAssignment = _partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions);
+      partitionAssignment = _streamPartitionAssignmentGenerator.generateStreamPartitionAssignment(tableConfig, numPartitions);
     } catch (InvalidConfigException e) {
       LOGGER.error("Exception when generating partition assignment for table {} and numPartitions {}",
           realtimeTableName, numPartitions, e);
@@ -931,7 +931,7 @@ public class PinotLLCRealtimeSegmentManager {
     final long now = getCurrentTimeMs();
 
     PartitionAssignment partitionAssignment =
-        _partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, partitionCount);
+        _streamPartitionAssignmentGenerator.generateStreamPartitionAssignment(tableConfig, partitionCount);
 
     Set<Integer> newPartitions = new HashSet<>(partitionCount);
     for (int partition = 0; partition < partitionCount; partition++) {
@@ -1038,14 +1038,14 @@ public class PinotLLCRealtimeSegmentManager {
     PartitionAssignment partitionAssignment;
     boolean skipNewPartitions = false;
     try {
-      partitionAssignment = _partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, partitionCount);
+      partitionAssignment = _streamPartitionAssignmentGenerator.generateStreamPartitionAssignment(tableConfig, partitionCount);
     } catch (InvalidConfigException e) {
       _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.PARTITION_ASSIGNMENT_GENERATION_ERROR,
           1L);
       LOGGER.warn(
           "Could not generate partition assignment. Fetching partition assignment from ideal state for repair of table {}",
           tableNameWithType);
-      partitionAssignment = _partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
+      partitionAssignment = _streamPartitionAssignmentGenerator.getStreamPartitionAssignmentFromIdealState(tableConfig, idealState);
       skipNewPartitions = true;
     }
 

@@ -23,7 +23,7 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.partition.IdealStateBuilderUtil;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
-import com.linkedin.pinot.common.partition.PartitionAssignmentGenerator;
+import com.linkedin.pinot.common.partition.StreamPartitionAssignmentGenerator;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -155,9 +155,9 @@ public class DefaultRebalanceStrategyTest {
   @Test
   public void testGetRebalancedPartitionAssignment() throws InvalidConfigException {
     HelixManager mockHelixManager = mock(HelixManager.class);
-    TestPartitionAssignmentGenerator partitionAssignmentGenerator = new TestPartitionAssignmentGenerator(mockHelixManager);
+    TestStreamPartitionAssignmentGenerator partitionAssignmentGenerator = new TestStreamPartitionAssignmentGenerator(mockHelixManager);
     TestRebalanceSegmentsStrategy rebalanceSegmentsStrategy = new TestRebalanceSegmentsStrategy(mockHelixManager);
-    rebalanceSegmentsStrategy.setPartitionAssignmentGenerator(partitionAssignmentGenerator);
+    rebalanceSegmentsStrategy.setStreamPartitionAssignmentGenerator(partitionAssignmentGenerator);
 
     int nReplicas = 2;
     int nPartitions = 8;
@@ -593,7 +593,7 @@ public class DefaultRebalanceStrategyTest {
    */
   private class TestRebalanceSegmentsStrategy extends DefaultRebalanceSegmentStrategy {
     HelixManager _helixManager;
-    PartitionAssignmentGenerator _partitionAssignmentGenerator;
+    StreamPartitionAssignmentGenerator _streamPartitionAssignmentGenerator;
 
     public TestRebalanceSegmentsStrategy(HelixManager helixManager) {
       super(helixManager);
@@ -601,22 +601,22 @@ public class DefaultRebalanceStrategyTest {
     }
 
     @Override
-    protected PartitionAssignmentGenerator getPartitionAssignmentGenerator() {
-      return _partitionAssignmentGenerator;
+    protected StreamPartitionAssignmentGenerator getStreamPartitionAssignmentGenerator() {
+      return _streamPartitionAssignmentGenerator;
     }
 
-    void setPartitionAssignmentGenerator(PartitionAssignmentGenerator partitionAssignmentGenerator) {
-      _partitionAssignmentGenerator = partitionAssignmentGenerator;
+    void setStreamPartitionAssignmentGenerator(StreamPartitionAssignmentGenerator streamPartitionAssignmentGenerator) {
+      _streamPartitionAssignmentGenerator = streamPartitionAssignmentGenerator;
     }
   }
 
   /**
    * Test class for partition assignment generator
    */
-  private class TestPartitionAssignmentGenerator extends PartitionAssignmentGenerator {
+  private class TestStreamPartitionAssignmentGenerator extends StreamPartitionAssignmentGenerator {
     private List<String> _consumingTaggedInstances = new ArrayList<>();
 
-    public TestPartitionAssignmentGenerator(HelixManager helixManager) {
+    public TestStreamPartitionAssignmentGenerator(HelixManager helixManager) {
       super(helixManager);
     }
 
