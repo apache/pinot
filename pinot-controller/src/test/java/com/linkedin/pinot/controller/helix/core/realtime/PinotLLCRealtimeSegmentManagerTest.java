@@ -30,7 +30,7 @@ import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.partition.IdealStateBuilderUtil;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
-import com.linkedin.pinot.common.partition.PartitionAssignmentGenerator;
+import com.linkedin.pinot.common.partition.StreamPartitionAssignmentGenerator;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
@@ -298,7 +298,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // 2 partitions advanced a seq number
     PartitionAssignment partitionAssignment =
-        segmentManager._partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
+        segmentManager._partitionAssignmentGenerator.getStreamPartitionAssignmentFromIdealState(tableConfig, idealState);
     for (int p = 0; p < 2; p++) {
       String segmentName = idealStateBuilder.getSegment(p, 0);
       advanceASeqForPartition(idealState, segmentManager, partitionAssignment, segmentName, p, 1, 100, tableConfig);
@@ -475,7 +475,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     nPartitions = 4;
     segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
     PartitionAssignment expectedPartitionAssignment =
-        segmentManager._partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, nPartitions);
+        segmentManager._partitionAssignmentGenerator.generateStreamPartitionAssignment(tableConfig, nPartitions);
 
     // set up a happy path - segment is present in ideal state, is CONSUMING, metadata says IN_PROGRESS
     idealState = clearAndSetupHappyPathIdealState(idealStateBuilder, segmentManager, tableConfig, nPartitions);
@@ -669,12 +669,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
             instances = getInstanceList(numInstances);
             segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
             expectedPartitionAssignment =
-                segmentManager._partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, nPartitions);
+                segmentManager._partitionAssignmentGenerator.generateStreamPartitionAssignment(tableConfig, nPartitions);
             break;
           case N_PARTITIONS_INCREASED:
             // randomly increase partitions and hence set a new expected partition assignment
             expectedPartitionAssignment =
-                segmentManager._partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, nPartitions + 1);
+                segmentManager._partitionAssignmentGenerator.generateStreamPartitionAssignment(tableConfig, nPartitions + 1);
             break;
           case N_INSTANCES_CHANGED_AND_PARTITIONS_INCREASED:
             // both changed and hence set a new expected partition assignment
@@ -682,7 +682,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
             instances = getInstanceList(numInstances);
             segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
             expectedPartitionAssignment =
-                segmentManager._partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, nPartitions + 1);
+                segmentManager._partitionAssignmentGenerator.generateStreamPartitionAssignment(tableConfig, nPartitions + 1);
             break;
         }
       }
@@ -781,7 +781,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
     PartitionAssignment partitionAssignment =
-        segmentManager._partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
+        segmentManager._partitionAssignmentGenerator.getStreamPartitionAssignmentFromIdealState(tableConfig, idealState);
     for (int p = 0; p < nPartitions; p++) {
       String segmentName = idealStateBuilder.getSegment(p, 0);
       advanceASeqForPartition(idealState, segmentManager, partitionAssignment, segmentName, p, 1, 100, tableConfig);
@@ -889,7 +889,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
     segmentManager.setupNewTable(tableConfig, idealState);
     PartitionAssignment partitionAssignment =
-        segmentManager._partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, nPartitions);
+        segmentManager._partitionAssignmentGenerator.generateStreamPartitionAssignment(tableConfig, nPartitions);
 
     // Happy path: committing segment has states {CONSUMING,CONSUMING}
     int committingPartition = 6;
@@ -1172,7 +1172,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     public List<String> _paths = new ArrayList<>(16);
     public List<ZNRecord> _records = new ArrayList<>(16);
     public Map<String, LLCRealtimeSegmentZKMetadata> _metadataMap = new HashMap<>(4);
-    private FakePartitionAssignmentGenerator _partitionAssignmentGenerator;
+    private FakeStreamPartitionAssignmentGenerator _partitionAssignmentGenerator;
 
     public long _kafkaLargestOffsetToReturn;
     public long _kafkaSmallestOffsetToReturn;
@@ -1212,9 +1212,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
         tableConfigCacheField.set(this, mockCache);
 
         HelixManager mockHelixManager = mock(HelixManager.class);
-        _partitionAssignmentGenerator = new FakePartitionAssignmentGenerator(mockHelixManager);
+        _partitionAssignmentGenerator = new FakeStreamPartitionAssignmentGenerator(mockHelixManager);
         Field partitionAssignmentGeneratorField =
-            PinotLLCRealtimeSegmentManager.class.getDeclaredField("_partitionAssignmentGenerator");
+            PinotLLCRealtimeSegmentManager.class.getDeclaredField("_streamPartitionAssignmentGenerator");
         partitionAssignmentGeneratorField.setAccessible(true);
         partitionAssignmentGeneratorField.set(this, _partitionAssignmentGenerator);
       } catch (Exception e) {
@@ -1436,11 +1436,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
   }
 
-  private static class FakePartitionAssignmentGenerator extends PartitionAssignmentGenerator {
+  private static class FakeStreamPartitionAssignmentGenerator extends StreamPartitionAssignmentGenerator {
 
     private List<String> _consumingInstances;
 
-    public FakePartitionAssignmentGenerator(HelixManager helixManager) {
+    public FakeStreamPartitionAssignmentGenerator(HelixManager helixManager) {
       super(helixManager);
       _consumingInstances = new ArrayList<>();
     }

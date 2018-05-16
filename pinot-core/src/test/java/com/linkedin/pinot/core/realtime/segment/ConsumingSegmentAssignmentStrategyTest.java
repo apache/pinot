@@ -21,7 +21,7 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.partition.IdealStateBuilderUtil;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
-import com.linkedin.pinot.common.partition.PartitionAssignmentGenerator;
+import com.linkedin.pinot.common.partition.StreamPartitionAssignmentGenerator;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -171,8 +171,8 @@ public class ConsumingSegmentAssignmentStrategyTest {
     IdealStateBuilderUtil idealStateBuilder = new IdealStateBuilderUtil(tableName);
 
     HelixManager _mockHelixManager = mock(HelixManager.class);
-    TestPartitionAssignmentGenerator partitionAssignmentGenerator =
-        new TestPartitionAssignmentGenerator(_mockHelixManager);
+    TestStreamPartitionAssignmentGenerator partitionAssignmentGenerator =
+        new TestStreamPartitionAssignmentGenerator(_mockHelixManager);
     partitionAssignmentGenerator.setConsumingInstances(consumingInstances);
     PartitionAssignment partitionAssignmentFromIdealState;
     ConsumingSegmentAssignmentStrategy consumingSegmentAssignmentStrategy = new ConsumingSegmentAssignmentStrategy();
@@ -184,7 +184,7 @@ public class ConsumingSegmentAssignmentStrategyTest {
 
     // getPartitionsAssignmentFrom
     partitionAssignmentFromIdealState =
-        partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
+        partitionAssignmentGenerator.getStreamPartitionAssignmentFromIdealState(tableConfig, idealState);
 
     // assign
     List<String> segmentNames = new ArrayList<>(numPartitions);
@@ -206,7 +206,7 @@ public class ConsumingSegmentAssignmentStrategyTest {
         .build();
 
     partitionAssignmentFromIdealState =
-        partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
+        partitionAssignmentGenerator.getStreamPartitionAssignmentFromIdealState(tableConfig, idealState);
 
     segmentNames = new ArrayList<>(numPartitions);
     for (int i = 0; i < numPartitions; i++) {
@@ -225,7 +225,7 @@ public class ConsumingSegmentAssignmentStrategyTest {
         .moveToServers(2, 0, completedInstances)
         .build();
     partitionAssignmentFromIdealState =
-        partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
+        partitionAssignmentGenerator.getStreamPartitionAssignmentFromIdealState(tableConfig, idealState);
 
     assignment = consumingSegmentAssignmentStrategy.assign(segmentNames, partitionAssignmentFromIdealState);
 
@@ -239,7 +239,7 @@ public class ConsumingSegmentAssignmentStrategyTest {
         .setSegmentState(2, 1, "OFFLINE")
         .build();
     partitionAssignmentFromIdealState =
-        partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
+        partitionAssignmentGenerator.getStreamPartitionAssignmentFromIdealState(tableConfig, idealState);
 
     assignment = consumingSegmentAssignmentStrategy.assign(segmentNames, partitionAssignmentFromIdealState);
 
@@ -247,10 +247,10 @@ public class ConsumingSegmentAssignmentStrategyTest {
     verifyAssignmentIsFromLatest(partitionAssignmentGenerator, idealState, assignment);
   }
 
-  private void verifyAssignmentIsFromLatest(PartitionAssignmentGenerator partitionAssignmentGenerator,
+  private void verifyAssignmentIsFromLatest(StreamPartitionAssignmentGenerator streamPartitionAssignmentGenerator,
       IdealState idealState, Map<String, List<String>> assignment) {
     Map<String, LLCSegmentName> partitionToLatestSegments =
-        partitionAssignmentGenerator.getPartitionToLatestSegments(idealState);
+        streamPartitionAssignmentGenerator.getPartitionToLatestSegments(idealState);
     for (Map.Entry<String, List<String>> entry : assignment.entrySet()) {
       String segmentName = entry.getKey();
       List<String> assignedInstances = entry.getValue();
@@ -263,11 +263,11 @@ public class ConsumingSegmentAssignmentStrategyTest {
     }
   }
 
-  private class TestPartitionAssignmentGenerator extends PartitionAssignmentGenerator {
+  private class TestStreamPartitionAssignmentGenerator extends StreamPartitionAssignmentGenerator {
 
     private List<String> _consumingInstances;
 
-    public TestPartitionAssignmentGenerator(HelixManager helixManager) {
+    public TestStreamPartitionAssignmentGenerator(HelixManager helixManager) {
       super(helixManager);
       _consumingInstances = new ArrayList<>();
     }
