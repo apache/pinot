@@ -23,7 +23,9 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.LLCUtils;
 import com.linkedin.pinot.common.utils.SegmentName;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -68,7 +70,8 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
     }
 
     // Gather all segments and group them by Kafka partition, sorted by sequence number
-    Map<String, SortedSet<SegmentName>> sortedSegmentsByKafkaPartition = LLCUtils.sortSegmentsByStreamPartition(externalView.getPartitionSet());
+    Map<String, SortedSet<SegmentName>> sortedSegmentsByKafkaPartition =
+        LLCUtils.sortSegmentsByStreamPartition(externalView.getPartitionSet());
 
     // Ensure that for each Kafka partition, we have at most one Helix partition (Pinot segment) in consuming state
     Map<String, SegmentName> allowedSegmentInConsumingStateByKafkaPartition =
@@ -118,6 +121,16 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
       if (!segmentSet.contains(segmentName)) {
         _segmentToZkMetadataMapping.remove(segmentName);
       }
+    }
+
+    // Get the unique set of replica ids and find the maximum id to update the number of replicas
+    Set<Integer> replicaGroupIds = new HashSet<>();
+    for (Map<Integer, String> replicaToServer : segmentToReplicaToServerMap.values()) {
+      replicaGroupIds.addAll(replicaToServer.keySet());
+    }
+    int numReplicas = Collections.max(replicaGroupIds) + 1;
+    if (_numReplicas != numReplicas) {
+      _numReplicas = numReplicas;
     }
 
     setSegmentToReplicaToServerMap(segmentToReplicaToServerMap);
