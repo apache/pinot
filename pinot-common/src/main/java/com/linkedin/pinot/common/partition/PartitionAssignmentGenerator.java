@@ -36,7 +36,6 @@ import org.apache.helix.model.IdealState;
 
 /**
  * Class to generate partitions assignment based on num partitions in ideal state, num tagged instances and num replicas
- * TODO: This is only for LLC stream partition assignment. This will replace StreamPartitionAssignmentGenerator
  */
 public class PartitionAssignmentGenerator {
 
