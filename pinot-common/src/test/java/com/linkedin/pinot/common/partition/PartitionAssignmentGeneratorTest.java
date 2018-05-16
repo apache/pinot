@@ -17,7 +17,6 @@
 package com.linkedin.pinot.common.partition;
 
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TenantConfig;
@@ -300,18 +299,15 @@ public class PartitionAssignmentGeneratorTest {
 
   private class TestPartitionAssignmentGenerator extends PartitionAssignmentGenerator {
 
-    private HelixManager _helixManager;
     private List<String> _consumingInstances;
-    private RealtimeTagConfig _realtimeTagConfig;
 
     public TestPartitionAssignmentGenerator(HelixManager helixManager) {
       super(helixManager);
-      _helixManager = helixManager;
       _consumingInstances = new ArrayList<>();
     }
 
     @Override
-    protected List<String> getConsumingTaggedInstances(RealtimeTagConfig realtimeTagConfig) {
+    protected List<String> getConsumingTaggedInstances(TableConfig tableConfig) {
       return _consumingInstances;
     }
 
