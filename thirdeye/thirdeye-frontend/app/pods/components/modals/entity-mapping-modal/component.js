@@ -37,7 +37,7 @@ import _ from 'lodash';
 const MAPPING_TYPES = [
   'METRIC',
   'DIMENSION',
-  'SERVICE',
+  // 'SERVICE', // TODO: Enable once we want to fix services endpoint
   'DATASET',
   'LIXTAG'
 ];
@@ -270,7 +270,7 @@ export default Component.extend({
   }),
 
   /**
-   * Calculates the params object 
+   * Calculates the params object
    * to be send with the create call
    * @type {Object}
    */
@@ -337,18 +337,13 @@ export default Component.extend({
 
   async init() {
     this._super(...arguments);
-
     const datasets = await fetch(entityMappingApi.getDatasetsUrl).then(checkStatus);
-    const services = await fetch(entityMappingApi.getServicesUrl).then(checkStatus);
 
     if (this.isDestroyed || this.isDestroying) {
       return;
     }
 
-    this.setProperties({
-      datasets,
-      services
-    });
+    set(this, 'datasets', datasets);
   },
 
   /**
