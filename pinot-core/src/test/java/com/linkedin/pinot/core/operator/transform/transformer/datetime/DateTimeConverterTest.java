@@ -138,6 +138,47 @@ public class DateTimeConverterTest {
           new Object[]{"1:MILLISECONDS:EPOCH", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMddHH tz(America/New_York)", "1:DAYS", input, expected});
     }
 
+    // additional granularity tests
+    {
+      // Test conversion from millis since epoch to simple date format (America/Denver timezone with 15 second granualrity)
+      long[] input =
+          {1523560598000L /* 20180412T19:16:38 */, 1523560589000L /* 20180412T19:16:29 */, 1523560632000L /* 20180412T19:17:12 */ };
+      String[] expected = {"2018-04-12 13:16:30.000", "2018-04-12 13:16:15.000", "2018-04-12 13:17:00.000"};
+      entries.add(
+          new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "15:SECONDS", input, expected});
+    }
+    {
+      // Test conversion from millis since epoch to simple date format (America/Denver timezone with 3 minute granualrity)
+      long[] input =
+          {1523560598000L /* 20180412T19:16:38 */, 1523560708000L /* 20180412T19:18:28 */, 1523561708000L /* 20180412T19:35:08 */ };
+      String[] expected = {"2018-04-12 13:15:00.000", "2018-04-12 13:18:00.000", "2018-04-12 13:33:00.000"};
+      entries.add(
+          new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "3:MINUTES", input, expected});
+    }
+    {
+      // Test conversion from millis since epoch to simple date format (America/Denver timezone with 12 hour granualrity)
+      long[] input =
+          {1523560598000L /* 20180412T19:16:38 */, 1523460502000L /* 20180411T15:28:22 */, 1523430205000L /* 20180411T07:03:25 */ };
+      String[] expected = {"2018-04-12 12:00:00.000", "2018-04-11 00:00:00.000", "2018-04-11 00:00:00.000"};
+      entries.add(
+          new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "12:HOURS", input, expected});
+    }
+    {
+      // Test conversion from millis since epoch to simple date format (America/Denver timezone with 5 day granualrity)
+      long[] input =
+          {1523560598000L /* 20180412T19:16:38 */, 1524160502000L /* 20180419T17:55:02 */, 1522230205000L /* 20180328T09:43:25 */ };
+      String[] expected = {"2018-04-10 00:00:00.000", "2018-04-15 00:00:00.000", "2018-03-25 00:00:00.000"};
+      entries.add(
+          new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "5:DAYS", input, expected});
+    }
+    {
+      // Test conversion from millis since epoch to simple date format (America/Los_Angeles timezone with 1 day granualrity)
+      long[] input =
+          {1524045600000L /* 20180418T10:00:00 */, 1524013200000L /* 20180418T01:00:00 */};
+      String[] expected = {"2018-04-18 00:00:00.000", "2018-04-17 00:00:00.000"};
+      entries.add(
+          new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Los_Angeles)", "1:DAYS", input, expected});
+    }
 
     /*************** SDF to Epoch ***************/
     {
