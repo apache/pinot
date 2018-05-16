@@ -70,7 +70,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
     final SchedulerQueryContext schedQueryContext = new SchedulerQueryContext(queryRequest);
     try {
       queryQueue.put(schedQueryContext);
-    } catch (OutOfCapacityError e) {
+    } catch (OutOfCapacityException e) {
       LOGGER.error("Out of capacity for table {}, message: {}", queryRequest.getTableName(), e.getMessage());
       return immediateErrorResponse(queryRequest, QueryException.SERVER_OUT_OF_CAPACITY_ERROR);
     }

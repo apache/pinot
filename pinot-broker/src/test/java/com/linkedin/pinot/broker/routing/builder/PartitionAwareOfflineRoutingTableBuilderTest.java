@@ -214,7 +214,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
 
     Set<String> servers = new HashSet<>();
     for (int i = 0; i < 100; i++) {
-      String countStarQuery = "select count(*) from myTable";
+      String countStarQuery = "select count(*) from " + OFFLINE_TABLE_NAME;
       Map<String, List<String>> routingTable =
           routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery));
       Assert.assertEquals(routingTable.keySet().size(), 1);
@@ -271,7 +271,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     for (int serverId = 0; serverId < NUM_SERVERS; serverId++) {
       int groupId = serverId / numServersPerReplica;
       if (!replicaGroupServers.containsKey(groupId)) {
-        replicaGroupServers.put(groupId, new ArrayList<String>());
+        replicaGroupServers.put(groupId, new ArrayList<>());
       }
       String serverName = "Server_localhost_" + serverId;
       replicaGroupServers.get(groupId).add(serverName);

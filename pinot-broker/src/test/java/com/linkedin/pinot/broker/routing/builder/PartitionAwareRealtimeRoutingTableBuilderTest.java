@@ -85,7 +85,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
 
       // Create instance Configs
       List<InstanceConfig> instanceConfigs = new ArrayList<>();
-      for (int serverId = 0; serverId <= NUM_SERVERS; serverId++) {
+      for (int serverId = 0; serverId < NUM_SERVERS; serverId++) {
         String serverName = "Server_localhost_" + serverId;
         instanceConfigs.add(new InstanceConfig(serverName));
       }
@@ -96,7 +96,6 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
       // Create the fake external view
       ExternalView externalView =
           buildExternalView(REALTIME_TABLE_NAME, fakePropertyStore, partitionToServerMapping, segmentList);
-
 
       // Create the partition aware realtime routing table builder.
       RoutingTableBuilder routingTableBuilder =
@@ -110,7 +109,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
       // Check that all segments are covered exactly for once.
       Set<String> assignedSegments = new HashSet<>();
       for (List<String> segmentsForServer : routingTable.values()) {
-        for (String segmentName: segmentsForServer) {
+        for (String segmentName : segmentsForServer) {
           Assert.assertFalse(assignedSegments.contains(segmentName));
           assignedSegments.add(segmentName);
         }
@@ -125,7 +124,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
         int partition = queryPartition % NUM_PARTITION;
         assignedSegments = new HashSet<>();
         for (List<String> segmentsForServer : routingTable.values()) {
-          for (String segmentName: segmentsForServer) {
+          for (String segmentName : segmentsForServer) {
             Assert.assertFalse(assignedSegments.contains(segmentName));
             assignedSegments.add(segmentName);
           }
@@ -158,7 +157,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
 
     // Create instance Configs
     List<InstanceConfig> instanceConfigs = new ArrayList<>();
-    for (int serverId = 0; serverId <= NUM_SERVERS; serverId++) {
+    for (int serverId = 0; serverId < NUM_SERVERS; serverId++) {
       String serverName = "Server_localhost_" + serverId;
       instanceConfigs.add(new InstanceConfig(serverName));
     }
@@ -186,7 +185,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
     // Check that all segments are covered exactly for once.
     Set<String> assignedSegments = new HashSet<>();
     for (List<String> segmentsForServer : routingTable.values()) {
-      for (String segmentName: segmentsForServer) {
+      for (String segmentName : segmentsForServer) {
         Assert.assertFalse(assignedSegments.contains(segmentName));
         assignedSegments.add(segmentName);
       }
@@ -198,6 +197,71 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
     for (int i = ONLINE_SEGMENTS + 1; i < NUM_SEGMENTS; i++) {
       Assert.assertFalse(assignedSegments.contains(segmentList.get(i)));
     }
+  }
+
+  @Test
+  public void testRoutingAfterRebalance() throws Exception {
+    NUM_PARTITION = 10;
+    NUM_REPLICA = 1;
+    NUM_SERVERS = 1;
+    NUM_SEGMENTS = 10;
+
+    // Create the fake property store
+    FakePropertyStore fakePropertyStore = new FakePropertyStore();
+
+    // Create the table config, partition mapping,
+    TableConfig tableConfig = buildRealtimeTableConfig();
+
+    Map<Integer, Integer> partitionSegmentCount = new HashMap<>();
+    for (int i = 0; i < NUM_PARTITION; i++) {
+      partitionSegmentCount.put(i, 0);
+    }
+
+    List<String> segmentList = updateZkMetadataAndBuildSegmentList(partitionSegmentCount, fakePropertyStore);
+
+    // Create instance Configs
+    List<InstanceConfig> instanceConfigs = new ArrayList<>();
+    for (int serverId = 0; serverId < NUM_SERVERS; serverId++) {
+      String serverName = "Server_localhost_" + serverId;
+      instanceConfigs.add(new InstanceConfig(serverName));
+    }
+
+    // Create stream partition mapping
+    Map<Integer, List<String>> partitionToServerMapping = buildStreamPartitionMapping(instanceConfigs);
+
+    ExternalView externalView =
+        buildExternalView(REALTIME_TABLE_NAME, fakePropertyStore, partitionToServerMapping, segmentList);
+
+    // Create the partition aware realtime routing table builder.
+    RoutingTableBuilder routingTableBuilder =
+        buildPartitionAwareRealtimeRoutingTableBuilder(fakePropertyStore, tableConfig, externalView, instanceConfigs);
+
+    NUM_REPLICA = 2;
+    NUM_SERVERS = 2;
+
+    // Update instance configs
+    String newServerName = "Server_localhost_" + (NUM_SERVERS - 1);
+    instanceConfigs.add(new InstanceConfig(newServerName));
+
+    // Update external view
+    partitionToServerMapping = buildKafkaPartitionMapping(instanceConfigs);
+    ExternalView newExternalView =
+        buildExternalView(REALTIME_TABLE_NAME, fakePropertyStore, partitionToServerMapping, segmentList);
+
+    // Compute routing table
+    routingTableBuilder.computeRoutingTableFromExternalView(REALTIME_TABLE_NAME, newExternalView, instanceConfigs);
+
+    Set<String> servers = new HashSet<>();
+    for (int i = 0; i < 100; i++) {
+      String countStarQuery = "select count(*) from " + REALTIME_TABLE_NAME;
+      Map<String, List<String>> routingTable =
+          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery));
+      Assert.assertEquals(routingTable.keySet().size(), 1);
+      servers.addAll(routingTable.keySet());
+    }
+
+    // Check if both servers are get picked
+    Assert.assertEquals(servers.size(), 2);
   }
 
   private List<String> updateZkMetadataAndBuildSegmentList(Map<Integer, Integer> partitionSegmentCount,
@@ -227,8 +291,6 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
   private Map<Integer, List<String>> buildStreamPartitionMapping(List<InstanceConfig> instanceConfigs) {
     // Create partition assignment mapping table.
     Map<Integer, List<String>> partitionToServers = new HashMap<>();
-    ZNRecord streamPartitionMapping = new ZNRecord(REALTIME_TABLE_NAME);
-
     int serverIndex = 0;
     for (int partitionId = 0; partitionId < NUM_PARTITION; partitionId++) {
       List<String> assignedServers = new ArrayList<>();
@@ -237,9 +299,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
         serverIndex++;
       }
       partitionToServers.put(partitionId, assignedServers);
-      streamPartitionMapping.setListField(Integer.toString(partitionId), assignedServers);
     }
-
     return partitionToServers;
   }
 
@@ -258,10 +318,10 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
 
     // Create External View
     ExternalView externalView = new ExternalView(tableName);
-    for (String segmentName: segmentList) {
+    for (String segmentName : segmentList) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
       int partitionId = llcSegmentName.getPartitionId();
-      for (String server: partitionToServerMapping.get(partitionId)) {
+      for (String server : partitionToServerMapping.get(partitionId)) {
         externalView.setState(segmentName, server, "ONLINE");
       }
     }
@@ -283,10 +343,11 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
     routingConfig.setRoutingTableBuilderName("PartitionAwareOffline");
 
     // Create table config
-    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME)
-        .setTableName(REALTIME_TABLE_NAME)
-        .setNumReplicas(NUM_REPLICA)
-        .build();
+    TableConfig tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME)
+            .setTableName(REALTIME_TABLE_NAME)
+            .setNumReplicas(NUM_REPLICA)
+            .build();
 
     tableConfig.getValidationConfig().setReplicasPerPartition(Integer.toString(NUM_REPLICA));
     tableConfig.getIndexingConfig().setSegmentPartitionConfig(partitionConfig);
@@ -306,5 +367,4 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
     metadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     return metadata;
   }
-
 }
