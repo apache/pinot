@@ -20,12 +20,12 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableCustomConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.config.TagOverrideConfig;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.TenantConfig;
 import com.linkedin.pinot.common.data.Schema;
@@ -1058,6 +1058,34 @@ public class PinotHelixResourceManager {
     if (_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, serverTenantName).isEmpty()) {
       throw new InvalidTableConfigException(
           "Server tenant: " + serverTenantName + " does not exist for table: " + tableNameWithType);
+    }
+    TagOverrideConfig tagOverrideConfig = tenantConfig.getTagOverrideConfig();
+    if (tagOverrideConfig != null) {
+      String realtimeConsumingTag = tagOverrideConfig.getRealtimeConsuming();
+      if (realtimeConsumingTag != null) {
+        if (!ControllerTenantNameBuilder.hasValidServerTagSuffix(realtimeConsumingTag)) {
+          throw new InvalidTableConfigException(
+              "Invalid realtime consuming tag: " + realtimeConsumingTag + ". Must have suffix _REALTIME or _OFFLINE");
+        }
+        if (_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, realtimeConsumingTag).isEmpty()) {
+          throw new InvalidTableConfigException(
+              "No instances found with overridden realtime consuming tag: " + realtimeConsumingTag + " for table: "
+                  + tableNameWithType);
+        }
+      }
+
+      String realtimeCompletedTag = tagOverrideConfig.getRealtimeCompleted();
+      if (realtimeCompletedTag != null) {
+        if (!ControllerTenantNameBuilder.hasValidServerTagSuffix(realtimeCompletedTag)) {
+          throw new InvalidTableConfigException(
+              "Invalid realtime completed tag: " + realtimeCompletedTag + ". Must have suffix _REALTIME or _OFFLINE");
+        }
+        if (_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, realtimeCompletedTag).isEmpty()) {
+          throw new InvalidTableConfigException(
+              "No instances found with overridden realtime completed tag: " + realtimeCompletedTag + " for table: "
+                  + tableNameWithType);
+        }
+      }
     }
 
     SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();

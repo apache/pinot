@@ -18,6 +18,7 @@ package com.linkedin.pinot.controller.helix.core;
 import com.google.common.collect.BiMap;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.config.TagOverrideConfig;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -29,9 +30,11 @@ import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
+import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 import org.apache.helix.model.IdealState;
+import org.json.JSONException;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -66,6 +69,132 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
         .setOfflineInstances(NUM_INSTANCES)
         .build();
     _helixResourceManager.createServerTenant(serverTenant);
+  }
+
+  @Test
+  public void testAddTableWithTenant() throws IOException, JSONException {
+
+    TableConfig.Builder tableConfigBuilder = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE);
+    tableConfigBuilder.setTableName("testOfflineTable")
+        .setTimeColumnName("timeColumn")
+        .setTimeType("DAYS")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("5");
+
+    // no tenants defined
+    TableConfig tableConfig = tableConfigBuilder.build();
+    try {
+      _helixResourceManager.addTable(tableConfig);
+      Assert.fail("Add table should not succeed without server and broker tenants");
+    } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
+      // expected
+    }
+
+    // 1 tenant undefined
+    tableConfig = tableConfigBuilder.setServerTenant(SERVER_TENANT_NAME).build();
+    try {
+      _helixResourceManager.addTable(tableConfig);
+      Assert.fail("Add table should not succeed without server and broker tenants");
+    } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
+      // expected
+    }
+
+    Tenant brokerTenant =
+        new Tenant.TenantBuilder("createdBrokerTenant").setRole(TenantRole.BROKER).setTotalInstances(1).build();
+    _helixResourceManager.createBrokerTenant(brokerTenant);
+
+    // non existing tenant
+    tableConfig = tableConfigBuilder.setBrokerTenant("nonExistingBrokerTenant").build();
+    try {
+      _helixResourceManager.addTable(tableConfig);
+      Assert.fail("Add table should not succeed with non existing broker tenant");
+    } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
+      // expected
+    }
+
+    // non existing tenant
+    tableConfig = tableConfigBuilder.setBrokerTenant("createdBrokerTenant").setServerTenant("nonExistingServerTenant").build();
+    try {
+      _helixResourceManager.addTable(tableConfig);
+      Assert.fail("Add table should not succeed with non existing server tenant");
+    } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
+      // expected
+    }
+
+    // correctly set tenants
+    tableConfig = tableConfigBuilder.setServerTenant(SERVER_TENANT_NAME).build();
+    _helixResourceManager.addTable(tableConfig);
+    Assert.assertNotNull(_helixAdmin.getResourceIdealState(getHelixClusterName(), tableConfig.getTableName()));
+    _helixResourceManager.deleteOfflineTable(tableConfig.getTableName());
+    Assert.assertNull(_helixAdmin.getResourceIdealState(getHelixClusterName(), tableConfig.getTableName()));
+
+    // null tag override config
+    tableConfig = tableConfigBuilder.setTagOverrideConfig(null).build();
+    _helixResourceManager.addTable(tableConfig);
+    Assert.assertNotNull(_helixAdmin.getResourceIdealState(getHelixClusterName(), tableConfig.getTableName()));
+    _helixResourceManager.deleteOfflineTable(tableConfig.getTableName());
+
+    // empty tag override config
+    TagOverrideConfig tagOverrideConfig = new TagOverrideConfig();
+    tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
+    _helixResourceManager.addTable(tableConfig);
+    Assert.assertNotNull(_helixAdmin.getResourceIdealState(getHelixClusterName(), tableConfig.getTableName()));
+    _helixResourceManager.deleteOfflineTable(tableConfig.getTableName());
+
+    // incorrect suffix for rt consuming tag
+    tagOverrideConfig.setRealtimeConsuming("incorrect_suffix_tag");
+    tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
+    try {
+      _helixResourceManager.addTable(tableConfig);
+      Assert.fail("Add table should not succeed with incorrect suffix for realtime consuming tag");
+    } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
+      // expected
+    }
+
+    // non existing rt consuming tag
+    tagOverrideConfig.setRealtimeConsuming("nonExisting_REALTIME");
+    tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
+    try {
+      _helixResourceManager.addTable(tableConfig);
+      Assert.fail("Add table should not succeed with non existing realtime consuming tag");
+    } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
+      // expected
+    }
+
+    // correct realtime consuming tag override
+    tagOverrideConfig.setRealtimeConsuming("serverTenant_OFFLINE");
+    tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
+    _helixResourceManager.addTable(tableConfig);
+    Assert.assertNotNull(_helixAdmin.getResourceIdealState(getHelixClusterName(), tableConfig.getTableName()));
+    _helixResourceManager.deleteOfflineTable(tableConfig.getTableName());
+
+    // incorrect suffix for rt completed
+    tagOverrideConfig.setRealtimeCompleted("incorrect_offline");
+    tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
+    try {
+      _helixResourceManager.addTable(tableConfig);
+      Assert.fail("Add table should not succeed with incorrect suffix for realtime completed tag");
+    } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
+      // expected
+    }
+
+    // non existing tag for rt completed
+    tagOverrideConfig.setRealtimeCompleted("nonExisting_OFFLINE");
+    tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
+    try {
+      _helixResourceManager.addTable(tableConfig);
+      Assert.fail("Add table should not succeed with non existing realtime completed tag");
+    } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
+      // expected
+    }
+
+    tagOverrideConfig.setRealtimeCompleted("serverTenant_OFFLINE");
+    tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
+    _helixResourceManager.addTable(tableConfig);
+    Assert.assertNotNull(_helixAdmin.getResourceIdealState(getHelixClusterName(), tableConfig.getTableName()));
+    _helixResourceManager.deleteOfflineTable(tableConfig.getTableName());
+
+    _helixResourceManager.deleteBrokerTenantFor("createdBrokerTenant");
   }
 
   @Test

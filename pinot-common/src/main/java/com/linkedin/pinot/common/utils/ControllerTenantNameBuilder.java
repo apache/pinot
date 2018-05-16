@@ -30,6 +30,13 @@ public class ControllerTenantNameBuilder {
     return tenantName + "_" + TenantRole.BROKER.toString();
   }
 
+  public static boolean hasValidServerTagSuffix(String tagName) {
+    if (tagName.endsWith(ServerType.REALTIME.toString()) || tagName.endsWith(ServerType.OFFLINE.toString())) {
+      return true;
+    }
+    return false;
+  }
+
   public static TenantRole getTenantRoleFromTenantName(String tenantName) {
     if (tenantName.endsWith(ServerType.REALTIME.toString())) {
       return TenantRole.SERVER;
