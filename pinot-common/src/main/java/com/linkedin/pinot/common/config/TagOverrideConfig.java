@@ -21,6 +21,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * This config will allow specifying overrides to the tags derived from tenantConfig.
+ * Supported overrides:
+ * 1) realtimeConsuming - which tag should be used for consuming segments
+ * 2) realtimeCompleted - which tag should the realtime segments be moved to after they are done consuming
+ *
+ * These fields expect the complete tag name including the suffix, unlike the tenantConfig server and broker, where we construct the tag name by attaching suffix later on.
+ * Basic validation of the tags does happen when the table is being added. The validations include:
+ * 1) checking if the suffix is correct (must be either _OFFLINE or _REALTIME)
+ * 2) checking if instances with the tag exist
+ *
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TagOverrideConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(TagOverrideConfig.class);
