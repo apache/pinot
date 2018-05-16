@@ -101,7 +101,7 @@ import org.slf4j.LoggerFactory;
 
 public class PinotLLCRealtimeSegmentManager {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotLLCRealtimeSegmentManager.class);
-  private static final int KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS = 10000;
+  private static final int STREAM_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS = 10000;
   protected static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
   protected static final long END_OFFSET_FOR_CONSUMING_SEGMENTS = Long.MAX_VALUE;
   private static final int NUM_LOCKS = 4;
@@ -238,9 +238,6 @@ public class PinotLLCRealtimeSegmentManager {
 
   // Remove all trace of LLC for this table.
   public void cleanupLLC(final String realtimeTableName) {
-    // Start by removing the kafka partition assigment znode. This will prevent any new segments being created.
-    ZKMetadataProvider.removeKafkaPartitionAssignmentFromPropertyStore(_propertyStore, realtimeTableName);
-    LOGGER.info("Removed Kafka partition assignment (if any) record for {}", realtimeTableName);
     // If there are any completions in the pipeline we let them commit.
     Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
 
@@ -1320,11 +1317,11 @@ public class PinotLLCRealtimeSegmentManager {
     public Boolean call() throws Exception {
 
       PinotStreamConsumer
-          kafkaConsumer = _pinotStreamConsumerFactory.buildConsumer("dummyClientId", _partitionId, _streamMetadata);
+          streamConsumer = _pinotStreamConsumerFactory.buildConsumer("dummyClientId", _partitionId, _streamMetadata);
       try {
-        _offset = kafkaConsumer.fetchPartitionOffset(_offsetCriteria, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
+        _offset = streamConsumer.fetchPartitionOffset(_offsetCriteria, STREAM_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
         if (_exception != null) {
-          LOGGER.info("Successfully retrieved offset({}) for kafka topic {} partition {}", _offset, _topicName, _partitionId);
+          LOGGER.info("Successfully retrieved offset({}) for stream topic {} partition {}", _offset, _topicName, _partitionId);
         }
         return Boolean.TRUE;
       } catch (SimpleConsumerWrapper.TransientConsumerException e) {
@@ -1335,7 +1332,7 @@ public class PinotLLCRealtimeSegmentManager {
         _exception = e;
         throw e;
       } finally {
-        IOUtils.closeQuietly(kafkaConsumer);
+        IOUtils.closeQuietly(streamConsumer);
       }
     }
   }

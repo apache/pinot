@@ -39,7 +39,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.lang.math.IntRange;
-import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
@@ -91,9 +90,8 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
         instanceConfigs.add(new InstanceConfig(serverName));
       }
 
-      // Update replica group mapping zk metadata
-      Map<Integer, List<String>> partitionToServerMapping =
-          buildKafkaPartitionMapping(REALTIME_TABLE_NAME, fakePropertyStore, instanceConfigs);
+      // Create stream partition assignment
+      Map<Integer, List<String>> partitionToServerMapping = buildStreamPartitionMapping(instanceConfigs);
 
       // Create the fake external view
       ExternalView externalView =
@@ -165,9 +163,8 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
       instanceConfigs.add(new InstanceConfig(serverName));
     }
 
-    // Update replica group mapping zk metadata
-    Map<Integer, List<String>> partitionToServerMapping =
-        buildKafkaPartitionMapping(REALTIME_TABLE_NAME, fakePropertyStore, instanceConfigs);
+    // Create stream partition mapping
+    Map<Integer, List<String>> partitionToServerMapping = buildStreamPartitionMapping(instanceConfigs);
 
     ExternalView externalView =
         buildExternalView(REALTIME_TABLE_NAME, fakePropertyStore, partitionToServerMapping, segmentList);
@@ -227,11 +224,10 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
     return segmentList;
   }
 
-  private Map<Integer, List<String>> buildKafkaPartitionMapping(String tableName, FakePropertyStore propertyStore,
-      List<InstanceConfig> instanceConfigs) {
+  private Map<Integer, List<String>> buildStreamPartitionMapping(List<InstanceConfig> instanceConfigs) {
     // Create partition assignment mapping table.
     Map<Integer, List<String>> partitionToServers = new HashMap<>();
-    ZNRecord kafkaPartitionMapping = new ZNRecord(REALTIME_TABLE_NAME);
+    ZNRecord streamPartitionMapping = new ZNRecord(REALTIME_TABLE_NAME);
 
     int serverIndex = 0;
     for (int partitionId = 0; partitionId < NUM_PARTITION; partitionId++) {
@@ -241,17 +237,14 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
         serverIndex++;
       }
       partitionToServers.put(partitionId, assignedServers);
-      kafkaPartitionMapping.setListField(Integer.toString(partitionId), assignedServers);
+      streamPartitionMapping.setListField(Integer.toString(partitionId), assignedServers);
     }
-
-    String path = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(tableName);
-    propertyStore.set(path, kafkaPartitionMapping, AccessOption.PERSISTENT);
 
     return partitionToServers;
   }
 
   private RoutingTableBuilder buildPartitionAwareRealtimeRoutingTableBuilder(FakePropertyStore propertyStore,
-      TableConfig tableConfig, ExternalView externalView, List<InstanceConfig> instanceConfigs) throws Exception{
+      TableConfig tableConfig, ExternalView externalView, List<InstanceConfig> instanceConfigs) {
 
     PartitionAwareRealtimeRoutingTableBuilder routingTableBuilder = new PartitionAwareRealtimeRoutingTableBuilder();
     routingTableBuilder.init(null, tableConfig, propertyStore);

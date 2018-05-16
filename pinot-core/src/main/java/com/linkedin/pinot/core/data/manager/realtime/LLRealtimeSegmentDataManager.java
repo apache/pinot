@@ -77,12 +77,12 @@ import org.slf4j.LoggerFactory;
  */
 public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   protected enum State {
-    // The state machine starts off with this state. While in this state we consume kafka events
+    // The state machine starts off with this state. While in this state we consume stream events
     // and index them in memory. We continue to be in this state until the end criteria is satisfied
     // (time or number of rows)
     INITIAL_CONSUMING,
 
-    // In this state, we consume from kafka until we reach the _finalOffset (exclusive)
+    // In this state, we consume from stream until we reach the _finalOffset (exclusive)
     CATCHING_UP,
 
     // In this state, we sleep for MAX_HOLDING_TIME_MS, and the make a segmentConsumed() call to the
@@ -103,7 +103,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     COMMITTING,
 
     // We have been asked to discard the in-memory segment we have. We will be serving queries, but not consuming
-    // anymore rows from kafka. We wait for a helix transition to go ONLINE, at which point, we can download the
+    // anymore rows from stream. We wait for a helix transition to go ONLINE, at which point, we can download the
     // segment from the controller and replace it with the in-memory segment.
     DISCARDED,
 
@@ -211,8 +211,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private static final int MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS = 31;
 
   private Thread _consumerThread;
-  private final String _kafkaTopic;
-  private final int _kafkaPartitionId;
+  private final String _streamTopic;
+  private final int _streamPartitionId;
   final String _clientId;
   private final LLCSegmentName _segmentName;
   private final PlainFieldExtractor _fieldExtractor;
@@ -233,7 +233,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final long _consumeStartTime;
   private final long _startOffset;
   private final StreamMetadata _streamMetadata;
-  private final String _kafkaBootstrapNodes;
+  private final String _streamBootstrapNodes;
 
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
@@ -307,13 +307,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  private void handleTransientKafkaErrors(Exception e) throws  Exception {
+  private void handleTransientStreamErrors(Exception e) throws Exception {
     consecutiveErrorCount++;
     if (consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
-      segmentLogger.warn("Kafka transient exception when fetching messages, stopping consumption after {} attempts", consecutiveErrorCount, e);
+      segmentLogger.warn("Stream transient exception when fetching messages, stopping consumption after {} attempts", consecutiveErrorCount, e);
       throw e;
     } else {
-      segmentLogger.warn("Kafka transient exception when fetching messages, retrying (count={})", consecutiveErrorCount, e);
+      segmentLogger.warn("Stream transient exception when fetching messages, retrying (count={})", consecutiveErrorCount, e);
       Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
       makeConsumerWrapper("Too many transient errors");
     }
@@ -329,7 +329,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // anymore. Remove the file if it exists.
     removeSegmentFile();
 
-    final long _endOffset = Long.MAX_VALUE; // No upper limit on Kafka offset
+    final long _endOffset = Long.MAX_VALUE; // No upper limit on stream offset
     segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
     while(!_shouldStop && !endCriteriaReached()) {
       // Consume for the next _kafkaReadTime ms, or we get to final offset, whichever happens earlier,
@@ -340,31 +340,31 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             _streamMetadata.getKafkaFetchTimeoutMillis());
         consecutiveErrorCount = 0;
       } catch (TimeoutException e) {
-        handleTransientKafkaErrors(e);
+        handleTransientStreamErrors(e);
         continue;
       } catch (SimpleConsumerWrapper.TransientConsumerException e) {
-        handleTransientKafkaErrors(e);
+        handleTransientStreamErrors(e);
         continue;
       } catch (SimpleConsumerWrapper.PermanentConsumerException e) {
         segmentLogger.warn("Kafka permanent exception when fetching messages, stopping consumption", e);
         throw e;
       } catch (Exception e) {
-        // Unknown exception from Kafka. Treat as a transient exception.
+        // Unknown exception from stream. Treat as a transient exception.
         // One such exception seen so far is java.net.SocketTimeoutException
-        handleTransientKafkaErrors(e);
+        handleTransientStreamErrors(e);
         continue;
       }
 
-      processKafkaEvents(messageBatch, idlePipeSleepTimeMillis);
+      processStreamEvents(messageBatch, idlePipeSleepTimeMillis);
 
       if (_currentOffset != lastUpdatedOffset) {
-        // We consumed something. Update the highest kafka offset as well as partition-consuming metric.
+        // We consumed something. Update the highest stream offset as well as partition-consuming metric.
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, _currentOffset);
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
         lastUpdatedOffset = _currentOffset;
       } else {
         // We did not consume any rows. Update the partition-consuming metric only if we have been idling for a long time.
-        // Create a new kafka consumer wrapper, in case we are stuck on something.
+        // Create a new stream consumer wrapper, in case we are stuck on something.
         if (++idleCount > maxIdleCountBeforeStatUpdate) {
           _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
           idleCount = 0;
@@ -384,12 +384,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     return true;
   }
 
-  private void processKafkaEvents(MessageBatch messagesAndOffsets, long idlePipeSleepTimeMillis) {
+  private void processStreamEvents(MessageBatch messagesAndOffsets, long idlePipeSleepTimeMillis) {
     Meter realtimeRowsConsumedMeter = null;
     Meter realtimeRowsDroppedMeter = null;
 
     int indexedMessageCount = 0;
-    int kafkaMessageCount = 0;
+    int streamMessageCount = 0;
     boolean canTakeMore = true;
     GenericRow decodedRow = null;
     GenericRow transformedRow = null;
@@ -407,7 +407,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         //
         // 2. We are in CATCHING_UP state, and we legally hit this error due to Kafka unclean leader election where
         //    offsets get changed with higher generation numbers for some pinot servers but not others. So, if another
-        //    server (who got a larger kafka offset) asked us to catch up to that offset, but we are connected to a
+        //    server (who got a larger stream offset) asked us to catch up to that offset, but we are connected to a
         //    broker who has smaller offsets, then we may try to push more rows into the buffer than maximum. This
         //    is a rare case, and we really don't know how to handle this at this time.
         //    Throw an exception.
@@ -448,12 +448,12 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       _currentOffset = messagesAndOffsets.getNextStreamMessageOffsetAtIndex(index);
       _numRowsIndexed = _realtimeSegment.getNumDocsIndexed();
       _numRowsConsumed++;
-      kafkaMessageCount++;
+      streamMessageCount++;
     }
     updateCurrentDocumentCountMetrics();
-    if (kafkaMessageCount != 0) {
-      segmentLogger.debug("Indexed {} messages ({} messages read from Kafka) current offset {}", indexedMessageCount,
-          kafkaMessageCount, _currentOffset);
+    if (streamMessageCount != 0) {
+      segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}", indexedMessageCount,
+          streamMessageCount, _currentOffset);
     } else {
       // If there were no messages to be fetched from Kafka, wait for a little bit as to avoid hammering the
       // Kafka broker
@@ -989,16 +989,16 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _pinotStreamConsumerFactory = PinotStreamConsumerFactory.create(_streamMetadata);
     KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig = createStreamProviderConfig();
     kafkaStreamProviderConfig.init(tableConfig, instanceZKMetadata, schema);
-    _kafkaBootstrapNodes = indexingConfig.getStreamConfigs()
+    _streamBootstrapNodes = indexingConfig.getStreamConfigs()
         .get(CommonConstants.Helix.DataSource.STREAM_PREFIX + "."
             + CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
-    _kafkaTopic = kafkaStreamProviderConfig.getTopicName();
+    _streamTopic = kafkaStreamProviderConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _segmentName = new LLCSegmentName(_segmentNameStr);
-    _kafkaPartitionId = _segmentName.getPartitionId();
+    _streamPartitionId = _segmentName.getPartitionId();
     _tableName = _tableConfig.getTableName();
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
-    _metricKeyName = _tableName + "-" + _kafkaTopic + "-" + _kafkaPartitionId;
+    _metricKeyName = _tableName + "-" + _streamTopic + "-" + _streamPartitionId;
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() +
         "_" + _segmentNameStr);
     _tableStreamName = _tableName + "_" + kafkaStreamProviderConfig.getStreamName();
@@ -1053,7 +1053,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Start new realtime segment
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setSegmentName(_segmentNameStr)
-            .setStreamName(_kafkaTopic)
+            .setStreamName(_streamTopic)
             .setSchema(schema)
             .setCapacity(_segmentMaxRowCount)
             .setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
@@ -1067,7 +1067,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // Create message decoder
     _messageDecoder = _pinotStreamConsumerFactory.getDecoder(kafkaStreamProviderConfig);
-    _clientId = _kafkaPartitionId + "-" + NetUtil.getHostnameOrAddress();
+    _clientId = _streamPartitionId + "-" + NetUtil.getHostnameOrAddress();
 
     // Create field extractor
     _fieldExtractor = FieldExtractorFactory.getPlainFieldExtractor(schema);
@@ -1076,7 +1076,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     SegmentPartitionConfig segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
     if (segmentPartitionConfig != null) {
       try {
-        int nPartitions = _consumerWrapper.getPartitionCount(_kafkaTopic, /*maxWaitTimeMs=*/5000L);
+        int nPartitions = _consumerWrapper.getPartitionCount(_streamTopic, /*maxWaitTimeMs=*/5000L);
         segmentPartitionConfig.setNumPartitions(nPartitions);
         realtimeSegmentConfigBuilder.setSegmentPartitionConfig(segmentPartitionConfig);
       } catch (Exception e) {
@@ -1137,11 +1137,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       try {
         _consumerWrapper.close();
       } catch (Exception e) {
-        segmentLogger.warn("Could not close Kafka consumer wrapper");
+        segmentLogger.warn("Could not close stream consumer wrapper");
       }
     }
-    segmentLogger.info("Creating new Kafka consumer wrapper, reason: {}", reason);
-    _consumerWrapper = _pinotStreamConsumerFactory.buildConsumer(_clientId, _kafkaPartitionId, _streamMetadata);
+    segmentLogger.info("Creating new stream consumer wrapper, reason: {}", reason);
+    _consumerWrapper = _pinotStreamConsumerFactory.buildConsumer(_clientId, _streamPartitionId, _streamMetadata);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

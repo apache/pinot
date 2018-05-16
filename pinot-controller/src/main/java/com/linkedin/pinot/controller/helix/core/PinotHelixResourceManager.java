@@ -1349,9 +1349,6 @@ public class PinotHelixResourceManager {
     // Remove table config
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, realtimeTableName);
 
-    // Remove Kafka partition assignment for LLC table
-    ZKMetadataProvider.removeKafkaPartitionAssignmentFromPropertyStore(_propertyStore, realtimeTableName);
-
     // Remove groupId/PartitionId mapping for HLC table
     if (instancesForTable != null) {
       for (String instance : instancesForTable) {

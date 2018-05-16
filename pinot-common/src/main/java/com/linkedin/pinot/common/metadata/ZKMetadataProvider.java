@@ -47,7 +47,6 @@ public class ZKMetadataProvider {
   private static final String CLUSTER_TENANT_ISOLATION_ENABLED_KEY = "tenantIsolationEnabled";
   private static final String PROPERTYSTORE_SEGMENTS_PREFIX = "/SEGMENTS";
   private static final String PROPERTYSTORE_SCHEMAS_PREFIX = "/SCHEMAS";
-  private static final String PROPERTYSTORE_KAFKA_PARTITIONS_PREFIX = "/KAFKA_PARTITIONS";
   private static final String PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX = "/INSTANCE_PARTITIONS";
   private static final String PROPERTYSTORE_TABLE_CONFIGS_PREFIX = "/CONFIGS/TABLE";
   private static final String PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX = "/CONFIGS/INSTANCE";
@@ -83,11 +82,6 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_SCHEMAS_PREFIX, schemaName);
   }
 
-  @Deprecated
-  public static String constructPropertyStorePathForKafkaPartitions(String realtimeTableName) {
-    return StringUtil.join("/", PROPERTYSTORE_KAFKA_PARTITIONS_PREFIX, realtimeTableName);
-  }
-
   public static String constructPropertyStorePathForInstancePartitions(String offlineTableName) {
     return StringUtil.join("/", PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX, offlineTableName);
   }
@@ -118,13 +112,6 @@ public class ZKMetadataProvider {
 
   public static void removeResourceConfigFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
     String propertyStorePath = constructPropertyStorePathForResourceConfig(resourceName);
-    if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
-      propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
-    }
-  }
-
-  public static void removeKafkaPartitionAssignmentFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName) {
-    String propertyStorePath = constructPropertyStorePathForKafkaPartitions(realtimeTableName);
     if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
       propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
     }
