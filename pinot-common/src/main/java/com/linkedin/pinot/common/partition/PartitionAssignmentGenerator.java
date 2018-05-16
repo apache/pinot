@@ -120,9 +120,8 @@ public class PartitionAssignmentGenerator {
 
     String tableNameWithType = tableConfig.getTableName();
     int numReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
-    RealtimeTagConfig realtimeTagConfig = getRealtimeTagConfig(tableConfig);
 
-    List<String> consumingTaggedInstances = getConsumingTaggedInstances(realtimeTagConfig);
+    List<String> consumingTaggedInstances = getConsumingTaggedInstances(tableConfig);
     if (consumingTaggedInstances.size() < numReplicas) {
       throw new InvalidConfigException(
           "Not enough consuming instances tagged. Must be atleast equal to numReplicas:" + numReplicas);
@@ -167,7 +166,8 @@ public class PartitionAssignmentGenerator {
   }
 
   @VisibleForTesting
-  protected List<String> getConsumingTaggedInstances(RealtimeTagConfig realtimeTagConfig) {
+  protected List<String> getConsumingTaggedInstances(TableConfig tableConfig) {
+    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
     String consumingServerTag = realtimeTagConfig.getConsumingServerTag();
     List<String> consumingTaggedInstances = _helixManager.getClusterManagmentTool()
         .getInstancesInClusterWithTag(_helixManager.getClusterName(), consumingServerTag);
@@ -175,10 +175,5 @@ public class PartitionAssignmentGenerator {
       throw new IllegalStateException("No instances found with tag " + consumingServerTag);
     }
     return consumingTaggedInstances;
-  }
-
-  @VisibleForTesting
-  protected RealtimeTagConfig getRealtimeTagConfig(TableConfig tableConfig) {
-    return new RealtimeTagConfig(tableConfig, _helixManager);
   }
 }

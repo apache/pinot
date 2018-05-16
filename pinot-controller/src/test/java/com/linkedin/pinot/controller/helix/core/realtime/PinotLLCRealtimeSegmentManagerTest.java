@@ -21,7 +21,6 @@ import com.google.common.collect.MinMaxPriorityQueue;
 import com.google.common.io.Files;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.IndexingConfig;
-import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.StreamConsumptionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
@@ -1467,7 +1466,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected List<String> getConsumingTaggedInstances(RealtimeTagConfig realtimeTagConfig) {
+    protected List<String> getConsumingTaggedInstances(TableConfig tableConfig) {
       return _consumingInstances;
     }
 
