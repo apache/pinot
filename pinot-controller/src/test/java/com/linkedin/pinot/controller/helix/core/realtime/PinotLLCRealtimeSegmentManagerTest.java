@@ -1214,7 +1214,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
         HelixManager mockHelixManager = mock(HelixManager.class);
         _partitionAssignmentGenerator = new FakeStreamPartitionAssignmentGenerator(mockHelixManager);
         Field partitionAssignmentGeneratorField =
-            PinotLLCRealtimeSegmentManager.class.getDeclaredField("_partitionAssignmentGenerator");
+            PinotLLCRealtimeSegmentManager.class.getDeclaredField("_streamPartitionAssignmentGenerator");
         partitionAssignmentGeneratorField.setAccessible(true);
         partitionAssignmentGeneratorField.set(this, _partitionAssignmentGenerator);
       } catch (Exception e) {
