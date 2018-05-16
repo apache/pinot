@@ -46,7 +46,6 @@ const HumanizedAnomaly = EmberObject.extend({//TODO: rename `anomaly` to `record
  * @example anomaliesApiService: service('services/api/anomalies');
  */
 export default Service.extend({
-  store: service('store'),
   queryCache: service('services/query-cache'),
 
   init() {

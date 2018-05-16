@@ -8,6 +8,7 @@ import {
   filterPrefix,
   hasPrefix,
   toBaselineUrn,
+  toBaselineRange,
   toCurrentUrn,
   toOffsetUrn,
   toFilters,

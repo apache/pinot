@@ -44,6 +44,8 @@ export default DS.RESTAdapter.extend({
     switch(modelName) {
       case 'performance':
         return `${this.get('namespace')}/${query.appName}`;
+      case 'dimensions':
+        return `${this.get('namespace')}`;
       default:
         return this._super(...arguments);
     }
