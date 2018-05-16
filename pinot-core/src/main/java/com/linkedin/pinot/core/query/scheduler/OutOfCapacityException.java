@@ -18,9 +18,9 @@ package com.linkedin.pinot.core.query.scheduler;
 /**
  * Indicates that the scheduler queue is out of capacity
  */
-public class OutOfCapacityError extends Exception {
+public class OutOfCapacityException extends Exception {
 
-  public OutOfCapacityError(String msg) {
+  public OutOfCapacityException(String msg) {
     super(msg);
   }
 }
