@@ -18,7 +18,7 @@ package com.linkedin.pinot.controller.helix;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.TenantNameBuilder;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
@@ -33,8 +33,8 @@ import org.testng.annotations.Test;
 public class ControllerInstanceToggleTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
-  private static final String SERVER_TENANT_NAME = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(null);
-  private static final String BROKER_TENANT_NAME = ControllerTenantNameBuilder.getBrokerTenantNameForTenant(null);
+  private static final String SERVER_TENANT_NAME = TenantNameBuilder.getOfflineTenantNameForTenant(null);
+  private static final String BROKER_TENANT_NAME = TenantNameBuilder.getBrokerTenantNameForTenant(null);
   private static final int NUM_INSTANCES = 3;
 
   private final String _helixClusterName = getHelixClusterName();

@@ -23,7 +23,7 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.TenantNameBuilder;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -100,7 +100,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     // Untag all Brokers assigned to broker tenant
     for (String brokerInstance : _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)) {
       _helixAdmin.removeInstanceTag(_helixClusterName, brokerInstance,
-          ControllerTenantNameBuilder.getBrokerTenantNameForTenant(BROKER_TENANT_NAME));
+          TenantNameBuilder.getBrokerTenantNameForTenant(BROKER_TENANT_NAME));
       _helixAdmin.addInstanceTag(_helixClusterName, brokerInstance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
 
@@ -121,7 +121,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     // Untag all Brokers for other tests
     for (String brokerInstance : _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)) {
       _helixAdmin.removeInstanceTag(_helixClusterName, brokerInstance,
-          ControllerTenantNameBuilder.getBrokerTenantNameForTenant(BROKER_TENANT_NAME));
+          TenantNameBuilder.getBrokerTenantNameForTenant(BROKER_TENANT_NAME));
       _helixAdmin.addInstanceTag(_helixClusterName, brokerInstance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
 

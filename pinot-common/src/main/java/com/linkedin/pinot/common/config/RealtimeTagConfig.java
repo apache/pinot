@@ -15,8 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
-
+import com.linkedin.pinot.common.utils.TenantNameBuilder;
 
 /**
  * Wrapper class over TableConfig for a realtime table
@@ -33,8 +32,9 @@ public class RealtimeTagConfig extends TagConfig {
     super(tableConfig);
 
     // TODO: after we introduce config to override tags, pick the right ones from config for consuming and completed
-    _consumingRealtimeServerTag = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(_serverTenant);
-    _completedRealtimeServerTag = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(_serverTenant);
+    _consumingRealtimeServerTag = TenantNameBuilder.getRealtimeTenantNameForTenant(_serverTenant);
+    _completedRealtimeServerTag = TenantNameBuilder.getRealtimeTenantNameForTenant(_serverTenant);
+
     if (!_consumingRealtimeServerTag.equals(_completedRealtimeServerTag)) {
       _relocateCompletedSegments = true;
     }
