@@ -39,7 +39,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.lang.math.IntRange;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
@@ -244,7 +243,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
     instanceConfigs.add(new InstanceConfig(newServerName));
 
     // Update external view
-    partitionToServerMapping = buildKafkaPartitionMapping(instanceConfigs);
+    partitionToServerMapping = buildStreamPartitionMapping(instanceConfigs);
     ExternalView newExternalView =
         buildExternalView(REALTIME_TABLE_NAME, fakePropertyStore, partitionToServerMapping, segmentList);
 
