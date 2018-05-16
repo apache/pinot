@@ -10,7 +10,6 @@ import EmberObject, { computed, get } from '@ember/object';
  * @example anomaliesApiService: service('services/api/dimensions');
  */
 export default Service.extend({
-  store: service('store'),
   queryCache: service('services/query-cache'),
 
   init() {

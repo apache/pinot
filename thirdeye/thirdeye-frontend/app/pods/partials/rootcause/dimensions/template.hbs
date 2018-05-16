@@ -8,13 +8,11 @@
 
   {{#if model.isDevEnv}} {{!--  Remove conditional when table view is ready  --}}
     {{#subtab.tabpanel name="table"}}
-      <div class="rootcause-dimensions-table">
-        {{rootcause-dimensions
-          selectedUrn=metricUrn
-          entities=entities
-          context=context
-        }}
-      </div>
+      {{rootcause-dimensions
+        selectedUrn=metricUrn
+        entities=entities
+        context=context
+      }}
     {{/subtab.tabpanel}}
   {{/if}}
 
@@ -24,7 +22,6 @@
         {{ember-spinner}}
       </div>
     {{/if}}
-
     {{rootcause-heatmap
       entities=entities
       breakdowns=breakdowns

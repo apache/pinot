@@ -8,10 +8,10 @@ module('Integration | Component | rootcause-dimensions', function(hooks) {
 
   skip('it renders', async function(assert) {
     this.setProperties({
-      metricUrn: 'thirdeye:metric:12345',
+      metricUrn: 'dataset1:metric1:12345',
       entities: {
         'thirdeye:metric:12345': {
-          label: 'thirdeyeKbmi::warmSignUps'
+          label: 'dataset1::metric1'
         }
       },
       context: {

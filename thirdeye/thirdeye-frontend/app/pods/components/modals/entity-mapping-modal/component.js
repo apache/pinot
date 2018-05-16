@@ -37,7 +37,6 @@ import _ from 'lodash';
 const MAPPING_TYPES = [
   'METRIC',
   'DIMENSION',
-  // 'SERVICE', // TODO: Enable once we want to fix services endpoint
   'DATASET',
   'LIXTAG'
 ];

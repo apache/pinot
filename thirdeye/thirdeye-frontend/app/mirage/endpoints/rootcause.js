@@ -1,4 +1,6 @@
 import moment from 'moment';
+import advancedDimensions from 'thirdeye-frontend/mocks/anomalies';
+
 export default function(server) {
   /**
    * Get request for rootcause page
@@ -97,6 +99,14 @@ export default function(server) {
       selectedUrns: [ "thirdeye:metric:1", "frontend:metric:baseline:1", "frontend:metric:current:1" ],
       permissions: "READ_WRITE"
     };
+  });
+
+
+  /**
+   * Retrieves dimension data for a metric
+   */
+  server.get('/dashboard/summary/autoDimensionOrder', () => {
+    return advancedDimensions;
   });
 
   /**

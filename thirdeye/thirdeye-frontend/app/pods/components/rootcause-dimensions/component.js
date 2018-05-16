@@ -12,13 +12,15 @@ export default Component.extend({
 
   /**
    * Incoming cached state for rootcause view
-   * Contains date-range and active metric settings
+   * The context object is maintained by the RCA caching services. It defines the 'state' of the analysis view as
+   * the user modifies options. This object will always contain start/end ranges, and active metric settings, which
+   * this component needs to react to.
    * @type {Object}
    */
   context: {},
 
   /**
-   * Incoming cached collection of loaded entities
+   * Incoming collection of loaded entities cached in RCA services
    * @type {Object}
    */
   entities: {},
@@ -60,11 +62,22 @@ export default Component.extend({
   isDimensionDataPresent: false,
 
   /**
+   * Build request object for service query call each time we have fresh attributes if a 'metricEntity' is found
+   */
+  didReceiveAttrs() {
+    this._super(...arguments);
+    // The table needs clearing at this point
+    this._clearTable();
+    // Load new data from either cache or new call
+    this._loadDimensionAnalysisData();
+  },
+
+  /**
    * Clears rendered table data
    * @returns {undefined}
    * @private
    */
-  clearTable() {
+  _clearTable() {
     this.setProperties({
       dimensionTableData:[],
       dimensionTableHeaders:[],
@@ -74,20 +87,20 @@ export default Component.extend({
   },
 
   /**
-   * Build request object for service query call each time we have fresh attributes if a 'metricEntity' is found
+   * Parses required dimension query params and calls the concurrency task to fetch requested dimensions
+   * @method _loadDimensionAnalysisData
+   * @returns {undefined}
+   * @private
    */
-  didReceiveAttrs() {
-    this._super(...arguments);
-
+  _loadDimensionAnalysisData() {
     const { entities, selectedUrn, context } = this.getProperties('entities', 'selectedUrn', 'context');
     // Baseline start/end is dependent on 'compareMode' (WoW, Wo2W, etc)
     const baselineRange = toBaselineRange(context.analysisRange, context.compareMode);
     // If metric URN is found in entity list, proceed. Otherwise, we have no metadata to construct the call.
     const metricEntity = entities[selectedUrn];
-
     if (metricEntity) {
       const parsedMetric = metricEntity.label.split('::');
-      const dimensionTableObj = {
+      get(this, 'fetchDimensionAnalysisData').perform({
         metric: parsedMetric[1],
         dataset: parsedMetric[0],
         currentStart: context.analysisRange[0],
@@ -97,21 +110,18 @@ export default Component.extend({
         summarySize: 20,
         oneSideError: false,
         depth: 3
-      };
-      // The table needs clearing at this point
-      this.clearTable();
-      // Load new data from either cache or new call
-      get(this, 'loadDimensionAnalysisData').perform(dimensionTableObj);
+      });
     }
   },
 
   /**
    * Adds dimension data to dimension rows for table
+   * @method  _getDimensionTableData
    * @param {Object} dimensionsPayload - result from dimensions endpoint
    * @returns {Array} dimensionRows
    * @private
    */
-  getDimensionTableData(dimensionsPayload) {
+  _getDimensionTableData(dimensionsPayload) {
     const dimensionNames = dimensionsPayload.dimensions;
     const dimensionRows = dimensionsPayload.responseRows || [];
     let summaryRowIndex = 0; // row containing aggregated values
@@ -140,11 +150,12 @@ export default Component.extend({
 
   /**
    * Builds the columns array, pushing incoming dimensions into the base columns
+   * @method  _getDimensionTableColumns
    * @param {Array} dimensionNamesArr - array containing dimension names
    * @returns {Array} combinedColumnsArr
    * @private
    */
-  getDimensionTableColumns(dimensionNamesArr) {
+  _getDimensionTableColumns(dimensionNamesArr) {
     const tableBaseClass = 'advanced-dimensions-table__column';
     let dimensionArr = [];
     let combinedColumnsArr = [];
@@ -166,17 +177,18 @@ export default Component.extend({
 
   /**
    * Concurrency task to call for either cached or new dimension data from store
+   * @method fetchDimensionAnalysisData
    * @param {Object} dimensionObj - required params for query
    * @returns {Generator object}
    * @private
    */
-  loadDimensionAnalysisData: task(function * (dimensionObj) {
+  fetchDimensionAnalysisData: task(function * (dimensionObj) {
     const overallChange = get(this, 'overallChange');
     const dimensionsPayload = yield this.get('dimensionsApiService').queryDimensionsByMetric(dimensionObj);
     const dimensionNames = dimensionsPayload.dimensions || null;
     const dimensionTableHeaders = dimensionNames ? groupedHeaders(dimensionNames.length, overallChange) : [];
-    const dimensionTableColumns = yield this.getDimensionTableColumns(dimensionNames);
-    const dimensionTableData = yield this.getDimensionTableData(dimensionsPayload);
+    const dimensionTableColumns = yield this._getDimensionTableColumns(dimensionNames);
+    const dimensionTableData = yield this._getDimensionTableData(dimensionsPayload);
     this.setProperties({
       dimensionTableHeaders,
       dimensionTableColumns,
