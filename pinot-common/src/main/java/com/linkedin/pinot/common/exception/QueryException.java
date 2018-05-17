@@ -49,6 +49,7 @@ public class QueryException {
   public static final int BROKER_TIMEOUT_ERROR_CODE = 400;
   public static final int BROKER_RESOURCE_MISSING_ERROR_CODE = 410;
   public static final int BROKER_INSTANCE_MISSING_ERROR_CODE = 420;
+  public static final int TOO_MANY_REQUESTS_ERROR_CODE = 429;
   public static final int INTERNAL_ERROR_CODE = 450;
   public static final int MERGE_RESPONSE_ERROR_CODE = 500;
   public static final int FEDERATED_BROKER_UNAVAILABLE_ERROR_CODE = 550;
@@ -86,6 +87,7 @@ public class QueryException {
       new ProcessingException(COMBINE_GROUP_BY_EXCEPTION_ERROR_CODE);
   public static final ProcessingException QUERY_VALIDATION_ERROR = new ProcessingException(QUERY_VALIDATION_ERROR_CODE);
   public static final ProcessingException UNKNOWN_ERROR = new ProcessingException(UNKNOWN_ERROR_CODE);
+  public static final ProcessingException QUOTA_EXCEEDED_ERROR = new ProcessingException(TOO_MANY_REQUESTS_ERROR_CODE);
 
   static {
     JSON_PARSING_ERROR.setMessage("JsonParsingError");
@@ -109,6 +111,7 @@ public class QueryException {
     COMBINE_GROUP_BY_EXCEPTION_ERROR.setMessage("CombineGroupByExceptionError");
     QUERY_VALIDATION_ERROR.setMessage("QueryValidationError");
     UNKNOWN_ERROR.setMessage("UnknownError");
+    QUOTA_EXCEEDED_ERROR.setMessage("QuotaExceededError");
   }
 
   public static ProcessingException getException(ProcessingException processingException, Exception exception) {

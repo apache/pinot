@@ -110,12 +110,14 @@ public class StorageQuotaCheckerTest {
     setupTableSegmentSize(5800, 900);
     when(_tableConfig.getQuotaConfig()).thenReturn(_quotaConfig);
     when(_quotaConfig.storageSizeBytes()).thenReturn(3000L);
+    when(_quotaConfig.getStorage()).thenReturn("3K");
     StorageQuotaChecker checker = new StorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics);
     StorageQuotaChecker.QuotaCheckerResponse response =
         checker.isSegmentStorageWithinQuota(TEST_DIR, "testTable", "segment1", 1000);
     Assert.assertTrue(response.isSegmentWithinQuota);
 
     when(_quotaConfig.storageSizeBytes()).thenReturn(2800L);
+    when(_quotaConfig.getStorage()).thenReturn("2.8K");
     response = checker.isSegmentStorageWithinQuota(TEST_DIR, "testTable", "segment1", 1000);
     Assert.assertFalse(response.isSegmentWithinQuota);
   }

@@ -19,6 +19,8 @@ import com.google.common.base.Splitter;
 import com.linkedin.pinot.broker.api.RequesterIdentity;
 import com.linkedin.pinot.broker.broker.AccessControlFactory;
 import com.linkedin.pinot.broker.pruner.SegmentZKMetadataPrunerService;
+
+import com.linkedin.pinot.broker.queryquota.TableQueryQuotaManager;
 import com.linkedin.pinot.broker.routing.RoutingTable;
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.broker.routing.TimeBoundaryService;
@@ -95,11 +97,12 @@ public class BrokerRequestHandler {
   private final int _queryResponseLimit;
   private final AtomicLong _requestIdGenerator;
   private final String _brokerId;
+  private final TableQueryQuotaManager _tableQueryQuotaManager;
 
   public BrokerRequestHandler(RoutingTable table, TimeBoundaryService timeBoundaryService,
       ScatterGather scatterGatherer, ReduceServiceRegistry reduceServiceRegistry,
       SegmentZKMetadataPrunerService segmentPrunerService, BrokerMetrics brokerMetrics, Configuration config,
-      AccessControlFactory accessControlFactory) {
+      AccessControlFactory accessControlFactory, TableQueryQuotaManager tableQueryQuotaManager) {
     _routingTable = table;
     _timeBoundaryService = timeBoundaryService;
     _reduceServiceRegistry = reduceServiceRegistry;
@@ -113,6 +116,7 @@ public class BrokerRequestHandler {
     _brokerId = config.getString(CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     _segmentPrunerService = segmentPrunerService;
     _accessControlFactory = accessControlFactory;
+    _tableQueryQuotaManager = tableQueryQuotaManager;
 
     LOGGER.info("Broker response limit is: " + _queryResponseLimit);
     LOGGER.info("Broker timeout is - " + _brokerTimeOutMs + " ms");
@@ -157,6 +161,7 @@ public class BrokerRequestHandler {
     }
     final String tableName = brokerRequest.getQuerySource().getTableName();
     final String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
         System.nanoTime() - compilationStartTime);
 
@@ -203,6 +208,15 @@ public class BrokerRequestHandler {
       LOGGER.info("No table matches the name: {}", tableName);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1L);
       return BrokerResponseFactory.getStaticNoTableHitBrokerResponse(ResponseType.BROKER_RESPONSE_TYPE_NATIVE);
+    }
+
+    // Validate qps quota.
+    if (!_tableQueryQuotaManager.acquire(tableName)) {
+      String msg = String.format("Query quota exceeded on requestId %d. TableName: %s. Broker Id: %s", requestId, rawTableName, _brokerId);
+      LOGGER.error(msg);
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1L);
+      return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE,
+          QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, msg));
     }
 
     // Validate the request

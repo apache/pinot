@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.broker.broker.helix;
 
+import com.linkedin.pinot.broker.queryquota.TableQueryQuotaManager;
 import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.BrokerTimer;
@@ -43,6 +44,7 @@ import org.slf4j.LoggerFactory;
 public class ClusterChangeMediator implements LiveInstanceChangeListener, ExternalViewChangeListener, InstanceConfigChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterChangeMediator.class);
   private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
+  private final TableQueryQuotaManager _tableQueryQuotaManager;
 
   private enum UpdateType {
     EXTERNAL_VIEW,
@@ -54,8 +56,10 @@ public class ClusterChangeMediator implements LiveInstanceChangeListener, Extern
   private Thread _deferredClusterUpdater = null;
 
   public ClusterChangeMediator(HelixExternalViewBasedRouting helixExternalViewBasedRouting,
+      TableQueryQuotaManager tableQueryQuotaManager,
       final BrokerMetrics brokerMetrics) {
     _helixExternalViewBasedRouting = helixExternalViewBasedRouting;
+    _tableQueryQuotaManager = tableQueryQuotaManager;
 
     // Simple thread that polls every 10 seconds to check if there are any cluster updates to apply
     _deferredClusterUpdater = new Thread("Deferred cluster state updater") {
@@ -90,6 +94,7 @@ public class ClusterChangeMediator implements LiveInstanceChangeListener, Extern
             if (externalViewUpdated) {
               try {
                 _helixExternalViewBasedRouting.processExternalViewChange();
+                // TODO: call processQueryQuotaChange
               } catch (Exception e) {
                 LOGGER.warn("Caught exception while updating external view", e);
               }
