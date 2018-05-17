@@ -229,15 +229,6 @@ public class BrokerRequestHandler {
       LOGGER.debug("Debug options are set to: {} for requestId {}: {}", debugOptions, requestId, query);
       brokerRequest.setDebugOptions(debugOptions);
     }
-    if (request.has(QUERY_OPTIONS)) {
-      Map<String, String> queryOptions = Splitter.on(';')
-          .omitEmptyStrings()
-          .trimResults()
-          .withKeyValueSeparator('=')
-          .split(request.getString(QUERY_OPTIONS));
-      LOGGER.debug("Query options are set to: {} for requestId {}: {}", queryOptions, requestId, query);
-      brokerRequest.setQueryOptions(queryOptions);
-    }
     brokerRequest.setResponseFormat(ResponseType.BROKER_RESPONSE_TYPE_NATIVE.name());
 
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERIES, 1L);

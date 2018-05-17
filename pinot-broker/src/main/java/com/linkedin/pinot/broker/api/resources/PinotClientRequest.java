@@ -63,8 +63,7 @@ public class PinotClientRequest {
       // Query param "bql" is for backward compatibility
       @ApiParam(value = "Query", required = true) @QueryParam("bql") String query,
       @ApiParam(value = "Trace enabled") @QueryParam(TRACE) String traceEnabled,
-      @ApiParam(value = "Debug options") @QueryParam(DEBUG_OPTIONS) String debugOptions,
-      @ApiParam(value = "Query options") @QueryParam(QUERY_OPTIONS) String queryOptions
+      @ApiParam(value = "Debug options") @QueryParam(DEBUG_OPTIONS) String debugOptions
   ) {
     try {
       JSONObject requestJson = new JSONObject();
@@ -74,9 +73,6 @@ public class PinotClientRequest {
       }
       if (debugOptions != null) {
         requestJson.put(DEBUG_OPTIONS, debugOptions);
-      }
-      if (queryOptions != null) {
-        requestJson.put(QUERY_OPTIONS, queryOptions);
       }
       BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, null);
       return brokerResponse.toJsonString();
