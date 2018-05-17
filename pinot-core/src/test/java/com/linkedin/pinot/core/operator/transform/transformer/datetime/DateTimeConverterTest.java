@@ -265,6 +265,32 @@ public class DateTimeConverterTest {
           new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd ZZZ", "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(America/Chicago)", "1:MILLISECONDS", input, expected});
     }
 
+    // additional granularity tests
+    {
+      // Test conversion from simple date format to another simple date format (America/Denver timezone with 15 second granualrity)
+      String[] input =
+          {"20180412T19:16:38", "20180412T19:16:29", "20180412T19:17:12" };
+      String[] expected = {"2018-04-12 13:16:30.000", "2018-04-12 13:16:15.000", "2018-04-12 13:17:00.000"};
+      entries.add(
+          new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd'T'HH:mm:ss", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "15:SECONDS", input, expected});
+    }
+    {
+      // Test conversion from simple date format to another simple date format (America/Denver timezone with 5 day granualrity)
+      String[] input =
+          {"20180412T19:16:38", "20180419T17:55:02", "20180328T09:43:25" };
+      String[] expected = {"2018-04-10 00:00:00.000", "2018-04-15 00:00:00.000", "2018-03-25 00:00:00.000"};
+      entries.add(
+          new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd'T'HH:mm:ss", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Denver)", "5:DAYS", input, expected});
+    }
+    {
+      // Test conversion from simple date format to another simple date format (America/Los_Angeles timezone with 1 day granualrity)
+      String[] input =
+          {"20180418T10:00:00", "20180418T01:00:00"};
+      String[] expected = {"2018-04-18 00:00:00.000", "2018-04-17 00:00:00.000"};
+      entries.add(
+          new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd'T'HH:mm:ss", "1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS tz(America/Los_Angeles)", "1:DAYS", input, expected});
+    }
+
     return entries.toArray(new Object[entries.size()][]);
   }
 }
