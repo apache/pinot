@@ -359,11 +359,9 @@ AnomalyResultView.prototype = {
   },
 
   dataEventHandler : function(e) {
-    e.preventDefault();
     var currentTargetId = e.currentTarget.id;
-    if (currentTargetId.startsWith('investigate-button-')) {
-      this.investigateButtonClickEvent.notify(e.data);
-    } else if (currentTargetId.startsWith('show-details-')) {
+    if (currentTargetId.startsWith('show-details-')) {
+      e.preventDefault();
       this.showDetailsLinkClickEvent.notify(e.data);
     }
   },
@@ -444,7 +442,7 @@ AnomalyResultView.prototype = {
       anomalyId: anomaly.anomalyId,
     }
     const anomalyCard = $(`#anomaly-card-${index}`);
-    
+
     $(`#feedback-edit-${index}`).click(() => {
       this.toggleEdit(anomalyCard);
     });
