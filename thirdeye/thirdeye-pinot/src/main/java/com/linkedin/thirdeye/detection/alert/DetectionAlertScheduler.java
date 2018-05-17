@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -45,14 +46,8 @@ public class DetectionAlertScheduler implements Runnable {
     this.alertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
   }
 
-  private List<String> getScheduledJobs() throws SchedulerException {
-    List<String> activeJobKeys = new ArrayList<>();
-    for (String groupName : scheduler.getJobGroupNames()) {
-      for (JobKey jobKey : scheduler.getJobKeys(GroupMatcher.jobGroupEquals(groupName))) {
-        activeJobKeys.add(jobKey.getName());
-      }
-    }
-    return activeJobKeys;
+  private Set<JobKey> getScheduledJobs() throws SchedulerException {
+    return scheduler.getJobKeys(GroupMatcher.jobGroupEquals(TaskConstants.TaskType.DETECTION_ALERT.toString()));
   }
 
   public void start() throws SchedulerException {
@@ -65,12 +60,12 @@ public class DetectionAlertScheduler implements Runnable {
     this.scheduler.shutdown();
   }
 
-  private void stopJob(String jobKey) throws SchedulerException {
-    if (!scheduler.checkExists(JobKey.jobKey(jobKey))) {
-      throw new IllegalStateException("Cannot stop alert config " + jobKey + ", it has not been scheduled");
+  private void stopJob(JobKey key) throws SchedulerException {
+    if (!scheduler.checkExists(key)) {
+      throw new IllegalStateException("Cannot stop alert config " + key + ", it has not been scheduled");
     }
-    scheduler.deleteJob(JobKey.jobKey(jobKey));
-    LOG.info("Stopped alert config {}", jobKey);
+    scheduler.deleteJob(key);
+    LOG.info("Stopped alert config {}", key);
   }
 
   public void run() {
@@ -80,7 +75,7 @@ public class DetectionAlertScheduler implements Runnable {
       List<DetectionAlertConfigDTO> alertConfigs = alertConfigDAO.findAll();
 
       // get active jobs
-      List<String> scheduledJobs = getScheduledJobs();
+      Set<JobKey> scheduledJobs = getScheduledJobs();
       LOG.info("Scheduled jobs {}", scheduledJobs);
 
       for (DetectionAlertConfigDTO alertConfig : alertConfigs) {
@@ -93,7 +88,7 @@ public class DetectionAlertScheduler implements Runnable {
 
       // for any scheduled jobs, not having a function in the database,
       // stop the schedule, as function has been deleted
-      for (String scheduledJobKey : scheduledJobs) {
+      for (JobKey scheduledJobKey : scheduledJobs) {
         try {
           deleteAlertJob(scheduledJobKey);
         } catch (Exception e) {
@@ -110,7 +105,7 @@ public class DetectionAlertScheduler implements Runnable {
     return jobKey;
   }
 
-  private void deleteAlertJob(String scheduledJobKey) throws SchedulerException {
+  private void deleteAlertJob(JobKey scheduledJobKey) throws SchedulerException {
     Long configId = getIdFromJobKey(scheduledJobKey);
     DetectionAlertConfigDTO alertConfigSpec = alertConfigDAO.findById(configId);
     if (alertConfigSpec == null) {
@@ -119,8 +114,8 @@ public class DetectionAlertScheduler implements Runnable {
     }
   }
 
-  private Long getIdFromJobKey(String jobKey) {
-    String[] tokens = jobKey.split("_");
+  private Long getIdFromJobKey(JobKey jobKey) {
+    String[] tokens = jobKey.getName().split("_");
     String id = tokens[tokens.length - 1];
     return Long.valueOf(id);
   }
@@ -133,36 +128,37 @@ public class DetectionAlertScheduler implements Runnable {
     LOG.info(String.format("scheduled detection pipeline job %s.", key.getName()));
   }
 
-  private void createOrUpdateAlertJob(List<String> scheduledJobs, DetectionAlertConfigDTO alertConfig)
+  private void createOrUpdateAlertJob(Set<JobKey> scheduledJobs, DetectionAlertConfigDTO alertConfig)
       throws SchedulerException {
     Long id = alertConfig.getId();
-    String jobKey = getJobKey(id);
     boolean isActive = alertConfig.isActive();
-    boolean isScheduled = scheduledJobs.contains(jobKey);
+
+    JobKey key = new JobKey(getJobKey(id), TaskConstants.TaskType.DETECTION_ALERT.toString());
+    boolean isScheduled = scheduledJobs.contains(key);
 
     if (isActive) {
       if (isScheduled) {
         String cronInDatabase = alertConfig.getCronExpression();
 
-        List<Trigger> triggers = (List<Trigger>) scheduler.getTriggersOfJob(JobKey.jobKey(jobKey));
+        List<Trigger> triggers = (List<Trigger>) scheduler.getTriggersOfJob(key);
         CronTrigger cronTrigger = (CronTrigger) triggers.get(0);
         String cronInSchedule = cronTrigger.getCronExpression();
         // cron expression has been updated, restart this job
         if (!cronInDatabase.equals(cronInSchedule)) {
           LOG.info(
               "Cron expression for config {} with jobKey {} has been changed from {}  to {}. " + "Restarting schedule",
-              id, jobKey, cronInSchedule, cronInDatabase);
-          stopJob(jobKey);
-          startJob(alertConfig, new JobKey(jobKey));
+              id, key, cronInSchedule, cronInDatabase);
+          stopJob(key);
+          startJob(alertConfig, key);
         }
       } else {
         LOG.info("Found active but not scheduled {}", id);
-        startJob(alertConfig, new JobKey(jobKey));
+        startJob(alertConfig, key);
       }
     } else {
       if (isScheduled) {
         LOG.info("Found inactive but scheduled {}", id);
-        stopJob(jobKey);
+        stopJob(key);
       }
       // for all jobs with not isActive, and not isScheduled, no change required
     }

@@ -87,6 +87,10 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
     DetectionPipeline pipeline = this.loader.from(this.provider, config, info.start, info.end);
     DetectionPipelineResult result = pipeline.run();
 
+    if (result.getLastTimestamp() < 0) {
+      return Collections.emptyList();
+    }
+
     config.setLastTimestamp(result.getLastTimestamp());
     this.detectionDAO.update(config);
 

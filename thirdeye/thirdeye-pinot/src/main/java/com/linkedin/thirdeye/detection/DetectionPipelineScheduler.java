@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detection;
 
+import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -7,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Collection;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -17,6 +19,7 @@ import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
+import org.quartz.SchedulerFactory;
 import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
 import org.quartz.impl.StdSchedulerFactory;
@@ -52,7 +55,7 @@ public class DetectionPipelineScheduler implements Runnable {
 
       // add or update
       for (DetectionConfigDTO config : configs) {
-        JobKey key = new JobKey(String.valueOf(config.getId()));
+        JobKey key = new JobKey(getJobKey(config.getId()), TaskConstants.TaskType.DETECTION.toString());
 
         if (scheduler.checkExists(key)) {
           LOG.warn("Detection config  " + key + " is already scheduled.");
@@ -67,10 +70,10 @@ public class DetectionPipelineScheduler implements Runnable {
       }
 
       // remove
-      List<JobKey> scheduledJobs = getScheduledJobs();
+      Set<JobKey> scheduledJobs = getScheduledJobs();
       for (JobKey jobKey : scheduledJobs) {
         try {
-          Long id = Long.parseLong(jobKey.getName());
+          Long id = getIdFromJobKey(jobKey.getName());
           DetectionConfigDTO detectionDTO = detectionDAO.findById(id);
           if (detectionDTO == null) {
             LOG.info("Found a scheduled detection pipeline, but not found in the database {}", id);
@@ -115,18 +118,22 @@ public class DetectionPipelineScheduler implements Runnable {
     LOG.info("Stopped detection pipeline {}", jobKey.getName());
   }
 
-  public List<JobKey> getScheduledJobs() throws SchedulerException {
-    List<JobKey> activeJobKeys = new ArrayList<>();
-    for (String groupName : this.scheduler.getJobGroupNames()) {
-      for (JobKey jobKey : this.scheduler.getJobKeys(GroupMatcher.jobGroupEquals(groupName))) {
-        activeJobKeys.add(jobKey);
-      }
-    }
-    return activeJobKeys;
+  public Set<JobKey> getScheduledJobs() throws SchedulerException {
+    return this.scheduler.getJobKeys(GroupMatcher.jobGroupEquals(TaskConstants.TaskType.DETECTION.toString()));
   }
 
   public void shutdown() throws SchedulerException {
     AnomalyUtils.safelyShutdownExecutionService(scheduledExecutorService, this.getClass());
     scheduler.shutdown();
+  }
+
+  private String getJobKey(Long id) {
+    return String.format("%s_%d", TaskConstants.TaskType.DETECTION, id);
+  }
+
+  private Long getIdFromJobKey(String jobKey) {
+    String[] tokens = jobKey.split("_");
+    String id = tokens[tokens.length - 1];
+    return Long.valueOf(id);
   }
 }

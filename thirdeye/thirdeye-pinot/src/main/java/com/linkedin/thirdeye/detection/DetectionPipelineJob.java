@@ -25,7 +25,7 @@ public class DetectionPipelineJob implements Job {
   @Override
   public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
     JobKey jobKey = jobExecutionContext.getJobDetail().getKey();
-    Long id = Long.parseLong(jobKey.getName());
+    Long id = getIdFromJobKey(jobKey.getName());
     DetectionConfigDTO configDTO = detectionDAO.findById(id);
     DetectionPipelineTaskInfo taskInfo = new DetectionPipelineTaskInfo(configDTO.getId(), configDTO.getLastTimestamp(), System.currentTimeMillis());
 
@@ -46,6 +46,12 @@ public class DetectionPipelineJob implements Job {
     long taskId = taskDAO.save(taskDTO);
     LOG.info("Created detection pipeline task {} with taskId {}", taskDTO, taskId);
 
+  }
+
+  private Long getIdFromJobKey(String jobKey) {
+    String[] tokens = jobKey.split("_");
+    String id = tokens[tokens.length - 1];
+    return Long.valueOf(id);
   }
 }
 
