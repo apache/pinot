@@ -17,6 +17,7 @@ package com.linkedin.pinot.controller.helix.core;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.util.concurrent.Uninterruptibles;
@@ -2142,7 +2143,7 @@ public class PinotHelixResourceManager {
    * server instances. With BiMap, both mappings are easily available
    */
   public @Nonnull
-  BiMap<String, String> getDataInstanceAdminEndpoints(@Nonnull Set<String> instances) {
+  BiMap<String, String> getDataInstanceAdminEndpoints(@Nonnull Set<String> instances) throws InvalidConfigException {
     Preconditions.checkNotNull(instances);
     BiMap<String, String> endpointToInstance = HashBiMap.create(instances.size());
     for (String instance : instances) {
@@ -2150,8 +2151,15 @@ public class PinotHelixResourceManager {
       ZNRecord record = helixInstanceConfig.getRecord();
       String[] hostnameSplit = helixInstanceConfig.getHostName().split("_");
       Preconditions.checkState(hostnameSplit.length >= 2);
-      String port = record.getSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY);
-      endpointToInstance.put(instance, hostnameSplit[1] + ":" + port);
+      String adminPort = record.getSimpleField(CommonConstants.Helix.Instance.ADMIN_PORT_KEY);
+      // If admin port is missing, there's no point to calculate the remaining table size.
+      // Thus, throwing an exception will be good here.
+      if (Strings.isNullOrEmpty(adminPort)) {
+        String message = String.format("Admin port is missing for host: %s", helixInstanceConfig.getHostName());
+        LOGGER.error(message);
+        throw new InvalidConfigException(message);
+      }
+      endpointToInstance.put(instance, hostnameSplit[1] + ":" + adminPort);
     }
     return endpointToInstance;
   }

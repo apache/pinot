@@ -19,6 +19,7 @@ package com.linkedin.pinot.controller.api.resources;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
@@ -413,8 +414,14 @@ public class PinotSegmentUploadRestletResource {
     }
 
     // Check quota
-    StorageQuotaChecker.QuotaCheckerResponse quotaResponse =
-        checkStorageQuota(indexDir, segmentMetadata, offlineTableConfig);
+    StorageQuotaChecker.QuotaCheckerResponse quotaResponse;
+    try {
+      quotaResponse = checkStorageQuota(indexDir, segmentMetadata, offlineTableConfig);
+    } catch (InvalidConfigException e) {
+      // Admin port is missing, return response with 500 status code.
+      throw new ControllerApplicationException(LOGGER, "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: "
+          + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
     if (!quotaResponse.isSegmentWithinQuota) {
       throw new ControllerApplicationException(LOGGER,
           "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: "
@@ -620,7 +627,7 @@ public class PinotSegmentUploadRestletResource {
    * @param offlineTableConfig offline table configuration. This should not be null.
    */
   private StorageQuotaChecker.QuotaCheckerResponse checkStorageQuota(@Nonnull File segmentFile,
-      @Nonnull SegmentMetadata metadata, @Nonnull TableConfig offlineTableConfig) {
+      @Nonnull SegmentMetadata metadata, @Nonnull TableConfig offlineTableConfig) throws InvalidConfigException {
     TableSizeReader tableSizeReader = new TableSizeReader(_executor, _connectionManager, _pinotHelixResourceManager);
     StorageQuotaChecker quotaChecker = new StorageQuotaChecker(offlineTableConfig, tableSizeReader, _controllerMetrics);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(metadata.getTableName());

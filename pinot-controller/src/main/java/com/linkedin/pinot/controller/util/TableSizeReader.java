@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.util;
 
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -65,7 +66,7 @@ public class TableSizeReader {
    * @return
    */
   public @Nullable TableSizeDetails getTableSizeDetails(@Nonnull String tableName,
-      @Nonnegative int timeoutMsec) {
+      @Nonnegative int timeoutMsec) throws InvalidConfigException {
     Preconditions.checkNotNull(tableName, "Table name should not be null");
     Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be greater than 0");
 
@@ -134,7 +135,8 @@ public class TableSizeReader {
     public Map<String, SegmentSizeInfo> serverInfo = new HashMap<>();
   }
 
-  public TableSubTypeSizeDetails getTableSubtypeSize(String tableNameWithType, int timeoutMsec) {
+  public TableSubTypeSizeDetails getTableSubtypeSize(String tableNameWithType, int timeoutMsec)
+      throws InvalidConfigException {
     // for convenient usage within this function
     final String table = tableNameWithType;
 
