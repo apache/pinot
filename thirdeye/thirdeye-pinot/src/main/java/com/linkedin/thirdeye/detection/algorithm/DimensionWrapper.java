@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
@@ -44,6 +45,9 @@ public class DimensionWrapper extends DetectionPipeline {
   private static final String PROP_K = "k";
   private static final int PROP_K_DEFAULT = -1;
 
+  private static final String PROP_LOOKBACK = "lookback";
+  private static final long PROP_LOOKBACK_DEFAULT = TimeUnit.DAYS.toMillis(7);
+
   // prototyping
   private static final String PROP_NESTED = "nested";
 
@@ -59,6 +63,7 @@ public class DimensionWrapper extends DetectionPipeline {
   private final int k;
   private final double minValue;
   private final double minContribution;
+  private final long lookback;
 
   private final String nestedMetricUrn;
   private final String nestedMetricUrnKey;
@@ -77,6 +82,7 @@ public class DimensionWrapper extends DetectionPipeline {
     this.dimensions = config.getProperties().containsKey(PROP_DIMENSIONS) ?
         new ArrayList<>((Collection<String>) config.getProperties().get(PROP_DIMENSIONS)) :
         Collections.<String>emptyList();
+    this.lookback = MapUtils.getLongValue(config.getProperties(), PROP_LOOKBACK, PROP_LOOKBACK_DEFAULT);
 
     // prototyping
     Preconditions.checkArgument(config.getProperties().containsKey(PROP_NESTED), "Missing " + PROP_NESTED);
@@ -90,8 +96,12 @@ public class DimensionWrapper extends DetectionPipeline {
 
   @Override
   public DetectionPipelineResult run() throws Exception {
+    long startTime = this.startTime;
+    if (this.endTime - this.startTime < this.lookback) {
+      startTime = this.endTime - this.lookback;
+    }
     MetricEntity metric = MetricEntity.fromURN(this.metricUrn, 1.0);
-    MetricSlice slice = MetricSlice.from(metric.getId(), this.startTime, this.endTime, metric.getFilters());
+    MetricSlice slice = MetricSlice.from(metric.getId(), startTime, this.endTime, metric.getFilters());
 
     DataFrame aggregates = this.provider.fetchAggregates(Collections.singletonList(slice), this.dimensions).get(slice);
 
@@ -151,6 +161,10 @@ public class DimensionWrapper extends DetectionPipeline {
 
         anomalies.addAll(intermediate.getAnomalies());
       }
+    }
+
+    if (lastTimestamp == Long.MAX_VALUE) {
+      lastTimestamp = -1L;
     }
 
     return new DetectionPipelineResult(anomalies, lastTimestamp);

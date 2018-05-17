@@ -95,6 +95,9 @@ public class MergeWrapper extends DetectionPipeline {
 
     allAnomalies.addAll(this.provider.fetchAnomalies(Collections.singleton(this.slice)).get(this.slice));
 
+    if (overallLastTimeStamp == Long.MAX_VALUE) {
+      overallLastTimeStamp = -1L;
+    }
     return new DetectionPipelineResult(mergeOnTime(allAnomalies), overallLastTimeStamp);
   }
 
