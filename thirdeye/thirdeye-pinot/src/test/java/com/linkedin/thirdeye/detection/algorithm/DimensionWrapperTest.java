@@ -17,6 +17,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -30,6 +31,7 @@ public class DimensionWrapperTest {
   private static final String PROP_MIN_VALUE = "minValue";
   private static final String PROP_MIN_CONTRIBUTION = "minContribution";
   private static final String PROP_K = "k";
+  private static final String PROP_LOOKBACK = "lookback";
 
   // prototyping
   private static final String PROP_NESTED = "nested";
@@ -53,11 +55,12 @@ public class DimensionWrapperTest {
   private DetectionConfigDTO config;
   private Map<String, Object> properties;
   private Map<String, Object> nestedProperties;
+  private Map<MetricSlice, DataFrame> aggregates;
 
   @BeforeMethod
   public void beforeMethod() {
-    Map<MetricSlice, DataFrame> aggregates = new HashMap<>();
-    aggregates.put(MetricSlice.from(1, 10, 15),
+    this.aggregates = new HashMap<>();
+    this.aggregates.put(MetricSlice.from(1, 10, 15),
         new DataFrame()
             .addSeries("a", StringSeries.buildFrom("1", "1", "1", "1", "1", "2", "2", "2", "2", "2"))
             .addSeries("b", StringSeries.buildFrom("1", "2", "1", "2", "3", "1", "2", "1", "2", "3"))
@@ -68,7 +71,7 @@ public class DimensionWrapperTest {
     this.outputs = new ArrayList<>();
 
     this.provider = new MockDataProvider()
-        .setAggregates(aggregates)
+        .setAggregates(this.aggregates)
         .setLoader(new MockPipelineLoader(this.runs, this.outputs));
 
     this.nestedProperties = new HashMap<>();
@@ -81,11 +84,26 @@ public class DimensionWrapperTest {
     this.properties.put(PROP_NESTED_METRIC_URN_KEY, PROP_NESTED_METRIC_URN_KEY_VALUE);
     this.properties.put(PROP_NESTED_METRIC_URN, PROP_NESTED_METRIC_URN_VALUE);
     this.properties.put(PROP_NESTED, Collections.singletonList(this.nestedProperties));
+    this.properties.put(PROP_LOOKBACK, 0);
 
     this.config = new DetectionConfigDTO();
     this.config.setId(PROP_ID_VALUE);
     this.config.setName(PROP_NAME_VALUE);
     this.config.setProperties(this.properties);
+  }
+
+  @Test
+  public void testLookBack() throws Exception {
+    this.properties.put(PROP_LOOKBACK, 5);
+    this.properties.put(PROP_DIMENSIONS, Collections.singleton("b"));
+
+    this.wrapper = new DimensionWrapper(this.provider, this.config, 14, 15);
+    this.wrapper.run();
+
+    Assert.assertEquals(this.runs.size(), 3);
+    assertEquals(this.runs.get(0), makePipeline("thirdeye:metric:2:b%3D1", 14, 15));
+    assertEquals(this.runs.get(1), makePipeline("thirdeye:metric:2:b%3D2", 14, 15));
+    assertEquals(this.runs.get(2), makePipeline("thirdeye:metric:2:b%3D3", 14, 15));
   }
 
   @Test
@@ -170,9 +188,14 @@ public class DimensionWrapperTest {
   }
 
   private MockPipeline makePipeline(String metricUrn) {
-    return new MockPipeline(this.provider, makeConfig(metricUrn), 10, 15,
+    return makePipeline(metricUrn, 10, 15);
+  }
+
+  private MockPipeline makePipeline(String metricUrn, long startTime, long endTime) {
+    return new MockPipeline(this.provider, makeConfig(metricUrn), startTime, endTime,
         new MockPipelineOutput(Collections.<MergedAnomalyResultDTO>emptyList(), -1));
   }
+
 
   private static void assertEquals(MockPipeline a, MockPipeline b) {
     Assert.assertEquals(a, b);
