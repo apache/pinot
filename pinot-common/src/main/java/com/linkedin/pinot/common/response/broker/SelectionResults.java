@@ -24,23 +24,33 @@ import org.codehaus.jackson.annotate.JsonPropertyOrder;
 
 @JsonPropertyOrder({"columns", "results"})
 public class SelectionResults {
-  private final List<String> _columnList;
-  private final List<Serializable[]> _rows;
+  private List<String> _columns;
+  private List<Serializable[]> _rows;
 
   @JsonCreator
-  public SelectionResults(@JsonProperty("columns") List<String> columnList,
+  public SelectionResults(@JsonProperty("columns") List<String> columns,
       @JsonProperty("results") List<Serializable[]> results) {
-    _columnList = columnList;
+    _columns = columns;
     _rows = results;
   }
 
   @JsonProperty("columns")
   public List<String> getColumns() {
-    return _columnList;
+    return _columns;
+  }
+
+  @JsonProperty("columns")
+  public void setColumns(List<String> columns) {
+    _columns = columns;
   }
 
   @JsonProperty("results")
   public List<Serializable[]> getRows() {
     return _rows;
+  }
+
+  @JsonProperty("results")
+  public void setRows(List<Serializable[]> rows) {
+    _rows = rows;
   }
 }

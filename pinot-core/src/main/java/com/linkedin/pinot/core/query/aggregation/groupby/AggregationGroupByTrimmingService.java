@@ -230,7 +230,7 @@ public class AggregationGroupByTrimmingService {
 
         GroupByResult groupByResult = new GroupByResult();
         groupByResult.setGroup(Arrays.asList(groupKeys));
-        groupByResult.setValue(AggregationFunctionUtils.formatValue(groupKeyResultPair._result));
+        groupByResult.setValue(AggregationFunctionUtils.getSerializableValue(groupKeyResultPair._result));
 
         // Add to head to reverse the order
         dest.addFirst(groupByResult);
