@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -31,16 +32,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
-import org.joda.time.Period;
-import org.joda.time.format.PeriodFormatter;
-import org.joda.time.format.PeriodFormatterBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,8 +52,6 @@ import org.slf4j.LoggerFactory;
  */
 public class RealtimeSegmentRelocator {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentRelocator.class);
-  private final static PeriodFormatter PERIOD_FORMATTER =
-      new PeriodFormatterBuilder().appendHours().appendSuffix("h").appendMinutes().appendSuffix("m").toFormatter();
 
   private final ScheduledExecutorService _executorService;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
@@ -70,13 +65,10 @@ public class RealtimeSegmentRelocator {
     _helixAdmin = pinotHelixResourceManager.getHelixAdmin();
     _runFrequencySeconds = getRunFrequencySeconds(config.getRealtimeSegmentRelocatorFrequency());
 
-    _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
-      @Override
-      public Thread newThread(Runnable runnable) {
-        Thread thread = new Thread(runnable);
-        thread.setName("RealtimeSegmentRelocatorExecutorService");
-        return thread;
-      }
+    _executorService = Executors.newSingleThreadScheduledExecutor(runnable -> {
+      Thread thread = new Thread(runnable);
+      thread.setName("RealtimeSegmentRelocatorExecutorService");
+      return thread;
     });
   }
 
@@ -286,8 +278,8 @@ public class RealtimeSegmentRelocator {
   private long getRunFrequencySeconds(String timeStr) {
     long seconds;
     try {
-      Period p = PERIOD_FORMATTER.parsePeriod(timeStr);
-      seconds = p.toStandardDuration().getStandardSeconds();
+      Long millis = TimeUtils.convertPeriodToMillis(timeStr);
+      seconds = millis / 1000;
     } catch (Exception e) {
       throw new RuntimeException("Invalid time spec '" + timeStr + "' (Valid examples: '3h', '4h30m', '30m')", e);
     }
