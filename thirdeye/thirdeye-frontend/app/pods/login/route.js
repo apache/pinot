@@ -38,7 +38,7 @@ export default Route.extend(UnauthenticatedRouteMixin, {
         transition.abort();
         this.transitionTo('login', { queryParams: { fromUrl } });
       } else {
-        return true;
+        return this.transitionTo('home', { queryParams: { fromUrl } });
       }
 
     }

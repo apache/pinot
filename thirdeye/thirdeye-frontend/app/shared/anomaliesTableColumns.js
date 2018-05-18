@@ -25,21 +25,21 @@ export default [
     propertyName: 'baseline',
     template: 'custom/anomalies-table/current-wow',
     title: 'Current/WoW',
-    className: 'anomalies-table__column anomalies-table__column--med-width',
+    className: 'anomalies-table__column anomalies-table__column--small-width',
     disableFiltering: true
   },
   {
     propertyName: 'feedback',
     component: 'custom/anomalies-table/resolution',
     title: 'Resolution',
-    className: 'anomalies-table__column anomalies-table__column--large-width',
+    className: 'anomalies-table__column anomalies-table__column--med-width',
     disableFiltering: true
   },
   {
     propertyName: 'link',
     template: 'custom/anomalies-table/investigation-link',
     title: 'Investigation Link',
-    className: 'anomalies-table__column anomalies-table__column--med-width',
+    className: 'anomalies-table__column anomalies-table__column--small-width',
     disableFiltering: true
   }
 ];
