@@ -27,41 +27,41 @@
       </div>
     </section>
 
+  {{#if (gt anomaliesCount 0)}}
     <section>
       {{stats-cards stats=stats}}
     </section>
 
     <section>
-      {{#if (gt anomaliesCount 0)}}
-        {{#each-in model.anomalyMapping as |metric alertList|}}
-          <h4 class="dashboard-container__title">Metric:
-            <span><strong>{{metric}} ({{alertList.length}} {{if (gt alertList.length 1) "anomalies" "anomaly"}})</strong></span>
-          </h4>
-            {{models-table
-              data=alertList
-              columns=columns
-              customClasses=classes
-              showColumnsDropdown=false
-              showGlobalFilter=false
-              filteringIgnoreCase=true
-              multipleExpand=true
-              pageSize=5
-              showComponentFooter=true
-            }}
-            {{!-- TODO: leave to decide if after poc we need it - lohuynh
-            {{#if (gt alertList.length 5)}}
-              <a href="{{get (get model.redirectLink metric) alert}}" class="dashboard-container__redirect-link">
-                See More
-              </a>
-            {{/if}} --}}
-        {{/each-in}}
-      {{else}}
-        <div class="card-container card-container--md card-container--flush-top">
-          {{rootcause-placeholder
-            message="No anomalies found."
-            iconClass="glyphicon glyphicon-equalizer"}}
-        </div>
-      {{/if}}
+      {{#each-in model.anomalyMapping as |metric anomalyList|}}
+        <h4 class="dashboard-container__title">Metric:
+          <span>{{metric}} ({{anomalyList.length}} {{if (gt anomalyList.length 1) "anomalies" "anomaly"}})</span>
+        </h4>
+          {{models-table
+            data=anomalyList
+            columns=columns
+            customClasses=classes
+            showColumnsDropdown=false
+            showGlobalFilter=false
+            filteringIgnoreCase=true
+            multipleExpand=true
+            pageSize=5
+            showComponentFooter=true
+          }}
+          {{!-- TODO: leave to decide if after poc we need it - lohuynh
+          {{#if (gt anomalyList.length 5)}}
+            <a href="{{get (get model.redirectLink metric) alert}}" class="dashboard-container__redirect-link">
+              See More
+            </a>
+          {{/if}} --}}
+      {{/each-in}}
     </section>
+  {{else}}
+    <section class="card-container card-container--md card-container--flush-top">
+      {{rootcause-placeholder
+        message="No anomalies found."
+        iconClass="glyphicon glyphicon-equalizer"}}
+    </section>
+  {{/if}}
   </article>
 </div>

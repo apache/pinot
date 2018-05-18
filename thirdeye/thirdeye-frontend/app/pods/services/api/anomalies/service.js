@@ -9,7 +9,7 @@ import {
   anomalyResponseObj
 } from 'thirdeye-frontend/utils/anomaly';
 
-const HumanizedAnomaly = EmberObject.extend({//TODO: rename `anomaly` to `record` for generic? - lohuynh
+const HumanizedAnomaly = EmberObject.extend({// ex: record.humanizedChangeDisplay (humanized), record.anomaly.start (raw)
   id: computed.alias('anomaly.id'),
   _changeFloat: computed('anomaly.{current,baseline}', function() {
     const current = get(this, 'anomaly.current');
@@ -36,6 +36,15 @@ const HumanizedAnomaly = EmberObject.extend({//TODO: rename `anomaly` to `record
   }),
   anomalyFeedback: computed('anomaly.feedback', function() {
     return get(this, 'anomaly.feedback') ? anomalyResponseObj.find(res => res.value === get(this, 'anomaly.feedback')).name : '';
+  }),
+  queryDuration: computed('humanizedObject.queryDuration', function() {
+    return get(this, 'humanizedObject.queryDuration');
+  }),
+  queryStart: computed('humanizedObject.queryStart', function() {
+    return get(this, 'humanizedObject.queryStart');
+  }),
+  queryEnd: computed('humanizedObject.queryEnd', function() {
+    return get(this, 'humanizedObject.queryEnd');
   })
 });
 
@@ -73,18 +82,19 @@ export default Service.extend({
    4. Assign to humanizedEntity the new HumanizedAnomaly ember object. This allow us not to mutate the actual anomaly record later.
    5. Return the humanizedEntity
  * @method getHumanizedEntity
- * @param {object} anomaly - an anomaly record from the store cache (proxy model). This param name must match the name used in `HumanizedAnomaly`
+ * @param {object} anomaly - a raw anomaly record from the store cache (proxy model). This param name must match the name used in `HumanizedAnomaly`
+ * @param {object} humanizedEntity - The object that contains any additional humanized items.
  * @return {Ember.Object}
  * @example:
    usage: `this.get('anomaliesApiService').getHumanizedEntity(entity);`
  */
-  getHumanizedEntity(anomaly) {
+  getHumanizedEntity(anomaly, humanizedObject) {
     assert('you must pass anomaly record.', anomaly);
 
     let cacheKey = get(anomaly, 'id');
     let humanizedEntity = this._humanizedAnomaliesCache[cacheKey];//retrieve the anomaly from cache if exists
     if (!humanizedEntity) {
-      humanizedEntity = this._humanizedAnomaliesCache[cacheKey] = HumanizedAnomaly.create({ anomaly });// add to our dictionary
+      humanizedEntity = this._humanizedAnomaliesCache[cacheKey] = HumanizedAnomaly.create({ anomaly, humanizedObject });// add to our dictionary
     }
 
     return humanizedEntity;
@@ -116,13 +126,13 @@ export default Service.extend({
    * @example: for call `/userdashboard/anomalies?application={someAppName}&start={1508472800000}`
      usage: `this.get('anomaliesApiService').queryAnomaliesByAppName(this.get('appName'), this.get('startDate'));`
    */
-  async queryAnomaliesByAppName(appName, start) {
+  async queryAnomaliesByAppName(appName, start, end) {
     assert('you must pass appName param as an required argument.', appName);
     assert('you must pass start param as an required argument.', start);
 
     const queryCache = this.get('queryCache');
     const modelName = 'anomalies';
-    const query = { application: appName, start };
+    const query = { application: appName, start, end };
     const anomalies = await queryCache.query(modelName, query, { reload: false, cacheKey: queryCache.urlForQueryKey(modelName, query) });
     return anomalies;
     //const url = anomalyApiUrls.getAnomaliesByAppNameUrl(appName, startTime);//TODO: remove from the utils/api/anomaly.js - lohuynh
