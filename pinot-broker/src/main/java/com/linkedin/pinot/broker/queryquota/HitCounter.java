@@ -30,7 +30,7 @@ public class HitCounter {
   private static int BUCKET_COUNT = 100;
   private final int _timeBucketWidthMs;
   private final AtomicLongArray _bucketStartTime;
-  private AtomicIntegerArray _bucketHitCount;
+  private final AtomicIntegerArray _bucketHitCount;
 
   public HitCounter(int timeRangeInSeconds) {
     _timeBucketWidthMs = timeRangeInSeconds * 1000 / BUCKET_COUNT;
@@ -54,8 +54,8 @@ public class HitCounter {
     } else {
       synchronized (_bucketStartTime) {
         if (_bucketStartTime.get(index) != numTimeUnits) {
-          _bucketStartTime.set(index, numTimeUnits);
           _bucketHitCount.set(index, 1);
+          _bucketStartTime.set(index, numTimeUnits);
         } else {
           _bucketHitCount.incrementAndGet(index);
         }
