@@ -83,14 +83,11 @@ public class RealtimeSegmentRelocator {
   public void start() {
     LOGGER.info("Starting realtime segment relocator");
 
-    _executorService.scheduleWithFixedDelay(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          runRelocation();
-        } catch (Exception e) {
-          LOGGER.warn("Caught exception while running realtime segment relocator", e);
-        }
+    _executorService.scheduleWithFixedDelay(() -> {
+      try {
+        runRelocation();
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while running realtime segment relocator", e);
       }
     }, 120, _runFrequencySeconds, TimeUnit.SECONDS);
   }
@@ -121,7 +118,7 @@ public class RealtimeSegmentRelocator {
         final RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
         if (!realtimeTagConfig.isRelocateCompletedSegments()) {
           LOGGER.info("Skipping relocation of segments for {}", tableNameWithType);
-          return;
+          continue;
         }
 
         Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
