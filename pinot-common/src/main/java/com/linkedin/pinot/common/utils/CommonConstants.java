@@ -214,10 +214,15 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.id";
     public static final BrokerResponseFactory.ResponseType DEFAULT_BROKER_RESPONSE_TYPE =
         BrokerResponseFactory.ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
+
     public static class Request {
       public static final String PQL = "pql";
       public static final String TRACE = "trace";
       public static final String DEBUG_OPTIONS = "debugOptions";
+
+      public static class QueryOptionKey {
+        public static final String ATTACH_VALUE_IN_FOR_COLUMNS = "attachValueInForColumns";
+      }
     }
   }
 

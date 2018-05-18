@@ -166,7 +166,7 @@ public class TransformExpressionTree {
       case IDENTIFIER:
         return _value;
       case LITERAL:
-        return "\'" + _value + "\'";
+        return "'" + _value + "'";
       default:
         throw new IllegalStateException();
     }

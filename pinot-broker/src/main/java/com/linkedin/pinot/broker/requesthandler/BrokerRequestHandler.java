@@ -45,6 +45,7 @@ import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableFactory;
+import com.linkedin.pinot.core.operator.transform.function.ValueInTransformFunction;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.serde.SerDe;
 import com.linkedin.pinot.transport.common.CompositeFuture;
@@ -153,6 +154,7 @@ public class BrokerRequestHandler {
     BrokerRequest brokerRequest;
     try {
       brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(query);
+      preprocessRequest(brokerRequest);
     } catch (Exception e) {
       LOGGER.info("Parsing error on requestId {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1L);
@@ -268,6 +270,15 @@ public class BrokerRequestHandler {
         brokerResponse.getTotalDocs(), scatterGatherStats, StringUtils.substring(query, 0, _queryLogLength));
 
     return brokerResponse;
+  }
+
+  /**
+   * Preprocess the broker request.
+   *
+   * @param brokerRequest Broker request to preprocess
+   */
+  private void preprocessRequest(BrokerRequest brokerRequest) {
+    RequestPreprocessUtils.attachValueInUDF(brokerRequest);
   }
 
   /**

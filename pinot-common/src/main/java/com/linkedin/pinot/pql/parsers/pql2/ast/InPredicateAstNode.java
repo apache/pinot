@@ -23,6 +23,7 @@ import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -89,23 +90,23 @@ public class InPredicateAstNode extends PredicateAstNode {
       throw new Pql2CompilationException("IN predicate has no identifier");
     }
 
-    Set<String> values = new HashSet<>();
-
+    // Deduplicate the values
+    Set<String> valueSet = new HashSet<>();
+    List<String> valueList = new ArrayList<>();
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof LiteralAstNode) {
-        LiteralAstNode node = (LiteralAstNode) astNode;
-        values.add(node.getValueAsString());
+        String value = ((LiteralAstNode) astNode).getValueAsString();
+        if (valueSet.add(value)) {
+          valueList.add(value);
+        }
       }
     }
 
-    FilterOperator filterOperator;
     if (_isNotInClause) {
-      filterOperator = FilterOperator.NOT_IN;
+      return new FilterQueryTree(_identifier, valueList, FilterOperator.NOT_IN, null);
     } else {
-      filterOperator = FilterOperator.IN;
+      return new FilterQueryTree(_identifier, valueList, FilterOperator.IN, null);
     }
-
-    return new FilterQueryTree(_identifier, new ArrayList<>(values), filterOperator, null);
   }
 
   @Override
