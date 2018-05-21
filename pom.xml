@@ -1000,7 +1000,7 @@
             <exclude>**/com/linkedin/pinot/common/request/*.*</exclude>
             <exclude>**/com/linkedin/pinot/common/response/*.*</exclude>
             <exclude>pinot-dashboard/**/*.*</exclude>
-            <exclude>thirdeye/**/*.*</exclude>
+            <exclude>thirdeye/**/*</exclude>
             <!-- Files that already had a different license header -->
             <exclude>**/NamedThreadFactory.java</exclude>
             <exclude>**/FileUploadUtils.java</exclude>
