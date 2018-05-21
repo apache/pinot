@@ -8,7 +8,7 @@ const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly
 const DEFAULT_ACTIVE_DURATION = '1d'; // setting this date range selection as default (Last 24 Hours)
 const UI_DATE_FORMAT = 'MMM D, YYYY hh:mm a'; // format for date picker to use (usually varies by route or metric)
 const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently across app to display custom date range
-const TIME_RANGE_OPTIONS = ['today', '1d', '1w'];
+const TIME_RANGE_OPTIONS = ['today', '1d', '2d', '1w'];
 
 export default Controller.extend({
   queryParams: ['appName', 'startDate', 'endDate', 'duration'],
@@ -36,7 +36,8 @@ export default Controller.extend({
       const duration = this.get('model.duration') || DEFAULT_ACTIVE_DURATION;
       const predefinedRanges = {
         'Today': [moment().startOf('day'), moment()],
-        'Last  24 hours': [moment().subtract(1, 'day'), moment()],
+        'Last 24 hours': [moment().subtract(1, 'day'), moment()],
+        'Yesterday': [moment().subtract(1, 'day').startOf('day'), moment().subtract(1, 'days').endOf('day')],
         'Last Week': [moment().subtract(1, 'week'), moment()]
       };
 
