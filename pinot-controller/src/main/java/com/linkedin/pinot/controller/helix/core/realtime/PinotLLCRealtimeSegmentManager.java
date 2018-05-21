@@ -102,6 +102,7 @@ import org.slf4j.LoggerFactory;
 public class PinotLLCRealtimeSegmentManager {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotLLCRealtimeSegmentManager.class);
   private static final int STREAM_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS = 10000;
+  private static final String KAFKA_SMALLEST_OFFSET = "smallest";
   protected static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
   protected static final long END_OFFSET_FOR_CONSUMING_SEGMENTS = Long.MAX_VALUE;
   private static final int NUM_LOCKS = 4;
@@ -938,8 +939,10 @@ public class PinotLLCRealtimeSegmentManager {
       newPartitions.add(partition);
     }
 
+    String offsetCriteria = streamMetadata.getKafkaConsumerProperties()
+        .get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
     Set<String> consumingSegments =
-        setupNewPartitions(tableConfig, streamMetadata, partitionAssignment, newPartitions, now);
+        setupNewPartitions(tableConfig, streamMetadata, offsetCriteria, partitionAssignment, newPartitions, now);
 
     RealtimeSegmentAssignmentStrategy segmentAssignmentStrategy = new ConsumingSegmentAssignmentStrategy();
     Map<String, List<String>> assignments = segmentAssignmentStrategy.assign(consumingSegments, partitionAssignment);
@@ -1113,7 +1116,7 @@ public class PinotLLCRealtimeSegmentManager {
               nextSeqNum);
           // To begin with, set startOffset to the oldest available offset in kafka. Fix it to be the one we want,
           // depending on what the prev segment had.
-          long startOffset = getKafkaPartitionOffset(streamMetadata, "smallest", partition);
+          long startOffset = getKafkaPartitionOffset(streamMetadata, KAFKA_SMALLEST_OFFSET, partition);
           LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableNameWithType, partition);
           startOffset =
               getBetterStartOffsetIfNeeded(tableNameWithType, partition, segmentName, startOffset, nextSeqNum);
@@ -1157,7 +1160,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     if (!skipNewPartitions) {
       Set<String> newPartitionSegments =
-          setupNewPartitions(tableConfig, streamMetadata, partitionAssignment, newPartitions, now);
+          setupNewPartitions(tableConfig, streamMetadata, KAFKA_SMALLEST_OFFSET, partitionAssignment, newPartitions, now);
       consumingSegments.addAll(newPartitionSegments);
     }
 
@@ -1214,25 +1217,29 @@ public class PinotLLCRealtimeSegmentManager {
 
   /**
    * Create metadata for new partitions
-   * @param tableConfig
-   * @param streamMetadata
-   * @param partitionAssignment
-   * @param newPartitions
-   * @param now
+   * @param tableConfig  the table configuration to use for the new partition
+   * @param streamMetadata stream configuration associated with the table
+   * @param offsetCriteria the offset to query to start consumption from. Can be different for a
+   *                       new table being setup vs new partitions being added to an existing table
+   * @param partitionAssignment the partition assignment strategy to use
+   * @param newPartitions the new partitions to set up
+   * @param now the current timestamp in milliseconds
    * @return set of newly created segment names
    */
   private Set<String> setupNewPartitions(TableConfig tableConfig, StreamMetadata streamMetadata,
-      PartitionAssignment partitionAssignment, Set<Integer> newPartitions, long now) {
+      String offsetCriteria, PartitionAssignment partitionAssignment, Set<Integer> newPartitions,
+      long now) {
 
     String tableName = tableConfig.getTableName();
     Set<String> newSegmentNames = new HashSet<>(newPartitions.size());
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     int nextSeqNum = STARTING_SEQUENCE_NUMBER;
-    String consumerStartOffsetSpec = streamMetadata.getKafkaConsumerProperties()
-        .get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
+
     for (int partition : newPartitions) {
-      LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", tableName, partition, nextSeqNum);
-      long startOffset = getKafkaPartitionOffset(streamMetadata, consumerStartOffsetSpec, partition);
+      LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", tableName, partition,
+          nextSeqNum);
+      long startOffset = getKafkaPartitionOffset(streamMetadata, offsetCriteria, partition);
+
       LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableName, partition);
 
       LLCSegmentName newLLCSegmentName = new LLCSegmentName(rawTableName, partition, nextSeqNum, now);
