@@ -43,15 +43,21 @@
           </a> --}}
         <div class="te-nav__user-dropdown">
           <a {{action "onToggleExpanded"}} class="dropdown-toggle te-nav__dropdown-link" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" title="help center">
-            <span class="te-nav__help-icon"><i class="te-icon glyphicon glyphicon-question-sign"></i></span>
+            <span class="te-nav__help-icon"><i class="te-icon glyphicon glyphicon-user"></i></span>
             <span><i class="te-icon glyphicon {{if isExpanded 'glyphicon-menu-up' 'glyphicon-menu-down'}}"></i> </span>
           </a>
           {{#if isExpanded}}
-            <div class="te-nav__dropdown-wrapper">
-              <a class="te-nav__dropdown-item" href="mailto:ask_thirdeye@linkedin.com?Subject=TE-Feedback" target="_blank">Submit Feedback</a>
-              <a class="te-nav__dropdown-item" href="http://go/thirdeye-help">Help page</a>
-              {{#link-to "logout" class="te-nav__dropdown-item"}}Logout{{/link-to}}
-            </div>
+            <ul class="te-nav__dropdown-wrapper">
+              <li class="te-nav__dropdown-item"><a href="mailto:ask_thirdeye@linkedin.com?Subject=TE-Feedback" target="_blank">Submit Feedback</a></li>
+              <li class="te-nav__dropdown-item"><a href="http://go/thirdeye-help">Help page</a></li>
+              <div class="te-nav__dropdown-divider"></div>
+              <li class="te-nav__dropdown-item">
+                {{#link-to "logout"}}
+                  Logout<br />
+                  {{username}}
+                {{/link-to}}
+              </li>
+            </ul>
           {{/if}}
         </div>
       </div>

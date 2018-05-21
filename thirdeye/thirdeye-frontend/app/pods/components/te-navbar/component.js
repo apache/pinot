@@ -5,6 +5,8 @@
  */
 import Component from '@ember/component';
 import config from '../../../config/environment';
+import { reads } from '@ember/object/computed';
+import { inject as service } from '@ember/service';
 
 export default Component.extend({
 
@@ -12,6 +14,9 @@ export default Component.extend({
    * Component's tag name
    */
   tagName: 'nav',
+
+  authService: service('session'),
+  username: reads('authService.data.authenticated.name'),
 
   /**
    * Apply property-based class namete
