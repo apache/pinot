@@ -94,14 +94,14 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
       }
 
       // Update replica group mapping zk metadata
-      updatePartitionMappingZkMetadata(OFFLINE_TABLE_NAME, fakePropertyStore);
+      updatgeReplicaGroupPartitionAssignment(OFFLINE_TABLE_NAME, fakePropertyStore);
 
       // Create the fake external view
       ExternalView externalView = buildExternalView(OFFLINE_TABLE_NAME, replicaToServerMapping);
 
       // Create instance Configs
       List<InstanceConfig> instanceConfigs = new ArrayList<>();
-      for (int serverId = 0; serverId <= NUM_SERVERS; serverId++) {
+      for (int serverId = 0; serverId < NUM_SERVERS; serverId++) {
         String serverName = "Server_localhost_" + serverId;
         instanceConfigs.add(new InstanceConfig(serverName));
       }
@@ -151,12 +151,86 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     }
   }
 
-  private void updatePartitionMappingZkMetadata(String tableNameWithType, FakePropertyStore propertyStore) {
+  @Test
+  public void testRoutingTableAfterRebalance() throws Exception {
+    NUM_REPLICA = 1;
+    NUM_PARTITION = 1;
+    NUM_SERVERS = 1;
+    NUM_SEGMENTS = 10;
+
+    // Create the fake property store
+    FakePropertyStore fakePropertyStore = new FakePropertyStore();
+
+    // Create the table config, partition mapping,
+    TableConfig tableConfig = buildOfflineTableConfig();
+
+    // Create the replica group id to server mapping
+    Map<Integer, List<String>> replicaToServerMapping = buildReplicaGroupMapping();
+
+    // Update segment zk metadata.
+    for (int i = 0; i < NUM_SEGMENTS; i++) {
+      String segmentName = "segment" + i;
+      int partition = i % NUM_PARTITION;
+      SegmentZKMetadata metadata = buildOfflineSegmentZKMetadata(segmentName, partition);
+      fakePropertyStore.setContents(
+          ZKMetadataProvider.constructPropertyStorePathForSegment(OFFLINE_TABLE_NAME, segmentName),
+          metadata.toZNRecord());
+    }
+
+    // Update replica group mapping zk metadata
+    updatgeReplicaGroupPartitionAssignment(OFFLINE_TABLE_NAME, fakePropertyStore);
+
+    // Create the fake external view
+    ExternalView externalView = buildExternalView(OFFLINE_TABLE_NAME, replicaToServerMapping);
+
+    // Create instance Configs
+    List<InstanceConfig> instanceConfigs = new ArrayList<>();
+    for (int serverId = 0; serverId < NUM_SERVERS; serverId++) {
+      String serverName = "Server_localhost_" + serverId;
+      instanceConfigs.add(new InstanceConfig(serverName));
+    }
+
+    // Create the partition aware offline routing table builder.
+    RoutingTableBuilder routingTableBuilder =
+        buildPartitionAwareOfflineRoutingTableBuilder(fakePropertyStore, tableConfig, externalView, instanceConfigs);
+
+    // Simulate the case where we add 1 more server/replica
+    NUM_REPLICA = 2;
+    NUM_SERVERS = 2;
+
+    // Update instance configs
+    String newServerName = "Server_localhost_" + (NUM_SERVERS - 1);
+    instanceConfigs.add(new InstanceConfig(newServerName));
+
+    // Update replica group partition assignment
+    updatgeReplicaGroupPartitionAssignment(OFFLINE_TABLE_NAME, fakePropertyStore);
+
+    // Update external view
+    Map<Integer, List<String>> newReplicaToServerMapping = buildReplicaGroupMapping();
+    ExternalView newExternalView = buildExternalView(OFFLINE_TABLE_NAME, newReplicaToServerMapping);
+
+    // Compute routing table and this should not throw null pointer exception
+    routingTableBuilder.computeRoutingTableFromExternalView(OFFLINE_TABLE_NAME, newExternalView, instanceConfigs);
+
+    Set<String> servers = new HashSet<>();
+    for (int i = 0; i < 100; i++) {
+      String countStarQuery = "select count(*) from " + OFFLINE_TABLE_NAME;
+      Map<String, List<String>> routingTable =
+          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery));
+      Assert.assertEquals(routingTable.keySet().size(), 1);
+      servers.add(routingTable.keySet().iterator().next());
+    }
+
+    // Check if both servers are get picked
+    Assert.assertEquals(servers.size(), 2);
+  }
+
+  private void updatgeReplicaGroupPartitionAssignment(String tableNameWithType, FakePropertyStore propertyStore) {
     // Create partition assignment mapping table.
     ReplicaGroupPartitionAssignment replicaGroupPartitionAssignment = new ReplicaGroupPartitionAssignment(tableNameWithType);
 
     int partitionId = 0;
-    for (int serverId = 0; serverId <= NUM_SERVERS; serverId++) {
+    for (int serverId = 0; serverId < NUM_SERVERS; serverId++) {
       String serverName = "Server_localhost_" + serverId;
       int replicaGroupId = serverId / (NUM_SERVERS / NUM_REPLICA);
       replicaGroupPartitionAssignment.addInstanceToReplicaGroup(partitionId, replicaGroupId, serverName);
@@ -197,7 +271,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     for (int serverId = 0; serverId < NUM_SERVERS; serverId++) {
       int groupId = serverId / numServersPerReplica;
       if (!replicaGroupServers.containsKey(groupId)) {
-        replicaGroupServers.put(groupId, new ArrayList<String>());
+        replicaGroupServers.put(groupId, new ArrayList<>());
       }
       String serverName = "Server_localhost_" + serverId;
       replicaGroupServers.get(groupId).add(serverName);

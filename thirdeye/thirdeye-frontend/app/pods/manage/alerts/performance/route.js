@@ -246,7 +246,11 @@ export default Route.extend({
       .then((richFunctionObjects) => {
         // Catch any rejected promises
         if (isPromiseRejected(richFunctionObjects)) {
-          throw new Error('API error');
+          const badId = richFunctionObjects.filter(obj => obj.state !== 'fulfilled').map((obj) => {
+            return getWithDefault(obj, 'reason.response.url', '').split('?')[0].split('/').pop();
+          });
+          const errMsg = badId.length ? `API error with alert ids ${badId.join(',')}` : 'API error';
+          throw new Error(errMsg);
         }
 
         const newFunctionObjects = richFunctionObjects.map(obj => obj.value);
@@ -327,8 +331,11 @@ export default Route.extend({
         });
 
       })
-      .catch(() => {
-        controller.set('isDataLoadingError', true);
+      .catch((errMsg) => {
+        controller.setProperties({
+          isDataLoadingError: true,
+          errMsg
+        });
       });
   }
 });

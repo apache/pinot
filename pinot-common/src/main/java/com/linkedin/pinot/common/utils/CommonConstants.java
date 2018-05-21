@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import com.linkedin.pinot.common.response.BrokerResponseFactory;
 import java.io.File;
 import org.apache.commons.lang.StringUtils;
 
@@ -206,9 +207,18 @@ public class CommonConstants {
   public static class Broker {
     public static final String CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT = "pinot.broker.query.response.limit";
     public static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
+    public static final String CONFIG_OF_BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";
+    public static final int DEFAULT_BROKER_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.id";
+    public static final BrokerResponseFactory.ResponseType DEFAULT_BROKER_RESPONSE_TYPE =
+        BrokerResponseFactory.ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
+    public static class Request {
+      public static final String PQL = "pql";
+      public static final String TRACE = "trace";
+      public static final String DEBUG_OPTIONS = "debugOptions";
+    }
   }
 
   public static class Server {

@@ -13,14 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.query.scheduler;
+package com.linkedin.pinot.broker.queryquota;
 
-/**
- * Indicates that the scheduler queue is out of capacity
- */
-public class OutOfCapacityError extends Exception {
+import com.google.common.util.concurrent.RateLimiter;
+import javax.annotation.Nonnull;
 
-  public OutOfCapacityError(String msg) {
-    super(msg);
+
+public class QueryQuotaConfig {
+
+  private RateLimiter _rateLimiter;
+  private HitCounter _hitCounter;
+
+  public QueryQuotaConfig(@Nonnull RateLimiter rateLimiter, @Nonnull HitCounter hitCounter) {
+    _rateLimiter = rateLimiter;
+    _hitCounter = hitCounter;
+  }
+
+  public RateLimiter getRateLimiter() {
+    return _rateLimiter;
+  }
+
+  public HitCounter getHitCounter() {
+    return _hitCounter;
   }
 }

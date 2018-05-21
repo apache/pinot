@@ -6,6 +6,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 
 public class RequestStatisticsFormatter {
@@ -80,7 +81,7 @@ public class RequestStatisticsFormatter {
   private <K, V> String format(Map<K, V> map, Comparator<Map.Entry<K, V>> comparator, String format) {
     StringBuilder builder = new StringBuilder();
     for (Map.Entry<K, V> entry : topk(map, comparator)) {
-      String key = entry.getKey().toString();
+      String key = Objects.toString(entry.getKey());
       if (key.length() > MAX_KEY_LEN) {
         key = key.substring(0, MAX_KEY_LEN - 3) + "...";
       }

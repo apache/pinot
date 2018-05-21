@@ -30,6 +30,7 @@ import com.linkedin.pinot.minion.metrics.MinionMetrics;
 import com.linkedin.pinot.minion.metrics.MinionQueryPhase;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.apache.helix.task.Task;
 import org.apache.helix.task.TaskConfig;
@@ -81,7 +82,8 @@ public class TaskFactoryRegistry {
                 _eventObserver.notifyTaskSuccess(pinotTaskConfig, executionResult);
                 minionMetrics.addMeteredTableValue(taskType, MinionMeter.NUMBER_TASKS_COMPLETED, 1L);
                 minionMetrics.addPhaseTiming(taskType, MinionQueryPhase.TASK_EXECUTION, timeSpentInNanos);
-                LOGGER.info("Task: {} completed in: {}ms", _taskConfig.getId(), timeSpentInNanos / 1000);
+                LOGGER.info("Task: {} completed in: {}ms", _taskConfig.getId(),
+                    TimeUnit.NANOSECONDS.toMillis(timeSpentInNanos));
                 return new TaskResult(TaskResult.Status.COMPLETED, "Succeeded");
               } catch (TaskCancelledException e) {
                 _eventObserver.notifyTaskCancelled(pinotTaskConfig);

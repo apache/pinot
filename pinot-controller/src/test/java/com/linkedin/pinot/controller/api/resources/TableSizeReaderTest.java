@@ -18,6 +18,7 @@ package com.linkedin.pinot.controller.api.resources;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
 import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -219,12 +220,13 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void testNoSuchTable() {
+  public void testNoSuchTable() throws InvalidConfigException {
     TableSizeReader reader = new TableSizeReader(executor, connectionManager, helix);
     Assert.assertNull(reader.getTableSizeDetails("mytable", 5000));
   }
 
-  private TableSizeReader.TableSizeDetails testRunner(final String[] servers, String table) {
+  private TableSizeReader.TableSizeDetails testRunner(final String[] servers, String table)
+      throws InvalidConfigException {
     when(helix.getInstanceToSegmentsInATableMap(anyString()))
         .thenAnswer(new Answer<Object>() {
           @Override
@@ -308,7 +310,7 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void testGetTableSubTypeSizeAllSuccess() {
+  public void testGetTableSubTypeSizeAllSuccess() throws InvalidConfigException {
     final String[] servers = { "server0", "server1"};
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, "offline");
     TableSizeReader.TableSubTypeSizeDetails offlineSizes = tableSizeDetails.offlineSegments;
@@ -322,7 +324,7 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void testGetTableSubTypeSizesWithErrors() {
+  public void testGetTableSubTypeSizesWithErrors() throws InvalidConfigException {
     final String[] servers = { "server0", "server1", "server2", "server5"};
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, "offline");
     TableSizeReader.TableSubTypeSizeDetails offlineSizes = tableSizeDetails.offlineSegments;
@@ -333,7 +335,7 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void getTableSizeDetailsRealtimeOnly() {
+  public void getTableSizeDetailsRealtimeOnly() throws InvalidConfigException {
     final String[] servers = { "server3", "server4"};
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, "realtime");
     Assert.assertNull(tableSizeDetails.offlineSegments);

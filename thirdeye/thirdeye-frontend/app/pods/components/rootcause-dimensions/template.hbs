@@ -1,0 +1,15 @@
+{{#if isDimensionDataPresent}}
+  {{models-table
+    data=dimensionTableData
+    columns=dimensionTableColumns
+    groupedHeaders=dimensionTableHeaders
+    useFilteringByColumns=false
+    showColumnsDropdown=false
+    showGlobalFilter=false
+    filteringIgnoreCase=true
+    pageSize=15
+    showComponentFooter=true
+    useFilteringByColumns=false
+    multipleSelect=true
+  }}
+{{/if}}

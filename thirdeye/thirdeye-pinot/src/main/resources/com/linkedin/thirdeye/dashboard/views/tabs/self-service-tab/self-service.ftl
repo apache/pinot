@@ -86,7 +86,7 @@
             </li>
             <li id="manage-alerts">
                 <div class="title-box full-width" style="margin-top:15px;">
-                    <h2>Manage Alerts</h2>
+                    <h2>Alerts</h2>
                 </div>
                 <table id="configure-emails-form-table" initiallenght="100" class="uk-form">
                     <tr>

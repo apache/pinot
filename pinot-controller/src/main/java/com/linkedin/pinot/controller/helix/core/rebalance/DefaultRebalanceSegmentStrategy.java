@@ -24,7 +24,7 @@ import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
-import com.linkedin.pinot.common.partition.PartitionAssignmentGenerator;
+import com.linkedin.pinot.common.partition.StreamPartitionAssignmentGenerator;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
@@ -102,9 +102,9 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
           rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.INCLUDE_CONSUMING, DEFAULT_INCLUDE_CONSUMING);
       if (includeConsuming) {
 
-        PartitionAssignmentGenerator partitionAssignmentGenerator = getPartitionAssignmentGenerator();
-        int numPartitions = partitionAssignmentGenerator.getNumPartitionsFromIdealState(idealState);
-        newPartitionAssignment = partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions);
+        StreamPartitionAssignmentGenerator streamPartitionAssignmentGenerator = getStreamPartitionAssignmentGenerator();
+        int numPartitions = streamPartitionAssignmentGenerator.getNumPartitionsFromIdealState(idealState);
+        newPartitionAssignment = streamPartitionAssignmentGenerator.generateStreamPartitionAssignment(tableConfig, numPartitions);
 
       } else {
         LOGGER.info("includeConsuming = false. No need to rebalance partition assignment for {}",
@@ -115,8 +115,8 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
   }
 
   @VisibleForTesting
-  protected PartitionAssignmentGenerator getPartitionAssignmentGenerator() {
-    return new PartitionAssignmentGenerator(_helixManager);
+  protected StreamPartitionAssignmentGenerator getStreamPartitionAssignmentGenerator() {
+    return new StreamPartitionAssignmentGenerator(_helixManager);
   }
 
   /**
@@ -364,10 +364,10 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
       List<String> enabledServingInstances) {
     String tag;
     if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
-      RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
+      RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
       tag = realtimeTagConfig.getCompletedServerTag();
     } else {
-      OfflineTagConfig offlineTagConfig = new OfflineTagConfig(tableConfig, _helixManager);
+      OfflineTagConfig offlineTagConfig = new OfflineTagConfig(tableConfig);
       tag = offlineTagConfig.getOfflineServerTag();
     }
     servingInstances.addAll(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, tag));

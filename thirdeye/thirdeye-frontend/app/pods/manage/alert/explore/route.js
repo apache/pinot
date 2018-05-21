@@ -17,7 +17,7 @@ import {
   setProperties,
   getWithDefault
 } from '@ember/object';
-import { isPresent, isNone } from '@ember/utils';
+import { isPresent, isNone, isBlank } from '@ember/utils';
 import { checkStatus, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
 import {
   enhanceAnomalies,
@@ -234,7 +234,7 @@ export default Route.extend({
     const anomaliesUrl = `/dashboard/anomaly-function/${alertId}/anomalies?${qsParams}`;
     let anomalyPromiseHash = {
       projectedMttd: 0,
-      metricsByName: '',
+      metricsByName: [],
       anomalyIds: []
     };
 
@@ -249,7 +249,7 @@ export default Route.extend({
 
     return RSVP.hash(anomalyPromiseHash)
       .then(async (data) => {
-        const metricId = isArray(data.metricsByName) ? data.metricsByName[0].id || 0 : 0;
+        const metricId = this._locateMetricId(data.metricsByName, alertData);
         const totalAnomalies = data.anomalyIds.length;
         Object.assign(alertEvalMetrics.projected, { mttd: data.projectedMttd });
         Object.assign(config, { id: metricId });
@@ -349,12 +349,13 @@ export default Route.extend({
   /**
    * Performs the repetitive task of setting graph properties based on
    * returned metric data and dimension data
-   * @method setGraphProperties
+   * @method _setGraphProperties
    * @param {Object} metricData - returned metric timeseries data
    * @param {String} exploreDimensions - string of metric dimensions
-   * @returns {RSVP promise}
+   * @returns {undefined}
+   * @private
    */
-  setGraphProperties(metricData, exploreDimensions) {
+  _setGraphProperties(metricData, exploreDimensions) {
     const alertDimension = exploreDimensions ? exploreDimensions.split(',')[0] : '';
     Object.assign(metricData, { color: METRIC_DATA_COLOR });
     this.controller.setProperties({
@@ -372,6 +373,21 @@ export default Route.extend({
         availableDimensions: topDimensions.length
       });
     }
+  },
+
+  /**
+   * Tries find a specific metric id based on a common dataset string
+   * @method _locateMetricId
+   * @param {Array} metricList - list of metrics from metric-by-name lookup
+   * @param {Object} alertData - currently loaded alert properties
+   * @returns {Number} target metric id
+   * @private
+   */
+  _locateMetricId(metricList, alertData) {
+    const metricId = metricList.find((metric) => {
+      return metric.dataset === alertData.collection;
+    }) || { id: 0 };
+    return isBlank(metricList) ? 0 : metricId.id;
   },
 
   /**
@@ -502,7 +518,7 @@ export default Route.extend({
       // Fetch and load graph metric data from either local store or API
       const metricData = yield fetch(metricDataUrl).then(checkStatus);
       // Load graph with metric data from timeseries API
-      yield this.setGraphProperties(metricData, exploreDimensions);
+      yield this._setGraphProperties(metricData, exploreDimensions);
     } catch (e) {
       this.controller.setProperties({
         isMetricDataInvalid: true,

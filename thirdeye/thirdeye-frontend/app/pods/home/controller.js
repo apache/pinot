@@ -63,13 +63,14 @@ export default Controller.extend({
         return {};
       }
 
-      const { totalAlerts, responseRate, precision, recall } = this.get('model.anomalyPerformance').getProperties('totalAlerts', 'responseRate', 'precision', 'recall');
+      const { responseRate, precision, recall } = this.get('model.anomalyPerformance').getProperties('responseRate', 'precision', 'recall');
       const totalAlertsDescription = 'Total number of anomalies that occured over a period of time';
       const responseRateDescription = '% of anomalies that are reviewed';
       const precisionDescription = '% of all anomalies detected by the system that are true';
       const recallDescription = '% of all anomalies detected by the system';
+      //TODO: Since totalAlerts is not correct here. We will use anomaliesCount for now till backend api is fixed. - lohuynh
       const statsArray = [
-        ['Number of anomalies', totalAlertsDescription, totalAlerts, 'digit'],
+        ['Number of anomalies', totalAlertsDescription, this.get('anomaliesCount'), 'digit'],
         ['Response Rate', responseRateDescription, floatToPercent(responseRate), 'percent'],
         ['Precision', precisionDescription, floatToPercent(precision), 'percent'],
         ['Recall', recallDescription, floatToPercent(recall), 'percent']

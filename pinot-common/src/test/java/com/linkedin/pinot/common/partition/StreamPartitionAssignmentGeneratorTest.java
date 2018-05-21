@@ -17,7 +17,6 @@
 package com.linkedin.pinot.common.partition;
 
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TenantConfig;
@@ -38,7 +37,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.*;
 
 
-public class PartitionAssignmentGeneratorTest {
+public class StreamPartitionAssignmentGeneratorTest {
 
   private String aServerTenant = "aTenant";
   private HelixManager _mockHelixManager;
@@ -128,10 +127,10 @@ public class PartitionAssignmentGeneratorTest {
 
   private void verifyPartitionAssignmentFromIdealState(TableConfig tableConfig, IdealState idealState,
       int numPartitions) {
-    TestPartitionAssignmentGenerator partitionAssignmentGenerator =
-        new TestPartitionAssignmentGenerator(_mockHelixManager);
+    TestStreamPartitionAssignmentGenerator partitionAssignmentGenerator =
+        new TestStreamPartitionAssignmentGenerator(_mockHelixManager);
     PartitionAssignment partitionAssignmentFromIdealState =
-        partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
+        partitionAssignmentGenerator.getStreamPartitionAssignmentFromIdealState(tableConfig, idealState);
     Assert.assertEquals(tableConfig.getTableName(), partitionAssignmentFromIdealState.getTableName());
     Assert.assertEquals(partitionAssignmentFromIdealState.getNumPartitions(), numPartitions);
     // check that latest segments are honoring partition assignment
@@ -242,12 +241,12 @@ public class PartitionAssignmentGeneratorTest {
       List<String> consumingInstanceList, PartitionAssignment previousPartitionAssignment, boolean exceptionExpected,
       boolean unchanged) {
     String tableName = tableConfig.getTableName();
-    TestPartitionAssignmentGenerator partitionAssignmentGenerator =
-        new TestPartitionAssignmentGenerator(_mockHelixManager);
+    TestStreamPartitionAssignmentGenerator partitionAssignmentGenerator =
+        new TestStreamPartitionAssignmentGenerator(_mockHelixManager);
     partitionAssignmentGenerator.setConsumingInstances(consumingInstanceList);
     PartitionAssignment partitionAssignment;
     try {
-      partitionAssignment = partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions);
+      partitionAssignment = partitionAssignmentGenerator.generateStreamPartitionAssignment(tableConfig, numPartitions);
       Assert.assertFalse(exceptionExpected, "Unexpected exception for table " + tableName);
       verify(tableName, partitionAssignment, numPartitions, consumingInstanceList, unchanged,
           previousPartitionAssignment);
@@ -298,20 +297,17 @@ public class PartitionAssignmentGeneratorTest {
     }
   }
 
-  private class TestPartitionAssignmentGenerator extends PartitionAssignmentGenerator {
+  private class TestStreamPartitionAssignmentGenerator extends StreamPartitionAssignmentGenerator {
 
-    private HelixManager _helixManager;
     private List<String> _consumingInstances;
-    private RealtimeTagConfig _realtimeTagConfig;
 
-    public TestPartitionAssignmentGenerator(HelixManager helixManager) {
+    public TestStreamPartitionAssignmentGenerator(HelixManager helixManager) {
       super(helixManager);
-      _helixManager = helixManager;
       _consumingInstances = new ArrayList<>();
     }
 
     @Override
-    protected List<String> getConsumingTaggedInstances(RealtimeTagConfig realtimeTagConfig) {
+    protected List<String> getConsumingTaggedInstances(TableConfig tableConfig) {
       return _consumingInstances;
     }
 

@@ -35,21 +35,21 @@ import org.apache.helix.model.IdealState;
 
 
 /**
- * Class to generate partitions assignment based on num partitions in ideal state, num tagged instances and num replicas
- * TODO: This is only for LLC stream partition assignment. This will replace StreamPartitionAssignmentGenerator
+ * Class to generate stream partitions assignment based on num partitions in ideal state, num tagged instances and num replicas
  */
-public class PartitionAssignmentGenerator {
+public class StreamPartitionAssignmentGenerator {
 
   private HelixManager _helixManager;
 
-  public PartitionAssignmentGenerator(HelixManager helixManager) {
+  public StreamPartitionAssignmentGenerator(HelixManager helixManager) {
     _helixManager = helixManager;
   }
 
   /**
-   * Gets partition assignment of a table by reading the segment assignment in ideal state
+   * Gets stream partition assignment of a table by reading the segment assignment in ideal state
    */
-  public PartitionAssignment getPartitionAssignmentFromIdealState(TableConfig tableConfig, IdealState idealState) {
+  public PartitionAssignment getStreamPartitionAssignmentFromIdealState(TableConfig tableConfig,
+      IdealState idealState) {
     String tableNameWithType = tableConfig.getTableName();
 
     // get latest segment in each partition
@@ -106,9 +106,9 @@ public class PartitionAssignmentGenerator {
   }
 
   /**
-   * Generates partition assignment for given table, using tagged hosts and num partitions
+   * Generates stream partition assignment for given table, using tagged hosts and num partitions
    */
-  public PartitionAssignment generatePartitionAssignment(TableConfig tableConfig, int numPartitions)
+  public PartitionAssignment generateStreamPartitionAssignment(TableConfig tableConfig, int numPartitions)
       throws InvalidConfigException {
 
     // TODO: add an override which can read from znode, instead of generating on the fly
@@ -120,9 +120,8 @@ public class PartitionAssignmentGenerator {
 
     String tableNameWithType = tableConfig.getTableName();
     int numReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
-    RealtimeTagConfig realtimeTagConfig = getRealtimeTagConfig(tableConfig);
 
-    List<String> consumingTaggedInstances = getConsumingTaggedInstances(realtimeTagConfig);
+    List<String> consumingTaggedInstances = getConsumingTaggedInstances(tableConfig);
     if (consumingTaggedInstances.size() < numReplicas) {
       throw new InvalidConfigException(
           "Not enough consuming instances tagged. Must be atleast equal to numReplicas:" + numReplicas);
@@ -131,7 +130,7 @@ public class PartitionAssignmentGenerator {
     /**
      * TODO: We will use only uniform assignment for now
      * This will be refactored as AssignmentStrategy interface and implementations UniformAssignment, BalancedAssignment etc
-     * {@link PartitionAssignmentGenerator} and AssignmentStrategy interface will together replace
+     * {@link StreamPartitionAssignmentGenerator} and AssignmentStrategy interface will together replace
      * StreamPartitionAssignmentGenerator and StreamPartitionAssignmentStrategy
      */
     return uniformAssignment(tableNameWithType, partitions, numReplicas, consumingTaggedInstances);
@@ -167,7 +166,8 @@ public class PartitionAssignmentGenerator {
   }
 
   @VisibleForTesting
-  protected List<String> getConsumingTaggedInstances(RealtimeTagConfig realtimeTagConfig) {
+  protected List<String> getConsumingTaggedInstances(TableConfig tableConfig) {
+    RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
     String consumingServerTag = realtimeTagConfig.getConsumingServerTag();
     List<String> consumingTaggedInstances = _helixManager.getClusterManagmentTool()
         .getInstancesInClusterWithTag(_helixManager.getClusterName(), consumingServerTag);
@@ -175,10 +175,5 @@ public class PartitionAssignmentGenerator {
       throw new IllegalStateException("No instances found with tag " + consumingServerTag);
     }
     return consumingTaggedInstances;
-  }
-
-  @VisibleForTesting
-  protected RealtimeTagConfig getRealtimeTagConfig(TableConfig tableConfig) {
-    return new RealtimeTagConfig(tableConfig, _helixManager);
   }
 }

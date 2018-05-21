@@ -19,6 +19,7 @@ package com.linkedin.pinot.controller.validation;
 import com.linkedin.pinot.common.config.QuotaConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.controller.util.TableSizeReader;
 import java.io.File;
@@ -63,7 +64,7 @@ public class StorageQuotaCheckerTest {
   }
 
   @Test
-  public void testNoQuota() {
+  public void testNoQuota() throws InvalidConfigException {
     StorageQuotaChecker checker = new StorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics);
     when(_tableConfig.getQuotaConfig()).thenReturn(null);
     StorageQuotaChecker.QuotaCheckerResponse res =
@@ -72,7 +73,7 @@ public class StorageQuotaCheckerTest {
   }
 
   @Test
-  public void testNoStorageQuotaConfig() {
+  public void testNoStorageQuotaConfig() throws InvalidConfigException {
     StorageQuotaChecker checker = new StorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics);
     when(_tableConfig.getQuotaConfig()).thenReturn(_quotaConfig);
     when(_quotaConfig.storageSizeBytes()).thenReturn(-1L);
@@ -81,7 +82,7 @@ public class StorageQuotaCheckerTest {
     Assert.assertTrue(res.isSegmentWithinQuota);
   }
 
-  public void setupTableSegmentSize(final long tableSize, final long segmentSize) {
+  public void setupTableSegmentSize(final long tableSize, final long segmentSize) throws InvalidConfigException {
     when(_tableSizeReader.getTableSubtypeSize("testTable", 1000)).thenAnswer(
         new Answer<TableSizeReader.TableSubTypeSizeDetails>() {
           @Override
@@ -98,8 +99,7 @@ public class StorageQuotaCheckerTest {
   }
 
   @Test
-  public void testWithinQuota()
-      throws IOException {
+  public void testWithinQuota() throws IOException, InvalidConfigException {
     File tempFile = new File(TEST_DIR, "small_file");
     tempFile.createNewFile();
     byte[] data = new byte[1024];
@@ -110,12 +110,14 @@ public class StorageQuotaCheckerTest {
     setupTableSegmentSize(5800, 900);
     when(_tableConfig.getQuotaConfig()).thenReturn(_quotaConfig);
     when(_quotaConfig.storageSizeBytes()).thenReturn(3000L);
+    when(_quotaConfig.getStorage()).thenReturn("3K");
     StorageQuotaChecker checker = new StorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics);
     StorageQuotaChecker.QuotaCheckerResponse response =
         checker.isSegmentStorageWithinQuota(TEST_DIR, "testTable", "segment1", 1000);
     Assert.assertTrue(response.isSegmentWithinQuota);
 
     when(_quotaConfig.storageSizeBytes()).thenReturn(2800L);
+    when(_quotaConfig.getStorage()).thenReturn("2.8K");
     response = checker.isSegmentStorageWithinQuota(TEST_DIR, "testTable", "segment1", 1000);
     Assert.assertFalse(response.isSegmentWithinQuota);
   }

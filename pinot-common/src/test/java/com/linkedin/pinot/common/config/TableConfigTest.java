@@ -68,6 +68,13 @@ public class TableConfigTest {
       Assert.assertEquals(tableConfig.getIndexingConfig().getLoadMode(), "HEAP");
       Assert.assertNotNull(tableConfig.getQuotaConfig());
       Assert.assertEquals(tableConfig.getQuotaConfig().getStorage(), "30G");
+      Assert.assertNull(tableConfig.getQuotaConfig().getMaxQueriesPerSecond());
+
+      // With qps quota
+      quotaConfig.setMaxQueriesPerSecond("100.00");
+      tableConfig = tableConfigBuilder.setQuotaConfig(quotaConfig).build();
+      Assert.assertNotNull(tableConfig.getQuotaConfig().getMaxQueriesPerSecond());
+      Assert.assertEquals(tableConfig.getQuotaConfig().getMaxQueriesPerSecond(), "100.00");
 
       // Serialize then de-serialize
       JSONObject jsonConfig = TableConfig.toJSONConfig(tableConfig);

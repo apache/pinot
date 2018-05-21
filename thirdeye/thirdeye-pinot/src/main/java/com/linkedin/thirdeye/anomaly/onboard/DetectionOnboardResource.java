@@ -77,6 +77,7 @@ public class DetectionOnboardResource {
       anomalyFunctionId = anomalyDAO.save(function);
 
     } catch (Exception e) {
+      LOG.error("Error creating anomaly function '{}'", jobName, e);
       return makeErrorStatus(-1, jobName, JobConstants.JobStatus.FAILED);
     }
 
@@ -101,6 +102,7 @@ public class DetectionOnboardResource {
 
       return detectionOnboardJobStatusToJsonString(new DetectionOnboardJobStatus(anomalyFunctionId, jobName, JobConstants.JobStatus.SCHEDULED, ""));
     } catch (Exception e) {
+      LOG.error("Error creating onboarding job '{}'", jobName, e);
       this.anomalyDAO.deleteById(anomalyFunctionId);
       return makeErrorStatus(-1, jobName, JobConstants.JobStatus.FAILED);
     }

@@ -1,14 +1,14 @@
 <ul class="te-anomaly-table__list">
-  <li class="te-anomaly-table__list-item te-anomaly-table__list-item--smaller" title="{{record.anomaly.functionName}}">
-    {{#link-to 'rootcause' (query-params anomalyId=record.id)}}
+  <li class="te-anomaly-table__list-item" title="{{record.anomaly.functionName}}">
+    {{#link-to "manage.alert.explore" record.anomaly.functionId (query-params duration=record.queryDuration startDate=record.queryStart endDate=record.queryEnd) class="te-anomaly-table__link"}}
       {{record.anomaly.functionName}}
     {{/link-to}}
   </li>
   {{#each-in record.anomaly.dimensions as |dimName dimList|}}
-   <li class="te-anomaly-table__list-item te-anomaly-table__list-item--smaller" title="{{dimension.dimensionVal}}">
-     {{dimName}}:<span class="te-anomaly-table__list-value">{{dimList}}</span>
-   </li>
-  {{else}}
-    -
+     <li class="te-anomaly-table__list-item" title="{{dimension.dimensionVal}}">
+       {{dimName}}:<span class="te-anomaly-table__list-value">{{dimList}}</span>
+     </li>
+    {{else}}
+      -
   {{/each-in}}
 </ul>

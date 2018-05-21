@@ -30,7 +30,6 @@ public class StreamConsumptionConfig {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private String _streamPartitionAssignmentStrategy;
-  private String _flushThresholdUpdateStrategy;
 
   public String getStreamPartitionAssignmentStrategy() {
     return _streamPartitionAssignmentStrategy;
@@ -38,14 +37,6 @@ public class StreamConsumptionConfig {
 
   public void setStreamPartitionAssignmentStrategy(String streamPartitionAssignmentStrategy) {
     _streamPartitionAssignmentStrategy = streamPartitionAssignmentStrategy;
-  }
-
-  public String getFlushThresholdUpdateStrategy() {
-    return _flushThresholdUpdateStrategy;
-  }
-
-  public void setFlushThresholdUpdateStrategy(String flushThresholdUpdateStrategy) {
-    _flushThresholdUpdateStrategy = flushThresholdUpdateStrategy;
   }
 
   @Override

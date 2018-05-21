@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package com.linkedin.pinot.controller.helix.core.realtime.partition;
+package com.linkedin.pinot.core.query.scheduler;
 
 /**
- * Enum to define partition assignment strategies for a table
+ * Indicates that the scheduler queue is out of capacity
  */
-public enum StreamPartitionAssignmentStrategyEnum {
-  UniformStreamPartitionAssignment,
-  BalancedStreamPartitionAssignment
+public class OutOfCapacityException extends Exception {
+
+  public OutOfCapacityException(String msg) {
+    super(msg);
+  }
 }
