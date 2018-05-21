@@ -93,7 +93,7 @@ public class ClusterChangeMediator implements LiveInstanceChangeListener, Extern
             if (externalViewUpdated) {
               try {
                 _helixExternalViewBasedRouting.processExternalViewChange();
-                // TODO: call processQueryQuotaChange
+                _tableQueryQuotaManager.processQueryQuotaChange();
               } catch (Exception e) {
                 LOGGER.warn("Caught exception while updating external view", e);
               }

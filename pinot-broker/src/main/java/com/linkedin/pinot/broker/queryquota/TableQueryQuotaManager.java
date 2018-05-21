@@ -25,8 +25,10 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metrics.BrokerGauge;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
@@ -34,18 +36,22 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.linkedin.pinot.common.utils.CommonConstants.Helix.*;
+
 
 public class TableQueryQuotaManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableQueryQuotaManager.class);
 
   private BrokerMetrics _brokerMetrics;
   private final HelixManager _helixManager;
+  private final AtomicInteger _lastKnownBrokerResourceVersion;
   private final Map<String, QueryQuotaConfig> _rateLimiterMap;
   private static int TIME_RANGE_IN_SECOND = 1;
 
   public TableQueryQuotaManager(HelixManager helixManager) {
     _helixManager = helixManager;
     _rateLimiterMap  = new ConcurrentHashMap<>();
+    _lastKnownBrokerResourceVersion = new AtomicInteger();
   }
 
   /**
@@ -88,16 +94,15 @@ public class TableQueryQuotaManager {
    * @param tableName table name with type.
    */
   public void dropTableQueryQuota(String tableName) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    LOGGER.info("Dropping rate limiter for table {}", rawTableName);
+    LOGGER.info("Dropping rate limiter for table {}", tableName);
     removeRateLimiter(tableName);
   }
 
   /** Remove or update rate limiter if another table with the same raw table name but different type is still using the quota config.
-   * @param tableName original table name
+   * @param tableNameWithType table name with type
    */
-  private void removeRateLimiter(String tableName) {
-    _rateLimiterMap.remove(tableName);
+  private void removeRateLimiter(String tableNameWithType) {
+    _rateLimiterMap.remove(tableNameWithType);
   }
 
   /**
@@ -146,11 +151,9 @@ public class TableQueryQuotaManager {
         }
       }
     }
-    LOGGER.info("The number of online brokers for table {} is {}", tableName, otherOnlineBrokerCount + 1);
-    //int onlineCount = otherOnlineBrokerCount + 1;
 
-    // FIXME We use fixed rate for the 1st version.
-    int onlineCount = 1;
+    int onlineCount = otherOnlineBrokerCount + 1;
+    LOGGER.info("The number of online brokers for table {} is {}", tableName, onlineCount);
 
     // Get the dynamic rate
     double overallRate;
@@ -244,7 +247,56 @@ public class TableQueryQuotaManager {
     _rateLimiterMap.clear();
   }
 
+  /**
+   * Process query quota change when number of online brokers has changed.
+   */
   public void processQueryQuotaChange() {
-    // TODO: update rate
+    long startTime = System.currentTimeMillis();
+
+    ExternalView currentBrokerResource = HelixHelper.getExternalViewForResource(_helixManager.getClusterManagmentTool(),
+        _helixManager.getClusterName(), BROKER_RESOURCE_INSTANCE);
+    int currentVersionNumber = currentBrokerResource.getRecord().getVersion();
+    if (currentVersionNumber == _lastKnownBrokerResourceVersion.get()) {
+      return;
+    }
+
+    int numRebuilt = 0;
+    for (Map.Entry<String, QueryQuotaConfig> entry : _rateLimiterMap.entrySet()) {
+      String tableNameWithType = entry.getKey();
+      QueryQuotaConfig queryQuotaConfig = entry.getValue();
+      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+
+      // Get quota config for table.
+      QuotaConfig quotaConfig = getQuotaConfigFromPropertyStore(rawTableName, tableType);
+      if (quotaConfig == null || quotaConfig.getMaxQueriesPerSecond() == null || !quotaConfig.isMaxQueriesPerSecondValid()) {
+        removeRateLimiter(tableNameWithType);
+        continue;
+      }
+
+      // Get number of online brokers.
+      Map<String, String> stateMap = currentBrokerResource.getStateMap(tableNameWithType);
+      if (stateMap == null) {
+        removeRateLimiter(tableNameWithType);
+        continue;
+      }
+      int onlineBrokerCount = 0;
+      for (Map.Entry<String, String> state : stateMap.entrySet()) {
+        if (state.getValue().equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)) {
+          onlineBrokerCount++;
+        }
+      }
+
+      double overallRate = Double.parseDouble(quotaConfig.getMaxQueriesPerSecond());
+      double latestRate = overallRate / onlineBrokerCount;
+      if (Math.abs(latestRate - queryQuotaConfig.getRateLimiter().getRate()) > 0.001) {
+        queryQuotaConfig.getRateLimiter().setRate(latestRate);
+        numRebuilt++;
+      }
+    }
+    _lastKnownBrokerResourceVersion.set(currentVersionNumber);
+    long endTime = System.currentTimeMillis();
+    LOGGER.info("Processed query quota change in {}ms, {} / {} query quota config rebuilt.", (endTime - startTime),
+        numRebuilt, _rateLimiterMap.size());
   }
 }
