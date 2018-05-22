@@ -52,6 +52,8 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -60,6 +62,8 @@ import org.json.JSONObject;
  */
 @SuppressWarnings("unused")
 public class FileUploadDownloadClient implements Closeable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FileUploadDownloadClient.class);
+
   public static class CustomHeaders {
     public static final String UPLOAD_TYPE = "UPLOAD_TYPE";
     public static final String DOWNLOAD_URI = "DOWNLOAD_URI";
@@ -224,6 +228,15 @@ public class FileUploadDownloadClient implements Closeable {
 
   private SimpleHttpResponse sendRequest(HttpUriRequest request) throws IOException, HttpErrorStatusException {
     try (CloseableHttpResponse response = _httpClient.execute(request)) {
+      String controllerHost = null;
+      String controllerVersion = null;
+      if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
+        controllerHost = response.getFirstHeader(CommonConstants.Controller.HOST_HTTP_HEADER).getValue();
+        controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
+      }
+      if (controllerHost != null) {
+        LOGGER.info(String.format("Sending request: %s to controller: %s, version: %s", request.getURI(), controllerHost, controllerVersion));
+      }
       int statusCode = response.getStatusLine().getStatusCode();
       if (statusCode >= 300) {
         throw new HttpErrorStatusException(getErrorMessage(request, response), statusCode);
