@@ -1087,7 +1087,7 @@ public class PinotHelixResourceManager {
         break;
       case REALTIME:
         // Ensure that realtime table is not created for the realtime table
-        Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
+        Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, segmentsConfig.getSchemaName());
         if (schema == null) {
           throw new InvalidTableConfigException("No schema defined for realtime table: " + tableNameWithType);
         }
