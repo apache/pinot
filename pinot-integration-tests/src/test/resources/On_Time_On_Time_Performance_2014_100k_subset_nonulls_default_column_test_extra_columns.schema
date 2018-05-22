@@ -1,5 +1,5 @@
 {
-  "schemaName": "mytable",
+  "schemaName": "myschema",
   "dimensionFieldSpecs": [
     {
       "name": "AirlineID",
