@@ -171,7 +171,8 @@ public class TarGzCompressionUtils {
   public static List<File> unTar(final File inputFile, final File outputDir) throws FileNotFoundException, IOException,
       ArchiveException {
 
-    LOGGER.debug(String.format("Untaring %s to dir %s.", inputFile.getAbsolutePath(), outputDir.getAbsolutePath()));
+    String outputDirectoryPath = outputDir.getCanonicalPath();
+    LOGGER.debug(String.format("Untaring %s to dir %s.", inputFile.getAbsolutePath(), outputDirectoryPath));
     TarArchiveInputStream debInputStream = null;
     InputStream is = null;
     final List<File> untaredFiles = new LinkedList<File>();
@@ -181,6 +182,10 @@ public class TarGzCompressionUtils {
       TarArchiveEntry entry = null;
       while ((entry = (TarArchiveEntry) debInputStream.getNextEntry()) != null) {
         final File outputFile = new File(outputDir, entry.getName());
+        // Check whether the untarred file will be put outside of the target output directory.
+        if (!outputFile.getCanonicalPath().startsWith(outputDirectoryPath)) {
+          throw new IOException("Tar file must not be untarred outside of the target output directory!");
+        }
         if (entry.isDirectory()) {
           LOGGER.debug(String.format("Attempting to write output directory %s.", outputFile.getAbsolutePath()));
           if (!outputFile.exists()) {
