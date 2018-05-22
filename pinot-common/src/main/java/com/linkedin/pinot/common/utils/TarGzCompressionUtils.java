@@ -50,6 +50,8 @@ import org.slf4j.LoggerFactory;
 public class TarGzCompressionUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TarGzCompressionUtils.class);
   public static final String TAR_GZ_FILE_EXTENTION = ".tar.gz";
+  public static final String EXTRACT_FILE_OUTSIDE_OF_TARGET_DIR =
+      "Tar file must not be untarred outside of the target output directory!";
 
   /**
    * Creates a tar.gz file at the specified path with the contents of the
@@ -64,12 +66,12 @@ public class TarGzCompressionUtils {
    * @throws IOException
    *           If anything goes wrong
    */
-  public static String createTarGzOfDirectory(String directoryPath, String tarGzPath)
-      throws IOException {
+  public static String createTarGzOfDirectory(String directoryPath, String tarGzPath) throws IOException {
     return createTarGzOfDirectory(directoryPath, tarGzPath, "");
   }
 
-  public static String createTarGzOfDirectory(String directoryPath, String tarGzPath, String entryPrefix) throws IOException {
+  public static String createTarGzOfDirectory(String directoryPath, String tarGzPath, String entryPrefix)
+      throws IOException {
     FileOutputStream fOut = null;
     BufferedOutputStream bOut = null;
     GzipCompressorOutputStream gzOut = null;
@@ -165,11 +167,11 @@ public class TarGzCompressionUtils {
    * @throws IOException
    * @throws FileNotFoundException
    *
-   * @return  The {@link List} of {@link File}s with the untared content.
+   * @return The {@link List} of {@link File}s with the untared content.
    * @throws ArchiveException
    */
-  public static List<File> unTar(final File inputFile, final File outputDir) throws FileNotFoundException, IOException,
-      ArchiveException {
+  public static List<File> unTar(final File inputFile, final File outputDir)
+      throws FileNotFoundException, IOException, ArchiveException {
 
     String outputDirectoryPath = outputDir.getCanonicalPath();
     LOGGER.debug(String.format("Untaring %s to dir %s.", inputFile.getAbsolutePath(), outputDirectoryPath));
@@ -184,15 +186,15 @@ public class TarGzCompressionUtils {
         final File outputFile = new File(outputDir, entry.getName());
         // Check whether the untarred file will be put outside of the target output directory.
         if (!outputFile.getCanonicalPath().startsWith(outputDirectoryPath)) {
-          throw new IOException("Tar file must not be untarred outside of the target output directory!");
+          throw new IOException(EXTRACT_FILE_OUTSIDE_OF_TARGET_DIR);
         }
         if (entry.isDirectory()) {
           LOGGER.debug(String.format("Attempting to write output directory %s.", outputFile.getAbsolutePath()));
           if (!outputFile.exists()) {
             LOGGER.debug(String.format("Attempting to create output directory %s.", outputFile.getAbsolutePath()));
             if (!outputFile.mkdirs()) {
-              throw new IllegalStateException(String.format("Couldn't create directory %s.",
-                  outputFile.getAbsolutePath()));
+              throw new IllegalStateException(
+                  String.format("Couldn't create directory %s.", outputFile.getAbsolutePath()));
             }
           } else {
             LOGGER.error("The directory already there. Deleting - " + outputFile.getAbsolutePath());

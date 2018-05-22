@@ -15,11 +15,18 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import org.apache.commons.compress.archivers.ArchiveException;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -50,7 +57,6 @@ public class TarGzCompressionUtilsTest {
     FileUtils.forceMkdir(tarDir);
     FileUtils.forceMkdir(untarDir);
     FileUtils.forceMkdir(segmentDir);
-
   }
 
   @AfterMethod
@@ -121,5 +127,62 @@ public class TarGzCompressionUtilsTest {
     Assert.assertNotNull(segmentFiles);
     Assert.assertEquals(segmentFiles.length, 0);
 
+  }
+
+  @Test
+  public void testBadFilePath() throws Exception {
+    File metaFile = new File(segmentDir, "metadata.properties");
+    metaFile.createNewFile();
+
+    // We guarantee metaFile isn't a directory.
+    Assert.assertFalse(metaFile.isDirectory());
+
+    File tarGzPath = new File(tarDir, SEGMENT_NAME + ".tar.gz");
+    mockIncorrectData(metaFile, tarGzPath);
+
+    try {
+      TarGzCompressionUtils.unTar(tarGzPath, untarDir);
+      Assert.fail("Did not get exception!!");
+    } catch (IOException e) {
+      Assert.assertTrue(e.getMessage().contains(TarGzCompressionUtils.EXTRACT_FILE_OUTSIDE_OF_TARGET_DIR));
+    }
+  }
+
+  private void mockIncorrectData(File nonDirFile, File tarGzPath) throws IOException {
+    FileOutputStream fOut = null;
+    BufferedOutputStream bOut = null;
+    GzipCompressorOutputStream gzOut = null;
+    TarArchiveOutputStream tOut = null;
+    try {
+      fOut = new FileOutputStream(new File(tarGzPath.getPath()));
+      bOut = new BufferedOutputStream(fOut);
+      gzOut = new GzipCompressorOutputStream(bOut);
+      tOut = new TarArchiveOutputStream(gzOut);
+      tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
+
+      // Mock the file that doesn't use the correct file name.
+      String badEntryName =  "../foo/bar";
+      TarArchiveEntry tarEntry = new TarArchiveEntry(nonDirFile, badEntryName);
+      tOut.putArchiveEntry(tarEntry);
+      IOUtils.copy(new FileInputStream(nonDirFile), tOut);
+      tOut.closeArchiveEntry();
+
+    }  catch (IOException e) {
+      Assert.fail("Unexpected Exception!!");
+    } finally {
+      if (tOut != null) {
+        tOut.finish();
+        tOut.close();
+      }
+      if (gzOut != null) {
+        gzOut.close();
+      }
+      if (bOut != null) {
+        bOut.close();
+      }
+      if (fOut != null) {
+        fOut.close();
+      }
+    }
   }
 }
