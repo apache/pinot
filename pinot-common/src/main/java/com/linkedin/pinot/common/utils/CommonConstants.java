@@ -218,6 +218,10 @@ public class CommonConstants {
       public static final String PQL = "pql";
       public static final String TRACE = "trace";
       public static final String DEBUG_OPTIONS = "debugOptions";
+
+      public static class QueryOptionKey {
+        public static final String PRESERVE_TYPE = "preserveType";
+      }
     }
   }
 

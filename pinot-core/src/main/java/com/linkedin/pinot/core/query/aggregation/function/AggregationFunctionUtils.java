@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.plan.AggregationFunctionInitializer;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
+import java.io.Serializable;
 import java.util.List;
 import java.util.Locale;
 import javax.annotation.Nonnull;
@@ -85,6 +86,14 @@ public class AggregationFunctionUtils {
       } else {
         return String.format(Locale.US, "%1.5f", doubleValue);
       }
+    } else {
+      return value.toString();
+    }
+  }
+
+  public static Serializable getSerializableValue(@Nonnull Object value) {
+    if (value instanceof Number) {
+      return (Number) value;
     } else {
       return value.toString();
     }

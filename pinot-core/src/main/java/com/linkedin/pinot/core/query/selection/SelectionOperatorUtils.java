@@ -406,7 +406,7 @@ public class SelectionOperatorUtils {
   }
 
   /**
-   * Render the unformatted selection rows to a formatted {@link SelectionResults} object for selection queries without
+   * Render the selection rows to a formatted {@link SelectionResults} object for selection queries without
    * <code>ORDER BY</code>. (Broker side)
    * <p>{@link SelectionResults} object will be used to build the broker response.
    * <p>Should be called after method "reduceWithoutOrdering()".
@@ -419,7 +419,22 @@ public class SelectionOperatorUtils {
   @Nonnull
   public static SelectionResults renderSelectionResultsWithoutOrdering(@Nonnull List<Serializable[]> rows,
       @Nonnull DataSchema dataSchema, @Nonnull List<String> selectionColumns) {
-    // TODO: remove the code for backward compatible after server updated to the latest code.
+    int[] columnIndices = getColumnIndicesWithoutOrdering(selectionColumns, dataSchema);
+    int numRows = rows.size();
+    for (int i = 0; i < numRows; i++) {
+      rows.set(i, extractColumns(rows.get(i), columnIndices));
+    }
+    return new SelectionResults(selectionColumns, rows);
+  }
+
+  /**
+   * Helper method to compute column indices from selection columns and the data schema for selection queries without
+   * <code>ORDER BY</code>.
+   * @param selectionColumns selection columns.
+   * @param dataSchema data schema.
+   * @return column indices
+   */
+  public static int[] getColumnIndicesWithoutOrdering(@Nonnull List<String> selectionColumns, @Nonnull DataSchema dataSchema) {
     int numSelectionColumns = selectionColumns.size();
     int[] columnIndices = new int[numSelectionColumns];
     Map<String, Integer> dataSchemaIndices = new HashMap<>(numSelectionColumns);
@@ -429,16 +444,94 @@ public class SelectionOperatorUtils {
     for (int i = 0; i < numSelectionColumns; i++) {
       columnIndices[i] = dataSchemaIndices.get(selectionColumns.get(i));
     }
+    return columnIndices;
+  }
+
+  /**
+   * Helper method to compute column indices from selection columns and the data schema for selection queries with
+   * <code>ORDER BY</code>.
+   * @param selectionColumns selection columns.
+   * @param dataSchema data schema.
+   * @return column indices
+   */
+  public static int[] getColumnIndicesWithOrdering(@Nonnull List<String> selectionColumns, @Nonnull DataSchema dataSchema) {
+    int numSelectionColumns = selectionColumns.size();
+    int[] columnIndices = new int[numSelectionColumns];
+    int numColumnsInDataSchema = dataSchema.size();
+    Map<String, Integer> dataSchemaIndices = new HashMap<>(numColumnsInDataSchema);
+    for (int i = 0; i < numColumnsInDataSchema; i++) {
+      dataSchemaIndices.put(dataSchema.getColumnName(i), i);
+    }
+    for (int i = 0; i < numSelectionColumns; i++) {
+      columnIndices[i] = dataSchemaIndices.get(selectionColumns.get(i));
+    }
+    return columnIndices;
+  }
+
+  /**
+   * Extract columns from the row based on the given column indices.
+   * <p>The extracted row is used to build the {@link SelectionResults}.
+   *
+   * @param row selection row to be extracted.
+   * @param columnIndices column indices.
+   * @return selection row.
+   */
+  @Nonnull
+  public static Serializable[] extractColumns(@Nonnull Serializable[] row, @Nonnull int[] columnIndices) {
+    int numColumns = columnIndices.length;
+    Serializable[] extractedRow = new Serializable[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      int columnIndex = columnIndices[i];
+      extractedRow[i] = row[columnIndex];
+    }
+    return extractedRow;
+  }
+
+  /**
+   * Helper method to format multiple selections rows for selection queries with <code>ORDER BY</code>
+   * @param rows selection rows to be formatted.
+   * @param dataSchema data schema.
+   */
+  public static List<Serializable[]> formatRowsWithOrdering(@Nonnull List<Serializable[]> rows,
+      @Nonnull int[] columnIndices, @Nonnull DataSchema dataSchema) {
     int numRows = rows.size();
     for (int i = 0; i < numRows; i++) {
-      rows.set(i, getFormattedRowWithoutOrdering(rows.get(i), dataSchema, columnIndices));
+      rows.set(i, formatRowWithOrdering(rows.get(i), columnIndices, dataSchema));
     }
+    return rows;
+  }
 
-    /* TODO: uncomment after server updated to the latest code.
-    for (Serializable[] row : rows) {
-      formatRowWithoutOrdering(row, dataSchema);
-    }*/
-    return new SelectionResults(selectionColumns, rows);
+  /**
+   * Helper method to format a selection row, make all values string or string array type based on data schema passed in
+   * for selection queries with <code>ORDER BY</code>. (Broker side)
+   * <p>Formatted row is used to build the {@link SelectionResults}.
+   *
+   * @param row selection row to be formatted.
+   * @param columnIndices column indices.
+   * @param dataSchema data schema.
+   */
+  private static Serializable[] formatRowWithOrdering(@Nonnull Serializable[] row, @Nonnull int[] columnIndices,
+      @Nonnull DataSchema dataSchema) {
+    int numColumns = columnIndices.length;
+    for (int i = 0; i < numColumns; i++) {
+      int columnIndex = columnIndices[i];
+      row[i] = getFormattedValue(row[i], dataSchema.getColumnDataType(columnIndex));
+    }
+    return row;
+  }
+
+  /**
+   * Helper method to format multiple selections rows for selection queries without <code>ORDER BY</code>
+   * @param rows selection rows to be formatted.
+   * @param dataSchema data schema.
+   */
+  public static List<Serializable[]> formatRowsWithoutOrdering(@Nonnull List<Serializable[]> rows,
+      @Nonnull DataSchema dataSchema) {
+    int numRows = rows.size();
+    for (int i = 0; i < numRows; i++) {
+      rows.set(i, formatRowWithoutOrdering(rows.get(i), dataSchema));
+    }
+    return rows;
   }
 
   /**
@@ -449,24 +542,12 @@ public class SelectionOperatorUtils {
    * @param row selection row to be formatted.
    * @param dataSchema data schema.
    */
-  private static void formatRowWithoutOrdering(@Nonnull Serializable[] row, @Nonnull DataSchema dataSchema) {
+  private static Serializable[] formatRowWithoutOrdering(@Nonnull Serializable[] row, @Nonnull DataSchema dataSchema) {
     int numColumns = row.length;
     for (int i = 0; i < numColumns; i++) {
       row[i] = getFormattedValue(row[i], dataSchema.getColumnDataType(i));
     }
-  }
-
-  // TODO: remove this method after server updated to the latest code.
-  private static Serializable[] getFormattedRowWithoutOrdering(@Nonnull Serializable[] row,
-      @Nonnull DataSchema dataSchema, @Nonnull int[] columnIndices) {
-    int numColumns = columnIndices.length;
-    Serializable[] formattedRow = new Serializable[numColumns];
-    for (int i = 0; i < numColumns; i++) {
-      int columnIndex = columnIndices[i];
-      formattedRow[i] =
-          SelectionOperatorUtils.getFormattedValue(row[columnIndex], dataSchema.getColumnDataType(columnIndex));
-    }
-    return formattedRow;
+    return row;
   }
 
   /**
@@ -479,7 +560,7 @@ public class SelectionOperatorUtils {
    * @return formatted value.
    */
   @Nonnull
-  public static Serializable getFormattedValue(@Nonnull Serializable value,
+  private static Serializable getFormattedValue(@Nonnull Serializable value,
       @Nonnull DataSchema.ColumnDataType dataType) {
     switch (dataType) {
       // Single-value column.

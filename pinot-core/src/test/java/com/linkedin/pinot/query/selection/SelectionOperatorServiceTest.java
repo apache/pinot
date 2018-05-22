@@ -143,13 +143,28 @@ public class SelectionOperatorServiceTest {
     SelectionResults selectionResults =
         SelectionOperatorUtils.renderSelectionResultsWithoutOrdering(rows, _upgradedDataSchema,
             Arrays.asList(_columnNames));
-    List<Serializable[]> formattedRows = selectionResults.getRows();
+
+    List<Serializable[]> resultRows = selectionResults.getRows();
+
+    Serializable[] expectedRow1 =
+        {0, 1L, 2.0F, 3.0, "4", new int[]{5}, new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new String[]{"9"}};
+    Serializable[] expectedRow2 =
+        {1L, 2.0F, 3.0, 4, "5", new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new int[]{9}, new String[]{"10"}};
+    Assert.assertEquals(resultRows.get(0), expectedRow1);
+    Assert.assertEquals(resultRows.get(1), expectedRow2);
+
+    int[] columnIndices =
+        SelectionOperatorUtils.getColumnIndicesWithoutOrdering(selectionResults.getColumns(), _dataSchema);
+
+    // TODO: use "formatRowsWithoutOrdering" after server updated to the latest code.
+    resultRows = SelectionOperatorUtils.formatRowsWithOrdering(resultRows, columnIndices, _upgradedDataSchema);
+
     Serializable[] expectedFormattedRow1 =
         {"0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9"}};
     Serializable[] expectedFormattedRow2 =
         {"1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"}, new String[]{"10"}};
-    Assert.assertEquals(formattedRows.get(0), expectedFormattedRow1);
-    Assert.assertEquals(formattedRows.get(1), expectedFormattedRow2);
+    Assert.assertEquals(resultRows.get(0), expectedFormattedRow1);
+    Assert.assertEquals(resultRows.get(1), expectedFormattedRow2);
   }
 
   @Test
@@ -160,13 +175,27 @@ public class SelectionOperatorServiceTest {
     rows.offer(_row1.clone());
     rows.offer(_compatibleRow1.clone());
     rows.offer(_compatibleRow2.clone());
+
     SelectionResults selectionResults = selectionOperatorService.renderSelectionResultsWithOrdering();
-    List<Serializable[]> formattedRows = selectionResults.getRows();
+    List<Serializable[]> resultRows = selectionResults.getRows();
+
+    Serializable[] expectedRow1 =
+        {1L, 2.0F, 3.0, 4, "5", new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new int[]{9}, new String[]{"10"}};
+    Serializable[] expectedRow2 =
+        {0, 1L, 2.0F, 3.0, "4", new int[]{5}, new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new String[]{"9"}};
+    Assert.assertEquals(resultRows.get(0), expectedRow1);
+    Assert.assertEquals(resultRows.get(1), expectedRow2);
+
+    int[] columnIndices =
+        SelectionOperatorUtils.getColumnIndicesWithOrdering(selectionResults.getColumns(), _dataSchema);
+    resultRows =
+        SelectionOperatorUtils.formatRowsWithOrdering(resultRows, columnIndices, _upgradedDataSchema);
+
     Serializable[] expectedFormattedRow1 =
         {"1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"}, new String[]{"10"}};
     Serializable[] expectedFormattedRow2 =
         {"0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9"}};
-    Assert.assertEquals(formattedRows.get(0), expectedFormattedRow1);
-    Assert.assertEquals(formattedRows.get(1), expectedFormattedRow2);
+    Assert.assertEquals(resultRows.get(0), expectedFormattedRow1);
+    Assert.assertEquals(resultRows.get(1), expectedFormattedRow2);
   }
 }
