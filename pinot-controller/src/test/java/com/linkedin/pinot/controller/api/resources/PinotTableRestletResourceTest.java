@@ -140,9 +140,20 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
     }
 
+    // Creating a REALTIME table with a different schema name in the config should succeed (backwards compatibility mode)
+    String schemaName = "differentRTSchema";
+    _realtimeBuilder.setSchemaName(schemaName);
+    // use a different table name so it doesn't associate a previously uploaded schema with the table
+    _realtimeBuilder.setTableName("RT_TABLE");
+    addDummySchema(schemaName);
+    TableConfig diffConfig = _realtimeBuilder.build();
+    sendPostRequest(_createTableUrl, diffConfig.toJSONConfigString());
+
     // Create a REALTIME table with a valid name and schema which should succeed
-    realtimeTableConfig.setTableName(REALTIME_TABLE_NAME);
-    String realtimeTableJSONConfigString = realtimeTableConfig.toJSONConfigString();
+    _realtimeBuilder.setTableName(REALTIME_TABLE_NAME);
+    _realtimeBuilder.setSchemaName(REALTIME_TABLE_NAME);
+    TableConfig config = _realtimeBuilder.build();
+    String realtimeTableJSONConfigString = config.toJSONConfigString();
     sendPostRequest(_createTableUrl, realtimeTableJSONConfigString);
 
     // TODO: check whether we should allow POST request to create REALTIME table that already exists

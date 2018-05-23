@@ -1086,15 +1086,24 @@ public class PinotHelixResourceManager {
         updateReplicaGroupPartitionAssignment(tableConfig);
         break;
       case REALTIME:
-        // Ensure that realtime table is not created for the realtime table
-        Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
+        // Ensure that realtime table is not created if schema is not present
+        Schema schema = ZKMetadataProvider
+            .getSchema(_propertyStore, TableNameBuilder.extractRawTableName(tableNameWithType));
+
         if (schema == null) {
-          throw new InvalidTableConfigException("No schema defined for realtime table: " + tableNameWithType);
+          // Fall back to getting schema-name from table config if schema-name != table-name
+          String schemaName = tableConfig.getValidationConfig().getSchemaName();
+          if (schemaName == null
+              || ZKMetadataProvider.getSchema(_propertyStore, schemaName) == null) {
+            throw new InvalidTableConfigException(
+                "No schema defined for realtime table: " + tableNameWithType);
+          }
         }
 
         // lets add table configs
         ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType,
             TableConfig.toZnRecord(tableConfig));
+
         /*
          * PinotRealtimeSegmentManager sets up watches on table and segment path. When a table gets created,
          * it expects the INSTANCE path in propertystore to be set up so that it can get the kafka group ID and
