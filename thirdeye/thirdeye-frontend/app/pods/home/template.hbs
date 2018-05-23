@@ -33,12 +33,12 @@
     </section>
 
     <section>
-      {{#each-in model.anomalyMapping as |metric anomalyList|}}
+      {{#each-in model.anomalyMapping as |metric humanizedEntityList|}}
         <h4 class="dashboard-container__title">Metric:
-          <span>{{metric}} ({{anomalyList.length}} {{if (gt anomalyList.length 1) "anomalies" "anomaly"}})</span>
+          <span>{{metric}} ({{humanizedEntityList.length}} {{if (gt humanizedEntityList.length 1) "anomalies" "anomaly"}})</span>
         </h4>
           {{models-table
-            data=anomalyList
+            data=humanizedEntityList
             columns=columns
             customClasses=classes
             showColumnsDropdown=false
@@ -49,7 +49,7 @@
             showComponentFooter=true
           }}
           {{!-- TODO: leave to decide if after poc we need it - lohuynh
-          {{#if (gt anomalyList.length 5)}}
+          {{#if (gt humanizedEntityList.length 5)}}
             <a href="{{get (get model.redirectLink metric) alert}}" class="dashboard-container__redirect-link">
               See More
             </a>

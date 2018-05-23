@@ -2,12 +2,12 @@ import Service from '@ember/service';
 import { inject as service } from '@ember/service';
 import { assert } from '@ember/debug';
 
-  // set expiration to 7 days
-  const EXPIRATION = 60 * 60 * 24 * 7;
+  // set expiration to 1 day
+  const EXPIRATION = 60 * 60 * 24 * 1;
 /**
  * @type {Ember.Service}
  * @summary This service is to also cached the query response data for `this.get('store').query()` calls. In general,
-   the call to `this.get('store').query()` does not do auto cache under the hood.
+   the call to `this.get('store').query()` does not do request caching under the hood.
    The `onion wrapper` cache only caches the info that ember-data does not currently cache for us. Meaning if the internal records
    in the ember store changes it changes for this cache as well.
    This is caching the `onion wrapper` we get back with the data document.
@@ -19,13 +19,14 @@ import { assert } from '@ember/debug';
       data: [] | {}  <- Note: this will have the entity or entities that the ember-data will cache in its store.
     }
  * @see {@link http://jsonapi.org/|jsonapi.org}
- * //To debug what is in the store - this.get('store')._identityMap.
+ * //DEMO: To debug what is in the store - this.get('store')._identityMap.
+ * //assets->addon-tree-output->modules/ember-data->_private.js (_push: function _push(jsonApiDoc)
  * @example   anomaliesApiService: service('services/api/anomalies'),
  */
 export default Service.extend({
   init() {
     this._super(...arguments);
-    this._cache = Object.create(null);//create our cache
+    this._cache = Object.create(null);
   },
 
   store: service('store'),
@@ -35,21 +36,21 @@ export default Service.extend({
    * @method query
    * @param {String} type - modelName
    * @param {Object} query - query object used to generate the
-   * @param {Object} adapterOptions - adapter options object
+   * @param {Object} adapterOptions - adapter options object (reload: true will enforces getting fresh data)
    * @example
        const query = { application: appName, start };
        const anomalies = await queryCache.query(modelName, query, { reload: false, cacheKey: queryCache.urlForQueryKey(modelName, query) });
-   * @return {Obect}
+   * @return {Object}
    */
   query(type, query, adapterOptions) {
+    const cacheKey = adapterOptions.cacheKey;
     assert('you must pass adapterOptions to queryCache.query', adapterOptions);
-    assert('you must pass adapterOptions.cacheKey to queryCache.query', adapterOptions.cacheKey);
+    assert('you must include adapterOptions.cacheKey', cacheKey);
 
-    let cached = this._cache[adapterOptions.cacheKey];
-    if (!cached || adapterOptions.reload) {
-       cached = this._cache[adapterOptions.cacheKey] = this.get('store').query(type, query, adapterOptions);//add to our dictionary
+    let cached = this._cache[cacheKey];
+    if (!cached || adapterOptions.reload) {// TODO: Add `EXPIRATION` here to purge when possible - lohuynh
+       cached = this._cache[cacheKey] = this.get('store').query(type, query, adapterOptions);
     }
-
     return cached;
   },
 

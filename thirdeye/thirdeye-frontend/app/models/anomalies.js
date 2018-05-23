@@ -14,3 +14,4 @@ export default DS.Model.extend({
   functionId: DS.attr(),
   dataset: DS.attr()
 });
+//DEMO: avoidTheSharedObject: attr('object', { defaultValue: () => {} })
