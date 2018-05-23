@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
  */
 public class DetectionAlertScheduler implements Runnable {
   private static final Logger LOG = LoggerFactory.getLogger(AlertJobSchedulerV2.class);
-  private static final int DEFAULT_ALERT_DELAY = 10;
+  private static final int DEFAULT_ALERT_DELAY = 1;
   private static final TimeUnit DEFAULT_ALERT_DELAY_UNIT = TimeUnit.MINUTES;
 
   final Scheduler scheduler;

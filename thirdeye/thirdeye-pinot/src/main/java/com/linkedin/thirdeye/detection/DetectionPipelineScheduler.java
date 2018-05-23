@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 
 public class DetectionPipelineScheduler implements Runnable {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionPipelineScheduler.class);
-  public static final int DEFAULT_DETECTION_DELAY = 5;
+  public static final int DEFAULT_DETECTION_DELAY = 1;
   public static final TimeUnit DEFAULT_ALERT_DELAY_UNIT = TimeUnit.MINUTES;
 
   final DetectionConfigManager detectionDAO;
