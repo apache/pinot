@@ -91,21 +91,7 @@ public class ThresholdAlgorithm extends StaticDetectionPipeline {
         long start = df.getLong(COL_TIME, i);
         long end = getEndTime(df, i);
 
-        double current = df.getDouble(COL_VALUE, i);
-
-        double baseline = 0;
-        if (df.getBooleans(COL_TOO_HIGH).booleanValue()){
-          baseline = this.max;
-        }
-
-        if (df.getBooleans(COL_TOO_LOW).booleanValue()){
-          baseline = this.min;
-        }
-
-        MergedAnomalyResultDTO anomaly = this.makeAnomaly(this.slice.withStart(start).withEnd(end));
-        anomaly.setAvgCurrentVal(current);
-        anomaly.setAvgBaselineVal(baseline);
-        anomalies.add(anomaly);
+        anomalies.add(this.makeAnomaly(this.slice.withStart(start).withEnd(end)));
       }
     }
 

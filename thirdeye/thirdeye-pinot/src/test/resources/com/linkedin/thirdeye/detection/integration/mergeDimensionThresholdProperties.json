@@ -9,6 +9,7 @@
       "nestedMetricUrn": "thirdeye:metric:2",
       "dimensions": ["a", "b"],
       "minValue": 10,
+      "lookback": 0,
       "k": 3,
       "nested": [
         {

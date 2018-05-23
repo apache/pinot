@@ -95,7 +95,7 @@ public class DetectionPipelineTaskRunnerTest {
   public void testTaskRunnerPersistence() throws Exception {
     MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(this.detectorId, 1300, 1400, null, null, Collections.singletonMap("myKey", "myValue"));
 
-    this.outputs.add(new MockPipelineOutput(Collections.singletonList(anomaly), -1));
+    this.outputs.add(new MockPipelineOutput(Collections.singletonList(anomaly), 1400));
 
     this.runner.execute(this.info, this.context);
 
@@ -108,5 +108,15 @@ public class DetectionPipelineTaskRunnerTest {
     Assert.assertEquals(readAnomaly.getDimensions(), new DimensionMap("{\"myKey\":\"myValue\"}"));
   }
 
+  @Test
+  public void testTaskRunnerPersistenceFailTimestamp() throws Exception {
+    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(this.detectorId, 1300, 1400, null, null,
+        Collections.singletonMap("myKey", "myValue"));
 
+    this.outputs.add(new MockPipelineOutput(Collections.singletonList(anomaly), -1));
+
+    this.runner.execute(this.info, this.context);
+
+    Assert.assertNull(anomaly.getId());
+  }
 }

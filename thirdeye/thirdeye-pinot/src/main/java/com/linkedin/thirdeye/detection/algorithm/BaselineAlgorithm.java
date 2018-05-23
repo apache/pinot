@@ -125,13 +125,8 @@ public class BaselineAlgorithm extends StaticDetectionPipeline {
       if (BooleanSeries.booleanValueOf(df.getBoolean(COL_ANOMALY, i))) {
         long start = df.getLong(COL_TIME, i);
         long end = getEndTime(df, i);
-        double current = df.getDouble(COL_CURR, i);
-        double baseline = df.getDouble(COL_BASE, i);
 
-        MergedAnomalyResultDTO anomaly = this.makeAnomaly(this.slice.withStart(start).withEnd(end));
-        anomaly.setAvgCurrentVal(current);
-        anomaly.setAvgBaselineVal(baseline);
-        anomalies.add(anomaly);
+        anomalies.add(this.makeAnomaly(this.slice.withStart(start).withEnd(end)));
       }
     }
 
