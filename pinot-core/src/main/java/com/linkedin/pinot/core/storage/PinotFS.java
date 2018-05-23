@@ -76,7 +76,8 @@ public abstract class PinotFS {
   public abstract long length(URI segmentUri) throws IOException;
 
   /**
-   * Lists all the files at the location provided. Returns null if this abstract pathname does not denote a directory, or if
+   * Lists all the files at the location provided. Does not list recursively
+   * Returns null if this abstract pathname does not denote a directory, or if
    * an I/O error occurs.
    * @param segmentUri location of file
    * @return an array of strings that contains file paths
@@ -86,7 +87,7 @@ public abstract class PinotFS {
   public abstract String[] listFiles(URI segmentUri) throws FileNotFoundException, IOException;
 
   /**
-   * Copies a file from a remote filesystem to the local one.
+   * Copies a file from a remote filesystem to the local one. Keeps the original file.
    * @param srcUri location of current file on remote filesystem
    * @param dstUri location of destination on local filesystem
    * @throws IOException IO Failures

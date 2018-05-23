@@ -33,9 +33,11 @@ public class LocalPinotFS extends PinotFS {
   public LocalPinotFS() {
   }
 
+  @Override
   public void init(Configuration configuration) {
   }
 
+  @Override
   public boolean delete(URI segmentUri) throws IOException {
     File file = new File(segmentUri);
     if (file.isDirectory()) {
@@ -45,6 +47,7 @@ public class LocalPinotFS extends PinotFS {
     return file.delete();
   }
 
+  @Override
   public boolean move(URI srcUri, URI dstUri) throws IOException {
     File srcFile = new File(srcUri);
     File dstFile = new File(dstUri);
@@ -52,6 +55,7 @@ public class LocalPinotFS extends PinotFS {
     return srcFile.renameTo(dstFile) && srcFile.delete();
   }
 
+  @Override
   public boolean copy(URI srcUri, URI dstUri) throws IOException {
     File srcFile = new File(srcUri);
     File dstFile = new File(dstUri);
@@ -59,25 +63,30 @@ public class LocalPinotFS extends PinotFS {
     return srcFile.renameTo(dstFile);
   }
 
+  @Override
   public boolean exists(URI segmentUri) throws IOException {
     File file = new File(segmentUri);
     return file.exists();
   }
 
+  @Override
   public long length(URI segmentUri) throws IOException {
     File file = new File(segmentUri);
     return file.length();
   }
 
+  @Override
   public String[] listFiles(URI segmentUri) throws FileNotFoundException, IOException {
     File file = new File(segmentUri);
     return file.list();
   }
 
+  @Override
   public void copyToLocalFile(URI srcUri, URI dstUri) throws IOException {
     copy(srcUri, dstUri);
   }
 
+  @Override
   public void copyFromLocalFile(URI srcUri, URI dstUri) throws IOException {
     copy(srcUri, dstUri);
   }
