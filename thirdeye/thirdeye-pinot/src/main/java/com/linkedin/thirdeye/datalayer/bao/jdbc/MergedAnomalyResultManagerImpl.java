@@ -345,26 +345,12 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
   private List<MergedAnomalyResultDTO> getAnomaliesForMetricBeanAndTimeRange(MetricConfigBean mbean, long start, long end) {
 
-    LOG.info("Fetching functions for metricId={}", mbean.getId());
-
-    // TODO use metricId instead of metric/dataset on join (requires database cleanup)
-    List<AnomalyFunctionBean> functionBeans = genericPojoDao.get(
-        Predicate.AND(
-            Predicate.EQ("metric", mbean.getName()),
-            Predicate.EQ("collection", mbean.getDataset())),
-        AnomalyFunctionBean.class);
-
-    // extract functionIds
-    List<Long> functionIds = new ArrayList<>();
-    for(AnomalyFunctionBean fbean : functionBeans) {
-      functionIds.add(fbean.getId());
-    }
-
-    LOG.info("Fetching anomalies for metricId={}, functionIds={}", mbean.getId(), functionIds);
+    LOG.info("Fetching anomalies for metric '{}' and dataset '{}'", mbean.getName(), mbean.getDataset());
 
     List<MergedAnomalyResultBean> anomalyBeans = genericPojoDao.get(
         Predicate.AND(
-            Predicate.IN("functionId", functionIds.toArray()),
+            Predicate.EQ("metric", mbean.getName()),
+            Predicate.EQ("collection", mbean.getDataset()),
             Predicate.LT("startTime", end),
             Predicate.GT("endTime", start)
         ),
