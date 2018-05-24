@@ -72,7 +72,7 @@ public class SegmentPurger {
         purgeRecordReader.next();
       }
 
-      if(_numRecordsModified == 0 && _numRecordsPurged == 0) {
+      if (_numRecordsModified == 0 && _numRecordsPurged == 0) {
         // Returns null if no records to be modified or purged
         return null;
       }
@@ -81,15 +81,28 @@ public class SegmentPurger {
       config.setOutDir(_workingDir.getPath());
       config.setTableName(tableName);
       config.setSegmentName(segmentName);
+
       // Keep index creation time the same as original segment because both segments use the same raw data.
       // This way, for REFRESH case, when new segment gets pushed to controller, we can use index creation time to
       // identify if the new pushed segment has newer data than the existing one.
       config.setCreationTime(String.valueOf(segmentMetadata.getIndexCreationTime()));
 
+      // The time column type info is not stored in the segment metadata.
+      // Keep segment start/end time to properly handle time column type other than EPOCH (e.g.SIMPLE_FORMAT).
+      if (segmentMetadata.getTimeInterval() != null) {
+        config.setTimeColumnName(segmentMetadata.getTimeColumn());
+        config.setStartTime(Long.toString(segmentMetadata.getStartTime()));
+        config.setEndTime(Long.toString(segmentMetadata.getEndTime()));
+        config.setSegmentTimeUnit(segmentMetadata.getTimeUnit());
+      }
+
+      // Generate star-tree if it exists in the original segment
       StarTreeMetadata starTreeMetadata = segmentMetadata.getStarTreeMetadata();
       if (starTreeMetadata != null) {
         config.enableStarTreeIndex(StarTreeIndexSpec.fromStarTreeMetadata(starTreeMetadata));
       }
+
+      // TODO: currently we don't generate inverted index
 
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       purgeRecordReader.rewind();
@@ -97,10 +110,9 @@ public class SegmentPurger {
       driver.build();
     }
 
-    LOGGER.info("Finish purging table: {}, segment: {}, purged {} records, modified {} records", tableName,
-        segmentName, _numRecordsPurged, _numRecordsModified);
+    LOGGER.info("Finish purging table: {}, segment: {}, purged {} records, modified {} records", tableName, segmentName,
+        _numRecordsPurged, _numRecordsModified);
     return new File(_workingDir, segmentName);
-
   }
 
   public RecordPurger getRecordPurger() {
