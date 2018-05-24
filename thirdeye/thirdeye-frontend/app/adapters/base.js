@@ -38,6 +38,7 @@ export default DS.RESTAdapter.extend({
   //   delete query.appName;//remove from query as not needed for actual request
   //   return this.ajax(url, 'GET', { data: query });
   // },
+  
   // The urlForQuery works like the `query` hook above. Both allow mutating the request url.
   urlForQuery (query, modelName) {
     /* The switch allows for adding more model names that needs custom request url */

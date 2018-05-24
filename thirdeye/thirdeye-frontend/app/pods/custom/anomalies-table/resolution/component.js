@@ -20,7 +20,7 @@ import { getAnomalyDataUrl } from 'thirdeye-frontend/utils/api/anomaly';
 import { inject as service } from '@ember/service';
 
 export default Component.extend({
-  store: service('store'),
+  //store: service('store'),
 
   tagName: '',//using tagless so i can add my own in hbs
   anomalyResponseNames: anomalyUtil.anomalyResponseObj.mapBy('name'),
@@ -31,7 +31,7 @@ export default Component.extend({
     /**
      * Handle dynamically saving anomaly feedback responses
      * @method onChangeAnomalyResponse
-     * @param {Object} humanizedAnomaly - the anomaly being responded to
+     * @param {Object} humanizedAnomaly - the humanized anomaly entity
      * @param {String} selectedResponse - user-selected anomaly feedback option
      * @param {Object} inputObj - the selection object
      */
@@ -46,7 +46,7 @@ export default Component.extend({
         res = await anomalyUtil.updateAnomalyFeedback(id, responseObj.value);
         // We make a call to ensure our new response got saved
         res = await anomalyUtil.verifyAnomalyFeedback(id, responseObj.status);
-        // TODO: right now we will update the union wrapper cached record for this anomalyId
+        // TODO: right now we will update the union wrapper cached record for this anomaly
         humanizedAnomaly.set('anomaly.feedback', responseObj.value);
 
         const filterMap = getWithDefault(res, 'searchFilters.statusFilterMap', null);

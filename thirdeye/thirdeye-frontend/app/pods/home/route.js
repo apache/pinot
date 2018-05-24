@@ -26,9 +26,9 @@ export default Route.extend({
   },
   applicationAnomalies: null,
   appName: null,
-  startDate: moment().startOf('day').utc().valueOf(),
-  endDate: moment().utc().valueOf(),
-  duration: '1d',
+  startDate: moment().subtract(1, 'day').utc().valueOf(), //taylored for Last 24 hours vs Today -> moment().startOf('day').utc().valueOf(),
+  endDate: moment().utc().valueOf(),//taylored for Last 24 hours
+  duration: '1d',//taylored for Last 24 hours
 
   /**
    * Returns a mapping of anomalies by metric and functionName (aka alert), performance stats for anomalies by
@@ -48,7 +48,7 @@ export default Route.extend({
    */
   async model(params) {
     const { appName, startDate, endDate, duration } = params;//check params
-    const applications = await this.get('anomaliesApiService').queryApplications(appName, startDate, endDate);// Get all applicatons available
+    const applications = await this.get('anomaliesApiService').queryApplications(appName, startDate);// Get all applicatons available
 
     return hash({
       appName,
@@ -76,7 +76,7 @@ export default Route.extend({
 
     return new RSVP.Promise(async (resolve, reject) => {
       try {
-        const anomalyMapping = appName ? await this.get('_getAnomalyMapping').perform(model) : [];
+        const anomalyMapping = appName ? await this.get('_getAnomalyMapping').perform(model) : [];//DEMO:
         const anomalyPerformance = appName ? await this.get('anomaliesApiService').queryPerformanceByAppNameUrl(appName, moment(this.get('startDate')).startOf('day').utc().format(), moment(this.get('endDate')).startOf('day').utc().format()) : [];
         const defaultParams = {
           anomalyMapping,
