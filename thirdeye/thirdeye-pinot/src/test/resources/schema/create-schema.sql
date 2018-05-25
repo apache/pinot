@@ -349,3 +349,18 @@ create index rootcause_session_anomaly_range_end_idx on rootcause_session_index(
 create index rootcause_session_created_idx on rootcause_session_index(created);
 create index rootcause_session_updated_idx on rootcause_session_index(updated);
 create index rootcause_session_base_id_idx ON rootcause_session_index(base_id);
+
+create table if not exists session_index (
+    base_id bigint(20) not null,
+    session_key CHAR(32) not null,
+    principal VARCHAR(256),
+    principal_type VARCHAR(32),
+    expiration_time bigint(20),
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+ALTER TABLE `session_index` ADD UNIQUE `session_unique_index`(session_key);
+create index session_base_id_idx ON session_index(base_id);
+create index session_key_idx ON session_index(session_key);
+create index session_principal_type_idx ON session_index(principal_type);

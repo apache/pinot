@@ -1,11 +1,11 @@
 package com.linkedin.thirdeye.auth;
 
-import com.google.common.base.Optional;
 import com.linkedin.thirdeye.dashboard.resources.v2.AuthResource;
+import com.linkedin.thirdeye.datalayer.bao.SessionManager;
+import com.linkedin.thirdeye.datalayer.dto.SessionDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import io.dropwizard.auth.AuthFilter;
-import io.dropwizard.auth.AuthenticationException;
 import io.dropwizard.auth.Authenticator;
-import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import javax.ws.rs.WebApplicationException;
@@ -20,39 +20,44 @@ public class ThirdEyeAuthFilter extends AuthFilter<Credentials, ThirdEyePrincipa
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAuthFilter.class);
 
   private static final ThreadLocal<ThirdEyePrincipal> principalAuthContextThreadLocal = new ThreadLocal<>();
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  private final Authenticator<Credentials, ThirdEyePrincipal> authenticator;
-  private final AuthCookieSerializer serializer;
   private final Set<String> allowedPaths;
+  private final SessionManager sessionDAO;
 
-  public ThirdEyeAuthFilter(Authenticator<Credentials, ThirdEyePrincipal> authenticator, AuthCookieSerializer serializer, Set<String> allowedPaths) {
+  public ThirdEyeAuthFilter(Authenticator<Credentials, ThirdEyePrincipal> authenticator, Set<String> allowedPaths) {
     this.authenticator = authenticator;
-    this.serializer = serializer;
     this.allowedPaths = allowedPaths;
+    this.sessionDAO = DAO_REGISTRY.getSessionDAO();
   }
 
   @Override
-  public void filter(ContainerRequestContext containerRequestContext) throws IOException {
+  public void filter(ContainerRequestContext containerRequestContext) {
     setCurrentPrincipal(null);
 
     String uriPath = containerRequestContext.getUriInfo().getPath();
     LOG.info("Checking auth for {}", uriPath);
 
-    Credentials credentials = new Credentials();
-    try {
-      credentials = getCredentials(containerRequestContext);
-    } catch(Exception e) {
-      LOG.error("Could not extract credentials from cookie", e);
+    boolean authenticated = false;
+    ThirdEyePrincipal principal = new ThirdEyePrincipal();
+
+    Map<String, Cookie> cookies = containerRequestContext.getCookies();
+    if (cookies != null && cookies.containsKey(AuthResource.AUTH_TOKEN_NAME)) {
+      String sessionKey = cookies.get(AuthResource.AUTH_TOKEN_NAME).getValue();
+      if (sessionKey.isEmpty()) {
+        LOG.error("Empty sessionKey. Skipping.");
+      } else {
+        SessionDTO sessionDTO = this.sessionDAO.findBySessionKey(sessionKey);
+        if (sessionDTO != null && System.currentTimeMillis() < sessionDTO.getExpirationTime()) {
+          // session exist in database and has not expired
+          authenticated = true;
+          principal.setName(sessionDTO.getPrincipal());
+          LOG.info("Found valid session {} for user {}", sessionDTO.getSessionKey(), sessionDTO.getPrincipal());
+        }
+      }
     }
 
-    Optional<ThirdEyePrincipal> optPrincipal = Optional.absent();
-    try {
-      optPrincipal = authenticator.authenticate(credentials);
-    } catch (AuthenticationException e) {
-      LOG.error("Could not authenticate {}", credentials.getPrincipal(), e);
-    }
-
-    if (!optPrincipal.isPresent()) {
+    if (!authenticated) {
       // not authenticated, check exceptions
 
       // authenticate end points should be out of auth filter
@@ -79,26 +84,7 @@ public class ThirdEyeAuthFilter extends AuthFilter<Credentials, ThirdEyePrincipa
       throw new WebApplicationException("Unable to validate credentials", Response.Status.UNAUTHORIZED);
     }
 
-    setCurrentPrincipal(optPrincipal.get());
-  }
-
-  private Credentials getCredentials(ContainerRequestContext requestContext) throws Exception {
-    Credentials credentials = new Credentials();
-
-    Map<String, Cookie> cookies = requestContext.getCookies();
-    if (cookies != null && cookies.containsKey(AuthResource.AUTH_TOKEN_NAME)) {
-      String rawCookie = cookies.get(AuthResource.AUTH_TOKEN_NAME).getValue();
-      if (rawCookie.isEmpty()) {
-        LOG.error("Empty cookie. Skipping.");
-        return credentials;
-      }
-      
-      AuthCookie cookie = this.serializer.deserializeCookie(rawCookie);
-      credentials.setPrincipal(cookie.getPrincipal());
-      credentials.setPassword(cookie.getPassword()); // TODO replace with token in DB
-    }
-
-    return credentials;
+    setCurrentPrincipal(principal);
   }
 
   private static void setCurrentPrincipal(ThirdEyePrincipal principal) {
