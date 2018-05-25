@@ -12,6 +12,7 @@ import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.SessionManager;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -21,6 +22,9 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.SessionDTO;
+import com.linkedin.thirdeye.datalayer.pojo.SessionBean;
+import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 
 import com.wordnik.swagger.annotations.Api;
@@ -59,6 +63,7 @@ public class EntityManagerResource {
   private final ClassificationConfigManager classificationConfigManager;
   private final ApplicationManager applicationManager;
   private final EntityToEntityMappingManager entityToEntityMappingManager;
+  private final SessionManager sessionManager;
   private final ThirdEyeConfiguration config;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
@@ -75,12 +80,13 @@ public class EntityManagerResource {
     this.classificationConfigManager = DAO_REGISTRY.getClassificationConfigDAO();
     this.applicationManager = DAO_REGISTRY.getApplicationDAO();
     this.entityToEntityMappingManager = DAO_REGISTRY.getEntityToEntityMappingDAO();
+    this.sessionManager = DAO_REGISTRY.getSessionDAO();
     this.config = configuration;
   }
 
   private enum EntityType {
     ANOMALY_FUNCTION, DATASET_CONFIG, METRIC_CONFIG,
-    OVERRIDE_CONFIG, ALERT_CONFIG, CLASSIFICATION_CONFIG, APPLICATION, ENTITY_MAPPING
+    OVERRIDE_CONFIG, ALERT_CONFIG, CLASSIFICATION_CONFIG, APPLICATION, ENTITY_MAPPING, SESSION
   }
 
   @GET
@@ -135,6 +141,9 @@ public class EntityManagerResource {
     case ENTITY_MAPPING:
       results.addAll(entityToEntityMappingManager.findAll());
       break;
+    case SESSION:
+        results.addAll(sessionManager.findByPredicate(Predicate.EQ("principalType", SessionBean.PrincipalType.SERVICE)));
+        break;
     default:
       throw new WebApplicationException("Unknown entity type : " + entityType);
     }
@@ -213,6 +222,14 @@ public class EntityManagerResource {
           entityToEntityMappingManager.update(mappingDTODTO);
         }
         break;
+      case SESSION:
+          SessionDTO sessionDTO = OBJECT_MAPPER.readValue(jsonPayload, SessionDTO.class);
+          if (sessionDTO.getId() == null) {
+            sessionManager.save(sessionDTO);
+          } else {
+            sessionManager.update(sessionDTO);
+          }
+          break;
       }
     } catch (IOException e) {
       LOG.error("Error saving the entity with payload : " + jsonPayload, e);
