@@ -39,6 +39,14 @@
     }
   }
 
+  &__application-filter-by {
+    margin-top: 20px;
+
+    .te-anomaly-table__select {
+      display: inline-flex;
+    }
+  }
+
   &__redirect-link{
     display: flex;
     justify-content: center;

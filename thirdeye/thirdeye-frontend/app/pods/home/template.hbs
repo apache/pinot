@@ -33,35 +33,58 @@
     </section>
 
     <section>
-      {{#each-in model.anomalyMapping as |metric humanizedEntityList|}}
+      <div class="dashboard-container__application-filter-by">
+        <strong>Filter by</strong>
+        {{#power-select
+          triggerId="dash-filter-by"
+          triggerClass="te-anomaly-table__select te-anomaly-table__select--margin-left"
+          options=anomalyResponseNames
+          searchEnabled=false
+          placeholder="All Resolutions"
+          selected=feedbackType
+          onchange=(action "onFilterBy" feedbackType)
+          as |feedbackType|
+        }}
+          {{feedbackType}}
+        {{/power-select}}
+      </div>
+
+      {{#each-in filteredAnomalyMapping as |metric humanizedEntityList|}}
         <h4 class="dashboard-container__title">Metric:
           <span>{{metric}} ({{humanizedEntityList.length}} {{if (gt humanizedEntityList.length 1) "anomalies" "anomaly"}})</span>
         </h4>
-          {{models-table
-            data=humanizedEntityList
-            columns=columns
-            customClasses=classes
-            showColumnsDropdown=false
-            showGlobalFilter=false
-            filteringIgnoreCase=true
-            multipleExpand=true
-            pageSize=5
-            showComponentFooter=true
-          }}
+
+          {{!-- {{#bs-accordion as |accordion|}}
+            {{#accordion.item
+              title=anomalyList.length
+              class="te-form__custom-label"
+            }} --}}
+              {{models-table
+                data=humanizedEntityList
+                columns=columns
+                customClasses=classes
+                showColumnsDropdown=false
+                showGlobalFilter=false
+                filteringIgnoreCase=true
+                multipleExpand=true
+                pageSize=5
+                showComponentFooter=true
+              }}
+            {{!-- {{/accordion.item}}
+          {{/bs-accordion}} --}}
+
           {{!-- TODO: leave to decide if after poc we need it - lohuynh
           {{#if (gt humanizedEntityList.length 5)}}
             <a href="{{get (get model.redirectLink metric) alert}}" class="dashboard-container__redirect-link">
               See More
             </a>
           {{/if}} --}}
+      {{else}}
+        {{partial 'partials/home'}}
       {{/each-in}}
     </section>
   {{else}}
-    <section class="card-container card-container--md card-container--flush-top">
-      {{rootcause-placeholder
-        message="No anomalies found."
-        iconClass="glyphicon glyphicon-equalizer"}}
-    </section>
+    {{partial 'partials/home'}}
   {{/if}}
   </article>
 </div>
