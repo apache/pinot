@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.controller.helix.core.sharding;
 
+import com.linkedin.pinot.common.config.TagNameBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.TenantNameBuilder;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,7 +39,7 @@ public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {
   @Override
   public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
       String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
-    String serverTenantName = TenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
+    String serverTenantName = TagNameBuilder.getOfflineTagForTenant(tenantName);
 
     List<String> allInstances = HelixHelper.getEnabledInstancesWithTag(helixAdmin, helixClusterName, serverTenantName);
     List<String> selectedInstanceList = new ArrayList<>();

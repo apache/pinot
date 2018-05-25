@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.common.config;
 
-import com.linkedin.pinot.common.utils.TenantNameBuilder;
-
 /**
  * Wrapper class over TableConfig for a realtime table
  * This class will help answer questions about what are consuming/completed tags for a table
@@ -31,9 +29,17 @@ public class RealtimeTagConfig extends TagConfig {
   public RealtimeTagConfig(TableConfig tableConfig) {
     super(tableConfig);
 
-    // TODO: after we introduce config to override tags, pick the right ones from config for consuming and completed
-    _consumingRealtimeServerTag = TenantNameBuilder.getRealtimeTenantNameForTenant(_serverTenant);
-    _completedRealtimeServerTag = TenantNameBuilder.getRealtimeTenantNameForTenant(_serverTenant);
+    TagOverrideConfig tagOverrideConfig = tableConfig.getTenantConfig().getTagOverrideConfig();
+    if (tagOverrideConfig != null && tagOverrideConfig.getRealtimeConsuming() != null) {
+      _consumingRealtimeServerTag = tagOverrideConfig.getRealtimeConsuming();
+    } else {
+      _consumingRealtimeServerTag = TagNameBuilder.getRealtimeTagForTenant(_serverTenant);
+    }
+    if (tagOverrideConfig != null && tagOverrideConfig.getRealtimeCompleted() != null) {
+      _completedRealtimeServerTag = tagOverrideConfig.getRealtimeCompleted();
+    } else {
+      _completedRealtimeServerTag = TagNameBuilder.getRealtimeTagForTenant(_serverTenant);
+    }
 
     if (!_consumingRealtimeServerTag.equals(_completedRealtimeServerTag)) {
       _relocateCompletedSegments = true;

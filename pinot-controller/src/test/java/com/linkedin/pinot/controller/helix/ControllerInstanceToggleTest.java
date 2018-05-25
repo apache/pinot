@@ -17,8 +17,8 @@ package com.linkedin.pinot.controller.helix;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.config.TagNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.TenantNameBuilder;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
@@ -33,8 +33,8 @@ import org.testng.annotations.Test;
 public class ControllerInstanceToggleTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
-  private static final String SERVER_TENANT_NAME = TenantNameBuilder.getOfflineTenantNameForTenant(null);
-  private static final String BROKER_TENANT_NAME = TenantNameBuilder.getBrokerTenantNameForTenant(null);
+  private static final String SERVER_TAG_NAME = TagNameBuilder.getOfflineTagForTenant(null);
+  private static final String BROKER_TAG_NAME = TagNameBuilder.getBrokerTagForTenant(null);
   private static final int NUM_INSTANCES = 3;
 
   private final String _helixClusterName = getHelixClusterName();
@@ -76,25 +76,25 @@ public class ControllerInstanceToggleTest extends ControllerTest {
 
     // Disable server instances
     int numEnabledInstances = NUM_INSTANCES;
-    for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, SERVER_TENANT_NAME)) {
+    for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, SERVER_TAG_NAME)) {
       sendPostRequest(_controllerRequestURLBuilder.forInstanceState(instanceName), "disable");
       checkNumOnlineInstancesFromExternalView(OFFLINE_TABLE_NAME, --numEnabledInstances);
     }
 
     // Enable server instances
-    for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, SERVER_TENANT_NAME)) {
+    for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, SERVER_TAG_NAME)) {
       sendPostRequest(_controllerRequestURLBuilder.forInstanceState(instanceName), "ENABLE");
       checkNumOnlineInstancesFromExternalView(OFFLINE_TABLE_NAME, ++numEnabledInstances);
     }
 
     // Disable broker instances
-    for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, BROKER_TENANT_NAME)) {
+    for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, BROKER_TAG_NAME)) {
       sendPostRequest(_controllerRequestURLBuilder.forInstanceState(instanceName), "Disable");
       checkNumOnlineInstancesFromExternalView(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, --numEnabledInstances);
     }
 
     // Enable broker instances
-    for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, BROKER_TENANT_NAME)) {
+    for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, BROKER_TAG_NAME)) {
       sendPostRequest(_controllerRequestURLBuilder.forInstanceState(instanceName), "Enable");
       checkNumOnlineInstancesFromExternalView(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, ++numEnabledInstances);
     }

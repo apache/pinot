@@ -16,10 +16,10 @@
 package com.linkedin.pinot.controller.helix;
 
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.config.TagNameBuilder;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.TenantNameBuilder;
 import com.linkedin.pinot.common.utils.TenantRole;
 import java.util.HashMap;
 import java.util.Map;
@@ -59,8 +59,8 @@ public class ControllerRequestBuilderUtil {
       helixZkManager.connect();
       if (isSingleTenant) {
         helixZkManager.getClusterManagmentTool()
-            .addInstanceTag(helixClusterName, brokerId, TenantNameBuilder.getBrokerTenantNameForTenant(
-                TenantNameBuilder.DEFAULT_TENANT_NAME));
+            .addInstanceTag(helixClusterName, brokerId,
+                TagNameBuilder.getBrokerTagForTenant(TagNameBuilder.DEFAULT_TENANT_NAME));
       } else {
         helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, brokerId, UNTAGGED_BROKER_INSTANCE);
       }
@@ -112,10 +112,10 @@ public class ControllerRequestBuilderUtil {
     if (isSingleTenant) {
       helixZkManager.getClusterManagmentTool()
           .addInstanceTag(helixClusterName, instanceId,
-              TableNameBuilder.OFFLINE.tableNameWithType(TenantNameBuilder.DEFAULT_TENANT_NAME));
+              TableNameBuilder.OFFLINE.tableNameWithType(TagNameBuilder.DEFAULT_TENANT_NAME));
       helixZkManager.getClusterManagmentTool()
           .addInstanceTag(helixClusterName, instanceId,
-              TableNameBuilder.REALTIME.tableNameWithType(TenantNameBuilder.DEFAULT_TENANT_NAME));
+              TableNameBuilder.REALTIME.tableNameWithType(TagNameBuilder.DEFAULT_TENANT_NAME));
     } else {
       helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId, UNTAGGED_SERVER_INSTANCE);
     }
