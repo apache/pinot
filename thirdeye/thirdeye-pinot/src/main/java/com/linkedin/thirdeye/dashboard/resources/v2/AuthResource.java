@@ -7,8 +7,10 @@ import com.linkedin.thirdeye.auth.ThirdEyePrincipal;
 import com.linkedin.thirdeye.datalayer.bao.SessionManager;
 import com.linkedin.thirdeye.datalayer.dto.SessionDTO;
 import com.linkedin.thirdeye.datalayer.pojo.SessionBean;
+import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import io.dropwizard.auth.Authenticator;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.GET;
@@ -35,12 +37,15 @@ public class AuthResource {
   private final Authenticator<Credentials, ThirdEyePrincipal> authenticator;
   private final long cookieTTL;
   private final SessionManager sessionDAO;
+  private final Random random;
 
   public AuthResource(Authenticator<Credentials, ThirdEyePrincipal> authenticator,
       long cookieTTL) {
     this.authenticator = authenticator;
     this.cookieTTL = cookieTTL;
     this.sessionDAO = DAO_REGISTRY.getSessionDAO();
+    this.random = new Random();
+    this.random.setSeed(System.currentTimeMillis());
   }
 
   /**
@@ -53,8 +58,7 @@ public class AuthResource {
   @Path("/create-token")
   @POST
   public Response createServiceToken(@QueryParam("service") @NotNull String service, @QueryParam("validDays") Integer validDays){
-    long currentTimeStamp = System.currentTimeMillis();
-    String serviceToken = DigestUtils.md5Hex(service + currentTimeStamp);
+    String serviceToken = generateSessionKey(service);
     SessionDTO sessionDTO = new SessionDTO();
     sessionDTO.setSessionKey(serviceToken);
     sessionDTO.setPrincipal(service);
@@ -62,7 +66,7 @@ public class AuthResource {
     if (validDays == null){
       validDays = DEFAULT_VALID_DAYS_VALUE;
     }
-    sessionDTO.setExpirationTime(currentTimeStamp + TimeUnit.DAYS.toMillis(validDays));
+    sessionDTO.setExpirationTime(System.currentTimeMillis() + TimeUnit.DAYS.toMillis(validDays));
 
     this.sessionDAO.save(sessionDTO);
     return Response.ok(serviceToken).build();
@@ -79,13 +83,12 @@ public class AuthResource {
 
       final ThirdEyePrincipal principal = optPrincipal.get();
 
-      long currentTimeStamp = System.currentTimeMillis();
-      String sessionKey = DigestUtils.md5Hex(principal.getName() + currentTimeStamp);
+      String sessionKey = generateSessionKey(principal.getName());
       SessionDTO sessionDTO = new SessionDTO();
       sessionDTO.setSessionKey(sessionKey);
       sessionDTO.setPrincipalType(SessionBean.PrincipalType.USER);
       sessionDTO.setPrincipal(principal.getName());
-      sessionDTO.setExpirationTime(currentTimeStamp + TimeUnit.HOURS.toMillis(6));
+      sessionDTO.setExpirationTime(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(6));
       this.sessionDAO.save(sessionDTO);
 
       NewCookie cookie =
@@ -101,6 +104,9 @@ public class AuthResource {
   @Path("/logout")
   @GET
   public Response logout() {
+    ThirdEyePrincipal principal = ThirdEyeAuthFilter.getCurrentPrincipal();
+    this.sessionDAO.deleteByPredicate(Predicate.EQ("sessionKey", principal.getSessionKey()));
+
     NewCookie cookie = new NewCookie(AUTH_TOKEN_NAME, "", "/", null, null, -1, false);
     return Response.ok().cookie(cookie).build();
   }
@@ -119,4 +125,9 @@ public class AuthResource {
     }
     return Response.ok(principal).build();
   }
+
+  private String generateSessionKey(String principalName) {
+    return DigestUtils.sha256Hex(principalName + this.random.nextLong());
+  }
+
 }

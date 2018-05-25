@@ -352,7 +352,7 @@ create index rootcause_session_base_id_idx ON rootcause_session_index(base_id);
 
 create table if not exists session_index (
     base_id bigint(20) not null,
-    session_key CHAR(32) not null,
+    session_key CHAR(64) not null,
     principal VARCHAR(256),
     principal_type VARCHAR(32),
     expiration_time bigint(20),

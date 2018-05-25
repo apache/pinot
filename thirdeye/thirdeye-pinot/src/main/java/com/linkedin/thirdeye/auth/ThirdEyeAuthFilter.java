@@ -38,26 +38,9 @@ public class ThirdEyeAuthFilter extends AuthFilter<Credentials, ThirdEyePrincipa
     String uriPath = containerRequestContext.getUriInfo().getPath();
     LOG.info("Checking auth for {}", uriPath);
 
-    boolean authenticated = false;
     ThirdEyePrincipal principal = new ThirdEyePrincipal();
 
-    Map<String, Cookie> cookies = containerRequestContext.getCookies();
-    if (cookies != null && cookies.containsKey(AuthResource.AUTH_TOKEN_NAME)) {
-      String sessionKey = cookies.get(AuthResource.AUTH_TOKEN_NAME).getValue();
-      if (sessionKey.isEmpty()) {
-        LOG.error("Empty sessionKey. Skipping.");
-      } else {
-        SessionDTO sessionDTO = this.sessionDAO.findBySessionKey(sessionKey);
-        if (sessionDTO != null && System.currentTimeMillis() < sessionDTO.getExpirationTime()) {
-          // session exist in database and has not expired
-          authenticated = true;
-          principal.setName(sessionDTO.getPrincipal());
-          LOG.info("Found valid session {} for user {}", sessionDTO.getSessionKey(), sessionDTO.getPrincipal());
-        }
-      }
-    }
-
-    if (!authenticated) {
+    if (!isAuthenticated(containerRequestContext, principal)) {
       // not authenticated, check exceptions
 
       // authenticate end points should be out of auth filter
@@ -85,6 +68,27 @@ public class ThirdEyeAuthFilter extends AuthFilter<Credentials, ThirdEyePrincipa
     }
 
     setCurrentPrincipal(principal);
+  }
+
+  private boolean isAuthenticated(ContainerRequestContext containerRequestContext, ThirdEyePrincipal principal) {
+    Map<String, Cookie> cookies = containerRequestContext.getCookies();
+
+    if (cookies != null && cookies.containsKey(AuthResource.AUTH_TOKEN_NAME)) {
+      String sessionKey = cookies.get(AuthResource.AUTH_TOKEN_NAME).getValue();
+      if (sessionKey.isEmpty()) {
+        LOG.error("Empty sessionKey. Skipping.");
+      } else {
+        SessionDTO sessionDTO = this.sessionDAO.findBySessionKey(sessionKey);
+        if (sessionDTO != null && System.currentTimeMillis() < sessionDTO.getExpirationTime()) {
+          // session exist in database and has not expired
+          principal.setName(sessionDTO.getPrincipal());
+          principal.setSessionKey(sessionKey);
+          LOG.info("Found valid session {} for user {}", sessionDTO.getSessionKey(), sessionDTO.getPrincipal());
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private static void setCurrentPrincipal(ThirdEyePrincipal principal) {
