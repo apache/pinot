@@ -139,9 +139,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         try {
           dictionaryCreator.build();
         } catch (Exception e) {
-          LOGGER.error("Error building dictionary for field: {}, cardinality: {}, max length in bytes: {}",
+          LOGGER.error("Error building dictionary for field: {}, cardinality: {}, number of bytes per entry: {}",
               fieldSpec.getName(), indexCreationInfo.getDistinctValueCount(), dictionaryCreator.getNumBytesPerEntry());
-          Utils.rethrowException(e);
+          throw e;
         }
 
         // Initialize forward index creator
