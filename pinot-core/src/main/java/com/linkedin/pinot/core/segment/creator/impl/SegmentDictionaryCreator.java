@@ -69,7 +69,7 @@ public class SegmentDictionaryCreator implements Closeable {
         _intValueToIndexMap = new Int2IntOpenHashMap(numValues);
 
         try (PinotDataBuffer dataBuffer = PinotDataBuffer.fromFile(_dictionaryFile, 0,
-            numValues * V1Constants.Numbers.INTEGER_SIZE, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
+            (long) numValues * V1Constants.Numbers.INTEGER_SIZE, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
             _dictionaryFile.getName());
             FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
           for (int i = 0; i < numValues; i++) {
@@ -88,7 +88,7 @@ public class SegmentDictionaryCreator implements Closeable {
         _longValueToIndexMap = new Long2IntOpenHashMap(numValues);
 
         try (PinotDataBuffer dataBuffer = PinotDataBuffer.fromFile(_dictionaryFile, 0,
-            numValues * V1Constants.Numbers.LONG_SIZE, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
+            (long) numValues * V1Constants.Numbers.LONG_SIZE, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
             _dictionaryFile.getName());
             FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
           for (int i = 0; i < numValues; i++) {
@@ -107,7 +107,7 @@ public class SegmentDictionaryCreator implements Closeable {
         _floatValueToIndexMap = new Float2IntOpenHashMap(numValues);
 
         try (PinotDataBuffer dataBuffer = PinotDataBuffer.fromFile(_dictionaryFile, 0,
-            numValues * V1Constants.Numbers.FLOAT_SIZE, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
+            (long) numValues * V1Constants.Numbers.FLOAT_SIZE, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
             _dictionaryFile.getName());
             FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
           for (int i = 0; i < numValues; i++) {
@@ -126,7 +126,7 @@ public class SegmentDictionaryCreator implements Closeable {
         _doubleValueToIndexMap = new Double2IntOpenHashMap(numValues);
 
         try (PinotDataBuffer dataBuffer = PinotDataBuffer.fromFile(_dictionaryFile, 0,
-            numValues * V1Constants.Numbers.DOUBLE_SIZE, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
+            (long) numValues * V1Constants.Numbers.DOUBLE_SIZE, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
             _dictionaryFile.getName());
             FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
           for (int i = 0; i < numValues; i++) {
@@ -154,8 +154,9 @@ public class SegmentDictionaryCreator implements Closeable {
           _numBytesPerEntry = Math.max(_numBytesPerEntry, valueBytes.length);
         }
 
-        try (PinotDataBuffer dataBuffer = PinotDataBuffer.fromFile(_dictionaryFile, 0, numValues * _numBytesPerEntry,
-            ReadMode.mmap, FileChannel.MapMode.READ_WRITE, _dictionaryFile.getName());
+        try (PinotDataBuffer dataBuffer = PinotDataBuffer.fromFile(_dictionaryFile, 0,
+            (long) numValues * _numBytesPerEntry, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
+            _dictionaryFile.getName());
             FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
           for (int i = 0; i < numValues; i++) {
             byte[] value = sortedStringBytes[i];

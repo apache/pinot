@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.segment.creator.impl;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.ColumnPartitionConfig;
 import com.linkedin.pinot.common.data.DateTimeFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -53,6 +54,8 @@ import java.util.Set;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.math.IntRange;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
@@ -67,6 +70,7 @@ import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataK
 // TODO: check resource leaks
 public class SegmentColumnarIndexCreator implements SegmentCreator {
   // TODO Refactor class name to match interface name
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
   private SegmentGeneratorConfig config;
   private Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
   private Map<String, SegmentDictionaryCreator> _dictionaryCreatorMap = new HashMap<>();
@@ -86,8 +90,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
-      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
-      throws Exception {
+      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir) throws Exception {
     docIdCounter = 0;
     config = segmentCreationSpec;
     this.indexCreationInfoMap = indexCreationInfoMap;
@@ -133,7 +136,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         _dictionaryCreatorMap.put(columnName, dictionaryCreator);
 
         // Create dictionary
-        dictionaryCreator.build();
+        try {
+          dictionaryCreator.build();
+        } catch (Exception e) {
+          LOGGER.error("Error building dictionary for field: {}, cardinality: {}, number of bytes per entry: {}",
+              fieldSpec.getName(), indexCreationInfo.getDistinctValueCount(), dictionaryCreator.getNumBytesPerEntry());
+          throw e;
+        }
 
         // Initialize forward index creator
         int cardinality = indexCreationInfo.getDistinctValueCount();
@@ -172,7 +181,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         Preconditions.checkState(!invertedIndexColumns.contains(columnName),
             "Cannot create inverted index for raw index column: %s", columnName);
 
-        ChunkCompressorFactory.CompressionType compressionType = segmentCreationSpec.getColumnCompressionType(columnName);
+        ChunkCompressorFactory.CompressionType compressionType =
+            segmentCreationSpec.getColumnCompressionType(columnName);
 
         // Initialize forward index creator
         _forwardIndexCreatorMap.put(columnName,
@@ -254,16 +264,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   @Override
-  public void seal()
-      throws ConfigurationException, IOException {
+  public void seal() throws ConfigurationException, IOException {
     for (InvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
       invertedIndexCreator.seal();
     }
     writeMetadata();
   }
 
-  void writeMetadata()
-      throws ConfigurationException {
+  void writeMetadata() throws ConfigurationException {
     PropertiesConfiguration properties =
         new PropertiesConfiguration(new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
@@ -467,8 +475,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    */
   public static SingleValueRawIndexCreator getRawIndexCreatorForColumn(File file,
       ChunkCompressorFactory.CompressionType compressionType, String column, FieldSpec.DataType dataType, int totalDocs,
-      int lengthOfLongestEntry)
-      throws IOException {
+      int lengthOfLongestEntry) throws IOException {
 
     SingleValueRawIndexCreator indexCreator;
     switch (dataType) {
@@ -506,8 +513,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     for (SegmentDictionaryCreator dictionaryCreator : _dictionaryCreatorMap.values()) {
       dictionaryCreator.close();
     }
