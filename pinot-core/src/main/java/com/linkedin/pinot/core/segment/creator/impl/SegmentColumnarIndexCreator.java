@@ -53,6 +53,8 @@ import java.util.Set;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.math.IntRange;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
@@ -302,20 +304,29 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       derivedHllFieldToOriginMap = hllConfig.getDerivedHllFieldToOriginMap();
     }
 
+    // Write time related metadata (start time, end time, time unit)
     String timeColumn = config.getTimeColumnName();
-    if (indexCreationInfoMap.get(timeColumn) != null) {
-      properties.setProperty(SEGMENT_START_TIME, indexCreationInfoMap.get(timeColumn).getMin());
-      properties.setProperty(SEGMENT_END_TIME, indexCreationInfoMap.get(timeColumn).getMax());
-      properties.setProperty(TIME_UNIT, config.getSegmentTimeUnit());
-    }
+    ColumnIndexCreationInfo timeColumnIndexCreationInfo = indexCreationInfoMap.get(timeColumn);
+    if (timeColumnIndexCreationInfo != null) {
+      // Use start/end time in config if defined
+      if (config.getStartTime() != null && config.getEndTime() != null) {
+        properties.setProperty(SEGMENT_START_TIME, config.getStartTime());
+        properties.setProperty(SEGMENT_END_TIME, config.getEndTime());
+      } else {
+        Object minTime = timeColumnIndexCreationInfo.getMin();
+        Object maxTime = timeColumnIndexCreationInfo.getMax();
 
-    if (config.containsCustomProperty(SEGMENT_START_TIME)) {
-      properties.setProperty(SEGMENT_START_TIME, config.getStartTime());
-    }
-    if (config.containsCustomProperty(SEGMENT_END_TIME)) {
-      properties.setProperty(SEGMENT_END_TIME, config.getEndTime());
-    }
-    if (config.containsCustomProperty(TIME_UNIT)) {
+        // Convert time value into millis since epoch for SIMPLE_DATE
+        if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
+          DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(config.getSimpleDateFormat());
+          properties.setProperty(SEGMENT_START_TIME, dateTimeFormatter.parseMillis(minTime.toString()));
+          properties.setProperty(SEGMENT_END_TIME, dateTimeFormatter.parseMillis(maxTime.toString()));
+        } else {
+          properties.setProperty(SEGMENT_START_TIME, minTime);
+          properties.setProperty(SEGMENT_END_TIME, maxTime);
+        }
+      }
+
       properties.setProperty(TIME_UNIT, config.getSegmentTimeUnit());
     }
 

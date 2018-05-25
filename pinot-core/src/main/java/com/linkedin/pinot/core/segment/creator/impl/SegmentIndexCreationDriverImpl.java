@@ -58,9 +58,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.commons.io.FileUtils;
-import org.joda.time.DateTime;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -365,7 +362,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       throws Exception {
     final String timeColumn = config.getTimeColumnName();
     segmentName = config.getSegmentNameGenerator().generateSegmentName(segmentStats.getColumnProfileFor(timeColumn));
-    updateSegmentStartEndTimeIfNecessary(segmentStats.getColumnProfileFor(timeColumn));
 
     try {
       // Write the index files to disk
@@ -413,36 +409,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Driver, record read time : {}", totalRecordReadTime);
     LOGGER.info("Driver, stats collector time : {}", totalStatsCollectorTime);
     LOGGER.info("Driver, indexing time : {}", totalIndexTime);
-  }
-
-  private void updateSegmentStartEndTimeIfNecessary(ColumnStatistics timeColumnStats) {
-    switch (config.getTimeColumnType()) {
-      case EPOCH:
-        break;
-      case SIMPLE_DATE:
-        long startTime = convertStartTimeSDFToMillis(timeColumnStats);
-        config.getCustomProperties().put(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME, String.valueOf(startTime));
-        long endTime = convertEndTimeSDFToMillis(timeColumnStats);
-        config.getCustomProperties().put(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME, String.valueOf(endTime));
-        break;
-    }
-  }
-
-  public long convertStartTimeSDFToMillis(ColumnStatistics timeColumnStats) {
-    final String minTimeStr = timeColumnStats.getMinValue().toString();
-    return convertSDFToMillis(minTimeStr);
-  }
-
-  public long convertEndTimeSDFToMillis(ColumnStatistics timeColumnStats) {
-    final String maxTimeStr = timeColumnStats.getMaxValue().toString();
-    return convertSDFToMillis(maxTimeStr);
-  }
-
-  private long convertSDFToMillis(final String colValue) {
-    final String sdfFormatStr = config.getSimpleDateFormat();
-    DateTimeFormatter sdfFormatter = DateTimeFormat.forPattern(sdfFormatStr);
-    DateTime dateTime = DateTime.parse(colValue, sdfFormatter);
-    return dateTime.getMillis();
   }
 
   // Explanation of why we are using format converter:
