@@ -33,12 +33,12 @@ public class RealtimeTagConfig extends TagConfig {
     if (tagOverrideConfig != null && tagOverrideConfig.getRealtimeConsuming() != null) {
       _consumingRealtimeServerTag = tagOverrideConfig.getRealtimeConsuming();
     } else {
-      _consumingRealtimeServerTag = TagNameBuilder.getRealtimeTagForTenant(_serverTenant);
+      _consumingRealtimeServerTag = TagNameUtils.getRealtimeTagForTenant(_serverTenant);
     }
     if (tagOverrideConfig != null && tagOverrideConfig.getRealtimeCompleted() != null) {
       _completedRealtimeServerTag = tagOverrideConfig.getRealtimeCompleted();
     } else {
-      _completedRealtimeServerTag = TagNameBuilder.getRealtimeTagForTenant(_serverTenant);
+      _completedRealtimeServerTag = TagNameUtils.getRealtimeTagForTenant(_serverTenant);
     }
 
     if (!_consumingRealtimeServerTag.equals(_completedRealtimeServerTag)) {

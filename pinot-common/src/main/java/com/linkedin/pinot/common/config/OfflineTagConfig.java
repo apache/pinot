@@ -26,7 +26,7 @@ public class OfflineTagConfig extends TagConfig {
   public OfflineTagConfig(TableConfig tableConfig) {
     super(tableConfig);
 
-    _offlineServerTag = TagNameBuilder.getOfflineTagForTenant(_serverTenant);
+    _offlineServerTag = TagNameUtils.getOfflineTagForTenant(_serverTenant);
   }
 
   public String getOfflineServerTag() {

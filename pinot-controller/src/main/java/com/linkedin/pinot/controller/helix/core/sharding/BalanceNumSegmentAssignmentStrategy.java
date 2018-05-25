@@ -16,7 +16,7 @@
 package com.linkedin.pinot.controller.helix.core.sharding;
 
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.config.TagNameBuilder;
+import com.linkedin.pinot.common.config.TagNameUtils;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.common.utils.Pairs.Number2ObjectPair;
@@ -45,7 +45,7 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
   public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
       String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
-    String serverTenantName = TagNameBuilder.getOfflineTagForTenant(tenantName);
+    String serverTenantName = TagNameUtils.getOfflineTagForTenant(tenantName);
 
     List<String> selectedInstances = new ArrayList<>();
     Map<String, Integer> currentNumSegmentsPerInstanceMap = new HashMap<>();

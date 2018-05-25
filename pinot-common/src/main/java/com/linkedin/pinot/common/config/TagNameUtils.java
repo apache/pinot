@@ -19,7 +19,7 @@ import com.linkedin.pinot.common.utils.ServerType;
 import com.linkedin.pinot.common.utils.TenantRole;
 
 
-public class TagNameBuilder {
+public class TagNameUtils {
   public final static String DEFAULT_TENANT_NAME = "DefaultTenant";
 
   private static String buildRealtimeTagFromTenantName(String tenantName) {
@@ -63,34 +63,34 @@ public class TagNameBuilder {
 
   public static String getRealtimeTagForTenant(String tenantName) {
     if (tenantName == null) {
-      return TagNameBuilder.getRealtimeTagForTenant(DEFAULT_TENANT_NAME);
+      return TagNameUtils.getRealtimeTagForTenant(DEFAULT_TENANT_NAME);
     }
     if (tenantName.endsWith(ServerType.REALTIME.toString())) {
       return tenantName;
     } else {
-      return TagNameBuilder.buildRealtimeTagFromTenantName(tenantName);
+      return TagNameUtils.buildRealtimeTagFromTenantName(tenantName);
     }
   }
 
   public static String getOfflineTagForTenant(String tenantName) {
     if (tenantName == null) {
-      return TagNameBuilder.getOfflineTagForTenant(DEFAULT_TENANT_NAME);
+      return TagNameUtils.getOfflineTagForTenant(DEFAULT_TENANT_NAME);
     }
     if (tenantName.endsWith(ServerType.OFFLINE.toString())) {
       return tenantName;
     } else {
-      return TagNameBuilder.buildOfflineTagFromTenantName(tenantName);
+      return TagNameUtils.buildOfflineTagFromTenantName(tenantName);
     }
   }
 
   public static String getBrokerTagForTenant(String tenantName) {
     if (tenantName == null) {
-      return TagNameBuilder.getBrokerTagForTenant(DEFAULT_TENANT_NAME);
+      return TagNameUtils.getBrokerTagForTenant(DEFAULT_TENANT_NAME);
     }
     if (tenantName.endsWith(TenantRole.BROKER.toString())) {
       return tenantName;
     } else {
-      return TagNameBuilder.buildBrokerTenantTagFromTenantName(tenantName);
+      return TagNameUtils.buildBrokerTenantTagFromTenantName(tenantName);
     }
   }
 

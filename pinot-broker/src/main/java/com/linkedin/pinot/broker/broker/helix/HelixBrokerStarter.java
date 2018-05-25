@@ -20,7 +20,7 @@ import com.linkedin.pinot.broker.broker.AccessControlFactory;
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.broker.queryquota.TableQueryQuotaManager;
 import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
-import com.linkedin.pinot.common.config.TagNameBuilder;
+import com.linkedin.pinot.common.config.TagNameUtils;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -176,7 +176,7 @@ public class HelixBrokerStarter {
     if (instanceTags == null || instanceTags.isEmpty()) {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
         _helixAdmin.addInstanceTag(clusterName, instanceName,
-            TagNameBuilder.getBrokerTagForTenant(TagNameBuilder.DEFAULT_TENANT_NAME));
+            TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME));
       } else {
         _helixAdmin.addInstanceTag(clusterName, instanceName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
       }

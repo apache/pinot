@@ -19,7 +19,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.config.TagNameBuilder;
+import com.linkedin.pinot.common.config.TagNameUtils;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -222,9 +222,9 @@ public class HelixServerStarter {
     if (instanceTags == null || instanceTags.size() == 0) {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
         _helixAdmin.addInstanceTag(clusterName, instanceName,
-            TableNameBuilder.OFFLINE.tableNameWithType(TagNameBuilder.DEFAULT_TENANT_NAME));
+            TableNameBuilder.OFFLINE.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
         _helixAdmin.addInstanceTag(clusterName, instanceName,
-            TableNameBuilder.REALTIME.tableNameWithType(TagNameBuilder.DEFAULT_TENANT_NAME));
+            TableNameBuilder.REALTIME.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
       } else {
         _helixAdmin.addInstanceTag(clusterName, instanceName, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
       }

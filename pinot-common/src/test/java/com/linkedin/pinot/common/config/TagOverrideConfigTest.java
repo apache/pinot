@@ -25,7 +25,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class TagConfigTest {
+public class TagOverrideConfigTest {
 
   @DataProvider(name = "realtimeTagConfigTestDataProvider")
   public Object[][] realtimeTagConfigTestDataProvider() throws IOException, JSONException {

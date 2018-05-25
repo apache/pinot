@@ -16,7 +16,7 @@
 package com.linkedin.pinot.controller.helix;
 
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TagNameBuilder;
+import com.linkedin.pinot.common.config.TagNameUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
@@ -83,13 +83,13 @@ public class ControllerSentinelTestV2 extends ControllerTest {
             .size(), 0);
 
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-        TagNameBuilder.getBrokerTagForTenant(TagNameBuilder.DEFAULT_TENANT_NAME))
+        TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME))
         .size(), 20);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-        TagNameBuilder.getRealtimeTagForTenant(TagNameBuilder.DEFAULT_TENANT_NAME))
+        TagNameUtils.getRealtimeTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME))
         .size(), 20);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-        TagNameBuilder.getOfflineTagForTenant(TagNameBuilder.DEFAULT_TENANT_NAME))
+        TagNameUtils.getOfflineTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME))
         .size(), 20);
   }
 }
