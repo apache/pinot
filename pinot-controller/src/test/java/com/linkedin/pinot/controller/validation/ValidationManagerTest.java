@@ -16,11 +16,11 @@
 package com.linkedin.pinot.controller.validation;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TagNameUtils;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.TenantNameBuilder;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.ZkStarter;
@@ -98,8 +98,7 @@ public class ValidationManagerTest {
     IdealState idealState = HelixHelper.getBrokerIdealStates(helixAdmin, HELIX_CLUSTER_NAME);
     // Ensure that the broker resource is not rebuilt.
     Assert.assertTrue(idealState.getInstanceSet(partitionName)
-        .equals(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(
-            TenantNameBuilder.DEFAULT_TENANT_NAME)));
+        .equals(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME)));
     _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(partitionName);
 
     // Add another table that needs to be rebuilt
@@ -116,18 +115,16 @@ public class ValidationManagerTest {
     instanceConfig.setPort("2");
     helixAdmin.addInstance(HELIX_CLUSTER_NAME, instanceConfig);
     helixAdmin.addInstanceTag(HELIX_CLUSTER_NAME, instanceConfig.getInstanceName(),
-        TenantNameBuilder.getBrokerTenantNameForTenant(TenantNameBuilder.DEFAULT_TENANT_NAME));
+        TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME));
     idealState = HelixHelper.getBrokerIdealStates(helixAdmin, HELIX_CLUSTER_NAME);
     // Assert that the two don't equal before the call to rebuild the broker resource.
     Assert.assertTrue(!idealState.getInstanceSet(partitionNameTwo)
-        .equals(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(
-            TenantNameBuilder.DEFAULT_TENANT_NAME)));
+        .equals(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME)));
     _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(partitionNameTwo);
     idealState = HelixHelper.getBrokerIdealStates(helixAdmin, HELIX_CLUSTER_NAME);
     // Assert that the two do equal after being rebuilt.
     Assert.assertTrue(idealState.getInstanceSet(partitionNameTwo)
-        .equals(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(
-            TenantNameBuilder.DEFAULT_TENANT_NAME)));
+        .equals(_pinotHelixResourceManager.getAllInstancesForBrokerTenant(TagNameUtils.DEFAULT_TENANT_NAME)));
   }
 
   @Test

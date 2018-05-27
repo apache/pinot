@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.common.config;
 
-import com.linkedin.pinot.common.utils.TenantNameBuilder;
-
 /**
  * Wrapper class over TableConfig for an offline table
  * This class will help answer questions about what are server tags for a table
@@ -28,7 +26,7 @@ public class OfflineTagConfig extends TagConfig {
   public OfflineTagConfig(TableConfig tableConfig) {
     super(tableConfig);
 
-    _offlineServerTag = TenantNameBuilder.getOfflineTenantNameForTenant(_serverTenant);
+    _offlineServerTag = TagNameUtils.getOfflineTagForTenant(_serverTenant);
   }
 
   public String getOfflineServerTag() {

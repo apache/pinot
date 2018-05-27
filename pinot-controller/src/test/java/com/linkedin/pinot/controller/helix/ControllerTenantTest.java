@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import com.linkedin.pinot.common.config.TagNameUtils;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.TenantNameBuilder;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import java.io.IOException;
 import org.json.JSONException;
@@ -56,12 +56,12 @@ public class ControllerTenantTest extends ControllerTest {
   public void testBrokerTenant() throws IOException, JSONException {
     // Create broker tenants
     for (int i = 1; i <= NUM_BROKER_TAGS; i++) {
-      String brokerTag = BROKER_TAG_PREFIX + i;
+      String brokerTenant = BROKER_TAG_PREFIX + i;
       JSONObject payload =
-          ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON(brokerTag, NUM_BROKERS_PER_TAG);
+          ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON(brokerTenant, NUM_BROKERS_PER_TAG);
       sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(), payload.toString());
       Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-          TenantNameBuilder.getBrokerTenantNameForTenant(brokerTag)).size(), NUM_BROKERS_PER_TAG);
+          TagNameUtils.getBrokerTagForTenant(brokerTenant)).size(), NUM_BROKERS_PER_TAG);
       Assert.assertEquals(
           _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE)
               .size(), NUM_INSTANCES - i * NUM_BROKERS_PER_TAG);
@@ -83,11 +83,11 @@ public class ControllerTenantTest extends ControllerTest {
 
     // Update broker tenants
     for (int i = 0; i <= NUM_INSTANCES - (NUM_BROKER_TAGS - 1) * NUM_BROKERS_PER_TAG; i++) {
-      String brokerTag = BROKER_TAG_PREFIX + 1;
-      JSONObject payload = ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON(brokerTag, i);
+      String brokerTenant = BROKER_TAG_PREFIX + 1;
+      JSONObject payload = ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON(brokerTenant, i);
       sendPutRequest(_controllerRequestURLBuilder.forTenantCreate(), payload.toString());
       Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-          TenantNameBuilder.getBrokerTenantNameForTenant(brokerTag)).size(), i);
+          TagNameUtils.getBrokerTagForTenant(brokerTenant)).size(), i);
       Assert.assertEquals(
           _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE)
               .size(), NUM_INSTANCES - (NUM_BROKER_TAGS - 1) * NUM_BROKERS_PER_TAG - i);
@@ -95,10 +95,10 @@ public class ControllerTenantTest extends ControllerTest {
 
     // Delete broker tenants
     for (int i = 1; i <= NUM_BROKER_TAGS; i++) {
-      String brokerTag = BROKER_TAG_PREFIX + i;
-      sendDeleteRequest(_controllerRequestURLBuilder.forBrokerTenantDelete(brokerTag));
+      String brokerTenant = BROKER_TAG_PREFIX + i;
+      sendDeleteRequest(_controllerRequestURLBuilder.forBrokerTenantDelete(brokerTenant));
       Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-          TenantNameBuilder.getBrokerTenantNameForTenant(brokerTag)).size(), 0);
+          TagNameUtils.getBrokerTagForTenant(brokerTenant)).size(), 0);
       Assert.assertEquals(
           _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE)
               .size(), NUM_INSTANCES - (NUM_BROKER_TAGS - i) * NUM_BROKERS_PER_TAG);
@@ -109,15 +109,15 @@ public class ControllerTenantTest extends ControllerTest {
   public void testServerTenant() throws IOException, JSONException {
     // Create server tenants
     for (int i = 1; i <= NUM_SERVER_TAGS; i++) {
-      String serverTag = SERVER_TAG_PREFIX + i;
+      String serverTenant = SERVER_TAG_PREFIX + i;
       JSONObject payload =
-          ControllerRequestBuilderUtil.buildServerTenantCreateRequestJSON(serverTag, NUM_SERVERS_PER_TAG,
+          ControllerRequestBuilderUtil.buildServerTenantCreateRequestJSON(serverTenant, NUM_SERVERS_PER_TAG,
               NUM_OFFLINE_SERVERS_PER_TAG, NUM_REALTIME_SERVERS_PER_TAG);
       sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(), payload.toString());
       Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-          TenantNameBuilder.getOfflineTenantNameForTenant(serverTag)).size(), NUM_OFFLINE_SERVERS_PER_TAG);
+          TagNameUtils.getOfflineTagForTenant(serverTenant)).size(), NUM_OFFLINE_SERVERS_PER_TAG);
       Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-          TenantNameBuilder.getRealtimeTenantNameForTenant(serverTag)).size(), NUM_REALTIME_SERVERS_PER_TAG);
+          TagNameUtils.getRealtimeTagForTenant(serverTenant)).size(), NUM_REALTIME_SERVERS_PER_TAG);
       Assert.assertEquals(
           _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)
               .size(), NUM_INSTANCES - i * NUM_SERVERS_PER_TAG);
@@ -140,16 +140,16 @@ public class ControllerTenantTest extends ControllerTest {
     // Update server tenants
     // Note: server tenants cannot scale down
     for (int i = 0; i <= (NUM_INSTANCES - NUM_SERVER_TAGS * NUM_SERVERS_PER_TAG) / 2; i++) {
-      String serverTag = SERVER_TAG_PREFIX + 1;
+      String serverTenant = SERVER_TAG_PREFIX + 1;
       JSONObject payload =
-          ControllerRequestBuilderUtil.buildServerTenantCreateRequestJSON(serverTag, NUM_SERVERS_PER_TAG + i * 2,
+          ControllerRequestBuilderUtil.buildServerTenantCreateRequestJSON(serverTenant, NUM_SERVERS_PER_TAG + i * 2,
               NUM_OFFLINE_SERVERS_PER_TAG + i, NUM_REALTIME_SERVERS_PER_TAG + i);
       sendPutRequest(_controllerRequestURLBuilder.forTenantCreate(), payload.toString());
       Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-          TenantNameBuilder.getOfflineTenantNameForTenant(serverTag)).size(),
+          TagNameUtils.getOfflineTagForTenant(serverTenant)).size(),
           NUM_OFFLINE_SERVERS_PER_TAG + i);
       Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-          TenantNameBuilder.getRealtimeTenantNameForTenant(serverTag)).size(),
+          TagNameUtils.getRealtimeTagForTenant(serverTenant)).size(),
           NUM_REALTIME_SERVERS_PER_TAG + i);
       Assert.assertEquals(
           _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)
@@ -158,12 +158,12 @@ public class ControllerTenantTest extends ControllerTest {
 
     // Delete server tenants
     for (int i = 1; i < NUM_SERVER_TAGS; i++) {
-      String serverTag = SERVER_TAG_PREFIX + i;
-      sendDeleteRequest(_controllerRequestURLBuilder.forServerTenantDelete(serverTag));
+      String serverTenant = SERVER_TAG_PREFIX + i;
+      sendDeleteRequest(_controllerRequestURLBuilder.forServerTenantDelete(serverTenant));
       Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-          TenantNameBuilder.getOfflineTenantNameForTenant(serverTag)).size(), 0);
+          TagNameUtils.getOfflineTagForTenant(serverTenant)).size(), 0);
       Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-          TenantNameBuilder.getRealtimeTenantNameForTenant(serverTag)).size(), 0);
+          TagNameUtils.getRealtimeTagForTenant(serverTenant)).size(), 0);
       Assert.assertEquals(
           _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE)
               .size(), NUM_INSTANCES - (NUM_SERVER_TAGS - i) * NUM_SERVERS_PER_TAG);

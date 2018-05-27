@@ -18,9 +18,9 @@ package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Function;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.config.TagNameUtils;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.TenantNameBuilder;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ZkStarter;
@@ -93,7 +93,7 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
     // Add Helix tag to the server
     _serverHelixManager.getClusterManagmentTool()
         .addInstanceTag(_clusterName, _serverInstance,
-            TableNameBuilder.REALTIME.tableNameWithType(TenantNameBuilder.DEFAULT_TENANT_NAME));
+            TableNameBuilder.REALTIME.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
 
     // Initialize controller leader locator
     ControllerLeaderLocator.create(_serverHelixManager);
