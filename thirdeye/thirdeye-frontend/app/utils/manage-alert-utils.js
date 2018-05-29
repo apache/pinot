@@ -226,7 +226,7 @@ export function getTopDimensions(metricData, dimCount) {
   dimensionKeys.forEach((subDimension) => {
     let subdObj = dimensionObj[subDimension];
     let changeArr = subdObj.cumulativePercentageChange.map(item => Math.abs(item));
-    let average = changeArr.reduce((previous, current) => current += previous) / changeArr.length;
+    let average = changeArr.length ? changeArr.reduce((previous, current) => current += previous) / changeArr.length : 0;
     if (subDimension.toLowerCase() !== 'all') {
       dimensionList.push({
         average,
