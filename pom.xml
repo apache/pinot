@@ -37,7 +37,8 @@
     <module>pinot-integration-tests</module>
     <module>pinot-distribution</module>
     <module>pinot-minion</module>
-    <module>pinot-hadoop-storage</module>
+    <module>pinot-filesystem</module>
+    <module>pinot-hadoop-filesystem</module>
   </modules>
   <licenses>
     <license>
@@ -242,6 +243,16 @@
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
         <artifactId>pinot-minion</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
+        <artifactId>pinot-storage</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
+        <artifactId>pinot-hadoop-storage</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
