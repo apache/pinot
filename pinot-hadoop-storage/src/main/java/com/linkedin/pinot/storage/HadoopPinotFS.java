@@ -17,8 +17,6 @@ package com.linkedin.pinot.storage;
 
 import com.google.common.base.Strings;
 import com.linkedin.pinot.common.segment.fetcher.HdfsSegmentFetcher;
-import com.linkedin.pinot.core.storage.PinotFS;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -31,8 +29,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.HdfsSegmentFetcher.*;
 import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.*;
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.HdfsSegmentFetcher.*;
 
 
 /**
@@ -48,7 +46,7 @@ public class HadoopPinotFS extends PinotFS {
   public HadoopPinotFS() {
 
   }
-  
+
   @Override
   public void init(Configuration config) {
     try {
@@ -111,7 +109,7 @@ public class HadoopPinotFS extends PinotFS {
    * Does not list recursively, only lists files within directory.
    */
   @Override
-  public String[] listFiles(URI segmentUri) throws FileNotFoundException, IOException {
+  public String[] listFiles(URI segmentUri) throws IOException {
     RemoteIterator<LocatedFileStatus> iterator = hadoopFS.listFiles(new Path(segmentUri), false);
     ArrayList<String> filePathStrings = new ArrayList<>();
     Path path = new Path(segmentUri);

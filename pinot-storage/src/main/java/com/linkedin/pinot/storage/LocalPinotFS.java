@@ -15,11 +15,10 @@
  */
 package com.linkedin.pinot.storage;
 
-import com.linkedin.pinot.core.storage.PinotFS;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Collection;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 
@@ -41,26 +40,42 @@ public class LocalPinotFS extends PinotFS {
   public boolean delete(URI segmentUri) throws IOException {
     File file = new File(segmentUri);
     if (file.isDirectory()) {
+      // Throws an IOException if it is unable to delete
       FileUtils.deleteDirectory(file);
-      return true;
+    } else {
+      // Returns false if delete fails
+      return FileUtils.deleteQuietly(file);
     }
-    return file.delete();
+    return true;
   }
 
   @Override
   public boolean move(URI srcUri, URI dstUri) throws IOException {
     File srcFile = new File(srcUri);
     File dstFile = new File(dstUri);
-    dstFile.getParentFile().mkdirs();
-    return srcFile.renameTo(dstFile) && srcFile.delete();
+    if (!srcFile.isDirectory() && !dstFile.exists()) {
+      dstFile.getParentFile().mkdirs();
+      dstFile.createNewFile();
+    }
+    if (srcFile.isDirectory() && !dstFile.exists()) {
+      dstFile.mkdirs();
+    }
+    FileUtils.moveFile(srcFile, dstFile);
+    return true;
   }
 
   @Override
   public boolean copy(URI srcUri, URI dstUri) throws IOException {
     File srcFile = new File(srcUri);
     File dstFile = new File(dstUri);
-    dstFile.getParentFile().mkdirs();
-    return srcFile.renameTo(dstFile);
+    if (srcFile.isDirectory()) {
+      // Throws Exception on failure
+      FileUtils.copyDirectory(srcFile, dstFile);
+    } else {
+      // Will create parent directories, throws Exception on failure
+      FileUtils.copyFile(srcFile, dstFile);
+    }
+    return true;
   }
 
   @Override
@@ -72,13 +87,14 @@ public class LocalPinotFS extends PinotFS {
   @Override
   public long length(URI segmentUri) throws IOException {
     File file = new File(segmentUri);
-    return file.length();
+    return FileUtils.sizeOf(file);
   }
 
   @Override
-  public String[] listFiles(URI segmentUri) throws FileNotFoundException, IOException {
+  public String[] listFiles(URI segmentUri) throws IOException {
     File file = new File(segmentUri);
-    return file.list();
+    Collection<File> files = FileUtils.listFiles(file, null, true);
+    return files.stream().map(File::getPath).toArray(String[]::new);
   }
 
   @Override

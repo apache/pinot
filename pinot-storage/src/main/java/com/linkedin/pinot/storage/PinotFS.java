@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.storage;
+package com.linkedin.pinot.storage;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import org.apache.commons.configuration.Configuration;
@@ -41,7 +40,8 @@ public abstract class PinotFS {
 
   /**
    * Moves the file from the src to dst. Does not keep the original file. If the dst has parent directories
-   * that haven't been created, this method will create all the necessary parent directories.
+   * that haven't been created, this method will create all the necessary parent directories. If dst already exists,
+   * it will overwrite. Will work either for moving a directory or a file.
    * @param srcUri URI of the original file
    * @param dstUri URI of the final file location
    * @return true if move is successful
@@ -51,7 +51,8 @@ public abstract class PinotFS {
 
   /**
    * Copies a file from src to dst. Keeps the original file. If the dst has parent directories that haven't
-   * been created, this method will create all the necessary parent directories.
+   * been created, this method will create all the necessary parent directories. If dst already exists, it will overwrite.
+   * Works both for moving a directory and a file.
    * @param srcUri URI of the original file
    * @param dstUri URI of the final file location
    * @return true if copy is successful
@@ -60,7 +61,7 @@ public abstract class PinotFS {
   public abstract boolean copy(URI srcUri, URI dstUri) throws IOException;
 
   /**
-   * Checks whether the file at the provided location exists.
+   * Checks whether the file or directory at the provided location exists.
    * @param segmentUri URI of file
    * @return true if path exists
    * @throws IOException on IO Failure
@@ -68,23 +69,22 @@ public abstract class PinotFS {
   public abstract boolean exists(URI segmentUri) throws IOException;
 
   /**
-   * Returns the length of the file at the provided location.
+   * Returns the length of the file or directory at the provided location.
    * @param segmentUri location of file
-   * @return the number of bytes; 0 for a directory
+   * @return the number of bytes; size of all files in directory if directory
    * @throws IOException on IO Failure
    */
   public abstract long length(URI segmentUri) throws IOException;
 
   /**
-   * Lists all the files at the location provided. Does not list recursively
+   * Lists all the files at the location provided. Lists recursively.
    * Returns null if this abstract pathname does not denote a directory, or if
    * an I/O error occurs.
    * @param segmentUri location of file
    * @return an array of strings that contains file paths
-   * @throws FileNotFoundException when path does not exist
    * @throws IOException see specific implementation
    */
-  public abstract String[] listFiles(URI segmentUri) throws FileNotFoundException, IOException;
+  public abstract String[] listFiles(URI segmentUri) throws IOException;
 
   /**
    * Copies a file from a remote filesystem to the local one. Keeps the original file.

@@ -37,6 +37,7 @@
     <module>pinot-integration-tests</module>
     <module>pinot-distribution</module>
     <module>pinot-minion</module>
+    <module>pinot-hadoop-storage</module>
   </modules>
   <licenses>
     <license>
