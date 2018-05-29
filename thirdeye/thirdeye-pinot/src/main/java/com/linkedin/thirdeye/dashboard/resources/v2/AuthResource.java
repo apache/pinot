@@ -1,27 +1,19 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.google.common.base.Optional;
+import com.linkedin.thirdeye.auth.AuthCookie;
+import com.linkedin.thirdeye.auth.AuthCookieSerializer;
 import com.linkedin.thirdeye.auth.Credentials;
 import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
 import com.linkedin.thirdeye.auth.ThirdEyePrincipal;
-import com.linkedin.thirdeye.datalayer.bao.SessionManager;
-import com.linkedin.thirdeye.datalayer.dto.SessionDTO;
-import com.linkedin.thirdeye.datalayer.pojo.SessionBean;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
-import com.linkedin.thirdeye.datasource.DAORegistry;
 import io.dropwizard.auth.Authenticator;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
-import javax.validation.constraints.NotNull;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.NewCookie;
 import javax.ws.rs.core.Response;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,45 +23,15 @@ import org.slf4j.LoggerFactory;
 public class AuthResource {
   public static final String AUTH_TOKEN_NAME = "te_auth";
   private static final Logger LOG = LoggerFactory.getLogger(AuthResource.class);
-  private final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  private static final int DEFAULT_VALID_DAYS_VALUE = 90;
   private final Authenticator<Credentials, ThirdEyePrincipal> authenticator;
+  private final AuthCookieSerializer serializer;
   private final long cookieTTL;
-  private final SessionManager sessionDAO;
-  private final Random random;
 
-  public AuthResource(Authenticator<Credentials, ThirdEyePrincipal> authenticator,
-      long cookieTTL) {
+  public AuthResource(Authenticator<Credentials, ThirdEyePrincipal> authenticator, AuthCookieSerializer serializer, long cookieTTL) {
     this.authenticator = authenticator;
+    this.serializer = serializer;
     this.cookieTTL = cookieTTL;
-    this.sessionDAO = DAO_REGISTRY.getSessionDAO();
-    this.random = new Random();
-    this.random.setSeed(System.currentTimeMillis());
-  }
-
-  /**
-   * Create service token for a service.
-   *
-   * @param service the service
-   * @param validDays the number of valid days
-   * @return the token
-   */
-  @Path("/create-token")
-  @POST
-  public Response createServiceToken(@QueryParam("service") @NotNull String service, @QueryParam("validDays") Integer validDays){
-    String serviceToken = generateSessionKey(service);
-    SessionDTO sessionDTO = new SessionDTO();
-    sessionDTO.setSessionKey(serviceToken);
-    sessionDTO.setPrincipal(service);
-    sessionDTO.setPrincipalType(SessionBean.PrincipalType.SERVICE);
-    if (validDays == null){
-      validDays = DEFAULT_VALID_DAYS_VALUE;
-    }
-    sessionDTO.setExpirationTime(System.currentTimeMillis() + TimeUnit.DAYS.toMillis(validDays));
-
-    this.sessionDAO.save(sessionDTO);
-    return Response.ok(serviceToken).build();
   }
 
   @Path("/authenticate")
@@ -83,16 +45,14 @@ public class AuthResource {
 
       final ThirdEyePrincipal principal = optPrincipal.get();
 
-      String sessionKey = generateSessionKey(principal.getName());
-      SessionDTO sessionDTO = new SessionDTO();
-      sessionDTO.setSessionKey(sessionKey);
-      sessionDTO.setPrincipalType(SessionBean.PrincipalType.USER);
-      sessionDTO.setPrincipal(principal.getName());
-      sessionDTO.setExpirationTime(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(6));
-      this.sessionDAO.save(sessionDTO);
+      AuthCookie authCookie = new AuthCookie();
+      authCookie.setPrincipal(credentials.getPrincipal());
+      authCookie.setPassword(credentials.getPassword()); // TODO replace with token in DB
+      authCookie.setTimeCreated(System.currentTimeMillis());
 
-      NewCookie cookie =
-          new NewCookie(AUTH_TOKEN_NAME, sessionKey, "/", null, null, (int) (this.cookieTTL / 1000), false);
+      final String cookieValue = this.serializer.serializeCookie(authCookie);
+
+      NewCookie cookie = new NewCookie(AUTH_TOKEN_NAME, cookieValue, "/", null, null, (int) (this.cookieTTL / 1000), false);
 
       return Response.ok(principal).cookie(cookie).build();
     } catch (Exception e) {
@@ -104,9 +64,6 @@ public class AuthResource {
   @Path("/logout")
   @GET
   public Response logout() {
-    ThirdEyePrincipal principal = ThirdEyeAuthFilter.getCurrentPrincipal();
-    this.sessionDAO.deleteByPredicate(Predicate.EQ("sessionKey", principal.getSessionKey()));
-
     NewCookie cookie = new NewCookie(AUTH_TOKEN_NAME, "", "/", null, null, -1, false);
     return Response.ok().cookie(cookie).build();
   }
@@ -120,14 +77,9 @@ public class AuthResource {
     // TODO refactor this, use injection
     ThirdEyePrincipal principal = ThirdEyeAuthFilter.getCurrentPrincipal();
     if (principal == null) {
-      LOG.error("Could not find a valid user");
+      LOG.error("Could not find a valid the user");
       return Response.status(Response.Status.UNAUTHORIZED).build();
     }
     return Response.ok(principal).build();
   }
-
-  private String generateSessionKey(String principalName) {
-    return DigestUtils.sha256Hex(principalName + this.random.nextLong());
-  }
-
 }

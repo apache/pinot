@@ -8,15 +8,6 @@ import java.util.Set;
 public class ThirdEyePrincipal implements Principal {
   String name; // 'username@domainName'
   Set<String> groups = new HashSet<>();
-  String sessionKey;
-
-  public String getSessionKey() {
-    return sessionKey;
-  }
-
-  public void setSessionKey(String sessionKey) {
-    this.sessionKey = sessionKey;
-  }
 
   @Override
   public String getName() {
