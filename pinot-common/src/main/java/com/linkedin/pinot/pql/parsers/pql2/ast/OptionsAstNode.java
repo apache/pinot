@@ -26,7 +26,10 @@ import java.util.HashMap;
 public class OptionsAstNode extends BaseAstNode {
   @Override
   public void updateBrokerRequest(BrokerRequest brokerRequest) {
-    brokerRequest.setQueryOptions(new HashMap<>());
+    if (brokerRequest.getQueryOptions() == null) {
+      brokerRequest.setQueryOptions(new HashMap<>());
+    }
+
     sendBrokerRequestUpdateToChildren(brokerRequest);
   }
 }
