@@ -41,6 +41,7 @@ Router.map(function() {
 
   this.route('screenshot', { path: 'screenshot/:anomaly_id' });
   this.route('rootcause');
+  this.route('preview');
 });
 
 export default Router;
