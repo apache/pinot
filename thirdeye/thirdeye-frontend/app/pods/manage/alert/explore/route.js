@@ -20,6 +20,10 @@ import {
 import { isPresent, isNone, isBlank } from '@ember/utils';
 import { checkStatus, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
 import {
+  splitFilterFragment,
+  toFilterMap
+} from 'thirdeye-frontend/utils/rca-utils';
+import {
   enhanceAnomalies,
   toIdGroups,
   setUpTimeRangeOptions,
@@ -202,10 +206,12 @@ export default Route.extend({
       metric: metricName,
       collection: dataset,
       exploreDimensions,
-      filters,
+      filters: filtersRaw,
       bucketSize,
       bucketUnit
     } = alertData;
+
+    const filters = this._makeFilterString(filtersRaw);
 
     // Derive start/end time ranges based on querystring input with fallback on default '1 month'
     const {
@@ -385,9 +391,17 @@ export default Route.extend({
    */
   _locateMetricId(metricList, alertData) {
     const metricId = metricList.find((metric) => {
-      return metric.dataset === alertData.collection;
+      return (metric.name === alertData.metric) && (metric.dataset === alertData.collection);
     }) || { id: 0 };
     return isBlank(metricList) ? 0 : metricId.id;
+  },
+
+  _makeFilterString(filtersRaw) {
+    try {
+      return JSON.stringify(toFilterMap(filtersRaw.split(';').map(splitFilterFragment)));
+    } catch (ignore) {
+      return '';
+    }
   },
 
   /**
