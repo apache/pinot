@@ -36,6 +36,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.operator.DocIdSetOperator;
 import com.linkedin.pinot.core.operator.ProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -93,7 +94,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   private static final String TABLE_NAME = "TDIGEST_TABLE";
 
   private static final String[] groups = new String[]{"abc", "def", "ghij", "klmno", "pqrst"};
-  public static final String GROUP_BY_CLAUSE = " group by " + GROUPBY_COLUMN + " TOP " + groups.length;
+  private static final String GROUP_BY_CLAUSE = " group by " + GROUPBY_COLUMN + " TOP " + groups.length;
   private static final int[] PERCENTILES_TO_COMPUTE = new int[]{5, 10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 95, 99};
   private static final long RANDOM_SEED = System.nanoTime();
 
@@ -281,6 +282,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);
     config.setTableName(TABLE_NAME);
+    config.setRawIndexCreationColumns(Arrays.asList(TDIGEST_COLUMN));
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     _expectedTDigest = new TDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);

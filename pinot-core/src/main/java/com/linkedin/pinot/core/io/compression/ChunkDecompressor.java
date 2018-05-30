@@ -28,11 +28,11 @@ public interface ChunkDecompressor {
    * This method decompresses chunk of data that was compressed using {@link ChunkCompressor}.
    * Assumes that size of output ByteBuffer is large enough to de-compress the input.
    *
-   * @param inCompressed Compressed data
-   * @param outDecompressed ByteBuffer where the decompressed data is put.
+   * @param compressedInput Compressed data
+   * @param decompressedOutput ByteBuffer where the decompressed data is put.
    * @return Size of decompressed data.
    * @throws IOException
    */
-  int decompress(ByteBuffer inCompressed, ByteBuffer outDecompressed)
+  int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
       throws IOException;
 }

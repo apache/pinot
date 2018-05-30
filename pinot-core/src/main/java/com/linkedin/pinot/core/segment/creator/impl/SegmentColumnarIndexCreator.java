@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.segment.creator.impl;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.ColumnPartitionConfig;
 import com.linkedin.pinot.common.data.DateTimeFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -181,14 +180,41 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         Preconditions.checkState(!invertedIndexColumns.contains(columnName),
             "Cannot create inverted index for raw index column: %s", columnName);
 
-        ChunkCompressorFactory.CompressionType compressionType =
-            segmentCreationSpec.getColumnCompressionType(columnName);
+        ChunkCompressorFactory.CompressionType compressionType = getColumnCompressionType(segmentCreationSpec, fieldSpec);
 
         // Initialize forward index creator
         _forwardIndexCreatorMap.put(columnName,
             getRawIndexCreatorForColumn(_indexDir, compressionType, columnName, fieldSpec.getDataType(), totalDocs,
                 indexCreationInfo.getLengthOfLongestEntry()));
       }
+    }
+  }
+
+  /**
+   * Helper method that returns compression type to use based on segment creation spec and field type.
+   * <ul>
+   *   <li> Returns compression type from segment creation spec, if specified there.</li>
+   *   <li> Else, returns PASS_THROUGH for metrics, and SNAPPY for dimensions. This is because metrics are likely
+   *        to be spread in different chunks after applying predicates. Same could be true for dimensions, but in that
+   *        case, clients are expected to explicitly specify the appropriate compression type in the spec. </li>
+   * </ul>
+   * @param segmentCreationSpec Segment creation spec
+   * @param fieldSpec Field spec for the column
+   * @return Compression type to use
+   */
+  private ChunkCompressorFactory.CompressionType getColumnCompressionType(SegmentGeneratorConfig segmentCreationSpec,
+      FieldSpec fieldSpec) {
+    ChunkCompressorFactory.CompressionType compressionType =
+        segmentCreationSpec.getRawIndexCompressionType().get(fieldSpec.getName());
+
+    if (compressionType == null) {
+      if (fieldSpec.getFieldType().equals(FieldType.METRIC)) {
+        return ChunkCompressorFactory.CompressionType.PASS_THROUGH;
+      } else {
+        return ChunkCompressorFactory.CompressionType.SNAPPY;
+      }
+    } else {
+      return compressionType;
     }
   }
 
@@ -211,7 +237,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       FieldSpec spec) {
     String column = spec.getName();
 
-    if (config.getRawIndexCreationColumns().contains(column)) {
+    if (config.getRawIndexCreationColumns().contains(column) || config.getRawIndexCompressionType().containsKey(column)) {
       if (!spec.isSingleValueField()) {
         throw new RuntimeException(
             "Creation of indices without dictionaries is supported for single valued columns only.");

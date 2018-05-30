@@ -487,14 +487,6 @@ public class SegmentGeneratorConfig {
     _onHeap = onHeap;
   }
 
-  @JsonIgnore
-  public ChunkCompressorFactory.CompressionType getColumnCompressionType(String columnName) {
-    if (_rawIndexCompressionType.containsKey(columnName)) {
-      return _rawIndexCompressionType.get(columnName);
-    }
-    return ChunkCompressorFactory.CompressionType.SNAPPY;
-  }
-
   public Map<String, ChunkCompressorFactory.CompressionType> getRawIndexCompressionType() {
     return _rawIndexCompressionType;
   }
