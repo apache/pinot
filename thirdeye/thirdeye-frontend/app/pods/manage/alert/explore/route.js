@@ -211,7 +211,7 @@ export default Route.extend({
       bucketUnit
     } = alertData;
 
-    const filters = JSON.stringify(toFilterMap(filtersRaw.split(';').map(splitFilterFragment)));
+    const filters = this._makeFilterString(filtersRaw);
 
     // Derive start/end time ranges based on querystring input with fallback on default '1 month'
     const {
@@ -391,9 +391,17 @@ export default Route.extend({
    */
   _locateMetricId(metricList, alertData) {
     const metricId = metricList.find((metric) => {
-      return metric.dataset === alertData.collection;
+      return (metric.name === alertData.metric) && (metric.dataset === alertData.collection);
     }) || { id: 0 };
     return isBlank(metricList) ? 0 : metricId.id;
+  },
+
+  _makeFilterString(filtersRaw) {
+    try {
+      return JSON.stringify(toFilterMap(filtersRaw.split(';').map(splitFilterFragment)));
+    } catch (ignore) {
+      return '';
+    }
   },
 
   /**
