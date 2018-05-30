@@ -6,7 +6,6 @@ import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardResource;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.auth.AuthCookieSerializer;
 import com.linkedin.thirdeye.auth.Credentials;
 import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
 import com.linkedin.thirdeye.auth.ThirdEyeAuthenticatorDisabled;
@@ -192,8 +191,6 @@ public class ThirdEyeDashboardApplication
 
     if (config.getAuthConfig() != null) {
       final AuthConfiguration authConfig = config.getAuthConfig();
-      final SecretKeySpec aesKey = new SecretKeySpec(authConfig.getAuthKey().getBytes("UTF-8"), "AES");
-      final AuthCookieSerializer serializer = new AuthCookieSerializer(aesKey, new ObjectMapper());
 
       // default permissive authenticator
       Authenticator<Credentials, ThirdEyePrincipal> authenticator = new ThirdEyeAuthenticatorDisabled();
@@ -203,12 +200,10 @@ public class ThirdEyeDashboardApplication
         final ThirdEyeAuthenticatorLdap authenticatorLdap = new ThirdEyeAuthenticatorLdap(authConfig.getDomainSuffix(), authConfig.getLdapUrl());
         authenticator = new CachingAuthenticator<>(env.metrics(), authenticatorLdap, CacheBuilder.newBuilder().expireAfterWrite(authConfig.getCacheTTL(), TimeUnit.SECONDS));
       }
-
       // auth filter
-      env.jersey().register(new ThirdEyeAuthFilter(authenticator, serializer, authConfig.getAllowedPaths()));
-
+      env.jersey().register(new ThirdEyeAuthFilter(authenticator, authConfig.getAllowedPaths()));
       // auth resource
-      env.jersey().register(new AuthResource(authenticator, serializer, authConfig.getCookieTTL() * 1000));
+      env.jersey().register(new AuthResource(authenticator, authConfig.getCookieTTL() * 1000));
     }
 
     env.lifecycle().manage(new Managed() {
