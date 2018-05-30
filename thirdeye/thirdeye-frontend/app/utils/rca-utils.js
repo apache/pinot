@@ -406,7 +406,13 @@ export function toFilters(urns) {
   return [...new Set([...dimensionFilters, ...metricFilters, ...frontendMetricFilters, ...anomalyFunctoinFilters])].sort();
 }
 
-function splitFilterFragment(fragment) {
+/**
+ * Splits filter fragments strings into 2-tuples (e.g. 'key=value' to ['key', 'value'])
+ *
+ * @param {String} fragment
+ * @returns {Array} filter tuples
+ */
+export function splitFilterFragment(fragment) {
   const parts = fragment.split('=');
   return [parts[0], _.slice(parts, 1).join('=')];
 }
@@ -602,5 +608,6 @@ export default {
   colorMapping,
   eventColorMapping,
   dateFormatFull,
-  trimTimeRanges
+  trimTimeRanges,
+  splitFilterFragment
 };
