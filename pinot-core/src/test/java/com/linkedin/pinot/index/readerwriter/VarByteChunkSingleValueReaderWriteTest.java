@@ -44,6 +44,15 @@ public class VarByteChunkSingleValueReaderWriteTest {
   private static final int MAX_STRING_LENGTH = 101;
   private static final String TEST_FILE = System.getProperty("java.io.tmpdir") + File.separator + "varByteSVRTest";
 
+  @Test
+  public void testWithCompression() throws Exception {
+    test(ChunkCompressorFactory.CompressionType.SNAPPY);
+  }
+
+  @Test
+  public void testWithoutCompression() throws Exception {
+    test(ChunkCompressorFactory.CompressionType.PASS_THROUGH);
+  }
   /**
    * This test writes {@link #NUM_ENTRIES} using {@link VarByteChunkSingleValueWriter}. It then reads
    * the strings & bytes using {@link VarByteChunkSingleValueReader}, and asserts that what was written is the same as
@@ -51,10 +60,10 @@ public class VarByteChunkSingleValueReaderWriteTest {
    *
    * Number of docs and docs per chunk are chosen to generate complete as well partial chunks.
    *
+   * @param compressionType Compression type
    * @throws Exception
    */
-  @Test
-  public void test()
+  public void test(ChunkCompressorFactory.CompressionType compressionType)
       throws Exception {
     String[] expected = new String[NUM_ENTRIES];
     Random random = new Random();
@@ -68,7 +77,6 @@ public class VarByteChunkSingleValueReaderWriteTest {
       maxStringLengthInBytes = Math.max(maxStringLengthInBytes, expected[i].getBytes(UTF_8).length);
     }
 
-    ChunkCompressorFactory.CompressionType compressionType = ChunkCompressorFactory.CompressionType.SNAPPY;
     VarByteChunkSingleValueWriter writer =
         new VarByteChunkSingleValueWriter(outFile, compressionType, NUM_ENTRIES, NUM_DOCS_PER_CHUNK,
             maxStringLengthInBytes);

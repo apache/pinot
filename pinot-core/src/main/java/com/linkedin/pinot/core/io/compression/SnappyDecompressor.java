@@ -25,8 +25,8 @@ import org.xerial.snappy.Snappy;
  */
 public class SnappyDecompressor implements ChunkDecompressor {
   @Override
-  public int decompress(ByteBuffer inCompressed, ByteBuffer outDecompressed)
+  public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
       throws IOException {
-    return Snappy.uncompress(inCompressed, outDecompressed);
+    return Snappy.uncompress(compressedInput, decompressedOutput);
   }
 }
