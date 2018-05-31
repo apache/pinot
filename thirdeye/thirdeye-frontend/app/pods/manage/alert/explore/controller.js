@@ -70,6 +70,7 @@ export default Controller.extend({
     this.setProperties({
       filters: {},
       loadedWowData: [],
+      topDimensions: [],
       predefinedRanges: {},
       missingAnomalyProps: {},
       selectedSortMode: '',
@@ -307,6 +308,18 @@ export default Controller.extend({
         });
       }
       return anomalies;
+    }
+  ),
+
+  /**
+   * All selected dimensions to be loaded into graph
+   * @returns {Array}
+   */
+  selectedDimensions: computed(
+    'topDimensions',
+    'topDimensions.@each.isSelected',
+    function() {
+      return this.get('topDimensions').filterBy('isSelected');
     }
   ),
 

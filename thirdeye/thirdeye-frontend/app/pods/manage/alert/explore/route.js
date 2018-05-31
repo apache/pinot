@@ -367,7 +367,6 @@ export default Route.extend({
     this.controller.setProperties({
       metricData,
       alertDimension,
-      topDimensions: [],
       isMetricDataLoading: false
     });
     // If alert has dimensions set, load them into graph once replay is done.
