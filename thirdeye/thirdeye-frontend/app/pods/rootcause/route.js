@@ -145,6 +145,20 @@ export default Route.extend(AuthenticatedRouteMixin, {
     });
   },
 
+  /**
+   * @description Resets any query params to allow not to have leak state or sticky query-param
+   * @method resetController
+   * @param {Object} controller - active controller
+   * @param {Boolean} isExiting - exit status
+   * @return {undefined}
+   */
+  resetController(controller, isExiting) {
+    this._super(...arguments);
+    if (isExiting) {
+      controller.set('sessionId', null);
+    }
+  },
+
   afterModel(model, transition) {
     const defaultParams = {
       anomalyRangeStart: moment().startOf('hour').subtract(3, 'hour').valueOf(),
