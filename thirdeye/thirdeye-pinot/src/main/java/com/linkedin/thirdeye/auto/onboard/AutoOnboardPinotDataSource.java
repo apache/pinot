@@ -1,5 +1,18 @@
 package com.linkedin.thirdeye.auto.onboard;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.Lists;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean.DimensionAsMetricProperties;
+import com.linkedin.thirdeye.datalayer.util.Predicate;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.datasource.DataSourceConfig;
+import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
@@ -9,25 +22,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean.DimensionAsMetricProperties;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.DataSourceConfig;
 
 /**
  * This is a service to onboard datasets automatically to thirdeye from pinot
@@ -39,6 +39,7 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
 
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static final DatasetConfigManager datasetDAO = DAO_REGISTRY.getDatasetConfigDAO();
 
   private AutoOnboardPinotMetricsUtils autoLoadPinotMetricsUtils;
 
@@ -66,16 +67,39 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
       Map<String, Map<String, String>> allCustomConfigs = new HashMap<>();
       loadDatasets(allDatasets, allSchemas, allCustomConfigs);
       LOG.info("Checking all datasets");
+      removeDeletedDataset(allDatasets);
       for (String dataset : allDatasets) {
         LOG.info("Checking dataset {}", dataset);
 
         Schema schema = allSchemas.get(dataset);
         Map<String, String> customConfigs = allCustomConfigs.get(dataset);
-        DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
+        DatasetConfigDTO datasetConfig = datasetDAO.findByDataset(dataset);
         addPinotDataset(dataset, schema, customConfigs, datasetConfig);
       }
     } catch (Exception e) {
       LOG.error("Exception in loading datasets", e);
+    }
+  }
+
+  void removeDeletedDataset(List<String> allDatasets) {
+    LOG.info("Removing deleted Pinot datasets");
+    List<DatasetConfigDTO> allExsistingDataset = datasetDAO.findAll();
+
+    CollectionUtils.filter(allExsistingDataset, new org.apache.commons.collections.Predicate() {
+      @Override
+      public boolean evaluate(Object o) {
+        return ((DatasetConfigDTO) o).getDataSource().equals(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
+      }
+    });
+
+    Set<String> datasets = new HashSet<>();
+    for (DatasetConfigDTO datasetConfig : allExsistingDataset) {
+      datasets.add(datasetConfig.getDataset());
+    }
+    datasets.removeAll(allDatasets);
+
+    for (String dataset : datasets) {
+      datasetDAO.deleteByPredicate(Predicate.EQ("dataset", dataset));
     }
   }
 

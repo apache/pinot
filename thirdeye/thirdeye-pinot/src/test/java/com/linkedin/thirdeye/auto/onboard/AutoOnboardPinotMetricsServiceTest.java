@@ -13,11 +13,11 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -50,6 +50,13 @@ public class AutoOnboardPinotMetricsServiceTest {
   @AfterMethod(alwaysRun = true)
   void afterMethod() {
     testDAOProvider.cleanup();
+  }
+
+  @Test
+  public void testRemoveDataset() throws Exception {
+    Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
+    testAutoLoadPinotMetricsService.removeDeletedDataset(Collections.<String>emptyList());
+    Assert.assertEquals(datasetConfigDAO.findAll().size(), 0);
   }
 
   @Test
