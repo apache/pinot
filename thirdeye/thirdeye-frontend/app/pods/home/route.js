@@ -9,13 +9,14 @@ import RSVP from "rsvp";
 import moment from 'moment';
 import { inject as service } from '@ember/service';
 import _ from 'lodash';
+import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
 const queryParamsConfig = {
   refreshModel: true,
   replace: false
 };
 
-export default Route.extend({
+export default Route.extend(AuthenticatedRouteMixin, {
   store: service('store'),
   anomaliesApiService: service('services/api/anomalies'),
 

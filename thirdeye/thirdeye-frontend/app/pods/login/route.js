@@ -31,14 +31,13 @@ export default Route.extend(UnauthenticatedRouteMixin, {
      */
     willTransition(transition) {
       const fromUrl = get(transition, 'intent.url');
-      const isRedirectedToRca = fromUrl && fromUrl.startsWith('/rca');
       const isAuthenticated = this.get('session.isAuthenticated');
-
-      if (isRedirectedToRca && !isAuthenticated) {
+      
+      if (!isAuthenticated) {
         transition.abort();
         this.transitionTo('login', { queryParams: { fromUrl } });
       } else {
-        return this.transitionTo('home', { queryParams: { fromUrl } });
+        return true;
       }
 
     }
