@@ -95,7 +95,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
     this.detectionDAO.update(config);
 
     for (MergedAnomalyResultDTO mergedAnomalyResultDTO: result.getAnomalies()) {
-      this.anomalyDAO.update(mergedAnomalyResultDTO);
+      this.anomalyDAO.save(mergedAnomalyResultDTO);
     }
 
     return Collections.emptyList();

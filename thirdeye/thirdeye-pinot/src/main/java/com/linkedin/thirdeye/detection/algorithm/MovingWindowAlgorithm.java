@@ -50,7 +50,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private static final String PROP_METRIC_URN = "metricUrn";
 
   private static final String PROP_LOOKBACK = "lookback";
-  private static final Period PROP_LOOKBACK_DEFAULT = new Period(7, PeriodType.days());
+  private static final Period PROP_LOOKBACK_DEFAULT = new Period().withField(DurationFieldType.days(), 7);
 
   private static final String PROP_QUANTILE_MIN = "quantileMin";
   private static final double PROP_QUANTILE_MIN_DEFAULT = Double.NaN;
@@ -94,7 +94,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     this.quantileMax = MapUtils.getDoubleValue(config.getProperties(), PROP_QUANTILE_MAX, PROP_QUANTILE_MAX_DEFAULT);
     this.zscoreMin = MapUtils.getDoubleValue(config.getProperties(), PROP_ZSCORE_MIN, PROP_ZSCORE_MIN_DEFAULT);
     this.zscoreMax = MapUtils.getDoubleValue(config.getProperties(), PROP_ZSCORE_MAX, PROP_ZSCORE_MAX_DEFAULT);
-    this.lookback = parseLookback(config.getProperties().get(PROP_LOOKBACK).toString());
+    this.lookback = parseLookback(MapUtils.getString(config.getProperties(), PROP_LOOKBACK, ""));
     this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), PROP_TIMEZONE, PROP_TIMEZONE_DEFAULT));
 
     Preconditions.checkArgument(Double.isNaN(this.quantileMin) || (this.quantileMin >= 0 && this.quantileMin <= 1.0), PROP_QUANTILE_MIN + " must be between 0.0 and 1.0");

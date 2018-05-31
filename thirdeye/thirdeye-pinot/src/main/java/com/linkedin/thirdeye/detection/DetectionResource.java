@@ -12,9 +12,15 @@ import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.wordnik.swagger.annotations.ApiParam;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -40,7 +46,6 @@ public class DetectionResource {
   private final DetectionConfigManager configDAO;
 
   public DetectionResource() {
-
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.eventDAO = DAORegistry.getInstance().getEventDAO();
@@ -56,8 +61,7 @@ public class DetectionResource {
 
     this.loader = new DetectionPipelineLoader();
 
-    this.provider =
-        new DefaultDataProvider(metricDAO, eventDAO, anomalyDAO, timeseriesLoader, aggregationLoader, loader);
+    this.provider = new DefaultDataProvider(metricDAO, eventDAO, anomalyDAO, timeseriesLoader, aggregationLoader, loader);
   }
 
   @POST
@@ -67,7 +71,13 @@ public class DetectionResource {
     if (jsonPayload == null) {
       throw new IllegalArgumentException("Empty Json Payload");
     }
-    DetectionConfigDTO config = OBJECT_MAPPER.readValue(jsonPayload, DetectionConfigDTO.class);
+
+    Map<String, Object> properties = OBJECT_MAPPER.readValue(jsonPayload, Map.class);
+
+    DetectionConfigDTO config = new DetectionConfigDTO();
+    config.setId(Long.MAX_VALUE);
+    config.setName("preview");
+    config.setProperties(properties);
 
     DetectionPipeline pipeline = this.loader.from(this.provider, config, start, end);
     DetectionPipelineResult result = pipeline.run();
@@ -82,7 +92,7 @@ public class DetectionResource {
       @QueryParam("start") long start,
       @QueryParam("end") long end) throws Exception {
 
-    DetectionConfigDTO config = configDAO.findById(id);
+    DetectionConfigDTO config = this.configDAO.findById(id);
     if (config == null) {
       throw new IllegalArgumentException("Detection Config not exist");
     }
@@ -105,11 +115,30 @@ public class DetectionResource {
       throw new IllegalArgumentException(String.format("Cannot find config %d", configId));
     }
 
+    // clear existing anomalies
+    AnomalySlice slice = new AnomalySlice().withConfigId(configId).withStart(start).withEnd(end);
+    Collection<MergedAnomalyResultDTO> existing = this.provider.fetchAnomalies(Collections.singleton(slice)).get(slice);
+
+    List<Long> existingIds = new ArrayList<>();
+    for (MergedAnomalyResultDTO anomaly : existing) {
+      existingIds.add(anomaly.getId());
+    }
+
+    this.anomalyDAO.deleteByIds(existingIds);
+
+    // execute replay
     DetectionPipeline pipeline = this.loader.from(this.provider, config, start, end);
     DetectionPipelineResult result = pipeline.run();
 
-    for (MergedAnomalyResultDTO mergedAnomalyResultDTO : result.getAnomalies()) {
-      this.anomalyDAO.update(mergedAnomalyResultDTO);
+    // save state
+    if (result.getLastTimestamp() > 0) {
+      config.setLastTimestamp(result.getLastTimestamp());
+    }
+
+    this.configDAO.update(config);
+
+    for (MergedAnomalyResultDTO anomaly : result.getAnomalies()) {
+      this.anomalyDAO.save(anomaly);
     }
 
     return Response.ok(result.getAnomalies()).build();
