@@ -43,22 +43,18 @@ public class CommonConstants {
         public static final String ONLINE = "ONLINE";
         public static final String OFFLINE = "OFFLINE";
         public static final String ERROR = "ERROR";
-        public static final String DROPPED = "DROPPED";
       }
 
       public static class RealtimeSegmentOnlineOfflineStateModel {
         public static final String ONLINE = "ONLINE";
         public static final String OFFLINE = "OFFLINE";
         public static final String ERROR = "ERROR";
-        public static final String DROPPED = "DROPPED";
         public static final String CONSUMING = "CONSUMING";
-        public static final String CONVERTING = "CONVERTING";
       }
 
       public static class BrokerOnlineOfflineStateModel {
         public static final String ONLINE = "ONLINE";
         public static final String OFFLINE = "OFFLINE";
-        public static final String DROPPED = "DROPPED";
         public static final String ERROR = "ERROR";
       }
     }
