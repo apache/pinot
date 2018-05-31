@@ -410,6 +410,10 @@ body {
 
 .te-graph-container {
   margin: 10px 0 20px -15px;
+
+  &--marginless {
+    margin: 0;
+  }
 }
 
 .te-block-container {

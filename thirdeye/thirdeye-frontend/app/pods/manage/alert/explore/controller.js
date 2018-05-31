@@ -88,7 +88,6 @@ export default Controller.extend({
       sortColumnStartUp: false,
       sortColumnScoreUp: false,
       sortColumnChangeUp: false,
-      isFetchingDimensions: false,
       isDimensionFetchDone: false,
       sortColumnResolutionUp: false,
       checkReplayInterval: 2000, // 2 seconds

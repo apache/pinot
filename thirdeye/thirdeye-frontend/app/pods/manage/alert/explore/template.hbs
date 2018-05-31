@@ -115,7 +115,6 @@
             dimensionOptions=dimensionOptions
             timePickerIncrement=timePickerIncrement
             isDimensionFetchDone=isDimensionFetchDone
-            isFetchingDimensions=alertHasDimensions
             isMetricDataLoading=isMetricDataLoading
             isMetricDataInvalid=isMetricDataInvalid
             inputAction=(action "onInputMissingAnomaly")
@@ -127,12 +126,12 @@
 
       {{!-- Alert page graph --}}
       {{self-serve-graph
-        isMetricSelected=true
         metricData=metricData
         componentId='alert-page'
         topDimensions=topDimensions
         selectedDimension=alertDimension
         selectedDimensions=selectedDimensions
+        isMetricSelected=true
         isMetricDataLoading=isMetricDataLoading
         isMetricDataInvalid=isMetricDataInvalid
         isDimensionFetchDone=isDimensionFetchDone
