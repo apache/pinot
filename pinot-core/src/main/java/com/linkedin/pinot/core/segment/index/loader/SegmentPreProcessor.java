@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.segment.index.loader;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGenerator;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
@@ -60,6 +61,16 @@ public class SegmentPreProcessor implements AutoCloseable {
   public void process() throws Exception {
     if (_segmentMetadata.getTotalDocs() == 0) {
       return;
+    }
+
+    File[] directoryListing = _indexDir.listFiles();
+    String tempFileExtension = V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION + ".tmp";
+    if (directoryListing != null) {
+      for (File child : directoryListing) {
+        if (child.getName().endsWith(tempFileExtension)) {
+          org.apache.commons.io.FileUtils.deleteQuietly(child);
+        }
+      }
     }
 
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
