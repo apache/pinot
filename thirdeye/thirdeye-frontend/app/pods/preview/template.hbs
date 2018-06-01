@@ -1,0 +1,37 @@
+<div class="container">
+  <div class="row">
+    <div class="col-xs-12">
+      <button onClick={{action "onPreview"}}>preview</button>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-xs-4">
+      {{textarea-autosize
+        placeholder="Enter detection config here ..."
+        value=detectionConfig
+        cols=50
+        rows=20}}
+    </div>
+    <div class="col-xs-8">
+      {{rootcause-select-metric-dimension
+        selectedUrn=metricUrn
+        onSelection=(action "onMetricChange")
+      }}
+      {{timeseries-chart
+        series=series
+      }}
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-xs-12">
+      {{#each-in anomaliesGroupedFormatted as | key anomalies |}}
+        <p>{{key}}</p>
+        <ul>
+        {{#each anomalies as | anomaly |}}
+          <li>{{anomaly}}</li>
+        {{/each}}
+        </ul>
+      {{/each-in}}
+    </div>
+  </div>
+</div>
