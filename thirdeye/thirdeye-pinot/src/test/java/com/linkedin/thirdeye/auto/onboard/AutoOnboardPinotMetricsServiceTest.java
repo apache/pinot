@@ -53,13 +53,6 @@ public class AutoOnboardPinotMetricsServiceTest {
   }
 
   @Test
-  public void testRemoveDataset() throws Exception {
-    Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
-    testAutoLoadPinotMetricsService.removeDeletedDataset(Collections.<String>emptyList());
-    Assert.assertEquals(datasetConfigDAO.findAll().size(), 0);
-  }
-
-  @Test
   public void testAddNewDataset() throws Exception {
     Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
     DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
@@ -83,7 +76,7 @@ public class AutoOnboardPinotMetricsServiceTest {
     }
   }
 
-  @Test
+  @Test (dependsOnMethods={"testAddNewDataset"})
   public void testRefreshDataset() throws Exception {
     DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
     DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("newDimension", DataType.STRING, true);
@@ -123,5 +116,12 @@ public class AutoOnboardPinotMetricsServiceTest {
       Assert.assertTrue(datasetCustomConfigs.containsKey(configKey));
       Assert.assertEquals(datasetCustomConfigs.get(configKey), configValue);
     }
+  }
+
+  @Test (dependsOnMethods={"testRefreshDataset"})
+  public void testRemoveDataset() throws Exception {
+    Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
+    testAutoLoadPinotMetricsService.removeDeletedDataset(Collections.<String>emptyList());
+    Assert.assertEquals(datasetConfigDAO.findAll().size(), 0);
   }
 }
