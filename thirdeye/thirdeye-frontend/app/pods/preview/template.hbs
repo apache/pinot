@@ -31,6 +31,7 @@
     <div class="col-xs-12 preview-chart">
       {{timeseries-chart
         series=series
+        colorMapping=colorMapping
       }}
     </div>
   </div>
@@ -39,8 +40,8 @@
       {{textarea-autosize
         placeholder="Enter detection config here ..."
         value=detectionConfig
-        cols=50
-        rows=20
+        cols=70
+        rows=16
       }}
       <button onClick={{action "onPreview"}}>preview</button>
     </div>

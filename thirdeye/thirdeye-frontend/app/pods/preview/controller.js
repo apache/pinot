@@ -14,7 +14,8 @@ import {
   toFilters,
   toFilterMap,
   appendFilters,
-  dateFormatFull
+  dateFormatFull,
+  colorMapping
 } from 'thirdeye-frontend/utils/rca-utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/shared/eventTableColumns';
 import filterBarConfig from 'thirdeye-frontend/shared/filterBarConfig';
@@ -58,6 +59,8 @@ export default Controller.extend({
   errorBaseline: null,
 
   errorAnomalies: null,
+
+  colorMapping: colorMapping,
 
   anomalies: computed('output', function () {
     return this._filterAnomalies(get(this, 'output'));
@@ -128,7 +131,7 @@ export default Controller.extend({
         timestamps: baseline.timestamp,
         values: baseline.value,
         type: 'line',
-        color: 'blue'
+        color: 'light-blue'
       };
     }
 
