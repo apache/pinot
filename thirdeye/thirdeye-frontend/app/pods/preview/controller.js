@@ -12,6 +12,7 @@ import {
   toCurrentUrn,
   toOffsetUrn,
   toFilters,
+  toFilterMap,
   appendFilters,
   dateFormatFull
 } from 'thirdeye-frontend/utils/rca-utils';
@@ -23,7 +24,7 @@ import _ from 'lodash';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
 
-const PREVIEW_DATE_FORMAT = 'YYYY-MM-HH hh:mm';
+const PREVIEW_DATE_FORMAT = 'MMM DD, hh:mm a';
 
 export default Controller.extend({
   detectionConfig: null,
@@ -34,7 +35,29 @@ export default Controller.extend({
 
   timeseries: null,
 
+  baseline: null,
+
   analysisRange: [moment().subtract(1, 'month').valueOf(), moment().valueOf()],
+
+  compareMode: 'wo1w',
+
+  compareModeOptions: [
+    'wo1w',
+    'wo2w',
+    'wo3w',
+    'wo4w',
+    'mean4w',
+    'median4w',
+    'min4w',
+    'max4w',
+    'none'
+  ],
+
+  errorTimeseries: null,
+
+  errorBaseline: null,
+
+  errorAnomalies: null,
 
   anomalies: computed('output', function () {
     return this._filterAnomalies(get(this, 'output'));
@@ -49,33 +72,75 @@ export default Controller.extend({
     const anomaliesGrouped = get(this, 'anomaliesGrouped');
     Object.keys(anomaliesGrouped).forEach(key => {
       const anomalies = anomaliesGrouped[key];
-      output[key] = anomalies.map(anomaly => this._formatAnomaly(anomaly)).sort();
+      const outputKey = `${key} (${anomalies.length})`;
+      let outputValue = anomalies.map(anomaly => this._formatAnomaly(anomaly)).sort();
+
+      if (outputValue.length > 7) {
+        outputValue = _.slice(outputValue, 0, 3).concat(['...'], _.slice(outputValue, -3));
+      }
+
+      output[outputKey] = outputValue;
     });
     return output;
   }),
 
-  series: computed('anomalies', 'timeseries', function () {
+  series: computed('anomalies', 'timeseries', 'baseline', function () {
+    const metricUrn = get(this, 'metricUrn');
+    const anomalies = get(this, 'anomalies');
+    const anomaliesGrouped = get(this, 'anomaliesGrouped');
     const timeseries = get(this, 'timeseries');
+    const baseline = get(this, 'baseline');
 
-    if (_.isEmpty(timeseries)) { return; }
+    const series = {};
 
-    return {
-      myseries: {
+    if (!_.isEmpty(anomaliesGrouped)) {
+      const filters = toFilters(metricUrn);
+      const key = this._makeKey(toFilterMap(filters));
+
+      let anomaliesList = [];
+      if (_.isEmpty(key)) {
+        anomaliesList = anomalies;
+      } else if (!_.isEmpty(anomaliesGrouped[key])) {
+        anomaliesList = anomaliesGrouped[key];
+      }
+
+      anomaliesList.forEach(anomaly => {
+        series[this._formatAnomaly(anomaly)] = {
+          timestamps: [anomaly.startTime, anomaly.endTime],
+          values: [1, 1],
+          type: 'line',
+          color: 'teal'
+        }
+      });
+    }
+
+    if (!_.isEmpty(timeseries)) {
+      series['current'] = {
         timestamps: timeseries.timestamp,
         values: timeseries.value,
         type: 'line',
         color: 'blue'
-      }
-    };
+      };
+    }
+
+    if (!_.isEmpty(baseline)) {
+      series['baseline'] = {
+        timestamps: baseline.timestamp,
+        values: baseline.value,
+        type: 'line',
+        color: 'blue'
+      };
+    }
+
+    return series;
   }),
 
-  _formatDimensions(dimensions) {
-    return Object.values(dimensions).sort().join(', ');
+  _makeKey(dimensions) {
+    return Object.values(dimensions).join(', ')
   },
 
   _formatAnomaly(anomaly) {
-    return `${moment(anomaly.startTime).format(PREVIEW_DATE_FORMAT)} to ` +
-           `${moment(anomaly.endTime).format(PREVIEW_DATE_FORMAT)}`;
+    return `${moment(anomaly.startTime).format(PREVIEW_DATE_FORMAT)} (${this._makeKey(anomaly.dimensions)})`;
   },
 
   _filterAnomalies(rows) {
@@ -85,7 +150,7 @@ export default Controller.extend({
   _groupByDimensions(anomalies) {
     const grouping = {};
     anomalies.forEach(anomaly => {
-      const key = Object.values(anomaly.dimensions).join(', ');
+      const key = this._makeKey(anomaly.dimensions);
       grouping[key] = (grouping[key] || []).concat([anomaly]);
     });
     return grouping;
@@ -94,15 +159,25 @@ export default Controller.extend({
   _fetchTimeseries() {
     const metricUrn = get(this, 'metricUrn');
     const range = get(this, 'analysisRange');
-    const offset = 'current';
     const granularity = '15_MINUTES';
     const timezone = moment.tz.guess();
 
-    const url = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&granularity=${granularity}&timezone=${timezone}`;
-    return fetch(url)
+    set(this, 'errorTimeseries', null);
+
+    const urlCurrent = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=current&granularity=${granularity}&timezone=${timezone}`;
+    fetch(urlCurrent)
       .then(checkStatus)
       .then(res => set(this, 'timeseries', res))
-      .catch(err => set(this, 'output', [err]));
+      .catch(err => set(this, 'errorTimeseries', err));
+
+    set(this, 'errorBaseline', null);
+
+    const offset = get(this, 'compareMode');
+    const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&granularity=${granularity}&timezone=${timezone}`;
+    fetch(urlBaseline)
+      .then(checkStatus)
+      .then(res => set(this, 'baseline', res))
+      .catch(err => set(this, 'errorBaseline', err));
   },
 
   _fetchAnomalies() {
@@ -111,10 +186,12 @@ export default Controller.extend({
 
     const jsonString = get(this, 'detectionConfig');
 
+    set(this, 'errorAnomalies', null);
+
     fetch(url, { method: 'POST', body: jsonString })
       .then(checkStatus)
-      .then(res => set(this, 'output', res))
-      .catch(err => set(this, 'output', [err]));
+      .then(res => set(this, 'anomalies', this._filterAnomalies(res)))
+      .catch(err => set(this, 'errorAnomalies', err));
   },
 
   actions: {
@@ -132,6 +209,12 @@ export default Controller.extend({
       const metricUrn = metricUrns[0];
 
       set(this, 'metricUrn', metricUrn);
+
+      this._fetchTimeseries();
+    },
+
+    onCompareMode(compareMode) {
+      set(this, 'compareMode', compareMode);
 
       this._fetchTimeseries();
     }
