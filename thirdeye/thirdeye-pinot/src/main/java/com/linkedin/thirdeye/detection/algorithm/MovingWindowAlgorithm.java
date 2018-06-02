@@ -126,7 +126,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     df = applyMovingWindow(df);
 
     // zscore check
-    df.addSeries(COL_ZSCORE, df.getDoubles(COL_VALUE).subtract(df.get(COL_MEAN)).divide(df.get(COL_STD)));
+    df.addSeries(COL_ZSCORE, df.getDoubles(COL_VALUE).subtract(df.get(COL_MEAN)).divide(df.getDoubles(COL_STD).replace(0.0d, DoubleSeries.NULL)));
 
     df.addSeries(COL_ZSCORE_MIN_VIOLATION, BooleanSeries.fillValues(df.size(), false));
     if (!Double.isNaN(this.zscoreMin)) {

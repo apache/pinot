@@ -62,6 +62,24 @@ export default Controller.extend({
 
   colorMapping: colorMapping,
 
+  axis: {
+    y: {
+      show: true
+    },
+    y2: {
+      show: false,
+      min: 0,
+      max: 1
+    },
+    x: {
+      type: 'timeseries',
+      show: true,
+      tick: {
+        fit: false
+      }
+    }
+  },
+
   anomalies: computed('output', function () {
     return this._filterAnomalies(get(this, 'output'));
   }),
@@ -112,7 +130,8 @@ export default Controller.extend({
           timestamps: [anomaly.startTime, anomaly.endTime],
           values: [1, 1],
           type: 'line',
-          color: 'teal'
+          color: 'teal',
+          axis: 'y2'
         }
       });
     }
