@@ -16,6 +16,7 @@ public class AnomalySummary {
   private double current;
   private double baseline;
   private AnomalyFeedbackType feedback;
+  private String comment;
   private String metricName;
   private String metricUrn;
   private long metricId;
@@ -137,5 +138,13 @@ public class AnomalySummary {
 
   public void setDataset(String dataset) {
     this.dataset = dataset;
+  }
+
+  public String getComment() {
+    return comment;
+  }
+
+  public void setComment(String comment) {
+    this.comment = comment;
   }
 }
