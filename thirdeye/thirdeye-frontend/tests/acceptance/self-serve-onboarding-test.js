@@ -3,7 +3,7 @@ import moment from 'moment';
 import { module, test } from 'qunit';
 import { setupApplicationTest } from 'ember-qunit';
 import { selfServeConst, selfServeSettings, optionsToString } from 'thirdeye-frontend/tests/utils/constants';
-import { visit, fillIn, click, currentURL, triggerKeyEvent, waitUntil } from '@ember/test-helpers';
+import { visit, fillIn, click, currentURL, triggerKeyEvent, waitUntil, waitFor } from '@ember/test-helpers';
 import { filters, dimensions, granularities } from 'thirdeye-frontend/mocks/metricPeripherals';
 import { selectChoose, clickTrigger } from 'thirdeye-frontend/tests/helpers/ember-power-select';
 
@@ -40,10 +40,11 @@ module('Acceptance | create alert', function(hooks) {
       'Graph placeholder is visible. Data is not yet loaded.'
     );
 
-    // Select a metric
+    // Select a metric, wait for data to be loaded into graph
     await click(selfServeConst.METRIC_SELECT);
     await fillIn(selfServeConst.METRIC_INPUT, 'test');
     await click($(`${selfServeConst.OPTION_ITEM}:contains(${selectedMetric})`).get(0));
+    await waitFor(`${selfServeConst.GRANULARITY_SELECT} ${selfServeConst.SELECTED_ITEM}`, 3000);
 
     // Fields are now enabled with defaults and load correct options, graph is loaded
     assert.equal(

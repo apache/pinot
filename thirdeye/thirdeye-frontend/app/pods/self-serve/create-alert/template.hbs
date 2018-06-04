@@ -5,12 +5,11 @@
       <legend class="te-form__section-title">Select a metric to monitor</legend>
     </div>
     <div class="col-xs-12 col-sm-8">
-      <div class="te-page__right te-page__right--inside">
+      <label for="select-metric" class="control-label te-label te-label--taller required">Search for a metric, or
         {{#link-to "self-serve.import-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
           Import a Metric From InGraphs
         {{/link-to}}
-      </div>
-      <label for="select-metric" class="control-label te-label te-label--taller required">Search for a Metric</label>
+      </label>
       <div class="te-form__sub-label te-form__sub-label--raised">Please contact ask_thirdeye if you need to onboard non-additive UMP or derived metrics</div>
       {{#power-select
         search=(perform searchMetricsList)
@@ -28,7 +27,7 @@
       {{/power-select}}
     </div>
 
-    <div class="col-xs-6 col-sm-4">
+    <div class="te-form__custom-field te-form__custom-field--lower col-xs-6 col-sm-4">
       <label for="select-granularity" class="control-label te-label te-label--taller">Monitor at this data granularity</label>
       {{#power-select
         options=metricGranularityOptions

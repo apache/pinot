@@ -10,7 +10,7 @@ import _ from 'lodash';
 import fetch from 'fetch';
 import moment from 'moment';
 import Controller from '@ember/controller';
-import { computed, set } from '@ember/object';
+import { computed, set, getWithDefault } from '@ember/object';
 import { task, timeout } from 'ember-concurrency';
 import {
   isPresent,
@@ -798,9 +798,9 @@ export default Controller.extend({
         .then((metricHash) => {
           const { maxTime, filters, dimensions, granularities } = metricHash;
           const targetMetric = this.get('metricLookupCache').find(metric => metric.id === selectedObj.id);
-          const isIngraphMetric = targetMetric && isPresent(targetMetric.extSourceLinkInfo.INGRAPH);
+          const inGraphLink = getWithDefault(targetMetric, 'extSourceLinkInfo.INGRAPH', null);
           // In the event that we have an "ingraph" metric, enable only "minute" level granularity
-          const adjustedGranularity = this.get('isIngraphMetric') ? granularities.filter(g => g.toLowerCase().includes('minute')) : granularities;
+          const adjustedGranularity = (targetMetric && inGraphLink) ? granularities.filter(g => g.toLowerCase().includes('minute')) : granularities;
 
           this.setProperties({
             maxTime,
@@ -809,7 +809,7 @@ export default Controller.extend({
             granularities: adjustedGranularity,
             originalDimensions: dimensions,
             metricGranularityOptions: adjustedGranularity,
-            selectedGranularity: granularities[0],
+            selectedGranularity: adjustedGranularity[0],
             alertFunctionName: this.get('functionNamePrimer')
           });
           this.triggerGraphFromMetric();

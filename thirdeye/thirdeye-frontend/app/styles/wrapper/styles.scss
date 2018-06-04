@@ -114,6 +114,12 @@ body {
     }
   }
 
+  &__custom-field {
+    &--lower {
+      margin-top: 17px;
+    }
+  }
+
   &__banner {
     width: auto;
     border: none;
