@@ -1,10 +1,10 @@
 import Controller from '@ember/controller';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import { computed, set } from '@ember/object';
+import { isBlank } from '@ember/utils';
 import moment from 'moment';
 import { setUpTimeRangeOptions } from 'thirdeye-frontend/utils/manage-alert-utils';
 import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
-import _ from 'lodash';
 
 const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly to display time
 const DEFAULT_ACTIVE_DURATION = '1d'; // setting this date range selection as default (Last 24 Hours)
@@ -20,6 +20,7 @@ export default Controller.extend({
   duration: null,
   anomalyResponseObj: anomalyUtil.anomalyResponseObj,
   feedbackType: 'All Resolutions',
+  toggleCollapsed: false, /* hide/show accordians */
 
   /**
    * Overrides ember-models-table's css classes
@@ -50,7 +51,7 @@ export default Controller.extend({
       const feedbackType = this.get('feedbackType');
       const feedbackItem = this._checkFeedback(feedbackType);
 
-      if (feedbackItem.value !== 'ALL' && !_.isEmpty(filteredAnomalyMapping)) {
+      if (feedbackItem.value !== 'ALL' && !isBlank(filteredAnomalyMapping)) {
         let map = {};
           // Iterate through each anomaly
         Object.keys(filteredAnomalyMapping).some(function(key) {
@@ -141,6 +142,10 @@ export default Controller.extend({
   },
 
   actions: {
+    toggleAllAccordions() {
+      this.toggleProperty('toggleCollapsed')
+    },
+
     /**
      * Sets the selected application property based on user selection
      * @param {Object} selectedApplication - object that represents selected application
