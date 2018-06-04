@@ -47,7 +47,6 @@ export default Controller.extend({
   isFetchingDimensions: false,
   isDimensionFetchDone: false,
   isProcessingForm: false,
-  isIngraphMetric: false,
   isEmailError: false,
   isDuplicateEmail: false,
   isAlertNameUserModified: false,
@@ -760,7 +759,7 @@ export default Controller.extend({
       isCreateGroupSuccess: false,
       isGroupNameDuplicate: false,
       isAlertNameDuplicate: false,
-      isIngraphMetric: false,
+      metricLookupCache: [],
       graphEmailLinkProps: '',
       bsAlertBannerType: 'success',
       selectedFilters: JSON.stringify({})
