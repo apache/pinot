@@ -28,6 +28,7 @@ import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import java.io.File;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 
 
 /**
@@ -63,12 +64,15 @@ public class SegmentPreProcessor implements AutoCloseable {
       return;
     }
 
+    // Remove all the existing inverted index temp files before loading segments.
+    // NOTE: This step fixes the issue of temporary files not getting deleted after creating new inverted indexes.
+    // In this, we look for all files in the directory and remove the ones with  '.bitmap.inv.tmp' extension.
     File[] directoryListing = _indexDir.listFiles();
     String tempFileExtension = V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION + ".tmp";
     if (directoryListing != null) {
       for (File child : directoryListing) {
         if (child.getName().endsWith(tempFileExtension)) {
-          org.apache.commons.io.FileUtils.deleteQuietly(child);
+          FileUtils.deleteQuietly(child);
         }
       }
     }
