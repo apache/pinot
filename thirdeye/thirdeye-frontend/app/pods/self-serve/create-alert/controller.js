@@ -47,6 +47,7 @@ export default Controller.extend({
   isFetchingDimensions: false,
   isDimensionFetchDone: false,
   isProcessingForm: false,
+  isIngraphMetric: false,
   isEmailError: false,
   isDuplicateEmail: false,
   isAlertNameUserModified: false,
@@ -59,6 +60,7 @@ export default Controller.extend({
   graphEmailLinkProps: '',
   dimensionCount: 7,
   availableDimensions: 0,
+  metricLookupCache: [],
   legendText: {
     dotted: {
       text: 'WoW'
@@ -207,8 +209,9 @@ export default Controller.extend({
    */
   searchMetricsList: task(function* (metric) {
     yield timeout(600);
-    const url = selfServeApiCommon.metricAutoComplete(metric);
-    return fetch(url).then(checkStatus);
+    const autoCompleteResults = yield fetch(selfServeApiCommon.metricAutoComplete(metric)).then(checkStatus);
+    this.get('metricLookupCache').push( ...autoCompleteResults );
+    return autoCompleteResults;
   }),
 
   /**
@@ -757,6 +760,7 @@ export default Controller.extend({
       isCreateGroupSuccess: false,
       isGroupNameDuplicate: false,
       isAlertNameDuplicate: false,
+      isIngraphMetric: false,
       graphEmailLinkProps: '',
       bsAlertBannerType: 'success',
       selectedFilters: JSON.stringify({})
@@ -786,20 +790,25 @@ export default Controller.extend({
     onSelectMetric(selectedObj) {
       this.clearAll();
       this.setProperties({
-        isMetricDataLoading: true,
         topDimensions: [],
+        isMetricDataLoading: true,
         selectedMetricOption: selectedObj
       });
       this.fetchMetricData(selectedObj.id)
         .then((metricHash) => {
           const { maxTime, filters, dimensions, granularities } = metricHash;
+          const targetMetric = this.get('metricLookupCache').find(metric => metric.id === selectedObj.id);
+          const isIngraphMetric = targetMetric && isPresent(targetMetric.extSourceLinkInfo.INGRAPH);
+          // In the event that we have an "ingraph" metric, enable only "minute" level granularity
+          const adjustedGranularity = this.get('isIngraphMetric') ? granularities.filter(g => g.toLowerCase().includes('minute')) : granularities;
+
           this.setProperties({
             maxTime,
             filters,
             dimensions,
-            granularities,
+            granularities: adjustedGranularity,
             originalDimensions: dimensions,
-            metricGranularityOptions: granularities,
+            metricGranularityOptions: adjustedGranularity,
             selectedGranularity: granularities[0],
             alertFunctionName: this.get('functionNamePrimer')
           });

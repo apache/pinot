@@ -68,7 +68,7 @@ body {
 
   &__sub-label,
   &__super-label {
-    color: rgba(0,0,0,0.45);
+    color: $te-subtext;
     font-size: 14px;
     font-weight: normal;
     text-align: left;
@@ -79,6 +79,16 @@ body {
     &--strong {
       font-weight: 600;
     }
+
+    &--raised {
+      margin-top: -17px;
+    }
+  }
+
+  &__radio-label {
+    margin-left: 25px;
+    font-weight: normal;
+    color: $te-subtext;
   }
 
   &__input {
