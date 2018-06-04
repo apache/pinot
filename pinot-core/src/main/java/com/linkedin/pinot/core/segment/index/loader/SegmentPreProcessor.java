@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.segment.index.loader;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGenerator;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
@@ -27,6 +28,7 @@ import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import java.io.File;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 
 
 /**
@@ -60,6 +62,19 @@ public class SegmentPreProcessor implements AutoCloseable {
   public void process() throws Exception {
     if (_segmentMetadata.getTotalDocs() == 0) {
       return;
+    }
+
+    // Remove all the existing inverted index temp files before loading segments.
+    // NOTE: This step fixes the issue of temporary files not getting deleted after creating new inverted indexes.
+    // In this, we look for all files in the directory and remove the ones with  '.bitmap.inv.tmp' extension.
+    File[] directoryListing = _indexDir.listFiles();
+    String tempFileExtension = V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION + ".tmp";
+    if (directoryListing != null) {
+      for (File child : directoryListing) {
+        if (child.getName().endsWith(tempFileExtension)) {
+          FileUtils.deleteQuietly(child);
+        }
+      }
     }
 
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
