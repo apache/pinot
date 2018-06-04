@@ -82,6 +82,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
       if(values.length <= 0)
         return NULL;
 
+      values = Arrays.copyOf(values, values.length);
       Arrays.sort(values);
 
       // odd N, return mid

@@ -2710,6 +2710,13 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testDoubleMedianSideEffectFree() {
+    DoubleSeries base = DataFrame.toSeries(1.00, 3.00, 2.00, 4.00);
+    base.median();
+    assertEquals(base, 1.00, 3.00, 2.00, 4.00);
+  }
+
+  @Test
   public void testLongOperationsSeries() {
     LongSeries base = DataFrame.toSeries(LNULL, 0, 1, 5, 10);
     LongSeries mod = DataFrame.toSeries(1, 1, 1, 0, LNULL);
