@@ -12,13 +12,15 @@ import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
+import com.linkedin.thirdeye.detection.finetune.TuningAlgorithm;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.ws.rs.POST;
@@ -28,6 +30,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,6 +86,24 @@ public class DetectionResource {
     DetectionPipelineResult result = pipeline.run();
 
     return Response.ok(result.getAnomalies()).build();
+  }
+
+  @POST
+  @Path("/gridsearch")
+  public Response gridSearch(@QueryParam("start") long start, @QueryParam("end") long end,
+      @ApiParam("jsonPayload") String jsonPayload) throws Exception {
+    if (jsonPayload == null) {
+      throw new IllegalArgumentException("Empty Json Payload");
+    }
+
+    Map<String, Object> json = OBJECT_MAPPER.readValue(jsonPayload, Map.class);
+
+    LinkedHashMap<String, List<Number>> parameters = (LinkedHashMap<String, List<Number>>) json.get("parameters");
+
+    TuningAlgorithm gridSearch =
+        new GridSearchTuningAlgorithm(OBJECT_MAPPER.writeValueAsString(json.get("properties")), parameters);
+    gridSearch.fit(start, end);
+    return Response.ok(gridSearch.bestDetectionConfig()).build();
   }
 
   @POST
