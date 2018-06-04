@@ -718,6 +718,105 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     }, this, other);
   }
 
+  public BooleanSeries gt(final double constant) {
+    if(isNull(constant))
+      return BooleanSeries.nulls(this.size());
+    return this.map(new DoubleConditional() {
+      @Override
+      public boolean apply(double... values) {
+        return values[0] > constant;
+      }
+    });
+  }
+
+  public BooleanSeries gt(Series other) {
+    if(other.size() == 1)
+      return this.gt(other.getLong(0));
+    return map(new DoubleConditional() {
+      @Override
+      public boolean apply(double... values) {
+        return values[0] > values[1];
+      }
+    }, this, other);
+  }
+
+  public BooleanSeries gte(final double constant) {
+    if(isNull(constant))
+      return BooleanSeries.nulls(this.size());
+    return this.map(new DoubleConditional() {
+      @Override
+      public boolean apply(double... values) {
+        return values[0] >= constant;
+      }
+    });
+  }
+
+  public BooleanSeries gte(Series other) {
+    if(other.size() == 1)
+      return this.gte(other.getLong(0));
+    return map(new DoubleConditional() {
+      @Override
+      public boolean apply(double... values) {
+        return values[0] >= values[1];
+      }
+    }, this, other);
+  }
+
+  public BooleanSeries lt(final double constant) {
+    if(isNull(constant))
+      return BooleanSeries.nulls(this.size());
+    return this.map(new DoubleConditional() {
+      @Override
+      public boolean apply(double... values) {
+        return values[0] < constant;
+      }
+    });
+  }
+
+  public BooleanSeries lt(Series other) {
+    if(other.size() == 1)
+      return this.lt(other.getLong(0));
+    return map(new DoubleConditional() {
+      @Override
+      public boolean apply(double... values) {
+        return values[0] < values[1];
+      }
+    }, this, other);
+  }
+
+  public BooleanSeries lte(final double constant) {
+    if(isNull(constant))
+      return BooleanSeries.nulls(this.size());
+    return this.map(new DoubleConditional() {
+      @Override
+      public boolean apply(double... values) {
+        return values[0] <= constant;
+      }
+    });
+  }
+
+  public BooleanSeries lte(Series other) {
+    if(other.size() == 1)
+      return this.lte(other.getLong(0));
+    return map(new DoubleConditional() {
+      @Override
+      public boolean apply(double... values) {
+        return values[0] <= values[1];
+      }
+    }, this, other);
+  }
+
+  public BooleanSeries between(final double startIncl, final double endExcl) {
+    if(isNull(startIncl) || isNull(endExcl))
+      return BooleanSeries.nulls(this.size());
+    return this.map(new DoubleConditional() {
+      @Override
+      public boolean apply(double... values) {
+        return values[0] >= startIncl && values[0] < endExcl;
+      }
+    });
+  }
+
   @Override
   public DoubleSeries set(BooleanSeries mask, Series other) {
     if(other.size() == 1)
