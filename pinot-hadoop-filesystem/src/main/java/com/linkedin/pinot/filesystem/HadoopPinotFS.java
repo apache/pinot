@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.storage;
+package com.linkedin.pinot.filesystem;
 
 import com.google.common.base.Strings;
-import com.linkedin.pinot.common.segment.fetcher.HdfsSegmentFetcher;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -29,15 +28,15 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.*;
 import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.HdfsSegmentFetcher.*;
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.*;
 
 
 /**
  * Implementation of PinotFS for the Hadoop Filesystem
  */
 public class HadoopPinotFS extends PinotFS {
-  private static final Logger LOGGER = LoggerFactory.getLogger(HdfsSegmentFetcher.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(HadoopPinotFS.class);
   private org.apache.hadoop.fs.FileSystem hadoopFS = null;
   private int retryCount = RETRY_DEFAULT;
   private int retryWaitMs = RETRY_WAITIME_MS_DEFAULT;
@@ -55,9 +54,9 @@ public class HadoopPinotFS extends PinotFS {
       hadoopConf = getConf(config.getString(HADOOP_CONF_PATH));
       authenticate(hadoopConf, config);
       hadoopFS = org.apache.hadoop.fs.FileSystem.get(hadoopConf);
-      LOGGER.info("successfully initialized hdfs segment fetcher");
+      LOGGER.info("successfully initialized HadoopPinotFS");
     } catch (Exception e) {
-      LOGGER.error("failed to initialized the hdfs segment fetcher", e);
+      LOGGER.error("failed to initialized the HadoopPinotFS", e);
     }
   }
 
@@ -85,12 +84,14 @@ public class HadoopPinotFS extends PinotFS {
         while (sourceFiles.hasNext()) {
           boolean succeeded = FileUtil.copy(hadoopFS, sourceFiles.next().getPath(), hadoopFS, target, true, hadoopConf);
           if (!succeeded) {
+            delete(dstUri);
             return false;
           }
         }
       }
     } catch (Exception e) {
       delete(dstUri);
+      return false;
     }
     return true;
   }
@@ -104,13 +105,9 @@ public class HadoopPinotFS extends PinotFS {
   public long length(URI segmentUri) throws IOException {
     return hadoopFS.getLength(new Path(segmentUri));
   }
-
-  /**
-   * Does not list recursively, only lists files within directory.
-   */
+  
   @Override
   public String[] listFiles(URI segmentUri) throws IOException {
-    RemoteIterator<LocatedFileStatus> iterator = hadoopFS.listFiles(new Path(segmentUri), false);
     ArrayList<String> filePathStrings = new ArrayList<>();
     Path path = new Path(segmentUri);
     if (hadoopFS.exists(path)) {

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.storage;
+package com.linkedin.pinot.filesystem;
 
 import java.io.File;
 import java.io.IOException;
@@ -53,6 +53,9 @@ public class LocalPinotFS extends PinotFS {
   public boolean move(URI srcUri, URI dstUri) throws IOException {
     File srcFile = new File(srcUri);
     File dstFile = new File(dstUri);
+    if (dstFile.exists()) {
+      FileUtils.forceDelete(dstFile);
+    }
     if (!srcFile.isDirectory() && !dstFile.exists()) {
       dstFile.getParentFile().mkdirs();
       dstFile.createNewFile();
