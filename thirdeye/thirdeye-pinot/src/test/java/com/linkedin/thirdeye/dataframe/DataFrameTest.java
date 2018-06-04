@@ -2690,6 +2690,13 @@ public class DataFrameTest {
     assertEquals(base.quantile(1.00), DNULL);
   }
 
+  @Test
+  public void testDoubleQuantileSideEffectFree() {
+    DoubleSeries base = DataFrame.toSeries(1.00, 3.00, 2.00, 4.00);
+    base.quantile(0.5);
+    assertEquals(base, 1.00, 3.00, 2.00, 4.00);
+  }
+
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testDoubleQuantileFailLowQ() {
     DoubleSeries base = DataFrame.toSeries(DNULL);
