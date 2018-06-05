@@ -53,6 +53,8 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang3.EnumUtils;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -251,7 +253,9 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
   public SuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
-      String tableConfigStr) throws Exception {
+      String tableConfigStr,
+      @ApiParam(value = "Whether to force to reload segments") @DefaultValue("false") @QueryParam("forceReload") Boolean forceReloadSegments)
+      throws Exception {
     TableConfig tableConfig;
     try {
       JSONObject tableConfigJson = new JSONObject(tableConfigStr);
@@ -293,7 +297,17 @@ public class PinotTableRestletResource {
       throw e;
     }
 
-    return new SuccessResponse("Table config updated for " + tableName);
+    // Auto reload segments.
+    StringBuilder successMessage = new StringBuilder("Table config updated for " + tableName);
+    if (forceReloadSegments != null && forceReloadSegments) {
+      autoReloadAllSegmentsForTable(tableConfig.getTableName(), successMessage);
+    }
+    return new SuccessResponse(successMessage.toString());
+  }
+
+  private void autoReloadAllSegmentsForTable(@Nonnull String tableNameWithType, StringBuilder successMessage) {
+    int numReloadMessagesSent = _pinotHelixResourceManager.reloadAllSegments(tableNameWithType);
+    successMessage.append(". Sent ").append(numReloadMessagesSent).append(" reload messages");
   }
 
   @POST
@@ -415,6 +429,5 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     }
     return jsonObject.toString();
-
   }
 }

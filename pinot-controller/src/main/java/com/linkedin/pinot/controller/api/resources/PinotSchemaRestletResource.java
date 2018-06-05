@@ -17,9 +17,12 @@
 package com.linkedin.pinot.controller.api.resources;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.api.events.MetadataEventNotifierFactory;
 import com.linkedin.pinot.controller.api.events.SchemaEventType;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -30,19 +33,24 @@ import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.json.JSONArray;
@@ -115,8 +123,9 @@ public class PinotSchemaRestletResource {
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully updated schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
-      FormDataMultiPart multiPart) {
-    return addOrUpdateSchema(schemaName, multiPart);
+      FormDataMultiPart multiPart,
+      @ApiParam(value = "Whether to force to reload segments") @DefaultValue("false") @QueryParam("forceReload") Boolean forceReload) {
+    return addOrUpdateSchema(schemaName, multiPart, forceReload);
   }
 
   // TODO: This should not update if the schema already exists
@@ -126,7 +135,7 @@ public class PinotSchemaRestletResource {
   @ApiOperation(value = "Add a new schema", notes = "Adds a new schema")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Successfully deleted schema"), @ApiResponse(code = 404, message = "Schema not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500, message = "Internal error")})
   public SuccessResponse addSchema(FormDataMultiPart multiPart) {
-    return addOrUpdateSchema(null, multiPart);
+    return addOrUpdateSchema(null, multiPart, false);
   }
 
   @POST
@@ -150,7 +159,7 @@ public class PinotSchemaRestletResource {
    *                   not part of URI
    * @return
    */
-  private SuccessResponse addOrUpdateSchema(@Nullable String schemaName, FormDataMultiPart multiPart) {
+  private SuccessResponse addOrUpdateSchema(@Nullable String schemaName, FormDataMultiPart multiPart, Boolean forceReloadSegments) {
     final String schemaNameForLogging = (schemaName == null) ? "new schema" : schemaName + " schema";
     Schema schema = getSchemaFromMultiPart(multiPart);
     if (!schema.validate(LOGGER)) {
@@ -178,12 +187,52 @@ public class PinotSchemaRestletResource {
       LOGGER.info("Metadata change notification for schema {}, type {}", schema, eventType);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, eventType);
 
-      return new SuccessResponse(schema.getSchemaName() + " successfully added");
+      // Auto reload segments.
+      StringBuilder successMessage = new StringBuilder(schema.getSchemaName() + " successfully added");
+      if (forceReloadSegments != null && forceReloadSegments) {
+        autoReloadAllSegmentsForTable(schemaName, successMessage);
+      }
+      return new SuccessResponse(successMessage.toString());
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to update schema %s", schemaNameForLogging), Response.Status.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  /**
+   * Auto reload all the segments for tables.
+   * Note: Schema name and raw table name should be the same.
+   * @param schemaName the schema name that is used to fetch existing tables
+   * @param successMessage success message
+   */
+  private void autoReloadAllSegmentsForTable(String schemaName, StringBuilder successMessage) {
+    List<String> tableNamesWithType = getExistingTables(schemaName);
+    int numReloadMessagesSent = 0;
+    for (String tableNameWithType : tableNamesWithType) {
+      numReloadMessagesSent += _pinotHelixResourceManager.reloadAllSegments(tableNameWithType);
+    }
+    successMessage.append(". Sent ").append(numReloadMessagesSent).append(" reload messages");
+  }
+
+  private List<String> getExistingTables(String schemaName) {
+    List<String> tableNamesWithType = new ArrayList<>(2);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+
+    // for real-time table
+    String realTimeTableName = TableNameBuilder.forType(CommonConstants.Helix.TableType.REALTIME).tableNameWithType(schemaName);
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(propertyStore, realTimeTableName);
+    if (tableConfig != null) {
+      tableNamesWithType.add(realTimeTableName);
+    }
+
+    // for offline table
+    String offlineTableName = TableNameBuilder.forType(CommonConstants.Helix.TableType.REALTIME).tableNameWithType(schemaName);
+    tableConfig = ZKMetadataProvider.getTableConfig(propertyStore, offlineTableName);
+    if (tableConfig != null) {
+      tableNamesWithType.add(offlineTableName);
+    }
+    return tableNamesWithType;
   }
 
   private Schema getSchemaFromMultiPart(FormDataMultiPart multiPart) {
