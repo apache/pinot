@@ -18,6 +18,7 @@ package com.linkedin.pinot.filesystem;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.util.Collection;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
@@ -54,16 +55,15 @@ public class LocalPinotFS extends PinotFS {
     File srcFile = new File(srcUri);
     File dstFile = new File(dstUri);
     if (dstFile.exists()) {
-      FileUtils.forceDelete(dstFile);
+      FileUtils.deleteQuietly(dstFile);
     }
-    if (!srcFile.isDirectory() && !dstFile.exists()) {
+    if (!srcFile.isDirectory()) {
       dstFile.getParentFile().mkdirs();
-      dstFile.createNewFile();
+      FileUtils.moveFile(srcFile, dstFile);
     }
-    if (srcFile.isDirectory() && !dstFile.exists()) {
-      dstFile.mkdirs();
+    if (srcFile.isDirectory()) {
+      Files.move(srcFile.toPath(), dstFile.toPath());
     }
-    FileUtils.moveFile(srcFile, dstFile);
     return true;
   }
 
@@ -90,6 +90,9 @@ public class LocalPinotFS extends PinotFS {
   @Override
   public long length(URI segmentUri) throws IOException {
     File file = new File(segmentUri);
+    if (file.isDirectory()) {
+      throw new IllegalArgumentException("File is directory");
+    }
     return FileUtils.sizeOf(file);
   }
 

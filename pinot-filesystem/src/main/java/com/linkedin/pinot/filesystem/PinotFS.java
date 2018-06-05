@@ -69,16 +69,16 @@ public abstract class PinotFS {
   public abstract boolean exists(URI segmentUri) throws IOException;
 
   /**
-   * Returns the length of the file or directory at the provided location.
+   * Returns the length of the file at the provided location. Will throw exception if a directory
    * @param segmentUri location of file
-   * @return the number of bytes; size of all files in directory if directory
+   * @return the number of bytes
    * @throws IOException on IO Failure
    */
   public abstract long length(URI segmentUri) throws IOException;
 
   /**
    * Lists all the files at the location provided. Lists recursively.
-   * Returns null if this abstract pathname does not denote a directory, or if
+   * Throws exception if this abstract pathname is not valid, or if
    * an I/O error occurs.
    * @param segmentUri location of file
    * @return an array of strings that contains file paths

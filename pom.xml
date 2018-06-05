@@ -247,12 +247,12 @@
       </dependency>
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
-        <artifactId>pinot-storage</artifactId>
+        <artifactId>pinot-filesystem</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
-        <artifactId>pinot-hadoop-storage</artifactId>
+        <artifactId>pinot-hadoop-filesystem</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

@@ -55,8 +55,8 @@ public class HadoopPinotFS extends PinotFS {
       authenticate(hadoopConf, config);
       hadoopFS = org.apache.hadoop.fs.FileSystem.get(hadoopConf);
       LOGGER.info("successfully initialized HadoopPinotFS");
-    } catch (Exception e) {
-      LOGGER.error("failed to initialized the HadoopPinotFS", e);
+    } catch (IOException e) {
+      throw new RuntimeException("Could not initialize HadoopPinotFS", e);
     }
   }
 
@@ -72,26 +72,20 @@ public class HadoopPinotFS extends PinotFS {
 
   /**
    * Note that this method copies within a cluster. If you want to copy outside the cluster, you will
-   * need to create a new configuration and filesystem.
+   * need to create a new configuration and filesystem. Keeps files if copy/move is partial.
    */
   @Override
   public boolean copy(URI srcUri, URI dstUri) throws IOException {
     Path source = new Path(srcUri);
     Path target = new Path(dstUri);
     RemoteIterator<LocatedFileStatus> sourceFiles = hadoopFS.listFiles(source, true);
-    try {
-      if (sourceFiles != null) {
-        while (sourceFiles.hasNext()) {
-          boolean succeeded = FileUtil.copy(hadoopFS, sourceFiles.next().getPath(), hadoopFS, target, true, hadoopConf);
-          if (!succeeded) {
-            delete(dstUri);
-            return false;
-          }
+    if (sourceFiles != null) {
+      while (sourceFiles.hasNext()) {
+        boolean succeeded = FileUtil.copy(hadoopFS, sourceFiles.next().getPath(), hadoopFS, target, true, hadoopConf);
+        if (!succeeded) {
+          return false;
         }
       }
-    } catch (Exception e) {
-      delete(dstUri);
-      return false;
     }
     return true;
   }
@@ -105,7 +99,7 @@ public class HadoopPinotFS extends PinotFS {
   public long length(URI segmentUri) throws IOException {
     return hadoopFS.getLength(new Path(segmentUri));
   }
-  
+
   @Override
   public String[] listFiles(URI segmentUri) throws IOException {
     ArrayList<String> filePathStrings = new ArrayList<>();
@@ -116,6 +110,8 @@ public class HadoopPinotFS extends PinotFS {
         LocatedFileStatus file = fileListItr.next();
         filePathStrings.add(file.getPath().toUri().toString());
       }
+    } else {
+      throw new IllegalArgumentException("segmentUri is not valid");
     }
     String[] retArray = new String[filePathStrings.size()];
     filePathStrings.toArray(retArray);

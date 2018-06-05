@@ -16,6 +16,7 @@ package com.linkedin.pinot.filesystem;
  */
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
@@ -23,78 +24,100 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.*;
+
 
 public class LocalPinotFSTest {
   private String _tmpDir;
-  private File _originalFile;
+  private File testFile;
   private File _absoluteTmpDirPath;
+  private File _newTmpDir;
 
   @BeforeClass
   public void setUp() {
-    _tmpDir = System.getProperty("java.io.tmpdir") + LocalPinotFSTest.class.getSimpleName();
-    _absoluteTmpDirPath = new File(_tmpDir);
+    String tmpDirString = System.getProperty("java.io.tmpdir") + LocalPinotFSTest.class.getSimpleName() + "first";
+    _absoluteTmpDirPath = new File(tmpDirString);
     FileUtils.deleteQuietly(_absoluteTmpDirPath);
     _absoluteTmpDirPath.mkdir();
-    _originalFile = new File(_absoluteTmpDirPath, "testFile");
+    testFile = new File(_absoluteTmpDirPath, "testFile");
     try {
-      _originalFile.createNewFile();
-    } catch (Exception e) {
-
+      testFile.createNewFile();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
+    _newTmpDir = new File(System.getProperty("java.io.tmpdir") + LocalPinotFSTest.class.getSimpleName() + "second");
+    FileUtils.deleteQuietly(_newTmpDir);
+
     _absoluteTmpDirPath.deleteOnExit();
+    _newTmpDir.deleteOnExit();
   }
 
   @AfterClass
   public void tearDown() {
-    new File(_tmpDir).delete();
+    _absoluteTmpDirPath.delete();
+    _newTmpDir.delete();
   }
 
   @Test
-  public void testFS() {
+  public void testFS() throws Exception {
     LocalPinotFS localPinotFS = new LocalPinotFS();
+    URI testFileUri = testFile.toURI();
+    // Check whether a directory exists
+    Assert.assertTrue(localPinotFS.exists(_absoluteTmpDirPath.toURI()));
+    // Check whether a file exists
+    Assert.assertTrue(localPinotFS.exists(testFileUri));
+
+    File file = new File(_absoluteTmpDirPath, "secondTestFile");
+    URI secondTestFileUri = file.toURI();
+    // Check that file does not exist
+    Assert.assertTrue(!localPinotFS.exists(secondTestFileUri));
+
+    localPinotFS.copy(testFileUri, secondTestFileUri);
+    Assert.assertEquals(2, localPinotFS.listFiles(_absoluteTmpDirPath.toURI()).length);
+
+    // Check file copy worked when file was not created
+    Assert.assertTrue(localPinotFS.exists(secondTestFileUri));
+
+    // Create another file in the same path
+    File thirdTestFile = new File(_absoluteTmpDirPath, "thirdTestFile");
+    thirdTestFile.createNewFile();
+
+    // Check file copy to location where something already exists still works
+    localPinotFS.copy(testFileUri, thirdTestFile.toURI());
+    // Check length of file
+    Assert.assertEquals(0, localPinotFS.length(secondTestFileUri));
+    Assert.assertTrue(localPinotFS.exists(thirdTestFile.toURI()));
+
+    // Check that method deletes dst directory during move and is successful by overwriting dir
+    _newTmpDir.mkdirs();
+    localPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI());
+    Assert.assertEquals(_absoluteTmpDirPath.length(), 0);
+
+    localPinotFS.delete(secondTestFileUri);
+    // Check deletion from final location worked
+    Assert.assertTrue(!localPinotFS.exists(secondTestFileUri));
+
+    File firstTempDir = new File(_absoluteTmpDirPath, "firstTempDir");
+    File secondTempDir = new File(_absoluteTmpDirPath, "secondTempDir");
+
+    firstTempDir.mkdirs();
+    // Check that directory only copy worked
+    localPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
+    Assert.assertTrue(localPinotFS.exists(secondTempDir.toURI()));
+
+    testFile.createNewFile();
+    localPinotFS.copyFromLocalFile(testFileUri, secondTestFileUri);
+    Assert.assertTrue(localPinotFS.exists(secondTestFileUri));
+    localPinotFS.copyToLocalFile(testFileUri, secondTestFileUri);
+    Assert.assertTrue(localPinotFS.exists(secondTestFileUri));
+
+
+    // List files on a file - exception if file already exists
     try {
-      URI originalLocationUri = _originalFile.toURI();
-      // Check whether a directory exists
-      Assert.assertTrue(localPinotFS.exists(_absoluteTmpDirPath.toURI()));
-      // Check whether a file exists
-      Assert.assertTrue(localPinotFS.exists(originalLocationUri));
-      File file = new File(_tmpDir, "secondTestFile");
-      URI finalLocationUri = file.toURI();
-      // Check that file does not exist
-      Assert.assertTrue(!localPinotFS.exists(finalLocationUri));
+      localPinotFS.listFiles(thirdTestFile.toURI());
+      fail();
+    } catch (IllegalArgumentException e) {
 
-      localPinotFS.copy(originalLocationUri, finalLocationUri);
-      // Check file copy worked when file was not created
-      Assert.assertTrue(localPinotFS.exists(finalLocationUri));
-      // Check file copy to location it already exists still works
-      localPinotFS.copy(originalLocationUri, finalLocationUri);
-      // Check length of file
-      Assert.assertEquals(0, localPinotFS.length(finalLocationUri));
-      Assert.assertTrue(localPinotFS.exists(finalLocationUri));
-      Assert.assertEquals(2, localPinotFS.listFiles(_absoluteTmpDirPath.toURI()).length);
-
-      localPinotFS.delete(finalLocationUri);
-      // Check deletion from final location worked
-      Assert.assertTrue(!localPinotFS.exists(finalLocationUri));
-
-      File firstTempDir = new File(_tmpDir, "firstTempDir");
-      File secondTempDir = new File(_tmpDir, "secondTempDir");
-
-      firstTempDir.mkdirs();
-      // Check that directory only copy worked
-      localPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
-      Assert.assertTrue(localPinotFS.exists(secondTempDir.toURI()));
-      long secondDirLength = localPinotFS.length(secondTempDir.toURI());
-      // Check length of directory
-      Assert.assertEquals(0, secondDirLength);
-
-      localPinotFS.copyFromLocalFile(originalLocationUri, finalLocationUri);
-      Assert.assertTrue(localPinotFS.exists(finalLocationUri));
-      localPinotFS.copyToLocalFile(originalLocationUri, finalLocationUri);
-      Assert.assertTrue(localPinotFS.exists(finalLocationUri));
-    } catch (Exception e) {
-      Assert.fail();
     }
-
   }
 }

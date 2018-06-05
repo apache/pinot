@@ -67,11 +67,11 @@
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
-      <artifactId>pinot-storage</artifactId>
+      <artifactId>pinot-filesystem</artifactId>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
-      <artifactId>pinot-hadoop-storage</artifactId>
+      <artifactId>pinot-hadoop-filesystem</artifactId>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
