@@ -166,6 +166,10 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     // anomalies
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_ZSCORE_MIN_VIOLATION, COL_ZSCORE_MAX_VIOLATION, COL_QUANTILE_MIN_VIOLATION, COL_QUANTILE_MAX_VIOLATION);
 
+    System.out.println("*******************************************");
+    System.out.println(this.slice.getFilters());
+    System.out.println(df);
+
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     for (int i = 0; i < df.size(); i++) {
       if (BooleanSeries.booleanValueOf(df.getBoolean(COL_ANOMALY, i))) {
@@ -270,7 +274,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       @Override
       public long apply(long... values) {
         return new DateTime(values[0], MovingWindowAlgorithm.this.timezone)
-            .plus(MovingWindowAlgorithm.this.lookback).getMillis();
+            .plus(new Period().withField(DurationFieldType.weeks(), 1)).getMillis();
       }
     }, COL_TIME);
     dfBase.renameSeries(COL_VALUE, COL_BASE);
