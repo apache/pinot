@@ -26,7 +26,7 @@ import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.*;
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentOperations.*;
 
 
 public class HttpSegmentFetcher implements SegmentFetcher {

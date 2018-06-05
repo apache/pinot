@@ -82,23 +82,23 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean exists(URI segmentUri) throws IOException {
-    File file = new File(segmentUri);
+  public boolean exists(URI fileUri) throws IOException {
+    File file = new File(fileUri);
     return file.exists();
   }
 
   @Override
-  public long length(URI segmentUri) throws IOException {
-    File file = new File(segmentUri);
+  public long length(URI fileUri) throws IOException {
+    File file = new File(fileUri);
     if (file.isDirectory()) {
-      throw new IllegalArgumentException("File is directory");
+      throw new RuntimeException("File is directory");
     }
     return FileUtils.sizeOf(file);
   }
 
   @Override
-  public String[] listFiles(URI segmentUri) throws IOException {
-    File file = new File(segmentUri);
+  public String[] listFiles(URI fileUri) throws IOException {
+    File file = new File(fileUri);
     Collection<File> files = FileUtils.listFiles(file, null, true);
     return files.stream().map(File::getPath).toArray(String[]::new);
   }

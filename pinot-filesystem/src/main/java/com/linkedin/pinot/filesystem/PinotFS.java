@@ -62,29 +62,29 @@ public abstract class PinotFS {
 
   /**
    * Checks whether the file or directory at the provided location exists.
-   * @param segmentUri URI of file
+   * @param fileUri URI of file
    * @return true if path exists
    * @throws IOException on IO Failure
    */
-  public abstract boolean exists(URI segmentUri) throws IOException;
+  public abstract boolean exists(URI fileUri) throws IOException;
 
   /**
    * Returns the length of the file at the provided location. Will throw exception if a directory
-   * @param segmentUri location of file
+   * @param fileUri location of file
    * @return the number of bytes
    * @throws IOException on IO Failure
    */
-  public abstract long length(URI segmentUri) throws IOException;
+  public abstract long length(URI fileUri) throws IOException;
 
   /**
    * Lists all the files at the location provided. Lists recursively.
    * Throws exception if this abstract pathname is not valid, or if
    * an I/O error occurs.
-   * @param segmentUri location of file
+   * @param fileUri location of file
    * @return an array of strings that contains file paths
    * @throws IOException see specific implementation
    */
-  public abstract String[] listFiles(URI segmentUri) throws IOException;
+  public abstract String[] listFiles(URI fileUri) throws IOException;
 
   /**
    * Copies a file from a remote filesystem to the local one. Keeps the original file.

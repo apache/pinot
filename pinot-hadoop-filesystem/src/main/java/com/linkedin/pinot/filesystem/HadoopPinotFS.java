@@ -28,8 +28,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.HdfsSegmentFetcher.*;
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.*;
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentOperations.HadoopSegmentOperations.*;
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentOperations.*;
 
 
 /**
@@ -91,19 +91,19 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean exists(URI segmentUri) throws IOException {
-    return hadoopFS.exists(new Path(segmentUri));
+  public boolean exists(URI fileUri) throws IOException {
+    return hadoopFS.exists(new Path(fileUri));
   }
 
   @Override
-  public long length(URI segmentUri) throws IOException {
-    return hadoopFS.getLength(new Path(segmentUri));
+  public long length(URI fileUri) throws IOException {
+    return hadoopFS.getLength(new Path(fileUri));
   }
 
   @Override
-  public String[] listFiles(URI segmentUri) throws IOException {
+  public String[] listFiles(URI fileUri) throws IOException {
     ArrayList<String> filePathStrings = new ArrayList<>();
-    Path path = new Path(segmentUri);
+    Path path = new Path(fileUri);
     if (hadoopFS.exists(path)) {
       RemoteIterator<LocatedFileStatus> fileListItr = hadoopFS.listFiles(path, true);
       while (fileListItr != null && fileListItr.hasNext()) {
@@ -129,7 +129,7 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   private void authenticate(org.apache.hadoop.conf.Configuration hadoopConf, org.apache.commons.configuration.Configuration configs) {
-    String principal = configs.getString(PRINCIPLE);
+    String principal = configs.getString(PRINCIPAL);
     String keytab = configs.getString(KEYTAB);
     if (!Strings.isNullOrEmpty(principal) && !Strings.isNullOrEmpty(keytab)) {
       UserGroupInformation.setConfiguration(hadoopConf);
