@@ -142,7 +142,7 @@ public class MutableSegmentImpl implements MutableSegment {
         String allocationContext = buildAllocationContext(_segmentName, column, V1Constants.Dict.FILE_EXTENSION);
         MutableDictionary dictionary =
             MutableDictionaryFactory.getMutableDictionary(dataType, _offHeap, _memoryManager, dictionaryColumnSize,
-                _statsHistory.getEstimatedCardinality(column), allocationContext);
+                Math.min(_statsHistory.getEstimatedCardinality(column), _capacity), allocationContext);
         _dictionaryMap.put(column, dictionary);
       }
 
