@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.DurationFieldType;
@@ -46,11 +45,18 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private static final String COL_ANOMALY = "anomaly";
   private static final String COL_TIME = DataFrameUtils.COL_TIME;
   private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
+  private static final String COL_OUTLIER = "outlier";
 
   private static final String PROP_METRIC_URN = "metricUrn";
 
   private static final String PROP_LOOKBACK = "lookback";
-  private static final Period PROP_LOOKBACK_DEFAULT = new Period().withField(DurationFieldType.days(), 7);
+  private static final String PROP_LOOKBACK_DEFAULT = "1w";
+
+  private static final String PROP_OUTLIER_DURATION = "outlierDuration";
+  private static final String PROP_OUTLIER_DURATION_DEFAULT = "0";
+
+  private static final String PROP_CHANGE_DURATION = "changeDuration";
+  private static final String PROP_CHANGE_DURATION_DEFAULT = "0";
 
   private static final String PROP_QUANTILE_MIN = "quantileMin";
   private static final double PROP_QUANTILE_MIN_DEFAULT = Double.NaN;
@@ -70,7 +76,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private static final String PROP_TIMEZONE = "timezone";
   private static final String PROP_TIMEZONE_DEFAULT = "UTC";
 
-  private static final Pattern PATTERN_LOOKBACK = Pattern.compile("([0-9]+)\\s*(\\S*)");
+  private static final Pattern PATTERN_PERIOD = Pattern.compile("([0-9]+)\\s*(\\S*)");
 
   private final MetricSlice slice;
   private final Period lookback;
@@ -80,6 +86,8 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private final double quantileMax;
   private final boolean weekOverWeek;
   private final DateTimeZone timezone;
+  private final Period outlierDuration;
+  private final Period changeDuration;
 
   public MovingWindowAlgorithm(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
@@ -94,8 +102,10 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     this.quantileMax = MapUtils.getDoubleValue(config.getProperties(), PROP_QUANTILE_MAX, PROP_QUANTILE_MAX_DEFAULT);
     this.zscoreMin = MapUtils.getDoubleValue(config.getProperties(), PROP_ZSCORE_MIN, PROP_ZSCORE_MIN_DEFAULT);
     this.zscoreMax = MapUtils.getDoubleValue(config.getProperties(), PROP_ZSCORE_MAX, PROP_ZSCORE_MAX_DEFAULT);
-    this.lookback = parseLookback(MapUtils.getString(config.getProperties(), PROP_LOOKBACK, ""));
     this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), PROP_TIMEZONE, PROP_TIMEZONE_DEFAULT));
+    this.lookback = parsePeriod(MapUtils.getString(config.getProperties(), PROP_LOOKBACK, PROP_LOOKBACK_DEFAULT));
+    this.outlierDuration = parsePeriod(MapUtils.getString(config.getProperties(), PROP_OUTLIER_DURATION, PROP_OUTLIER_DURATION_DEFAULT));
+    this.changeDuration = parsePeriod(MapUtils.getString(config.getProperties(), PROP_CHANGE_DURATION, PROP_CHANGE_DURATION_DEFAULT));
 
     Preconditions.checkArgument(Double.isNaN(this.quantileMin) || (this.quantileMin >= 0 && this.quantileMin <= 1.0), PROP_QUANTILE_MIN + " must be between 0.0 and 1.0");
     Preconditions.checkArgument(Double.isNaN(this.quantileMax) || (this.quantileMax >= 0 && this.quantileMax <= 1.0), PROP_QUANTILE_MAX + " must be between 0.0 and 1.0");
@@ -126,47 +136,31 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     df = applyMovingWindow(df);
 
     // zscore check
-    df.addSeries(COL_ZSCORE, df.getDoubles(COL_VALUE).subtract(df.get(COL_MEAN)).divide(df.getDoubles(COL_STD).replace(0.0d, DoubleSeries.NULL)));
-
     df.addSeries(COL_ZSCORE_MIN_VIOLATION, BooleanSeries.fillValues(df.size(), false));
-    if (!Double.isNaN(this.zscoreMin)) {
-      df.mapInPlace(new Series.DoubleConditional() {
-        @Override
-        public boolean apply(double... values) {
-          return values[0] < MovingWindowAlgorithm.this.zscoreMin;
-        }
-      }, COL_ZSCORE_MIN_VIOLATION, COL_ZSCORE).fillNull(COL_ZSCORE_MIN_VIOLATION);
-    }
-
     df.addSeries(COL_ZSCORE_MAX_VIOLATION, BooleanSeries.fillValues(df.size(), false));
-    if (!Double.isNaN(this.zscoreMax)) {
-      df.mapInPlace(new Series.DoubleConditional() {
-        @Override
-        public boolean apply(double... values) {
-          return values[0] > MovingWindowAlgorithm.this.zscoreMax;
-        }
-      }, COL_ZSCORE_MAX_VIOLATION, COL_ZSCORE).fillNull(COL_ZSCORE_MAX_VIOLATION);
+
+    if (!Double.isNaN(this.zscoreMin) || !Double.isNaN(this.zscoreMax)) {
+      df.addSeries(COL_ZSCORE, df.getDoubles(COL_VALUE).subtract(df.get(COL_MEAN)).divide(df.getDoubles(COL_STD).replace(0.0d, DoubleSeries.NULL)));
+
+      if (!Double.isNaN(this.zscoreMin)) {
+        df.addSeries(COL_ZSCORE_MIN_VIOLATION, df.getDoubles(COL_ZSCORE).lt(this.zscoreMin).fillNull());
+      }
+
+      if (!Double.isNaN(this.zscoreMax)) {
+        df.addSeries(COL_ZSCORE_MAX_VIOLATION, df.getDoubles(COL_ZSCORE).gt(this.zscoreMax).fillNull());
+      }
     }
 
     // quantile check
     df.addSeries(COL_QUANTILE_MIN_VIOLATION, BooleanSeries.fillValues(df.size(), false));
+    df.addSeries(COL_QUANTILE_MAX_VIOLATION, BooleanSeries.fillValues(df.size(), false));
+
     if (!Double.isNaN(this.quantileMin)) {
-      df.mapInPlace(new Series.DoubleConditional() {
-        @Override
-        public boolean apply(double... values) {
-          return values[0] < values[1];
-        }
-      }, COL_QUANTILE_MIN_VIOLATION, COL_VALUE, COL_QUANTILE_MIN).fillNull(COL_QUANTILE_MIN_VIOLATION);
+      df.addSeries(COL_QUANTILE_MIN_VIOLATION, df.getDoubles(COL_VALUE).lt(df.get(COL_QUANTILE_MIN)).fillNull());
     }
 
-    df.addSeries(COL_QUANTILE_MAX_VIOLATION, BooleanSeries.fillValues(df.size(), false));
     if (!Double.isNaN(this.quantileMax)) {
-      df.mapInPlace(new Series.DoubleConditional() {
-        @Override
-        public boolean apply(double... values) {
-          return values[0] > values[1];
-        }
-      }, COL_QUANTILE_MAX_VIOLATION, COL_VALUE, COL_QUANTILE_MAX).fillNull(COL_QUANTILE_MAX_VIOLATION);
+      df.addSeries(COL_QUANTILE_MAX_VIOLATION, df.getDoubles(COL_VALUE).gt(df.get(COL_QUANTILE_MAX)).fillNull());
     }
 
     // anomalies
@@ -212,6 +206,14 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
         return values[0] >= MovingWindowAlgorithm.this.startTime;
       }
     }).dropNull();
+
+    res.addSeries(COL_OUTLIER, BooleanSeries.fillValues(res.size(), false));
+
+    if (this.outlierDuration.toStandardDuration().getMillis() > 0) {
+      res.addSeries(COL_OUTLIER, AlgorithmUtils.getOutliers(res, this.outlierDuration.toStandardDuration()));
+    }
+
+    // TODO support change points
 
     double[] std = new double[timestamps.size()];
     double[] mean = new double[timestamps.size()];
@@ -294,25 +296,21 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     return df.filter(new Series.LongConditional() {
       @Override
       public boolean apply(long... values) {
-        return values[0] >= tStart && values[0] < tCurrent;
+        return values[0] >= tStart && values[0] < tCurrent && values[1] != 1;
       }
-    }, COL_TIME).dropNull();
+    }, COL_TIME, COL_OUTLIER).dropNull();
   }
 
   /**
-   * Helper for parsing lookback period string from config (e.g. '3 days', '1min', '3600000')
+   * Helper for parsing a period string from config (e.g. '3 days', '1min', '3600000')
    *
-   * @param lookback
+   * @param period
    * @return
    */
-  static Period parseLookback(String lookback) {
-    if (StringUtils.isBlank(lookback)) {
-      return PROP_LOOKBACK_DEFAULT;
-    }
-
-    Matcher m = PATTERN_LOOKBACK.matcher(lookback);
+  static Period parsePeriod(String period) {
+    Matcher m = PATTERN_PERIOD.matcher(period);
     if (!m.find()) {
-      throw new IllegalArgumentException(String.format("Could not parse lookback expression '%s'", lookback));
+      throw new IllegalArgumentException(String.format("Could not parse period expression '%s'", period));
     }
 
     int size = Integer.valueOf(m.group(1).trim());

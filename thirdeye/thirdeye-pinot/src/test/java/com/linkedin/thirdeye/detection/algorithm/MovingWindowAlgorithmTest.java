@@ -29,13 +29,11 @@ public class MovingWindowAlgorithmTest {
   private static final String METRIC_NAME = "myMetric";
   private static final String DATASET_NAME = "myDataset";
 
-  private static final String COL_CURR = "current";
-  private static final String COL_BASE = "baseline";
   private static final String COL_STD = "std";
   private static final String COL_MEAN = "mean";
   private static final String COL_QUANTILE_MIN = "quantileMin";
   private static final String COL_QUANTILE_MAX = "quantileMax";
-  private static final String COL_ZSCORE = "zscore";
+  private static final String COL_OUTLIER = "outlier";
 
   private static final String PROP_METRIC_URN = "metricUrn";
   private static final String PROP_LOOKBACK = "lookback";
@@ -44,7 +42,7 @@ public class MovingWindowAlgorithmTest {
   private static final String PROP_ZSCORE_MIN = "zscoreMin";
   private static final String PROP_ZSCORE_MAX = "zscoreMax";
   private static final String PROP_WEEK_OVER_WEEK = "weekOverWeek";
-  private static final String PROP_TIMEZONE = "timezone";
+  private static final String PROP_OUTLIER_DURATION = "outlierDuration";
 
   private DataProvider provider;
   private MovingWindowAlgorithm algorithm;
@@ -181,6 +179,29 @@ public class MovingWindowAlgorithmTest {
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1764000000L, 1767600000L)));
   }
 
+  @Test
+  public void testQuantileMaxOutlierCorrection() throws Exception {
+    this.data.set(COL_VALUE,
+        this.data.getDoubles(COL_TIME).gte(86400000L).and(
+            this.data.getDoubles(COL_TIME).lt(172800000L)
+        ),
+        this.data.getDoubles(COL_VALUE).add(500));
+
+    this.properties.put(PROP_QUANTILE_MAX, 0.975);
+    this.properties.put(PROP_OUTLIER_DURATION, "12h");
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 604800000L, 1209600000L);
+    DetectionPipelineResult res = this.algorithm.run();
+
+    Assert.assertEquals(res.getAnomalies().size(), 7);
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(626400000L, 630000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(705600000L, 709200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(846000000L, 849600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(892800000L, 896400000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(903600000L, 907200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(918000000L, 921600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(950400000L, 954000000L)));
+  }
+
   //
   // zscore
   //
@@ -267,7 +288,8 @@ public class MovingWindowAlgorithmTest {
         .addSeries(COL_STD, Double.NaN, Double.NaN, 0.7071067811865476, Double.NaN) // TODO avoid exact double compare
         .addSeries(COL_MEAN, Double.NaN, 1, 1.5, 3)
         .addSeries(COL_QUANTILE_MIN, Double.NaN, 1, 1.25, 3)
-        .addSeries(COL_QUANTILE_MAX, Double.NaN, 1, 1.75, 3);
+        .addSeries(COL_QUANTILE_MAX, Double.NaN, 1, 1.75, 3)
+        .addSeries(COL_OUTLIER, false, false, false, false);
 
     DataFrame window = this.algorithm.applyMovingWindow(input);
 
@@ -275,17 +297,17 @@ public class MovingWindowAlgorithmTest {
   }
 
   @Test
-  public void testLookbackParser() {
-    Assert.assertEquals(MovingWindowAlgorithm.parseLookback("3600"), new Period().withField(DurationFieldType.millis(), 3600));
-    Assert.assertEquals(MovingWindowAlgorithm.parseLookback("1d"), new Period().withField(DurationFieldType.days(), 1));
-    Assert.assertEquals(MovingWindowAlgorithm.parseLookback("2hours"), new Period().withField(DurationFieldType.hours(), 2));
-    Assert.assertEquals(MovingWindowAlgorithm.parseLookback("24 hrs"), new Period().withField(DurationFieldType.hours(), 24));
-    Assert.assertEquals(MovingWindowAlgorithm.parseLookback("1 year"), new Period().withField(DurationFieldType.years(), 1));
-    Assert.assertEquals(MovingWindowAlgorithm.parseLookback("  3   w  "), new Period().withField(DurationFieldType.weeks(), 3));
+  public void testPeriodParser() {
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriod("3600"), new Period().withField(DurationFieldType.millis(), 3600));
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriod("1d"), new Period().withField(DurationFieldType.days(), 1));
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriod("2hours"), new Period().withField(DurationFieldType.hours(), 2));
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriod("24 hrs"), new Period().withField(DurationFieldType.hours(), 24));
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriod("1 year"), new Period().withField(DurationFieldType.years(), 1));
+    Assert.assertEquals(MovingWindowAlgorithm.parsePeriod("  3   w  "), new Period().withField(DurationFieldType.weeks(), 3));
   }
 
   @Test
-  public void testPeriodParser() {
+  public void testPeriodTypeParser() {
     Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("ms"), PeriodType.millis());
     Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("millis"), PeriodType.millis());
     Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("s"), PeriodType.seconds());
