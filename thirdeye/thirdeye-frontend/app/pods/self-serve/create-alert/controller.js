@@ -10,7 +10,7 @@ import _ from 'lodash';
 import fetch from 'fetch';
 import moment from 'moment';
 import Controller from '@ember/controller';
-import { computed, set } from '@ember/object';
+import { computed, set, getWithDefault } from '@ember/object';
 import { task, timeout } from 'ember-concurrency';
 import {
   isPresent,
@@ -59,6 +59,7 @@ export default Controller.extend({
   graphEmailLinkProps: '',
   dimensionCount: 7,
   availableDimensions: 0,
+  metricLookupCache: [],
   legendText: {
     dotted: {
       text: 'WoW'
@@ -207,8 +208,9 @@ export default Controller.extend({
    */
   searchMetricsList: task(function* (metric) {
     yield timeout(600);
-    const url = selfServeApiCommon.metricAutoComplete(metric);
-    return fetch(url).then(checkStatus);
+    const autoCompleteResults = yield fetch(selfServeApiCommon.metricAutoComplete(metric)).then(checkStatus);
+    this.get('metricLookupCache').push( ...autoCompleteResults );
+    return autoCompleteResults;
   }),
 
   /**
@@ -786,21 +788,27 @@ export default Controller.extend({
     onSelectMetric(selectedObj) {
       this.clearAll();
       this.setProperties({
-        isMetricDataLoading: true,
         topDimensions: [],
+        isMetricDataLoading: true,
         selectedMetricOption: selectedObj
       });
       this.fetchMetricData(selectedObj.id)
         .then((metricHash) => {
           const { maxTime, filters, dimensions, granularities } = metricHash;
+          const targetMetric = this.get('metricLookupCache').find(metric => metric.id === selectedObj.id);
+          const inGraphLink = getWithDefault(targetMetric, 'extSourceLinkInfo.INGRAPH', null);
+          // In the event that we have an "ingraph" metric, enable only "minute" level granularity
+          const adjustedGranularity = (targetMetric && inGraphLink) ? granularities.filter(g => g.toLowerCase().includes('minute')) : granularities;
+
           this.setProperties({
             maxTime,
             filters,
             dimensions,
-            granularities,
+            metricLookupCache: [],
+            granularities: adjustedGranularity,
             originalDimensions: dimensions,
-            metricGranularityOptions: granularities,
-            selectedGranularity: granularities[0],
+            metricGranularityOptions: adjustedGranularity,
+            selectedGranularity: adjustedGranularity[0],
             alertFunctionName: this.get('functionNamePrimer')
           });
           this.triggerGraphFromMetric();
