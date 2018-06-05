@@ -19,10 +19,16 @@
         }
       }
     }
+
+    //Show/hide accordian
+    .panel-group {
+      .panel {
+        margin-bottom: 20px;
+      }
+    }
   }
 
   &__title {
-    margin: 30px 0 15px 0;
 
     span {
       margin-left: 5px;
@@ -40,7 +46,7 @@
   }
 
   &__application-filter-by {
-    margin-top: 20px;
+    margin: 20px 0;
 
     .te-anomaly-table__select {
       display: inline-flex;

@@ -4,6 +4,11 @@
       {{record.anomaly.functionName}}
     {{/link-to}}
   </li>
+  {{#if record.anomaly.comment}}
+    <li class="te-anomaly-table__list-item" title="{{record.anomaly.comment}}">
+      comment: {{record.anomaly.comment}}
+    </li>
+  {{/if}}
   {{#each-in record.anomaly.dimensions as |dimName dimList|}}
      <li class="te-anomaly-table__list-item" title="{{dimension.dimensionVal}}">
        {{dimName}}:<span class="te-anomaly-table__list-value">{{dimList}}</span>

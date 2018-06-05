@@ -42,14 +42,14 @@ export default Service.extend({
        const anomalies = await queryCache.query(modelName, query, { reload: false, cacheKey: queryCache.urlForQueryKey(modelName, query) });
    * @return {Object}
    */
-  query(type, query, adapterOptions) {
+  async query(type, query, adapterOptions) {
     const cacheKey = adapterOptions.cacheKey;
     assert('you must pass adapterOptions to queryCache.query', adapterOptions);
     assert('you must include adapterOptions.cacheKey', cacheKey);
 
     let cached = this._cache[cacheKey];
     if (!cached || adapterOptions.reload) {// TODO: Add `EXPIRATION` here to purge when possible - lohuynh
-       cached = this._cache[cacheKey] = this.get('store').query(type, query, adapterOptions);
+       cached = this._cache[cacheKey] = await this.get('store').query(type, query, adapterOptions);
     }
     return cached;
   },
