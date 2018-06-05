@@ -759,7 +759,6 @@ export default Controller.extend({
       isCreateGroupSuccess: false,
       isGroupNameDuplicate: false,
       isAlertNameDuplicate: false,
-      metricLookupCache: [],
       graphEmailLinkProps: '',
       bsAlertBannerType: 'success',
       selectedFilters: JSON.stringify({})
@@ -805,6 +804,7 @@ export default Controller.extend({
             maxTime,
             filters,
             dimensions,
+            metricLookupCache: [],
             granularities: adjustedGranularity,
             originalDimensions: dimensions,
             metricGranularityOptions: adjustedGranularity,
