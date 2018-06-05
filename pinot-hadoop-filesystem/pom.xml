@@ -44,7 +44,6 @@
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
-      <optional>true</optional>
       <scope>provided</scope>
       <exclusions>
         <exclusion>

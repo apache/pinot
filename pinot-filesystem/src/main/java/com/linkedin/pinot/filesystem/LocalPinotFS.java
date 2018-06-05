@@ -71,6 +71,9 @@ public class LocalPinotFS extends PinotFS {
   public boolean copy(URI srcUri, URI dstUri) throws IOException {
     File srcFile = new File(srcUri);
     File dstFile = new File(dstUri);
+    if (dstFile.exists()) {
+      FileUtils.deleteQuietly(dstFile);
+    }
     if (srcFile.isDirectory()) {
       // Throws Exception on failure
       FileUtils.copyDirectory(srcFile, dstFile);
@@ -91,7 +94,7 @@ public class LocalPinotFS extends PinotFS {
   public long length(URI fileUri) throws IOException {
     File file = new File(fileUri);
     if (file.isDirectory()) {
-      throw new RuntimeException("File is directory");
+      throw new IllegalArgumentException("File is directory");
     }
     return FileUtils.sizeOf(file);
   }

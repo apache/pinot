@@ -99,18 +99,36 @@ public class LocalPinotFSTest {
 
     File firstTempDir = new File(_absoluteTmpDirPath, "firstTempDir");
     File secondTempDir = new File(_absoluteTmpDirPath, "secondTempDir");
-
     firstTempDir.mkdirs();
+
     // Check that directory only copy worked
     localPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
     Assert.assertTrue(localPinotFS.exists(secondTempDir.toURI()));
 
+    // Copying directory with files to directory with files
+    File testFile = new File(firstTempDir, "testFile");
     testFile.createNewFile();
-    localPinotFS.copyFromLocalFile(testFileUri, secondTestFileUri);
-    Assert.assertTrue(localPinotFS.exists(secondTestFileUri));
-    localPinotFS.copyToLocalFile(testFileUri, secondTestFileUri);
-    Assert.assertTrue(localPinotFS.exists(secondTestFileUri));
+    File newTestFile = new File(secondTempDir, "newTestFile");
+    newTestFile.createNewFile();
 
+    localPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
+    localPinotFS.listFiles(secondTempDir.toURI());
+    Assert.assertEquals(localPinotFS.listFiles(secondTempDir.toURI()).length, 1);
+
+    // len of dir = exception
+    try {
+      localPinotFS.length(firstTempDir.toURI());
+      fail();
+    } catch (IllegalArgumentException e) {
+
+    }
+
+    testFile.createNewFile();
+
+    localPinotFS.copyFromLocalFile(testFile.toURI(), secondTestFileUri);
+    Assert.assertTrue(localPinotFS.exists(secondTestFileUri));
+    localPinotFS.copyToLocalFile(testFile.toURI(), secondTestFileUri);
+    Assert.assertTrue(localPinotFS.exists(secondTestFileUri));
 
     // List files on a file - exception if file already exists
     try {
