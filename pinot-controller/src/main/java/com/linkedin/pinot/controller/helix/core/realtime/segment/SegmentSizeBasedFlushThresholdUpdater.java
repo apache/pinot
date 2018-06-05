@@ -167,6 +167,9 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
 
   private long capNumRowsIfOverflow(long targetSegmentNumRows) {
     if (targetSegmentNumRows > Integer.MAX_VALUE) {
+      // TODO Picking Integer.MAX_VALUE for number of rows will most certainly make the segment unloadable
+      // so we need to pick a lower value here. But before that, we need to consider why the value may
+      // go so high and prevent it. We will definitely reach a high segment size long before we get here...
       targetSegmentNumRows = Integer.MAX_VALUE;
     }
     return Math.max(targetSegmentNumRows, MINIMUM_NUM_ROWS_THRESHOLD);
