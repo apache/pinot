@@ -233,9 +233,10 @@ public class PinotLLCRealtimeSegmentManager {
         }
       }
     }
+    _flushThresholdUpdateManager.clearFlushThresholdUpdater(tableConfig);
     IdealState idealState = setupTable(tableConfig, emptyIdealState, partitionCount);
     setTableIdealState(tableConfig.getTableName(), idealState);
-  }
+ }
 
   // Remove all trace of LLC for this table.
   public void cleanupLLC(final String realtimeTableName) {
