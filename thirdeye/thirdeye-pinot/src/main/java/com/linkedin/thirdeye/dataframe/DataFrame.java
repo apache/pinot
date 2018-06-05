@@ -1016,6 +1016,13 @@ public class DataFrame {
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
+  public BooleanSeries map(Series.Conditional function, String... seriesNames) {
+    return map(function, names2series(seriesNames));
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
   public BooleanSeries map(Series.DoubleConditional function, String... seriesNames) {
     return map(function, names2series(seriesNames));
   }
@@ -1140,6 +1147,13 @@ public class DataFrame {
    */
   public static ObjectSeries map(Series.ObjectFunction function, Series... series) {
     return (ObjectSeries)map((Series.Function)function, series);
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public static BooleanSeries map(Series.Conditional function, Series... series) {
+    return (BooleanSeries)map((Series.Function)function, series);
   }
 
   /**
@@ -1328,6 +1342,14 @@ public class DataFrame {
     return this.project(fromIndex);
   }
 
+  /**
+   * Returns a copy of the DataFrame with rows filtered by series values referenced by {@code seriesName}.
+   * If the value referenced by {@code seriesName} associated with a row is {@code true} the row is copied,
+   * otherwise it is set to {@code null}.
+   *
+   * @param seriesName filter series name
+   * @return filtered DataFrame copy
+   */
   public DataFrame filter(String seriesName) {
     return this.filter(this.getBooleans(seriesName));
   }
@@ -1358,6 +1380,21 @@ public class DataFrame {
 
   public DataFrame filterEquals(String seriesName, final Object value) {
     return this.filter(this.get(seriesName).getObjects().eq(value));
+  }
+
+  /**
+   * Sets the values of the series references by {@code seriesName} and masked by {@code mask}
+   * to the corresponding values in {@code values}. Uses a copy of the affected series.
+   *
+   * @see Series#set(BooleanSeries, Series)
+   *
+   * @param seriesName series name to set values of
+   * @param mask row mask (if {@code true} row is replaced by value)
+   * @param values values to replace row with
+   * @return DataFrame with values
+   */
+  public DataFrame set(String seriesName, BooleanSeries mask, Series values) {
+    return this.addSeries(seriesName, this.get(seriesName).set(mask, values));
   }
 
   /**
