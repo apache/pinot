@@ -82,6 +82,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
       if(values.length <= 0)
         return NULL;
 
+      values = Arrays.copyOf(values, values.length);
       Arrays.sort(values);
 
       // odd N, return mid
@@ -204,6 +205,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     public double apply(double... values) {
       if (values.length <= 0)
         return NULL;
+      values = Arrays.copyOf(values, values.length);
       Arrays.sort(values);
       double index = (values.length - 1) * this.q;
       int lo = (int) Math.floor(index);
