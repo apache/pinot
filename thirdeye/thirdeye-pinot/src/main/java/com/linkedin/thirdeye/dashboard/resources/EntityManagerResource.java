@@ -35,12 +35,10 @@ import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -49,14 +47,12 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 @Path("thirdeye/entity")
 @Produces(MediaType.APPLICATION_JSON)
-@Consumes(MediaType.APPLICATION_JSON)
 @Api(tags = {Constants.DASHBOARD_TAG})
 public class EntityManagerResource {
   private final AnomalyFunctionManager anomalyFunctionManager;
@@ -117,13 +113,13 @@ public class EntityManagerResource {
   @GET
   @Path("{entityType}")
   @ApiOperation(value = "GET request to get all entities for a type.")
-  public Response getAllEntitiesForType(@PathParam("entityType") String entityTypeStr) {
+  public List<? extends AbstractDTO> getAllEntitiesForType(@PathParam("entityType") String entityTypeStr) {
     EntityType entityType = EntityType.valueOf(entityTypeStr);
-    List<AbstractDTO> results = new ArrayList<>();
+
     switch (entityType) {
       case ANOMALY_FUNCTION:
-        results.addAll(anomalyFunctionManager.findAll());
-        break;
+        return anomalyFunctionManager.findAll();
+
       case DATASET_CONFIG:
         List<DatasetConfigDTO> allDatasets = datasetConfigManager.findAll();
         Collections.sort(allDatasets, new Comparator<DatasetConfigDTO>() {
@@ -133,8 +129,8 @@ public class EntityManagerResource {
             return o1.getDataset().compareTo(o2.getDataset());
           }
         });
-        results.addAll(allDatasets);
-        break;
+        return allDatasets;
+
       case METRIC_CONFIG:
         List<MetricConfigDTO> allMetrics = metricConfigManager.findAll();
         Collections.sort(allMetrics, new Comparator<MetricConfigDTO>() {
@@ -144,109 +140,106 @@ public class EntityManagerResource {
             return o1.getDataset().compareTo(o2.getDataset());
           }
         });
-        results.addAll(allMetrics);
-        break;
+        return allMetrics;
+
       case OVERRIDE_CONFIG:
-        results.addAll(overrideConfigManager.findAll());
-        break;
+        return overrideConfigManager.findAll();
+
       case ALERT_CONFIG:
-        results.addAll(alertConfigManager.findAll());
-        break;
+        return alertConfigManager.findAll();
+
       case CLASSIFICATION_CONFIG:
-        results.addAll(classificationConfigManager.findAll());
-        break;
+        return classificationConfigManager.findAll();
+
       case APPLICATION:
-        results.addAll(applicationManager.findAll());
-        break;
+        return applicationManager.findAll();
+
       case ENTITY_MAPPING:
-        results.addAll(entityToEntityMappingManager.findAll());
-        break;
+        return entityToEntityMappingManager.findAll();
+
       case DETECTION_CONFIG:
-        results.addAll(detectionConfigManager.findAll());
-        break;
+        return detectionConfigManager.findAll();
+
       case MERGED_ANOMALY:
-        results.addAll(mergedAnomalyResultManager.findByPredicate(Predicate.GT("detectionConfigId", 0)));
-        break;
+        return mergedAnomalyResultManager.findByPredicate(Predicate.GT("detectionConfigId", 0));
+
       case SESSION:
-        results.addAll(sessionManager.findByPredicate(Predicate.EQ("principalType", SessionBean.PrincipalType.SERVICE)));
-        break;
+        return sessionManager.findByPredicate(Predicate.EQ("principalType", SessionBean.PrincipalType.SERVICE));
+
       case DETECTION_ALERT_CONFIG:
-        results.addAll(detectionAlertConfigManager.findAll());
-        break;
+        return detectionAlertConfigManager.findAll();
+
       default:
         throw new WebApplicationException("Unknown entity type : " + entityType);
     }
-    return Response.ok(results).build();
   }
 
   @POST
-  public Response updateEntity(@QueryParam("entityType") String entityTypeStr, String jsonPayload) {
+  public Long updateEntity(@QueryParam("entityType") String entityTypeStr, String jsonPayload) {
     if (Strings.isNullOrEmpty(entityTypeStr)) {
       throw new WebApplicationException("EntryType can not be null");
     }
+
     EntityType entityType = EntityType.valueOf(entityTypeStr);
+
     try {
       switch (entityType) {
         case DATASET_CONFIG:
-          datasetConfigManager.update(OBJECT_MAPPER.readValue(jsonPayload, DatasetConfigDTO.class));
-          break;
+          return assertNotNull(datasetConfigManager.save(OBJECT_MAPPER.readValue(jsonPayload, DatasetConfigDTO.class)));
 
         case METRIC_CONFIG:
-          metricConfigManager.save(OBJECT_MAPPER.readValue(jsonPayload, MetricConfigDTO.class));
-          break;
+          return assertNotNull(metricConfigManager.save(OBJECT_MAPPER.readValue(jsonPayload, MetricConfigDTO.class)));
 
         case ANOMALY_FUNCTION:
-          anomalyFunctionManager.save(OBJECT_MAPPER.readValue(jsonPayload, AnomalyFunctionDTO.class));
-          break;
+          return assertNotNull(anomalyFunctionManager.save(OBJECT_MAPPER.readValue(jsonPayload, AnomalyFunctionDTO.class)));
 
         case OVERRIDE_CONFIG:
-          overrideConfigManager.save(OBJECT_MAPPER.readValue(jsonPayload, OverrideConfigDTO.class));
-          break;
+          return assertNotNull(overrideConfigManager.save(OBJECT_MAPPER.readValue(jsonPayload, OverrideConfigDTO.class)));
 
         case ALERT_CONFIG:
           AlertConfigDTO alertConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, AlertConfigDTO.class);
           if (Strings.isNullOrEmpty(alertConfigDTO.getFromAddress())) {
             alertConfigDTO.setFromAddress(config.getFailureToAddress());
           }
-          alertConfigManager.save(alertConfigDTO);
-          break;
+
+          return assertNotNull(alertConfigManager.save(alertConfigDTO));
 
         case CLASSIFICATION_CONFIG:
-          classificationConfigManager.save(OBJECT_MAPPER.readValue(jsonPayload, ClassificationConfigDTO.class));
-          break;
+          return assertNotNull(classificationConfigManager.save(OBJECT_MAPPER.readValue(jsonPayload, ClassificationConfigDTO.class)));
 
         case APPLICATION:
-          applicationManager.save(OBJECT_MAPPER.readValue(jsonPayload, ApplicationDTO.class));
-          break;
+          return assertNotNull(applicationManager.save(OBJECT_MAPPER.readValue(jsonPayload, ApplicationDTO.class)));
 
         case ENTITY_MAPPING:
-          entityToEntityMappingManager.save(OBJECT_MAPPER.readValue(jsonPayload, EntityToEntityMappingDTO.class));
-          break;
+          return assertNotNull(entityToEntityMappingManager.save(OBJECT_MAPPER.readValue(jsonPayload, EntityToEntityMappingDTO.class)));
 
         case DETECTION_CONFIG:
-          detectionConfigManager.save(OBJECT_MAPPER.readValue(jsonPayload, DetectionConfigDTO.class));
-          break;
+          return assertNotNull(detectionConfigManager.save(OBJECT_MAPPER.readValue(jsonPayload, DetectionConfigDTO.class)));
 
         case MERGED_ANOMALY:
-          mergedAnomalyResultManager.save(OBJECT_MAPPER.readValue(jsonPayload, MergedAnomalyResultDTO.class));
-          break;
+          return assertNotNull(mergedAnomalyResultManager.save(OBJECT_MAPPER.readValue(jsonPayload, MergedAnomalyResultDTO.class)));
 
         case SESSION:
-          sessionManager.save(OBJECT_MAPPER.readValue(jsonPayload, SessionDTO.class));
-          break;
+          return assertNotNull(sessionManager.save(OBJECT_MAPPER.readValue(jsonPayload, SessionDTO.class)));
 
         case DETECTION_ALERT_CONFIG:
-          detectionAlertConfigManager.save(OBJECT_MAPPER.readValue(jsonPayload, DetectionAlertConfigDTO.class));
-          break;
+          return assertNotNull(detectionAlertConfigManager.save(OBJECT_MAPPER.readValue(jsonPayload, DetectionAlertConfigDTO.class)));
 
         default:
           throw new WebApplicationException("Unknown entity type : " + entityType);
       }
+
     } catch (IOException e) {
       LOG.error("Error saving the entity with payload : " + jsonPayload, e);
       throw new WebApplicationException(e);
     }
-    return Response.ok().build();
+  }
+
+  private static Long assertNotNull(Long id) {
+    if (id == null) {
+      throw new WebApplicationException("Could not save entity");
+    }
+    return id;
   }
 
   // TODO: create a common delete end point for these entities
