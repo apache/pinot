@@ -57,6 +57,8 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   // Not to be serialized
   transient int _arraySize;
   transient File _historyFile;
+  transient long _minIntervalBetweenUpdatesMillis = 0;
+  transient long _lastUpdateTimeMillis = 0;
 
   @VisibleForTesting
   public static int getMaxNumEntries() {
@@ -233,9 +235,21 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     return getNumntriesToScan() == 0;
   }
 
+  public void setMinIntervalBetweenUpdatesMillis(long millis) {
+    _minIntervalBetweenUpdatesMillis = millis;
+  }
+
   public synchronized void addSegmentStats(SegmentStats segmentStats) {
+    if (_minIntervalBetweenUpdatesMillis > 0) {
+      long now = System.currentTimeMillis();
+      if (now - _lastUpdateTimeMillis < _minIntervalBetweenUpdatesMillis) {
+        return;
+      }
+      _lastUpdateTimeMillis = now;
+    }
+
     _entries[_cursor] = segmentStats;
-    if (_cursor >= _arraySize -1) {
+    if (_cursor >= _arraySize - 1) {
       _isFull = true;
     }
     _cursor = (_cursor + 1) % _arraySize;
