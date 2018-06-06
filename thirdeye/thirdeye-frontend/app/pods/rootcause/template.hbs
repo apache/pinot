@@ -76,6 +76,14 @@
           </div>
         </div>
         <div class="row rootcause-compare">
+          <label class="te-label te-label--small">Baseline
+            <span>
+              <i class="glyphicon glyphicon-question-sign"></i>
+              {{#tooltip-on-element class="te-tooltip"}}
+                This is the compare mode for computing the baseline in the charts above and below. For example, "Wo2W" uses data from the analysis period shifted by two weeks.
+              {{/tooltip-on-element}}
+            </span>
+          </label>
           {{rootcause-select-comparison-range
             granularity=context.granularity
             anomalyRange=context.anomalyRange
@@ -94,32 +102,39 @@
     </div>
 
     {{#if hasServiceErrors}}
-      {{#if hasErrorsEntities}}
-        <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
-          <a class="close" data-dismiss="alert" {{action "clearErrors" "entities"}}>&times;</a>
-          Error for task(s):{{#each entitiesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
-        </div>
-      {{/if}}
+      <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
+        <a class="close" data-dismiss="alert" {{action "clearErrors" "all"}}>&times;</a>
+        We encountered errors connecting to our data sources. This should be temporary. Please save and reload your session and contact <strong>ask_thirdeye</strong> if the condition persists.
+      </div>
 
-      {{#if hasErrorsTimeseries}}
-        <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
-          <a class="close" data-dismiss="alert" {{action "clearErrors" "timeseries"}}>&times;</a>
-          Could not load timeseries:{{#each timeseriesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
-        </div>
-      {{/if}}
+      {{#if verbose}}
+        {{#if hasErrorsEntities}}
+          <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
+            <a class="close" data-dismiss="alert" {{action "clearErrors" "entities"}}>&times;</a>
+            Error for task(s):{{#each entitiesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+          </div>
+        {{/if}}
 
-      {{#if hasErrorsAggregates}}
-        <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
-          <a class="close" data-dismiss="alert" {{action "clearErrors" "aggregates"}}>&times;</a>
-          Could not load aggregates:{{#each aggregatesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
-        </div>
-      {{/if}}
+        {{#if hasErrorsTimeseries}}
+          <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
+            <a class="close" data-dismiss="alert" {{action "clearErrors" "timeseries"}}>&times;</a>
+            Could not load timeseries:{{#each timeseriesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+          </div>
+        {{/if}}
 
-      {{#if hasErrorsBreakdowns}}
-        <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
-          <a class="close" data-dismiss="alert" {{action "clearErrors" "breakdowns"}}>&times;</a>
-          Could not load dimensions:{{#each breakdownsService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
-        </div>
+        {{#if hasErrorsAggregates}}
+          <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
+            <a class="close" data-dismiss="alert" {{action "clearErrors" "aggregates"}}>&times;</a>
+            Could not load aggregates:{{#each aggregatesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+          </div>
+        {{/if}}
+
+        {{#if hasErrorsBreakdowns}}
+          <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
+            <a class="close" data-dismiss="alert" {{action "clearErrors" "breakdowns"}}>&times;</a>
+            Could not load dimensions:{{#each breakdownsService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+          </div>
+        {{/if}}
       {{/if}}
     {{/if}}
 
