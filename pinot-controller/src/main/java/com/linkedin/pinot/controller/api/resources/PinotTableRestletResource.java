@@ -254,7 +254,7 @@ public class PinotTableRestletResource {
   public SuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
       String tableConfigStr,
-      @ApiParam(value = "Whether to force to reload segments") @DefaultValue("false") @QueryParam("forceReload") Boolean forceReloadSegments)
+      @ApiParam(value = "Whether to reload segments right after config updated") @DefaultValue("false") @QueryParam("reload") boolean reload)
       throws Exception {
     TableConfig tableConfig;
     try {
@@ -299,7 +299,7 @@ public class PinotTableRestletResource {
 
     // Auto reload segments.
     StringBuilder successMessage = new StringBuilder("Table config updated for " + tableName);
-    if (forceReloadSegments != null && forceReloadSegments) {
+    if (reload) {
       autoReloadAllSegmentsForTable(tableConfig.getTableName(), successMessage);
     }
     return new SuccessResponse(successMessage.toString());

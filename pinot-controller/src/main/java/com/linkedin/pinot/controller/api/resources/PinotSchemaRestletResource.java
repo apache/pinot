@@ -124,8 +124,8 @@ public class PinotSchemaRestletResource {
   public SuccessResponse updateSchema(
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
       FormDataMultiPart multiPart,
-      @ApiParam(value = "Whether to force to reload segments") @DefaultValue("false") @QueryParam("forceReload") Boolean forceReload) {
-    return addOrUpdateSchema(schemaName, multiPart, forceReload);
+      @ApiParam(value = "Whether to reload segments right after schema updated") @DefaultValue("false") @QueryParam("reload") boolean reload) {
+    return addOrUpdateSchema(schemaName, multiPart, reload);
   }
 
   // TODO: This should not update if the schema already exists
@@ -159,7 +159,7 @@ public class PinotSchemaRestletResource {
    *                   not part of URI
    * @return
    */
-  private SuccessResponse addOrUpdateSchema(@Nullable String schemaName, FormDataMultiPart multiPart, Boolean forceReloadSegments) {
+  private SuccessResponse addOrUpdateSchema(@Nullable String schemaName, FormDataMultiPart multiPart, boolean reloadSegments) {
     final String schemaNameForLogging = (schemaName == null) ? "new schema" : schemaName + " schema";
     Schema schema = getSchemaFromMultiPart(multiPart);
     if (!schema.validate(LOGGER)) {
@@ -189,7 +189,7 @@ public class PinotSchemaRestletResource {
 
       // Auto reload segments.
       StringBuilder successMessage = new StringBuilder(schema.getSchemaName() + " successfully added");
-      if (forceReloadSegments != null && forceReloadSegments) {
+      if (reloadSegments) {
         autoReloadAllSegmentsForTable(schemaName, successMessage);
       }
       return new SuccessResponse(successMessage.toString());
@@ -220,14 +220,14 @@ public class PinotSchemaRestletResource {
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
 
     // for real-time table
-    String realTimeTableName = TableNameBuilder.forType(CommonConstants.Helix.TableType.REALTIME).tableNameWithType(schemaName);
+    String realTimeTableName = TableNameBuilder.REALTIME.tableNameWithType(schemaName);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(propertyStore, realTimeTableName);
     if (tableConfig != null) {
       tableNamesWithType.add(realTimeTableName);
     }
 
     // for offline table
-    String offlineTableName = TableNameBuilder.forType(CommonConstants.Helix.TableType.REALTIME).tableNameWithType(schemaName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(schemaName);
     tableConfig = ZKMetadataProvider.getTableConfig(propertyStore, offlineTableName);
     if (tableConfig != null) {
       tableNamesWithType.add(offlineTableName);
