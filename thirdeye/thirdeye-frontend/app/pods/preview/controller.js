@@ -30,15 +30,21 @@ const PREVIEW_DATE_FORMAT = 'MMM DD, hh:mm a';
 export default Controller.extend({
   detectionConfig: null,
 
+  detectionConfigName: null,
+
+  detectionConfigCron: null,
+
   metricUrn: null,
 
-  output: ['nothing here'],
+  output: 'nothing here',
+
+  anomalies: null,
 
   timeseries: null,
 
   baseline: null,
 
-  analysisRange: [moment().subtract(2, 'month').valueOf(), moment().valueOf()],
+  analysisRange: [moment().subtract(1, 'month').valueOf(), moment().valueOf()],
 
   compareMode: 'wo1w',
 
@@ -80,12 +86,18 @@ export default Controller.extend({
     }
   },
 
-  anomalies: computed('output', function () {
-    return this._filterAnomalies(get(this, 'output'));
-  }),
+  zoom: {
+    enabled: true,
+    rescale: true
+  },
 
   anomaliesGrouped: computed('anomalies', function () {
-    return this._groupByDimensions(get(this, 'anomalies'));
+    const anomalies = get(this, 'anomalies');
+    if (_.isEmpty(anomalies)) {
+      return {};
+    }
+
+    return this._groupByDimensions(anomalies);
   }),
 
   anomaliesGroupedFormatted: computed('anomaliesGrouped', function () {
@@ -190,6 +202,7 @@ export default Controller.extend({
     fetch(urlCurrent)
       .then(checkStatus)
       .then(res => set(this, 'timeseries', res))
+      .then(res => set(this, 'output', 'got timeseries'))
       .catch(err => set(this, 'errorTimeseries', err));
 
     set(this, 'errorBaseline', null);
@@ -199,6 +212,7 @@ export default Controller.extend({
     fetch(urlBaseline)
       .then(checkStatus)
       .then(res => set(this, 'baseline', res))
+      .then(res => set(this, 'output', 'got baseline'))
       .catch(err => set(this, 'errorBaseline', err));
   },
 
@@ -213,17 +227,36 @@ export default Controller.extend({
     fetch(url, { method: 'POST', body: jsonString })
       .then(checkStatus)
       .then(res => set(this, 'anomalies', this._filterAnomalies(res)))
+      .then(res => set(this, 'output', 'got anomalies'))
+      .catch(err => set(this, 'errorAnomalies', err));
+  },
+
+  _writeDetectionConfig() {
+    const detectionConfigBean = {
+      name: get(this, 'detectionConfigName'),
+      cron: get(this, 'detectionConfigCron'),
+      properties: JSON.parse(get(this, 'detectionConfig')),
+      lastTimestamp: 0
+    };
+
+    const jsonString = JSON.stringify(detectionConfigBean);
+
+    return fetch(`/thirdeye/entity?entityType=DETECTION_CONFIG`, { method: 'POST', body: jsonString })
+      .then(checkStatus)
+      .then(res => set(this, 'output', `saved '${detectionConfigBean.name}' as id ${res}`))
       .catch(err => set(this, 'errorAnomalies', err));
   },
 
   actions: {
     onPreview() {
-      set(this, 'output', ['loading ...']);
+      set(this, 'output', 'loading anomalies ...');
 
       this._fetchAnomalies();
     },
 
     onMetricChange(updates) {
+      set(this, 'output', 'fetching time series ...');
+
       const metricUrns = filterPrefix(Object.keys(updates), 'thirdeye:metric:');
 
       if (_.isEmpty(metricUrns)) { return; }
@@ -236,9 +269,17 @@ export default Controller.extend({
     },
 
     onCompareMode(compareMode) {
+      set(this, 'output', 'fetching time series ...');
+
       set(this, 'compareMode', compareMode);
 
       this._fetchTimeseries();
+    },
+
+    onSave() {
+      set(this, 'output', 'saving detection config ...');
+
+      this._writeDetectionConfig();
     }
   }
 });

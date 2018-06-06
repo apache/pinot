@@ -38,7 +38,18 @@
         series=series
         colorMapping=colorMapping
         axis=axis
+        zoom=zoom
       }}
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-xs-6">
+      <label>Name</label>{{input value=detectionConfigName}}
+      <label>Cron</label>{{input value=detectionConfigCron}}
+      <button onClick={{action "onSave"}}>save</button>
+    </div>
+    <div class="col-xs-6">
+      {{output}}
     </div>
   </div>
   <div class="row">
