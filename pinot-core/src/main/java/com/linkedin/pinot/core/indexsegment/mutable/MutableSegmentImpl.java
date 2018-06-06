@@ -406,7 +406,6 @@ public class MutableSegmentImpl implements MutableSegment {
         segmentStats.setMemUsedBytes(totalMemBytes);
         segmentStats.setNumSeconds(numSeconds);
         _statsHistory.addSegmentStats(segmentStats);
-        _statsHistory.save();
       }
     }
 

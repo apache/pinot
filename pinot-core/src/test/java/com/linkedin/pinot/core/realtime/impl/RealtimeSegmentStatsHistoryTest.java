@@ -66,8 +66,6 @@ public class RealtimeSegmentStatsHistoryTest {
       segmentStats.setColumnStats(columName, columnStats);
 
       history.addSegmentStats(segmentStats);
-
-      history.save();
     }
     {
       RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
@@ -100,7 +98,6 @@ public class RealtimeSegmentStatsHistoryTest {
         Assert.assertEquals(history.isFull(), false);
       }
       Assert.assertEquals(history.getArraySize(), maxNumEntries);
-      history.save();
       history.getEstimatedAvgColSize("0");
       history.getEstimatedCardinality("0");
     }
@@ -115,7 +112,6 @@ public class RealtimeSegmentStatsHistoryTest {
       Assert.assertEquals(history.isFull(), false);
       Assert.assertEquals(history.getArraySize(), maxNumEntries);
       Assert.assertEquals(history.getCursor(), prevMax-1);
-      history.save();
       // Add one segment
       addSegmentStats(segmentId++, history);
       Assert.assertEquals(history.isFull(), false);
@@ -124,7 +120,6 @@ public class RealtimeSegmentStatsHistoryTest {
       Assert.assertEquals(history.getCursor(), segmentId);
       history.getEstimatedAvgColSize("0");
       history.getEstimatedCardinality("0");
-      history.save();
     // Now add 2 more segments for it to go over.
       addSegmentStats(segmentId++, history);
       Assert.assertEquals(history.isFull(), false);
@@ -133,7 +128,6 @@ public class RealtimeSegmentStatsHistoryTest {
       Assert.assertEquals(history.getCursor(), segmentId);
       history.getEstimatedAvgColSize("0");
       history.getEstimatedCardinality("0");
-      history.save();
 
       addSegmentStats(segmentId++, history);
       Assert.assertEquals(history.isFull(), true);
@@ -141,7 +135,6 @@ public class RealtimeSegmentStatsHistoryTest {
       Assert.assertEquals(history.getCursor(), 0);
       history.getEstimatedAvgColSize("0");
       history.getEstimatedCardinality("0");
-      history.save();
 
       // And then one more to bump the cursor.
 
@@ -150,7 +143,6 @@ public class RealtimeSegmentStatsHistoryTest {
       Assert.assertEquals(history.getArraySize(), maxNumEntries);
       Assert.assertEquals(history.getCursor(), 1);
       // Rewrite the history file
-      history.save();
       history.getEstimatedAvgColSize("0");
       history.getEstimatedCardinality("0");
     }
@@ -164,8 +156,9 @@ public class RealtimeSegmentStatsHistoryTest {
       Assert.assertEquals(history.isFull(), true);
       Assert.assertEquals(history.getArraySize(), maxNumEntries);
       Assert.assertEquals(history.getCursor(), 0);
+      // Force a save by calling addSegmentStats
+      addSegmentStats(segmentId++, history);
 
-      history.save();
       history.getEstimatedAvgColSize("0");
       history.getEstimatedCardinality("0");
     }
@@ -192,7 +185,6 @@ public class RealtimeSegmentStatsHistoryTest {
       Assert.assertEquals(history.getEstimatedCardinality("new"), RealtimeSegmentStatsHistory.getDefaultEstCardinality());
       savedIsFull = history.isFull();
       savedCursor = history.getCursor();
-      history.save();
     }
     {
       RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
@@ -289,7 +281,6 @@ public class RealtimeSegmentStatsHistoryTest {
         segmentStats.setColumnStats(COL2, columnStats);
 
         _statsHistory.addSegmentStats(segmentStats);
-        _statsHistory.save();
       }
     }
   }
