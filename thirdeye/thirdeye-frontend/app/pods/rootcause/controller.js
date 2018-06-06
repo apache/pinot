@@ -40,6 +40,7 @@ const ROOTCAUSE_SERVICE_TIMESERIES = 'timeseries';
 const ROOTCAUSE_SERVICE_AGGREGATES = 'aggregates';
 const ROOTCAUSE_SERVICE_BREAKDOWNS = 'breakdowns';
 const ROOTCAUSE_SERVICE_ANOMALY_FUNCTIONS = 'anomalyFunctions';
+const ROOTCAUSE_SERVICE_ALL = 'all';
 
 const ROOTCAUSE_SESSION_TIMER_INTERVAL = 300000;
 
@@ -169,6 +170,12 @@ export default Controller.extend({
    * @type {boolean}
    */
   setupMode: ROOTCAUSE_SETUP_MODE_NONE,
+
+  /**
+   * toggle for displaying verbose error messages
+   * @type {boolean}
+   */
+  verbose: false,
 
   //
   // session data
@@ -1072,6 +1079,14 @@ export default Controller.extend({
 
         case ROOTCAUSE_SERVICE_ROUTE:
           this.setProperties({ routeErrors: new Set() });
+          break;
+
+        case ROOTCAUSE_SERVICE_ALL:
+          entitiesService.clearErrors();
+          timeseriesService.clearErrors();
+          aggregatesService.clearErrors();
+          breakdownsService.clearErrors();
+          anomalyFunctionService.clearErrors();
           break;
 
       }
