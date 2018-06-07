@@ -1141,7 +1141,7 @@ public class AnomaliesResource {
     if (Double.isInfinite(aggregate.getDouble(COL_VALUE, 0))) {
       return String.valueOf(Double.NaN);
     }
-    return String.format("%6f", aggregate.getDouble(COL_VALUE, 0));
+    return formatDoubleValue(aggregate.getDouble(COL_VALUE, 0));
   }
 
   private static List<String> makeStringValues(DoubleSeries timeseries) {
@@ -1152,7 +1152,7 @@ public class AnomaliesResource {
         continue;
       }
 
-      dates.add(String.format("%6f", value));
+      dates.add(formatDoubleValue(value));
     }
     return dates;
   }
@@ -1163,6 +1163,19 @@ public class AnomaliesResource {
       dates.add(timeSeriesDateFormatter.print(timestamp));
     }
     return dates;
+  }
+
+  private static String formatDoubleValue(double value) {
+    if (Double.isInfinite(value) || Double.isNaN(value)) {
+      return String.valueOf(Double.NaN);
+    }
+    if (Math.abs(value) >= 1000) {
+      return String.format("%.0f", value);
+    }
+    if (Math.abs(value) >= 0.001) {
+      return String.format("%.3f", value);
+    }
+    return String.valueOf(value);
   }
 
   /**
