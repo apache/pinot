@@ -45,6 +45,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -122,9 +123,9 @@ public class DetectionAlertTaskRunner implements TaskRunner {
   }
 
   private void sendEmail(DetectionAlertFilterResult detectionResult) throws Exception {
-    for (Map.Entry<List<MergedAnomalyResultDTO>, List<String>> entry : detectionResult.getResult().entrySet()) {
-      List<String> recipients = entry.getValue();
-      List<MergedAnomalyResultDTO> anomalies = entry.getKey();
+    for (Map.Entry<Set<String>, Set<MergedAnomalyResultDTO>> entry : detectionResult.getResult().entrySet()) {
+      Set<String> recipients = entry.getKey();
+      Set<MergedAnomalyResultDTO> anomalies = entry.getValue();
 
       EmailContentFormatter emailContentFormatter =
           EmailContentFormatterFactory.fromClassName(DEFAULT_EMAIL_FORMATTER_TYPE);

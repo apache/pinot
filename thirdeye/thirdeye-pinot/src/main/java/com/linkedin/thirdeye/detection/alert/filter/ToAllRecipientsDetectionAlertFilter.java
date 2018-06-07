@@ -12,10 +12,12 @@ import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,22 +31,19 @@ public class ToAllRecipientsDetectionAlertFilter extends DetectionAlertFilter {
   private static final String PROP_RECIPIENTS = "recipients";
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
 
-  List<String> recipients;
+  Set<String> recipients;
   List<Long> detectionConfigIds;
   Map<Long, Long> vectorClocks;
 
   public ToAllRecipientsDetectionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
     super(provider, config, endTime);
     Preconditions.checkNotNull(config.getProperties().get(PROP_RECIPIENTS), "Recipients not found.");
-    Preconditions.checkArgument(config.getProperties().get(PROP_RECIPIENTS) instanceof List, "Read recipients failed.");
-    Preconditions.checkNotNull(config.getProperties().get(PROP_DETECTION_CONFIG_IDS),
-        "Detection config ids not found.");
-    Preconditions.checkArgument(config.getProperties().get(PROP_DETECTION_CONFIG_IDS) instanceof List,
-        "Read detection config ids failed.");
+    Preconditions.checkArgument(config.getProperties().get(PROP_RECIPIENTS) instanceof Collection, "Read recipients failed.");
+    Preconditions.checkNotNull(config.getProperties().get(PROP_DETECTION_CONFIG_IDS), "Detection config ids not found.");
+    Preconditions.checkArgument(config.getProperties().get(PROP_DETECTION_CONFIG_IDS) instanceof Collection, "Read detection config ids failed.");
 
-    this.recipients = new ArrayList<>((Collection<String>) this.config.getProperties().get(PROP_RECIPIENTS));
-    this.detectionConfigIds =
-        extractLongs((Collection<Number>) this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
+    this.recipients = new HashSet<>((Collection<String>) this.config.getProperties().get(PROP_RECIPIENTS));
+    this.detectionConfigIds = extractLongs((Collection<Number>) this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
     this.vectorClocks = this.config.getVectorClocks();
   }
 
@@ -53,38 +52,30 @@ public class ToAllRecipientsDetectionAlertFilter extends DetectionAlertFilter {
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
 
     for (Long detectionConfigId : this.detectionConfigIds) {
-      Long startTime = this.vectorClocks.get(detectionConfigId);
-      if (startTime == null) {
-        LOG.warn(String.format("Missing vector clock for detection %d", detectionConfigId));
-        startTime = 0L;
-      }
+      long startTime = MapUtils.getLong(this.vectorClocks, detectionConfigId, 0L);
 
-      List<MergedAnomalyResultDTO> candidates = new ArrayList<>();
-      AnomalySlice slice =
-          new AnomalySlice().withConfigId(detectionConfigId).withStart(startTime).withEnd(this.endTime);
-      candidates.addAll(this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice));
+      AnomalySlice slice = new AnomalySlice().withConfigId(detectionConfigId).withStart(startTime).withEnd(this.endTime);
+      Collection<MergedAnomalyResultDTO> candidates = this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice);
 
-      List<MergedAnomalyResultDTO> anomalies =
-          new ArrayList<>(Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
+      Collection<MergedAnomalyResultDTO> anomalies =
+          Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
             @Override
             public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomalyResultDTO) {
               return mergedAnomalyResultDTO != null && !mergedAnomalyResultDTO.isChild();
             }
-          }));
+          });
 
-      if (CollectionUtils.isNotEmpty(anomalies)) {
-        Collections.sort(anomalies);
-        result.addMapping(anomalies, this.recipients);
-        this.vectorClocks.put(detectionConfigId, getLastTimeStamp(anomalies));
-      }
+      result.addMapping(this.recipients, new HashSet<>(anomalies));
+
+      this.vectorClocks.put(detectionConfigId, getLastTimeStamp(anomalies));
     }
 
     result.setVectorClocks(this.vectorClocks);
     return result;
   }
 
-  private Long getLastTimeStamp(List<MergedAnomalyResultDTO> anomalies){
-    long lastTimeStamp = 0;
+  private Long getLastTimeStamp(Collection<MergedAnomalyResultDTO> anomalies){
+    long lastTimeStamp = -1;
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       lastTimeStamp = Math.max(anomaly.getEndTime(), lastTimeStamp);
     }

@@ -3,10 +3,11 @@ package com.linkedin.thirdeye.detection.alert;
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 
 /**
@@ -16,7 +17,7 @@ public class DetectionAlertFilterResult {
   /**
    * The Result.
    */
-  private Map<List<MergedAnomalyResultDTO>, List<String>> result;
+  private Map<Set<String>, Set<MergedAnomalyResultDTO>> result;
 
   Map<Long, Long> vectorClocks;
   /**
@@ -40,7 +41,7 @@ public class DetectionAlertFilterResult {
    * @param result the result
    * @param lastTimestamp the last timestamp
    */
-  public DetectionAlertFilterResult(Map<List<MergedAnomalyResultDTO>, List<String>> result, long lastTimestamp) {
+  public DetectionAlertFilterResult(Map<Set<String>, Set<MergedAnomalyResultDTO>> result, long lastTimestamp) {
     Preconditions.checkNotNull(result);
     this.result = result;
   }
@@ -50,7 +51,7 @@ public class DetectionAlertFilterResult {
    *
    * @return the result
    */
-  public Map<List<MergedAnomalyResultDTO>, List<String>> getResult() {
+  public Map<Set<String>, Set<MergedAnomalyResultDTO>> getResult() {
     return result;
   }
 
@@ -61,7 +62,7 @@ public class DetectionAlertFilterResult {
    */
   public List<MergedAnomalyResultDTO> getAllAnomalies() {
     List<MergedAnomalyResultDTO> allAnomalies = new ArrayList<>();
-    for (List<MergedAnomalyResultDTO> anomalies : result.keySet()) {
+    for (Set<MergedAnomalyResultDTO> anomalies : result.values()) {
       allAnomalies.addAll(anomalies);
     }
     return allAnomalies;
@@ -70,15 +71,15 @@ public class DetectionAlertFilterResult {
   /**
    * Add a mapping from anomalies to recipients in this detection alert filter result.
    *
-   * @param anomalies the anomalies
    * @param recipients the recipients
+   * @param anomalies the anomalies
    * @return the detection alert filter result
    */
-  public DetectionAlertFilterResult addMapping(List<MergedAnomalyResultDTO> anomalies, Collection<String> recipients) {
-    if (!this.result.containsKey(anomalies)) {
-      this.result.put(anomalies, new ArrayList<String>());
+  public DetectionAlertFilterResult addMapping(Set<String> recipients, Set<MergedAnomalyResultDTO> anomalies) {
+    if (!this.result.containsKey(recipients)) {
+      this.result.put(recipients, new HashSet<MergedAnomalyResultDTO>());
     }
-    this.result.get(anomalies).addAll(recipients);
+    this.result.get(recipients).addAll(anomalies);
     return this;
   }
 }

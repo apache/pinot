@@ -36,4 +36,7 @@ public class DetectionTestUtils {
     return DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, start, end, null, null, dimensions);
   }
 
+  public static MergedAnomalyResultDTO makeAnomaly(Long configId, long start, long end, Map<String, String> dimensions) {
+    return DetectionTestUtils.makeAnomaly(configId, start, end, null, null, dimensions);
+  }
 }
