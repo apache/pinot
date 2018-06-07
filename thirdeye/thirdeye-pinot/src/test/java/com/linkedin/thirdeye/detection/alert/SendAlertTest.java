@@ -2,7 +2,8 @@ package com.linkedin.thirdeye.detection.alert;
 
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
+import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoader;
+import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.DefaultAggregationLoader;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -20,6 +21,7 @@ import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.datasource.csv.CSVThirdEyeDataSource;
+import com.linkedin.thirdeye.detection.CurrentAndBaselineLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -143,21 +145,5 @@ public class SendAlertTest {
     Assert.assertTrue(alert.getVectorClocks().get(this.detectionConfigId) == 2000L);
   }
 
-  @Test
-  public void testfillInCurrentAndBaselineValue() throws Exception {
-    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-    MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
-    anomaly.setMetric(METRIC_VALUE);
-    anomaly.setCollection(COLLECTION_VALUE);
-    anomaly.setStartTime(1527019478000L);
-    anomaly.setEndTime(1527023078000L);
 
-    anomalies.add(anomaly);
-
-    taskRunner.fillInCurrentAndBaselineValue(anomalies);
-
-    Assert.assertEquals(anomaly.getAvgBaselineVal(), 100.0);
-    Assert.assertEquals(anomaly.getAvgCurrentVal(), 200.0);
-
-  }
 }

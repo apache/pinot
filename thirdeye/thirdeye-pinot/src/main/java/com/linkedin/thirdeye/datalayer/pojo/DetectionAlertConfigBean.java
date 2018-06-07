@@ -19,6 +19,7 @@ public class DetectionAlertConfigBean extends AbstractBean {
   String name;
   String fromAddress;
   String cronExpression;
+  String application;
 
   Map<Long, Long> vectorClocks;
   Map<String, Object> properties;
@@ -69,6 +70,14 @@ public class DetectionAlertConfigBean extends AbstractBean {
 
   public void setVectorClocks(Map<Long, Long> vectorClocks) {
     this.vectorClocks = vectorClocks;
+  }
+
+  public String getApplication() {
+    return application;
+  }
+
+  public void setApplication(String application) {
+    this.application = application;
   }
 
   @Override

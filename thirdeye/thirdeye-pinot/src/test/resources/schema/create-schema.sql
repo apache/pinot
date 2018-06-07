@@ -378,6 +378,7 @@ create index detection_config_name_idx ON detection_config_index(`name`);
 
 create table if not exists detection_alert_config_index (
     base_id bigint(20) not null,
+    application VARCHAR(128),
     `name` VARCHAR(256) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
