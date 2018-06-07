@@ -7,6 +7,9 @@ import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.DefaultAggregati
 import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.DefaultTimeSeriesLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.TimeSeriesLoader;
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DoubleSeries;
+import com.linkedin.thirdeye.dataframe.LongSeries;
+import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -20,6 +23,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -108,6 +112,8 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 @Path(value = "/anomalies")
 @Produces(MediaType.APPLICATION_JSON)
 public class AnomaliesResource {
+  private static final String COL_CURRENT = "current";
+  private static final String COL_BASELINE = "baseline";
 
   private static final Logger LOG = LoggerFactory.getLogger(AnomaliesResource.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -648,19 +654,27 @@ public class AnomaliesResource {
   /**
    * Constructs AnomaliesWrapper object from a list of merged anomalies
    */
-  private AnomaliesWrapper constructAnomaliesWrapperFromMergedAnomalies(List<MergedAnomalyResultDTO> anomalies,
+  private AnomaliesWrapper constructAnomaliesWrapperFromMergedAnomalies(List<MergedAnomalyResultDTO> mergedAnomalies,
       String searchFiltersJSON, int pageNumber, boolean filterOnly) throws ExecutionException {
-    List<MergedAnomalyResultDTO> mergedAnomalies = anomalies;
 
     AnomaliesWrapper anomaliesWrapper = new AnomaliesWrapper();
 
-    //filter the anomalies
-    if (searchFiltersJSON != null) {
-      SearchFilters searchFilters = SearchFilters.fromJSON(searchFiltersJSON);
-      if (searchFilters != null) {
-        mergedAnomalies = SearchFilters.applySearchFilters(anomalies, searchFilters);
+    // remove child anomalies
+    Iterator<MergedAnomalyResultDTO> itAnomaly = mergedAnomalies.iterator();
+    while (itAnomaly.hasNext()) {
+      if (itAnomaly.next().isChild()) {
+        itAnomaly.remove();
       }
     }
+
+    //filter the anomalies
+    SearchFilters searchFilters = new SearchFilters();
+    if (searchFiltersJSON != null) {
+      searchFilters = SearchFilters.fromJSON(searchFiltersJSON);
+    }
+
+    mergedAnomalies = SearchFilters.applySearchFilters(mergedAnomalies, searchFilters);
+
     //set the search filters
     anomaliesWrapper.setSearchFilters(SearchFilters.fromAnomalies(mergedAnomalies));
     anomaliesWrapper.setTotalAnomalies(mergedAnomalies.size());
@@ -1095,15 +1109,20 @@ public class AnomaliesResource {
 
     MetricSlice sliceViewCurrent = sliceAnomalyCurrent
         .withStart(new DateTime(sliceAnomalyCurrent.getStart(), dataTimeZone).minus(offsets.getPreOffsetPeriod()).getMillis())
-        .withEnd(new DateTime(sliceAnomalyCurrent.getEnd(), dataTimeZone).plus(offsets.getPreOffsetPeriod()).getMillis());
+        .withEnd(new DateTime(sliceAnomalyCurrent.getEnd(), dataTimeZone).plus(offsets.getPostOffsetPeriod()).getMillis());
     MetricSlice sliceViewBaseline = baseline.scatter(sliceViewCurrent).get(0);
 
     DataFrame dfCurrent = this.timeSeriesLoader.load(sliceViewCurrent);
-    DataFrame dfBaseline = this.timeSeriesLoader.load(sliceViewBaseline);
 
-    details.setDates(makeStringDates(dfCurrent));
-    details.setCurrentValues(makeStringValues(dfCurrent));
-    details.setBaselineValues(makeStringValues(dfBaseline));
+    DataFrame dfBaseline = this.timeSeriesLoader.load(sliceViewBaseline);
+    dfBaseline = baseline.gather(sliceViewCurrent, Collections.singletonMap(sliceViewBaseline, dfBaseline));
+
+    DataFrame dfAligned = dfCurrent.renameSeries(COL_VALUE, COL_CURRENT).joinOuter(
+        dfBaseline.renameSeries(COL_VALUE, COL_BASELINE));
+
+    details.setDates(makeStringDates(dfAligned.getLongs(COL_TIME)));
+    details.setCurrentValues(makeStringValues(dfAligned.getDoubles(COL_CURRENT)));
+    details.setBaselineValues(makeStringValues(dfAligned.getDoubles(COL_BASELINE)));
 
     details.setTimeUnit(dataTimeUnit.toString());
     details.setCurrentStart(getFormattedDateTime(anomaly.getStartTime(), dataset));
@@ -1119,20 +1138,28 @@ public class AnomaliesResource {
     if (aggregate.get(COL_VALUE).isNull(0)) {
       return String.valueOf(Double.NaN);
     }
+    if (Double.isInfinite(aggregate.getDouble(COL_VALUE, 0))) {
+      return String.valueOf(Double.NaN);
+    }
     return String.format("%6f", aggregate.getDouble(COL_VALUE, 0));
   }
 
-  private static List<String> makeStringValues(DataFrame timeseries) {
+  private static List<String> makeStringValues(DoubleSeries timeseries) {
     List<String> dates = new ArrayList<>();
-    for (Double value : timeseries.getDoubles(COL_VALUE).toList()) {
+    for (Double value : timeseries.toList()) {
+      if (value == null) {
+        dates.add(String.valueOf(Double.NaN));
+        continue;
+      }
+
       dates.add(String.format("%6f", value));
     }
     return dates;
   }
 
-  private static List<String> makeStringDates(DataFrame timeseries) {
+  private static List<String> makeStringDates(LongSeries timeseries) {
     List<String> dates = new ArrayList<>();
-    for (Long timestamp : timeseries.getLongs(COL_TIME).toList()) {
+    for (Long timestamp : timeseries.toList()) {
       dates.add(timeSeriesDateFormatter.print(timestamp));
     }
     return dates;

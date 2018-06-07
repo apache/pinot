@@ -149,7 +149,13 @@ public class SearchFilters {
       }
       passed = passed && checkFilter(feedbackFilterMap, status);
       // check status filter
-      String functionName = mergedAnomalyResultDTO.getFunction().getFunctionName();
+      String functionName = "unknown";
+      if (mergedAnomalyResultDTO.getFunction() != null) {
+        functionName = mergedAnomalyResultDTO.getFunction().getFunctionName();
+      }
+      if (mergedAnomalyResultDTO.getDetectionConfigId() != null) {
+        functionName = String.format("DetectionConfig %d", mergedAnomalyResultDTO.getDetectionConfigId());
+      }
       passed = passed && checkFilter(functionFilterMap, functionName);
       // check datasetFilterMap
       String dataset = mergedAnomalyResultDTO.getCollection();
