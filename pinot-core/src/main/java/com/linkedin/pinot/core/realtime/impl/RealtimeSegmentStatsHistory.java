@@ -34,7 +34,15 @@ import org.slf4j.LoggerFactory;
 
 
 /*
- * Keeps history of statistics for segments consumed from kafka for a single table.
+ * Keeps history of statistics for segments consumed from realtime stream for a single table.
+ * The approach is to keep a circular buffer of statistics for the last MAX_NUM_ENTRIES segments.
+ * Each instance of the object is associated with a file. The expected usage is that there is one
+ * file (and one instance of RealtimeSegmentStatsHistory) per table, all consuming partitions for that
+ * table share the same instance of RealtimeSegmentStatsHistory object and call addSegmentStats when
+ * they destroy a consuming segment.
+ *
+ * Methods to add/get statistics are synchronized so that access from multiple consuming threads
+ * are protected.
  */
 public class RealtimeSegmentStatsHistory implements Serializable {
   public static Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentStatsHistory.class);
@@ -57,6 +65,8 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   // Not to be serialized
   transient int _arraySize;
   transient File _historyFile;
+  transient long _minIntervalBetweenUpdatesMillis = 0;
+  transient long _lastUpdateTimeMillis = 0;
 
   @VisibleForTesting
   public static int getMaxNumEntries() {
@@ -233,12 +243,25 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     return getNumntriesToScan() == 0;
   }
 
+  public synchronized void setMinIntervalBetweenUpdatesMillis(long millis) {
+    _minIntervalBetweenUpdatesMillis = millis;
+  }
+
   public synchronized void addSegmentStats(SegmentStats segmentStats) {
+    if (_minIntervalBetweenUpdatesMillis > 0) {
+      long now = System.currentTimeMillis();
+      if (now - _lastUpdateTimeMillis < _minIntervalBetweenUpdatesMillis) {
+        return;
+      }
+      _lastUpdateTimeMillis = now;
+    }
+
     _entries[_cursor] = segmentStats;
-    if (_cursor >= _arraySize -1) {
+    if (_cursor >= _arraySize - 1) {
       _isFull = true;
     }
     _cursor = (_cursor + 1) % _arraySize;
+    save();
   }
 
   /**
@@ -327,7 +350,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     return "cursor=" + getCursor() + ",numEntries=" + getArraySize() + ",isFull=" + isFull();
   }
 
-  public synchronized void save() {
+  private void save() {
     try (OutputStream os = new FileOutputStream(new File(_historyFilePath));
         ObjectOutputStream obos = new ObjectOutputStream(os)
     ) {

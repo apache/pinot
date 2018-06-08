@@ -13,11 +13,11 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -76,7 +76,7 @@ public class AutoOnboardPinotMetricsServiceTest {
     }
   }
 
-  @Test
+  @Test (dependsOnMethods={"testAddNewDataset"})
   public void testRefreshDataset() throws Exception {
     DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
     DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("newDimension", DataType.STRING, true);
@@ -116,5 +116,12 @@ public class AutoOnboardPinotMetricsServiceTest {
       Assert.assertTrue(datasetCustomConfigs.containsKey(configKey));
       Assert.assertEquals(datasetCustomConfigs.get(configKey), configValue);
     }
+  }
+
+  @Test (dependsOnMethods={"testRefreshDataset"})
+  public void testRemoveDataset() throws Exception {
+    Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
+    testAutoLoadPinotMetricsService.removeDeletedDataset(Collections.<String>emptyList());
+    Assert.assertEquals(datasetConfigDAO.findAll().size(), 0);
   }
 }

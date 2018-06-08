@@ -71,6 +71,7 @@ public class UserDashboardResource {
    *     "current" : 1213.0,
    *     "baseline" : 550.0,
    *     "feedback" : "NO_FEEDBACK",
+   *     "comment": "",
    *     "metricId" : 12346
    *     "metric" : "page_views",
    *     "metricUrn" : "thirdeye:metric:12345:country%3Dus"
@@ -230,8 +231,10 @@ public class UserDashboardResource {
       }
 
       summary.setFeedback(AnomalyFeedbackType.NO_FEEDBACK);
+      summary.setComment("");
       if (anomaly.getFeedback() != null) {
         summary.setFeedback(anomaly.getFeedback().getFeedbackType());
+        summary.setComment(anomaly.getFeedback().getComment());
       }
 
       output.add(summary);

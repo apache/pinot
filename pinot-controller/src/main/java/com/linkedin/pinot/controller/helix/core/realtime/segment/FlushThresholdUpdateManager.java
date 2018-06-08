@@ -59,6 +59,10 @@ public class FlushThresholdUpdateManager {
     }
   }
 
+  public void clearFlushThresholdUpdater(TableConfig tableConfig) {
+    _flushThresholdUpdaterMap.remove(tableConfig.getTableName());
+  }
+
   /**
    * Returns the max number of rows that a host holds across all consuming LLC partitions.
    * This number should be divided by the number of partitions on the host, so as to get

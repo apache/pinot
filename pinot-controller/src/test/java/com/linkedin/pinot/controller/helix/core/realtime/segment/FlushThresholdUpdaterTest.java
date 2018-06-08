@@ -443,4 +443,90 @@ public class FlushThresholdUpdaterTest {
     flushThresholdUpdater.updateFlushThreshold(metadata2, metadata1, committingSegmentDescriptor, null);
     Assert.assertTrue(metadata2.getSizeThresholdToFlushSegment() != metadata1.getSizeThresholdToFlushSegment());
   }
+
+  @Test
+  public void testMinThreshold() {
+    String tableName = "fakeTable_REALTIME";
+    final int partitionId = 0;
+    int seqNum = 0;
+    long startOffset = 0;
+    long committingSegmentSizeBytes;
+    CommittingSegmentDescriptor committingSegmentDescriptor;
+    long now = System.currentTimeMillis();
+    long seg0time = now - 1334_650;
+    long seg1time = seg0time + 14_000;
+
+    // initial segment consumes only 15 rows, so next segment has 10k rows min.
+    LLCSegmentName seg0SegmentName = new LLCSegmentName(tableName, partitionId, seqNum, seg0time);
+    LLCRealtimeSegmentZKMetadata metadata0 = getNextSegmentMetadata(tableName, startOffset, partitionId, seqNum++);
+    metadata0.setSegmentName(seg0SegmentName.getSegmentName());
+    SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
+    committingSegmentDescriptor = new CommittingSegmentDescriptor(seg0SegmentName.getSegmentName(), startOffset, 10_000);
+    metadata0.setTotalRawDocs(15);
+    metadata0.setCreationTime(seg0time);
+    metadata0.setSizeThresholdToFlushSegment(874_990);
+    LLCSegmentName seg1SegmentName = new LLCSegmentName(tableName, partitionId, seqNum+1, seg1time);
+    LLCRealtimeSegmentZKMetadata metadata1 = new LLCRealtimeSegmentZKMetadata();
+    metadata1.setSegmentName(seg1SegmentName.getSegmentName());
+    metadata1.setCreationTime(seg1time);
+    flushThresholdUpdater.updateFlushThreshold(metadata1, metadata0, committingSegmentDescriptor, null);
+    Assert.assertEquals(metadata1.getSizeThresholdToFlushSegment(), flushThresholdUpdater.getMinimumNumRowsThreshold());
+
+    // seg1 also consumes 20 rows, so seg2 also gets 10k as threshold.
+    LLCSegmentName seg2SegmentName = new LLCSegmentName(tableName, partitionId, seqNum+2, now);
+    LLCRealtimeSegmentZKMetadata metadata2 = new LLCRealtimeSegmentZKMetadata();
+    metadata2.setSegmentName(seg2SegmentName.getSegmentName());
+    metadata2.setStartTime(now);
+    committingSegmentDescriptor = new CommittingSegmentDescriptor(seg1SegmentName.getSegmentName(), startOffset+1000, 14_000);
+    metadata1.setTotalRawDocs(25);
+    flushThresholdUpdater.updateFlushThreshold(metadata2, metadata1, committingSegmentDescriptor, null);
+    Assert.assertEquals(metadata2.getSizeThresholdToFlushSegment(), flushThresholdUpdater.getMinimumNumRowsThreshold());
+  }
+
+  @Test
+  public void testNonZeroPartitionUpdates() {
+    String tableName = "fakeTable_REALTIME";
+    int seqNum = 0;
+    long startOffset = 0;
+    long committingSegmentSizeBytes;
+    CommittingSegmentDescriptor committingSegmentDescriptor;
+    long now = System.currentTimeMillis();
+    long seg0time = now - 1334_650;
+    long seg1time = seg0time + 14_000;
+    SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
+
+    // Initial update is from partition 1
+    LLCSegmentName seg0SegmentName = new LLCSegmentName(tableName, 1, seqNum, seg0time);
+    LLCRealtimeSegmentZKMetadata metadata0 = getNextSegmentMetadata(tableName, startOffset, 1, seqNum++);
+    metadata0.setSegmentName(seg0SegmentName.getSegmentName());
+    committingSegmentDescriptor = new CommittingSegmentDescriptor(seg0SegmentName.getSegmentName(), startOffset, 3_110_000);
+    metadata0.setTotalRawDocs(1_234_000);
+    metadata0.setCreationTime(seg0time);
+    metadata0.setSizeThresholdToFlushSegment(874_990);
+    LLCSegmentName seg1SegmentName = new LLCSegmentName(tableName, 1, seqNum+1, seg1time);
+    LLCRealtimeSegmentZKMetadata metadata1 = new LLCRealtimeSegmentZKMetadata();
+    metadata1.setSegmentName(seg1SegmentName.getSegmentName());
+    metadata1.setCreationTime(seg1time);
+    Assert.assertEquals(flushThresholdUpdater.getLatestSegmentRowsToSizeRatio(), 0.0);
+    flushThresholdUpdater.updateFlushThreshold(metadata1, metadata0, committingSegmentDescriptor, null);
+    final double currentRatio = flushThresholdUpdater.getLatestSegmentRowsToSizeRatio();
+    Assert.assertTrue(currentRatio > 0.0);
+
+    // Next segment update from partition 1 does not change the ratio.
+
+    LLCSegmentName seg2SegmentName = new LLCSegmentName(tableName, 1, seqNum+2, now);
+    LLCRealtimeSegmentZKMetadata metadata2 = new LLCRealtimeSegmentZKMetadata();
+    metadata2.setSegmentName(seg2SegmentName.getSegmentName());
+    metadata2.setStartTime(now);
+    committingSegmentDescriptor = new CommittingSegmentDescriptor(seg1SegmentName.getSegmentName(), startOffset+1000, 256_000_000);
+    metadata1.setTotalRawDocs(2_980_880);
+    flushThresholdUpdater.updateFlushThreshold(metadata2, metadata1, committingSegmentDescriptor, null);
+    Assert.assertEquals(flushThresholdUpdater.getLatestSegmentRowsToSizeRatio(), currentRatio);
+
+    // But if seg1 is from partition 0, the ratio is changed.
+    seg1SegmentName = new LLCSegmentName(tableName, 0, seqNum+1, seg1time);
+    metadata1.setSegmentName(seg1SegmentName.getSegmentName());
+    flushThresholdUpdater.updateFlushThreshold(metadata2, metadata1, committingSegmentDescriptor, null);
+    Assert.assertTrue(flushThresholdUpdater.getLatestSegmentRowsToSizeRatio() != currentRatio);
+  }
 }

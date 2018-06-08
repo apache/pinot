@@ -31,7 +31,6 @@ import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.helix.HelixAdmin;
@@ -98,72 +97,6 @@ public class PinotTableIdealStateBuilder {
     state.setPartitionState(segmentId, instanceName, ONLINE);
     state.setNumPartitions(state.getNumPartitions() + 1);
     return state;
-  }
-
-  /**
-   * Remove a segment is also required to recompute the ideal state.
-   *
-   * @param tableName
-   * @param segmentId
-   * @param helixAdmin
-   * @param helixClusterName
-   * @return
-   */
-  public synchronized static IdealState dropSegmentFromIdealStateFor(String tableName, String segmentId,
-      HelixAdmin helixAdmin, String helixClusterName) {
-
-    final IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, tableName);
-    final Set<String> currentInstanceSet = currentIdealState.getInstanceSet(segmentId);
-    if (!currentInstanceSet.isEmpty() && currentIdealState.getPartitionSet().contains(segmentId)) {
-      for (String instanceName : currentIdealState.getInstanceSet(segmentId)) {
-        currentIdealState.setPartitionState(segmentId, instanceName, "DROPPED");
-      }
-    } else {
-      throw new RuntimeException("Cannot found segmentId - " + segmentId + " in table - " + tableName);
-    }
-    return currentIdealState;
-  }
-
-  /**
-   * Remove a segment is also required to recompute the ideal state.
-   *
-   * @param tableName
-   * @param segmentId
-   * @param helixAdmin
-   * @param helixClusterName
-   * @return
-   */
-  public synchronized static IdealState removeSegmentFromIdealStateFor(String tableName, String segmentId,
-      HelixAdmin helixAdmin, String helixClusterName) {
-
-    final IdealState currentIdealState = helixAdmin.getResourceIdealState(helixClusterName, tableName);
-    if (currentIdealState != null && currentIdealState.getPartitionSet() != null
-        && currentIdealState.getPartitionSet().contains(segmentId)) {
-      currentIdealState.getPartitionSet().remove(segmentId);
-    } else {
-      throw new RuntimeException("Cannot found segmentId - " + segmentId + " in table - " + tableName);
-    }
-    return currentIdealState;
-  }
-
-  /**
-   *
-   * @param brokerResourceName
-   * @param helixAdmin
-   * @param helixClusterName
-   * @return
-   */
-  public static IdealState removeBrokerResourceFromIdealStateFor(String brokerResourceName, HelixAdmin helixAdmin,
-      String helixClusterName) {
-    final IdealState currentIdealState =
-        helixAdmin.getResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    final Set<String> currentInstanceSet = currentIdealState.getInstanceSet(brokerResourceName);
-    if (!currentInstanceSet.isEmpty() && currentIdealState.getPartitionSet().contains(brokerResourceName)) {
-      currentIdealState.getPartitionSet().remove(brokerResourceName);
-    } else {
-      throw new RuntimeException("Cannot found broker resource - " + brokerResourceName + " in broker resource ");
-    }
-    return currentIdealState;
   }
 
   public static IdealState buildInitialHighLevelRealtimeIdealStateFor(String realtimeTableName,

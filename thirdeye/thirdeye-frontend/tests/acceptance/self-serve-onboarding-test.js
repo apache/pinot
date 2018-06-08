@@ -3,7 +3,7 @@ import moment from 'moment';
 import { module, test } from 'qunit';
 import { setupApplicationTest } from 'ember-qunit';
 import { selfServeConst, selfServeSettings, optionsToString } from 'thirdeye-frontend/tests/utils/constants';
-import { visit, fillIn, click, currentURL, triggerKeyEvent, waitUntil } from '@ember/test-helpers';
+import { visit, fillIn, click, currentURL, triggerKeyEvent, waitFor } from '@ember/test-helpers';
 import { filters, dimensions, granularities } from 'thirdeye-frontend/mocks/metricPeripherals';
 import { selectChoose, clickTrigger } from 'thirdeye-frontend/tests/helpers/ember-power-select';
 
@@ -40,10 +40,11 @@ module('Acceptance | create alert', function(hooks) {
       'Graph placeholder is visible. Data is not yet loaded.'
     );
 
-    // Select a metric
+    // Select a metric, wait for data to be loaded into graph
     await click(selfServeConst.METRIC_SELECT);
     await fillIn(selfServeConst.METRIC_INPUT, 'test');
     await click($(`${selfServeConst.OPTION_ITEM}:contains(${selectedMetric})`).get(0));
+    await waitFor(`${selfServeConst.GRANULARITY_SELECT} ${selfServeConst.SELECTED_ITEM}`, { timeout: 3000 });
 
     // Fields are now enabled with defaults and load correct options, graph is loaded
     assert.equal(
@@ -155,7 +156,7 @@ module('Acceptance | create alert', function(hooks) {
     await click(selfServeConst.SUBMIT_BUTTON);
 
     // Once sequence is complete (replay successful), verify transition to Alert Page
-    await waitUntil(() => document.querySelector(selfServeConst.ALERT_TITLE));
+    await waitFor(selfServeConst.ALERT_TITLE, { timeout: 3000 })
 
     assert.ok(
       currentURL().includes(`/manage/alert/1/explore?duration=3m`),
@@ -174,7 +175,7 @@ module('Acceptance | create alert', function(hooks) {
       'Alert status label is set to active.'
     );
 
-    await waitUntil(() => document.querySelector(selfServeConst.ALERT_CARDS_CONTAINER));
+    await waitFor(selfServeConst.ALERT_CARDS_CONTAINER, { timeout: 3000 });
 
     assert.ok(
       $(selfServeConst.ALERT_CARDS_CONTAINER).length > 0,

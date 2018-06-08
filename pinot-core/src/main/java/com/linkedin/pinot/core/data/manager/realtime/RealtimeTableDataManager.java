@@ -46,6 +46,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.FileUtils;
@@ -61,6 +62,19 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   private static final String STATS_FILE_NAME = "stats.ser";
   private static final String CONSUMERS_DIR = "consumers";
+
+  // Topics tend to have similar cardinality for values across partitions consumed during the same time.
+  // Multiple partitions of a topic are likely to be consumed in each server, and these will tend to
+  // transition from CONSUMING to ONLINE at roughly the same time. So, if we include statistics from
+  // all partitions in the RealtimeSegmentStatsHistory we will over-weigh the most recent partition,
+  // and cause spikes in memory allocation for dictionary. It is best to consider one partition as a sample
+  // amongst the partitions that complete at the same time.
+  //
+  // It is not predictable which partitions, or how many partitions get allocated to a single server,
+  // but it is likely that a partition takes more than half an hour to consume a full segment. So we set
+  // the minimum interval between updates to RealtimeSegmentStatsHistory as 30 minutes. This way it is
+  // likely that we get fresh data each time instead of multiple copies of roughly same data.
+  private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
   @Override
   protected void doInit() {
@@ -91,6 +105,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         Utils.rethrowException(e2);
       }
     }
+    _statsHistory.setMinIntervalBetweenUpdatesMillis(
+        TimeUnit.MILLISECONDS.convert(MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES, TimeUnit.MINUTES));
 
     String consumerDirPath = getConsumerDir();
     File consumerDir = new File(consumerDirPath);
