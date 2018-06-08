@@ -342,9 +342,9 @@ public class CommonConstants {
     }
   }
 
-  public static class SegmentFetcher {
-    public static class HdfsSegmentFetcher {
-      public static final String PRINCIPLE = "hadoop.kerberos.principle";
+  public static class SegmentOperations {
+    public static class HadoopSegmentOperations {
+      public static final String PRINCIPAL = "hadoop.kerberos.principle";
       public static final String KEYTAB = "hadoop.kerberos.keytab";
       public static final String HADOOP_CONF_PATH = "hadoop.conf.path";
     }

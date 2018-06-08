@@ -67,6 +67,14 @@
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-filesystem</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-hadoop-filesystem</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-transport</artifactId>
     </dependency>
     <dependency>

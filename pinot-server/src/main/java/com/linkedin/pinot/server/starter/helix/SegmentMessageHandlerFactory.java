@@ -112,7 +112,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       _logger.info("Handling message: {}", _message);
       try {
         acquireSema(_segmentName, LOGGER);
-        // The number of retry times depends on the retry count in SegmentFetcher.
+        // The number of retry times depends on the retry count in SegmentOperations.
         _fetcherAndLoader.addOrReplaceOfflineSegment(_tableName, _segmentName);
         result.setSuccess(true);
       } finally {
