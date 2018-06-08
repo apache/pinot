@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
 public class EmailUtils {
   private static final Logger LOG = LoggerFactory.getLogger(EmailUtils.class);
   public static Pattern EMAIL_REGEX_PATTERN = Pattern.compile(
-      "\\b[\\w.%-]+@[-.\\w]+\\.[A-Za-z]{2,4}\\b", Pattern.CASE_INSENSITIVE);
+      "\\b[\\w.%+\\-]+@[-.\\w]+\\.[A-Za-z]{2,4}\\b", Pattern.CASE_INSENSITIVE);
   /**
    * Check if given email is a valid email
    * @param email
