@@ -7,7 +7,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 
+/**
+ * The F1 score function.
+ */
 public class F1ScoreFunction implements ScoreFunction {
+
+  /**
+   * Calculate F1 score of the result against the anomalies.
+   */
   @Override
   public double calculateScore(DetectionPipelineResult result, List<MergedAnomalyResultDTO> anomalies) {
     List<MergedAnomalyResultDTO> trueTestAnomalies = new ArrayList<>();

@@ -26,6 +26,9 @@ import org.joda.time.DateTimeZone;
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
+/**
+ * The Current and baseline loader.
+ */
 public class CurrentAndBaselineLoader {
   private static final long TIMEOUT = 60000;
 
@@ -33,6 +36,13 @@ public class CurrentAndBaselineLoader {
   private DatasetConfigManager datasetDAO;
   private AggregationLoader aggregationLoader;
 
+  /**
+   * Instantiates a new Current and baseline loader.
+   *
+   * @param metricDAO the metric dao
+   * @param datasetDAO the dataset dao
+   * @param aggregationLoader the aggregation loader
+   */
   public CurrentAndBaselineLoader(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO,
       AggregationLoader aggregationLoader) {
     this.metricDAO = metricDAO;
@@ -40,6 +50,12 @@ public class CurrentAndBaselineLoader {
     this.aggregationLoader = aggregationLoader;
   }
 
+  /**
+   * Fill in current and baseline value in the anomalies.
+   *
+   * @param anomalies the anomalies
+   * @throws Exception the exception
+   */
   public void fillInCurrentAndBaselineValue(Collection<MergedAnomalyResultDTO> anomalies) throws Exception {
     ExecutorService executor = Executors.newCachedThreadPool();
 

@@ -8,7 +8,7 @@ import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
  */
 public interface TuningAlgorithm {
   /**
-   * Fit the time series and anomalies between start and end, and score the detection configs.
+   * Fit the time series and anomalies between start and end time stamps, and score the detection configs.
    *
    * @param start the start
    * @param end the end
