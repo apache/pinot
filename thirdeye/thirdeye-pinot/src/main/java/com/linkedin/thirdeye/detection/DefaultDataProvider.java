@@ -6,9 +6,11 @@ import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoade
 import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.TimeSeriesLoader;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -33,15 +35,18 @@ public class DefaultDataProvider implements DataProvider {
   private final ExecutorService executor = Executors.newCachedThreadPool();
 
   private final MetricConfigManager metricDAO;
+  private final DatasetConfigManager datasetDAO;
   private final EventManager eventDAO;
   private final MergedAnomalyResultManager anomalyDAO;
   private final TimeSeriesLoader timeseriesLoader;
   private final AggregationLoader aggregationLoader;
   private final DetectionPipelineLoader loader;
 
-  public DefaultDataProvider(MetricConfigManager metricDAO, EventManager eventDAO, MergedAnomalyResultManager anomalyDAO,
-      TimeSeriesLoader timeseriesLoader, AggregationLoader aggregationLoader, DetectionPipelineLoader loader) {
+  public DefaultDataProvider(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, EventManager eventDAO,
+      MergedAnomalyResultManager anomalyDAO, TimeSeriesLoader timeseriesLoader, AggregationLoader aggregationLoader,
+      DetectionPipelineLoader loader) {
     this.metricDAO = metricDAO;
+    this.datasetDAO = datasetDAO;
     this.eventDAO = eventDAO;
     this.anomalyDAO = anomalyDAO;
     this.timeseriesLoader = timeseriesLoader;
@@ -160,6 +165,19 @@ public class DefaultDataProvider implements DataProvider {
     for (MetricConfigDTO metric : metrics) {
       if (metric != null) {
         output.put(metric.getId(), metric);
+      }
+    }
+    return output;
+  }
+
+  @Override
+  public Map<String, DatasetConfigDTO> fetchDatasets(Collection<String> datasetNames) {
+    List<DatasetConfigDTO> datasets = this.datasetDAO.findByPredicate(Predicate.IN("dataset", datasetNames.toArray()));
+
+    Map<String, DatasetConfigDTO> output = new HashMap<>();
+    for (DatasetConfigDTO dataset : datasets) {
+      if (dataset != null) {
+        output.put(dataset.getDataset(), dataset);
       }
     }
     return output;

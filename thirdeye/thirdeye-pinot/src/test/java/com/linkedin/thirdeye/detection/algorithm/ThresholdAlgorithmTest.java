@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detection.algorithm;
 
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -13,6 +14,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -27,16 +29,23 @@ public class ThresholdAlgorithmTest {
   @BeforeMethod
   public void beforeMethod() {
     Map<MetricSlice, DataFrame> timeSeries = new HashMap<>();
-    timeSeries.put(MetricSlice.from(123L, 0, 5),
-        new DataFrame().addSeries(COL_VALUE, 0, 100, 200, 500, 1000).addSeries(COL_TIME, 0, 1, 2, 3, 4));
+    timeSeries.put(MetricSlice.from(123L, 0, 10),
+        new DataFrame().addSeries(COL_VALUE, 0, 100, 200, 500, 1000).addSeries(COL_TIME, 0, 2, 4, 6, 8));
 
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
     metricConfigDTO.setId(123L);
     metricConfigDTO.setName("thirdeye-test");
     metricConfigDTO.setDataset("thirdeye-test-dataset");
 
+    DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();
+    datasetConfigDTO.setId(124L);
+    datasetConfigDTO.setDataset("thirdeye-test-dataset");
+    datasetConfigDTO.setTimeDuration(2);
+    datasetConfigDTO.setTimeUnit(TimeUnit.MILLISECONDS);
+    datasetConfigDTO.setTimezone("UTC");
+
     DetectionConfigDTO detectionConfigDTO = new DetectionConfigDTO();
-    detectionConfigDTO.setId(124L);
+    detectionConfigDTO.setId(125L);
     Map<String, Object> properties = new HashMap<>();
     properties.put("min", 100);
     properties.put("max", 500);
@@ -45,19 +54,20 @@ public class ThresholdAlgorithmTest {
 
     this.testDataProvider = new MockDataProvider()
         .setMetrics(Collections.singletonList(metricConfigDTO))
+        .setDatasets(Collections.singletonList(datasetConfigDTO))
         .setTimeseries(timeSeries);
-    this.thresholdAlgorithm = new ThresholdAlgorithm(this.testDataProvider, detectionConfigDTO, 0, 5);
+    this.thresholdAlgorithm = new ThresholdAlgorithm(this.testDataProvider, detectionConfigDTO, 0, 10);
   }
 
   @Test
   public void testThresholdAlgorithmRun() throws Exception {
     DetectionPipelineResult result = this.thresholdAlgorithm.run();
     List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
-    Assert.assertEquals(result.getLastTimestamp(), 4);
+    Assert.assertEquals(result.getLastTimestamp(), 8);
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 0);
-    Assert.assertEquals(anomalies.get(0).getEndTime(), 1);
-    Assert.assertEquals(anomalies.get(1).getStartTime(), 4);
-    Assert.assertEquals(anomalies.get(1).getEndTime(), 5);
+    Assert.assertEquals(anomalies.get(0).getEndTime(), 2);
+    Assert.assertEquals(anomalies.get(1).getStartTime(), 8);
+    Assert.assertEquals(anomalies.get(1).getEndTime(), 10);
   }
 }

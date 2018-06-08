@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.detection.algorithm;
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -95,40 +94,24 @@ public class BaselineAlgorithm extends StaticDetectionPipeline {
     df.addSeries(COL_DIFF, df.getDoubles(COL_CURR).subtract(df.get(COL_BASE)));
     df.addSeries(COL_CHANGE, df.getDoubles(COL_CURR).divide(df.get(COL_BASE)).subtract(1));
 
-    // relative change
+    // defaults
     df.addSeries(COL_CHANGE_VIOLATION, BooleanSeries.fillValues(df.size(), false));
+    df.addSeries(COL_DIFF_VIOLATION, BooleanSeries.fillValues(df.size(), false));
+
+    // relative change
     if (!Double.isNaN(this.change)) {
-      df.mapInPlace(new Series.DoubleConditional() {
-        @Override
-        public boolean apply(double... values) {
-          return Math.abs(values[0]) >= BaselineAlgorithm.this.change;
-        }
-      }, COL_CHANGE_VIOLATION, COL_CHANGE);
+      df.addSeries(COL_CHANGE_VIOLATION, df.getDoubles(COL_CHANGE).abs().gte(this.change));
     }
 
     // absolute difference
-    df.addSeries(COL_DIFF_VIOLATION, BooleanSeries.fillValues(df.size(), false));
     if (!Double.isNaN(this.difference)) {
-      df.mapInPlace(new Series.DoubleConditional() {
-        @Override
-        public boolean apply(double... values) {
-          return Math.abs(values[0]) >= BaselineAlgorithm.this.difference;
-        }
-      }, COL_DIFF_VIOLATION, COL_DIFF);
+      df.addSeries(COL_DIFF_VIOLATION, df.getDoubles(COL_DIFF).abs().gte(this.difference));
     }
 
     // anomalies
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_CHANGE_VIOLATION, COL_DIFF_VIOLATION);
 
-    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-    for (int i = 0; i < df.size(); i++) {
-      if (BooleanSeries.booleanValueOf(df.getBoolean(COL_ANOMALY, i))) {
-        long start = df.getLong(COL_TIME, i);
-        long end = getEndTime(df, i);
-
-        anomalies.add(this.makeAnomaly(this.slice.withStart(start).withEnd(end)));
-      }
-    }
+    List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.slice, df, COL_ANOMALY);
 
     long maxTime = -1;
     if (!df.isEmpty()) {
@@ -136,12 +119,5 @@ public class BaselineAlgorithm extends StaticDetectionPipeline {
     }
 
     return new DetectionPipelineResult(anomalies, maxTime);
-  }
-
-  private long getEndTime(DataFrame df, int index) {
-    if (index < df.size() - 1) {
-      return df.getLong(COL_TIME, index + 1);
-    }
-    return df.getLongs(COL_TIME).max().longValue() + 1; // TODO use time granularity
   }
 }

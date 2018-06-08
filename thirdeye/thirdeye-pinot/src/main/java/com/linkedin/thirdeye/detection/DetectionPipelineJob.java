@@ -27,7 +27,7 @@ public class DetectionPipelineJob implements Job {
     JobKey jobKey = jobExecutionContext.getJobDetail().getKey();
     Long id = getIdFromJobKey(jobKey.getName());
     DetectionConfigDTO configDTO = detectionDAO.findById(id);
-    DetectionPipelineTaskInfo taskInfo = new DetectionPipelineTaskInfo(configDTO.getId(), configDTO.getLastTimestamp(), System.currentTimeMillis());
+    DetectionPipelineTaskInfo taskInfo = new DetectionPipelineTaskInfo(configDTO.getId(), configDTO.getLastTimestamp() + 1, System.currentTimeMillis());
 
     String taskInfoJson = null;
     try {

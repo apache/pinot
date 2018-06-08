@@ -89,8 +89,8 @@ public class DetectionAlertTaskRunner implements TaskRunner {
         new DefaultAggregationLoader(this.metricDAO, this.datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),
             ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
 
-    this.provider = new DefaultDataProvider(this.metricDAO, eventDAO, anomalyMergedResultDAO, this.timeseriesLoader,
-        this.aggregationLoader, new DetectionPipelineLoader());
+    this.provider = new DefaultDataProvider(this.metricDAO, this.datasetDAO, eventDAO, anomalyMergedResultDAO,
+        this.timeseriesLoader, this.aggregationLoader, new DetectionPipelineLoader());
   }
 
   @Override

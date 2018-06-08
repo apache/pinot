@@ -55,8 +55,8 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
             ThirdEyeCacheRegistry.getInstance().getQueryCache(),
             ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
 
-    this.provider = new DefaultDataProvider(
-        metricDAO, eventDAO, this.anomalyDAO, timeseriesLoader, aggregationLoader, this.loader);
+    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, this.anomalyDAO,
+        timeseriesLoader, aggregationLoader, this.loader);
   }
 
   /**

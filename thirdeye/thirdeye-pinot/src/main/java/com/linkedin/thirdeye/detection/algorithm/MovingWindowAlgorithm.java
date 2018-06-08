@@ -166,20 +166,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     // anomalies
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_ZSCORE_MIN_VIOLATION, COL_ZSCORE_MAX_VIOLATION, COL_QUANTILE_MIN_VIOLATION, COL_QUANTILE_MAX_VIOLATION);
 
-    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-    for (int i = 0; i < df.size(); i++) {
-      if (BooleanSeries.booleanValueOf(df.getBoolean(COL_ANOMALY, i))) {
-        long start = df.getLong(COL_TIME, i);
-        long end = getEndTime(df, i);
-
-        if (end < this.startTime) {
-          // skip past anomalies
-          continue;
-        }
-
-        anomalies.add(this.makeAnomaly(this.slice.withStart(start).withEnd(end)));
-      }
-    }
+    List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.slice, df, COL_ANOMALY);
 
     long maxTime = -1;
     if (!df.isEmpty()) {
@@ -187,13 +174,6 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     }
 
     return new DetectionPipelineResult(anomalies, maxTime);
-  }
-
-  private long getEndTime(DataFrame df, int index) {
-    if (index < df.size() - 1) {
-      return df.getLong(COL_TIME, index + 1);
-    }
-    return df.getLongs(COL_TIME).max().longValue() + 1; // TODO use time granularity
   }
 
   /**

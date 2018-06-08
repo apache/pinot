@@ -58,6 +58,7 @@ public class DataProviderTest {
   private List<Long> eventIds;
   private List<Long> anomalyIds;
   private List<Long> metricIds;
+  private List<Long> datasetIds;
 
   @BeforeMethod
   public void beforeMethod() throws Exception {
@@ -91,8 +92,9 @@ public class DataProviderTest {
     this.metricIds.add(this.metricDAO.save(makeMetric(null, "myMetric3", "myDataset1")));
 
     // datasets
-    this.datasetDAO.save(makeDataset(null, "myDataset1"));
-    this.datasetDAO.save(makeDataset(null, "myDataset2"));
+    this.datasetIds = new ArrayList<>();
+    this.datasetIds.add(this.datasetDAO.save(makeDataset(null, "myDataset1")));
+    this.datasetIds.add(this.datasetDAO.save(makeDataset(null, "myDataset2")));
 
     // data
     try (Reader dataReader = new InputStreamReader(this.getClass().getResourceAsStream("algorithm/timeseries-4w.csv"))) {
@@ -121,7 +123,8 @@ public class DataProviderTest {
     this.timeseriesLoader = new DefaultTimeSeriesLoader(this.metricDAO, this.datasetDAO, this.cache);
 
     // provider
-    this.provider = new DefaultDataProvider(this.metricDAO, this.eventDAO, this.anomalyDAO, this.timeseriesLoader, null, null);
+    this.provider = new DefaultDataProvider(this.metricDAO, this.datasetDAO, this.eventDAO, this.anomalyDAO,
+        this.timeseriesLoader, null, null);
   }
 
   @AfterMethod(alwaysRun = true)
@@ -193,6 +196,32 @@ public class DataProviderTest {
     Assert.assertEquals(metrics.size(), 2);
     Assert.assertTrue(metrics.contains(makeMetric(this.metricIds.get(1), "myMetric2", "myDataset2")));
     Assert.assertTrue(metrics.contains(makeMetric(this.metricIds.get(2), "myMetric3", "myDataset1")));
+  }
+
+  //
+  // datasets
+  //
+
+  @Test
+  public void testDatasetInvalid() {
+    Assert.assertTrue(this.provider.fetchDatasets(Collections.singleton("invalid")).isEmpty());
+  }
+
+  @Test
+  public void testDatasetSingle() {
+    DatasetConfigDTO dataset = this.provider.fetchDatasets(Collections.singleton("myDataset1")).get("myDataset1");
+
+    Assert.assertNotNull(dataset);
+    Assert.assertEquals(dataset, makeDataset(this.datasetIds.get(0), "myDataset1"));
+  }
+
+  @Test
+  public void testDatasetMultiple() {
+    Collection<DatasetConfigDTO> datasets = this.provider.fetchDatasets(Arrays.asList("myDataset1", "myDataset2")).values();
+
+    Assert.assertEquals(datasets.size(), 2);
+    Assert.assertTrue(datasets.contains(makeDataset(this.datasetIds.get(0), "myDataset1")));
+    Assert.assertTrue(datasets.contains(makeDataset(this.datasetIds.get(1), "myDataset2")));
   }
 
   //

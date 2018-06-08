@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.detection;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -10,7 +11,6 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 
 /**
@@ -78,6 +78,16 @@ public interface DataProvider {
    * @return map of metric configs (keyed by id)
    */
   Map<Long, MetricConfigDTO> fetchMetrics(Collection<Long> ids);
+
+  /**
+   * Returns a map of dataset configs (keyed by id) for a given set of dataset names.
+   *
+   * @see DatasetConfigDTO
+   *
+   * @param datasetNames dataset config names
+   * @return map of dataset configs (keyed by dataset name)
+   */
+  Map<String, DatasetConfigDTO> fetchDatasets(Collection<String> datasetNames);
 
   /**
    * Returns an initialized instance of a detection pipeline for the given config. Injects this

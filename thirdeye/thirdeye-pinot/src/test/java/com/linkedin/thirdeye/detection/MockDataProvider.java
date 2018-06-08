@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.Grouping;
 import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -31,6 +32,7 @@ public class MockDataProvider implements DataProvider {
   private List<EventDTO> events;
   private List<MergedAnomalyResultDTO> anomalies;
   private List<MetricConfigDTO> metrics;
+  private List<DatasetConfigDTO> datasets;
   private DetectionPipelineLoader loader;
 
   public MockDataProvider() {
@@ -136,6 +138,19 @@ public class MockDataProvider implements DataProvider {
   }
 
   @Override
+  public Map<String, DatasetConfigDTO> fetchDatasets(Collection<String> datasetNames) {
+    Map<String, DatasetConfigDTO> result = new HashMap<>();
+    for (String datasetName : datasetNames) {
+      for (DatasetConfigDTO dataset : this.datasets) {
+        if (datasetName.equals(dataset.getDataset())) {
+          result.put(datasetName, dataset);
+        }
+      }
+    }
+    return result;
+  }
+
+  @Override
   public DetectionPipeline loadPipeline(DetectionConfigDTO config, long start, long end) throws Exception {
     return this.loader.from(this, config, start, end);
   }
@@ -182,6 +197,15 @@ public class MockDataProvider implements DataProvider {
 
   public MockDataProvider setMetrics(List<MetricConfigDTO> metrics) {
     this.metrics = metrics;
+    return this;
+  }
+
+  public List<DatasetConfigDTO> getDatasets() {
+    return datasets;
+  }
+
+  public MockDataProvider setDatasets(List<DatasetConfigDTO> datasets) {
+    this.datasets = datasets;
     return this;
   }
 

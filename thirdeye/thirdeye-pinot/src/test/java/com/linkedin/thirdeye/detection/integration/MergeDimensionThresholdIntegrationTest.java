@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.HashMultimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -21,6 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -45,11 +47,13 @@ public class MergeDimensionThresholdIntegrationTest {
   private DataFrame data1;
   private DataFrame data2;
   private MetricConfigDTO metric2;
+  private DatasetConfigDTO dataset;
 
   private Map<MetricSlice, DataFrame> timeseries;
   private Map<MetricSlice, DataFrame> aggregates;
   private List<MetricConfigDTO> metrics;
   private List<MergedAnomalyResultDTO> anomalies;
+  private List<DatasetConfigDTO> datasets;
 
   @BeforeMethod
   public void beforeMethod() throws Exception {
@@ -80,6 +84,16 @@ public class MergeDimensionThresholdIntegrationTest {
     this.metrics = new ArrayList<>();
     this.metrics.add(this.metric2);
 
+    this.dataset = new DatasetConfigDTO();
+    this.dataset.setId(3L);
+    this.dataset.setDataset(DATASET);
+    this.dataset.setTimeDuration(1);
+    this.dataset.setTimeUnit(TimeUnit.HOURS);
+    this.dataset.setTimezone("UTC");
+
+    this.datasets = new ArrayList<>();
+    this.datasets.add(this.dataset);
+
     this.anomalies = new ArrayList<>();
 
     this.provider = new MockDataProvider()
@@ -87,6 +101,7 @@ public class MergeDimensionThresholdIntegrationTest {
         .setAggregates(this.aggregates)
         .setTimeseries(this.timeseries)
         .setMetrics(this.metrics)
+        .setDatasets(this.datasets)
         .setAnomalies(this.anomalies);
 
     this.config = new DetectionConfigDTO();
@@ -98,20 +113,16 @@ public class MergeDimensionThresholdIntegrationTest {
     DetectionPipeline pipeline = this.loader.from(this.provider, this.config, 0, 18000);
     DetectionPipelineResult result = pipeline.run();
 
-    Assert.assertEquals(result.getAnomalies().size(), 5);
+    Assert.assertEquals(result.getAnomalies().size(), 3);
     Assert.assertEquals(result.getLastTimestamp(), 14400);
 
     Assert.assertTrue(result.getAnomalies().contains(
-        makeAnomaly(10800, 14400, Collections.<String, String>emptyMap())));
-    Assert.assertTrue(result.getAnomalies().contains(
-        makeAnomaly(14400, 14401, Collections.<String, String>emptyMap())));
+        makeAnomaly(10800, 18000, Collections.<String, String>emptyMap())));
 
     Assert.assertTrue(result.getAnomalies().contains(
-        makeAnomaly(0, 3600, ONE_TWO)));
+        makeAnomaly(0, 7200, ONE_TWO)));
     Assert.assertTrue(result.getAnomalies().contains(
-        makeAnomaly(3600, 7200, ONE_TWO)));
-    Assert.assertTrue(result.getAnomalies().contains(
-        makeAnomaly(14400, 14401, ONE_TWO)));
+        makeAnomaly(14400, 18000, ONE_TWO)));
   }
 
   private static MergedAnomalyResultDTO makeAnomaly(long start, long end, Map<String, String> dimensions) {

@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.detection.algorithm;
 
 import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -62,38 +61,23 @@ public class ThresholdAlgorithm extends StaticDetectionPipeline {
   public DetectionPipelineResult run(StaticDetectionPipelineData data) {
     DataFrame df = data.getTimeseries().get(this.slice);
 
+    // defaults
     df.addSeries(COL_TOO_HIGH, BooleanSeries.fillValues(df.size(), false));
     df.addSeries(COL_TOO_LOW, BooleanSeries.fillValues(df.size(), false));
 
+    // max
     if (!Double.isNaN(this.max)) {
-      df.mapInPlace(new Series.DoubleConditional() {
-        @Override
-        public boolean apply(double... values) {
-          return values[0] > ThresholdAlgorithm.this.max;
-        }
-      }, COL_TOO_HIGH, COL_VALUE).fillNull(COL_TOO_HIGH);
+      df.addSeries(COL_TOO_HIGH, df.getDoubles(COL_VALUE).gt(this.max));
     }
 
+    // min
     if (!Double.isNaN(this.min)) {
-      df.mapInPlace(new Series.DoubleConditional() {
-        @Override
-        public boolean apply(double... values) {
-          return values[0] < ThresholdAlgorithm.this.min;
-        }
-      }, COL_TOO_LOW, COL_VALUE).fillNull(COL_TOO_LOW);
+      df.addSeries(COL_TOO_LOW, df.getDoubles(COL_VALUE).lt(this.min));
     }
 
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_TOO_HIGH, COL_TOO_LOW);
 
-    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-    for (int i = 0; i < df.size(); i++) {
-      if (BooleanSeries.booleanValueOf(df.getBoolean(COL_ANOMALY, i))) {
-        long start = df.getLong(COL_TIME, i);
-        long end = getEndTime(df, i);
-
-        anomalies.add(this.makeAnomaly(this.slice.withStart(start).withEnd(end)));
-      }
-    }
+    List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.slice, df, COL_ANOMALY);
 
     long maxTime = -1;
     if (!df.isEmpty()) {
@@ -101,12 +85,5 @@ public class ThresholdAlgorithm extends StaticDetectionPipeline {
     }
 
     return new DetectionPipelineResult(anomalies, maxTime);
-  }
-
-  private long getEndTime(DataFrame df, int index) {
-    if (index < df.size() - 1) {
-      return df.getLong(COL_TIME, index + 1);
-    }
-    return df.getLongs(COL_TIME).max().longValue() + 1; // TODO use time granularity
   }
 }
