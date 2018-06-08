@@ -91,44 +91,20 @@
       }}
     </div>
 
-    <div class="col-xs-12">
-      <div class="te-graph-alert {{if (not isMetricSelected) 'te-graph-alert--pending'}}">
-        {{#if (or isFetchingDimensions isDimensionFetchDone)}}
-          {{#if isDimensionError}}
-            <div class="te-form__super-label">... error loading subDimensions for <span class="stronger">{{selectedDimension}}</span></div>
-          {{else}}
-            <div class="te-form__super-label">...{{if isDimensionFetchDone 'Displaying' 'Loading'}} top {{availableDimensions}} contributing subDimensions for <span class="stronger">{{selectedDimension}}</span></div>
-          {{/if}}
-        {{/if}}
-        {{#if isMetricDataLoading}}{{ember-spinner}}{{/if}}
-        {{#if isMetricSelected}}
-          {{anomaly-graph
-            primaryMetric=selectedMetric
-            selectedDimensions=selectedDimensions
-            dimensions=topDimensions
-            showDimensions=true
-            isLoading=loading
-            showSubchart=true
-            showLegend=true
-            enableZoom=true
-            legendText=legendText
-            componentId='create-alert'
-            showGraphLegend=false
-            onSelection=(action "onSelection")
-            onPrimaryMetricToggle=(action "onPrimaryMetricToggle")
-            height=400
-          }}
-          <div class="te-form__note">
-            NOTE: If you find the metric shown above is inconsistent, please email <a class="thirdeye-link-secondary" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a>.
-          </div>
-        {{else}}
-          <div class="te-graph-alert__content">
-            <div class="glyphicon glyphicon-{{if isMetricDataInvalid 'alert' 'equalizer'}} te-graph-alert__icon{{if isMetricDataInvalid '--warning'}}"></div>
-            <p class="te-graph-alert__pre-text">{{graphMessageText}}</p>
-          </div>
-        {{/if}}
-      </div>
-    </div>
+    {{!-- Render metric graph --}}
+    {{self-serve-graph
+      removeGraphMargin=true
+      metricData=selectedMetric
+      componentId='create-alert'
+      topDimensions=topDimensions
+      selectedDimension=selectedDimension
+      selectedDimensions=selectedDimensions
+      isMetricSelected=isMetricSelected
+      isMetricDataLoading=isMetricDataLoading
+      isMetricDataInvalid=isMetricDataInvalid
+      isSecondaryDataLoading=isSecondaryDataLoading
+      isDimensionFetchDone=isDimensionFetchDone
+    }}
 
   </fieldset>
 

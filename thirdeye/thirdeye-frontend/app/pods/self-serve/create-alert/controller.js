@@ -44,7 +44,7 @@ export default Controller.extend({
   isMetricDataLoading: false,
   isGroupNameDuplicate: false,
   isAlertNameDuplicate: false,
-  isFetchingDimensions: false,
+  isSecondaryDataLoading: false,
   isDimensionFetchDone: false,
   isProcessingForm: false,
   isEmailError: false,
@@ -60,14 +60,6 @@ export default Controller.extend({
   dimensionCount: 7,
   availableDimensions: 0,
   metricLookupCache: [],
-  legendText: {
-    dotted: {
-      text: 'WoW'
-    },
-    solid: {
-      text: 'Observed'
-    }
-  },
 
   /**
    * Component property initial settings
@@ -297,6 +289,7 @@ export default Controller.extend({
           metricId: metric.id,
           isMetricSelected: isDataGood,
           isMetricDataLoading: false,
+          isSecondaryDataLoading: false,
           showGraphLegend: true,
           selectedMetric: Object.assign(metricData, { color: 'blue' }),
           isMetricDataInvalid: !isDataGood
@@ -308,7 +301,6 @@ export default Controller.extend({
           // Update graph only if we have new dimension data
           if (orderedDimensions.length) {
             this.setProperties({
-              isFetchingDimensions: false,
               isDimensionFetchDone: true,
               topDimensions: orderedDimensions,
               availableDimensions: orderedDimensions.length
@@ -319,6 +311,7 @@ export default Controller.extend({
         this.setProperties({
           isMetricDataInvalid: true,
           isMetricDataLoading: false,
+          isSecondaryDataLoading: false,
           selectMetricErrMsg: error
         });
       });
@@ -587,20 +580,6 @@ export default Controller.extend({
   ),
 
   /**
-   * Sets the message text over the graph placeholder before data is loaded
-   * @method graphMessageText
-   * @return {String} the appropriate graph placeholder text
-   */
-  graphMessageText: computed(
-    'isMetricDataInvalid',
-    function() {
-      const defaultMsg = 'Once a metric is selected, the metric replay graph will show here';
-      const invalidMsg = 'Sorry, metric has no current data';
-      return this.get('isMetricDataInvalid') ? invalidMsg : defaultMsg;
-    }
-  ),
-
-  /**
    * Determines whether input fields in general are enabled. When metric data is 'invalid',
    * we will still enable alert creation.
    * @method generalFieldsEnabled
@@ -735,7 +714,7 @@ export default Controller.extend({
    */
   clearAll() {
     this.setProperties({
-      isFetchingDimensions: false,
+      isSecondaryDataLoading: false,
       isDimensionFetchDone: false,
       isEmailError: false,
       isEmptyEmail: false,
@@ -770,13 +749,6 @@ export default Controller.extend({
    * Actions for create alert form view
    */
   actions: {
-
-    /**
-     * Handles the primary metric selection in the alert creation
-     */
-    onPrimaryMetricToggle() {
-      return;
-    },
 
     /**
      * When a metric is selected, fetch its props, and send them to the graph builder
@@ -846,7 +818,7 @@ export default Controller.extend({
       // Update dimension options and loader
       this.setProperties({
         dimensions: [...dimensionNameSet],
-        isMetricDataLoading: true
+        isSecondaryDataLoading: true
       });
       // Do not allow selected dimension to match selected filter
       if (isSelectedDimensionEqualToSelectedFilter) {
@@ -871,13 +843,10 @@ export default Controller.extend({
       if (selectedDimension === 'All') {
         this.setProperties({
           topDimensions: [],
-          isFetchingDimensions: false
+          isSecondaryDataLoading: false
         });
       } else {
-        this.setProperties({
-          isMetricDataLoading: true,
-          isFetchingDimensions: true
-        });
+        this.set('isSecondaryDataLoading', true);
         this.modifyAlertFunctionName();
         this.triggerGraphFromMetric();
       }
@@ -892,7 +861,7 @@ export default Controller.extend({
     onSelectGranularity(selectedObj) {
       this.setProperties({
         selectedGranularity: selectedObj,
-        isMetricDataLoading: true
+        isSecondaryDataLoading: true
       });
       this.modifyAlertFunctionName();
       this.triggerGraphFromMetric();
@@ -1037,16 +1006,6 @@ export default Controller.extend({
      */
     onResetForm() {
       this.clearAll();
-    },
-
-    /**
-     * Enable reaction to dimension toggling in graph legend component
-     * @method onSelection
-     * @return {undefined}
-     */
-    onSelection(selectedDimension) {
-      const { isSelected } = selectedDimension;
-      set(selectedDimension, 'isSelected', !isSelected);
     },
 
     /**

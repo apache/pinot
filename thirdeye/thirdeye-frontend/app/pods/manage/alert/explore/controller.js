@@ -70,6 +70,7 @@ export default Controller.extend({
     this.setProperties({
       filters: {},
       loadedWowData: [],
+      topDimensions: [],
       predefinedRanges: {},
       missingAnomalyProps: {},
       selectedSortMode: '',
@@ -87,7 +88,6 @@ export default Controller.extend({
       sortColumnStartUp: false,
       sortColumnScoreUp: false,
       sortColumnChangeUp: false,
-      isFetchingDimensions: false,
       isDimensionFetchDone: false,
       sortColumnResolutionUp: false,
       checkReplayInterval: 2000, // 2 seconds
@@ -307,6 +307,18 @@ export default Controller.extend({
         });
       }
       return anomalies;
+    }
+  ),
+
+  /**
+   * All selected dimensions to be loaded into graph
+   * @returns {Array}
+   */
+  selectedDimensions: computed(
+    'topDimensions',
+    'topDimensions.@each.isSelected',
+    function() {
+      return this.get('topDimensions').filterBy('isSelected');
     }
   ),
 
