@@ -67,15 +67,15 @@ public class ToAllRecipientsDetectionAlertFilter extends DetectionAlertFilter {
 
       result.addMapping(this.recipients, new HashSet<>(anomalies));
 
-      this.vectorClocks.put(detectionConfigId, getLastTimeStamp(anomalies));
+      this.vectorClocks.put(detectionConfigId, getLastTimeStamp(anomalies, startTime));
     }
 
     result.setVectorClocks(this.vectorClocks);
     return result;
   }
 
-  private Long getLastTimeStamp(Collection<MergedAnomalyResultDTO> anomalies){
-    long lastTimeStamp = -1;
+  private Long getLastTimeStamp(Collection<MergedAnomalyResultDTO> anomalies, long startTime) {
+    long lastTimeStamp = startTime;
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       lastTimeStamp = Math.max(anomaly.getEndTime(), lastTimeStamp);
     }

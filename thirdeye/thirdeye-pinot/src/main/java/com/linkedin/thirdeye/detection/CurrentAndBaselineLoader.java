@@ -16,6 +16,10 @@ import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTimeZone;
 
@@ -23,6 +27,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 public class CurrentAndBaselineLoader {
+  private static final long TIMEOUT = 60000;
 
   private MetricConfigManager metricDAO;
   private DatasetConfigManager datasetDAO;
@@ -36,7 +41,9 @@ public class CurrentAndBaselineLoader {
   }
 
   public void fillInCurrentAndBaselineValue(Collection<MergedAnomalyResultDTO> anomalies) throws Exception {
-    for (MergedAnomalyResultDTO anomaly : anomalies) {
+    ExecutorService executor = Executors.newCachedThreadPool();
+
+    for (final MergedAnomalyResultDTO anomaly : anomalies) {
       if (anomaly.getAvgBaselineVal() == 0 || anomaly.getAvgCurrentVal() == 0) {
         MetricConfigDTO metricConfigDTO =
             this.metricDAO.findByMetricAndDataset(anomaly.getMetric(), anomaly.getCollection());
@@ -53,16 +60,23 @@ public class CurrentAndBaselineLoader {
 
         Multimap<String, String> filters = getFiltersFromDimensionMaps(anomaly);
 
-        MetricSlice slice =
-            MetricSlice.from(metricConfigDTO.getId(), anomaly.getStartTime(), anomaly.getEndTime(), filters);
-        anomaly.setAvgCurrentVal(getAggregate(slice));
+        final MetricSlice slice = MetricSlice.from(metricConfigDTO.getId(), anomaly.getStartTime(), anomaly.getEndTime(), filters);
 
         DateTimeZone timezone = getDateTimeZone(datasetConfigDTO);
+        final Baseline baseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.SUM, 1, 1, timezone);
 
-        Baseline baseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, 1, 1, timezone);
-        anomaly.setAvgBaselineVal(getAggregate(baseline.scatter(slice).get(0)));
+        executor.submit(new Runnable() {
+          @Override
+          public void run() {
+            anomaly.setAvgCurrentVal(getAggregate(slice));
+            anomaly.setAvgBaselineVal(getAggregate(baseline.scatter(slice).get(0)));
+          }
+        });
       }
     }
+
+    executor.shutdown();
+    executor.awaitTermination(TIMEOUT, TimeUnit.MILLISECONDS);
   }
 
   private DateTimeZone getDateTimeZone(DatasetConfigDTO datasetConfigDTO) {
@@ -76,10 +90,9 @@ public class CurrentAndBaselineLoader {
     return DateTimeZone.UTC;
   }
 
-  private double getAggregate(MetricSlice slice) throws Exception {
-    DataFrame df = this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList());
+  private double getAggregate(MetricSlice slice) {
     try {
-      return df.getDouble(COL_VALUE, 0);
+      return this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList()).getDouble(COL_VALUE, 0);
     } catch (Exception e) {
       return Double.NaN;
     }

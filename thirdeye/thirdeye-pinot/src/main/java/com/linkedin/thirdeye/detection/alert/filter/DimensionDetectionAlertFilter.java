@@ -85,7 +85,7 @@ public class DimensionDetectionAlertFilter extends DetectionAlertFilter {
 
       allAnomalies.addAll(anomalies);
 
-      this.vectorClocks.put(detectionConfigId, getLastTimeStamp(anomalies));
+      this.vectorClocks.put(detectionConfigId, getLastTimeStamp(anomalies, startTime));
     }
 
     // update last timestamp(s)
@@ -112,8 +112,8 @@ public class DimensionDetectionAlertFilter extends DetectionAlertFilter {
     return result;
   }
 
-  private Long getLastTimeStamp(Collection<MergedAnomalyResultDTO> anomalies){
-    long lastTimeStamp = -1;
+  private Long getLastTimeStamp(Collection<MergedAnomalyResultDTO> anomalies, long startTime) {
+    long lastTimeStamp = startTime;
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       lastTimeStamp = Math.max(anomaly.getEndTime(), lastTimeStamp);
     }

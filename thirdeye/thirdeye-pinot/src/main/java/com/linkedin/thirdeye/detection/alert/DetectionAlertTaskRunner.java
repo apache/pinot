@@ -32,6 +32,8 @@ import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DefaultDataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineLoader;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -46,6 +48,13 @@ import org.slf4j.LoggerFactory;
  */
 public class DetectionAlertTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionAlertTaskRunner.class);
+
+  private static final Comparator<AnomalyResult> COMPARATOR_DESC = new Comparator<AnomalyResult>() {
+    @Override
+    public int compare(AnomalyResult o1, AnomalyResult o2) {
+      return -1 * Long.compare(o1.getStartTime(), o2.getStartTime());
+    }
+  };
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final String DEFAULT_EMAIL_FORMATTER_TYPE = "MultipleAnomaliesEmailContentFormatter";
@@ -95,8 +104,7 @@ public class DetectionAlertTaskRunner implements TaskRunner {
       LOG.warn(String.format("Detection alert %d contains no properties", detectionAlertConfigId));
     }
 
-    DetectionAlertFilter alertFilter =
-        this.alertFilterLoader.from(this.provider, this.detectionAlertConfig, System.currentTimeMillis());
+    DetectionAlertFilter alertFilter = this.alertFilterLoader.from(this.provider, this.detectionAlertConfig, System.currentTimeMillis());
 
     DetectionAlertFilterResult result = alertFilter.run();
 
@@ -127,6 +135,7 @@ public class DetectionAlertTaskRunner implements TaskRunner {
 
       List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>();
       anomalyResultListOfGroup.addAll(anomalies);
+      Collections.sort(anomalyResultListOfGroup, COMPARATOR_DESC);
 
       AlertConfigDTO alertConfig = new AlertConfigDTO();
       alertConfig.setName(this.detectionAlertConfig.getName());
