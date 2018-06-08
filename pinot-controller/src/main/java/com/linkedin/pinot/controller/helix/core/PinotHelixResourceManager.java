@@ -1879,7 +1879,7 @@ public class PinotHelixResourceManager {
         }
       }
 
-      // Wait until the partitions are offline in the external view
+      // Wait until all segments match with the expected external view state
       if (!ifExternalViewChangeReflectedForState(tableName, segmentName, status, (timeoutInSeconds * 1000),
           true)) {
         externalViewUpdateSuccessful = false;
