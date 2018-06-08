@@ -6,7 +6,7 @@
     {{#subtablist.tab name="heatmap"}}Heatmap{{/subtablist.tab}}
   {{/subtab.tablist}}
 
-  {{#if model.isDevEnv}} {{!--  Remove conditional when table view is ready  (action "onPrimaryChange") --}}
+  {{#if model.isDevEnv}} {{!--  Remove conditional when table view is ready --}}
     {{#subtab.tabpanel name="table"}}
       {{rootcause-dimensions
         entities=entities

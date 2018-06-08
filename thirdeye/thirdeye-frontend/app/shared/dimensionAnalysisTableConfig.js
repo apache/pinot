@@ -1,3 +1,5 @@
+const COLUMN_CLASS = 'rootcause-dimensions-table__column';
+
 /**
  * Dynamic grouped headers for RCA advanced dimension analysis table.
  * Colspan for 'dimensions' group dependent on user-selected analysis 'depth' level.
@@ -19,7 +21,7 @@ export const baseColumns = [
   {
     propertyName: 'cob',
     title: 'Current/Baseline',
-    className: 'rootcause-dimensions-table__column rootcause-dimensions-table__column--large-width',
+    className: `${COLUMN_CLASS} ${COLUMN_CLASS}--large-width`,
     disableSorting: true,
     disableFiltering: true
   },
@@ -27,21 +29,21 @@ export const baseColumns = [
     propertyName: 'contributionToOverallChange',
     component: 'custom/dimensions-table/change-bars',
     title: 'Contribution to Overall Change',
-    className: 'rootcause-dimensions-table__column rootcause-dimensions-table__column--bar-cell',
+    className: `${COLUMN_CLASS} ${COLUMN_CLASS}--bar-cell`,
     disableSorting: true,
     disableFiltering: true
   },
   {
     propertyName: 'percentageChange',
     title: '% Change',
-    className: 'rootcause-dimensions-table__column rootcause-dimensions-table__column--med-width',
+    className: `${COLUMN_CLASS} ${COLUMN_CLASS}--med-width`,
     disableSorting: true,
     disableFiltering: true
   },
   {
     propertyName: 'contributionChange',
     title: 'Change in Contribution',
-    className: 'rootcause-dimensions-table__column rootcause-dimensions-table__column--med-width',
+    className: `${COLUMN_CLASS} ${COLUMN_CLASS}--med-width`,
     disableSorting: true,
     disableFiltering: true
   }
