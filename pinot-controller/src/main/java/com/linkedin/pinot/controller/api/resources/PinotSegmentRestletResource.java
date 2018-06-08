@@ -135,7 +135,7 @@ public class PinotSegmentRestletResource {
   public String toggleStateOrListMetadataForOneSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "online|offline|drop", required = false) @QueryParam("state") String stateStr,
+      @ApiParam(value = "enable|disable|drop", required = false) @QueryParam("state") String stateStr,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr)
       throws JSONException {
     segmentName = checkGetEncodedParam(segmentName);
