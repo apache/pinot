@@ -14,7 +14,7 @@ import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
 // Setup for query param behavior
 const queryParamsConfig = {
   refreshModel: true,
-  replace: true
+  replace: false
 };
 
 export default Route.extend({

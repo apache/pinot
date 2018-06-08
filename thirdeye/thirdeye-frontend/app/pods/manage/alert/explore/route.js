@@ -112,7 +112,7 @@ const processRangeParams = (bucketUnit = 'DAYS', duration, start, end) => {
  */
 const queryParamsConfig = {
   refreshModel: true,
-  replace: true
+  replace: false
 };
 
 export default Route.extend({
@@ -268,7 +268,7 @@ export default Route.extend({
           config
         });
         const maxTimeUrl = selfServeApiGraph.maxDataTime(metricId);
-        const maxTime = isReplayDone ? await fetch(maxTimeUrl).then(checkStatus) : moment().valueOf();
+        const maxTime = isReplayDone && metricId ? await fetch(maxTimeUrl).then(checkStatus) : moment().valueOf();
         Object.assign(model, { metricDataUrl: buildMetricDataUrl({
           maxTime,
           id: metricId,
@@ -297,6 +297,7 @@ export default Route.extend({
       isReplayDone,
       metricDataUrl,
       anomalyDataUrl,
+      totalAnomalies,
       exploreDimensions,
       alertEvalMetrics
     } = model;
@@ -308,6 +309,7 @@ export default Route.extend({
       alertData,
       alertId: id,
       DEFAULT_SEVERITY,
+      totalAnomalies,
       anomalyDataUrl,
       baselineOptions,
       alertEvalMetrics,

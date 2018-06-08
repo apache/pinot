@@ -1,5 +1,5 @@
 import moment from 'moment';
-import advancedDimensions from 'thirdeye-frontend/mocks/anomalies';
+import advancedDimensions from 'thirdeye-frontend/mocks/advancedDimensions';
 
 export default function(server) {
   /**
@@ -22,6 +22,14 @@ export default function(server) {
         maxTime: [ 1517846400000 ],
         granularity: [ "1_HOURS" ]
       }
+    }, {
+      urn : "thirdeye:metric:100000",
+      score : 1.0,
+      label : "thirdeye::pageViews",
+      type : "metric",
+      link : null,
+      relatedEntities : [ ],
+      attributes : { }
     }, {
       urn : "thirdeye:timerange:anomaly:1512400800000:1512428100000",
       score : 1.0,

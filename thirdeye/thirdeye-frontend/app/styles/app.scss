@@ -53,6 +53,7 @@ body {
 @import 'components/rootcause-select-comparison-range';
 @import 'components/rootcause-chart';
 @import 'components/rootcause-trend';
+@import 'components/rootcause-dimensions';
 @import 'components/alert-report-modal';
 @import 'components/te-radio';
 @import 'components/metrics-table';
@@ -76,3 +77,4 @@ body {
 @import 'pods/rootcause';
 @import 'pods/home/alerts-dashboard';
 @import 'pods/custom/anomalies-table';
+@import 'pods/custom/dimensions-table';
