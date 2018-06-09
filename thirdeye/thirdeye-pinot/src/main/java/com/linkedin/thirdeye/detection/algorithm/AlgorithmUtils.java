@@ -44,17 +44,17 @@ public class AlgorithmUtils {
     Arrays.fill(outlier, (byte) 0);
 
     // TODO expanding window from last change point
-    double upQuartile = value.quantile(0.75).doubleValue();
-    double downQuartile = value.quantile(0.25).doubleValue();
+    double upDecile = value.quantile(0.90).doubleValue();
+    double downDecile = value.quantile(0.10).doubleValue();
 
     int runStart = 0;
     int runSide = 0;
     for (int i = 0; i < df.size(); i++) {
       if (!value.isNull(i)) {
         int side = 0;
-        if (value.getDouble(i) > upQuartile)
+        if (value.getDouble(i) > upDecile)
           side = 1;
-        if (value.getDouble(i) < downQuartile)
+        if (value.getDouble(i) < downDecile)
           side = -1;
 
         // run side changed or last run
