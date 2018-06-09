@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.rootcause.timeseries;
 
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Grouping;
 import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.Series;
@@ -122,7 +123,7 @@ public class BaselineAggregate implements Baseline {
     String[] arrNames = colNames.toArray(new String[colNames.size()]);
 
     // aggregation
-    output.addSeries(COL_VALUE, output.map(this.type.function, arrNames));
+    output.addSeries(COL_VALUE, mapWithNull(output, this.type.function, arrNames));
 
     // alignment
     output.addSeries(COL_TIME, this.toTimestampSeries(slice.getStart(), output.getLongs(COL_TIME)));
@@ -131,16 +132,20 @@ public class BaselineAggregate implements Baseline {
     List<String> dropNames = new ArrayList<>(output.getSeriesNames());
     dropNames.removeAll(output.getIndexNames());
 
-    output = output.filter(new Series.LongConditional() {
-      @Override
-      public boolean apply(long... values) {
-        return values[0] >= slice.getStart() && values[0] < slice.getEnd();
-      }
-    }, COL_TIME).dropNull(output.getIndexNames());
+    output = output.filter(
+        output.getLongs(COL_TIME).gte(slice.getStart()).and(
+            output.getLongs(COL_TIME).lt(slice.getEnd())))
+        .dropNull(output.getIndexNames());
 
     return output;
   }
 
+  /**
+   * Helper to eliminate duplicate timestamps via averaging of values
+   *
+   * @param df timeseries dataframe
+   * @return de-duplicated dataframe
+   */
   private static DataFrame eliminateDuplicates(DataFrame df) {
     List<String> aggExpressions = new ArrayList<>();
     for (String seriesName : df.getIndexNames()) {
@@ -151,6 +156,40 @@ public class BaselineAggregate implements Baseline {
     DataFrame res = df.groupByValue(df.getIndexNames()).aggregate(aggExpressions).dropSeries(COL_KEY);
 
     return res.setIndex(df.getIndexNames());
+  }
+
+  /**
+   * Helper to apply map operation to partially incomplete row, i.e. a row
+   * that contains null values.
+   *
+   * @param df dataframe
+   * @param f function
+   * @param colNames column to apply function to
+   * @return double series
+   */
+  // TODO move this into DataFrame API?
+  private static DoubleSeries mapWithNull(DataFrame df, Series.DoubleFunction f, String[] colNames) {
+    double[] values = new double[df.size()];
+
+    double[] row = new double[colNames.length];
+    for (int i = 0; i < df.size(); i++) {
+      int offset = 0;
+      for (int j = 0; j < colNames.length; j++) {
+        if (!df.isNull(colNames[j], i)) {
+          row[offset++] = df.getDouble(colNames[j], i);
+        }
+      }
+
+      if (offset <= 0) {
+        values[i] = DoubleSeries.NULL;
+      } else if (offset >= colNames.length) {
+        values[i] = f.apply(row);
+      } else {
+        values[i] = f.apply(Arrays.copyOf(row, offset));
+      }
+    }
+
+    return DoubleSeries.buildFrom(values);
   }
 
   /**

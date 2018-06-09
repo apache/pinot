@@ -1600,6 +1600,17 @@ public class DataFrame {
   }
 
   /**
+   * Returns {@code true} if series {@code seriesName} value at {@code index} is null.
+   *
+   * @param seriesName series name
+   * @param index row index
+   * @return {@code true} is null, otherwise {@code false}
+   */
+  public boolean isNull(String seriesName, int index) {
+    return assertSeriesExists(seriesName).isNull(index);
+  }
+
+  /**
    * Returns a copy of the DataFrame omitting series that contain a {@code null} value.
    *
    * @return DataFrame copy without null series
