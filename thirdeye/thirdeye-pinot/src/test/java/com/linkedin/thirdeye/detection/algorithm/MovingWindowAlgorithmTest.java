@@ -43,6 +43,7 @@ public class MovingWindowAlgorithmTest {
   private static final String PROP_ZSCORE_MAX = "zscoreMax";
   private static final String PROP_WEEK_OVER_WEEK = "weekOverWeek";
   private static final String PROP_OUTLIER_DURATION = "outlierDuration";
+  private static final String PROP_BASELINE_WEEKS = "baselineWeeks";
 
   private DataProvider provider;
   private MovingWindowAlgorithm algorithm;
@@ -116,6 +117,7 @@ public class MovingWindowAlgorithmTest {
   public void testQuantileDiffMin() throws Exception {
     this.properties.put(PROP_WEEK_OVER_WEEK, true);
     this.properties.put(PROP_QUANTILE_MIN, 0.01);
+    this.properties.put(PROP_BASELINE_WEEKS, 1);
     this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 1209600000L, 2419200000L);
     DetectionPipelineResult res = this.algorithm.run();
 
@@ -233,6 +235,7 @@ public class MovingWindowAlgorithmTest {
   public void testZScoreDiffMax() throws Exception {
     this.properties.put(PROP_WEEK_OVER_WEEK, true);
     this.properties.put(PROP_ZSCORE_MAX, 2.0);
+    this.properties.put(PROP_BASELINE_WEEKS, 1);
     this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 1209600000L, 2419200000L);
     DetectionPipelineResult res = this.algorithm.run();
 

@@ -16,10 +16,15 @@ import com.linkedin.thirdeye.detection.StaticDetectionPipeline;
 import com.linkedin.thirdeye.detection.StaticDetectionPipelineData;
 import com.linkedin.thirdeye.detection.StaticDetectionPipelineModel;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
-import java.util.ArrayList;
+import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
+import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
+import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.collections.MapUtils;
@@ -49,42 +54,17 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
   private static final String PROP_METRIC_URN = "metricUrn";
 
-  private static final String PROP_LOOKBACK = "lookback";
-  private static final String PROP_LOOKBACK_DEFAULT = "1w";
-
-  private static final String PROP_OUTLIER_DURATION = "outlierDuration";
-  private static final String PROP_OUTLIER_DURATION_DEFAULT = "0";
-
-  private static final String PROP_CHANGE_DURATION = "changeDuration";
-  private static final String PROP_CHANGE_DURATION_DEFAULT = "0";
-
-  private static final String PROP_QUANTILE_MIN = "quantileMin";
-  private static final double PROP_QUANTILE_MIN_DEFAULT = Double.NaN;
-
-  private static final String PROP_QUANTILE_MAX = "quantileMax";
-  private static final double PROP_QUANTILE_MAX_DEFAULT = Double.NaN;
-
-  private static final String PROP_ZSCORE_MIN = "zscoreMin";
-  private static final double PROP_ZSCORE_MIN_DEFAULT = Double.NaN;
-
-  private static final String PROP_ZSCORE_MAX = "zscoreMax";
-  private static final double PROP_ZSCORE_MAX_DEFAULT = Double.NaN;
-
-  private static final String PROP_WEEK_OVER_WEEK = "weekOverWeek";
-  private static final boolean PROP_WEEK_OVER_WEEK_DEFAULT = false;
-
-  private static final String PROP_TIMEZONE = "timezone";
-  private static final String PROP_TIMEZONE_DEFAULT = "UTC";
-
   private static final Pattern PATTERN_PERIOD = Pattern.compile("([0-9]+)\\s*(\\S*)");
 
-  private final MetricSlice slice;
+  private final MetricSlice sliceData;
+  private final MetricSlice sliceBaseline;
+  private final MetricSlice sliceDetection;
   private final Period lookback;
   private final double zscoreMin;
   private final double zscoreMax;
   private final double quantileMin;
   private final double quantileMax;
-  private final boolean weekOverWeek;
+  private final Baseline baseline;
   private final DateTimeZone timezone;
   private final Period outlierDuration;
   private final Period changeDuration;
@@ -97,39 +77,49 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     String metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
     MetricEntity me = MetricEntity.fromURN(metricUrn, 1.0);
 
-    this.weekOverWeek = MapUtils.getBooleanValue(config.getProperties(), PROP_WEEK_OVER_WEEK, PROP_WEEK_OVER_WEEK_DEFAULT);
-    this.quantileMin = MapUtils.getDoubleValue(config.getProperties(), PROP_QUANTILE_MIN, PROP_QUANTILE_MIN_DEFAULT);
-    this.quantileMax = MapUtils.getDoubleValue(config.getProperties(), PROP_QUANTILE_MAX, PROP_QUANTILE_MAX_DEFAULT);
-    this.zscoreMin = MapUtils.getDoubleValue(config.getProperties(), PROP_ZSCORE_MIN, PROP_ZSCORE_MIN_DEFAULT);
-    this.zscoreMax = MapUtils.getDoubleValue(config.getProperties(), PROP_ZSCORE_MAX, PROP_ZSCORE_MAX_DEFAULT);
-    this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), PROP_TIMEZONE, PROP_TIMEZONE_DEFAULT));
-    this.lookback = parsePeriod(MapUtils.getString(config.getProperties(), PROP_LOOKBACK, PROP_LOOKBACK_DEFAULT));
-    this.outlierDuration = parsePeriod(MapUtils.getString(config.getProperties(), PROP_OUTLIER_DURATION, PROP_OUTLIER_DURATION_DEFAULT));
-    this.changeDuration = parsePeriod(MapUtils.getString(config.getProperties(), PROP_CHANGE_DURATION, PROP_CHANGE_DURATION_DEFAULT));
+    this.quantileMin = MapUtils.getDoubleValue(config.getProperties(), "quantileMin", Double.NaN);
+    this.quantileMax = MapUtils.getDoubleValue(config.getProperties(), "quantileMax", Double.NaN);
+    this.zscoreMin = MapUtils.getDoubleValue(config.getProperties(), "zscoreMin", Double.NaN);
+    this.zscoreMax = MapUtils.getDoubleValue(config.getProperties(), "zscoreMax", Double.NaN);
+    this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), "timezone", "UTC"));
+    this.lookback = parsePeriod(MapUtils.getString(config.getProperties(), "lookback", "1week"));
+    this.outlierDuration = parsePeriod(MapUtils.getString(config.getProperties(), "outlierDuration", "0"));
+    this.changeDuration = parsePeriod(MapUtils.getString(config.getProperties(), "changeDuration", "0"));
 
-    Preconditions.checkArgument(Double.isNaN(this.quantileMin) || (this.quantileMin >= 0 && this.quantileMin <= 1.0), PROP_QUANTILE_MIN + " must be between 0.0 and 1.0");
-    Preconditions.checkArgument(Double.isNaN(this.quantileMax) || (this.quantileMax >= 0 && this.quantileMax <= 1.0), PROP_QUANTILE_MAX + " must be between 0.0 and 1.0");
+    int baselineWeeks = MapUtils.getIntValue(config.getProperties(), "baselineWeeks", 0);
+    BaselineAggregateType baselineType = BaselineAggregateType.valueOf(MapUtils.getString(config.getProperties(), "baselineType", "SUM"));
 
-    DateTime trainStart = new DateTime(startTime, this.timezone).minus(this.lookback);
-    if (this.weekOverWeek) {
-      trainStart = trainStart.minus(new Period().withField(DurationFieldType.weeks(), 1));
+    if (baselineWeeks <= 0) {
+      this.baseline = null;
+    } else {
+      this.baseline = BaselineAggregate.fromWeekOverWeek(baselineType, baselineWeeks, 1, this.timezone);
     }
 
-    this.slice = MetricSlice.from(me.getId(), trainStart.getMillis(), endTime, me.getFilters());
+    Preconditions.checkArgument(Double.isNaN(this.quantileMin) || (this.quantileMin >= 0 && this.quantileMin <= 1.0), "quantileMin must be between 0.0 and 1.0");
+    Preconditions.checkArgument(Double.isNaN(this.quantileMax) || (this.quantileMax >= 0 && this.quantileMax <= 1.0), "quantileMax must be between 0.0 and 1.0");
+
+    DateTime trainStart = new DateTime(startTime, this.timezone)
+        .minus(this.lookback);
+
+    DateTime dataStart = trainStart.minus(new Period().withField(DurationFieldType.weeks(), baselineWeeks));
+
+    this.sliceData = MetricSlice.from(me.getId(), dataStart.getMillis(), endTime, me.getFilters());
+    this.sliceBaseline = MetricSlice.from(me.getId(), trainStart.getMillis(), endTime, me.getFilters());
+    this.sliceDetection = MetricSlice.from(me.getId(), startTime, endTime, me.getFilters());
   }
 
   @Override
   public StaticDetectionPipelineModel getModel() {
     return new StaticDetectionPipelineModel()
-        .withTimeseriesSlices(Collections.singleton(this.slice));
+        .withTimeseriesSlices(Collections.singleton(this.sliceData));
   }
 
   @Override
   public DetectionPipelineResult run(StaticDetectionPipelineData data) throws Exception {
-    DataFrame df = data.getTimeseries().get(this.slice);
+    DataFrame df = data.getTimeseries().get(this.sliceData);
 
-    if (this.weekOverWeek) {
-      df = this.differentiateWeekOverWeek(df);
+    if (this.baseline != null) {
+      df = this.makeTimeseries(df);
     }
 
     // potentially variable window size. manual iteration required.
@@ -166,7 +156,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     // anomalies
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_ZSCORE_MIN_VIOLATION, COL_ZSCORE_MAX_VIOLATION, COL_QUANTILE_MIN_VIOLATION, COL_QUANTILE_MAX_VIOLATION);
 
-    List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.slice, df, COL_ANOMALY);
+    List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.sliceDetection, df, COL_ANOMALY);
 
     long maxTime = -1;
     if (!df.isEmpty()) {
@@ -185,12 +175,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   DataFrame applyMovingWindow(DataFrame df) {
     DataFrame res = new DataFrame(df);
 
-    LongSeries timestamps = res.getLongs(COL_TIME).filter(new Series.LongConditional() {
-      @Override
-      public boolean apply(long... values) {
-        return values[0] >= MovingWindowAlgorithm.this.startTime;
-      }
-    }).dropNull();
+    LongSeries timestamps = res.getLongs(COL_TIME).filter(res.getLongs(COL_TIME).gte(this.startTime)).dropNull();
 
     res.addSeries(COL_OUTLIER, BooleanSeries.fillValues(res.size(), false));
 
@@ -247,25 +232,32 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
    * @param df data
    * @return data with differentiated values
    */
-  DataFrame differentiateWeekOverWeek(DataFrame df) {
-    DataFrame dfCurr = new DataFrame(df);
-    DataFrame dfBase = new DataFrame(df);
+  DataFrame makeTimeseries(DataFrame df) {
+    Collection<MetricSlice> slices = this.baseline.scatter(this.sliceBaseline);
+    Map<MetricSlice, DataFrame> timeseriesMap = new HashMap<>();
+    for (MetricSlice slice : slices) {
+      timeseriesMap.put(slice, sliceTimeseries(df, slice));
+    }
 
-    dfBase.mapInPlace(new Series.LongFunction() {
-      @Override
-      public long apply(long... values) {
-        return new DateTime(values[0], MovingWindowAlgorithm.this.timezone)
-            .plus(new Period().withField(DurationFieldType.weeks(), 1)).getMillis();
-      }
-    }, COL_TIME);
-    dfBase.renameSeries(COL_VALUE, COL_BASE);
+    DataFrame dfCurr = new DataFrame(df).renameSeries(COL_VALUE, COL_CURR);
+    DataFrame dfBase = this.baseline.gather(this.sliceBaseline, timeseriesMap).renameSeries(COL_VALUE, COL_BASE);
 
-    dfCurr.addSeries(dfBase, COL_BASE);
-    dfCurr.renameSeries(COL_VALUE, COL_CURR);
+    DataFrame joined = new DataFrame(dfCurr);
+    joined.addSeries(dfBase, COL_BASE);
+    joined.addSeries(COL_VALUE, joined.getDoubles(COL_CURR).subtract(joined.get(COL_BASE)));
 
-    dfCurr.addSeries(COL_VALUE, dfCurr.getDoubles(COL_CURR).subtract(dfCurr.get(COL_BASE)));
+    return joined.dropNull();
+  }
 
-    return dfCurr.dropNull();
+  /**
+   * Helper slices base time series for given metric time slice
+   *
+   * @param df time series dataframe
+   * @param slice metric slice
+   * @return time series for given slice (range)
+   */
+  static DataFrame sliceTimeseries(DataFrame df, MetricSlice slice) {
+    return df.filter(df.getLongs(COL_TIME).gte(slice.getStart()).and(df.getLongs(COL_TIME).lt(slice.getEnd()))).dropNull(COL_TIME);
   }
 
   /**
