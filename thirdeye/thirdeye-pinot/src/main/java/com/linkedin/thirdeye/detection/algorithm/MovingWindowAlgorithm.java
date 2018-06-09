@@ -239,6 +239,8 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       timeseriesMap.put(slice, sliceTimeseries(df, slice));
     }
 
+    // TODO handle change points gracefully
+
     DataFrame dfCurr = new DataFrame(df).renameSeries(COL_VALUE, COL_CURR);
     DataFrame dfBase = this.baseline.gather(this.sliceBaseline, timeseriesMap).renameSeries(COL_VALUE, COL_BASE);
 

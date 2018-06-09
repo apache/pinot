@@ -251,6 +251,12 @@ public class MovingWindowAlgorithmTest {
   }
 
   //
+  // baseline test
+  //
+
+  // TODO test aggregated baselines, change points
+
+  //
   // edge cases
   //
 
