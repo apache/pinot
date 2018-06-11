@@ -6,5 +6,5 @@ import java.util.List;
 
 
 public interface ScoreFunction {
-  public double calculateScore(DetectionPipelineResult detectionResult, List<MergedAnomalyResultDTO> testAnomalies);
+  double calculateScore(DetectionPipelineResult detectionResult, List<MergedAnomalyResultDTO> testAnomalies);
 }

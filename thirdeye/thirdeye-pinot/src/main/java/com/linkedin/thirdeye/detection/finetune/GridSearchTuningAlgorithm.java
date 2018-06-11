@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detection.finetune;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Iterables;
 import com.jayway.jsonpath.DocumentContext;
@@ -26,11 +27,13 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class GridSearchTuningAlgorithm implements TuningAlgorithm {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
+  private static final Logger LOG = LoggerFactory.getLogger(GridSearchTuningAlgorithm.class);
   private final String jsonProperties;
   private final LinkedHashMap<String, List<Number>> parameters;
   private final DetectionPipelineLoader loader;
@@ -67,7 +70,7 @@ public class GridSearchTuningAlgorithm implements TuningAlgorithm {
     this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, timeseriesLoader, aggregationLoader, loader);
     this.scores = new HashMap<>();
     this.results = new LinkedHashMap<>();
-    this.scoreFunction = new F1ScoreFunction();
+    this.scoreFunction = new TimeBucketF1ScoreFunction();
   }
 
   /**
@@ -95,6 +98,7 @@ public class GridSearchTuningAlgorithm implements TuningAlgorithm {
       this.results.put(config, result);
       // calculate score
       this.scores.put(config, this.scoreFunction.calculateScore(result, testAnomalies));
+      LOG.info("Score for detection config {} is {}", OBJECT_MAPPER.writeValueAsString(config), this.scores.get(config));
       return;
     }
     String path = Iterables.get(this.parameters.keySet(), currentParameters.size());
@@ -139,8 +143,17 @@ public class GridSearchTuningAlgorithm implements TuningAlgorithm {
         maxVal = entry.getValue();
       }
     }
+    if (bestConfig != null) {
+      try {
+        LOG.info("Best detection config found is {} with score {}", OBJECT_MAPPER.writeValueAsString(bestConfig), this.scores.get(bestConfig));
+      } catch (JsonProcessingException e) {
+        LOG.error("error processing json config", e);
+      }
+      return bestConfig;
+    }
+
     // if no scores is available, compare the number of anomalies detected by each config.
-    if (bestConfig == null && !this.results.isEmpty()) {
+    if (!this.results.isEmpty()) {
       int maxNumberOfAnomalies = 0;
       bestConfig = (DetectionConfigDTO) results.keySet().toArray()[0];
       for (Map.Entry<DetectionConfigDTO, DetectionPipelineResult> entry : results.entrySet()) {

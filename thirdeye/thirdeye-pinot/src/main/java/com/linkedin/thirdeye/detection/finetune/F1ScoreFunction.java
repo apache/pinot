@@ -8,7 +8,7 @@ import java.util.List;
 
 
 /**
- * The F1 score function.
+ * The F1 score function based on counting anomaly.
  */
 public class F1ScoreFunction implements ScoreFunction {
 
@@ -18,11 +18,14 @@ public class F1ScoreFunction implements ScoreFunction {
   @Override
   public double calculateScore(DetectionPipelineResult result, List<MergedAnomalyResultDTO> anomalies) {
     List<MergedAnomalyResultDTO> trueTestAnomalies = new ArrayList<>();
+    int labeledAnomalies = 0;
 
     for (MergedAnomalyResultDTO testAnomaly : anomalies) {
-      if (testAnomaly.getAnomalyFeedbackId() != null
-          && testAnomaly.getFeedback().getFeedbackType() == AnomalyFeedbackType.ANOMALY) {
-        trueTestAnomalies.add(testAnomaly);
+      if (testAnomaly.getAnomalyFeedbackId() != null) {
+        labeledAnomalies++;
+        if (testAnomaly.getFeedback().getFeedbackType() == AnomalyFeedbackType.ANOMALY) {
+          trueTestAnomalies.add(testAnomaly);
+        }
       }
     }
 
@@ -38,7 +41,7 @@ public class F1ScoreFunction implements ScoreFunction {
     }
 
     double precision = truePositives / (double) (result.getAnomalies().size() - truePositives);
-    double recall = truePositives / (double) trueTestAnomalies.size();
+    double recall = truePositives / (double) labeledAnomalies;
     return 2 * precision * recall / (precision + recall);
   }
 
