@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detection.finetune;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Iterables;
 import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
@@ -17,12 +18,15 @@ import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.detection.AnomalySlice;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DefaultDataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipeline;
 import com.linkedin.thirdeye.detection.DetectionPipelineLoader;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -76,24 +80,23 @@ public class GridSearchTuningAlgorithm implements TuningAlgorithm {
   /**
    * Fit into a time range and evaluate the best config.
    *
-   * @param start the start
-   * @param end the end
+   * @param slice anomaly slice
    * @throws Exception the exception
    */
   @Override
-  public void fit(long start, long end) throws Exception {
-    List<MergedAnomalyResultDTO> testAnomalies = this.anomalyDAO.findByTime(start, end);
-    fit(start, end, new HashMap<String, Number>(), testAnomalies);
+  public void fit(AnomalySlice slice) throws Exception {
+    Collection<MergedAnomalyResultDTO> testAnomalies = this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice);
+    fit(slice, new HashMap<String, Number>(), testAnomalies);
   }
 
   /**
    * Fit into a time range and evaluate the best config recursively.
    * */
-  private void fit(long start, long end, Map<String, Number> currentParameters,
-      List<MergedAnomalyResultDTO> testAnomalies) throws Exception {
+  private void fit(AnomalySlice slice, Map<String, Number> currentParameters,
+      Collection<MergedAnomalyResultDTO> testAnomalies) throws Exception {
     if (currentParameters.size() == this.parameters.size()) {
       DetectionConfigDTO config = makeConfigFromParameters(currentParameters);
-      DetectionPipeline pipeline = this.loader.from(this.provider, config, start, end);
+      DetectionPipeline pipeline = this.loader.from(this.provider, config, slice.getStart(), slice.getEnd());
       DetectionPipelineResult result = pipeline.run();
       this.results.put(config, result);
       // calculate score
@@ -105,7 +108,7 @@ public class GridSearchTuningAlgorithm implements TuningAlgorithm {
     List<Number> values = this.parameters.get(path);
     for (Number value : values) {
       currentParameters.put(path, value);
-      fit(start, end, currentParameters, testAnomalies);
+      fit(slice, currentParameters, testAnomalies);
       currentParameters.remove(path);
     }
   }

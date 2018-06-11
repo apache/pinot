@@ -19,6 +19,7 @@ import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.datasource.csv.CSVThirdEyeDataSource;
+import com.linkedin.thirdeye.detection.AnomalySlice;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -107,7 +108,8 @@ public class GridSearchTuningAlgorithmTest {
 
   @Test
   public void testGridSearch() throws Exception {
-    gridSearch.fit(1525211842000L, 1527890242000L);
+    AnomalySlice slice = new AnomalySlice().withStart(1525211842000L).withEnd(1527890242000L);
+    gridSearch.fit(slice);
     DetectionConfigDTO config = gridSearch.bestDetectionConfig();
     Assert.assertEquals(MapUtils.getDouble(config.getProperties(), "change"), 0.05);
   }

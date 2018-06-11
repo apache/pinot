@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 
@@ -16,7 +17,7 @@ public class F1ScoreFunction implements ScoreFunction {
    * Calculate F1 score of the result against the anomalies.
    */
   @Override
-  public double calculateScore(DetectionPipelineResult result, List<MergedAnomalyResultDTO> anomalies) {
+  public double calculateScore(DetectionPipelineResult result, Collection<MergedAnomalyResultDTO> anomalies) {
     List<MergedAnomalyResultDTO> trueTestAnomalies = new ArrayList<>();
     int labeledAnomalies = 0;
 

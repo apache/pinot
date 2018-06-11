@@ -21,7 +21,7 @@ public class TimeBucketF1ScoreFunction implements ScoreFunction {
   private long bucketSize = TimeUnit.MINUTES.toMillis(1);
 
   @Override
-  public double calculateScore(DetectionPipelineResult detectionResult, List<MergedAnomalyResultDTO> testAnomalies) {
+  public double calculateScore(DetectionPipelineResult detectionResult, Collection<MergedAnomalyResultDTO> testAnomalies) {
     List<MergedAnomalyResultDTO> anomalyResults = detectionResult.getAnomalies();
     Set<Long> resultAnomalyTimes = new HashSet<>();
     for (MergedAnomalyResultDTO anomaly : anomalyResults) {

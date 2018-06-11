@@ -90,8 +90,8 @@ public class DetectionResource {
 
   @POST
   @Path("/gridsearch")
-  public Response gridSearch(@QueryParam("start") long start, @QueryParam("end") long end,
-      @ApiParam("jsonPayload") String jsonPayload) throws Exception {
+  public Response gridSearch(@QueryParam("configId") long configId, @QueryParam("start") long start,
+      @QueryParam("end") long end, @ApiParam("jsonPayload") String jsonPayload) throws Exception {
     if (jsonPayload == null) {
       throw new IllegalArgumentException("Empty Json Payload");
     }
@@ -100,9 +100,11 @@ public class DetectionResource {
 
     LinkedHashMap<String, List<Number>> parameters = (LinkedHashMap<String, List<Number>>) json.get("parameters");
 
-    TuningAlgorithm gridSearch =
-        new GridSearchTuningAlgorithm(OBJECT_MAPPER.writeValueAsString(json.get("properties")), parameters);
-    gridSearch.fit(start, end);
+    AnomalySlice slice = new AnomalySlice().withConfigId(configId).withStart(start).withEnd(end);
+
+    TuningAlgorithm gridSearch = new GridSearchTuningAlgorithm(OBJECT_MAPPER.writeValueAsString(json.get("properties")), parameters);
+    gridSearch.fit(slice);
+
     return Response.ok(gridSearch.bestDetectionConfig()).build();
   }
 

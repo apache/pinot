@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.detection.finetune;
 
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
+import com.linkedin.thirdeye.detection.AnomalySlice;
 
 
 /**
@@ -10,16 +11,15 @@ public interface TuningAlgorithm {
   /**
    * Fit the time series and anomalies between start and end time stamps, and score the detection configs.
    *
-   * @param start the start
-   * @param end the end
+   * @param slice anomaly slice
    * @throws Exception the exception
    */
-  public void fit(long start, long end) throws Exception;
+  void fit(AnomalySlice slice) throws Exception;
 
   /**
    * Return the best detection config detection config dto.
    *
    * @return the detection config dto
    */
-  public DetectionConfigDTO bestDetectionConfig();
+  DetectionConfigDTO bestDetectionConfig();
 }
