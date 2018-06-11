@@ -104,6 +104,7 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
 
     for (DatasetConfigDTO datasetConfigDTO : filtered) {
       if (shouldRemoveDataset(datasetConfigDTO, datasets)) {
+        LOG.info("Deleting pinot dataset '{}'", datasetConfigDTO.getDataset());
         datasetDAO.deleteByPredicate(Predicate.EQ("dataset", datasetConfigDTO.getDataset()));
       }
     }
