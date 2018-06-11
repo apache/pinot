@@ -1137,6 +1137,9 @@ public class AnomaliesResource {
   }
 
   private static DataFrame fixTimestamp(DataFrame df, long start) {
+    if (df.isEmpty()) {
+      return DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(start, DoubleSeries.NULL).build();
+    }
     return df.set(COL_TIME, BooleanSeries.fillValues(1, true), LongSeries.fillValues(1, start));
   }
 
