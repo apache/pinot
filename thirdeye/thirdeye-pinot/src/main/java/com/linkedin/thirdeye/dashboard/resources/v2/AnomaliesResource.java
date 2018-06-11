@@ -1094,7 +1094,7 @@ public class AnomaliesResource {
 
     // TODO parallel load
     // TODO type from agg function
-    Baseline baseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, 4, 1, dataTimeZone);
+    Baseline baseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, 1, 1, dataTimeZone);
 
     MetricSlice sliceAnomalyCurrent = MetricSlice.from(metric.getId(), anomaly.getStartTime(), anomaly.getEndTime(), filters);
 
