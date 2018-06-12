@@ -23,8 +23,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.collections.MapUtils;
@@ -47,6 +49,8 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private static final String COL_QUANTILE_MAX_VIOLATION = "quantileMaxViolation";
   private static final String COL_ZSCORE_MIN_VIOLATION = "zscoreMinViolation";
   private static final String COL_ZSCORE_MAX_VIOLATION = "zscoreMaxViolation";
+  private static final String COL_ZSCORE_AUC_MIN_VIOLATION = "zscoreAUCMinViolation";
+  private static final String COL_ZSCORE_AUC_MAX_VIOLATION = "zscoreAUCMaxViolation";
   private static final String COL_ANOMALY = "anomaly";
   private static final String COL_TIME = DataFrameUtils.COL_TIME;
   private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
@@ -59,9 +63,13 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private final MetricSlice sliceData;
   private final MetricSlice sliceBaseline;
   private final MetricSlice sliceDetection;
+//  private final AnomalySlice anomalySlice;
+
   private final Period lookback;
   private final double zscoreMin;
   private final double zscoreMax;
+  private final double zscoreAUCMin;
+  private final double zscoreAUCMax;
   private final double quantileMin;
   private final double quantileMax;
   private final Baseline baseline;
@@ -81,6 +89,8 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     this.quantileMax = MapUtils.getDoubleValue(config.getProperties(), "quantileMax", Double.NaN);
     this.zscoreMin = MapUtils.getDoubleValue(config.getProperties(), "zscoreMin", Double.NaN);
     this.zscoreMax = MapUtils.getDoubleValue(config.getProperties(), "zscoreMax", Double.NaN);
+    this.zscoreAUCMin = MapUtils.getDoubleValue(config.getProperties(), "zscoreAUCMin", Double.NaN);
+    this.zscoreAUCMax = MapUtils.getDoubleValue(config.getProperties(), "zscoreAUCMax", Double.NaN);
     this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), "timezone", "UTC"));
     this.lookback = parsePeriod(MapUtils.getString(config.getProperties(), "lookback", "1week"));
     this.outlierDuration = parsePeriod(MapUtils.getString(config.getProperties(), "outlierDuration", "0"));
@@ -98,28 +108,44 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     Preconditions.checkArgument(Double.isNaN(this.quantileMin) || (this.quantileMin >= 0 && this.quantileMin <= 1.0), "quantileMin must be between 0.0 and 1.0");
     Preconditions.checkArgument(Double.isNaN(this.quantileMax) || (this.quantileMax >= 0 && this.quantileMax <= 1.0), "quantileMax must be between 0.0 and 1.0");
 
-    DateTime trainStart = new DateTime(startTime, this.timezone)
-        .minus(this.lookback);
+    DateTime trainStart = new DateTime(startTime, this.timezone).minus(this.lookback);
 
     DateTime dataStart = trainStart.minus(new Period().withField(DurationFieldType.weeks(), baselineWeeks));
 
     this.sliceData = MetricSlice.from(me.getId(), dataStart.getMillis(), endTime, me.getFilters());
     this.sliceBaseline = MetricSlice.from(me.getId(), trainStart.getMillis(), endTime, me.getFilters());
     this.sliceDetection = MetricSlice.from(me.getId(), startTime, endTime, me.getFilters());
+
+//    // TODO doesn't work with preview/replay. support anomalies by metric?
+//    this.anomalySlice = new AnomalySlice()
+//        .withConfigId(this.config.getId())
+//        .withStart(this.sliceData.getStart())
+//        .withEnd(this.sliceData.getEnd());
   }
 
   @Override
   public StaticDetectionPipelineModel getModel() {
     return new StaticDetectionPipelineModel()
         .withTimeseriesSlices(Collections.singleton(this.sliceData));
+//        .withAnomalySlices(Collections.singleton(this.anomalySlice));
   }
 
   @Override
   public DetectionPipelineResult run(StaticDetectionPipelineData data) throws Exception {
     DataFrame df = data.getTimeseries().get(this.sliceData);
 
+    // change point rescaling
+    df = AlgorithmUtils.getRescaledSeries(df, getChangePoints(data));
+
+    // outliers
+    df.addSeries(COL_OUTLIER, BooleanSeries.fillValues(df.size(), false));
+    if (this.outlierDuration.toStandardDuration().getMillis() > 0) {
+      df.addSeries(COL_OUTLIER, AlgorithmUtils.getOutliers(df, this.outlierDuration.toStandardDuration()));
+    }
+
+    // relative baseline
     if (this.baseline != null) {
-      df = this.makeTimeseries(df);
+      df = this.makeRelativeTimeseries(df);
     }
 
     // potentially variable window size. manual iteration required.
@@ -128,8 +154,11 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     // zscore check
     df.addSeries(COL_ZSCORE_MIN_VIOLATION, BooleanSeries.fillValues(df.size(), false));
     df.addSeries(COL_ZSCORE_MAX_VIOLATION, BooleanSeries.fillValues(df.size(), false));
+    df.addSeries(COL_ZSCORE_AUC_MIN_VIOLATION, BooleanSeries.fillValues(df.size(), false));
+    df.addSeries(COL_ZSCORE_AUC_MAX_VIOLATION, BooleanSeries.fillValues(df.size(), false));
 
-    if (!Double.isNaN(this.zscoreMin) || !Double.isNaN(this.zscoreMax)) {
+    if (!Double.isNaN(this.zscoreMin) || !Double.isNaN(this.zscoreMax) ||
+        !Double.isNaN(this.zscoreAUCMin) || !Double.isNaN(this.zscoreAUCMax)) {
       df.addSeries(COL_ZSCORE, df.getDoubles(COL_VALUE).subtract(df.get(COL_MEAN)).divide(df.getDoubles(COL_STD).replace(0.0d, DoubleSeries.NULL)));
 
       if (!Double.isNaN(this.zscoreMin)) {
@@ -138,6 +167,12 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
       if (!Double.isNaN(this.zscoreMax)) {
         df.addSeries(COL_ZSCORE_MAX_VIOLATION, df.getDoubles(COL_ZSCORE).gt(this.zscoreMax).fillNull());
+      }
+
+      if (!Double.isNaN(this.zscoreAUCMin) || !Double.isNaN(this.zscoreAUCMax)) {
+        DataFrame dfAuc = timeseries2auc(df.renameSeries(COL_ZSCORE, COL_VALUE));
+        DataFrame dfAucAnomaly = auc2anomaly(df.getLongs(COL_TIME), dfAuc, this.zscoreAUCMin, this.zscoreAUCMax);
+        df.addSeries(dfAucAnomaly, COL_ZSCORE_AUC_MIN_VIOLATION, COL_ZSCORE_AUC_MAX_VIOLATION);
       }
     }
 
@@ -154,7 +189,10 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     }
 
     // anomalies
-    df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_ZSCORE_MIN_VIOLATION, COL_ZSCORE_MAX_VIOLATION, COL_QUANTILE_MIN_VIOLATION, COL_QUANTILE_MAX_VIOLATION);
+    df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY,
+        COL_ZSCORE_MIN_VIOLATION, COL_ZSCORE_MAX_VIOLATION,
+        COL_ZSCORE_AUC_MIN_VIOLATION, COL_ZSCORE_AUC_MAX_VIOLATION,
+        COL_QUANTILE_MIN_VIOLATION, COL_QUANTILE_MAX_VIOLATION);
 
     List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.sliceDetection, df, COL_ANOMALY);
 
@@ -176,14 +214,6 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     DataFrame res = new DataFrame(df);
 
     LongSeries timestamps = res.getLongs(COL_TIME).filter(res.getLongs(COL_TIME).gte(this.startTime)).dropNull();
-
-    res.addSeries(COL_OUTLIER, BooleanSeries.fillValues(res.size(), false));
-
-    if (this.outlierDuration.toStandardDuration().getMillis() > 0) {
-      res.addSeries(COL_OUTLIER, AlgorithmUtils.getOutliers(res, this.outlierDuration.toStandardDuration()));
-    }
-
-    // TODO support change points
 
     double[] std = new double[timestamps.size()];
     double[] mean = new double[timestamps.size()];
@@ -232,14 +262,12 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
    * @param df data
    * @return data with differentiated values
    */
-  DataFrame makeTimeseries(DataFrame df) {
+  DataFrame makeRelativeTimeseries(DataFrame df) {
     Collection<MetricSlice> slices = this.baseline.scatter(this.sliceBaseline);
     Map<MetricSlice, DataFrame> timeseriesMap = new HashMap<>();
     for (MetricSlice slice : slices) {
       timeseriesMap.put(slice, sliceTimeseries(df, slice));
     }
-
-    // TODO handle change points gracefully
 
     DataFrame dfCurr = new DataFrame(df).renameSeries(COL_VALUE, COL_CURR);
     DataFrame dfBase = this.baseline.gather(this.sliceBaseline, timeseriesMap).renameSeries(COL_VALUE, COL_BASE);
@@ -249,6 +277,42 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     joined.addSeries(COL_VALUE, joined.getDoubles(COL_CURR).subtract(joined.get(COL_BASE)));
 
     return joined.dropNull();
+  }
+
+  /**
+   * Returns a merged set of change points computed from time seires and user-labeled anomalies.
+   *
+   * @param data data
+   * @return set of change points
+   */
+  Set<Long> getChangePoints(StaticDetectionPipelineData data) {
+    // TODO purge near-duplicates
+
+    Set<Long> changePoints = new HashSet<>();
+
+    // from time series
+    if (this.changeDuration.toStandardDuration().getMillis() > 0) {
+      changePoints.addAll(AlgorithmUtils.getChangePoints(data.getTimeseries().get(this.sliceData), this.changeDuration.toStandardDuration()));
+    }
+
+    // TODO change points from user-labeled anomalies
+
+//    // from anomalies
+//    Collection<MergedAnomalyResultDTO> changePointAnomalies = Collections2.filter(
+//        data.getAnomalies().get(this.anomalySlice), new Predicate<MergedAnomalyResultDTO>() {
+//          @Override
+//          public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomalyResultDTO) {
+//            return mergedAnomalyResultDTO != null
+//                && mergedAnomalyResultDTO.getFeedback() != null
+//                && AnomalyFeedbackType.ANOMALY_NEW_TREND.equals(mergedAnomalyResultDTO.getFeedback().getFeedbackType());
+//          }
+//        });
+//
+//    for (MergedAnomalyResultDTO anomaly : changePointAnomalies) {
+//      changePoints.add(anomaly.getStartTime());
+//    }
+
+    return changePoints;
   }
 
   /**
@@ -278,6 +342,94 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
         return values[0] >= tStart && values[0] < tCurrent && values[1] != 1;
       }
     }, COL_TIME, COL_OUTLIER).dropNull();
+  }
+
+  /**
+   * Returns Area-Under-Curve estimates based on runs.
+   *
+   * @param df time series dataframe
+   * @return area-under-curve time series
+   */
+  static DataFrame timeseries2auc(DataFrame df) {
+    LongSeries timestamps = df.getLongs(COL_TIME);
+    DoubleSeries values = df.getDoubles(COL_VALUE);
+
+    DataFrame.Builder builder = DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE");
+
+    int runSide = Integer.MIN_VALUE;
+    int runStart = Integer.MIN_VALUE;
+    double runSum = 0;
+    for (int i = 0; i < df.size(); i++) {
+      if (values.isNull(i)) {
+        continue;
+      }
+
+      double val = values.getDouble(i);
+      int side = (int) Math.signum(val);
+
+      if (runStart <= Integer.MIN_VALUE) {
+        runStart = i;
+      }
+
+      if (runSide <= Integer.MIN_VALUE) {
+        runSide = side;
+      }
+
+      if (side != runSide) {
+        builder.append(timestamps.get(runStart), runSum);
+        runSide = side;
+        runStart = i;
+        runSum = 0;
+      }
+
+      runSum += val;
+    }
+
+    if (runStart > Integer.MIN_VALUE) {
+      builder.append(timestamps.get(runStart), runSum);
+    }
+
+    return builder.build();
+  }
+
+  /**
+   * Returns a time series-aligned dataframe for AUC anomalies
+   *
+   * @param timestamps time stamps
+   * @param dfAuc AUC dataframe
+   * @param aucMin min threshold
+   * @param aucMax max threshold
+   * @return anomaly data frame for {@code COL_ZSCORE_AUC_MIN_VIOLATION} and {@code COL_ZSCORE_AUC_MAX_VIOLATION}
+   */
+  static DataFrame auc2anomaly(LongSeries timestamps, DataFrame dfAuc, double aucMin, double aucMax) {
+    DataFrame df = new DataFrame(COL_TIME, timestamps)
+        .addSeries(COL_ANOMALY, BooleanSeries.fillValues(timestamps.size(), false));
+
+    df.addSeries(COL_ZSCORE_AUC_MIN_VIOLATION, BooleanSeries.fillValues(df.size(), false));
+    df.addSeries(COL_ZSCORE_AUC_MAX_VIOLATION, BooleanSeries.fillValues(df.size(), false));
+
+    BooleanSeries sTrue = BooleanSeries.fillValues(df.size(), true);
+
+    for (int i = 0; i < dfAuc.size(); i++) {
+      long curr = dfAuc.getLong(COL_TIME, i);
+
+      long next = timestamps.max().longValue() + 1;
+      if (i < dfAuc.size() - 1) {
+        next = dfAuc.getLong(COL_TIME, i + 1);
+      }
+
+      double val = dfAuc.getDouble(COL_VALUE, i);
+
+      if (!Double.isNaN(aucMin) && val < aucMin) {
+        df.set(COL_ZSCORE_AUC_MIN_VIOLATION, timestamps.gte(curr).and(timestamps.lt(next)), sTrue);
+      }
+
+      if (!Double.isNaN(aucMax) && val > aucMax) {
+        df.set(COL_ZSCORE_AUC_MAX_VIOLATION, timestamps.gte(curr).and(timestamps.lt(next)), sTrue);
+      }
+    }
+
+    return df;
   }
 
   /**

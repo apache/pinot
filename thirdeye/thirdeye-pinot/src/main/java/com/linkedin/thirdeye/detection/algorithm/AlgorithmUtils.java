@@ -5,7 +5,11 @@ import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.TreeSet;
 import org.joda.time.Duration;
 
@@ -120,4 +124,52 @@ public class AlgorithmUtils {
     return changePoints;
   }
 
+  /**
+   * Returns the time series re-scaled to and stitched backwards from change points
+   * (i.e. the last timestamp will be on its original level).
+   * <br/><b>NOTE:</b> rescales relative to segment median
+   *
+   * @param dfTimeseries time series dataframe
+   * @param changePoints set of change points
+   * @return re-scaled time series
+   */
+  static DataFrame getRescaledSeries(DataFrame dfTimeseries, Collection<Long> changePoints) {
+    if (dfTimeseries.isEmpty()) {
+      return dfTimeseries;
+    }
+
+    DataFrame df = new DataFrame(dfTimeseries);
+
+    List<Long> myChangePoints = new ArrayList<>(changePoints);
+    Collections.sort(myChangePoints);
+
+    LongSeries timestamps = df.getLongs(COL_TIME);
+
+    // create segments
+    List<DataFrame> segments = new ArrayList<>();
+    long prevTimestamp = timestamps.min().longValue();
+    for (Long changePoint : myChangePoints) {
+      segments.add(df.filter(timestamps.between(prevTimestamp, changePoint)).dropNull(COL_TIME));
+      prevTimestamp = changePoint;
+    }
+
+    segments.add(df.filter(timestamps.gte(prevTimestamp)).dropNull(COL_TIME));
+
+    // compute median
+    List<Double> medians = new ArrayList<>();
+    for (DataFrame segment : segments) {
+      medians.add(segment.getDoubles(COL_VALUE).median().doubleValue());
+    }
+
+    // rescale time series
+    double lastMedian = medians.get(medians.size() - 1);
+    for (int i = 0; i < segments.size(); i++) {
+      DataFrame segment = segments.get(i);
+      double median = medians.get(i);
+      double scalingFactor = lastMedian / median;
+      segment.addSeries(COL_VALUE, segment.getDoubles(COL_VALUE).multiply(scalingFactor));
+    }
+
+    return DataFrame.concatenate(segments);
+  }
 }

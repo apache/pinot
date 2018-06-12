@@ -1,8 +1,13 @@
 package com.linkedin.thirdeye.detection.algorithm;
 
+import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import org.joda.time.Duration;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -26,7 +31,7 @@ public class AlgorithmUtilsTest {
     this.outlierData = new DataFrame(this.data);
     this.outlierData.set(COL_VALUE,
         this.outlierData.getLongs(COL_TIME).between(86400000L, 86400000L * 3),
-        this.outlierData.getDoubles(COL_VALUE).subtract(500));
+        this.outlierData.getDoubles(COL_VALUE).multiply(0.5));
   }
 
   @Test
@@ -70,5 +75,38 @@ public class AlgorithmUtilsTest {
     Assert.assertTrue(AlgorithmUtils.getChangePoints(this.outlierData, new Duration(86400000L)).contains(86400000L));
     Assert.assertTrue(AlgorithmUtils.getChangePoints(this.outlierData, new Duration(86400000L)).contains(86400000L * 3 - 3600000L));
     // NOTE: last point is technically part of lower level, but above estimated median
+  }
+
+  @Test
+  public void testRescaleNoData() {
+    Assert.assertTrue(AlgorithmUtils.getRescaledSeries(new DataFrame(), new HashSet<Long>()).isEmpty());
+  }
+
+  @Test
+  public void testRescaleNone() {
+    Assert.assertEquals(AlgorithmUtils.getRescaledSeries(this.data, new HashSet<Long>()), this.data);
+  }
+
+  @Test
+  public void testRescale() {
+    Set<Long> changePoints = new HashSet<>(Arrays.asList(86400000L, 86400000L * 3));
+    Assert.assertTrue(equals(AlgorithmUtils.getRescaledSeries(this.outlierData, changePoints), this.data, 50));
+  }
+
+  private static boolean equals(DataFrame a, DataFrame b, double epsilon) {
+    if (!a.getSeriesNames().equals(b.getSeriesNames())) {
+      return false;
+    }
+
+    if (!a.get(COL_TIME).equals(b.get(COL_TIME))) {
+      return false;
+    }
+
+    DoubleSeries valA = a.getDoubles(COL_VALUE);
+    DoubleSeries valB = b.getDoubles(COL_VALUE);
+
+    BooleanSeries output = valA.lte(valB.add(epsilon)).and(valA.gte(valB.subtract(epsilon)));
+
+    return !output.hasFalse();
   }
 }

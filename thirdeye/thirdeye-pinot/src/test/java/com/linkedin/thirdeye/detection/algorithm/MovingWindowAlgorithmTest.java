@@ -41,8 +41,10 @@ public class MovingWindowAlgorithmTest {
   private static final String PROP_QUANTILE_MAX = "quantileMax";
   private static final String PROP_ZSCORE_MIN = "zscoreMin";
   private static final String PROP_ZSCORE_MAX = "zscoreMax";
-  private static final String PROP_WEEK_OVER_WEEK = "weekOverWeek";
+  private static final String PROP_ZSCORE_AUC_MIN = "zscoreAUCMin";
+  private static final String PROP_ZSCORE_AUC_MAX = "zscoreAUCMax";
   private static final String PROP_OUTLIER_DURATION = "outlierDuration";
+  private static final String PROP_CHANGE_DURATION = "changeDuration";
   private static final String PROP_BASELINE_WEEKS = "baselineWeeks";
 
   private DataProvider provider;
@@ -79,7 +81,8 @@ public class MovingWindowAlgorithmTest {
 
     this.provider = new MockDataProvider()
         .setTimeseries(timeseries)
-        .setMetrics(Collections.singletonList(metricConfigDTO));
+        .setMetrics(Collections.singletonList(metricConfigDTO))
+        .setAnomalies(Collections.<MergedAnomalyResultDTO>emptyList());
 
   }
 
@@ -115,7 +118,6 @@ public class MovingWindowAlgorithmTest {
 
   @Test
   public void testQuantileDiffMin() throws Exception {
-    this.properties.put(PROP_WEEK_OVER_WEEK, true);
     this.properties.put(PROP_QUANTILE_MIN, 0.01);
     this.properties.put(PROP_BASELINE_WEEKS, 1);
     this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 1209600000L, 2419200000L);
@@ -177,29 +179,6 @@ public class MovingWindowAlgorithmTest {
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1756800000L, 1767600000L)));
   }
 
-  @Test
-  public void testQuantileMaxOutlierCorrection() throws Exception {
-    this.data.set(COL_VALUE,
-        this.data.getDoubles(COL_TIME).gte(86400000L).and(
-            this.data.getDoubles(COL_TIME).lt(172800000L)
-        ),
-        this.data.getDoubles(COL_VALUE).add(500));
-
-    this.properties.put(PROP_QUANTILE_MAX, 0.975);
-    this.properties.put(PROP_OUTLIER_DURATION, "12h");
-    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 604800000L, 1209600000L);
-    DetectionPipelineResult res = this.algorithm.run();
-
-    Assert.assertEquals(res.getAnomalies().size(), 7);
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(626400000L, 630000000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(705600000L, 709200000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(846000000L, 849600000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(892800000L, 896400000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(903600000L, 907200000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(918000000L, 921600000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(950400000L, 954000000L)));
-  }
-
   //
   // zscore
   //
@@ -233,7 +212,6 @@ public class MovingWindowAlgorithmTest {
 
   @Test
   public void testZScoreDiffMax() throws Exception {
-    this.properties.put(PROP_WEEK_OVER_WEEK, true);
     this.properties.put(PROP_ZSCORE_MAX, 2.0);
     this.properties.put(PROP_BASELINE_WEEKS, 1);
     this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 1209600000L, 2419200000L);
@@ -251,10 +229,76 @@ public class MovingWindowAlgorithmTest {
   }
 
   //
-  // baseline test
+  // zscore AUC
   //
 
-  // TODO test aggregated baselines, change points
+  @Test
+  public void testZScoreAuc() throws Exception {
+    this.properties.put(PROP_ZSCORE_AUC_MIN, -6.0);
+    this.properties.put(PROP_ZSCORE_AUC_MAX, 6.0);
+    this.properties.put(PROP_BASELINE_WEEKS, 1);
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 1209600000L, 2419200000L);
+    DetectionPipelineResult res = this.algorithm.run();
+
+    Assert.assertEquals(res.getAnomalies().size(), 3);
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1274400000L, 1288800000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2102400000L, 2134800000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2401200000L, 2415600000L)));
+  }
+
+  //
+  // outlier and change point correction
+  //
+
+  @Test
+  public void testQuantileMaxOutlierCorrection() throws Exception {
+    this.data.set(COL_VALUE, this.data.getDoubles(COL_TIME).between(86400000L, 172800000L),
+        this.data.getDoubles(COL_VALUE).add(500));
+
+    this.properties.put(PROP_QUANTILE_MAX, 0.975);
+    this.properties.put(PROP_OUTLIER_DURATION, "12h");
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 604800000L, 1209600000L);
+    DetectionPipelineResult res = this.algorithm.run();
+
+    Assert.assertEquals(res.getAnomalies().size(), 7);
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(626400000L, 630000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(705600000L, 709200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(846000000L, 849600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(892800000L, 896400000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(903600000L, 907200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(918000000L, 921600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(950400000L, 954000000L)));
+  }
+
+  @Test
+  public void testQuantileMaxChangePointCorrection() throws Exception {
+    this.data.set(COL_VALUE, this.data.getDoubles(COL_TIME).between(298800000L, 903600000L),
+        this.data.getDoubles(COL_VALUE).multiply(1.88));
+    this.data.set(COL_VALUE, this.data.getDoubles(COL_TIME).gte(903600000L),
+        this.data.getDoubles(COL_VALUE).multiply(3.41));
+
+    this.properties.put(PROP_QUANTILE_MAX, 0.975);
+    this.properties.put(PROP_CHANGE_DURATION, "2d");
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 604800000L, 1209600000L);
+    DetectionPipelineResult res = this.algorithm.run();
+
+    Assert.assertEquals(res.getAnomalies().size(), 7);
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(626400000L, 630000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(705600000L, 709200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(846000000L, 849600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(892800000L, 896400000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(903600000L, 907200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(918000000L, 921600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(950400000L, 954000000L)));
+  }
+
+  // TODO test change points from user-labeled anomalies
+
+  //
+  // baselines
+  //
+
+  // TODO test baseline aggregation over multiple weeks
 
   //
   // edge cases
@@ -285,7 +329,8 @@ public class MovingWindowAlgorithmTest {
     this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 3600000L, 9999999L);
 
     DataFrame input = new DataFrame(COL_TIME, LongSeries.buildFrom(0L, 3600000L, 7200000L, 14400000L))
-        .addSeries(COL_VALUE, 1, 2, 3, 5);
+        .addSeries(COL_VALUE, 1, 2, 3, 5)
+        .addSeries(COL_OUTLIER, false, false, false, false);
 
     DataFrame output = new DataFrame(COL_TIME, LongSeries.buildFrom(0L, 3600000L, 7200000L, 14400000L))
         .addSeries(COL_VALUE, 1, 2, 3, 5)
