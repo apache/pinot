@@ -28,25 +28,25 @@ import static org.testng.Assert.*;
 
 
 public class LocalPinotFSTest {
-  private String _tmpDir;
   private File testFile;
   private File _absoluteTmpDirPath;
   private File _newTmpDir;
 
   @BeforeClass
   public void setUp() {
-    String tmpDirString = System.getProperty("java.io.tmpdir") + LocalPinotFSTest.class.getSimpleName() + "first";
-    _absoluteTmpDirPath = new File(tmpDirString);
+    _absoluteTmpDirPath = new File(System.getProperty("java.io.tmpdir"), LocalPinotFSTest.class.getSimpleName() + "first");
     FileUtils.deleteQuietly(_absoluteTmpDirPath);
-    _absoluteTmpDirPath.mkdir();
-    testFile = new File(_absoluteTmpDirPath, "testFile");
+    Assert.assertTrue(_absoluteTmpDirPath.mkdirs(), "Could not make directory " + _absoluteTmpDirPath.getPath());
     try {
+      testFile = new File(_absoluteTmpDirPath, "testFile");
       testFile.createNewFile();
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    _newTmpDir = new File(System.getProperty("java.io.tmpdir") + LocalPinotFSTest.class.getSimpleName() + "second");
+
+    _newTmpDir = new File(System.getProperty("java.io.tmpdir"), LocalPinotFSTest.class.getSimpleName() + "second");
     FileUtils.deleteQuietly(_newTmpDir);
+    Assert.assertTrue(_newTmpDir.mkdirs(), "Could not make directory " + _newTmpDir.getPath());
 
     _absoluteTmpDirPath.deleteOnExit();
     _newTmpDir.deleteOnExit();
