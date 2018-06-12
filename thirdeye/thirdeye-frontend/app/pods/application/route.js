@@ -12,7 +12,8 @@ export default Route.extend(ApplicationRouteMixin, {
   beforeModel() {
     // calling this._super to trigger ember-simple-auth's hook
     this._super(...arguments);
-
+    // SM: leaving this here for reference if needed
+    const isProdEnv = config.environment !== 'development';
     // invalidates session if cookie expired
     if (this.get('session.isAuthenticated')) {
       fetch('/auth')

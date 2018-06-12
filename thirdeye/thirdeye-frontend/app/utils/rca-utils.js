@@ -232,6 +232,16 @@ export function toMetricUrn(urn) {
 }
 
 /**
+ * Converts any percent string to number
+ * Example: '34%' returns 34
+ *
+ * @param {string} width - percent string
+ */
+export function toWidthNumber(width) {
+  return Number(width.replace('%',''));
+}
+
+/**
  * Returns a human-readable label for a metric urn, optionally using information from the entities cache.
  *
  * @param {string} urn metric urn
@@ -601,6 +611,7 @@ export default {
   toMetricLabel,
   toColor,
   toColorDirection,
+  toWidthNumber,
   isInverse,
   makeSortable,
   fromFilterMap,

@@ -9,12 +9,13 @@ import moment from 'moment';
 import { isPresent } from "@ember/utils";
 import Route from '@ember/routing/route';
 import { inject as service } from '@ember/service';
+import config from 'thirdeye-frontend/config/environment';
 import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
 
 // Setup for query param behavior
 const queryParamsConfig = {
   refreshModel: true,
-  replace: true
+  replace: false
 };
 
 export default Route.extend({
@@ -110,7 +111,7 @@ export default Route.extend({
     // We do not have a valid alertId. Set error state.
     if (isLoadError) {
       Object.assign(newAlertData, { functionName, isActive: false });
-      errorText = `${functionName.toUpperCase()} has failed to create. Please try again or email ask_thirdeye@linkedin.com`;
+      errorText = `${functionName.toUpperCase()} has failed to create. Please try again or email ${config.email}`;
     }
 
     controller.setProperties({

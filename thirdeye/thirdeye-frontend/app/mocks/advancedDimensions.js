@@ -22,7 +22,7 @@ export default {
         "(ALL)-",
         "(ALL)"
       ],
-      "otherDimensionValues": "null, japan, united states.iphone, italy, brazil, france.desktop, spain",
+      "otherDimensionValues": "null, guatemala, united states.iphone, italy, brazil, france.desktop, spain",
       "cost": 0
     },
     {
@@ -36,7 +36,7 @@ export default {
         "(ALL)"
       ],
       "otherDimensionValues": "",
-      "cost": 1524690.0039612
+      "cost": 1424690.0039612
     },
     {
       "baselineValue": 21545916,
@@ -45,7 +45,7 @@ export default {
       "contributionChange": "0.32%",
       "contributionToOverallChange": "5.15%",
       "names": [
-        "japan",
+        "guatemala",
         "(ALL)-"
       ],
       "otherDimensionValues": "iphone",
@@ -56,23 +56,23 @@ export default {
       "currentValue": 25105516,
       "percentageChange": "2.77%",
       "contributionChange": "0.28%",
-      "contributionToOverallChange": "3.58%",
+      "contributionToOverallChange": "7.58%",
       "names": [
-        "japan",
+        "guatemala",
         "iphone"
       ],
       "otherDimensionValues": "",
-      "cost": 3687.8513951803
+      "cost": 4687.8513951803
     }
   ],
   "dimensionCosts": [
     {
       "dimensinoName": "country_code",
-      "cost": 1597026.4955456
+      "cost": 2597026.4955456
     },
     {
       "dimensinoName": "device_type",
-      "cost": 98836.20901724
+      "cost": 18836.20901724
     }
   ]
 };

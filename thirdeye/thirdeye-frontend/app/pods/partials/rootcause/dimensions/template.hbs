@@ -6,12 +6,15 @@
     {{#subtablist.tab name="heatmap"}}Heatmap{{/subtablist.tab}}
   {{/subtab.tablist}}
 
-  {{#if model.isDevEnv}} {{!--  Remove conditional when table view is ready  --}}
+  {{#if model.isDevEnv}} {{!--  Remove conditional when table view is ready --}}
     {{#subtab.tabpanel name="table"}}
       {{rootcause-dimensions
-        selectedUrn=metricUrn
         entities=entities
+        metricUrn=metricUrn
         context=context
+        selectedUrns=selectedUrns
+        isLoading=true
+        onSelection=(action "onSelection")
       }}
     {{/subtab.tabpanel}}
   {{/if}}

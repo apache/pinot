@@ -49,6 +49,13 @@
       {{/bs-alert}}
     {{/if}}
 
+    {{#if (and anomaliesLoaded isAnomalyLoadError)}}
+      {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
+        <strong>Warning:</strong> We are not able to load data for {{model.totalAnomalies}} anomalies.
+        Please <a class="thirdeye-link-secondary thirdeye-link-secondary--warning" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a> for confirmation.
+      {{/bs-alert}}
+    {{/if}}
+
     <div class="te-content-block">
       <h4 class="te-self-serve__block-title">Anomalies over time ({{#if anomaliesLoaded}}{{filteredAnomalies.length}}{{else}}...loading anomalies{{/if}})</h4>
       <a class="te-self-serve__side-link te-self-serve__side-link--high" {{action "onClickReportAnomaly" this}}>Report missing anomaly</a>
@@ -127,11 +134,12 @@
       {{!-- Alert page graph --}}
       {{self-serve-graph
         metricData=metricData
+        isMetricSelected=true
         componentId='alert-page'
         topDimensions=topDimensions
         selectedDimension=alertDimension
         selectedDimensions=selectedDimensions
-        isMetricSelected=true
+        graphMailtoLink=graphMailtoLink
         isMetricDataLoading=isMetricDataLoading
         isMetricDataInvalid=isMetricDataInvalid
         isDimensionFetchDone=isDimensionFetchDone

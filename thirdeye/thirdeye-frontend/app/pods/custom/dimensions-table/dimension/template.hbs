@@ -1,0 +1,10 @@
+{{#if isFirstColumn}}
+  {{input
+    type="checkbox"
+    class="rootcause-dimensions-table__checkbox-cell"
+    checked=record.isSelected}}
+{{/if}}
+
+<div class="rootcause-dimensions-table__dimension-cell--dynamic {{if isFirstColumn "rootcause-dimensions-table__dimension-cell--first"}}" title="{{dimensionLabel}}">
+  {{dimensionLabel}}
+</div>

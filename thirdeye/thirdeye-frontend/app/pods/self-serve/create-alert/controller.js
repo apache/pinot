@@ -29,6 +29,7 @@ import {
   formatConfigGroupProps,
   getTopDimensions
 } from 'thirdeye-frontend/utils/manage-alert-utils';
+import config from 'thirdeye-frontend/config/environment';
 
 export default Controller.extend({
 
@@ -597,7 +598,7 @@ export default Controller.extend({
     function() {
       const selectedMetric = this.get('selectedMetricOption');
       const fullMetricName = `${selectedMetric.dataset}::${selectedMetric.name}`;
-      const recipient = 'ask_thirdeye@linkedin.com';
+      const recipient = config.email;
       const subject = 'TE Self-Serve Create Alert Metric Issue';
       const body = `TE Team, please look into a possible inconsistency issue with [ ${fullMetricName} ]`;
       const mailtoString = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;

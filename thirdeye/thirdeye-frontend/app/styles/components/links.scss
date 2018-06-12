@@ -84,6 +84,15 @@
     font-size: 15px;
   }
 
+  &--warning {
+    color: #a94442;
+    text-decoration: underline;
+
+    &:hover {
+      color: #711c1a;
+    }
+  }
+
   &:hover {
     color: #369ece;
     cursor: pointer;
