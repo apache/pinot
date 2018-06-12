@@ -14,6 +14,7 @@ import { computed, set } from '@ember/object';
 import { getWithDefault } from '@ember/object';
 import { isEmpty, isPresent } from "@ember/utils";
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import config from 'thirdeye-frontend/config/environment';
 import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
 import { formatConfigGroupProps } from 'thirdeye-frontend/utils/manage-alert-utils';
 
@@ -159,7 +160,7 @@ export default Controller.extend({
       return {
         active: true,
         name: this.get('newConfigGroupName'),
-        fromAddress: 'thirdeye-dev@linkedin.com',
+        fromAddress: config.devEmail,
         cronExpression: '0 0/5 * 1/1 * ? *',
         emailConfig: {
           functionIds: []

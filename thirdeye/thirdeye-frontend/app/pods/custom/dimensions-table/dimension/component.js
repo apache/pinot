@@ -30,7 +30,6 @@ export default Component.extend({
   onSelection: null,
   inputId: null,
   classNames: [BLOCK_CLASS],
-  classNameFirst: `${BLOCK_CLASS}--first`,
   classNameBindings: [`isCellHidden:${BLOCK_CLASS}--blank`],
 
   didReceiveAttrs() {

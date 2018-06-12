@@ -27,6 +27,7 @@ import {
   extractSeverity
 } from 'thirdeye-frontend/utils/manage-alert-utils';
 import { inject as service } from '@ember/service';
+import config from 'thirdeye-frontend/config/environment';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
 
@@ -220,10 +221,10 @@ export default Controller.extend({
     function() {
       const alertData = this.get('alertData');
       const fullMetricName = `${alertData.collection}::${alertData.metric}`;
-      const recipient = 'ask_thirdeye@linkedin.com';
+      const recipient = config.email;
       const subject = 'TE Self-Serve Alert Page: error loading metric and/or alert records';
       const body = `TE Team, please look into a possible inconsistency issue with [ ${fullMetricName} ] in alert page for alert id ${alertData.id}
-                    Alert page: https://thirdeye.corp.linkedin.com/app/#/manage/alert/${alertData.id}`;
+                    Alert page: ${location.href}`;
       const mailtoString = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       return mailtoString;
     }

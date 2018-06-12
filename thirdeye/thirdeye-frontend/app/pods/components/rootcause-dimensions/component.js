@@ -20,6 +20,7 @@
  */
 
 import Component from '@ember/component';
+import { once } from '@ember/runloop'
 import { isPresent, isEmpty } from '@ember/utils';
 import { task, timeout } from 'ember-concurrency';
 import { inject as service } from '@ember/service';
@@ -133,16 +134,18 @@ export default Component.extend({
 
     if (metricEntity) {
       const parsedMetric = metricEntity.label.split('::');
-      get(this, 'fetchDimensionAnalysisData').perform({
-        metric: parsedMetric[1],
-        dataset: parsedMetric[0],
-        currentStart: context.analysisRange[0],
-        currentEnd: context.analysisRange[1],
-        baselineStart: baselineRange[0],
-        baselineEnd: baselineRange[1],
-        summarySize: 20,
-        oneSideError: false,
-        depth: 3
+      once(() => {
+        get(this, 'fetchDimensionAnalysisData').perform({
+          metric: parsedMetric[1],
+          dataset: parsedMetric[0],
+          currentStart: context.analysisRange[0],
+          currentEnd: context.analysisRange[1],
+          baselineStart: baselineRange[0],
+          baselineEnd: baselineRange[1],
+          summarySize: 20,
+          oneSideError: false,
+          depth: 3
+        });
       });
     }
   },
@@ -159,6 +162,7 @@ export default Component.extend({
       const { dimensionsRawData, selectedUrns, metricUrn } = this.getProperties('dimensionsRawData', 'selectedUrns', 'metricUrn');
       const dimensionNames = dimensionsRawData.dimensions || [];
       const dimensionRows = dimensionsRawData.responseRows || [];
+      const toFixedIfDecimal = (number) => (number % 1 !== 0) ? number.toFixed(2) : number;
       let summaryRowIndex = 0; // row containing aggregated values
       let newDimensionRows = [];
 
@@ -179,7 +183,7 @@ export default Component.extend({
             contributionChange: record.contributionChange,
             contributionToOverallChange: overallContribution,
             isSelected: selectedUrns.has(dimensionUrn),
-            cob: `${record.currentValue || 0} / ${record.baselineValue || 0}`,
+            cob: `${toFixedIfDecimal(record.currentValue) || 0} / ${toFixedIfDecimal(record.baselineValue) || 0}`,
             elementWidth: this._calculateContributionBarWidth(dimensionRows, record)
           };
 
@@ -352,5 +356,5 @@ export default Component.extend({
       isDimensionDataPresent: true
     });
 
-  }).cancelOn('deactivate').restartable()
+  }).cancelOn('deactivate').drop()
 });

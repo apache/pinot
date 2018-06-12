@@ -21,41 +21,49 @@ import { toWidthNumber } from 'thirdeye-frontend/utils/rca-utils';
 import { once } from '@ember/runloop';
 import d3 from 'd3';
 
-const BLOCK_CLASS = 'rootcause-dimensions-table__dimension-cell';
-const BAR_CLASS = 'rootcause-dimensions-table__bar-container';
-
 export default Component.extend({
 
   dimensionLabel: null,
   isCellHidden: false,
   isFirstColumn: false,
-  classNames: [BLOCK_CLASS],
+  classNames: ['rootcause-dimensions-table__dimension-cell'],
   isRowSelected: false,
   onSelection: null,
   inputId: null,
 
-  didReceiveAttrs() {
+  init() {
     this._super(...arguments);
     this._setBarWidths();
   },
 
   _setBarWidths() {
-    const barClassExpand = `${BAR_CLASS}--expand`;
-    const barClassCollapse = `${BAR_CLASS}--collapse`;
     const negativeMax = d3.max(this.data.map(row => toWidthNumber(row.elementWidth.negative)));
     const positiveMax = d3.max(this.data.map(row => toWidthNumber(row.elementWidth.positive)));
 
+    // Map the max values to a slightly larger scale
     const containerWidthScale = d3.scale.linear()
       .domain([0, 100])
-      .range(['0%', `40%`]);
+      .range([0, 120]);
+
+    // Take the max value and map it to a width of 150 pixels. This will be the container width for each column.
+    const containerWidthNegative = Math.round(containerWidthScale(negativeMax));
+    const containerWidthPositive = Math.round(containerWidthScale(positiveMax));
+
+    // Map the negative bar width to the largest negative value as 100%
+    const negativeBarScale = d3.scale.linear()
+      .domain([0, negativeMax])
+      .range([0, 100]);
+
+    // Map the positive bar width to the largest positive value as 100%
+    const positiveBarScale = d3.scale.linear()
+      .domain([0, positiveMax])
+      .range([0, 100]);
 
     setProperties(this, {
-      containerWidthNegative: containerWidthScale(negativeMax),
-      barWidthNegative: toWidthNumber(this.record.elementWidth.negative) > 0 ? '100%' : '0%',
-      collapseClassNegative: negativeMax === 0 ? barClassCollapse : '',
-      collapseClassPositive: positiveMax === 0 ? barClassCollapse : '',
-      expandClassNegative: positiveMax === 0 ? barClassExpand : '',
-      expandClassPositive: negativeMax === 0 ? barClassExpand : ''
+      containerWidthNegative,
+      containerWidthPositive,
+      barWidthNegative: negativeBarScale(toWidthNumber(this.record.elementWidth.negative)),
+      barWidthPositive: positiveBarScale(toWidthNumber(this.record.elementWidth.positive))
     });
   }
 

@@ -13,6 +13,10 @@ module.exports = function(environment) {
 
     podModulePrefix: 'thirdeye-frontend/pods',
 
+    email: 'ask_thirdeye@linkedin.com',
+
+    devEmail: 'thirdeye-dev@linkedin.com',
+
     rootURL: '/app/',
 
     locationType: 'hash', 'ember-cli-mirage': {
