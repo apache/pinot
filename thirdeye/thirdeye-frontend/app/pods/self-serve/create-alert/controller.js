@@ -62,6 +62,7 @@ export default Controller.extend({
   dimensionCount: 7,
   availableDimensions: 0,
   metricLookupCache: [],
+  metricHelpMailto: `mailto:${config.email}?subject=Metric Onboarding Request (non-additive UMP or derived)`,
 
   /**
    * Component property initial settings
