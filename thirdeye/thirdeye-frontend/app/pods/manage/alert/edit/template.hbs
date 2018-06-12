@@ -109,7 +109,7 @@
     <div class="form-group col-xs-12">
       <label for="config-group" class="control-label te-label">
         Recipients in subscription group:
-        <div class="te-form__sub-label">Current recipients: <span class="te-form__sub-label--strong">{{if selectedConfigGroupRecipients selectedConfigGroupRecipients "No recipients yet"}}</span></div>
+        <div class="te-form__text-block te-form__text-block--faded">{{if selectedConfigGroupRecipients selectedConfigGroupRecipients "No recipients yet"}}</div>
       </label>
       {{#if isDuplicateEmail}}
         <div class="te-form__alert--warning alert-warning">Warning: <strong>{{duplicateEmails}}</strong> is already included in this group.</div>

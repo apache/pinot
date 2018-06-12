@@ -10,7 +10,10 @@
           Import a Metric From InGraphs
         {{/link-to}}
       </label>
-      <div class="te-form__sub-label te-form__sub-label--raised">Please contact ask_thirdeye if you need to onboard non-additive UMP or derived metrics</div>
+      <div class="te-form__sub-label te-form__sub-label--raised">
+        Please contact <a class="thirdeye-link-secondary" target="_blank" href="mailto:ask_thirdeye@linkedin.com?subject=Metric Onboarding Request (non-additive UMP or derived)">ask_thirdeye</a>
+        if you need to onboard non-additive UMP or derived metrics
+      </div>
       {{#power-select
         search=(perform searchMetricsList)
         selected=selectedMetricOption
@@ -97,6 +100,7 @@
       metricData=selectedMetric
       componentId='create-alert'
       topDimensions=topDimensions
+      graphMailtoLink=graphMailtoLink
       selectedDimension=selectedDimension
       selectedDimensions=selectedDimensions
       isMetricSelected=isMetricSelected
@@ -111,7 +115,7 @@
   <fieldset class="te-form__section row">
     <div class="col-xs-12">
       <legend class="te-form__section-title">Detection Settings</legend>
-      <div class="te-form__sub-label te-form__sub-label--raised">ThirdEye automatically selects an algorythm that learns from 1 month of data for "expected" behavior and detects anomalies when there's a deviation.</div>
+      <div class="te-form__sub-label te-form__sub-label--raised">ThirdEye automatically selects an algorithm that learns from 1 month of data for "expected" behavior and detects anomalies when there's a deviation.</div>
     </div>
 
     {{!-- Field: Pattern --}}
@@ -139,7 +143,7 @@
     <div class="te-form__vertical-block col-xs-12">
       <label for="select-sensitivity" class="control-label te-label te-label--taller required">ThirdEye will further filter anomalies by</label>
       <div class="te-form__indent-block">
-        <ul class="te-form__list col-xs-12 col-sm-8">
+        <ul class="te-form__list col-xs-12">
           <li class="te-form__list-item">
             {{#radio-button value="current" groupValue=selectedTuneType}}
               <div class="te-form__list-label">automatically tuning filter settings with reviewed anomalies</div>
@@ -213,7 +217,7 @@
         </label>
         {{#x-toggle
           value=selectedWeeklyEffect
-          classNames="te-toggle te-toggle--form te-toggle--left"
+          classNames="te-toggle te-toggle--lifted te-toggle--left"
           id="select-effect"
           theme='ios'
           showLabels=true
@@ -234,26 +238,6 @@
   <fieldset class="te-form__section row">
     <div class="col-xs-12">
       <legend class="te-form__section-title">Notifications Settings</legend>
-    </div>
-
-    {{!-- Field: Alert Name --}}
-    <div class="col-xs-12">
-      <label for="anomaly-form-function-name" class="control-label te-label te-label--taller required">
-        Name this alert
-        <div class="te-form__sub-label">Please follow this naming convention: <span class="te-form__sub-label--strong">applicationName_metricName_dimensionName_other</span></div>
-      </label>
-      {{#if isAlertNameDuplicate}}
-        <div class="te-form__alert--warning alert-warning">Warning: <strong>{{alertFunctionName}}</strong> already exists. Please try another name.</div>
-      {{/if}}
-      {{input
-        type="text"
-        id="anomaly-form-function-name"
-        class="form-control te-input"
-        placeholder="Add a descriptive alert name"
-        value=alertFunctionName
-        key-up=(action "validateAlertName" alertFunctionName true)
-        disabled=(not generalFieldsEnabled)
-      }}
     </div>
 
     {{!-- Field: App Name --}}
@@ -279,6 +263,26 @@
         {{#if isProcessingForm}}
           <div class="spinner-wrapper--self-serve">{{ember-spinner}}</div>
         {{/if}}
+    </div>
+
+    {{!-- Field: Alert Name --}}
+    <div class="col-xs-12">
+      <label for="anomaly-form-function-name" class="control-label te-label te-label--taller required">
+        Name this alert
+        <div class="te-form__sub-label">Please follow this naming convention: <span class="te-form__sub-label--strong">applicationName_metricName_dimensionName_other</span></div>
+      </label>
+      {{#if isAlertNameDuplicate}}
+        <div class="te-form__alert--warning alert-warning">Warning: <strong>{{alertFunctionName}}</strong> already exists. Please try another name.</div>
+      {{/if}}
+      {{input
+        type="text"
+        id="anomaly-form-function-name"
+        class="form-control te-input"
+        placeholder="Add a descriptive alert name"
+        value=alertFunctionName
+        key-up=(action "validateAlertName" alertFunctionName true)
+        disabled=(not generalFieldsEnabled)
+      }}
     </div>
 
     {{!-- Field: Select Existing Subscription Group --}}

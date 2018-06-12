@@ -68,7 +68,7 @@
 
       {{else if (eq selectedSearchMode 'Subscriber Groups')}}
         {{#power-select
-          onchange=(perform searchByDatasetName)
+          onchange=(perform searchByConfigGroup)
           selected=selectedsubscriberGroupNames
           options=subscriberGroupNames
           searchPlaceholder="Search for a dataset"
