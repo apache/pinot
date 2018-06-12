@@ -66,8 +66,6 @@ export default Controller.extend({
       const activeGroups = this.get('alertConfigGroups').filterBy('active');
       const groupsWithAppName = activeGroups.filter(group => isPresent(group.application));
 
-      console.log('appName: ', appName);
-
       if (isPresent(appName)) {
         return groupsWithAppName.filter(group => group.application.toLowerCase().includes(appName.application.toLowerCase()));
       } else {
@@ -234,8 +232,6 @@ export default Controller.extend({
     const existingFunctionList = getWithDefault(this, 'configGroup.emailConfig.functionIds', []);
     const newFunctionList = [];
     let cnt = 0;
-
-    console.log(configGroup);
 
     // Build object for each function(alert) to display in results table
     return new RSVP.Promise((resolve) => {
@@ -404,8 +400,6 @@ export default Controller.extend({
       const emails = selectedObj.recipients || '';
       const configGroupSwitched = selectedObj.name !== this.get('originalConfigGroup.name');
 
-      console.log('hey');
-
       this.setProperties({
         selectedConfigGroup: selectedObj,
         selectedConfigGroupName: selectedObj.name,
@@ -416,7 +410,6 @@ export default Controller.extend({
       });
 
       this.prepareFunctions(selectedObj).then(functionData => {
-        console.log('data: ', functionData);
         this.set('selectedGroupFunctions', functionData);
       });
     },
