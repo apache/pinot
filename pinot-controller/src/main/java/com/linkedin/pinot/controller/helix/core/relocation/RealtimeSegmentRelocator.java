@@ -35,8 +35,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,14 +53,10 @@ public class RealtimeSegmentRelocator {
 
   private final ScheduledExecutorService _executorService;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
-  private final HelixManager _helixManager;
-  private final HelixAdmin _helixAdmin;
   private final long _runFrequencySeconds;
 
   public RealtimeSegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
-    _helixManager = pinotHelixResourceManager.getHelixZkManager();
-    _helixAdmin = pinotHelixResourceManager.getHelixAdmin();
     _runFrequencySeconds = getRunFrequencySeconds(config.getRealtimeSegmentRelocatorFrequency());
 
     _executorService = Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -126,7 +120,7 @@ public class RealtimeSegmentRelocator {
           }
         };
 
-        HelixHelper.updateIdealState(_helixManager, tableNameWithType, updater,
+        HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), tableNameWithType, updater,
             RetryPolicies.exponentialBackoffRetryPolicy(5, 1000, 2.0f));
       } catch (Exception e) {
         LOGGER.error("Exception in relocating realtime segments of table {}", tableNameWithType, e);
@@ -143,14 +137,16 @@ public class RealtimeSegmentRelocator {
    */
   protected void relocateSegments(RealtimeTagConfig realtimeTagConfig, IdealState idealState) {
 
-    List<String> consumingServers = _helixAdmin.getInstancesInClusterWithTag(_helixManager.getClusterName(),
-        realtimeTagConfig.getConsumingServerTag());
+    List<String> consumingServers = _pinotHelixResourceManager.getHelixAdmin()
+        .getInstancesInClusterWithTag(_pinotHelixResourceManager.getHelixClusterName(),
+            realtimeTagConfig.getConsumingServerTag());
     if (consumingServers.isEmpty()) {
       throw new IllegalStateException(
           "Found no realtime consuming servers with tag " + realtimeTagConfig.getConsumingServerTag());
     }
-    List<String> completedServers = _helixAdmin.getInstancesInClusterWithTag(_helixManager.getClusterName(),
-        realtimeTagConfig.getCompletedServerTag());
+    List<String> completedServers = _pinotHelixResourceManager.getHelixAdmin()
+        .getInstancesInClusterWithTag(_pinotHelixResourceManager.getHelixClusterName(),
+            realtimeTagConfig.getCompletedServerTag());
     if (completedServers.isEmpty()) {
       throw new IllegalStateException(
           "Found no realtime completed servers with tag " + realtimeTagConfig.getCompletedServerTag());
@@ -165,9 +161,8 @@ public class RealtimeSegmentRelocator {
     // create map of completed server name to num segments it holds.
     // This will help us decide which completed server to choose for replacing a consuming server
     Map<String, Integer> completedServerToNumSegments = new HashMap<>(completedServers.size());
-    for (String server : completedServers) {
-      completedServerToNumSegments.put(server, 0);
-    }
+    completedServers.forEach(server -> completedServerToNumSegments.put(server, 0));
+
     for (String segmentName : idealState.getPartitionSet()) {
       Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
       for (String instance : instanceStateMap.keySet()) {
@@ -176,13 +171,9 @@ public class RealtimeSegmentRelocator {
         }
       }
     }
+    Comparator<Map.Entry<String, Integer>> comparator = Comparator.comparingInt(Map.Entry::getValue);
     MinMaxPriorityQueue<Map.Entry<String, Integer>> completedServersQueue =
-        MinMaxPriorityQueue.orderedBy(new Comparator<Map.Entry<String, Integer>>() {
-          @Override
-          public int compare(Map.Entry<String, Integer> entry1, Map.Entry<String, Integer> entry2) {
-            return Integer.compare(entry1.getValue(), entry2.getValue());
-          }
-        }).maximumSize(completedServers.size()).create();
+        MinMaxPriorityQueue.orderedBy(comparator).maximumSize(completedServers.size()).create();
     completedServersQueue.addAll(completedServerToNumSegments.entrySet());
 
     // get new mapping for segments that need relocation
@@ -207,7 +198,7 @@ public class RealtimeSegmentRelocator {
     for (String segmentName : idealState.getPartitionSet()) {
       Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
       Map<String, String> newInstanceStateMap =
-          createNewInstanceStateMap(instanceStateMap, consumingServers, completedServersQueue);
+          createNewInstanceStateMap(segmentName, instanceStateMap, consumingServers, completedServersQueue);
       if (MapUtils.isNotEmpty(newInstanceStateMap)) {
         idealState.setInstanceStateMap(segmentName, newInstanceStateMap);
       }
@@ -222,7 +213,7 @@ public class RealtimeSegmentRelocator {
    * @param completedServersQueue
    * @return
    */
-  private Map<String, String> createNewInstanceStateMap(Map<String, String> instanceStateMap,
+  private Map<String, String> createNewInstanceStateMap(String segmentName, Map<String, String> instanceStateMap,
       List<String> consumingServers, MinMaxPriorityQueue<Map.Entry<String, Integer>> completedServersQueue) {
 
     Map<String, String> newInstanceStateMap = null;
@@ -269,6 +260,8 @@ public class RealtimeSegmentRelocator {
 
         chosenServer.setValue(chosenServer.getValue() + 1);
         completedServersQueue.add(chosenServer);
+        LOGGER.info("Relocating segment {} from consuming server {} to completed server {}", segmentName, instance,
+            chosenServer);
         break;
       }
     }
