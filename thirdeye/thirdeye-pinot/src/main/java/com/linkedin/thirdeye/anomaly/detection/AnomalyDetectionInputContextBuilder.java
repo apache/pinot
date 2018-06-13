@@ -433,7 +433,7 @@ public class AnomalyDetectionInputContextBuilder {
    * @throws JobExecutionException
    * @throws ExecutionException
    */
-  public Map<DimensionKey, MetricTimeSeries> getTimeSeriesForAnomalyDetection(
+  public static Map<DimensionKey, MetricTimeSeries> getTimeSeriesForAnomalyDetection(
       AnomalyFunctionDTO anomalyFunctionSpec, List<Pair<Long, Long>> startEndTimeRanges, boolean endTimeInclusive)
       throws JobExecutionException, ExecutionException {
 
@@ -607,7 +607,7 @@ public class AnomalyDetectionInputContextBuilder {
     return metricTimeSeries;
   }
 
-  private TimeSeriesResponse getTimeSeriesResponseImpl(AnomalyFunctionDTO anomalyFunctionSpec,
+  public static TimeSeriesResponse getTimeSeriesResponseImpl(AnomalyFunctionDTO anomalyFunctionSpec,
       List<Pair<Long, Long>> startEndTimeRanges, TimeGranularity timeGranularity, Multimap<String, String> filters,
       List<String> groupByDimensions, boolean endTimeInclusive)
       throws JobExecutionException, ExecutionException {
@@ -615,7 +615,7 @@ public class AnomalyDetectionInputContextBuilder {
         timeGranularity, filters, groupByDimensions, endTimeInclusive);
   }
 
-  private TimeSeriesResponse getTimeSeriesResponseImpl(AnomalyFunctionDTO anomalyFunctionSpec, List<String> metrics,
+  private static TimeSeriesResponse getTimeSeriesResponseImpl(AnomalyFunctionDTO anomalyFunctionSpec, List<String> metrics,
       List<Pair<Long, Long>> startEndTimeRanges, TimeGranularity timeGranularity, Multimap<String, String> filters,
       List<String> groupByDimensions, boolean endTimeInclusive)
       throws JobExecutionException, ExecutionException {
