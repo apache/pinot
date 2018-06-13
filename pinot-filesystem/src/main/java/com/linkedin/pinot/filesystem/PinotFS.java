@@ -102,4 +102,11 @@ public abstract class PinotFS {
    * @throws IOException for IO Error
    */
   public abstract void copyFromLocalFile(URI srcUri, URI dstUri) throws IOException;
+
+  /**
+   * This method will determine whether files can be moved from the srcUri to the dstUri without
+   * copying the file locally first. We will handle move and copy inside the fs even if
+   * a copyToLocal needs to be done.
+   */
+  public abstract boolean canMoveBetweenLocations(URI srcUri, URI dstUri);
 }

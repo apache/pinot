@@ -128,6 +128,11 @@ public class HadoopPinotFS extends PinotFS {
     hadoopFS.copyFromLocalFile(new Path(srcUri), new Path(dstUri));
   }
 
+  @Override
+  public boolean canMoveBetweenLocations(URI srcUri, URI dstUri) {
+    return srcUri.getScheme().equals("hdfs") && dstUri.getScheme().equals("hdfs");
+  }
+
   private void authenticate(org.apache.hadoop.conf.Configuration hadoopConf, org.apache.commons.configuration.Configuration configs) {
     String principal = configs.getString(PRINCIPAL);
     String keytab = configs.getString(KEYTAB);
