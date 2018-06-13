@@ -53,10 +53,10 @@ import java.util.Set;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.math.IntRange;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
@@ -180,7 +180,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         Preconditions.checkState(!invertedIndexColumns.contains(columnName),
             "Cannot create inverted index for raw index column: %s", columnName);
 
-        ChunkCompressorFactory.CompressionType compressionType = getColumnCompressionType(segmentCreationSpec, fieldSpec);
+        ChunkCompressorFactory.CompressionType compressionType =
+            getColumnCompressionType(segmentCreationSpec, fieldSpec);
 
         // Initialize forward index creator
         _forwardIndexCreatorMap.put(columnName,
@@ -237,7 +238,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       FieldSpec spec) {
     String column = spec.getName();
 
-    if (config.getRawIndexCreationColumns().contains(column) || config.getRawIndexCompressionType().containsKey(column)) {
+    if (config.getRawIndexCreationColumns().contains(column) || config.getRawIndexCompressionType()
+        .containsKey(column)) {
       if (!spec.isSingleValueField()) {
         throw new RuntimeException(
             "Creation of indices without dictionaries is supported for single valued columns only.");
@@ -260,24 +262,20 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
       if (schema.getFieldSpecFor(columnName).isSingleValueField()) {
         if (dictionaryCreator != null) {
-          int dictionaryIndex = dictionaryCreator.indexOfSV(columnValueToIndex);
-          ((SingleValueForwardIndexCreator) _forwardIndexCreatorMap.get(columnName)).index(docIdCounter,
-              dictionaryIndex);
-          // TODO : {refactor inverted index addition}
+          int dictId = dictionaryCreator.indexOfSV(columnValueToIndex);
+          ((SingleValueForwardIndexCreator) _forwardIndexCreatorMap.get(columnName)).index(docIdCounter, dictId);
           if (_invertedIndexCreatorMap.containsKey(columnName)) {
-            _invertedIndexCreatorMap.get(columnName).addSV(docIdCounter, dictionaryIndex);
+            _invertedIndexCreatorMap.get(columnName).add(dictId);
           }
         } else {
           ((SingleValueRawIndexCreator) _forwardIndexCreatorMap.get(columnName)).index(docIdCounter,
               columnValueToIndex);
         }
       } else {
-        int[] dictionaryIndex = dictionaryCreator.indexOfMV(columnValueToIndex);
-        ((MultiValueForwardIndexCreator) _forwardIndexCreatorMap.get(columnName)).index(docIdCounter, dictionaryIndex);
-
-        // TODO : {refactor inverted index addition}
+        int[] dictIds = dictionaryCreator.indexOfMV(columnValueToIndex);
+        ((MultiValueForwardIndexCreator) _forwardIndexCreatorMap.get(columnName)).index(docIdCounter, dictIds);
         if (_invertedIndexCreatorMap.containsKey(columnName)) {
-          _invertedIndexCreatorMap.get(columnName).addMV(docIdCounter, dictionaryIndex);
+          _invertedIndexCreatorMap.get(columnName).add(dictIds, dictIds.length);
         }
       }
     }

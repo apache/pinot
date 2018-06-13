@@ -78,7 +78,7 @@ public class BitmapInvertedIndexCreatorTest {
     try (OnHeapBitmapInvertedIndexCreator onHeapCreator = new OnHeapBitmapInvertedIndexCreator(ON_HEAP_INDEX_DIR,
         COLUMN_NAME, CARDINALITY)) {
       for (int docId = 0; docId < NUM_DOCS; docId++) {
-        onHeapCreator.addSV(docId, dictIds[docId]);
+        onHeapCreator.add(dictIds[docId]);
       }
       onHeapCreator.seal();
     }
@@ -87,7 +87,7 @@ public class BitmapInvertedIndexCreatorTest {
     try (OffHeapBitmapInvertedIndexCreator offHeapCreator = new OffHeapBitmapInvertedIndexCreator(OFF_HEAP_INDEX_DIR,
         new DimensionFieldSpec(COLUMN_NAME, DataType.INT, true), CARDINALITY, NUM_DOCS, 0)) {
       for (int docId = 0; docId < NUM_DOCS; docId++) {
-        offHeapCreator.addSV(docId, dictIds[docId]);
+        offHeapCreator.add(dictIds[docId]);
       }
       offHeapCreator.seal();
     }
@@ -123,7 +123,7 @@ public class BitmapInvertedIndexCreatorTest {
     try (OnHeapBitmapInvertedIndexCreator onHeapCreator = new OnHeapBitmapInvertedIndexCreator(ON_HEAP_INDEX_DIR,
         COLUMN_NAME, CARDINALITY)) {
       for (int docId = 0; docId < NUM_DOCS; docId++) {
-        onHeapCreator.addMV(docId, dictIds[docId]);
+        onHeapCreator.add(dictIds[docId], dictIds[docId].length);
       }
       onHeapCreator.seal();
     }
@@ -132,7 +132,7 @@ public class BitmapInvertedIndexCreatorTest {
     try (OffHeapBitmapInvertedIndexCreator offHeapCreator = new OffHeapBitmapInvertedIndexCreator(OFF_HEAP_INDEX_DIR,
         new DimensionFieldSpec(COLUMN_NAME, DataType.INT, false), CARDINALITY, NUM_DOCS, numValues)) {
       for (int docId = 0; docId < NUM_DOCS; docId++) {
-        offHeapCreator.addMV(docId, dictIds[docId]);
+        offHeapCreator.add(dictIds[docId], dictIds[docId].length);
       }
       offHeapCreator.seal();
     }
