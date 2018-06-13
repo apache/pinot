@@ -28,25 +28,25 @@ import static org.testng.Assert.*;
 
 
 public class LocalPinotFSTest {
-  private String _tmpDir;
   private File testFile;
   private File _absoluteTmpDirPath;
   private File _newTmpDir;
 
   @BeforeClass
   public void setUp() {
-    String tmpDirString = System.getProperty("java.io.tmpdir") + LocalPinotFSTest.class.getSimpleName() + "first";
-    _absoluteTmpDirPath = new File(tmpDirString);
+    _absoluteTmpDirPath = new File(System.getProperty("java.io.tmpdir"), LocalPinotFSTest.class.getSimpleName() + "first");
     FileUtils.deleteQuietly(_absoluteTmpDirPath);
-    _absoluteTmpDirPath.mkdir();
-    testFile = new File(_absoluteTmpDirPath, "testFile");
+    Assert.assertTrue(_absoluteTmpDirPath.mkdir(), "Could not make directory " + _absoluteTmpDirPath.getPath());
     try {
-      testFile.createNewFile();
+      testFile = new File(_absoluteTmpDirPath, "testFile");
+      Assert.assertTrue(testFile.createNewFile(), "Could not create file " + testFile.getPath());
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    _newTmpDir = new File(System.getProperty("java.io.tmpdir") + LocalPinotFSTest.class.getSimpleName() + "second");
+
+    _newTmpDir = new File(System.getProperty("java.io.tmpdir"), LocalPinotFSTest.class.getSimpleName() + "second");
     FileUtils.deleteQuietly(_newTmpDir);
+    Assert.assertTrue(_newTmpDir.mkdir(), "Could not make directory " + _newTmpDir.getPath());
 
     _absoluteTmpDirPath.deleteOnExit();
     _newTmpDir.deleteOnExit();
@@ -80,7 +80,7 @@ public class LocalPinotFSTest {
 
     // Create another file in the same path
     File thirdTestFile = new File(_absoluteTmpDirPath, "thirdTestFile");
-    thirdTestFile.createNewFile();
+    Assert.assertTrue(thirdTestFile.createNewFile(), "Could not create file " + thirdTestFile.getPath());
 
     // Check file copy to location where something already exists still works
     localPinotFS.copy(testFileUri, thirdTestFile.toURI());
@@ -89,7 +89,7 @@ public class LocalPinotFSTest {
     Assert.assertTrue(localPinotFS.exists(thirdTestFile.toURI()));
 
     // Check that method deletes dst directory during move and is successful by overwriting dir
-    _newTmpDir.mkdirs();
+    Assert.assertTrue(_newTmpDir.exists());
     localPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI());
     Assert.assertEquals(_absoluteTmpDirPath.length(), 0);
 
@@ -99,7 +99,7 @@ public class LocalPinotFSTest {
 
     File firstTempDir = new File(_absoluteTmpDirPath, "firstTempDir");
     File secondTempDir = new File(_absoluteTmpDirPath, "secondTempDir");
-    firstTempDir.mkdirs();
+    Assert.assertTrue(firstTempDir.mkdirs(), "Could not make directory " + firstTempDir.getPath());
 
     // Check that directory only copy worked
     localPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
@@ -107,9 +107,9 @@ public class LocalPinotFSTest {
 
     // Copying directory with files to directory with files
     File testFile = new File(firstTempDir, "testFile");
-    testFile.createNewFile();
+    Assert.assertTrue(testFile.createNewFile(), "Could not create file " + testFile.getPath());
     File newTestFile = new File(secondTempDir, "newTestFile");
-    newTestFile.createNewFile();
+    Assert.assertTrue(newTestFile.createNewFile(), "Could not create file " + newTestFile.getPath());
 
     localPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
     localPinotFS.listFiles(secondTempDir.toURI());
@@ -123,7 +123,7 @@ public class LocalPinotFSTest {
 
     }
 
-    testFile.createNewFile();
+    Assert.assertTrue(testFile.exists());
 
     localPinotFS.copyFromLocalFile(testFile.toURI(), secondTestFileUri);
     Assert.assertTrue(localPinotFS.exists(secondTestFileUri));
