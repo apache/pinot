@@ -17,11 +17,13 @@ package com.linkedin.pinot.controller;
 
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.filesystem.LocalPinotFS;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 
@@ -56,6 +58,12 @@ public class ControllerConf extends PropertiesConfiguration {
   // protection is enabled. If the upload does not finish within the timeout, next upload can override the previous one.
   private static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
 
+  // Defines the kind of storage and the underlying PinotFS implementation;
+  // each storage type will have a different factory class with this prefix
+  private static final String PINOT_FS_FACTORY_CLASS_PREFIX = "controller.storage.factory.class";
+  private static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.file";
+  private static final String PINOT_FS_FACTORY_CLASS_HADOOP = "controller.storage.factory.class.hdfs";
+
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
   private static final int DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
@@ -72,6 +80,10 @@ public class ControllerConf extends PropertiesConfiguration {
       "com.linkedin.pinot.controller.api.access.AllowAllAccessFactory";
   private static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
 
+  private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
+  // Don't want to depend on hadoop unnecessarily
+  private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_HADOOP = "com.linkedin.pinot.filesystem.HadoopPinotFS";
+
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
   }
@@ -87,6 +99,14 @@ public class ControllerConf extends PropertiesConfiguration {
       // Shouldn't happen
       throw new AssertionError("UTF-8 encoding should always be supported", e);
     }
+  }
+
+  public void setPinotFSFactoryClass(Configuration pinotFSFactoryClasses) {
+    setProperty(PINOT_FS_FACTORY_CLASS_LOCAL, DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL);
+    setProperty(PINOT_FS_FACTORY_CLASS_HADOOP, DEFAULT_PINOT_FS_FACTORY_CLASS_HADOOP);
+
+    pinotFSFactoryClasses.getKeys().forEachRemaining(
+        key -> setProperty((String) key, pinotFSFactoryClasses.getProperty((String) key)));
   }
 
   public void setSplitCommit(boolean isSplitCommit) {
@@ -207,6 +227,10 @@ public class ControllerConf extends PropertiesConfiguration {
   @Override
   public String toString() {
     return super.toString();
+  }
+
+  public Configuration getPinotFSFactoryClasses() {
+    return this.subset(PINOT_FS_FACTORY_CLASS_PREFIX);
   }
 
   public boolean getAcceptSplitCommit() {
