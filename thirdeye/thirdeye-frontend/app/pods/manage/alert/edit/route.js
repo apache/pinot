@@ -27,6 +27,8 @@ export default Route.extend({
       allAppNames
     } = model;
 
+    console.log('allConfigGroups: ', allConfigGroups);
+
     const {
       id,
       filters,

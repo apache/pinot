@@ -16,9 +16,15 @@ body {
     margin-top: 60px;
   }
 
-  &__custom {
+  &--custom {
     margin-left: -15px;
     margin-top: 214px;
+  }
+
+  &--fixed {
+    position: fixed;
+    top: 28%;
+    left: 55%;
   }
 }
 

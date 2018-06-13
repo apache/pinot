@@ -7,7 +7,7 @@
     {{/if}}
   {{/if}}
   {{#if isAnythingLoading}} <div class="spinner-wrapper-self-serve">{{ember-spinner}}</div> {{/if}}
-  {{#if isMetricDataPending}}
+  {{#if (or isMetricDataPending isMetricDataInvalid)}}
     <div class="te-graph-alert__content">
       <div class="glyphicon glyphicon-{{if isMetricDataInvalid 'alert' 'equalizer'}} te-graph-alert__icon{{if isMetricDataInvalid '--warning'}}"></div>
       <p class="te-graph-alert__pre-text">{{graphMessageText}}</p>

@@ -61,9 +61,14 @@ export default Controller.extend({
    */
   filteredConfigGroups: computed(
     'selectedApplication',
+    'alertConfigGroups',
     function() {
-      const appName = this.get('selectedApplication');
-      const activeGroups = this.get('alertConfigGroups').filterBy('active');
+      const {
+        selectedApplication: appName,
+        alertConfigGroups: allGroups
+      } = this.getProperties('selectedApplication', 'alertConfigGroups');
+
+      const activeGroups = allGroups ? this.get('alertConfigGroups').filterBy('active') : [];
       const groupsWithAppName = activeGroups.filter(group => isPresent(group.application));
 
       if (isPresent(appName)) {

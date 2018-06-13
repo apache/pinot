@@ -69,12 +69,13 @@ export default Component.extend({
   isMetricDataPending: computed(
     'isMetricSelected',
     'isMetricDataLoading',
+    'isMetricDataInvalid',
     function() {
       const {
         isMetricSelected,
         isMetricDataLoading
       } = this.getProperties('isMetricSelected', 'isMetricDataLoading');
-      return !this.get('isMetricSelected') || this.get('isMetricDataLoading');
+      return !this.get('isMetricSelected') || this.get('isMetricDataLoading') || this.get('isMetricDataInvalid');
     }
   ),
 
@@ -93,7 +94,7 @@ export default Component.extend({
     'isMetricDataInvalid',
     function() {
       const defaultMsg = 'Graph will appear here when data is loaded...';
-      const invalidMsg = 'Sorry, metric has no current data';
+      const invalidMsg = 'Sorry, I\'m not able to load data for this metric';
       return this.get('isMetricDataInvalid') ? invalidMsg : defaultMsg;
     }
   ),

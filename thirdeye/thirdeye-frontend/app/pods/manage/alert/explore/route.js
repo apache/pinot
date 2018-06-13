@@ -537,8 +537,7 @@ export default Route.extend({
     } catch (e) {
       this.controller.setProperties({
         isMetricDataInvalid: true,
-        isMetricDataLoading: false,
-        graphMessageText: 'Error loading metric data'
+        isMetricDataLoading: false
       });
     }
   }).cancelOn('deactivate').restartable(),

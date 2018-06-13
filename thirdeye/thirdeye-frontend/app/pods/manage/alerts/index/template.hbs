@@ -110,9 +110,7 @@
       </section>
     {{/if}}
     {{#if isLoading}}
-      <div class="spinner-wrapper">
-        {{ember-spinner}}
-      </div>
+      <div class="spinner-wrapper-self-serve spinner-wrapper-self-serve--fixed">{{ember-spinner}}</div>
     {{/if}}
       {{#each paginatedSelectedAlerts as |alert|}}
         <section class="te-search-results">
