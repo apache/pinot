@@ -4,25 +4,29 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Collections2;
-import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
+import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
-import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.api.MetricSchema;
+import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.LongSeries;
+import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datasource.ResponseParserUtils;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.AnomalySlice;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipeline;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
+import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
@@ -30,14 +34,19 @@ import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
+
 
 public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
   private static final Logger LOG = LoggerFactory.getLogger(LegacyAnomalyFunctionAlgorithm.class);
   private static String PROP_ANOMALY_FUNCTION_CLASS = "anomalyFunctionClassName";
   private static String PROP_SPEC = "specs";
+  private static String PROP_METRIC_URN = "metricUrn";
 
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private BaseAnomalyFunction anomalyFunction;
+  private String metricUrn;
+  private MetricEntity metricEntity;
 
   public LegacyAnomalyFunctionAlgorithm(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
       throws Exception {
@@ -47,15 +56,13 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
     anomalyFunction = (BaseAnomalyFunction) Class.forName(anomalyFunctionClassName).newInstance();
     String specs = OBJECT_MAPPER.writeValueAsString(MapUtils.getMap(config.getProperties(), PROP_SPEC));
     anomalyFunction.init(OBJECT_MAPPER.readValue(specs, AnomalyFunctionDTO.class));
+    this.metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
+    metricEntity = MetricEntity.fromURN(metricUrn, 1.0);
   }
 
   @Override
   public DetectionPipelineResult run() throws Exception {
     LOG.info("Running legacy anomaly detection for time range {} to {}", this.startTime, this.endTime);
-
-    String datasetName = anomalyFunction.getSpec().getCollection();
-    DatasetConfigDTO datasetConfigDTO =
-        this.provider.fetchDatasets(Collections.singletonList(datasetName)).get(datasetName);
 
     Collection<MergedAnomalyResultDTO> historyMergedAnomalies;
     if (anomalyFunction.useHistoryAnomaly() && config.getId() != null) {
@@ -66,53 +73,36 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
       historyMergedAnomalies = Collections.emptyList();
     }
 
-    Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
-        AnomalyDetectionInputContextBuilder.getTimeSeriesForAnomalyDetection(anomalyFunction.getSpec(),
-            anomalyFunction.getDataRangeIntervals(this.startTime, this.endTime), false);
+    DimensionMap dimension = getDimensionMap();
 
-    Map<DimensionMap, MetricTimeSeries> dimensionMapMetricTimeSeriesMap = new HashMap<>();
-    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : dimensionKeyMetricTimeSeriesMap.entrySet()) {
-      DimensionKey dimensionKey = entry.getKey();
+    MetricConfigDTO metricConfig =
+        this.provider.fetchMetrics(Collections.singleton(metricEntity.getId())).get(metricEntity.getId());
 
-      // If the current time series belongs to OTHER dimension, which consists of time series whose
-      // sum of all its values belows 1% of sum of all time series values, then its anomaly is
-      // meaningless and hence we don't want to detection anomalies on it.
-      String[] dimensionValues = dimensionKey.getDimensionValues();
-      boolean isOTHERDimension = false;
-      for (String dimensionValue : dimensionValues) {
-        if (dimensionValue.equalsIgnoreCase(ResponseParserUtils.OTHER) || dimensionValue.equalsIgnoreCase(
-            ResponseParserUtils.UNKNOWN)) {
-          isOTHERDimension = true;
-          break;
-        }
-      }
-      if (isOTHERDimension) {
-        continue;
-      }
-
-      DimensionMap dimensionMap = DimensionMap.fromDimensionKey(dimensionKey, datasetConfigDTO.getDimensions());
-      dimensionMapMetricTimeSeriesMap.put(dimensionMap, entry.getValue());
-
-      if (entry.getValue().getTimeWindowSet().size() < 1) {
-        LOG.warn("Insufficient data for {} to run anomaly detection function", dimensionMap);
-      }
+    // get time series
+    DataFrame df = DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").build();
+    List<Pair<Long, Long>> timeIntervals = anomalyFunction.getDataRangeIntervals(this.startTime, this.endTime);
+    for (Pair<Long, Long> startEndInterval : timeIntervals) {
+      MetricSlice slice =
+          MetricSlice.from(metricEntity.getId(), startEndInterval.getFirst(), startEndInterval.getSecond(),
+              metricEntity.getFilters());
+      DataFrame currentDf = this.provider.fetchTimeseries(Collections.singleton(slice)).get(slice);
+      df = df.append(currentDf);
     }
 
-    List<AnomalyResult> results = new ArrayList<>();
-    for (Map.Entry<DimensionMap, MetricTimeSeries> entry : dimensionMapMetricTimeSeriesMap.entrySet()) {
-      try {
-        List<AnomalyResult> resultsOfAnEntry =
-            anomalyFunction.analyze(entry.getKey(), entry.getValue(), new DateTime(this.startTime),
-                new DateTime(this.endTime), new ArrayList<>(historyMergedAnomalies));
-        results.addAll(resultsOfAnEntry);
+    MetricTimeSeries metricTimeSeries = new MetricTimeSeries(MetricSchema.fromMetricSpecs(
+        Collections.singletonList(new MetricSpec(metricConfig.getName(), MetricType.DOUBLE))));
 
-      } catch (Exception ignore) {
-        // ignore
-      }
+    LongSeries timestamps = df.getLongs(COL_TIME);
+    for (int i = 0; i < timestamps.size(); i++) {
+      metricTimeSeries.set(timestamps.get(i), metricConfig.getName(), df.getDoubles(COL_VALUE).get(i));
     }
+
+    List<AnomalyResult> result =
+        anomalyFunction.analyze(dimension, metricTimeSeries, new DateTime(this.startTime), new DateTime(this.endTime),
+            new ArrayList<>(historyMergedAnomalies));
 
     Collection<MergedAnomalyResultDTO> mergedAnomalyResults =
-        Collections2.transform(results, new Function<AnomalyResult, MergedAnomalyResultDTO>() {
+        Collections2.transform(result, new Function<AnomalyResult, MergedAnomalyResultDTO>() {
           @Override
           public MergedAnomalyResultDTO apply(AnomalyResult result) {
             MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
@@ -123,5 +113,13 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
 
     LOG.info("Detected {} anomalies", mergedAnomalyResults.size());
     return new DetectionPipelineResult(new ArrayList<>(mergedAnomalyResults), this.endTime);
+  }
+
+  DimensionMap getDimensionMap() {
+    DimensionMap dimensionMap = new DimensionMap();
+    for (Map.Entry<String, String> entry : metricEntity.getFilters().entries()) {
+      dimensionMap.put(entry.getKey(), entry.getValue());
+    }
+    return dimensionMap;
   }
 }
