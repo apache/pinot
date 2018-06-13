@@ -57,10 +57,12 @@ export default Controller.extend({
   topDimensions: [],
   originalDimensions: [],
   bsAlertBannerType: 'success',
+  selectedTuneType: 'current',
   graphEmailLinkProps: '',
   dimensionCount: 7,
   availableDimensions: 0,
   metricLookupCache: [],
+  metricHelpMailto: `mailto:${config.email}?subject=Metric Onboarding Request (non-additive UMP or derived)`,
 
   /**
    * Component property initial settings
@@ -596,10 +598,10 @@ export default Controller.extend({
   graphMailtoLink: computed(
     'selectedMetricOption',
     function() {
-      const selectedMetric = this.get('selectedMetricOption');
-      const fullMetricName = `${selectedMetric.dataset}::${selectedMetric.name}`;
       const recipient = config.email;
+      const selectedMetric = this.get('selectedMetricOption');
       const subject = 'TE Self-Serve Create Alert Metric Issue';
+      const fullMetricName = selectedMetric ? `${selectedMetric.dataset}::${selectedMetric.name}` : '';
       const body = `TE Team, please look into a possible inconsistency issue with [ ${fullMetricName} ]`;
       const mailtoString = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       return mailtoString;

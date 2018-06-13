@@ -10,7 +10,7 @@ import RSVP from 'rsvp';
 import fetch from 'fetch';
 import Controller from '@ember/controller';
 import { later } from "@ember/runloop";
-import { computed, set } from '@ember/object';
+import { computed, set, get } from '@ember/object';
 import { getWithDefault } from '@ember/object';
 import { isEmpty, isPresent } from "@ember/utils";
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
@@ -64,14 +64,15 @@ export default Controller.extend({
     'alertConfigGroups',
     function() {
       const {
-        selectedApplication,
-        alertConfigGroups
+        selectedApplication: appName,
+        alertConfigGroups: allGroups
       } = this.getProperties('selectedApplication', 'alertConfigGroups');
-      const appName = getWithDefault(this, 'selectedApplication.application', null);
-      const activeGroups = alertConfigGroups ? alertConfigGroups.filterBy('active') : [];
+
+      const activeGroups = allGroups ? this.get('alertConfigGroups').filterBy('active') : [];
       const groupsWithAppName = activeGroups.filter(group => isPresent(group.application));
+
       if (isPresent(appName)) {
-        return groupsWithAppName.filter(group => group.application.toLowerCase().includes(appName.toLowerCase()));
+        return groupsWithAppName.filter(group => group.application.toLowerCase().includes(appName.application.toLowerCase()));
       } else {
         return activeGroups;
       }
@@ -427,6 +428,11 @@ export default Controller.extend({
         isEditedConfigGroup: true,
         selectedApplication: selectedObj
       });
+      // Once computations settle, select the first item of the current config group set
+      later(this, () => {
+        this.set('selectedConfigGroup', this.get('filteredConfigGroups')[0]);
+     });
+
     },
 
     /**

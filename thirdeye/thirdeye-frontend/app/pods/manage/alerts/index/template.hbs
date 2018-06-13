@@ -68,7 +68,7 @@
 
       {{else if (eq selectedSearchMode 'Subscriber Groups')}}
         {{#power-select
-          onchange=(perform searchByDatasetName)
+          onchange=(perform searchByConfigGroup)
           selected=selectedsubscriberGroupNames
           options=subscriberGroupNames
           searchPlaceholder="Search for a dataset"
@@ -110,9 +110,7 @@
       </section>
     {{/if}}
     {{#if isLoading}}
-      <div class="spinner-wrapper">
-        {{ember-spinner}}
-      </div>
+      <div class="spinner-wrapper-self-serve spinner-wrapper-self-serve--fixed">{{ember-spinner}}</div>
     {{/if}}
       {{#each paginatedSelectedAlerts as |alert|}}
         <section class="te-search-results">

@@ -65,6 +65,14 @@ export default Route.extend({
      */
     willTransition(transition) {
       this.get('durationCache').resetDuration();
+      this.controller.set('isLoading', true);
+    },
+
+    /**
+     * Once transition is complete, remove loader
+     */
+    didTransition() {
+      this.controller.set('isLoading', false);
     },
 
     /**

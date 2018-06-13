@@ -3,9 +3,16 @@
  * @module manage/alerts/controller
  * @exports alerts controller
  */
+import RSVP from 'rsvp';
 import _ from 'lodash';
 import fetch from 'fetch';
-import { computed, set } from '@ember/object';
+import {
+  set,
+  get,
+  computed,
+  setProperties,
+  getWithDefault
+} from '@ember/object';
 import Controller from '@ember/controller';
 import { task, timeout } from 'ember-concurrency';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
@@ -205,22 +212,32 @@ export default Controller.extend({
   }),
 
   /**
-   * Handler for search by subscriber gropu name
+   * Handler for search by subscriber group name
    * Utilizing ember concurrency (task)
    */
-  searchByDatasetName: task(function* (groupName) {
-    this.set('isLoading', true);
-    yield timeout(600);
-
-    this.set('selectedsubscriberGroupNames', groupName);
-    this.set('currentPage', 1);
-
-    return fetch(selfServeApiCommon.alertFunctionByName(groupName))
-      .then(res => res.json())
-      .then((filters) => {
-        this.set('isLoading', false);
-        this.set('selectedAlerts', filters);
-      });
+  searchByConfigGroup: task(function* (groupName) {
+    const allGroups = this.get('model.subscriberGroups');
+    // Add selected name to select input, start loader
+    setProperties(this, {
+      isLoading: true,
+      currentPage: 1,
+      selectedsubscriberGroupNames: groupName
+    });
+    // Smooth loading perception
+    yield timeout(50);
+    // Find selected group among all by name
+    const targetGroup = allGroups.find(group => group.name === groupName);
+    // Extract all of found config groups function Ids
+    const alertIds = getWithDefault(targetGroup, 'emailConfig.functionIds', []);
+    // Fecth data for each alert function by Id
+    const selectedAlerts = yield RSVP.all(alertIds.map((id) => {
+      return fetch(selfServeApiCommon.alertById(id)).then(checkStatus);
+    }));
+    // Load resolved records to template
+    setProperties(this, {
+      isLoading: false,
+      selectedAlerts
+    });
   }),
 
   actions: {
