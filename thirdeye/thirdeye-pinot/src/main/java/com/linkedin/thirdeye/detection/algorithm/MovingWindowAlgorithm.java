@@ -97,7 +97,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     this.changeDuration = parsePeriod(MapUtils.getString(config.getProperties(), "changeDuration", "0"));
 
     int baselineWeeks = MapUtils.getIntValue(config.getProperties(), "baselineWeeks", 0);
-    BaselineAggregateType baselineType = BaselineAggregateType.valueOf(MapUtils.getString(config.getProperties(), "baselineType", "SUM"));
+    BaselineAggregateType baselineType = BaselineAggregateType.valueOf(MapUtils.getString(config.getProperties(), "baselineType", "MEDIAN"));
 
     if (baselineWeeks <= 0) {
       this.baseline = null;
@@ -135,17 +135,17 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     DataFrame df = data.getTimeseries().get(this.sliceData);
 
     // change point rescaling
-    df = AlgorithmUtils.getRescaledSeries(df, getChangePoints(data));
+    df = AlgorithmUtils.getRescaledSeries(df, getChangePoints(df));
+
+    // relative baseline
+    if (this.baseline != null) {
+      df = makeRelativeTimeseries(df, this.baseline, this.sliceData);
+    }
 
     // outliers
     df.addSeries(COL_OUTLIER, BooleanSeries.fillValues(df.size(), false));
     if (this.outlierDuration.toStandardDuration().getMillis() > 0) {
       df.addSeries(COL_OUTLIER, AlgorithmUtils.getOutliers(df, this.outlierDuration.toStandardDuration()));
-    }
-
-    // relative baseline
-    if (this.baseline != null) {
-      df = this.makeRelativeTimeseries(df);
     }
 
     // potentially variable window size. manual iteration required.
@@ -262,15 +262,15 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
    * @param df data
    * @return data with differentiated values
    */
-  DataFrame makeRelativeTimeseries(DataFrame df) {
-    Collection<MetricSlice> slices = this.baseline.scatter(this.sliceBaseline);
+  static DataFrame makeRelativeTimeseries(DataFrame df, Baseline baseline, MetricSlice baseSlice) {
+    Collection<MetricSlice> slices = baseline.scatter(baseSlice);
     Map<MetricSlice, DataFrame> timeseriesMap = new HashMap<>();
     for (MetricSlice slice : slices) {
       timeseriesMap.put(slice, sliceTimeseries(df, slice));
     }
 
     DataFrame dfCurr = new DataFrame(df).renameSeries(COL_VALUE, COL_CURR);
-    DataFrame dfBase = this.baseline.gather(this.sliceBaseline, timeseriesMap).renameSeries(COL_VALUE, COL_BASE);
+    DataFrame dfBase = baseline.gather(baseSlice, timeseriesMap).renameSeries(COL_VALUE, COL_BASE);
 
     DataFrame joined = new DataFrame(dfCurr);
     joined.addSeries(dfBase, COL_BASE);
@@ -282,17 +282,21 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   /**
    * Returns a merged set of change points computed from time seires and user-labeled anomalies.
    *
-   * @param data data
+   * @param df data
    * @return set of change points
    */
-  Set<Long> getChangePoints(StaticDetectionPipelineData data) {
+  Set<Long> getChangePoints(DataFrame df) {
     // TODO purge near-duplicates
 
     Set<Long> changePoints = new HashSet<>();
 
     // from time series
     if (this.changeDuration.toStandardDuration().getMillis() > 0) {
-      changePoints.addAll(AlgorithmUtils.getChangePoints(data.getTimeseries().get(this.sliceData), this.changeDuration.toStandardDuration()));
+      // TODO make this configurable?
+      Baseline baseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.SUM, 1, 1, this.timezone);
+      DataFrame diffSeries = makeRelativeTimeseries(df, baseline, this.sliceData);
+
+      changePoints.addAll(AlgorithmUtils.getChangePoints(diffSeries, this.changeDuration.toStandardDuration()));
     }
 
     // TODO change points from user-labeled anomalies
@@ -323,7 +327,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
    * @return time series for given slice (range)
    */
   static DataFrame sliceTimeseries(DataFrame df, MetricSlice slice) {
-    return df.filter(df.getLongs(COL_TIME).gte(slice.getStart()).and(df.getLongs(COL_TIME).lt(slice.getEnd()))).dropNull(COL_TIME);
+    return df.filter(df.getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
   }
 
   /**
@@ -333,15 +337,10 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
    * @param tCurrent end timestamp (exclusive)
    * @return window data frame
    */
-  DataFrame makeWindow(DataFrame df, final long tCurrent) {
-    final long tStart = new DateTime(tCurrent, this.timezone).minus(this.lookback).getMillis();
+  DataFrame makeWindow(DataFrame df, long tCurrent) {
+    long tStart = new DateTime(tCurrent, this.timezone).minus(this.lookback).getMillis();
 
-    return df.filter(new Series.LongConditional() {
-      @Override
-      public boolean apply(long... values) {
-        return values[0] >= tStart && values[0] < tCurrent && values[1] != 1;
-      }
-    }, COL_TIME, COL_OUTLIER).dropNull();
+    return df.filter(df.getLongs(COL_TIME).between(tStart, tCurrent).and(df.getBooleans(COL_OUTLIER).not())).dropNull(COL_TIME);
   }
 
   /**
@@ -382,7 +381,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
         runSum = 0;
       }
 
-      runSum += val;
+      runSum += side * (val * val);
     }
 
     if (runStart > Integer.MIN_VALUE) {
@@ -421,11 +420,11 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       double val = dfAuc.getDouble(COL_VALUE, i);
 
       if (!Double.isNaN(aucMin) && val < aucMin) {
-        df.set(COL_ZSCORE_AUC_MIN_VIOLATION, timestamps.gte(curr).and(timestamps.lt(next)), sTrue);
+        df.set(COL_ZSCORE_AUC_MIN_VIOLATION, timestamps.between(curr, next), sTrue);
       }
 
       if (!Double.isNaN(aucMax) && val > aucMax) {
-        df.set(COL_ZSCORE_AUC_MAX_VIOLATION, timestamps.gte(curr).and(timestamps.lt(next)), sTrue);
+        df.set(COL_ZSCORE_AUC_MAX_VIOLATION, timestamps.between(curr, next), sTrue);
       }
     }
 
