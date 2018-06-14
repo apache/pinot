@@ -5,7 +5,6 @@ import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.LongSeries;
-import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -65,17 +64,20 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private final MetricSlice sliceDetection;
 //  private final AnomalySlice anomalySlice;
 
-  private final Period lookback;
+  private final Period windowSize;
+  private final Period minLookback;
   private final double zscoreMin;
   private final double zscoreMax;
-  private final double zscoreAUCMin;
-  private final double zscoreAUCMax;
+  private final double aucMin;
+  private final double aucMax;
   private final double quantileMin;
   private final double quantileMax;
   private final Baseline baseline;
   private final DateTimeZone timezone;
   private final Period outlierDuration;
   private final Period changeDuration;
+
+  private final long effectiveStartTime;
 
   public MovingWindowAlgorithm(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
@@ -89,10 +91,11 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     this.quantileMax = MapUtils.getDoubleValue(config.getProperties(), "quantileMax", Double.NaN);
     this.zscoreMin = MapUtils.getDoubleValue(config.getProperties(), "zscoreMin", Double.NaN);
     this.zscoreMax = MapUtils.getDoubleValue(config.getProperties(), "zscoreMax", Double.NaN);
-    this.zscoreAUCMin = MapUtils.getDoubleValue(config.getProperties(), "zscoreAUCMin", Double.NaN);
-    this.zscoreAUCMax = MapUtils.getDoubleValue(config.getProperties(), "zscoreAUCMax", Double.NaN);
+    this.aucMin = MapUtils.getDoubleValue(config.getProperties(), "zscoreAUCMin", Double.NaN);
+    this.aucMax = MapUtils.getDoubleValue(config.getProperties(), "zscoreAUCMax", Double.NaN);
     this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), "timezone", "UTC"));
-    this.lookback = parsePeriod(MapUtils.getString(config.getProperties(), "lookback", "1week"));
+    this.windowSize = parsePeriod(MapUtils.getString(config.getProperties(), "windowSize", "1week"));
+    this.minLookback = parsePeriod(MapUtils.getString(config.getProperties(), "minLookback", "1day"));
     this.outlierDuration = parsePeriod(MapUtils.getString(config.getProperties(), "outlierDuration", "0"));
     this.changeDuration = parsePeriod(MapUtils.getString(config.getProperties(), "changeDuration", "0"));
 
@@ -108,13 +111,19 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     Preconditions.checkArgument(Double.isNaN(this.quantileMin) || (this.quantileMin >= 0 && this.quantileMin <= 1.0), "quantileMin must be between 0.0 and 1.0");
     Preconditions.checkArgument(Double.isNaN(this.quantileMax) || (this.quantileMax >= 0 && this.quantileMax <= 1.0), "quantileMax must be between 0.0 and 1.0");
 
-    DateTime trainStart = new DateTime(startTime, this.timezone).minus(this.lookback);
+    long effectiveStartTime = startTime;
+    if (endTime - startTime < this.minLookback.toStandardDuration().getMillis()) {
+      effectiveStartTime = endTime - this.minLookback.toStandardDuration().getMillis();
+    }
+    this.effectiveStartTime = effectiveStartTime;
+
+    DateTime trainStart = new DateTime(effectiveStartTime, this.timezone).minus(this.windowSize);
 
     DateTime dataStart = trainStart.minus(new Period().withField(DurationFieldType.weeks(), baselineWeeks));
 
     this.sliceData = MetricSlice.from(me.getId(), dataStart.getMillis(), endTime, me.getFilters());
     this.sliceBaseline = MetricSlice.from(me.getId(), trainStart.getMillis(), endTime, me.getFilters());
-    this.sliceDetection = MetricSlice.from(me.getId(), startTime, endTime, me.getFilters());
+    this.sliceDetection = MetricSlice.from(me.getId(), effectiveStartTime, endTime, me.getFilters());
 
 //    // TODO doesn't work with preview/replay. support anomalies by metric?
 //    this.anomalySlice = new AnomalySlice()
@@ -158,7 +167,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     df.addSeries(COL_ZSCORE_AUC_MAX_VIOLATION, BooleanSeries.fillValues(df.size(), false));
 
     if (!Double.isNaN(this.zscoreMin) || !Double.isNaN(this.zscoreMax) ||
-        !Double.isNaN(this.zscoreAUCMin) || !Double.isNaN(this.zscoreAUCMax)) {
+        !Double.isNaN(this.aucMin) || !Double.isNaN(this.aucMax)) {
       df.addSeries(COL_ZSCORE, df.getDoubles(COL_VALUE).subtract(df.get(COL_MEAN)).divide(df.getDoubles(COL_STD).replace(0.0d, DoubleSeries.NULL)));
 
       if (!Double.isNaN(this.zscoreMin)) {
@@ -169,9 +178,9 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
         df.addSeries(COL_ZSCORE_MAX_VIOLATION, df.getDoubles(COL_ZSCORE).gt(this.zscoreMax).fillNull());
       }
 
-      if (!Double.isNaN(this.zscoreAUCMin) || !Double.isNaN(this.zscoreAUCMax)) {
+      if (!Double.isNaN(this.aucMin) || !Double.isNaN(this.aucMax)) {
         DataFrame dfAuc = timeseries2auc(df.renameSeries(COL_ZSCORE, COL_VALUE));
-        DataFrame dfAucAnomaly = auc2anomaly(df.getLongs(COL_TIME), dfAuc, this.zscoreAUCMin, this.zscoreAUCMax);
+        DataFrame dfAucAnomaly = auc2anomaly(df.getLongs(COL_TIME), dfAuc, this.aucMin, this.aucMax);
         df.addSeries(dfAucAnomaly, COL_ZSCORE_AUC_MIN_VIOLATION, COL_ZSCORE_AUC_MAX_VIOLATION);
       }
     }
@@ -196,12 +205,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
     List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.sliceDetection, df, COL_ANOMALY);
 
-    long maxTime = -1;
-    if (!df.isEmpty()) {
-      maxTime = df.getLongs(COL_TIME).max().longValue();
-    }
-
-    return new DetectionPipelineResult(anomalies, maxTime);
+    return new DetectionPipelineResult(anomalies);
   }
 
   /**
@@ -213,7 +217,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   DataFrame applyMovingWindow(DataFrame df) {
     DataFrame res = new DataFrame(df);
 
-    LongSeries timestamps = res.getLongs(COL_TIME).filter(res.getLongs(COL_TIME).gte(this.startTime)).dropNull();
+    LongSeries timestamps = res.getLongs(COL_TIME).filter(res.getLongs(COL_TIME).between(this.effectiveStartTime, this.endTime)).dropNull();
 
     double[] std = new double[timestamps.size()];
     double[] mean = new double[timestamps.size()];
@@ -338,7 +342,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
    * @return window data frame
    */
   DataFrame makeWindow(DataFrame df, long tCurrent) {
-    long tStart = new DateTime(tCurrent, this.timezone).minus(this.lookback).getMillis();
+    long tStart = new DateTime(tCurrent, this.timezone).minus(this.windowSize).getMillis();
 
     return df.filter(df.getLongs(COL_TIME).between(tStart, tCurrent).and(df.getBooleans(COL_OUTLIER).not())).dropNull(COL_TIME);
   }

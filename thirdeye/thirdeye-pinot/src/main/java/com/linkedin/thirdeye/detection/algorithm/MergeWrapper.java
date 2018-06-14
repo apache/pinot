@@ -71,8 +71,6 @@ public class MergeWrapper extends DetectionPipeline {
   public DetectionPipelineResult run() throws Exception {
     List<MergedAnomalyResultDTO> allAnomalies = new ArrayList<>();
 
-    long overallLastTimeStamp = Long.MAX_VALUE;
-
     for (Map<String, Object> properties : this.nestedProperties) {
       DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
 
@@ -86,23 +84,18 @@ public class MergeWrapper extends DetectionPipeline {
 
       DetectionPipelineResult intermediate = pipeline.run();
 
-      if (intermediate.getLastTimestamp() >= 0) {
-        overallLastTimeStamp = Math.min(intermediate.getLastTimestamp(), overallLastTimeStamp);
-      }
-
       allAnomalies.addAll(intermediate.getAnomalies());
     }
 
     allAnomalies.addAll(this.provider.fetchAnomalies(Collections.singleton(this.slice)).get(this.slice));
 
-    if (overallLastTimeStamp == Long.MAX_VALUE) {
-      overallLastTimeStamp = -1L;
-    }
-    return new DetectionPipelineResult(mergeOnTime(allAnomalies), overallLastTimeStamp);
+    return new DetectionPipelineResult(mergeOnTime(allAnomalies));
   }
 
   private List<MergedAnomalyResultDTO> mergeOnTime(List<MergedAnomalyResultDTO> anomalies) {
     // TODO make this an O(n) algorithm if necessary
+
+    // TODO deduplicate candidates and children
 
     List<MergedAnomalyResultDTO> candidates = new ArrayList<>(
         Collections2.filter(anomalies, new Predicate<MergedAnomalyResultDTO>() {

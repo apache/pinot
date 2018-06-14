@@ -140,7 +140,6 @@ public class DimensionWrapper extends DetectionPipeline {
       return new DetectionPipelineResult(Collections.<MergedAnomalyResultDTO>emptyList(), -1);
     }
 
-    long lastTimestamp = Long.MAX_VALUE;
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
 
     for (int i = 0; i < aggregates.size(); i++) {
@@ -155,19 +154,11 @@ public class DimensionWrapper extends DetectionPipeline {
       for (Map<String, Object> properties : this.nestedProperties) {
         DetectionPipelineResult intermediate = this.runNested(targetMetric, properties);
 
-        if (intermediate.getLastTimestamp() >= 0) {
-          lastTimestamp = Math.min(lastTimestamp, intermediate.getLastTimestamp());
-        }
-
         anomalies.addAll(intermediate.getAnomalies());
       }
     }
 
-    if (lastTimestamp == Long.MAX_VALUE) {
-      lastTimestamp = -1L;
-    }
-
-    return new DetectionPipelineResult(anomalies, lastTimestamp);
+    return new DetectionPipelineResult(anomalies);
   }
 
   private DetectionPipelineResult runNested(MetricEntity metric, Map<String, Object> template) throws Exception {

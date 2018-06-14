@@ -114,7 +114,7 @@ public class MergeDimensionThresholdIntegrationTest {
     DetectionPipelineResult result = pipeline.run();
 
     Assert.assertEquals(result.getAnomalies().size(), 3);
-    Assert.assertEquals(result.getLastTimestamp(), 14400);
+    Assert.assertEquals(result.getLastTimestamp(), 18000);
 
     Assert.assertTrue(result.getAnomalies().contains(
         makeAnomaly(10800, 18000, Collections.<String, String>emptyMap())));

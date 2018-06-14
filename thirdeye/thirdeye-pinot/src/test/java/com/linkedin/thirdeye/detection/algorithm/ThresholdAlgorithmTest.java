@@ -63,7 +63,7 @@ public class ThresholdAlgorithmTest {
   public void testThresholdAlgorithmRun() throws Exception {
     DetectionPipelineResult result = this.thresholdAlgorithm.run();
     List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
-    Assert.assertEquals(result.getLastTimestamp(), 8);
+    Assert.assertEquals(result.getLastTimestamp(), 10);
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 0);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2);

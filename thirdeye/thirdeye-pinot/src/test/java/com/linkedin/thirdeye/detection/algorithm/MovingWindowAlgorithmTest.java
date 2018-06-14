@@ -36,7 +36,8 @@ public class MovingWindowAlgorithmTest {
   private static final String COL_OUTLIER = "outlier";
 
   private static final String PROP_METRIC_URN = "metricUrn";
-  private static final String PROP_LOOKBACK = "lookback";
+  private static final String PROP_WINDOW_SIZE = "windowSize";
+  private static final String PROP_MIN_LOOKBACK = "minLookback";
   private static final String PROP_QUANTILE_MIN = "quantileMin";
   private static final String PROP_QUANTILE_MAX = "quantileMax";
   private static final String PROP_ZSCORE_MIN = "zscoreMin";
@@ -74,7 +75,7 @@ public class MovingWindowAlgorithmTest {
 
     this.properties = new HashMap<>();
     this.properties.put(PROP_METRIC_URN, "thirdeye:metric:1");
-    this.properties.put(PROP_LOOKBACK, "1week");
+    this.properties.put(PROP_WINDOW_SIZE, "1week");
 
     this.config = new DetectionConfigDTO();
     this.config.setProperties(properties);
@@ -313,8 +314,19 @@ public class MovingWindowAlgorithmTest {
     this.properties.put(PROP_QUANTILE_MAX, 1.0);
     this.properties.put(PROP_ZSCORE_MIN, -3.0);
     this.properties.put(PROP_ZSCORE_MAX, 3.0);
-    this.properties.put(PROP_LOOKBACK, "100secs");
+    this.properties.put(PROP_WINDOW_SIZE, "100secs");
+    this.properties.put(PROP_MIN_LOOKBACK, "0");
     this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 200000L, 300000L);
+    DetectionPipelineResult res = this.algorithm.run();
+
+    Assert.assertEquals(res.getAnomalies().size(), 0);
+  }
+
+  @Test
+  public void testMinLookback() throws Exception {
+    this.properties.put(PROP_WINDOW_SIZE, "100secs");
+    this.properties.put(PROP_MIN_LOOKBACK, 100000);
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 250000L, 300000L);
     DetectionPipelineResult res = this.algorithm.run();
 
     Assert.assertEquals(res.getAnomalies().size(), 0);
@@ -326,7 +338,7 @@ public class MovingWindowAlgorithmTest {
 
   @Test
   public void testWindow() {
-    this.properties.put(PROP_LOOKBACK, "2hours");
+    this.properties.put(PROP_WINDOW_SIZE, "2hours");
     this.properties.put(PROP_QUANTILE_MIN, 0.25);
     this.properties.put(PROP_QUANTILE_MAX, 0.75);
     this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 3600000L, 9999999L);
@@ -338,9 +350,9 @@ public class MovingWindowAlgorithmTest {
     DataFrame output = new DataFrame(COL_TIME, LongSeries.buildFrom(0L, 3600000L, 7200000L, 14400000L))
         .addSeries(COL_VALUE, 1, 2, 3, 5)
         .addSeries(COL_STD, Double.NaN, Double.NaN, 0.7071067811865476, Double.NaN) // TODO avoid exact double compare
-        .addSeries(COL_MEAN, Double.NaN, 1, 1.5, 3)
-        .addSeries(COL_QUANTILE_MIN, Double.NaN, 1, 1.25, 3)
-        .addSeries(COL_QUANTILE_MAX, Double.NaN, 1, 1.75, 3)
+        .addSeries(COL_MEAN, Double.NaN, 1, 1.5, Double.NaN)
+        .addSeries(COL_QUANTILE_MIN, Double.NaN, 1, 1.25, Double.NaN)
+        .addSeries(COL_QUANTILE_MAX, Double.NaN, 1, 1.75, Double.NaN)
         .addSeries(COL_OUTLIER, false, false, false, false);
 
     DataFrame window = this.algorithm.applyMovingWindow(input);

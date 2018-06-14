@@ -5,7 +5,6 @@ import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.LongSeries;
-import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -94,15 +93,18 @@ public abstract class DetectionPipeline {
    * @see DetectionPipeline#makeAnomaly(MetricSlice, MetricConfigDTO)
    *
    * @param slice metric slice
-   * @param dfTimeseries time series with COL_TIME and at least one value series
+   * @param df time series with COL_TIME and at least one boolean value series
    * @param seriesName name of the value series
    * @return list of anomalies
    */
-  protected final List<MergedAnomalyResultDTO> makeAnomalies(MetricSlice slice, DataFrame dfTimeseries, String seriesName) {
-    BooleanSeries filter = dfTimeseries.getLongs(COL_TIME).gte(this.startTime).and(dfTimeseries.getLongs(COL_TIME).lt(this.endTime));
-    DataFrame dfTruncated = dfTimeseries.filter(filter).dropNull(COL_TIME);
+  protected final List<MergedAnomalyResultDTO> makeAnomalies(MetricSlice slice, DataFrame df, String seriesName) {
+    if (df.isEmpty()) {
+      return Collections.emptyList();
+    }
 
-    if (dfTruncated.isEmpty()) {
+    df = df.filter(df.getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
+
+    if (df.isEmpty()) {
       return Collections.emptyList();
     }
 
@@ -114,11 +116,11 @@ public abstract class DetectionPipeline {
     MetricConfigDTO metric = metrics.get(slice.getMetricId());
 
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-    LongSeries sTime = dfTruncated.getLongs(COL_TIME);
-    BooleanSeries sVal = dfTruncated.getBooleans(seriesName);
+    LongSeries sTime = df.getLongs(COL_TIME);
+    BooleanSeries sVal = df.getBooleans(seriesName);
 
     int lastStart = -1;
-    for (int i = 0; i < dfTruncated.size(); i++) {
+    for (int i = 0; i < df.size(); i++) {
       if (sVal.isNull(i) || !BooleanSeries.booleanValueOf(sVal.get(i))) {
         // end of a run
         if (lastStart >= 0) {

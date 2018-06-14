@@ -75,7 +75,7 @@ public class BaselineAlgorithmTest {
     DetectionPipelineResult result = this.algorithm.run();
 
     List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
-    Assert.assertEquals(result.getLastTimestamp(), 2415600000L);
+    Assert.assertEquals(result.getLastTimestamp(), 2376000000L);
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2372400000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2376000000L);
@@ -89,7 +89,7 @@ public class BaselineAlgorithmTest {
     DetectionPipelineResult result = this.algorithm.run();
 
     List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
-    Assert.assertEquals(result.getLastTimestamp(), 2415600000L);
+    Assert.assertEquals(result.getLastTimestamp(), 2383200000L);
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2372400000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2376000000L);
@@ -107,7 +107,7 @@ public class BaselineAlgorithmTest {
     DetectionPipelineResult result = this.algorithm.run();
 
     List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
-    Assert.assertEquals(result.getLastTimestamp(), 2415600000L);
+    Assert.assertEquals(result.getLastTimestamp(), 2325600000L);
     Assert.assertEquals(anomalies.size(), 5);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2005200000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2008800000L);

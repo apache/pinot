@@ -113,11 +113,6 @@ public class BaselineAlgorithm extends StaticDetectionPipeline {
 
     List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.slice, df, COL_ANOMALY);
 
-    long maxTime = -1;
-    if (!df.isEmpty()) {
-      maxTime = df.getLongs(COL_TIME).max().longValue();
-    }
-
-    return new DetectionPipelineResult(anomalies, maxTime);
+    return new DetectionPipelineResult(anomalies);
   }
 }

@@ -11,7 +11,6 @@ import com.linkedin.thirdeye.detection.StaticDetectionPipeline;
 import com.linkedin.thirdeye.detection.StaticDetectionPipelineData;
 import com.linkedin.thirdeye.detection.StaticDetectionPipelineModel;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.collections.MapUtils;
@@ -79,11 +78,6 @@ public class ThresholdAlgorithm extends StaticDetectionPipeline {
 
     List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.slice, df, COL_ANOMALY);
 
-    long maxTime = -1;
-    if (!df.isEmpty()) {
-      maxTime = df.getLongs(COL_TIME).max().longValue();
-    }
-
-    return new DetectionPipelineResult(anomalies, maxTime);
+    return new DetectionPipelineResult(anomalies);
   }
 }
