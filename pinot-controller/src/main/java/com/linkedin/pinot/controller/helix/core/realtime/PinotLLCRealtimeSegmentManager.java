@@ -1085,7 +1085,9 @@ public class PinotLLCRealtimeSegmentManager {
                     + "Old segment metadata {} has status DONE, but segments are still in CONSUMING state in ideal STATE",
                 tableNameWithType, partition, segmentId);
 
-            LLCSegmentName newLLCSegmentName = getNextLLCSegment(tableNameWithType, segmentName, partition, now);
+            LLCSegmentName newLLCSegmentName = getNextLLCSegment(segmentName, partition, now);
+            LOGGER.info("{}: Creating new segment metadata for {}", tableNameWithType,
+                newLLCSegmentName.getSegmentName());
 
             CommittingSegmentDescriptor committingSegmentDescriptor =
                 new CommittingSegmentDescriptor(segmentId, latestMetadata.getEndOffset(), 0);
@@ -1132,7 +1134,9 @@ public class PinotLLCRealtimeSegmentManager {
                     + "Old segment metadata {} has status DONE, and segments in ONLINE state in ideal state, however new segment metadata and ideal state entries are missing",
                 tableNameWithType, partition, segmentId);
 
-            LLCSegmentName newLLCSegmentName = getNextLLCSegment(tableNameWithType, segmentName, partition, now);
+            LLCSegmentName newLLCSegmentName = getNextLLCSegment(segmentName, partition, now);
+            LOGGER.info("{}: Creating new segment metadata for {}", tableNameWithType,
+                newLLCSegmentName.getSegmentName());
 
             CommittingSegmentDescriptor committingSegmentDescriptor =
                 new CommittingSegmentDescriptor(segmentId, latestMetadata.getEndOffset(), 0);
@@ -1191,13 +1195,10 @@ public class PinotLLCRealtimeSegmentManager {
     return idealState;
   }
 
-  private LLCSegmentName getNextLLCSegment(String tableNameWithType, LLCSegmentName segmentName, int partition, long now) {
+  private LLCSegmentName getNextLLCSegment(LLCSegmentName segmentName, int partition, long now) {
     final int newSeqNum = segmentName.getSequenceNumber() + 1;
     LLCSegmentName newLLCSegmentName =
         new LLCSegmentName(segmentName.getTableName(), partition, newSeqNum, now);
-
-    LOGGER.info("{}: Creating new segment metadata for {}", tableNameWithType,
-        newLLCSegmentName.getSegmentName());
     return newLLCSegmentName;
   }
 
