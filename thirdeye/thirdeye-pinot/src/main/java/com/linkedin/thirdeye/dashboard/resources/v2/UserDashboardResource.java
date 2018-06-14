@@ -49,7 +49,7 @@ import javax.ws.rs.core.MediaType;
 @Path(value = "/userdashboard")
 @Produces(MediaType.APPLICATION_JSON)
 public class UserDashboardResource {
-  private static final int ANOMALIES_LIMIT_DEFAULT = 100;
+  private static final int ANOMALIES_LIMIT_DEFAULT = 500;
 
   private final MergedAnomalyResultManager anomalyDAO;
   private final AnomalyFunctionManager functionDAO;
