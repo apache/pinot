@@ -30,6 +30,7 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
   private static final String BROKER_PORT = "broker.port";
   private static final String SERVER_PORT = "server.port";
   private static final String PERF_URL = "perf.url";
+  private static final String SERVER_ENABLE_VERIFICATION =  "server.enable-verification";
 
   // Used if a reference cluster needs to be started for testing.
   private static final String REF_CONTROLLER_PORT = "ref.controller.port";
@@ -80,6 +81,7 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
   private static final boolean DEFAULT_START_CLUSTER = true;
   private static final String DEFAULT_TIME_COLUMN_NAME = "daysSinceEpoch";
   private static final String DEFAULT_TIME_UNIT = "DAYS";
+  private static final boolean DEFAULT_SERVER_ENABLE_VERIFICATION = false;
 
   public QueryComparisonConfig(File file)
       throws ConfigurationException {
@@ -200,5 +202,10 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
   public String getTimeUnit() {
     String value =  (String) getProperty(TIME_UNIT);
     return (value != null) ? value : DEFAULT_TIME_UNIT;
+  }
+
+  public boolean getServerEnableVerification() {
+    String value = (String) getProperty(SERVER_ENABLE_VERIFICATION);
+    return (value != null) ? Boolean.valueOf(value) : DEFAULT_SERVER_ENABLE_VERIFICATION;
   }
 }
