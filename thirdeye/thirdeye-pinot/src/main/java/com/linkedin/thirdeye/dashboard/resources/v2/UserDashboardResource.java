@@ -24,6 +24,7 @@ import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -270,7 +271,7 @@ public class UserDashboardResource {
     return output;
   }
 
-  private List<MergedAnomalyResultDTO> fetchAnomaliesOfDetectionPipelines(Long start, Long end, String application)
+  private Collection<MergedAnomalyResultDTO> fetchAnomaliesOfDetectionPipelines(Long start, Long end, String application)
       throws Exception {
     if (application == null) {
       return Collections.emptyList();
@@ -298,9 +299,9 @@ public class UserDashboardResource {
 
     predicates.add(Predicate.IN("detectionConfigId", detectionConfigIds.toArray()));
 
-    List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByPredicate(Predicate.AND(predicates.toArray(new Predicate[predicates.size()])));
+    Collection<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByPredicate(Predicate.AND(predicates.toArray(new Predicate[predicates.size()])));
 
-    Collections2.filter(anomalies, new com.google.common.base.Predicate<MergedAnomalyResultDTO>() {
+    anomalies = Collections2.filter(anomalies, new com.google.common.base.Predicate<MergedAnomalyResultDTO>() {
       @Override
       public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomalyResultDTO) {
         return !mergedAnomalyResultDTO.isChild();
