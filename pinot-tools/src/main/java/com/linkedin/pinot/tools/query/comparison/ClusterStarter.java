@@ -16,8 +16,10 @@
 package com.linkedin.pinot.tools.query.comparison;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.exception.HttpErrorStatusException;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.common.utils.SimpleHttpResponse;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.tools.admin.command.AddTableCommand;
 import com.linkedin.pinot.tools.admin.command.CreateSegmentCommand;
@@ -34,10 +36,23 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.SocketException;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLEncoder;
 import java.net.UnknownHostException;
+import javax.annotation.Nullable;
+import javax.net.ssl.SSLContext;
+import org.apache.http.HttpVersion;
+import org.apache.http.StatusLine;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.methods.RequestBuilder;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,7 +84,15 @@ public class ClusterStarter {
   private boolean _startZookeeper;
   private boolean _enableStarTreeIndex;
 
+  private CloseableHttpClient _httpClient = null;
+
   private static final long TIMEOUT_IN_MILLISECONDS = 200 * 1000;
+
+  ClusterStarter(QueryComparisonConfig config, @Nullable SSLContext sslContext)
+      throws SocketException, UnknownHostException {
+    this(config);
+    _httpClient = HttpClients.custom().setSSLContext(sslContext).build();
+  }
 
   ClusterStarter(QueryComparisonConfig config)
       throws SocketException, UnknownHostException {
@@ -245,12 +268,70 @@ public class ClusterStarter {
     uploadData();
   }
 
-  public String query(String query)
-      throws Exception {
+  public String query(String query) throws Exception {
     LOGGER.debug("Running query on Pinot Cluster");
-    PostQueryCommand queryRunner =
-        new PostQueryCommand().setQuery(query).setBrokerHost(_brokerHost).setBrokerPort(_brokerPort);
-    return queryRunner.run();
+    if (_httpClient != null) {
+
+      String encodedQuery = URLEncoder.encode(query, "UTF-8");
+      String brokerUrl = _perfUrl + encodedQuery;
+      LOGGER.info("Executing command: " + brokerUrl);
+
+      URI uri = new URI(brokerUrl);
+
+      // Build the request
+      RequestBuilder requestBuilder =
+          RequestBuilder.create(HttpGet.METHOD_NAME).setVersion(HttpVersion.HTTP_1_1).setUri(uri);
+      HttpUriRequest request = requestBuilder.build();
+      SimpleHttpResponse response = sendRequest(request);
+
+      return response.getResponse();
+    } else {
+      PostQueryCommand queryRunner = new PostQueryCommand().setQuery(query).setBrokerHost(_brokerHost).setBrokerPort(_brokerPort);
+      return queryRunner.run();
+    }
+  }
+
+
+  private SimpleHttpResponse sendRequest(HttpUriRequest request) throws IOException, HttpErrorStatusException {
+    try (CloseableHttpResponse response = _httpClient.execute(request)) {
+      String controllerHost = null;
+      String controllerVersion = null;
+      if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
+        controllerHost = response.getFirstHeader(CommonConstants.Controller.HOST_HTTP_HEADER).getValue();
+        controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
+      }
+      if (controllerHost != null) {
+        LOGGER.info(String.format("Sending request: %s to controller: %s, version: %s", request.getURI(), controllerHost, controllerVersion));
+      }
+      int statusCode = response.getStatusLine().getStatusCode();
+      if (statusCode >= 300) {
+        throw new HttpErrorStatusException(getErrorMessage(request, response), statusCode);
+      }
+      return new SimpleHttpResponse(statusCode, EntityUtils.toString(response.getEntity()));
+    }
+  }
+
+  private static String getErrorMessage(HttpUriRequest request, CloseableHttpResponse response) {
+    String controllerHost = null;
+    String controllerVersion = null;
+    if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
+      controllerHost = response.getFirstHeader(CommonConstants.Controller.HOST_HTTP_HEADER).getValue();
+      controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
+    }
+    StatusLine statusLine = response.getStatusLine();
+    String reason;
+    try {
+      reason = new JSONObject(EntityUtils.toString(response.getEntity())).getString("error");
+    } catch (Exception e) {
+      reason = "Failed to get reason";
+    }
+    String errorMessage = String.format("Got error status code: %d (%s) with reason: \"%s\" while sending request: %s",
+        statusLine.getStatusCode(), statusLine.getReasonPhrase(), reason, request.getURI());
+    if (controllerHost != null) {
+      errorMessage =
+          String.format("%s to controller: %s, version: %s", errorMessage, controllerHost, controllerVersion);
+    }
+    return errorMessage;
   }
 
   public int perfQuery(String query)
@@ -259,21 +340,39 @@ public class ClusterStarter {
     String encodedQuery = URLEncoder.encode(query, "UTF-8");
     String brokerUrl = _perfUrl + encodedQuery;
     LOGGER.info("Executing command: " + brokerUrl);
-    URLConnection conn = new URL(brokerUrl).openConnection();
-    conn.setDoOutput(true);
+    if (_httpClient != null) {
+      URI uri = new URI(brokerUrl);
 
-    long startTime = System.currentTimeMillis();
-    InputStream input = conn.getInputStream();
-    long endTime = System.currentTimeMillis();
+      // Build the request
+      RequestBuilder requestBuilder =
+          RequestBuilder.create(HttpGet.METHOD_NAME).setVersion(HttpVersion.HTTP_1_1).setUri(uri);
+      HttpUriRequest request = requestBuilder.build();
+      long startTime = System.currentTimeMillis();
+      String responseString;
+      try (CloseableHttpResponse response = _httpClient.execute(request)) {
+        responseString = EntityUtils.toString(response.getEntity());
+      }
+      long endTime = System.currentTimeMillis();
+      LOGGER.debug("Actual response: " + responseString);
 
-    BufferedReader reader = new BufferedReader(new InputStreamReader(input, "UTF-8"));
-    StringBuilder sb = new StringBuilder();
-    String line;
-    while ((line = reader.readLine()) != null) {
-      sb.append(line);
+      return (int) (endTime - startTime);
+    } else {
+      URLConnection conn = new URL(brokerUrl).openConnection();
+      conn.setDoOutput(true);
+
+      long startTime = System.currentTimeMillis();
+      InputStream input = conn.getInputStream();
+      long endTime = System.currentTimeMillis();
+
+      BufferedReader reader = new BufferedReader(new InputStreamReader(input, "UTF-8"));
+      StringBuilder sb = new StringBuilder();
+      String line;
+      while ((line = reader.readLine()) != null) {
+        sb.append(line);
+      }
+      LOGGER.debug("Actual response: " + sb.toString());
+
+      return (int) (endTime - startTime);
     }
-    LOGGER.debug("Actual response: " + sb.toString());
-
-    return (int) (endTime - startTime);
   }
 }
