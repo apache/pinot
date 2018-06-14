@@ -95,6 +95,7 @@ public class MergeDimensionThresholdIntegrationTest {
     this.datasets.add(this.dataset);
 
     this.anomalies = new ArrayList<>();
+    this.anomalies.add(makeAnomaly(9500, 10800, Collections.<String, String>emptyMap()));
 
     this.provider = new MockDataProvider()
         .setLoader(this.loader)
@@ -117,7 +118,7 @@ public class MergeDimensionThresholdIntegrationTest {
     Assert.assertEquals(result.getLastTimestamp(), 18000);
 
     Assert.assertTrue(result.getAnomalies().contains(
-        makeAnomaly(10800, 18000, Collections.<String, String>emptyMap())));
+        makeAnomaly(9500, 18000, Collections.<String, String>emptyMap())));
 
     Assert.assertTrue(result.getAnomalies().contains(
         makeAnomaly(0, 7200, ONE_TWO)));

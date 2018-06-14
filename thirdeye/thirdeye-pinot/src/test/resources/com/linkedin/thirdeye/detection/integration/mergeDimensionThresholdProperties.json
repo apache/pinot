@@ -1,7 +1,7 @@
 {
   "className": "com.linkedin.thirdeye.detection.algorithm.MergeWrapper",
   "maxGap": 100,
-  "maxDuration": 1000,
+  "maxDuration": 10000,
   "nested": [
     {
       "className": "com.linkedin.thirdeye.detection.algorithm.DimensionWrapper",
