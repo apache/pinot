@@ -21,10 +21,10 @@ import static com.linkedin.thirdeye.detection.DetectionTestUtils.*;
 public class LegacyAlertFilterTest {
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   private static final List<Long> PROP_ID_VALUE = Arrays.asList(1001L, 1002L);
-  private static String PROP_LEGACY_ALERT_FILTER_CONFIG = "legacyAlertFilterConfig";
-  private static String PROP_LEGACY_ALERT_CONFIG = "legacyAlertConfig";
-  private static String PROP_LEGACY_ALERT_FILTER_CLASS_NAME = "legacyAlertFilterClassName";
-  private static String RECIPIENTS_VALUES = "test@example.com,mytest@example.org";
+  private static final String PROP_LEGACY_ALERT_FILTER_CONFIG = "legacyAlertFilterConfig";
+  private static final String PROP_LEGACY_ALERT_CONFIG = "legacyAlertConfig";
+  private static final String PROP_LEGACY_ALERT_FILTER_CLASS_NAME = "legacyAlertFilterClassName";
+  private static final String RECIPIENTS_VALUES = "test@example.com,mytest@example.org";
 
   private List<MergedAnomalyResultDTO> detectedAnomalies;
   private LegacyAlertFilter legacyAlertFilter;

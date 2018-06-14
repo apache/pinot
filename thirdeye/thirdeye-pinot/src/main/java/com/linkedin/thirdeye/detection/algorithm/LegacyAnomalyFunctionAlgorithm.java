@@ -112,7 +112,7 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
           }
         });
 
-    LOG.info("Detected {} anomalies", mergedAnomalyResults.size());
+    LOG.info("Detected {} anomalies for {}", mergedAnomalyResults.size(), this.metricUrn);
 
     return new DetectionPipelineResult(new ArrayList<>(mergedAnomalyResults));
   }

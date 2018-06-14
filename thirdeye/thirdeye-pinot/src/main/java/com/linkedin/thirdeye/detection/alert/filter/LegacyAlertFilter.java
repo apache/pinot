@@ -25,9 +25,9 @@ import static com.linkedin.thirdeye.detection.alert.filter.DetectionAlertFilterU
 
 
 public class LegacyAlertFilter extends DetectionAlertFilter {
-  private static String PROP_LEGACY_ALERT_FILTER_CONFIG = "legacyAlertFilterConfig";
-  private static String PROP_LEGACY_ALERT_CONFIG = "legacyAlertConfig";
-  private static String PROP_LEGACY_ALERT_FILTER_CLASS_NAME = "legacyAlertFilterClassName";
+  private static final String PROP_LEGACY_ALERT_FILTER_CONFIG = "legacyAlertFilterConfig";
+  private static final String PROP_LEGACY_ALERT_CONFIG = "legacyAlertConfig";
+  private static final String PROP_LEGACY_ALERT_FILTER_CLASS_NAME = "legacyAlertFilterClassName";
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
 
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();

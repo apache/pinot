@@ -66,7 +66,7 @@ public class DimensionWrapper extends DetectionPipeline {
   private final long lookback;
 
   private final String nestedMetricUrn;
-  private final String nestedMetricUrnKey;
+  protected final String nestedMetricUrnKey;
   private final List<Map<String, Object>> nestedProperties;
 
   public DimensionWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
@@ -161,7 +161,7 @@ public class DimensionWrapper extends DetectionPipeline {
     return new DetectionPipelineResult(anomalies);
   }
 
-  private DetectionPipelineResult runNested(MetricEntity metric, Map<String, Object> template) throws Exception {
+  protected DetectionPipelineResult runNested(MetricEntity metric, Map<String, Object> template) throws Exception {
     Preconditions.checkArgument(template.containsKey(PROP_CLASS_NAME), "Nested missing " + PROP_CLASS_NAME);
 
     Map<String, Object> properties = new HashMap<>(template);
