@@ -284,15 +284,12 @@ public class MovingWindowAlgorithmTest {
     this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 604800000L, 1209600000L);
     DetectionPipelineResult res = this.algorithm.run();
 
-    Assert.assertEquals(res.getAnomalies().size(), 9);
+    Assert.assertEquals(res.getAnomalies().size(), 6);
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(626400000L, 630000000L)));
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(705600000L, 709200000L)));
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(813600000L, 817200000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(846000000L, 849600000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(892800000L, 896400000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(903600000L, 921600000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(928800000L, 932400000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(936000000L, 939600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(903600000L, 907200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(918000000L, 921600000L)));
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(950400000L, 954000000L)));
   }
 

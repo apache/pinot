@@ -72,9 +72,8 @@ public class AlgorithmUtilsTest {
   @Test
   public void testChange() {
     Assert.assertEquals(AlgorithmUtils.getChangePoints(this.outlierData, new Duration(86400000L)).size(), 2);
-    Assert.assertTrue(AlgorithmUtils.getChangePoints(this.outlierData, new Duration(86400000L)).contains(86400000L));
-    Assert.assertTrue(AlgorithmUtils.getChangePoints(this.outlierData, new Duration(86400000L)).contains(86400000L * 3 - 3600000L));
-    // NOTE: last point is technically part of lower level, but above estimated median
+    Assert.assertNotNull(AlgorithmUtils.getChangePoints(this.outlierData, new Duration(86400000L)).lower(86400000L));
+    Assert.assertNotNull(AlgorithmUtils.getChangePoints(this.outlierData, new Duration(86400000L)).higher(86400000L * 2));
   }
 
   @Test

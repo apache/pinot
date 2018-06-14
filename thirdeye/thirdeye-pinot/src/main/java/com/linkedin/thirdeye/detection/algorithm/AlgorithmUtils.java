@@ -21,6 +21,8 @@ import org.joda.time.Duration;
  * TODO implement all detection methods. all the methods!
  */
 public class AlgorithmUtils {
+  private static final int DEFAULT_SPLINE_ITERATIONS = 4;
+
   private static final String COL_TIME = DataFrameUtils.COL_TIME;
   private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
 
@@ -92,7 +94,7 @@ public class AlgorithmUtils {
     }
 
     LongSeries time = df.getLongs(COL_TIME);
-    DoubleSeries value = df.getDoubles(COL_VALUE);
+    DoubleSeries value = fastBSpline(df.getDoubles(COL_VALUE), DEFAULT_SPLINE_ITERATIONS);
 
     TreeSet<Long> changePoints = new TreeSet<>();
 
@@ -122,6 +124,28 @@ public class AlgorithmUtils {
     }
 
     return changePoints;
+  }
+
+  /**
+   * Helper for simulating B-spline with moving averages.
+   *
+   * @param s double series
+   * @param n number of iterations (e.g. 4 for cubic)
+   * @return smoothed series
+   */
+  static DoubleSeries fastBSpline(DoubleSeries s, int n) {
+    // NOTE: rules-of-thumb from https://en.wikipedia.org/wiki/Gaussian_filter
+    // four successive moving averages
+
+    DoubleSeries copy = s.copy();
+    double[] values = copy.values();
+    for (int j = 0; j < n; j++) {
+      for (int i = 1; i < values.length - 1; i++) {
+        values[i] = (values[i - 1] + values[i] + values[i + 1]) / 3;
+      }
+    }
+
+    return copy;
   }
 
   /**
