@@ -22,6 +22,8 @@ import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.linkedin.thirdeye.detection.alert.filter.DetectionAlertFilterUtils.*;
+
 
 /**
  * The detection alert filter that sends the anomaly email to all recipients
@@ -86,14 +88,4 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
     }
   }
 
-  private static List<Long> extractLongs(Collection<Number> numbers) {
-    List<Long> output = new ArrayList<>();
-    for (Number n : numbers) {
-      if (n == null) {
-        continue;
-      }
-      output.add(n.longValue());
-    }
-    return output;
-  }
 }

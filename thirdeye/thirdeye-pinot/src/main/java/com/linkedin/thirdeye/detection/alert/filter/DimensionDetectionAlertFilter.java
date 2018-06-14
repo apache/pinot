@@ -27,6 +27,8 @@ import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.linkedin.thirdeye.detection.alert.filter.DetectionAlertFilterUtils.*;
+
 
 /**
  * The detection alert filter that sends the anomaly email to a set
