@@ -179,17 +179,23 @@ public class RetentionManager {
     if (idealState == null) {
       return false;
     }
+    // delete a segment only if it is old enough (5 days) or else,
+    // 1. latest segment could get deleted in the middle of repair by ValidationManager
+    // 2. for a brand new segment, if this code kicks in after new metadata is created but ideal state entry is not yet created (between step 2 and 3),
+    // the latest segment metadata could get marked for deletion
+    if (System.currentTimeMillis() - realtimeSegmentZKMetadata.getCreationTime()
+        <= OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS) {
+      return false;
+    }
     Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
     if (stateMap == null) {
       // Segment is in property store but not in ideal state, delete it
       return true;
     } else {
-      // Delete segment if all of its replicas are OFFLINE and it is old enough
+      // Delete segment if all of its replicas are OFFLINE
       Set<String> states = new HashSet<>(stateMap.values());
       return states.size() == 1 && states.contains(
-          CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE)
-          && System.currentTimeMillis() - realtimeSegmentZKMetadata.getCreationTime()
-          > OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS;
+          CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE);
     }
   }
 
