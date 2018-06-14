@@ -22,16 +22,15 @@ import java.util.List;
 import java.io.Closeable;
 import java.io.IOException;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.startree.StarTreeBuilderConfig;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 
 
-public interface StarTreeBuilder extends Closeable {
+public interface StarTreeV2Builder extends Closeable {
 
   /**
    * Initialize the builder, called before append().
    */
-  void init(StarTreeBuilderConfig config) throws IOException;
+  void init(StarTreeV2BuilderConfig config) throws IOException;
 
   /**
    * Append a document to the star tree.
