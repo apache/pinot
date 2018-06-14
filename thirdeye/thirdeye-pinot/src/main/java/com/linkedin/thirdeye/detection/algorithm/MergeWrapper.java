@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.detection.algorithm;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.AnomalySlice;
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -69,7 +71,8 @@ public class MergeWrapper extends DetectionPipeline {
 
   @Override
   public DetectionPipelineResult run() throws Exception {
-    List<MergedAnomalyResultDTO> allAnomalies = new ArrayList<>();
+    List<MergedAnomalyResultDTO> allAnomalies = new ArrayList<>(
+        this.provider.fetchAnomalies(Collections.singleton(this.slice)).get(this.slice));
 
     for (Map<String, Object> properties : this.nestedProperties) {
       DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
@@ -87,15 +90,13 @@ public class MergeWrapper extends DetectionPipeline {
       allAnomalies.addAll(intermediate.getAnomalies());
     }
 
-    allAnomalies.addAll(this.provider.fetchAnomalies(Collections.singleton(this.slice)).get(this.slice));
-
     return new DetectionPipelineResult(mergeOnTime(allAnomalies));
   }
 
-  private List<MergedAnomalyResultDTO> mergeOnTime(List<MergedAnomalyResultDTO> anomalies) {
+  private List<MergedAnomalyResultDTO> mergeOnTime(Collection<MergedAnomalyResultDTO> anomalies) {
     // TODO make this an O(n) algorithm if necessary
 
-    // TODO deduplicate candidates and children
+    anomalies = deduplicate(anomalies);
 
     List<MergedAnomalyResultDTO> candidates = new ArrayList<>(
         Collections2.filter(anomalies, new Predicate<MergedAnomalyResultDTO>() {
@@ -205,5 +206,64 @@ public class MergeWrapper extends DetectionPipeline {
     newAnomaly.setEndTime(anomaly.getEndTime());
     newAnomaly.setDimensions(anomaly.getDimensions());
     return newAnomaly;
+  }
+
+  private static Collection<MergedAnomalyResultDTO> deduplicate(Collection<MergedAnomalyResultDTO> anomalies) {
+    Map<AnomalyMetaData, MergedAnomalyResultDTO> output = new HashMap<>();
+
+    // assumes that existing anomalies show up before new ones
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      AnomalyMetaData meta = AnomalyMetaData.from(anomaly);
+      if (!output.containsKey(meta)) {
+        output.put(meta, anomaly);
+      }
+    }
+
+    return output.values();
+  }
+
+  private static class AnomalyMetaData {
+    final String metric;
+    final String collection;
+    final DimensionMap dimensions;
+    final long startTime;
+    final long endTime;
+
+    public static AnomalyMetaData from(MergedAnomalyResultDTO anomaly) {
+      return new AnomalyMetaData(
+          anomaly.getMetric(),
+          anomaly.getCollection(),
+          anomaly.getDimensions(),
+          anomaly.getStartTime(),
+          anomaly.getEndTime()
+      );
+    }
+
+    public AnomalyMetaData(String metric, String collection, DimensionMap dimensions, long startTime, long endTime) {
+      this.metric = metric;
+      this.collection = collection;
+      this.dimensions = dimensions;
+      this.startTime = startTime;
+      this.endTime = endTime;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      AnomalyMetaData metaData = (AnomalyMetaData) o;
+      return startTime == metaData.startTime && endTime == metaData.endTime && Objects.equals(metric, metaData.metric)
+          && Objects.equals(collection, metaData.collection) && Objects.equals(dimensions, metaData.dimensions);
+    }
+
+    @Override
+    public int hashCode() {
+
+      return Objects.hash(metric, collection, dimensions, startTime, endTime);
+    }
   }
 }

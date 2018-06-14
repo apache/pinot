@@ -387,3 +387,4 @@ create table if not exists detection_alert_config_index (
 ALTER TABLE `detection_alert_config_index` ADD UNIQUE `detection_alert_config_unique_index`(`name`);
 create index detection_alert_config_base_id_idx ON detection_alert_config_index(base_id);
 create index detection_alert_config_name_idx ON detection_alert_config_index(`name`);
+create index detection_alert_config_application_idx ON detection_alert_config_index(`application`);
