@@ -780,15 +780,12 @@ public class PinotLLCRealtimeSegmentManager {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     final String segmentNameStr = segmentName.getSegmentName();
     try {
-      HelixHelper.updateIdealState(_helixManager, realtimeTableName, new Function<IdealState, IdealState>() {
-        @Override
-        public IdealState apply(IdealState idealState) {
-          idealState.setPartitionState(segmentNameStr, instance,
-              CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE);
-          Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentNameStr);
-          LOGGER.info("Attempting to mark {} offline. Current map:{}", segmentNameStr, instanceStateMap.toString());
-          return idealState;
-        }
+      HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
+        idealState.setPartitionState(segmentNameStr, instance,
+            CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE);
+        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentNameStr);
+        LOGGER.info("Attempting to mark {} offline. Current map:{}", segmentNameStr, instanceStateMap.toString());
+        return idealState;
       }, RetryPolicies.exponentialBackoffRetryPolicy(10, 500L, 1.2f));
     } catch (Exception e) {
       LOGGER.error("Failed to update idealstate for table {} instance {} segment {}", realtimeTableName, instance,
@@ -984,13 +981,8 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
 
-  private boolean isAllInstancesOffline(Map<String, String> instanceStateMap) {
-    for (String state : instanceStateMap.values()) {
-      if (!state.equals(PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE)) {
-        return false;
-      }
-    }
-    return true;
+  private boolean isAllInstancesInState(Map<String, String> instanceStateMap, String state) {
+    return instanceStateMap.values().stream().allMatch(value -> value.equals(state));
   }
 
   /*
@@ -1001,7 +993,7 @@ public class PinotLLCRealtimeSegmentManager {
    * a) metadata status is IN_PROGRESS, segment state is CONSUMING - happy path
    * b) metadata status is IN_PROGRESS, segment state is OFFLINE - create new metadata and new CONSUMING segment
    * c) metadata status is DONE, segment state is OFFLINE - create new metadata and new CONSUMING segment
-   * d) metadata status is DONE, segment state is CONSUMING - create new metadata and new CONSUMINg segment
+   * d) metadata status is DONE, segment state is CONSUMING - create new metadata and new CONSUMING segment
    * 2) Segment is absent from ideal state - add new segment to ideal state
    *
    * Also checks if it is too soon to correct (could be in the process of committing segment)
@@ -1027,13 +1019,13 @@ public class PinotLLCRealtimeSegmentManager {
     final long now = getCurrentTimeMs();
 
     // Get the metadata for the latest 2 segments of each partition
-    Map<Integer, MinMaxPriorityQueue<LLCRealtimeSegmentZKMetadata>> latestMetadata =
+    Map<Integer, MinMaxPriorityQueue<LLCRealtimeSegmentZKMetadata>> partitionToLatestMetadata =
         getLatestMetadata(tableNameWithType);
 
     // Find partitions for which there is no metadata at all. These are new partitions that we need to start consuming.
     Set<Integer> newPartitions = new HashSet<>(partitionCount);
     for (int partition = 0; partition < partitionCount; partition++) {
-      if (!latestMetadata.containsKey(partition)) {
+      if (!partitionToLatestMetadata.containsKey(partition)) {
         LOGGER.info("Found partition {} with no segments", partition);
         newPartitions.add(partition);
       }
@@ -1069,10 +1061,10 @@ public class PinotLLCRealtimeSegmentManager {
     //    a. Create a new segment (with the next seq number)
     //       and restart consumption from the same offset (if possible) or a newer offset (if realtime stream does not have the same offset).
     //       In latter case, report data loss.
-    for (Map.Entry<Integer, MinMaxPriorityQueue<LLCRealtimeSegmentZKMetadata>> entry : latestMetadata.entrySet()) {
+    for (Map.Entry<Integer, MinMaxPriorityQueue<LLCRealtimeSegmentZKMetadata>> entry : partitionToLatestMetadata.entrySet()) {
       int partition = entry.getKey();
-      LLCRealtimeSegmentZKMetadata metadata = entry.getValue().pollFirst();
-      final String segmentId = metadata.getSegmentName();
+      LLCRealtimeSegmentZKMetadata latestMetadata = entry.getValue().pollFirst();
+      final String segmentId = latestMetadata.getSegmentName();
       final LLCSegmentName segmentName = new LLCSegmentName(segmentId);
 
       Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
@@ -1080,7 +1072,7 @@ public class PinotLLCRealtimeSegmentManager {
         // Latest segment of metadata is in idealstate.
         Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentId);
         if (instanceStateMap.values().contains(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE)) {
-          if (metadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.DONE)) {
+          if (latestMetadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.DONE)) {
 
             // step-1 of commmitSegmentMetadata is done (i.e. marking old segment as DONE)
             // but step-2 is not done (i.e. adding new metadata for the next segment)
@@ -1093,15 +1085,10 @@ public class PinotLLCRealtimeSegmentManager {
                     + "Old segment metadata {} has status DONE, but segments are still in CONSUMING state in ideal STATE",
                 tableNameWithType, partition, segmentId);
 
-            final int newSeqNum = segmentName.getSequenceNumber() + 1;
-            LLCSegmentName newLLCSegmentName =
-                new LLCSegmentName(segmentName.getTableName(), partition, newSeqNum, now);
-
-            LOGGER.info("{}: Creating new segment metadata for {}", tableNameWithType,
-                newLLCSegmentName.getSegmentName());
+            LLCSegmentName newLLCSegmentName = getNextLLCSegment(tableNameWithType, segmentName, partition, now);
 
             CommittingSegmentDescriptor committingSegmentDescriptor =
-                new CommittingSegmentDescriptor(segmentId, metadata.getEndOffset(), 0);
+                new CommittingSegmentDescriptor(segmentId, latestMetadata.getEndOffset(), 0);
             createNewSegmentMetadataZNRecord(tableConfig, segmentName, newLLCSegmentName, partitionAssignment,
                 committingSegmentDescriptor);
 
@@ -1109,7 +1096,8 @@ public class PinotLLCRealtimeSegmentManager {
             consumingSegments.add(newLLCSegmentName.getSegmentName());
           }
           // else, the metadata should be IN_PROGRESS, which is the right state for a consuming segment.
-        } else if (isAllInstancesOffline(instanceStateMap)) {
+        } else if (isAllInstancesInState(instanceStateMap,
+            PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE)) {
           // An in-progress segment marked itself offline for some reason the server could not consume.
           // No instances are consuming, so create a new consuming segment.
           int nextSeqNum = segmentName.getSequenceNumber() + 1;
@@ -1129,8 +1117,32 @@ public class PinotLLCRealtimeSegmentManager {
               committingSegmentDescriptor);
 
           consumingSegments.add(newLLCSegmentName.getSegmentName());
+        } else if (isAllInstancesInState(instanceStateMap,
+            PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE)) { // else the segment is in ONLINE state
+          if (latestMetadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.DONE)) {
+            // could happen due to a race condition with the retention manager where we lost the new segment
+            // The retention manager saw the new segment metadata before it was updated in ideal state, and hence marked it for deletion
+            // later the new segment was updated in the ideal state, but the retention manager would clean it out from the metadata dn ideal state, having marked it earlier
+
+            // step-1 of commmitSegmentMetadata is done (i.e. marking old segment as DONE)
+            // step-2 was undone by retention manager (i.e. new metadata IN_PROGRESS for the next segment deleted)
+            // step 3 was partially undone by retention manager (i.e. marking old segment as ONLINE was done but and new segment as CONSUMING was deleted)
+
+            LOGGER.info("{}:Repairing segment for partition {}. "
+                    + "Old segment metadata {} has status DONE, and segments in ONLINE state in ideal state, however new segment metadata and ideal state entries are missing",
+                tableNameWithType, partition, segmentId);
+
+            LLCSegmentName newLLCSegmentName = getNextLLCSegment(tableNameWithType, segmentName, partition, now);
+
+            CommittingSegmentDescriptor committingSegmentDescriptor =
+                new CommittingSegmentDescriptor(segmentId, latestMetadata.getEndOffset(), 0);
+            createNewSegmentMetadataZNRecord(tableConfig, segmentName, newLLCSegmentName, partitionAssignment,
+                committingSegmentDescriptor);
+
+            consumingSegments.add(newLLCSegmentName.getSegmentName());
+          }
         }
-        // else It can be in ONLINE state, in which case there is no need to repair the segment.
+
       } else {
         // idealstate does not have an entry for the segment (but metadata is present)
         // controller has failed between step-2 and step-3 of commitSegmentMetadata.
@@ -1142,7 +1154,7 @@ public class PinotLLCRealtimeSegmentManager {
           continue;
         }
 
-        Preconditions.checkArgument(metadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.IN_PROGRESS));
+        Preconditions.checkArgument(latestMetadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.IN_PROGRESS));
         LOGGER.info("{}:Repairing segment for partition {}. Segment {} not found in idealstate", tableNameWithType,
             partition, segmentId);
 
@@ -1177,6 +1189,16 @@ public class PinotLLCRealtimeSegmentManager {
 
     updateIdealState(idealState, onlineSegments, consumingSegments, assignments);
     return idealState;
+  }
+
+  private LLCSegmentName getNextLLCSegment(String tableNameWithType, LLCSegmentName segmentName, int partition, long now) {
+    final int newSeqNum = segmentName.getSequenceNumber() + 1;
+    LLCSegmentName newLLCSegmentName =
+        new LLCSegmentName(segmentName.getTableName(), partition, newSeqNum, now);
+
+    LOGGER.info("{}: Creating new segment metadata for {}", tableNameWithType,
+        newLLCSegmentName.getSegmentName());
+    return newLLCSegmentName;
   }
 
   /**
