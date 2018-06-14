@@ -51,6 +51,7 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
   public LegacyAnomalyFunctionAlgorithm(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
       throws Exception {
     super(provider, config, startTime, endTime);
+    // TODO: Round start and end time stamps
     Preconditions.checkArgument(config.getProperties().containsKey(PROP_ANOMALY_FUNCTION_CLASS));
     String anomalyFunctionClassName = MapUtils.getString(config.getProperties(), PROP_ANOMALY_FUNCTION_CLASS);
     anomalyFunction = (BaseAnomalyFunction) Class.forName(anomalyFunctionClassName).newInstance();
@@ -112,10 +113,16 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
         });
 
     LOG.info("Detected {} anomalies", mergedAnomalyResults.size());
-    return new DetectionPipelineResult(new ArrayList<>(mergedAnomalyResults), this.endTime);
+
+    long maxTime = -1;
+    if (!df.isEmpty()) {
+      maxTime = df.getLongs(COL_TIME).max().longValue();
+    }
+
+    return new DetectionPipelineResult(new ArrayList<>(mergedAnomalyResults), maxTime);
   }
 
-  DimensionMap getDimensionMap() {
+  private DimensionMap getDimensionMap() {
     DimensionMap dimensionMap = new DimensionMap();
     for (Map.Entry<String, String> entry : metricEntity.getFilters().entries()) {
       dimensionMap.put(entry.getKey(), entry.getValue());
