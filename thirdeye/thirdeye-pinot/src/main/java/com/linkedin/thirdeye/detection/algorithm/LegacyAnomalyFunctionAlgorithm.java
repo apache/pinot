@@ -114,12 +114,7 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
 
     LOG.info("Detected {} anomalies", mergedAnomalyResults.size());
 
-    long maxTime = -1;
-    if (!df.isEmpty()) {
-      maxTime = df.getLongs(COL_TIME).max().longValue();
-    }
-
-    return new DetectionPipelineResult(new ArrayList<>(mergedAnomalyResults), maxTime);
+    return new DetectionPipelineResult(new ArrayList<>(mergedAnomalyResults));
   }
 
   private DimensionMap getDimensionMap() {
