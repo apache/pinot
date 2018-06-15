@@ -48,7 +48,7 @@ public class LegacyDimensionWrapperTest {
   private static final String PROP_NESTED_METRIC_URN_KEY_VALUE = "myMetricUrn";
   private static final String PROP_ANOMALY_FUNCTION_CLASS_NAME_VALUE =
       "com.linkedin.thirdeye.anomalydetection.function.MinMaxThresholdFunction";
-  private Map<String, Object> PROP_SPECS_VALUE;
+  private Map<String, Object> specs;
 
   private DataProvider provider;
 
@@ -87,10 +87,10 @@ public class LegacyDimensionWrapperTest {
     this.properties.put(PROP_NESTED_METRIC_URN, PROP_NESTED_METRIC_URN_VALUE);
     this.properties.put(PROP_NESTED, Collections.singletonList(this.nestedProperties));
     this.properties.put(PROP_LOOKBACK, 0);
-    this.PROP_SPECS_VALUE = new HashMap<>();
-    PROP_SPECS_VALUE.put("properties", "min=2;max=2");
-    PROP_SPECS_VALUE.put("exploreDimensions", "a");
-    this.properties.put(PROP_SPECS, PROP_SPECS_VALUE);
+    this.specs = new HashMap<>();
+    specs.put("properties", "min=2;max=2");
+    specs.put("exploreDimensions", "a");
+    this.properties.put(PROP_SPECS, specs);
     this.properties.put(PROP_ANOMALY_FUNCTION_CLASS, PROP_ANOMALY_FUNCTION_CLASS_NAME_VALUE);
 
     this.config = new DetectionConfigDTO();
@@ -116,7 +116,7 @@ public class LegacyDimensionWrapperTest {
   private DetectionConfigDTO makeConfig(String metricUrn) {
     Map<String, Object> properties = new HashMap<>(this.nestedProperties);
     properties.put(PROP_NESTED_METRIC_URN_KEY_VALUE, metricUrn);
-    properties.put(PROP_SPECS, PROP_SPECS_VALUE);
+    properties.put(PROP_SPECS, specs);
     properties.put(PROP_ANOMALY_FUNCTION_CLASS, PROP_ANOMALY_FUNCTION_CLASS_NAME_VALUE);
     DetectionConfigDTO config = new DetectionConfigDTO();
     config.setId(this.config.getId());

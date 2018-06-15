@@ -50,10 +50,10 @@ public class LegacyMergeWrapper extends DetectionPipeline {
   private static String PROP_SPEC = "specs";
   private static final String PROP_NESTED = "nested";
   private static final String PROP_CLASS_NAME = "className";
-  private static String PROP_ANOMALY_FUNCTION_CLASS = "anomalyFunctionClassName";
-  private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static Logger LOG = LoggerFactory.getLogger(LegacyMergeWrapper.class);
-  private final static AnomalyMergeConfig DEFAULT_TIME_BASED_MERGE_CONFIG;
+  private static final String PROP_ANOMALY_FUNCTION_CLASS = "anomalyFunctionClassName";
+  private static final AnomalyMergeConfig DEFAULT_TIME_BASED_MERGE_CONFIG;
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final Logger LOG = LoggerFactory.getLogger(LegacyMergeWrapper.class);
 
   private final BaseAnomalyFunction anomalyFunction;
   private final Map<String, Object> anomalyFunctionSpecs;
