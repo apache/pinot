@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.AnomalySlice;
 import com.linkedin.thirdeye.detection.DataProvider;
+import com.linkedin.thirdeye.detection.alert.AlertUtils;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilter;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
 import java.util.ArrayList;
@@ -61,7 +62,9 @@ public class ToAllRecipientsDetectionAlertFilter extends DetectionAlertFilter {
           Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
             @Override
             public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomalyResultDTO) {
-              return mergedAnomalyResultDTO != null && !mergedAnomalyResultDTO.isChild();
+              return mergedAnomalyResultDTO != null
+                  && !mergedAnomalyResultDTO.isChild()
+                  && !AlertUtils.hasFeedback(mergedAnomalyResultDTO);
             }
           });
 
