@@ -33,23 +33,11 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
   private final int _percentile;
 
   public PercentileAggregationFunction(int percentile) {
-    switch (percentile) {
-      case 50:
-        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE50.getName();
-        break;
-      case 90:
-        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE90.getName();
-        break;
-      case 95:
-        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE95.getName();
-        break;
-      case 99:
-        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE99.getName();
-        break;
-      default:
-        throw new UnsupportedOperationException(
-            "Unsupported percentile for PercentileAggregationFunction: " + percentile);
-    }
+    this("percentile" + percentile, percentile);
+  }
+
+  protected PercentileAggregationFunction(String name, int percentile) {
+    _name = name;
     _percentile = percentile;
   }
 
