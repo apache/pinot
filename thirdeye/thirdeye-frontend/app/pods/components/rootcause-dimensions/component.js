@@ -45,13 +45,16 @@ export default Component.extend({
   dimensionsApiService: service('services/api/dimensions'),
 
   /**
-   * Incoming cached state for rootcause view
-   * The context object is maintained by the RCA caching services. It defines the 'state' of the analysis view as
-   * the user modifies options. This object will always contain start/end ranges, and active metric settings, which
-   * this component needs to react to.
-   * @type {Object}
+   * Incoming start and end dates (context.analysisRange) for current metric or entity being analyzed
+   * @type {Array}
    */
-  context: {},
+  range: [],
+
+  /**
+   * The type of change used by the current metric (context.compareMode)
+   * @type {String}
+   */
+  mode: '',
 
   /**
    * Incoming collection of loaded entities cached in RCA services
@@ -96,6 +99,12 @@ export default Component.extend({
   dimensionsRawData: [],
 
   /**
+   * Single record cache for previous row's dimension names array
+   * @type {Array}
+   */
+  previousDimensionNames: [],
+
+  /**
    * Override for table classes
    * @type {Object}
    */
@@ -126,9 +135,9 @@ export default Component.extend({
     this._super(...arguments);
 
     // We're pulling in the entities list here because its the only way to extract the metric name and dataset
-    const { entities, metricUrn, context } = this.getProperties('entities', 'metricUrn', 'context');
+    const { entities, metricUrn, range, mode } = this.getProperties('entities', 'metricUrn', 'range', 'mode');
     // Baseline start/end is dependent on 'compareMode' (WoW, Wo2W, etc)
-    const baselineRange = toBaselineRange(context.analysisRange, context.compareMode);
+    const baselineRange = toBaselineRange(range, mode);
     // If metric URN is found in entity list, proceed. Otherwise, we have no metadata to construct the call.
     const metricEntity = entities[metricUrn];
 
@@ -138,8 +147,8 @@ export default Component.extend({
         get(this, 'fetchDimensionAnalysisData').perform({
           metric: parsedMetric[1],
           dataset: parsedMetric[0],
-          currentStart: context.analysisRange[0],
-          currentEnd: context.analysisRange[1],
+          currentStart: range[0],
+          currentEnd: range[1],
           baselineStart: baselineRange[0],
           baselineEnd: baselineRange[1],
           summarySize: 20,
@@ -151,7 +160,7 @@ export default Component.extend({
   },
 
   /**
-   * Data for dimensions table
+   * Data for each column of dimensions table
    * @type Array - array of objects, each corresponding to a row in the table
    */
   dimensionTableData: computed(
@@ -160,45 +169,35 @@ export default Component.extend({
     'metricUrn',
     function () {
       const { dimensionsRawData, selectedUrns, metricUrn } = this.getProperties('dimensionsRawData', 'selectedUrns', 'metricUrn');
+      const toFixedIfDecimal = (number) => (number % 1 !== 0) ? number.toFixed(2) : number;
       const dimensionNames = dimensionsRawData.dimensions || [];
       const dimensionRows = dimensionsRawData.responseRows || [];
-      const toFixedIfDecimal = (number) => (number % 1 !== 0) ? number.toFixed(2) : number;
-      let summaryRowIndex = 0; // row containing aggregated values
       let newDimensionRows = [];
 
-      // We are iterating over each row to make sure we have current-over-baseline and dimension data
+      // Build new dimension array for display as table rows
       if (dimensionRows.length) {
         dimensionRows.forEach((record, index) => {
-          // Generate URN for each record from dimension names/values
-          let { dimensionKeyVals, dimensionUrn } = this._buildDimensionalUrn(dimensionNames, record);
+          let {
+            dimensionArr, // Generate array of cell-specific objects for each dimension
+            dimensionUrn // Generate URN for each record from dimension names/values
+          } = this._generateDimensionUrn(dimensionNames, record);
           let overallContribution = record.contributionToOverallChange;
 
-          let newRow = {
-            id: index - 1,
+          // New records of template-ready data
+          newDimensionRows.push({
+            id: index + 1,
             dimensionUrn,
-            ...dimensionKeyVals, // add a new property to each row for each available dimension
+            dimensionArr,
             names: record.names,
             dimensions: dimensionNames,
+            isSelected: selectedUrns.has(dimensionUrn),
             percentageChange: record.percentageChange,
             contributionChange: record.contributionChange,
-            contributionToOverallChange: overallContribution,
-            isSelected: selectedUrns.has(dimensionUrn),
+            contributionToOverallChange: record.contributionToOverallChange,
             cob: `${toFixedIfDecimal(record.currentValue) || 0} / ${toFixedIfDecimal(record.baselineValue) || 0}`,
             elementWidth: this._calculateContributionBarWidth(dimensionRows, record)
-          };
-
-          // Append to new table data array
-          newDimensionRows.push(newRow);
-
-          // One row should contain the aggregate data with overall change contribution
-          if (record.names.every(name => name.includes('ALL'))) {
-            set(this, 'overallChange', overallContribution);
-            summaryRowIndex = index;
-          }
+          });
         });
-
-        // Remove the summary row from the array - not needed in table
-        newDimensionRows.splice(summaryRowIndex, 1);
       }
 
       return newDimensionRows;
@@ -238,7 +237,6 @@ export default Component.extend({
     }
   ),
 
-
   /**
    * Builds the headers array dynamically, based on availability of dimension records
    * @type {Array} Array of grouped headers
@@ -270,10 +268,9 @@ export default Component.extend({
     const widthAdditivePositive = allValuesPositive ? EXTRA_WIDTH : 0;
     const widthAdditiveNegative = allValuesNegative ? EXTRA_WIDTH : 0;
 
-    // Find the largest change value (excluding the first 'totals' row)
+    // Find the largest change value across all rows
     const maxChange = d3.max(dimensionRows.map((row) => {
-      let isIndexRow = row.names.every(name => name.includes('ALL'));
-      return isIndexRow ? 0 : Math.abs(toWidthNumber(row.contributionToOverallChange));
+      return Math.abs(toWidthNumber(row.contributionToOverallChange));
     }));
 
     // Generate a scale mapping the change value span to a specific range
@@ -293,26 +290,42 @@ export default Component.extend({
   },
 
   /**
-   * Builds a rich URN containing all the dimensions present in a record
-   * @method  _buildDimensionalUrn
+   * Builds an array of objects with enough data for the dynamic dimension table columns to
+   * know how to render each cell. Based on this object 'dimensionArr', we also build a  rich URN
+   * containing all the dimensions present in a record in a format that the RCA page understands.
+   * @method  _generateDimensionUrn
    * @param {Array} dimensionNames - array of dimension names from root of response object
    * @param {Array} record - single current record
-   * @returns {Object} name/value object for dimensions and the URN
+   * @returns {Object} name/value object for dimensions, plus the new URN
    * @private
    */
-  _buildDimensionalUrn(dimensionNames, record) {
-    // Object literal pulling in dimension names as keys
-    const dimensionKeyVals = Object.assign(...dimensionNames.map((name, index) => {
-      return { [name.camelize()]: record.names[index] || '-' };
-    }));
+  _generateDimensionUrn(dimensionNames, record) {
+    // We cache the value of the previous row's dimension values for row grouping
+    const previousDimensionNames = get(this, 'previousDimensionNames');
+    // We want to display excluded dimensions with value '(ALL)-' and having 'otherDimensionValues' prop
+    const otherValues = isPresent(record, 'otherDimensionValues') ? record.otherDimensionValues : null;
+
+    // Array to help dimension column component decide what to render in each cell
+    const dimensionArr = dimensionNames.map((name, index) => {
+      let dimensionValue = record.names[index];
+      return {
+        label: name.camelize(),
+        value: dimensionValue || '-',
+        isHidden: dimensionValue === previousDimensionNames[index], // if its a repeated value, hide it
+        otherValues: dimensionValue === '(ALL)-' ? otherValues : null
+      };
+    });
 
     // Create a string version of dimension name/value pairs
-    const encodedDimensions = isPresent(dimensionKeyVals) ? Object.keys(dimensionKeyVals).map((dName) => {
-      return encodeURIComponent(`${dName}=${dimensionKeyVals[dName]}`);
+    const encodedDimensions = isPresent(dimensionArr) ? dimensionArr.map((dObj) => {
+      return encodeURIComponent(`${dObj.label}=${dObj.value}`);
     }).join(':') : '';
-
+    // Append dimensions string to metricUrn. This will be sent to the graph legend for display
     const dimensionUrn = `${get(this, 'metricUrn')}:${encodedDimensions}`;
-    return { dimensionKeyVals, dimensionUrn };
+    // Now save the current record names as 'previous'
+    set(this, 'previousDimensionNames', record.names);
+
+    return { dimensionArr, dimensionUrn };
   },
 
   actions: {
@@ -348,12 +361,15 @@ export default Component.extend({
   fetchDimensionAnalysisData: task(function * (dimensionObj) {
     const dimensionsPayload = yield this.get('dimensionsApiService').queryDimensionsByMetric(dimensionObj);
     const dimensionNames = dimensionsPayload.dimensions || [];
+    const ratio = dimensionsPayload.globalRatio;
+    const convertedChangeRate = (ratio) => `${Math.abs((ratio -1) * 100).toFixed(2)}%`;
 
     this.setProperties({
       isLoading: false,
       dimensionsRawData: dimensionsPayload,
       cachedUrn: get(this, 'metricUrn'),
-      isDimensionDataPresent: true
+      isDimensionDataPresent: true,
+      overallChange: ratio ? convertedChangeRate(ratio) : 'N/A'
     });
 
   }).cancelOn('deactivate').drop()
