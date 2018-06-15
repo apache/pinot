@@ -23,39 +23,9 @@ import javax.annotation.Nonnull;
 
 
 public class PercentileMVAggregationFunction extends PercentileAggregationFunction {
-  private final String _name;
 
   public PercentileMVAggregationFunction(int percentile) {
-    super(percentile);
-    switch (percentile) {
-      case 50:
-        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE50MV.getName();
-        break;
-      case 90:
-        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE90MV.getName();
-        break;
-      case 95:
-        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE95MV.getName();
-        break;
-      case 99:
-        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE99MV.getName();
-        break;
-      default:
-        throw new UnsupportedOperationException(
-            "Unsupported percentile for PercentileAggregationFunction: " + percentile);
-    }
-  }
-
-  @Nonnull
-  @Override
-  public String getName() {
-    return _name;
-  }
-
-  @Nonnull
-  @Override
-  public String getColumnName(@Nonnull String[] columns) {
-    return _name + "_" + columns[0];
+    super("percentile" + percentile + "MV", percentile);
   }
 
   @Override
