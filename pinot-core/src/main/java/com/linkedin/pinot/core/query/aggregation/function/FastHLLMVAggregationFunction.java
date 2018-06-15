@@ -25,7 +25,7 @@ import javax.annotation.Nonnull;
 
 
 public class FastHLLMVAggregationFunction extends FastHLLAggregationFunction {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.FASTHLLMV.getName();
+  private static final String NAME = AggregationFunctionType.FASTHLLMV.getName();
 
   @Nonnull
   @Override

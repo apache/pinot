@@ -25,7 +25,7 @@ import javax.annotation.Nonnull;
 
 
 public class MinAggregationFunction implements AggregationFunction<Double, Double> {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.MIN.getName();
+  private static final String NAME = AggregationFunctionType.MIN.getName();
   private static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
 
   @Nonnull

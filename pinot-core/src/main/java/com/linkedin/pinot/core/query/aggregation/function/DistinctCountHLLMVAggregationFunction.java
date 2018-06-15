@@ -25,7 +25,7 @@ import javax.annotation.Nonnull;
 
 
 public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggregationFunction {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.DISTINCTCOUNTHLLMV.getName();
+  private static final String NAME = AggregationFunctionType.DISTINCTCOUNTHLLMV.getName();
 
   @Nonnull
   @Override

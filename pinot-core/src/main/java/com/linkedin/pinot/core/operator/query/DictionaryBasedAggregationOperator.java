@@ -23,7 +23,7 @@ import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.DoubleAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
@@ -69,8 +69,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
 
     for (AggregationFunctionContext aggregationFunctionContext : _aggregationFunctionContexts) {
       AggregationFunction function = aggregationFunctionContext.getAggregationFunction();
-      AggregationFunctionFactory.AggregationFunctionType functionType =
-          AggregationFunctionFactory.AggregationFunctionType.valueOf(function.getName().toUpperCase());
+      AggregationFunctionType functionType = AggregationFunctionType.valueOf(function.getName().toUpperCase());
       String column = aggregationFunctionContext.getAggregationColumns()[0];
       Dictionary dictionary = _dictionaryMap.get(column);
       AggregationResultHolder resultHolder;

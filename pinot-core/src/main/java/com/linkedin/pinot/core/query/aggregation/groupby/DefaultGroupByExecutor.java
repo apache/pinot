@@ -25,6 +25,7 @@ import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import java.util.List;
 import javax.annotation.Nonnull;
 
@@ -82,7 +83,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       AggregationFunction function = functionContexts[i].getAggregationFunction();
       _functions[i] = function;
       // TODO: currently only support single argument aggregation
-      if (!function.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+      if (!function.getName().equals(AggregationFunctionType.COUNT.getName())) {
         _aggregationExpressions[i] =
             TransformExpressionTree.compileToExpressionTree(functionContexts[i].getAggregationColumns()[0]);
       }
@@ -149,7 +150,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       GroupByResultHolder resultHolder = _resultHolders[i];
 
       resultHolder.ensureCapacity(capacityNeeded);
-      if (function.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+      if (function.getName().equals(AggregationFunctionType.COUNT.getName())) {
         if (_hasMVGroupByExpression) {
           function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder);
         } else {

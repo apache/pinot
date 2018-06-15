@@ -24,7 +24,7 @@ import javax.annotation.Nonnull;
 
 
 public class DistinctCountMVAggregationFunction extends DistinctCountAggregationFunction {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.DISTINCTCOUNTMV.getName();
+  private static final String NAME = AggregationFunctionType.DISTINCTCOUNTMV.getName();
 
   @Nonnull
   @Override

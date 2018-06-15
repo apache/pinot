@@ -22,7 +22,7 @@ import javax.annotation.Nonnull;
 
 
 public class AvgMVAggregationFunction extends AvgAggregationFunction {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.AVGMV.getName();
+  private static final String NAME = AggregationFunctionType.AVGMV.getName();
 
   @Nonnull
   @Override

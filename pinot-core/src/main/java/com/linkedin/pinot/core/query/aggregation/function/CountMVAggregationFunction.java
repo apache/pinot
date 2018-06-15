@@ -22,7 +22,7 @@ import javax.annotation.Nonnull;
 
 
 public class CountMVAggregationFunction extends CountAggregationFunction {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.COUNTMV.getName();
+  private static final String NAME = AggregationFunctionType.COUNTMV.getName();
 
   @Nonnull
   @Override

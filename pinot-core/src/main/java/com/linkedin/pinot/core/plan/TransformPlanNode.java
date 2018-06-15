@@ -20,7 +20,7 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.transform.TransformOperator;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -60,8 +60,7 @@ public class TransformPlanNode implements PlanNode {
   private void extractColumnsAndTransforms(@Nonnull BrokerRequest brokerRequest) {
     if (brokerRequest.isSetAggregationsInfo()) {
       for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
-        if (!aggregationInfo.getAggregationType()
-            .equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+        if (!aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
           String[] columns = aggregationInfo.getAggregationParams().get("column").split(",");
           for (String column : columns) {
             TransformExpressionTree transformExpressionTree = TransformExpressionTree.compileToExpressionTree(column);

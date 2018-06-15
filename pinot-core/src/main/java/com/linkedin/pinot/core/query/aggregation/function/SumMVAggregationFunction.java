@@ -22,7 +22,7 @@ import javax.annotation.Nonnull;
 
 
 public class SumMVAggregationFunction extends SumAggregationFunction {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.SUMMV.getName();
+  private static final String NAME = AggregationFunctionType.SUMMV.getName();
 
   @Nonnull
   @Override

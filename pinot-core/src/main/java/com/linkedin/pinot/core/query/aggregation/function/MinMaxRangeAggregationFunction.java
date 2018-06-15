@@ -26,7 +26,7 @@ import javax.annotation.Nonnull;
 
 
 public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMaxRangePair, Double> {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.MINMAXRANGE.getName();
+  private static final String NAME = AggregationFunctionType.MINMAXRANGE.getName();
 
   @Nonnull
   @Override

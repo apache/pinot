@@ -25,7 +25,7 @@ import javax.annotation.Nonnull;
 
 
 public class SumAggregationFunction implements AggregationFunction<Double, Double> {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.SUM.getName();
+  private static final String NAME = AggregationFunctionType.SUM.getName();
   private static final double DEFAULT_VALUE = 0.0;
 
   @Nonnull
