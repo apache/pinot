@@ -31,6 +31,9 @@ public class LegacyDimensionWrapper extends DimensionWrapper {
     anomalyFunction = (BaseAnomalyFunction) Class.forName(anomalyFunctionClassName).newInstance();
     String specs = OBJECT_MAPPER.writeValueAsString(anomalyFunctionSpecs);
     anomalyFunction.init(OBJECT_MAPPER.readValue(specs, AnomalyFunctionDTO.class));
+    if (anomalyFunction.getSpec().getExploreDimensions() != null) {
+      this.dimensions.add(anomalyFunction.getSpec().getExploreDimensions());
+    }
   }
 
 

@@ -59,7 +59,7 @@ public class DimensionWrapper extends DetectionPipeline {
   private static final String PROP_CLASS_NAME = "className";
 
   private final String metricUrn;
-  private final List<String> dimensions;
+  protected final List<String> dimensions;
   private final int k;
   private final double minValue;
   private final double minContribution;
@@ -81,7 +81,7 @@ public class DimensionWrapper extends DetectionPipeline {
     this.k = MapUtils.getIntValue(config.getProperties(), PROP_K, PROP_K_DEFAULT);
     this.dimensions = config.getProperties().containsKey(PROP_DIMENSIONS) ?
         new ArrayList<>((Collection<String>) config.getProperties().get(PROP_DIMENSIONS)) :
-        Collections.<String>emptyList();
+        new ArrayList<String>();
     this.lookback = MapUtils.getLongValue(config.getProperties(), PROP_LOOKBACK, PROP_LOOKBACK_DEFAULT);
 
     // prototyping

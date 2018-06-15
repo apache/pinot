@@ -74,7 +74,7 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
       historyMergedAnomalies = Collections.emptyList();
     }
 
-    DimensionMap dimension = getDimensionMap();
+    final DimensionMap dimension = getDimensionMap();
 
     MetricConfigDTO metricConfig =
         this.provider.fetchMetrics(Collections.singleton(metricEntity.getId())).get(metricEntity.getId());
@@ -108,6 +108,7 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
           public MergedAnomalyResultDTO apply(AnomalyResult result) {
             MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
             anomaly.populateFrom(result);
+            anomaly.setDimensions(dimension);
             return anomaly;
           }
         });

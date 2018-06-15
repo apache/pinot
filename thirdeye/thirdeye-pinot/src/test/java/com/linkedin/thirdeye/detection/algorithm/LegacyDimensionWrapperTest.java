@@ -82,13 +82,14 @@ public class LegacyDimensionWrapperTest {
 
     this.properties = new HashMap<>();
     this.properties.put(PROP_METRIC_URN, "thirdeye:metric:1");
-    this.properties.put(PROP_DIMENSIONS, Arrays.asList("a", "b"));
+    this.properties.put(PROP_DIMENSIONS, Arrays.asList("b"));
     this.properties.put(PROP_NESTED_METRIC_URN_KEY, PROP_NESTED_METRIC_URN_KEY_VALUE);
     this.properties.put(PROP_NESTED_METRIC_URN, PROP_NESTED_METRIC_URN_VALUE);
     this.properties.put(PROP_NESTED, Collections.singletonList(this.nestedProperties));
     this.properties.put(PROP_LOOKBACK, 0);
     this.PROP_SPECS_VALUE = new HashMap<>();
     PROP_SPECS_VALUE.put("properties", "min=2;max=2");
+    PROP_SPECS_VALUE.put("exploreDimensions", "a");
     this.properties.put(PROP_SPECS, PROP_SPECS_VALUE);
     this.properties.put(PROP_ANOMALY_FUNCTION_CLASS, PROP_ANOMALY_FUNCTION_CLASS_NAME_VALUE);
 
