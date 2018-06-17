@@ -45,7 +45,7 @@ public class PinotSegmentColumnReader {
     }
   }
 
-  Object readInt(int docId) {
+  public Object readInt(int docId) {
     SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
       int dictId = svReader.getInt(docId, _readerContext);
@@ -55,7 +55,7 @@ public class PinotSegmentColumnReader {
     }
   }
 
-  Object readLong(int docId) {
+  public Object readLong(int docId) {
     SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
       int dictId = svReader.getInt(docId, _readerContext);
@@ -65,7 +65,7 @@ public class PinotSegmentColumnReader {
     }
   }
 
-  Object readFloat(int docId) {
+  public Object readFloat(int docId) {
     SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
       int dictId = svReader.getInt(docId, _readerContext);
@@ -75,7 +75,7 @@ public class PinotSegmentColumnReader {
     }
   }
 
-  Object readDouble(int docId) {
+  public Object readDouble(int docId) {
     SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
       int dictId = svReader.getInt(docId, _readerContext);
@@ -85,7 +85,7 @@ public class PinotSegmentColumnReader {
     }
   }
 
-  Object readString(int docId) {
+  public Object readString(int docId) {
     SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
       int dictId = svReader.getInt(docId, _readerContext);
