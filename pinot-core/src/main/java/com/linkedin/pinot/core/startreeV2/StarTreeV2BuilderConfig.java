@@ -16,11 +16,9 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import com.google.common.collect.ListMultimap;
 import java.io.File;
-import java.util.Set;
 import java.util.List;
-import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ListMultimap;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 
@@ -30,9 +28,9 @@ public class StarTreeV2BuilderConfig {
   private File _outDir;
   private int _maxNumLeafRecords;
   private List<String> _dimensionsSplitOrder;
-  private List<DimensionFieldSpec> _dimensions;
-  private Set<String> _dimensionsWithoutStarNode;
-  private ListMultimap<MetricFieldSpec, String> _metric2aggFuncPairs;
+  private List<String> _dimensions;
+  private List<String> _dimensionsWithoutStarNode;
+  private ListMultimap<String, String> _metric2aggFuncPairs;
 
   /**
    * Set the temporary directory for star tree.
@@ -66,14 +64,14 @@ public class StarTreeV2BuilderConfig {
   /**
    * Set the dimensions present in this star tree.
    */
-  public void setDimensions(List<DimensionFieldSpec> dimensions) {
+  public void setDimensions(List<String> dimensions) {
     _dimensions = dimensions;
   }
 
   /**
    * get the dimensions present in this star tree.
    */
-  public List<DimensionFieldSpec> getDimensions() {
+  public List<String> getDimensions() {
     return _dimensions;
   }
 
@@ -94,28 +92,28 @@ public class StarTreeV2BuilderConfig {
   /**
    * Set the dimensions for which there is no need to create star nodes.
    */
-  public void setDimensionsWithoutStarNode(Set<String> excludedStarDimensions) {
+  public void setDimensionsWithoutStarNode(List<String> excludedStarDimensions) {
     _dimensionsWithoutStarNode = excludedStarDimensions;
   }
 
   /**
    * Get the dimensions for which there is no need to create star nodes.
    */
-  public Set<String> getDimensionsWithoutStarNode() {
+  public List<String> getDimensionsWithoutStarNode() {
     return _dimensionsWithoutStarNode;
   }
 
   /**
    * Set the mapping of metric to aggregation function
    */
-  public void setMetric2aggFuncPairs(ListMultimap<MetricFieldSpec, String> metric2aggFuncPairs) {
+  public void setMetric2aggFuncPairs(ListMultimap<String, String> metric2aggFuncPairs) {
     _metric2aggFuncPairs = metric2aggFuncPairs;
   }
 
   /**
    * Get the mapping of metric to aggregation function.
    */
-  public ListMultimap<MetricFieldSpec, String> getMetric2aggFuncPairs() {
+  public ListMultimap<String, String> getMetric2aggFuncPairs() {
     return _metric2aggFuncPairs;
   }
 }

@@ -13,37 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.startreeV2;
 
-import java.io.File;
 import java.util.Map;
-import java.util.List;
-import java.io.Closeable;
-import java.io.IOException;
-import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 
+/**
+ * Helper class to represent a tree node.
+ */
+public class TreeNode {
 
-public interface StarTreeV2Builder extends Closeable {
-
-  /**
-   * Initialize the builder, called before append().
-   */
-  void init(File indexDir, StarTreeV2BuilderConfig config) throws Exception;
-
-  /**
-   * Build the StarTree
-   */
-  void build() throws IOException;
-
-  /**
-   * Serialize the star tree into a file.
-   */
-  void serialize(File starTreeFile, Map<String, ColumnIndexCreationInfo> indexCreationInfoMap) throws IOException;
-
-  /**
-   * Returns the Meta Data of the Star tree.
-   */
-  List<String> getMetaData();
+    int _dimensionId = -1;
+    String _dimensionName = null;
+    Object _dimensionValue = null;
+    String _childDimensionName = null;
+    Map<Object, TreeNode> _children;
+    int _startDocId;
+    int _endDocId;
+    int _aggregatedDocId;
 }
-
