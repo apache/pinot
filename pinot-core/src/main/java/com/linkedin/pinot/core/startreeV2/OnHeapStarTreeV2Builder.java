@@ -85,6 +85,12 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
     // dimension split order.
     _dimensionsSplitOrder = config.getDimensionsSplitOrder();
+    /*
+      TODO:if the dimensions split order is not given, compute the default order.
+      if (_dimensionsSplitOrder.empty() || _dimensionsSplitOrder == null ) {
+        _dimensionsSplitOrder = OnHeapStarTreeV2BuilderHelper.computeDefaultSplitOrder();
+      }
+     */
     _dimensionsWithoutStarNode = config.getDimensionsWithoutStarNode();
 
     // metric
@@ -114,7 +120,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   public void build() throws IOException {
 
     /*
-     SORTING OF DATA.
+     TODO: figure out if the data in columns will always be sorted or not.
+     If data is not sorted, write a logic for sorting of the data.
     */
 
     // Recursively construct the star tree
@@ -137,8 +144,16 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
   }
 
-
-  // helper function
+  /**
+   * Helper function to construct a star tree.
+   *
+   * @param node TreeNode to start with.
+   * @param startDocId Start document id of the range to be grouped
+   * @param endDocId End document id (exclusive) of the range to be grouped
+   * @param level Name of the dimension to group on
+   *
+   * @return void.
+   */
   private void constructStarTree(TreeNode node, int startDocId, int endDocId, int level) throws IOException {
     if (level == _dimensionsSplitOrder.size()) {
       return;
@@ -206,23 +221,16 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     return getRangeMap(dimensionFieldSpec.getDataType(), startDocId, endDocId, dimensionName);
   }
 
-  private Object readHelper(PinotSegmentColumnReader reader, FieldSpec.DataType dataType, int docId) {
-    switch (dataType) {
-      case INT:
-        return reader.readInt(docId);
-      case FLOAT:
-        return reader.readFloat(docId);
-      case LONG:
-        return reader.readLong(docId);
-      case DOUBLE:
-        return reader.readDouble(docId);
-      case STRING:
-        return reader.readString(docId);
-    }
-
-    return null;
-  }
-
+  /**
+   * Helper function to get the unique value range map for a column
+   *
+   * @param dataType Data type of the column.
+   * @param startDocId Start document id of the range to be grouped
+   * @param endDocId End document id (exclusive) of the range to be grouped
+   * @param dimensionName Name of the dimension to group on
+   *
+   * @return Range Map.
+   */
   private Map<Object, Pairs.IntPair> getRangeMap (FieldSpec.DataType dataType, int startDocId, int endDocId, String dimensionName) {
     Map<Object, Pairs.IntPair> rangeMap = new HashMap<>();
     PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, dimensionName);
@@ -242,10 +250,36 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     rangeMap.put(currentValue, new Pairs.IntPair(groupStartDocId, endDocId));
 
     return rangeMap;
-   }
+  }
 
   /**
-   * create a aggregated document for this range.
+   * Helper function to read value of a doc in a column
+   *
+   * @param reader Pinot segment column reader
+   * @param dataType Data type of the column.
+   * @param docId document Id for which data has to be read.
+   *
+   * @return Object
+   */
+  private Object readHelper(PinotSegmentColumnReader reader, FieldSpec.DataType dataType, int docId) {
+    switch (dataType) {
+      case INT:
+        return reader.readInt(docId);
+      case FLOAT:
+        return reader.readFloat(docId);
+      case LONG:
+        return reader.readLong(docId);
+      case DOUBLE:
+        return reader.readDouble(docId);
+      case STRING:
+        return reader.readString(docId);
+    }
+
+    return null;
+  }
+
+  /**
+   * Create a aggregated document for this range.
    *
    * @param startDocId Start document id of the range to be grouped
    * @param endDocId End document id (exclusive) of the range to be grouped
@@ -270,9 +304,25 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
         aggDoc.setMin(val);
       }
     }
+
+    /*
+     TODO: write a logic for calculating the count(*)
+     val = calculateCount(metric, startDocId, endDocId);
+     aggDoc.setCount(val);
+    */
+
     return aggDoc;
   }
 
+  /**
+   * Calculate SUM of the range.
+   *
+   * @param metricName name of the metric for which sum has to be calculated.
+   * @param startDocId Start document id of the range to be grouped.
+   * @param endDocId End document id (exclusive) of the range to be grouped
+   *
+   * @return sum
+   */
   private Integer calculateSum(String metricName, Integer startDocId, Integer endDocId) {
     int sum = 0;
     PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, metricName);
@@ -283,6 +333,15 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     return sum;
   }
 
+  /**
+   * Calculate MAX of the range.
+   *
+   * @param metricName name of the metric for which max has to be calculated.
+   * @param startDocId Start document id of the range to be grouped.
+   * @param endDocId End document id (exclusive) of the range to be grouped
+   *
+   * @return max
+   */
   private Integer calculateMax(String metricName, Integer startDocId, Integer endDocId) {
     int max = Integer.MIN_VALUE;
     PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, metricName);
@@ -295,6 +354,15 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     return max;
   }
 
+  /**
+   * Calculate MIN of the range.
+   *
+   * @param metricName name of the metric for which min has to be calculated.
+   * @param startDocId Start document id of the range to be grouped.
+   * @param endDocId End document id (exclusive) of the range to be grouped
+   *
+   * @return min
+   */
   private Integer calculateMin(String metricName, Integer startDocId, Integer endDocId) {
     int min = Integer.MAX_VALUE;
     PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, metricName);
