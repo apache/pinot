@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.io.FileUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -121,8 +122,8 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
   public boolean execute() throws Exception {
     LOGGER.info("Executing command: {}", toString());
 
-    long[][] totalMemory = new long[NUM_HOSTS.length][NUM_HOURS_TO_CONSUME.length];
-    long[][] optimalSegmentSize = new long[NUM_HOSTS.length][NUM_HOURS_TO_CONSUME.length];
+    long[][] totalMemoryPerHostMB = new long[NUM_HOSTS.length][NUM_HOURS_TO_CONSUME.length];
+    long[][] optimalSegmentSizeMB = new long[NUM_HOSTS.length][NUM_HOURS_TO_CONSUME.length];
     File sampleCompletedSegmentFile = new File(_sampleCompletedSegmentDir);
     SegmentMetadataImpl segmentMetadata;
     try {
@@ -146,7 +147,7 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
         int totalConsumingPartitionsPerHost = (totalConsumingPartitions + numHosts - 1) / numHosts;
 
         // calculate completed component
-        long sampleCompletedSegmentSizeBytes = sampleCompletedSegmentFile.length();
+        long sampleCompletedSegmentSizeBytes = FileUtils.sizeOfDirectory(sampleCompletedSegmentFile);
         // consuming for _numHoursSampleSegmentConsumed, and got size sampleCompletedSegmentSizeBytes
         // hence, consuming for numHoursToConsume would give:
         long completedSegmentSizeBytes =
@@ -164,12 +165,52 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
         // add them up
         long totalMemoryPerHost = totalMemoryForCompletedSegmentsPerHost + totalMemoryForConsumingSegmentsPerHost;
 
-        totalMemory[i][j] = totalMemoryPerHost;
-        optimalSegmentSize[i][j++] = completedSegmentSizeBytes;
+        totalMemoryPerHostMB[i][j] = totalMemoryPerHost;
+        optimalSegmentSizeMB[i][j++] = completedSegmentSizeBytes;
       }
       i++;
     }
 
+    System.out.print("    ");
+    for (int numHours : NUM_HOURS_TO_CONSUME) {
+      System.out.print(numHours);
+      System.out.print("      |");
+    }
+    System.out.println();
+
+    i = 0;
+    for (int numHosts : NUM_HOSTS) {
+      int j = 0;
+      System.out.print(numHosts);
+      System.out.print("   ");
+      for (int numHours : NUM_HOURS_TO_CONSUME) {
+        System.out.print((int)(new Double(totalMemoryPerHostMB[i][j++])/(1024*1024)));
+        System.out.print("  |");
+      }
+      System.out.println();
+      i++;
+    }
+
+    System.out.println();
+    System.out.print("    ");
+    for (int numHours : NUM_HOURS_TO_CONSUME) {
+      System.out.print(numHours);
+      System.out.print("   |");
+    }
+    System.out.println();
+
+    i = 0;
+    for (int numHosts : NUM_HOSTS) {
+      int j = 0;
+      System.out.print(numHosts);
+      System.out.print("   ");
+      for (int numHours : NUM_HOURS_TO_CONSUME) {
+        System.out.print((int)(new Double(optimalSegmentSizeMB[i][j++])/(1024*1024)));
+        System.out.print("  |");
+      }
+      System.out.println();
+      i++;
+    }
     return true;
   }
 
