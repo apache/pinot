@@ -139,11 +139,6 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     return null;
   }
 
-  @Override
-  public void close() throws IOException {
-
-  }
-
   /**
    * Helper function to construct a star tree.
    *
@@ -194,12 +189,11 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
     // Create star node
     TreeNode starChild = new TreeNode();
-    _nodesCount++;
-    children.put(-1, starChild);
     starChild._dimensionName = splitDimensionName;
-    starChild._dimensionValue = "ALL";
     starChild._startDocId = startDocId;
     starChild._endDocId = endDocId;
+    children.put(StarTreeV2Constant.STAR_TREE_NODE, starChild);
+    _nodesCount++;
 
     if (endDocId - startDocId > _maxNumLeafRecords) {
       constructStarTree(starChild, startDocId, startDocId, level + 1);

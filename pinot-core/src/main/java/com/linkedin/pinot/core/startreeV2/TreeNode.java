@@ -23,8 +23,7 @@ import java.util.Map;
 public class TreeNode {
     int _startDocId;
     int _endDocId;
-    String _dimensionName = "ALL";
-    Object _dimensionValue = "ALL";
+    String _dimensionName = StarTreeV2Constant.STAR_TREE_NODE;
     String _childDimensionName = null;
     Map<Object, TreeNode> _children;
     AggregatedDataDocument _aggDoc;

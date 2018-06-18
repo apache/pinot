@@ -19,12 +19,11 @@ package com.linkedin.pinot.core.startreeV2;
 import java.io.File;
 import java.util.Map;
 import java.util.List;
-import java.io.Closeable;
 import java.io.IOException;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 
 
-public interface StarTreeV2Builder extends Closeable {
+public interface StarTreeV2Builder {
 
   /**
    * Initialize the builder, called before append().
