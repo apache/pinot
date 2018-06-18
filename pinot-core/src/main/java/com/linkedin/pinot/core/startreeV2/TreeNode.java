@@ -21,13 +21,11 @@ import java.util.Map;
  * Helper class to represent a tree node.
  */
 public class TreeNode {
-
-    int _dimensionId = -1;
+    int _startDocId;
+    int _endDocId;
     String _dimensionName = "ALL";
     Object _dimensionValue = "ALL";
     String _childDimensionName = null;
     Map<Object, TreeNode> _children;
-    int _startDocId;
-    int _endDocId;
     AggregatedDataDocument _aggDoc;
 }
