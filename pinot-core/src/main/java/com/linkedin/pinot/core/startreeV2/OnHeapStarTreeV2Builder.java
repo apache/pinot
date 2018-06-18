@@ -17,27 +17,23 @@
 package com.linkedin.pinot.core.startreeV2;
 
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import java.io.File;
-import java.util.HashSet;
+import java.util.Set;
 import java.util.Map;
 import java.util.List;
 import java.util.HashMap;
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.io.IOException;
 import com.linkedin.pinot.common.utils.Pairs;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.data.readers.PinotSegmentColumnReader;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import java.util.Set;
-import javax.xml.crypto.Data;
-import scala.Int;
 
 
 public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
@@ -59,11 +55,6 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   private int _metricAggfuncPairsCount;
   private List<Met2AggfuncPair> _met2aggfuncPairs;
   private Map<String, MetricFieldSpec> _metricsSpecMap;
-  private List<Met2AggfuncPair> _metricAggfuncPairs = new ArrayList<>();
-
-  // star tree data
-  Map<Object, Dictionary> _starTreeData = new HashMap<>();
-  Map<Integer, List<Integer>> _aggregatedData = new HashMap<>();
 
   // General
   private int _nodesCount;
@@ -152,10 +143,10 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     if (level == _dimensionsSplitOrder.size()) {
       return;
     }
+
     int numDocs = endDocId - startDocId;
     String splitDimensionName = _dimensionsSplitOrder.get(level);
     Map<Object, Pairs.IntPair> dimensionRangeMap = groupOnDimension(startDocId, endDocId, splitDimensionName);
-
 
     node._childDimensionName = splitDimensionName;
 
@@ -177,7 +168,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
         constructStarTree(child, childStartDocId, childEndDocId, level + 1);
       }
       _nodesCount++;
-      List<Integer> aggregatedDocument = getAggregatedDocument(childStartDocId, childEndDocId, (String)childDimensionValue);
+      AggregatedDataDocument aggDoc = getAggregatedDocument(childStartDocId, childEndDocId);
+      child._aggDoc = aggDoc;
     }
 
     // Directly return if we don't need to create star-node
@@ -257,31 +249,28 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
    *
    * @param startDocId Start document id of the range to be grouped
    * @param endDocId End document id (exclusive) of the range to be grouped
-   * @param dimensionName Name of the dimension to group on
    *
    * @return list of all metric2aggfunc value.
    */
-  private List<Integer> getAggregatedDocument(int startDocId, int endDocId, String dimensionName) {
-
-    List<Integer>aggregatedResult = new ArrayList<>();
-
-    for (Met2AggfuncPair pair : _metricAggfuncPairs) {
-
+  private AggregatedDataDocument getAggregatedDocument(int startDocId, int endDocId) {
+    int val = 0;
+    AggregatedDataDocument aggDoc = new AggregatedDataDocument();
+    for (Met2AggfuncPair pair : _met2aggfuncPairs) {
       String metric = pair.getMetricValue();
       String aggfunc = pair.getAggregatefunction();
 
-      int val = 0;
       if (aggfunc == "SUM") {
         val = calculateSum(metric, startDocId, endDocId);
+        aggDoc.setSum(val);
       } else if (aggfunc == "MAX") {
         val = calculateMax(metric, startDocId, endDocId);
+        aggDoc.setMax(val);
       } else if (aggfunc == "MIN") {
         val = calculateMin(metric, startDocId, endDocId);
+        aggDoc.setMin(val);
       }
-      aggregatedResult.add(val);
-
     }
-    return aggregatedResult;
+    return aggDoc;
   }
 
   private Integer calculateSum(String metricName, Integer startDocId, Integer endDocId) {
@@ -295,7 +284,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   }
 
   private Integer calculateMax(String metricName, Integer startDocId, Integer endDocId) {
-    int max = 100;
+    int max = Integer.MIN_VALUE;
     PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, metricName);
     for (int i = startDocId; i < endDocId; i++) {
       Object currentValue = columnReader.readInt(startDocId);;
@@ -307,7 +296,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   }
 
   private Integer calculateMin(String metricName, Integer startDocId, Integer endDocId) {
-    int min = -100;
+    int min = Integer.MAX_VALUE;
     PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, metricName);
     for (int i = startDocId; i < endDocId; i++) {
       Object currentValue = columnReader.readInt(startDocId);;
