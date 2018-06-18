@@ -17,14 +17,15 @@
 package com.linkedin.pinot.core.startreeV2;
 
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import java.io.File;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.List;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.io.IOException;
 import com.linkedin.pinot.common.utils.Pairs;
-import com.google.common.collect.ListMultimap;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -34,6 +35,9 @@ import com.linkedin.pinot.core.data.readers.PinotSegmentColumnReader;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import java.util.Set;
+import javax.xml.crypto.Data;
+import scala.Int;
 
 
 public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
@@ -51,9 +55,9 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
   // Metrics
   private int _metricsCount;
-  private List<String> _metricsName;
+  private Set<String> _metricsName;
   private int _metricAggfuncPairsCount;
-  private ListMultimap<String, String> _met2aggfuncPairs;
+  private List<Met2AggfuncPair> _met2aggfuncPairs;
   private Map<String, MetricFieldSpec> _metricsSpecMap;
   private List<Met2AggfuncPair> _metricAggfuncPairs = new ArrayList<>();
 
@@ -69,7 +73,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
 
   @Override
-  public void init(File indexDir, StarTreeV2BuilderConfig config) throws Exception {
+  public void init(File indexDir, StarTreeV2Config config) throws Exception {
 
     // segment
     _immutableSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
@@ -93,18 +97,15 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     _dimensionsWithoutStarNode = config.getDimensionsWithoutStarNode();
 
     // metric
+    _metricsName = new HashSet<>();
     _metricsSpecMap = new HashMap<>();
     _met2aggfuncPairs = config.getMetric2aggFuncPairs();
-    for (String metricName: _met2aggfuncPairs.keys()) {
-      _metricsCount++;
-      _metricsName.add(metricName);
-      List<String> aggfuncList = _met2aggfuncPairs.get(metricName);
-      for (String agg: aggfuncList) {
-        Met2AggfuncPair pair = new Met2AggfuncPair(metricName, agg);
-        _metricAggfuncPairs.add(pair);
-        _metricAggfuncPairsCount++;
-      }
+    _metricAggfuncPairsCount = _met2aggfuncPairs.size();
+    for (Met2AggfuncPair pair: _met2aggfuncPairs) {
+        _metricsName.add(pair.getMetricValue());
     }
+    _metricsCount = _metricsName.size();
+
     List<MetricFieldSpec> _metricsSpecList = _segmentMetadata.getSchema().getMetricFieldSpecs();
     for (MetricFieldSpec metric: _metricsSpecList) {
       if (_metricsName.contains(metric.getName())) {
@@ -163,18 +164,15 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
     node._children = children;
     for (Object key : dimensionRangeMap.keySet()) {
-      Pairs.IntPair value = dimensionRangeMap.get(key);
       Object childDimensionValue = key;
-      TreeNode child = new TreeNode();
-      children.put(childDimensionValue, child);
-
-      // The range pair value is the relative value to the start document id
       Pairs.IntPair range = dimensionRangeMap.get(childDimensionValue);
+
+      TreeNode child = new TreeNode();
       int childStartDocId = range.getLeft();
       child._startDocId = childStartDocId;
       int childEndDocId = range.getRight();
       child._endDocId = childEndDocId;
-
+      children.put(childDimensionValue, child);
       if (childEndDocId - childStartDocId > _maxNumLeafRecords) {
         constructStarTree(child, childStartDocId, childEndDocId, level + 1);
       }
@@ -211,49 +209,46 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
    * @return Map from dimension value to a pair of start docId and end docId (exclusive)
    */
   private Map<Object, Pairs.IntPair> groupOnDimension(int startDocId, int endDocId, String dimensionName) {
-
-    Map<Object, Pairs.IntPair> rangeMap = new HashMap<>();
     DimensionFieldSpec dimensionFieldSpec = _dimensionsSpecMap.get(dimensionName);
-    switch (dimensionFieldSpec.getDataType()) {
-      case INT:
-        rangeMap = getRangeMapforInt(startDocId, endDocId, dimensionName);
-        break;
-      case LONG:
-        rangeMap = getRangeMapforInt(startDocId, endDocId, dimensionName);
-        break;
-      case FLOAT:
-        rangeMap = getRangeMapforInt(startDocId, endDocId, dimensionName);
-        break;
-      case DOUBLE:
-        rangeMap = getRangeMapforInt(startDocId, endDocId, dimensionName);
-        break;
-      case STRING:
-        rangeMap = getRangeMapforInt(startDocId, endDocId, dimensionName);
-        break;
-      case BYTES:
-        rangeMap = getRangeMapforInt(startDocId, endDocId, dimensionName);
-        break;
-    }
-    return rangeMap;
+
+    return getRangeMap(dimensionFieldSpec.getDataType(), startDocId, endDocId, dimensionName);
   }
 
+  private Object readHelper(PinotSegmentColumnReader reader, FieldSpec.DataType dataType, int docId) {
+    switch (dataType) {
+      case INT:
+        return reader.readInt(docId);
+      case FLOAT:
+        return reader.readFloat(docId);
+      case LONG:
+        return reader.readLong(docId);
+      case DOUBLE:
+        return reader.readDouble(docId);
+      case STRING:
+        return reader.readString(docId);
+    }
 
-  private Map<Object, Pairs.IntPair> getRangeMapforInt(int startDocId, int endDocId, String dimensionName) {
+    return null;
+  }
+
+  private Map<Object, Pairs.IntPair> getRangeMap (FieldSpec.DataType dataType, int startDocId, int endDocId, String dimensionName) {
     Map<Object, Pairs.IntPair> rangeMap = new HashMap<>();
     PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, dimensionName);
-    Object currentValue = columnReader.readInt(startDocId);
+    Object currentValue = readHelper(columnReader, dataType, startDocId);
+
     int groupStartDocId = startDocId;
 
     for (int i = startDocId + 1; i < endDocId; i++) {
-      Object value = columnReader.readInt(i);
-      if ((int)value != (int)currentValue) {
-        int groupEndDocId = i + startDocId;
+      Object value = readHelper(columnReader, dataType, i);
+      if (!value.equals(currentValue)) {
+        int groupEndDocId = i + 1;
         rangeMap.put(currentValue, new Pairs.IntPair(groupStartDocId, groupEndDocId));
         currentValue = value;
         groupStartDocId = groupEndDocId;
       }
     }
     rangeMap.put(currentValue, new Pairs.IntPair(groupStartDocId, endDocId));
+
     return rangeMap;
    }
 

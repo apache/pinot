@@ -18,20 +18,20 @@ package com.linkedin.pinot.core.startreeV2;
 
 import java.io.File;
 import java.util.List;
-import com.google.common.collect.ListMultimap;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
 
 
-public class StarTreeV2BuilderConfig {
+public class StarTreeV2Config {
 
   private File _outDir;
   private int _maxNumLeafRecords;
   private List<String> _dimensionsSplitOrder;
   private List<String> _dimensions;
   private List<String> _dimensionsWithoutStarNode;
-  private ListMultimap<String, String> _metric2aggFuncPairs;
+  private List<Met2AggfuncPair> _metric2aggFuncPairs;
 
+  public StarTreeV2Config () {
+
+  }
   /**
    * Set the temporary directory for star tree.
    */
@@ -106,14 +106,14 @@ public class StarTreeV2BuilderConfig {
   /**
    * Set the mapping of metric to aggregation function
    */
-  public void setMetric2aggFuncPairs(ListMultimap<String, String> metric2aggFuncPairs) {
+  public void setMetric2aggFuncPairs(List<Met2AggfuncPair> metric2aggFuncPairs) {
     _metric2aggFuncPairs = metric2aggFuncPairs;
   }
 
   /**
    * Get the mapping of metric to aggregation function.
    */
-  public ListMultimap<String, String> getMetric2aggFuncPairs() {
+  public List<Met2AggfuncPair> getMetric2aggFuncPairs() {
     return _metric2aggFuncPairs;
   }
 }
