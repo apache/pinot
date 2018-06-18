@@ -29,5 +29,5 @@ public class TreeNode {
     Map<Object, TreeNode> _children;
     int _startDocId;
     int _endDocId;
-    int _aggregatedDocId;
+    AggregatedDataDocument _aggDoc;
 }
