@@ -36,38 +36,35 @@ import java.io.IOException;
  * |                           Data for last bitmap                          |
  * |-------------------------------------------------------------------------|
  * </pre>
+ *
+ * <p>To create an inverted index:
+ * <ul>
+ *   <li>
+ *     Construct an instance of <code>InvertedIndexCreator</code>
+ *   </li>
+ *   <li>
+ *     Call add() for each docId in sequence starting with 0 to add dictId (dictIds for multi-valued column) into the
+ *     creator
+ *   </li>
+ *   <li>
+ *     Call seal() after all dictIds have been added
+ *   </li>
+ * </ul>
  */
 public interface InvertedIndexCreator extends Closeable {
 
   /**
-   * Add an entry for single-value column.
-   *
-   * @param docId Document id
-   * @param dictId Dictionary id
+   * For single-valued column, adds the dictionary Id for the next document.
    */
-  void addSV(int docId, int dictId);
+  void add(int dictId);
 
   /**
-   * Add an entry for multi-value column.
-   *
-   * @param docId Document id
-   * @param dictIds Array of dictionary ids
+   * For multi-valued column, adds the dictionary Ids for the next document.
    */
-  void addMV(int docId, int[] dictIds);
+  void add(int[] dictIds, int length);
 
   /**
-   * Add an entry for multi-value column.
-   *
-   * @param docId Document id
-   * @param dictIds Array of dictionary ids
-   * @param numDictIds Number of dictionary ids
-   */
-  void addMV(int docId, int[] dictIds, int numDictIds);
-
-  /**
-   * Seal the results into the file.
-   *
-   * @throws IOException
+   * Seals the index and flushes it to disk.
    */
   void seal() throws IOException;
 }
