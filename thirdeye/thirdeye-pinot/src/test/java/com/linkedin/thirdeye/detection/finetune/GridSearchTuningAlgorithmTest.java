@@ -113,4 +113,6 @@ public class GridSearchTuningAlgorithmTest {
     DetectionConfigDTO config = gridSearch.bestDetectionConfig();
     Assert.assertEquals(MapUtils.getDouble(config.getProperties(), "change"), 0.05);
   }
+
+  // TODO test dimension separation
 }
