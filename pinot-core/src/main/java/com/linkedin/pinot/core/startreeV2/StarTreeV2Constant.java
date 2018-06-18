@@ -16,20 +16,9 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import java.util.List;
-import java.util.ArrayList;
+public class StarTreeV2Constant {
 
+  public static final String STAR_TREE_NODE = "ALL";
+  public static final Integer DEFAULT_AGGREGATED_VALUE = -1;
 
-public class OnHeapStarTreeV2BuilderHelper {
-
-  /**
-   * compute a defualt split order.
-   */
-  public static List<Integer> computeDefaultSplitOrder(int dimensionsCount) {
-    List<Integer> defaultSplitOrder = new ArrayList<>();
-    for (int i = 0; i < dimensionsCount; i++) {
-      defaultSplitOrder.add(i);
-    }
-    return defaultSplitOrder;
-  }
 }

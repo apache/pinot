@@ -19,10 +19,10 @@ package com.linkedin.pinot.core.startreeV2;
 
 public class AggregatedDataDocument {
 
-  private Object _max = -1;
-  private Object _min = -1;
-  private Object _sum = -1;
-  private Object _count = 0;
+  private Object _max = StarTreeV2Constant.DEFAULT_AGGREGATED_VALUE;
+  private Object _min = StarTreeV2Constant.DEFAULT_AGGREGATED_VALUE;
+  private Object _sum = StarTreeV2Constant.DEFAULT_AGGREGATED_VALUE;
+  private Object _count = StarTreeV2Constant.DEFAULT_AGGREGATED_VALUE;
 
   public void setMax(Object max) {
     _max = max;
