@@ -29,7 +29,7 @@ public interface StarTreeV2Builder extends Closeable {
   /**
    * Initialize the builder, called before append().
    */
-  void init(File indexDir, StarTreeV2BuilderConfig config) throws Exception;
+  void init(File indexDir, StarTreeV2Config config) throws Exception;
 
   /**
    * Build the StarTree

@@ -26,7 +26,11 @@ import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.core.startreeV2.Met2AggfuncPair;
+import com.linkedin.pinot.core.startreeV2.OnHeapStarTreeV2Builder;
+import com.linkedin.pinot.core.startreeV2.StarTreeV2Config;
 import com.linkedin.pinot.startree.hll.HllConfig;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -114,6 +118,27 @@ public class StarTreeIndexTestSegmentHelper {
     driver.build();
 
     LOGGER.info("Built segment {} at {}", segmentName, segmentDirName);
+
+    // New Star Tree Test.
+    StarTreeV2Config starTreeV2Config = new StarTreeV2Config();
+    String DATA_DIR = System.getProperty("java.io.tmpdir") + File.separator + "SumStarTreeIndexTest";
+    String SEGMENT_NAME = "starTreeSegment";
+    File indexDir = new File(DATA_DIR, SEGMENT_NAME);
+    OnHeapStarTreeV2Builder onTest = new OnHeapStarTreeV2Builder();
+
+    List<Met2AggfuncPair> metric2aggFuncPairs = new ArrayList<>();
+    Met2AggfuncPair pair1 = new Met2AggfuncPair("m1", "SUM");
+    metric2aggFuncPairs.add(pair1);
+    Met2AggfuncPair pair2 = new Met2AggfuncPair("m1", "MAX");
+    metric2aggFuncPairs.add(pair2);
+    Met2AggfuncPair pair3 = new Met2AggfuncPair("m2", "MIN");
+    metric2aggFuncPairs.add(pair3);
+    starTreeV2Config.setDimensions(schema.getDimensionNames());
+    starTreeV2Config.setMaxNumLeafRecords(10);
+    starTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs);
+    starTreeV2Config.setDimensionsSplitOrder(starTreeIndexSpec.getDimensionsSplitOrder());
+    onTest.init(indexDir, starTreeV2Config);
+    onTest.build();
     return schema;
   }
 }

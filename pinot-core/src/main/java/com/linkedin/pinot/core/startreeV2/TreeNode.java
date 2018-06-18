@@ -23,8 +23,8 @@ import java.util.Map;
 public class TreeNode {
 
     int _dimensionId = -1;
-    String _dimensionName = null;
-    Object _dimensionValue = null;
+    String _dimensionName = "ALL";
+    Object _dimensionValue = "ALL";
     String _childDimensionName = null;
     Map<Object, TreeNode> _children;
     int _startDocId;
