@@ -22,6 +22,8 @@ public class DetectionAlertConfigBean extends AbstractBean {
   String application;
 
   Map<Long, Long> vectorClocks;
+  Long highWaterMark;
+
   Map<String, Object> properties;
 
   public boolean isActive() {
@@ -80,23 +82,33 @@ public class DetectionAlertConfigBean extends AbstractBean {
     this.application = application;
   }
 
+  public Long getHighWaterMark() {
+    return highWaterMark;
+  }
+
+  public void setHighWaterMark(Long highWaterMark) {
+    this.highWaterMark = highWaterMark;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof DetectionAlertConfigBean)) {
+    if (o == null || getClass() != o.getClass()) {
       return false;
     }
     DetectionAlertConfigBean that = (DetectionAlertConfigBean) o;
-    return active == that.active && Objects.equals(name, that.name)
-        && Objects.equals(fromAddress, that.fromAddress) && Objects.equals(cronExpression, that.cronExpression)
-        && Objects.equals(vectorClocks, that.vectorClocks) && Objects.equals(properties, that.properties);
+    return active == that.active && Objects.equals(name, that.name) && Objects.equals(fromAddress, that.fromAddress)
+        && Objects.equals(cronExpression, that.cronExpression) && Objects.equals(application, that.application)
+        && Objects.equals(vectorClocks, that.vectorClocks) && Objects.equals(highWaterMark, that.highWaterMark)
+        && Objects.equals(properties, that.properties);
   }
 
   @Override
   public int hashCode() {
 
-    return Objects.hash(active, name, fromAddress, cronExpression, vectorClocks, properties);
+    return Objects.hash(active, name, fromAddress, cronExpression, application, vectorClocks, highWaterMark,
+        properties);
   }
 }

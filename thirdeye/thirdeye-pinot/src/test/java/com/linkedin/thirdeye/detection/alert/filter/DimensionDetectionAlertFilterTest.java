@@ -70,20 +70,11 @@ public class DimensionDetectionAlertFilterTest {
     this.properties.put(PROP_DIMENSION, PROP_DIMENSION_VALUE);
     this.properties.put(PROP_DIMENSION_RECIPIENTS, PROP_DIMENSION_RECIPIENTS_VALUE);
 
-    alertConfig.setProperties(this.properties);
+    this.alertConfig.setProperties(this.properties);
 
     Map<Long, Long> vectorClocks = new HashMap<>();
     vectorClocks.put(PROP_ID_VALUE.get(0), 0L);
-    alertConfig.setVectorClocks(vectorClocks);
-  }
-
-  @Test
-  public void testAlertFilterClocks() throws Exception {
-    this.alertFilter = new DimensionDetectionAlertFilter(provider, alertConfig,2500L);
-
-    DetectionAlertFilterResult result = this.alertFilter.run();
-    Assert.assertEquals(result.getVectorClocks().get(PROP_ID_VALUE.get(0)).longValue(), 2000);
-    Assert.assertEquals(result.getVectorClocks().get(PROP_ID_VALUE.get(1)).longValue(), 1600);
+    this.alertConfig.setVectorClocks(vectorClocks);
   }
 
   @Test

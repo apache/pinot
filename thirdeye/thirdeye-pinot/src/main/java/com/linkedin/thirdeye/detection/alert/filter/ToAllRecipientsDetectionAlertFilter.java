@@ -8,8 +8,8 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.AnomalySlice;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.alert.AlertUtils;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilter;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
+import com.linkedin.thirdeye.detection.alert.StatefulDetectionAlertFilter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -26,15 +26,16 @@ import org.slf4j.LoggerFactory;
 /**
  * The detection alert filter that sends the anomaly email to all recipients
  */
-public class ToAllRecipientsDetectionAlertFilter extends DetectionAlertFilter {
+public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertFilter {
 
   private static final Logger LOG = LoggerFactory.getLogger(ToAllRecipientsDetectionAlertFilter.class);
   private static final String PROP_RECIPIENTS = "recipients";
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
+  private static final String PROP_SEND_ONCE = "sendOnce";
 
   Set<String> recipients;
   List<Long> detectionConfigIds;
-  Map<Long, Long> vectorClocks;
+  boolean sendOnce;
 
   public ToAllRecipientsDetectionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
     super(provider, config, endTime);
@@ -45,15 +46,17 @@ public class ToAllRecipientsDetectionAlertFilter extends DetectionAlertFilter {
 
     this.recipients = new HashSet<>((Collection<String>) this.config.getProperties().get(PROP_RECIPIENTS));
     this.detectionConfigIds = extractLongs((Collection<Number>) this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
-    this.vectorClocks = this.config.getVectorClocks();
+    this.sendOnce = MapUtils.getBoolean(this.config.getProperties(), PROP_SEND_ONCE, true);
   }
 
   @Override
-  public DetectionAlertFilterResult run() {
+  public DetectionAlertFilterResult run(Map<Long, Long> vectorClocks, long highWaterMark) {
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
 
+    final long minId = getMinId(highWaterMark);
+
     for (Long detectionConfigId : this.detectionConfigIds) {
-      long startTime = MapUtils.getLong(this.vectorClocks, detectionConfigId, 0L);
+      long startTime = MapUtils.getLong(vectorClocks, detectionConfigId, 0L);
 
       AnomalySlice slice = new AnomalySlice().withConfigId(detectionConfigId).withStart(startTime).withEnd(this.endTime);
       Collection<MergedAnomalyResultDTO> candidates = this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice);
@@ -64,25 +67,23 @@ public class ToAllRecipientsDetectionAlertFilter extends DetectionAlertFilter {
             public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomalyResultDTO) {
               return mergedAnomalyResultDTO != null
                   && !mergedAnomalyResultDTO.isChild()
-                  && !AlertUtils.hasFeedback(mergedAnomalyResultDTO);
+                  && !AlertUtils.hasFeedback(mergedAnomalyResultDTO)
+                  && (mergedAnomalyResultDTO.getId() == null || mergedAnomalyResultDTO.getId() >= minId);
             }
           });
 
       result.addMapping(this.recipients, new HashSet<>(anomalies));
-
-      this.vectorClocks.put(detectionConfigId, getLastTimeStamp(anomalies, startTime));
     }
 
-    result.setVectorClocks(this.vectorClocks);
     return result;
   }
 
-  private Long getLastTimeStamp(Collection<MergedAnomalyResultDTO> anomalies, long startTime) {
-    long lastTimeStamp = startTime;
-    for (MergedAnomalyResultDTO anomaly : anomalies) {
-      lastTimeStamp = Math.max(anomaly.getEndTime(), lastTimeStamp);
+  private long getMinId(long highWaterMark) {
+    if (this.sendOnce) {
+      return highWaterMark + 1;
+    } else {
+      return 0;
     }
-    return lastTimeStamp;
   }
 
   private static List<Long> extractLongs(Collection<Number> numbers) {

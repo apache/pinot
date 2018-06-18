@@ -50,9 +50,9 @@ class EventSlice {
   }
 
   public boolean match(EventDTO event) {
-    if (this.start >= 0 && event.getEndTime() < this.start)
+    if (this.start >= 0 && event.getEndTime() <= this.start)
       return false;
-    if (this.end >= 0 && event.getStartTime() > this.end)
+    if (this.end >= 0 && event.getStartTime() >= this.end)
       return false;
 
     for (String dimName : this.filters.keySet()) {

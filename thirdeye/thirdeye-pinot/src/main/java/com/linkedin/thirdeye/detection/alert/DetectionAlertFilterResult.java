@@ -19,7 +19,6 @@ public class DetectionAlertFilterResult {
    */
   private Map<Set<String>, Set<MergedAnomalyResultDTO>> result;
 
-  Map<Long, Long> vectorClocks;
   /**
    * Instantiates a new Detection alert filter result.
    */
@@ -27,21 +26,12 @@ public class DetectionAlertFilterResult {
     this.result = new HashMap<>();
   }
 
-  public Map<Long, Long> getVectorClocks() {
-    return vectorClocks;
-  }
-
-  public void setVectorClocks(Map<Long, Long> vectorClock) {
-    this.vectorClocks = vectorClock;
-  }
-
   /**
    * Instantiates a new Detection alert filter result.
    *
    * @param result the result
-   * @param lastTimestamp the last timestamp
    */
-  public DetectionAlertFilterResult(Map<Set<String>, Set<MergedAnomalyResultDTO>> result, long lastTimestamp) {
+  public DetectionAlertFilterResult(Map<Set<String>, Set<MergedAnomalyResultDTO>> result) {
     Preconditions.checkNotNull(result);
     this.result = result;
   }

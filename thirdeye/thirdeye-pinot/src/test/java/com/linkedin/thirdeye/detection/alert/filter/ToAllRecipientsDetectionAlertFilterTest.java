@@ -29,6 +29,7 @@ public class ToAllRecipientsDetectionAlertFilterTest {
   private static final Set<String> PROP_RECIPIENTS_VALUE = new HashSet<>(Arrays.asList("test@test.com", "test@test.org"));
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   private static final List<Long> PROP_ID_VALUE = Arrays.asList(1001L, 1002L);
+  private static final String PROP_SEND_ONCE = "sendOnce";
 
   private DetectionAlertFilter alertFilter;
   private List<MergedAnomalyResultDTO> detectedAnomalies;
@@ -68,8 +69,6 @@ public class ToAllRecipientsDetectionAlertFilterTest {
 
     DetectionAlertFilterResult result = this.alertFilter.run();
     Assert.assertEquals(result.getResult().get(PROP_RECIPIENTS_VALUE), new HashSet<>(this.detectedAnomalies.subList(0, 4)));
-    Assert.assertTrue(result.getVectorClocks().get(PROP_ID_VALUE.get(0)) == 2000L);
-    Assert.assertTrue(result.getVectorClocks().get(PROP_ID_VALUE.get(1)) == 1500L);
   }
 
   @Test
@@ -103,6 +102,60 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     Assert.assertTrue(result.getResult().get(PROP_RECIPIENTS_VALUE).contains(this.detectedAnomalies.get(5)));
     Assert.assertTrue(result.getResult().get(PROP_RECIPIENTS_VALUE).contains(anomalyWithoutFeedback));
     Assert.assertTrue(result.getResult().get(PROP_RECIPIENTS_VALUE).contains(anomalyWithNull));
+  }
+
+  @Test
+  public void testAlertFilterNoResend() throws Exception {
+    MergedAnomalyResultDTO existingOld = makeAnomaly(1001L, 1000, 1100);
+    existingOld.setId(5L);
+
+    MergedAnomalyResultDTO existingNew = makeAnomaly(1001L, 1100, 1200);
+    existingNew.setId(6L);
+
+    MergedAnomalyResultDTO existingFuture = makeAnomaly(1001L, 1200, 1300);
+    existingFuture.setId(7L);
+
+    this.detectedAnomalies.clear();
+    this.detectedAnomalies.add(existingOld);
+    this.detectedAnomalies.add(existingNew);
+    this.detectedAnomalies.add(existingFuture);
+
+    this.alertConfig.setHighWaterMark(6L);
+    this.alertConfig.setVectorClocks(Collections.singletonMap(1001L, 1100L));
+
+    this.alertFilter = new ToAllRecipientsDetectionAlertFilter(this.provider, this.alertConfig,2500L);
+
+    DetectionAlertFilterResult result = this.alertFilter.run();
+    Assert.assertEquals(result.getResult().get(PROP_RECIPIENTS_VALUE).size(), 1);
+    Assert.assertTrue(result.getResult().get(PROP_RECIPIENTS_VALUE).contains(existingFuture));
+  }
+
+  @Test
+  public void testAlertFilterResend() throws Exception {
+    MergedAnomalyResultDTO existingOld = makeAnomaly(1001L, 1000, 1100);
+    existingOld.setId(5L);
+
+    MergedAnomalyResultDTO existingNew = makeAnomaly(1001L, 1100, 1200);
+    existingNew.setId(6L);
+
+    MergedAnomalyResultDTO existingFuture = makeAnomaly(1001L, 1200, 1300);
+    existingFuture.setId(7L);
+
+    this.detectedAnomalies.clear();
+    this.detectedAnomalies.add(existingOld);
+    this.detectedAnomalies.add(existingNew);
+    this.detectedAnomalies.add(existingFuture);
+
+    this.alertConfig.setHighWaterMark(5L);
+    this.alertConfig.setVectorClocks(Collections.singletonMap(1001L, 1100L));
+    this.alertConfig.getProperties().put(PROP_SEND_ONCE, false);
+
+    this.alertFilter = new ToAllRecipientsDetectionAlertFilter(this.provider, this.alertConfig,2500L);
+
+    DetectionAlertFilterResult result = this.alertFilter.run();
+    Assert.assertEquals(result.getResult().get(PROP_RECIPIENTS_VALUE).size(), 2);
+    Assert.assertTrue(result.getResult().get(PROP_RECIPIENTS_VALUE).contains(existingNew));
+    Assert.assertTrue(result.getResult().get(PROP_RECIPIENTS_VALUE).contains(existingFuture));
   }
 
 }

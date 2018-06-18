@@ -66,9 +66,9 @@ public class AnomalySlice {
   }
 
   public boolean match(MergedAnomalyResultDTO anomaly) {
-    if (this.start >= 0 && anomaly.getEndTime() < this.start)
+    if (this.start >= 0 && anomaly.getEndTime() <= this.start)
       return false;
-    if (this.end >= 0 && anomaly.getStartTime() > this.end)
+    if (this.end >= 0 && anomaly.getStartTime() >= this.end)
       return false;
     if (this.configId >= 0 && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != this.configId))
       return false;

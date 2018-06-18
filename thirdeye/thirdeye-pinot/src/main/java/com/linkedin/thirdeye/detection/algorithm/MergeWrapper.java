@@ -90,8 +90,8 @@ public class MergeWrapper extends DetectionPipeline {
 
     // retrieve anomalies
     AnomalySlice effectiveSlice = this.slice
-        .withStart(this.getStartTime(generated) - this.maxGap)
-        .withEnd(this.getEndTime(generated) + this.maxGap);
+        .withStart(this.getStartTime(generated) - this.maxGap - 1)
+        .withEnd(this.getEndTime(generated) + this.maxGap + 1);
 
     List<MergedAnomalyResultDTO> retrieved = new ArrayList<>();
     retrieved.addAll(this.provider.fetchAnomalies(Collections.singleton(effectiveSlice)).get(effectiveSlice));
