@@ -21,3 +21,8 @@
     {{/power-select}}
   {{/if}}
 </div>
+{{#if record.anomaly.comment}}
+  <div>
+    comment: {{markdown-to-html record.anomaly.comment}}
+  </div>
+{{/if}}
