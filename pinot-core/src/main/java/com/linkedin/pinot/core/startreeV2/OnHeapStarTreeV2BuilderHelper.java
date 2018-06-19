@@ -18,18 +18,50 @@ package com.linkedin.pinot.core.startreeV2;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Collections;
+import com.google.common.collect.BiMap;
 
 
 public class OnHeapStarTreeV2BuilderHelper {
 
   /**
+   * enumerate dimension set.
+   */
+  public static List<Integer> enumerateDimensions(List<String>dimensionNames, List<String>dimensionsOrder) {
+    List<Integer> enumeratedDimensions = new ArrayList<>();
+    if (dimensionsOrder != null) {
+      for (String dimensionName : dimensionsOrder) {
+        enumeratedDimensions.add(dimensionNames.indexOf(dimensionName));
+      }
+    }
+
+    return enumeratedDimensions;
+  }
+
+  /**
    * compute a defualt split order.
    */
-  public static List<Integer> computeDefaultSplitOrder(int dimensionsCount) {
+  public static List<Integer> computeDefaultSplitOrder(int dimensionsCount, List<BiMap<Object, Integer>> dimensionDictionaries) {
     List<Integer> defaultSplitOrder = new ArrayList<>();
     for (int i = 0; i < dimensionsCount; i++) {
       defaultSplitOrder.add(i);
     }
+
+    Collections.sort(defaultSplitOrder, new Comparator<Integer>() {
+      @Override
+      public int compare(Integer o1, Integer o2) {
+        return dimensionDictionaries.get(o2).size() - dimensionDictionaries.get(o1).size();
+      }
+    });
+
     return defaultSplitOrder;
+  }
+
+  /**
+   * sort the star tree data.
+   */
+  public static void sortStarTreeData() {
+
   }
 }
