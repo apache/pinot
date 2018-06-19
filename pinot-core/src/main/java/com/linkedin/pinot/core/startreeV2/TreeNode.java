@@ -17,14 +17,15 @@ package com.linkedin.pinot.core.startreeV2;
 
 import java.util.Map;
 
+
 /**
  * Helper class to represent a tree node.
  */
-public class TreeNode {
-    int _startDocId;
-    int _endDocId;
-    String _dimensionName = StarTreeV2Constant.STAR_TREE_NODE;
-    String _childDimensionName = null;
-    Map<Object, TreeNode> _children;
-    AggregatedDataDocument _aggDoc;
+class TreeNode {
+  int _startDocId;
+  int _endDocId;
+  String _dimensionName = StarTreeV2Constant.STAR_TREE_NODE;
+  String _childDimensionName = null;
+  Map<Object, TreeNode> _children;
+  AggregatedDataDocument _aggDoc;
 }
