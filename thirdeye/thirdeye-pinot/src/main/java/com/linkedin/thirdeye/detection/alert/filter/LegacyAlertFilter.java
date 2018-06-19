@@ -74,10 +74,8 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
 
       result.addMapping(new HashSet<>(Arrays.asList(this.alertConfig.getRecipients().split(","))), new HashSet<>(anomalies));
 
-      this.vectorClocks.put(detectionConfigId, getLastTimeStamp(anomalies, startTime));
     }
 
-    result.setVectorClocks(this.vectorClocks);
     return result;
   }
 }
