@@ -22,7 +22,8 @@ import javax.annotation.Nullable;
  */
 public class TimeBucketF1ScoreFunction implements ScoreFunction {
 
-  private long bucketSize = TimeUnit.MINUTES.toMillis(1);
+  private static final long BUCKET_SIZE = TimeUnit.MINUTES.toMillis(1);
+  private static final double beta = 3;
 
   @Override
   public double calculateScore(DetectionPipelineResult detectionResult, Collection<MergedAnomalyResultDTO> testAnomalies) {
@@ -59,8 +60,8 @@ public class TimeBucketF1ScoreFunction implements ScoreFunction {
     for (DimensionMap key : groupedLabeled.keySet()) {
       Set<Long> resultAnomalyTimes = new HashSet<>();
       for (MergedAnomalyResultDTO anomaly : groupedResults.get(key)) {
-        for (long time = anomaly.getStartTime(); time < anomaly.getEndTime(); time += bucketSize) {
-          resultAnomalyTimes.add(time / bucketSize);
+        for (long time = anomaly.getStartTime(); time < anomaly.getEndTime(); time += BUCKET_SIZE) {
+          resultAnomalyTimes.add(time / BUCKET_SIZE);
         }
       }
 
@@ -68,11 +69,11 @@ public class TimeBucketF1ScoreFunction implements ScoreFunction {
         if (labeledAnomaly.getFeedback().getFeedbackType() == AnomalyFeedbackType.ANOMALY) {
           totalLabeledTrueAnomaliesTime += (labeledAnomaly.getEndTime() - labeledAnomaly.getStartTime());
         }
-        for (long time = labeledAnomaly.getStartTime(); time < labeledAnomaly.getEndTime(); time += bucketSize) {
-          if (resultAnomalyTimes.contains(time / bucketSize)) {
-            totalOverlappedTime += bucketSize;
+        for (long time = labeledAnomaly.getStartTime(); time < labeledAnomaly.getEndTime(); time += BUCKET_SIZE) {
+          if (resultAnomalyTimes.contains(time / BUCKET_SIZE)) {
+            totalOverlappedTime += BUCKET_SIZE;
             if (labeledAnomaly.getFeedback().getFeedbackType() == AnomalyFeedbackType.ANOMALY) {
-              totalTruePositiveTime += bucketSize;
+              totalTruePositiveTime += BUCKET_SIZE;
             }
           }
         }
@@ -81,6 +82,6 @@ public class TimeBucketF1ScoreFunction implements ScoreFunction {
 
     double precision = totalTruePositiveTime / (double) totalOverlappedTime;
     double recall = totalTruePositiveTime / (double) totalLabeledTrueAnomaliesTime;
-    return 2 * precision * recall / (precision + recall);
+    return (1 + beta * beta) * precision * recall / ((beta * beta) * precision + recall);
   }
 }

@@ -105,7 +105,7 @@ public class DetectionResource {
     TuningAlgorithm gridSearch = new GridSearchTuningAlgorithm(OBJECT_MAPPER.writeValueAsString(json.get("properties")), parameters);
     gridSearch.fit(slice);
 
-    return Response.ok(gridSearch.bestDetectionConfig()).build();
+    return Response.ok(gridSearch.bestDetectionConfig().getProperties()).build();
   }
 
   @POST
