@@ -1979,69 +1979,44 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Check if an instance can safely dropped from helix cluster. Instance should not be dropped if:
-   * - It is a live instance.
-   * - Any idealstate includes the instance.
-   *
-   * @param instanceName: Name of the instance to be dropped.
-   * @return
+   * Drops the given instance from the Helix cluster.
+   * <p>Instance can be dropped if:
+   * <ul>
+   *   <li>It's not a live instance</li>
+   *   <li>No ideal state includes the instance</li>
+   * </ul>
    */
-  public boolean isInstanceDroppable(String instanceName) {
-    // Check if this instance is live
-    HelixDataAccessor helixDataAccessor = _helixZkManager.getHelixDataAccessor();
-    LiveInstance liveInstance = helixDataAccessor.getProperty(_keyBuilder.liveInstance(instanceName));
-    if (liveInstance != null) {
-      return false;
+  public PinotResourceManagerResponse dropInstance(String instanceName) {
+    // Check if the instance is live
+    if (_helixDataAccessor.getProperty(_keyBuilder.liveInstance(instanceName)) != null) {
+      return new PinotResourceManagerResponse("Instance " + instanceName + " is still live", false);
     }
 
-    // Check if any idealstate contains information on this instance
-    for (String resourceName : getAllResources()) {
-      IdealState resourceIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
-      for (String partition : resourceIdealState.getPartitionSet()) {
-        for (String instance : resourceIdealState.getInstanceSet(partition)) {
-          if (instance.equals(instanceName)) {
-            return false;
-          }
+    // Check if any ideal state includes the instance
+    for (String resource : getAllResources()) {
+      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resource);
+      for (String partition : idealState.getPartitionSet()) {
+        if (idealState.getInstanceSet(partition).contains(instanceName)) {
+          return new PinotResourceManagerResponse("Instance " + instanceName + " exists in ideal state for " + resource,
+              false);
         }
       }
     }
-    return true;
-  }
 
-  /**
-   * Drop the instance from helix cluster. Instance will not be dropped if:
-   *
-   * @param instanceName: Name of the instance to be dropped.
-   * @return
-   */
-  public PinotResourceManagerResponse dropInstance(final String instanceName) {
-    // Delete '/INSTANCES/<server_name>'
+    // Remove '/INSTANCES/<instanceName>'
     try {
-      final String instancePath = "/" + _helixClusterName + "/INSTANCES/" + instanceName;
-      DEFAULT_RETRY_POLICY.attempt(new Callable<Boolean>() {
-        @Override
-        public Boolean call()
-            throws Exception {
-          return _helixDataAccessor.getBaseDataAccessor().remove(instancePath, AccessOption.PERSISTENT);
-        }
-      });
+      DEFAULT_RETRY_POLICY.attempt(() -> _helixDataAccessor.removeProperty(_keyBuilder.instance(instanceName)));
     } catch (Exception e) {
-      return new PinotResourceManagerResponse("Failed to erase /INSTANCES/" + instanceName, false);
+      return new PinotResourceManagerResponse("Failed to remove /INSTANCES/" + instanceName, false);
     }
 
-    // Delete '/CONFIGS/PARTICIPANT/<server_name>'
+    // Remove '/CONFIGS/PARTICIPANT/<instanceName>'
     try {
-      DEFAULT_RETRY_POLICY.attempt(new Callable<Boolean>() {
-        @Override
-        public Boolean call() throws Exception {
-          PropertyKey instanceKey = _keyBuilder.instanceConfig(instanceName);
-          return _helixDataAccessor.removeProperty(instanceKey);
-        }
-      });
+      DEFAULT_RETRY_POLICY.attempt(() -> _helixDataAccessor.removeProperty(_keyBuilder.instanceConfig(instanceName)));
     } catch (Exception e) {
-      return new PinotResourceManagerResponse("Failed to erase /CONFIGS/PARTICIPANT/" + instanceName
-          + " Make sure to erase /CONFIGS/PARTICIPANT/" + instanceName  + " manually since /INSTANCES/" + instanceName
-          + " has already been removed.", false);
+      return new PinotResourceManagerResponse(
+          "Failed to remove /CONFIGS/PARTICIPANT/" + instanceName + " Make sure to remove /CONFIGS/PARTICIPANT/"
+              + instanceName + " manually since /INSTANCES/" + instanceName + " has already been removed.", false);
     }
 
     return new PinotResourceManagerResponse("Instance " + instanceName + " dropped.", true);
