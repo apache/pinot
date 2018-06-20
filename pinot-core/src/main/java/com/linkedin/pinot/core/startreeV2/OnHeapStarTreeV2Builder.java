@@ -49,7 +49,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   private int _dimensionsCount;
   private List<String> _dimensionsName;
   private List<Integer> _dimensionsSplitOrder;
-  private List<String> _dimensionsWithoutStarNode;
+  private List<Integer> _dimensionsWithoutStarNode;
   private Map<String, DimensionFieldSpec> _dimensionsSpecMap;
 
   // Metrics
@@ -65,9 +65,10 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   private TreeNode _rootNode;
   private int _maxNumLeafRecords;
 
-  // Star Tree.
-  private final List<BiMap<Object, Integer>> _dimensionDictionaries = new ArrayList<>();
-  private final List<List<Object>> _starTreeData = new ArrayList<List<Object>>();
+  // Star Tree
+  private List<List<Object>> _starTreeData = new ArrayList<List<Object>>();
+  private List<List<Object>> _rawStarTreeData = new ArrayList<List<Object>>();
+  private List<BiMap<Object, Integer>> _dimensionDictionaries = new ArrayList<>();
 
   @Override
   public void init(File indexDir, StarTreeV2Config config) throws Exception {
@@ -83,30 +84,32 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     _dimensionsCount = _dimensionsName.size();
 
     List<DimensionFieldSpec> _dimensionsSpecList = _segmentMetadata.getSchema().getDimensionFieldSpecs();
-    for ( DimensionFieldSpec dimension : _dimensionsSpecList) {
-        if (_dimensionsName.contains(dimension.getName())) {
-          _dimensionsSpecMap.put(dimension.getName(), dimension);
-          _dimensionDictionaries.add(HashBiMap.<Object, Integer>create());
+    for (DimensionFieldSpec dimension : _dimensionsSpecList) {
+      if (_dimensionsName.contains(dimension.getName())) {
+        _dimensionsSpecMap.put(dimension.getName(), dimension);
+        _dimensionDictionaries.add(HashBiMap.<Object, Integer>create());
       }
     }
 
     // dimension split order.
     List<String> dimensionsSplitOrder = config.getDimensionsSplitOrder();
     _dimensionsSplitOrder = OnHeapStarTreeV2BuilderHelper.enumerateDimensions(_dimensionsName, dimensionsSplitOrder);
-    _dimensionsWithoutStarNode = config.getDimensionsWithoutStarNode();
+    List<String> dimensionsWithoutStarNode = config.getDimensionsWithoutStarNode();
+    _dimensionsWithoutStarNode =
+        OnHeapStarTreeV2BuilderHelper.enumerateDimensions(_dimensionsName, dimensionsWithoutStarNode);
 
     // metric
     _metricsName = new HashSet<>();
     _metricsSpecMap = new HashMap<>();
     _met2aggfuncPairs = config.getMetric2aggFuncPairs();
     _met2aggfuncPairsCount = _met2aggfuncPairs.size();
-    for (Met2AggfuncPair pair: _met2aggfuncPairs) {
-        _metricsName.add(pair.getMetricValue());
+    for (Met2AggfuncPair pair : _met2aggfuncPairs) {
+      _metricsName.add(pair.getMetricValue());
     }
     _metricsCount = _metricsName.size();
 
     List<MetricFieldSpec> _metricsSpecList = _segmentMetadata.getSchema().getMetricFieldSpecs();
-    for (MetricFieldSpec metric: _metricsSpecList) {
+    for (MetricFieldSpec metric : _metricsSpecList) {
       if (_metricsName.contains(metric.getName())) {
         _metricsSpecMap.put(metric.getName(), metric);
       }
@@ -128,8 +131,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
       BiMap<Object, Integer> dimensionDictionary = _dimensionDictionaries.get(i);
       PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, dimensionName);
 
-      List<Object>encodedDimensionValues = new ArrayList<>();
-      for ( int j = 0; j < _rawDocsCount; j++) {
+      List<Object> encodedDimensionValues = new ArrayList<>();
+      for (int j = 0; j < _rawDocsCount; j++) {
         Object val = readHelper(columnReader, dimensionFieldSpec.getDataType(), j);
         Integer dictId = dimensionDictionary.get(val);
         if (dictId == null) {
@@ -138,32 +141,40 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
         }
         encodedDimensionValues.add(dictId);
       }
-      _starTreeData.add(encodedDimensionValues);
+      _rawStarTreeData.add(encodedDimensionValues);
     }
 
     // populating metric data.
-    for ( int i = 0; i < _met2aggfuncPairsCount; i++) {
+    for (int i = 0; i < _met2aggfuncPairsCount; i++) {
       String metricName = _met2aggfuncPairs.get(i).getMetricValue();
       MetricFieldSpec metricFieldSpec = _metricsSpecMap.get(i);
       PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, metricName);
       List<Object> metricRawValues = new ArrayList<>();
-      for ( int j = 0; j < _rawDocsCount; j++) {
+      for (int j = 0; j < _rawDocsCount; j++) {
         Object val = readHelper(columnReader, metricFieldSpec.getDataType(), j);
         metricRawValues.add(val);
       }
-      _starTreeData.add(metricRawValues);
+      _rawStarTreeData.add(metricRawValues);
     }
 
     // calculating default split order in case null provided.
-    if (_dimensionsSplitOrder.isEmpty() || _dimensionsSplitOrder == null ) {
-      _dimensionsSplitOrder = OnHeapStarTreeV2BuilderHelper.computeDefaultSplitOrder(_dimensionsCount, _dimensionDictionaries);
+    if (_dimensionsSplitOrder.isEmpty() || _dimensionsSplitOrder == null) {
+      _dimensionsSplitOrder =
+          OnHeapStarTreeV2BuilderHelper.computeDefaultSplitOrder(_dimensionsCount, _dimensionDictionaries);
     }
 
     // sorting the data as per the sort order.
-    OnHeapStarTreeV2BuilderHelper.sortStarTreeData();
+    int[] sortedDocId =
+        OnHeapStarTreeV2BuilderHelper.sortStarTreeData(0, _rawDocsCount, _dimensionsSplitOrder, _rawStarTreeData);
+    List<List<Object>> rawSortedStarTreeData =
+        OnHeapStarTreeV2BuilderHelper.reArrangeStarTreeData(sortedDocId, _rawStarTreeData);
+    _starTreeData = OnHeapStarTreeV2BuilderHelper.condenseData(rawSortedStarTreeData);
 
     // Recursively construct the star tree
-    constructStarTree(_rootNode, 0, _rawDocsCount, 0 );
+    constructStarTree(_rootNode, 0, _starTreeData.get(0).size(), 0);
+
+    // create aggregated doc for all nodes.
+    createAggregatedDocForAllNodes();
   }
 
   @Override
@@ -175,6 +186,13 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   @Override
   public List<String> getMetaData() {
     return null;
+  }
+
+  /**
+   * Helper function to create aggregated document for all nodes
+   */
+  private void createAggregatedDocForAllNodes() {
+
   }
 
   /**
@@ -193,10 +211,10 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     }
 
     int numDocs = endDocId - startDocId;
-    String splitDimensionName = _dimensionsName.get(_dimensionsSplitOrder.get(level));
-    Map<Object, Pairs.IntPair> dimensionRangeMap = groupOnDimension(startDocId, endDocId, splitDimensionName);
+    Integer splitDimensionId = _dimensionsSplitOrder.get(level);
+    Map<Object, Pairs.IntPair> dimensionRangeMap = groupOnDimension(startDocId, endDocId, splitDimensionId);
 
-    node._childDimensionName = splitDimensionName;
+    node._childDimensionId = splitDimensionId;
 
     // Reserve one space for star node
     Map<Object, TreeNode> children = new HashMap<>(dimensionRangeMap.size() + 1);
@@ -216,30 +234,36 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
         constructStarTree(child, childStartDocId, childEndDocId, level + 1);
       }
       _nodesCount++;
-      AggregatedDataDocument aggDoc = getAggregatedDocument(childStartDocId, childEndDocId);
-      child._aggDoc = aggDoc;
     }
 
     // Directly return if we don't need to create star-node
-    if (_dimensionsWithoutStarNode != null && _dimensionsWithoutStarNode.contains(splitDimensionName)) {
+    if (_dimensionsWithoutStarNode != null && _dimensionsWithoutStarNode.contains(splitDimensionId)) {
       return;
     }
 
     // Create star node
-
-    /*
-    TODO: In case of star node, we have to sort the entire data again.
-    check the example you came up with, in your notes.
-    */
     TreeNode starChild = new TreeNode();
-    starChild._dimensionName = splitDimensionName;
-    starChild._startDocId = startDocId;
-    starChild._endDocId = endDocId;
-    children.put(StarTreeV2Constant.STAR_TREE_NODE, starChild);
+    starChild._dimensionId = splitDimensionId;
+    int starChildStartDocId = _starTreeData.get(0).size();
+    starChild._startDocId = starChildStartDocId;
+
+    children.put(StarTreeV2Constant.STAR_NODE, starChild);
     _nodesCount++;
 
-    if (endDocId - startDocId > _maxNumLeafRecords) {
-      constructStarTree(starChild, startDocId, startDocId, level + 1);
+    List<List<Object>> sortedFilteredData = OnHeapStarTreeV2BuilderHelper.filterData(startDocId, endDocId, splitDimensionId, _dimensionsSplitOrder, _starTreeData);
+    List<List<Object>> condensedData = OnHeapStarTreeV2BuilderHelper.condenseData(sortedFilteredData);
+
+    for ( int i = 0; i < _starTreeData.size(); i++) {
+      List<Object>col = _starTreeData.get(i);
+      List<Object>aggCol = condensedData.get(i);
+      col.addAll(aggCol);
+    }
+
+    int starChildEndDocId = _starTreeData.get(0).size();
+    starChild._endDocId = starChildEndDocId;
+
+    if (starChildEndDocId - starChildStartDocId > _maxNumLeafRecords) {
+      constructStarTree(starChild, starChildStartDocId, starChildEndDocId, level + 1);
     }
   }
 
@@ -248,35 +272,19 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
    *
    * @param startDocId Start document id of the range to be grouped
    * @param endDocId End document id (exclusive) of the range to be grouped
-   * @param dimensionName Name of the dimension to group on
+   * @param dimensionId Id of the dimension to group on
    *
    * @return Map from dimension value to a pair of start docId and end docId (exclusive)
    */
-  private Map<Object, Pairs.IntPair> groupOnDimension(int startDocId, int endDocId, String dimensionName) {
-    DimensionFieldSpec dimensionFieldSpec = _dimensionsSpecMap.get(dimensionName);
-
-    return getRangeMap(dimensionFieldSpec.getDataType(), startDocId, endDocId, dimensionName);
-  }
-
-  /**
-   * Helper function to get the unique value range map for a column
-   *
-   * @param dataType Data type of the column.
-   * @param startDocId Start document id of the range to be grouped
-   * @param endDocId End document id (exclusive) of the range to be grouped
-   * @param dimensionName Name of the dimension to group on
-   *
-   * @return Range Map.
-   */
-  private Map<Object, Pairs.IntPair> getRangeMap (FieldSpec.DataType dataType, int startDocId, int endDocId, String dimensionName) {
+  private Map<Object, Pairs.IntPair> groupOnDimension(int startDocId, int endDocId, Integer dimensionId) {
     Map<Object, Pairs.IntPair> rangeMap = new HashMap<>();
-    PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, dimensionName);
-    Object currentValue = readHelper(columnReader, dataType, startDocId);
+    List<Object> column = _starTreeData.get(dimensionId);
+    Object currentValue = column.get(startDocId);
 
     int groupStartDocId = startDocId;
 
     for (int i = startDocId + 1; i < endDocId; i++) {
-      Object value = readHelper(columnReader, dataType, i);
+      Object value = column.get(i);
       if (!value.equals(currentValue)) {
         int groupEndDocId = i + 1;
         rangeMap.put(currentValue, new Pairs.IntPair(groupStartDocId, groupEndDocId));
