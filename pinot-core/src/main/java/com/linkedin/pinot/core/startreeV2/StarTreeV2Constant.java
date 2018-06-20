@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.startreeV2;
 
 public class StarTreeV2Constant {
 
-  public static final String STAR_TREE_NODE = "ALL";
+  public static final Integer STAR_NODE = -1;
   public static final Integer DEFAULT_AGGREGATED_VALUE = -1;
 
 }

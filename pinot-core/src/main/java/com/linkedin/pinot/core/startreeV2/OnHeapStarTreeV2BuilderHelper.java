@@ -20,7 +20,10 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Collections;
+import it.unimi.dsi.fastutil.Arrays;
+import it.unimi.dsi.fastutil.Swapper;
 import com.google.common.collect.BiMap;
+import it.unimi.dsi.fastutil.ints.IntComparator;
 
 
 public class OnHeapStarTreeV2BuilderHelper {
@@ -61,7 +64,94 @@ public class OnHeapStarTreeV2BuilderHelper {
   /**
    * sort the star tree data.
    */
-  public static void sortStarTreeData() {
+  public static int[] sortStarTreeData(int startDocId, int endDocId, List<Integer> sortOrder, List<List<Object>> starTreeData) {
+    int docsCount = endDocId - startDocId;
+    final int[] sortedDocIds = new int[docsCount];
+    for (int i = 0; i < docsCount; i++) {
+      sortedDocIds[i] = i;
+    }
 
+    IntComparator comparator = new IntComparator() {
+      @Override
+      public int compare(int i1, int i2) {
+        int docId1 = sortedDocIds[i1];
+        int docId2 = sortedDocIds[i2];
+
+        int compare = 0;
+        for (int index : sortOrder) {
+          List<Object> column = starTreeData.get(index);
+          compare = (int)column.get(docId1) - (int)column.get(docId2);
+          if (compare != 0) {
+            return compare;
+          }
+        }
+        return compare;
+      }
+
+      @Override
+      public int compare(Integer o1, Integer o2) {
+        throw new UnsupportedOperationException();
+      }
+    };
+
+    Swapper swapper = new Swapper() {
+      @Override
+      public void swap(int i, int j) {
+        int temp = sortedDocIds[i];
+        sortedDocIds[i] = sortedDocIds[j];
+        sortedDocIds[j] = temp;
+      }
+    };
+    Arrays.quickSort(startDocId, endDocId, comparator, swapper);
+
+    return sortedDocIds;
+  }
+
+  /**
+   * function to rearrange documents according to sorted order.
+   */
+  public static List<List<Object>> reArrangeStarTreeData(int [] sortOrder, List<List<Object>> starTreeData) {
+    List<List<Object>> newData = new ArrayList<>();
+    for (List<Object> col: starTreeData) {
+      List<Object> newCol = new ArrayList<>();
+      for (int id: sortOrder) {
+        newCol.add(col.get(id));
+      }
+      newData.add(newCol);
+    }
+    return newData;
+  }
+
+  /**
+   * function to condense documents according to sorted order.
+   */
+  public static List<List<Object>> condenseData(List<List<Object>> starTreeData) {
+    List<List<Object>> newData = new ArrayList<>();
+
+    // NOTE: fill this part.
+
+    return newData;
+  }
+
+  /**
+   * Filter data by removing the dimension we don't need.
+   */
+  public static List<List<Object>> filterData(int startDocId, int endDocId, int dimensionIdToRemove, List<Integer>sortOrder, List<List<Object>>starTreeData) {
+    int[] sortedDocId = new int[endDocId - startDocId];
+    List<List<Object>> newFilteredData = new ArrayList<>();
+
+    for (int i = 0; i < starTreeData.size(); i++) {
+      if (i != dimensionIdToRemove) {
+        List<Object> col = starTreeData.get(i);
+        List<Object> newCol = new ArrayList<>();
+        for (int j = startDocId; j < endDocId; j++) {
+          newCol.add(col.get(j));
+        }
+        newFilteredData.add(newCol);
+      }
+      sortOrder.remove(new Integer(dimensionIdToRemove));
+      sortedDocId = sortStarTreeData(startDocId, endDocId, sortOrder, newFilteredData);
+    }
+    return reArrangeStarTreeData(sortedDocId, newFilteredData);
   }
 }
