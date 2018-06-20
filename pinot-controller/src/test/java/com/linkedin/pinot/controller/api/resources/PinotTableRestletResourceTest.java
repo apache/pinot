@@ -117,6 +117,17 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 409"));
     }
 
+    // Create an OFFLINE table with invalid replication config
+    offlineTableConfig.getValidationConfig().setReplication("abc");
+    offlineTableConfig.setTableName("invalid_replication_table");
+    try {
+      sendPostRequest(_createTableUrl, offlineTableConfig.toJSONConfigString());
+      Assert.fail("Creation of an invalid OFFLINE table does not fail");
+    } catch (IOException e) {
+      // Expected 400 Bad Request
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+    }
+
     // Create a REALTIME table with an invalid name which should fail
     // NOTE: Set bad table name inside table config builder is not allowed, so have to explicitly set in table config
     TableConfig realtimeTableConfig = _realtimeBuilder.build();
