@@ -130,7 +130,7 @@ public class OnHeapStarTreeV2BuilderHelper {
 
     // NOTE: fill this part.
 
-    return newData;
+    return starTreeData;
   }
 
   /**

@@ -127,7 +127,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     // generating dictionary docId.
     for (int i = 0; i < _dimensionsCount; i++) {
       String dimensionName = _dimensionsName.get(i);
-      DimensionFieldSpec dimensionFieldSpec = _dimensionsSpecMap.get(i);
+      DimensionFieldSpec dimensionFieldSpec = _dimensionsSpecMap.get(dimensionName);
       BiMap<Object, Integer> dimensionDictionary = _dimensionDictionaries.get(i);
       PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, dimensionName);
 
@@ -147,7 +147,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     // populating metric data.
     for (int i = 0; i < _met2aggfuncPairsCount; i++) {
       String metricName = _met2aggfuncPairs.get(i).getMetricValue();
-      MetricFieldSpec metricFieldSpec = _metricsSpecMap.get(i);
+      MetricFieldSpec metricFieldSpec = _metricsSpecMap.get(metricName);
       PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, metricName);
       List<Object> metricRawValues = new ArrayList<>();
       for (int j = 0; j < _rawDocsCount; j++) {
@@ -186,13 +186,6 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   @Override
   public List<String> getMetaData() {
     return null;
-  }
-
-  /**
-   * Helper function to create aggregated document for all nodes
-   */
-  private void createAggregatedDocForAllNodes() {
-
   }
 
   /**
@@ -324,39 +317,41 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   }
 
   /**
+   * Helper function to create aggregated document for all nodes
+   * This is a bogus logic. Has to work on it. Wrote it for the sake of writing.
+   */
+  private void createAggregatedDocForAllNodes() {
+    Map<Object, TreeNode> children = _rootNode._children;
+
+    for (Object key: children.keySet()) {
+      TreeNode child = children.get(key);
+      int val = getAggregatedDocument(key, child._startDocId, child._endDocId);
+    }
+  }
+
+  /**
    * Create a aggregated document for this range.
    *
+   * @param key column to work on.
    * @param startDocId Start document id of the range to be grouped
    * @param endDocId End document id (exclusive) of the range to be grouped
    *
    * @return list of all metric2aggfunc value.
    */
-  private AggregatedDataDocument getAggregatedDocument(int startDocId, int endDocId) {
+  private int getAggregatedDocument(Object key, int startDocId, int endDocId) {
     int val = 0;
-    AggregatedDataDocument aggDoc = new AggregatedDataDocument();
     for (Met2AggfuncPair pair : _met2aggfuncPairs) {
       String metric = pair.getMetricValue();
       String aggfunc = pair.getAggregatefunction();
-
       if (aggfunc == "SUM") {
         val = calculateSum(metric, startDocId, endDocId);
-        aggDoc.setSum(val);
       } else if (aggfunc == "MAX") {
         val = calculateMax(metric, startDocId, endDocId);
-        aggDoc.setMax(val);
       } else if (aggfunc == "MIN") {
         val = calculateMin(metric, startDocId, endDocId);
-        aggDoc.setMin(val);
       }
     }
-
-    /*
-     TODO: write a logic for calculating the count(*)
-     val = calculateCount(metric, startDocId, endDocId);
-     aggDoc.setCount(val);
-    */
-
-    return aggDoc;
+    return val;
   }
 
   /**

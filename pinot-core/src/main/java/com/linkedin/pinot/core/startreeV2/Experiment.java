@@ -2,9 +2,11 @@ package com.linkedin.pinot.core.startreeV2;
 
 import java.util.List;
 import java.util.ArrayList;
+import it.unimi.dsi.fastutil.Arrays;
+import it.unimi.dsi.fastutil.Swapper;
+import it.unimi.dsi.fastutil.ints.IntComparator;
 
-
-public class experiments {
+public class Experiment {
 
   public List<Integer>order = new ArrayList<>();
   public List<List<Object>> data = new ArrayList<List<Object>>();
@@ -13,40 +15,47 @@ public class experiments {
   public List<Object> d2 = new ArrayList<>();
   public List<Object> d3 = new ArrayList<>();
 
-  public void createData() {
-    d1.add(4);
-    d1.add(5);
-    d1.add(1);
-    d1.add(1);
-    d1.add(1);
-    d1.add(4);
+  public int[] sort() {
 
-    data.add(d1);
+    final int[] sortedDocIds = new int[d1.size()];
+    for (int i = 0; i < d1.size(); i++) {
+      sortedDocIds[i] = i;
+    }
 
-    d2.add(1);
-    d2.add(1);
-    d2.add(2);
-    d2.add(3);
-    d2.add(1);
-    d2.add(4);
+    IntComparator comparator = new IntComparator() {
+      @Override
+      public int compare(int i1, int i2) {
+        int docId1 = sortedDocIds[i1];
+        int docId2 = sortedDocIds[i2];
 
-    data.add(d2);
+        int compare = 0;
+        for (int index : order) {
+          List<Object> column = data.get(index);
+          compare = (int)column.get(docId1) - (int)column.get(docId2);
+          if (compare != 0) {
+            return compare;
+          }
+        }
+        return compare;
+      }
 
-    d3.add(0);
-    d3.add(1);
-    d3.add(1);
-    d3.add(1);
-    d3.add(2);
-    d3.add(3);
+      @Override
+      public int compare(Integer o1, Integer o2) {
+        throw new UnsupportedOperationException();
+      }
+    };
 
-    data.add(d3);
+    Swapper swapper = new Swapper() {
+      @Override
+      public void swap(int i, int j) {
+        int temp = sortedDocIds[i];
+        sortedDocIds[i] = sortedDocIds[j];
+        sortedDocIds[j] = temp;
+      }
+    };
 
-    order.add(1);
-    order.add(2);
-    order.add(3);
-  }
+    Arrays.quickSort(0, d1.size(), comparator, swapper);
 
-  public void sort() {
-
+    return sortedDocIds;
   }
 }
