@@ -420,6 +420,7 @@ public class PinotSegmentRestletResource {
    * @return
    * @throws JSONException
    */
+  // TODO: move this method into PinotHelixResourceManager
   private static PinotResourceManagerResponse toggleSegmentsForTable(@Nonnull List<String> segmentsToToggle,
       @Nonnull String tableName, String segmentName, @Nonnull StateType state,
       PinotHelixResourceManager helixResourceManager) {
@@ -429,9 +430,9 @@ public class PinotSegmentRestletResource {
       if (state == StateType.ENABLE) {
         int instanceCount = helixResourceManager.getAllInstances().size();
         if (instanceCount != 0) {
-          timeOutInSeconds = (long) ((_offlineToOnlineTimeoutInseconds * segmentsToToggle.size()) / instanceCount);
+          timeOutInSeconds = (_offlineToOnlineTimeoutInseconds * segmentsToToggle.size()) / instanceCount;
         } else {
-          return new PinotResourceManagerResponse("Error: could not find any instances in table " + tableName, false);
+          return PinotResourceManagerResponse.failure("No instance found for table " + tableName);
         }
       }
     }
@@ -447,7 +448,7 @@ public class PinotSegmentRestletResource {
       //
       // In jersey, API, if there are no segments in realtime (or in offline), we succeed the operation AND return 200
       // if we succeeded.
-      return new PinotResourceManagerResponse("No segments to toggle", true);
+      return PinotResourceManagerResponse.success("No segment to toggle");
     }
 
     switch (state) {

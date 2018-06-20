@@ -21,7 +21,6 @@ import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.exception.InvalidConfigException;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -29,6 +28,7 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -171,22 +171,14 @@ public class PinotTableRestletResource {
       "Get/Enable/Disable/Drop a table. If table name is the only parameter specified "
           + ", the tableconfig will be printed")
   public String alterTableStateOrListTableConfig(
-      @ApiParam(value = "Name of the table", required = false) @PathParam("tableName") String tableName,
-      @ApiParam(value = "enable|disable|drop", required = false) @QueryParam("state") String stateStr,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr) {
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "enable|disable|drop") @QueryParam("state") String stateStr,
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     try {
-      if (tableName == null) {
-        List<String> rawTables = _pinotHelixResourceManager.getAllRawTables();
-        Collections.sort(rawTables);
-        JSONArray tableArray = new JSONArray(rawTables);
-        JSONObject resultObject = new JSONObject();
-        resultObject.put("tables", tableArray);
-        return resultObject.toString();
-      }
       if (stateStr == null) {
         return listTableConfigs(tableName, tableTypeStr);
       }
-      StateType state = Constants.validateState(stateStr);
+      Constants.validateState(stateStr);
       JSONArray ret = new JSONArray();
       boolean tableExists = false;
 
@@ -197,7 +189,7 @@ public class PinotTableRestletResource {
         tableExists = true;
 
         offline.put(FileUploadPathProvider.TABLE_NAME, offlineTableName);
-        offline.put(FileUploadPathProvider.STATE, toggleTableState(offlineTableName, stateStr).toJSON().toString());
+        offline.put(FileUploadPathProvider.STATE, toggleTableState(offlineTableName, stateStr));
         ret.put(offline);
       }
 
@@ -208,7 +200,7 @@ public class PinotTableRestletResource {
         tableExists = true;
 
         realTime.put(FileUploadPathProvider.TABLE_NAME, realTimeTableName);
-        realTime.put(FileUploadPathProvider.STATE, toggleTableState(realTimeTableName, stateStr).toJSON().toString());
+        realTime.put(FileUploadPathProvider.STATE, toggleTableState(realTimeTableName, stateStr));
         ret.put(realTime);
       }
       if (tableExists) {
@@ -319,6 +311,7 @@ public class PinotTableRestletResource {
     }
   }
 
+  // TODO: move this method into PinotHelixResourceManager
   private PinotResourceManagerResponse toggleTableState(String tableName, String state) {
     if (StateType.ENABLE.name().equalsIgnoreCase(state)) {
       return _pinotHelixResourceManager.toggleTableState(tableName, true);
@@ -329,7 +322,7 @@ public class PinotTableRestletResource {
     } else {
       String errorMessage = "Invalid state: " + state + ", must be one of {enable|disable|drop}";
       LOGGER.info(errorMessage);
-      return new PinotResourceManagerResponse("Failed: " + errorMessage, false);
+      return PinotResourceManagerResponse.failure(errorMessage);
     }
   }
 
@@ -415,6 +408,5 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     }
     return jsonObject.toString();
-
   }
 }

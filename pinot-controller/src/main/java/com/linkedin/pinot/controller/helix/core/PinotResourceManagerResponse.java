@@ -15,67 +15,40 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-
 public class PinotResourceManagerResponse {
+  public static final PinotResourceManagerResponse SUCCESS = new PinotResourceManagerResponse(true, null);
+  public static final PinotResourceManagerResponse FAILURE = new PinotResourceManagerResponse(false, null);
 
-  public final static PinotResourceManagerResponse SUCCESS_RESPONSE = new PinotResourceManagerResponse(true);
-  public final static PinotResourceManagerResponse FAILURE_RESPONSE = new PinotResourceManagerResponse(false);
+  private final boolean _successful;
+  private final String _message;
 
-  public enum ResponseStatus {
-    success,
-    failure;
+  public static PinotResourceManagerResponse success(String message) {
+    return new PinotResourceManagerResponse(true, message);
   }
 
-  public String message = "";
-  public ResponseStatus status = ResponseStatus.failure;
-
-  public PinotResourceManagerResponse() {
+  public static PinotResourceManagerResponse failure(String message) {
+    return new PinotResourceManagerResponse(false, message);
   }
 
-  public PinotResourceManagerResponse(String message, boolean succeeded) {
-    this.message = message;
-    if (succeeded) {
-      status = ResponseStatus.success;
-    } else {
-      status = ResponseStatus.failure;
-    }
-  }
-
-  public PinotResourceManagerResponse(boolean isSucceed) {
-    if (isSucceed) {
-      status = ResponseStatus.success;
-    } else {
-      status = ResponseStatus.failure;
-    }
+  private PinotResourceManagerResponse(boolean successful, String message) {
+    _successful = successful;
+    _message = message;
   }
 
   public boolean isSuccessful() {
-    return status == ResponseStatus.success;
+    return _successful;
   }
 
-  public JSONObject toJSON() throws JSONException {
-    final JSONObject ret = new JSONObject();
-    ret.put("status", status.toString());
-    if (status == ResponseStatus.success) {
-      ret.put("message", message);
-    } else {
-      ret.put("errorMessage", message);
-    }
-    return ret;
+  public String getMessage() {
+    return _message;
   }
 
   @Override
   public String toString() {
-    if (status == ResponseStatus.success) {
-      return "status : " + status + ",\tmessage : " + message;
+    if (_successful) {
+      return _message == null ? "SUCCESS" : "SUCCESS: " + _message;
     } else {
-      return "status : " + status + ",\terrorMessage : " + message;
+      return _message == null ? "FAILURE" : "FAILURE: " + _message;
     }
-  }
-
-  public String getMessage() {
-    return message;
   }
 }
