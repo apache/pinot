@@ -20,7 +20,6 @@
  */
 
 import Component from '@ember/component';
-import { once, later } from '@ember/runloop'
 import { isPresent, isEmpty } from '@ember/utils';
 import { task, timeout } from 'ember-concurrency';
 import { inject as service } from '@ember/service';
