@@ -114,7 +114,7 @@ public class PinotTableRestletResource {
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
       if (e instanceof PinotHelixResourceManager.InvalidTableConfigException) {
-        String errStr = "Invalid table config for table: " + tableName;
+        String errStr = String.format("Invalid table config for table %s: %s", tableName, e.getMessage());
         throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
       } else if (e instanceof PinotHelixResourceManager.TableAlreadyExistsException) {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
@@ -285,7 +285,7 @@ public class PinotTableRestletResource {
       ensureMinReplicas(tableConfig);
       _pinotHelixResourceManager.setExistingTableConfig(tableConfig, tableNameWithType, tableType);
     } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
-      String errStr = "Failed to update configuration for table " + tableName;
+      String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
@@ -315,7 +315,7 @@ public class PinotTableRestletResource {
       }
       return tableConfigValidateStr.toString();
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, "Invalid JSON", Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     }
   }
 
@@ -346,7 +346,8 @@ public class PinotTableRestletResource {
       try {
         streamMetadata = new StreamMetadata(config.getIndexingConfig().getStreamConfigs());
       } catch (Exception e) {
-        throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid tableIndexConfig or streamConfigs", e);
+        String errorMsg = String.format("Invalid tableIndexConfig or streamConfig: %s", e.getMessage());
+        throw new PinotHelixResourceManager.InvalidTableConfigException(errorMsg, e);
       }
       verifyReplicasPerPartition = streamMetadata.hasSimpleKafkaConsumerType();
       verifyReplication = streamMetadata.hasHighLevelKafkaConsumerType();
