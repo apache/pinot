@@ -21,6 +21,7 @@ import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -388,7 +389,11 @@ public class RootCauseMetricResource {
       futures.put(slice, this.executor.submit(new Callable<Double>() {
         @Override
         public Double call() throws Exception {
-          return RootCauseMetricResource.this.aggregationLoader.loadAggregate(slice);
+          DataFrame df = RootCauseMetricResource.this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList());
+          if (df.isEmpty()) {
+            return Double.NaN;
+          }
+          return df.getDouble(COL_VALUE, 0);
         }
       }));
     }

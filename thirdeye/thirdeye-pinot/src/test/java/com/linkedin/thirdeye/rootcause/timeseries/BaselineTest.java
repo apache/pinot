@@ -143,7 +143,7 @@ public class BaselineTest {
     DataFrame result = baseline.gather(BASE_SLICE, data);
 
     assertEquals(result.getLongs(COL_TIME), 15000L, 15500L, 16000L, 16500L);
-    assertEquals(result.getDoubles(COL_VALUE), 450d, 550d, 650d, Double.NaN);
+    assertEquals(result.getDoubles(COL_VALUE), 450d, 550d, 650d, 800d);
   }
 
   @Test

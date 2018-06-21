@@ -1600,6 +1600,17 @@ public class DataFrame {
   }
 
   /**
+   * Returns {@code true} if series {@code seriesName} value at {@code index} is null.
+   *
+   * @param seriesName series name
+   * @param index row index
+   * @return {@code true} is null, otherwise {@code false}
+   */
+  public boolean isNull(String seriesName, int index) {
+    return assertSeriesExists(seriesName).isNull(index);
+  }
+
+  /**
    * Returns a copy of the DataFrame omitting series that contain a {@code null} value.
    *
    * @return DataFrame copy without null series
@@ -2111,6 +2122,43 @@ public class DataFrame {
     }
 
     return df;
+  }
+
+  /**
+   * Returns a new DataFrame concatenated from a list of given DataFrames.
+   * Returns an empty DataFrame on empty input, otherwise follows the conventions of {@code append()}.
+   *
+   * @see DataFrame#append(DataFrame...)
+   *
+   * @param dataframes DataFrames to concatenate in sequence
+   * @return concatenated DataFrame
+   */
+  public static DataFrame concatenate(DataFrame... dataframes) {
+    return concatenate(Arrays.asList(dataframes));
+  }
+
+  /**
+   * Returns a new DataFrame concatenated from a list of given DataFrames.
+   * Returns an empty DataFrame on empty input, otherwise follows the conventions of {@code append()}.
+   *
+   * @see DataFrame#append(List)
+   *
+   * @param dataframes DataFrames to concatenate in sequence
+   * @return concatenated DataFrame
+   */
+  public static DataFrame concatenate(List<DataFrame> dataframes) {
+    if (dataframes.isEmpty()) {
+      return new DataFrame();
+    }
+
+    if (dataframes.size() == 1) {
+      return dataframes.get(0);
+    }
+
+    DataFrame first = dataframes.get(0);
+    List<DataFrame> others = dataframes.subList(1, dataframes.size());
+
+    return first.append(others);
   }
 
   @Override

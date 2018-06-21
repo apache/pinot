@@ -1,20 +1,18 @@
 package com.linkedin.thirdeye.anomaly.task;
 
-import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskInfo;
-import com.linkedin.thirdeye.anomaly.onboard.ReplayTaskInfo;
-import java.io.IOException;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
+import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskInfo;
 import com.linkedin.thirdeye.anomaly.detection.DetectionTaskInfo;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
+import com.linkedin.thirdeye.anomaly.onboard.ReplayTaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskInfo;
+import com.linkedin.thirdeye.detection.DetectionPipelineTaskInfo;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertTaskInfo;
+import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class returns deserializes the task info json and returns the TaskInfo,
@@ -29,6 +27,12 @@ public class TaskInfoFactory {
     TaskInfo taskInfo = null;
     try {
       switch(taskType) {
+        case DETECTION:
+          taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DetectionPipelineTaskInfo.class);
+          break;
+        case DETECTION_ALERT:
+          taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DetectionAlertTaskInfo.class);
+          break;
         case ANOMALY_DETECTION:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DetectionTaskInfo.class);
           break;

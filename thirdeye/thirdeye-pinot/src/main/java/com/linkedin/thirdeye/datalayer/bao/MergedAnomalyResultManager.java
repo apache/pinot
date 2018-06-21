@@ -26,6 +26,7 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
 
   List<MergedAnomalyResultDTO> findByMetricTime(String metric, long startTime, long endTime);
 
+  List<MergedAnomalyResultDTO> findByDetectionConfigAndIdGreaterThan(Long detectionConfigId, Long anomalyId);
 
   // TODO : add findByMetricId - currently we are not updating metricId in table.
 

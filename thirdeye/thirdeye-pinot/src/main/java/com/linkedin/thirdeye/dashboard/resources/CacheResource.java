@@ -130,7 +130,7 @@ public class CacheResource {
   // TODO: Clean deprecate endpoint called by our own code
   public Response refreshDatasets() {
     Response response = Response.ok().build();
-    CACHE_INSTANCE.getDatasetsCache().loadDatasets();
+    CACHE_INSTANCE.getDatasetsCache().expire();
     return response;
   }
 

@@ -49,7 +49,7 @@
                     <option value="ANOMALY_NEW_TREND">Yes (New Trend)</option>
                     <option value="NOT_ANOMALY">No (False Alarm)</option>
                   </select>
-                  <span class="card-feedback-final"> 
+                  <span class="card-feedback-final">
                     {{#if anomalyFeedback}}
                       Resolved ({{anomalyFeedback}})
                     {{else}}
@@ -57,13 +57,13 @@
                     {{/if}}
                   </span>
                   <button class="thirdeye-link thirdeye-link--secondary" id="feedback-edit-{{anomalyIndex}}" title="edit">
-                    <span class="thirdeye-link__icon"><i class="glyphicon glyphicon-pencil"></i></span> 
+                    <span class="thirdeye-link__icon"><i class="glyphicon glyphicon-pencil"></i></span>
                   </button>
                   <button class="thirdeye-link thirdeye-link--secondary hidden" id="feedback-submit-{{anomalyIndex}}" title="submit">
-                    <span class="thirdeye-link__icon"><i class="glyphicon glyphicon-ok"></i></span> 
+                    <span class="thirdeye-link__icon"><i class="glyphicon glyphicon-ok"></i></span>
                   </button>
                   <button class="thirdeye-link thirdeye-link--secondary thirdeye-link--delimited hidden" id="feedback-cancel-{{anomalyIndex}}" title="cancel">
-                    <span class="thirdeye-link__icon"><i class="glyphicon glyphicon-remove"></i></span> 
+                    <span class="thirdeye-link__icon"><i class="glyphicon glyphicon-remove"></i></span>
                   </button>
                 </span>
               </div>

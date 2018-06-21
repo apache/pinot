@@ -3,6 +3,8 @@ package com.linkedin.thirdeye.anomaly.task;
 public class TaskConstants {
 
   public enum TaskType {
+    DETECTION,
+    DETECTION_ALERT,
     ANOMALY_DETECTION,
     MERGE,
     // TODO: deprecate ALERT task type

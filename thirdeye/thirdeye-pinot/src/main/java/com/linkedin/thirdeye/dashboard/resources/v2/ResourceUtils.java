@@ -69,34 +69,31 @@ public class ResourceUtils {
     }
 
     AnomalyFunctionDTO function = anomaly.getFunction();
-    if (function == null) {
-      throw new IllegalArgumentException(String.format("Could not resolve anomaly function %d for anomaly id %d", anomaly.getFunctionId(), anomaly.getId()));
-    }
+    if (function != null) {
+      // anomaly function filters (does not apply to detector config!)
+      // NOTE: this should not need to be here. filters should be stored in the anomaly unconditionally
+      if (function.getFilters() != null) {
+        for (String filterString : function.getFilters().split(";")) {
+          try {
+            String[] filter = filterString.split("=", 2);
+            String dimName = filter[0];
+            String dimValue = filter[1];
 
-    // anomaly function filters
-    // NOTE: this should not need to be here. filters should be stored in the anomaly unconditionally
-    if (function.getFilters() != null) {
-      for (String filterString : function.getFilters().split(";")) {
-        try {
-          String[] filter = filterString.split("=", 2);
-          String dimName = filter[0];
-          String dimValue = filter[1];
+            if (!dataset.getDimensionsHaveNoPreAggregation().contains(dimName)
+                && Objects.equals(dimValue, dataset.getPreAggregatedKeyword())) {
+              // NOTE: workaround for anomaly detection inserting pre-aggregated keyword as dimension
+              continue;
+            }
 
-          if (!dataset.getDimensionsHaveNoPreAggregation().contains(dimName) &&
-              Objects.equals(dimValue, dataset.getPreAggregatedKeyword())) {
-            // NOTE: workaround for anomaly detection inserting pre-aggregated keyword as dimension
-            continue;
+            if (anomaly.getDimensions().containsKey(dimName)) {
+              // avoid duplication of explored dimensions
+              continue;
+            }
+
+            filters.put(dimName, dimValue);
+          } catch (Exception ignore) {
+            // left blank
           }
-
-          if (anomaly.getDimensions().containsKey(dimName)) {
-            // avoid duplication of explored dimensions
-            continue;
-          }
-
-          filters.put(dimName, dimValue);
-
-        } catch(Exception ignore) {
-          // left blank
         }
       }
     }

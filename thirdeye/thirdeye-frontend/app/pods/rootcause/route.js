@@ -293,8 +293,12 @@ export default Route.extend(AuthenticatedRouteMixin, {
         const anomalyMetricUrnRaw = `thirdeye:metric:${anomalyEntity.attributes['metricId'][0]}`;
         const anomalyMetricUrn = appendFilters(anomalyMetricUrnRaw, anomalyFilters);
 
-        const anomalyFunctionUrnRaw = `frontend:anomalyfunction:${anomalyEntity.attributes['functionId'][0]}`;
-        const anomalyFunctionUrn = appendFilters(anomalyFunctionUrnRaw, anomalyFilters);
+        const anomalyFunctionUrns = [];
+        if (!_.isEmpty(anomalyEntity.attributes['functionId'])) {
+          const anomalyFunctionUrnRaw = `frontend:anomalyfunction:${anomalyEntity.attributes['functionId'][0]}`;
+          anomalyFunctionUrns.pushObject(appendFilters(anomalyFunctionUrnRaw, anomalyFilters));
+        }
+
 
         context = {
           urns: new Set([anomalyMetricUrn]),
@@ -302,7 +306,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
           analysisRange,
           granularity,
           compareMode: 'WoW',
-          anomalyUrns: new Set([anomalyUrn, anomalyMetricUrn, anomalyFunctionUrn])
+          anomalyUrns: new Set([anomalyUrn, anomalyMetricUrn].concat(anomalyFunctionUrns))
         };
 
         selectedUrns = new Set([anomalyUrn, anomalyMetricUrn]);

@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.alert.content;
 import com.linkedin.thirdeye.alert.commons.EmailEntity;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import java.util.Collection;
 import java.util.Properties;
 

@@ -4,6 +4,10 @@ import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 
 import org.testng.Assert;
@@ -25,6 +29,7 @@ public class TestMergedAnomalyResultManager{
   private DAOTestBase testDAOProvider;
   private AnomalyFunctionManager anomalyFunctionDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
+
   @BeforeClass
   void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
@@ -90,5 +95,97 @@ public class TestMergedAnomalyResultManager{
     //verify feedback
     MergedAnomalyResultDTO mergedResult1 = mergedAnomalyResultDAO.findById(mergedResult.getId());
     Assert.assertEquals(mergedResult1.getFeedback().getFeedbackType(), AnomalyFeedbackType.ANOMALY);
+  }
+
+  @Test
+  public void testSaveChildren() {
+    MergedAnomalyResultDTO parent = new MergedAnomalyResultDTO();
+    parent.setStartTime(1000);
+    parent.setEndTime(2000);
+
+    MergedAnomalyResultDTO child1 = new MergedAnomalyResultDTO();
+    child1.setStartTime(1000);
+    child1.setEndTime(1500);
+
+    MergedAnomalyResultDTO child2 = new MergedAnomalyResultDTO();
+    child2.setStartTime(1500);
+    child2.setEndTime(2000);
+
+    parent.setChildren(new HashSet<>(Arrays.asList(child1, child2)));
+
+    this.mergedAnomalyResultDAO.save(parent);
+
+    Assert.assertNotNull(parent.getId());
+    Assert.assertNotNull(child1.getId());
+    Assert.assertNotNull(child2.getId());
+  }
+
+  @Test
+  public void testSaveChildrenIndependently() {
+    MergedAnomalyResultDTO parent = new MergedAnomalyResultDTO();
+    parent.setStartTime(1000);
+    parent.setEndTime(2000);
+
+    MergedAnomalyResultDTO child1 = new MergedAnomalyResultDTO();
+    child1.setStartTime(1000);
+    child1.setEndTime(1500);
+
+    MergedAnomalyResultDTO child2 = new MergedAnomalyResultDTO();
+    child2.setStartTime(1500);
+    child2.setEndTime(2000);
+
+    parent.setChildren(new HashSet<>(Arrays.asList(child1, child2)));
+
+    long id = this.mergedAnomalyResultDAO.save(child1);
+    this.mergedAnomalyResultDAO.save(parent);
+
+    Assert.assertNotNull(parent.getId());
+    Assert.assertEquals(child1.getId().longValue(), id);
+    Assert.assertNotNull(child2.getId());
+  }
+
+  @Test
+  public void testLoadChildren() {
+    MergedAnomalyResultDTO parent = new MergedAnomalyResultDTO();
+    parent.setStartTime(1000);
+    parent.setEndTime(2000);
+
+    MergedAnomalyResultDTO child1 = new MergedAnomalyResultDTO();
+    child1.setStartTime(1000);
+    child1.setEndTime(1500);
+
+    MergedAnomalyResultDTO child2 = new MergedAnomalyResultDTO();
+    child2.setStartTime(1500);
+    child2.setEndTime(2000);
+
+    parent.setChildren(new HashSet<>(Arrays.asList(child1, child2)));
+
+    long parentId = this.mergedAnomalyResultDAO.save(parent);
+
+    MergedAnomalyResultDTO read = this.mergedAnomalyResultDAO.findById(parentId);
+
+    Assert.assertNotSame(read, parent);
+    Assert.assertEquals(read.getStartTime(), 1000);
+    Assert.assertEquals(read.getEndTime(), 2000);
+    Assert.assertFalse(read.isChild());
+    Assert.assertFalse(read.getChildren().isEmpty());
+
+    List<MergedAnomalyResultDTO> readChildren = new ArrayList<>(read.getChildren());
+    Collections.sort(readChildren, new Comparator<MergedAnomalyResultDTO>() {
+      @Override
+      public int compare(MergedAnomalyResultDTO o1, MergedAnomalyResultDTO o2) {
+        return Long.compare(o1.getStartTime(), o2.getStartTime());
+      }
+    });
+
+    Assert.assertNotSame(readChildren.get(0), child1);
+    Assert.assertTrue(readChildren.get(0).isChild());
+    Assert.assertEquals(readChildren.get(0).getStartTime(), 1000);
+    Assert.assertEquals(readChildren.get(0).getEndTime(), 1500);
+
+    Assert.assertNotSame(readChildren.get(1), child2);
+    Assert.assertTrue(readChildren.get(1).isChild());
+    Assert.assertEquals(readChildren.get(1).getStartTime(), 1500);
+    Assert.assertEquals(readChildren.get(1).getEndTime(), 2000);
   }
 }

@@ -190,7 +190,7 @@ public class MonitorTaskRunner implements TaskRunner {
 
   private List<JobDTO> extractJobDTO(Map<Long, JobDTO> allJobs, Set<Long> jobIdToExtract) {
     List<JobDTO> jobsToUpdate = new ArrayList<>();
-    for (long jobId : jobIdToExtract) {
+    for (Long jobId : jobIdToExtract) {
       JobDTO jobDTO = allJobs.get(jobId);
       if (jobDTO != null) {
         jobsToUpdate.add(jobDTO);

@@ -23,4 +23,7 @@ DROP TABLE IF EXISTS config_index;
 DROP TABLE IF EXISTS application_index;
 DROP TABLE IF EXISTS alert_snapshot_index;
 DROP TABLE IF EXISTS rootcause_session_index;
+DROP TABLE IF EXISTS detection_config_index;
+DROP TABLE IF EXISTS detection_alert_config_index;
+DROP TABLE IF EXISTS session_index;
 SET FOREIGN_KEY_CHECKS = 1;

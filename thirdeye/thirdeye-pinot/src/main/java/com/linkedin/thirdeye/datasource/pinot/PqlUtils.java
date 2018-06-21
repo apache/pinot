@@ -5,10 +5,12 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
+import org.joda.time.Period;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
@@ -208,49 +210,38 @@ public class PqlUtils {
   static String getBetweenClause(DateTime start, DateTime endExclusive, TimeSpec timeFieldSpec, String dataset)
       throws ExecutionException {
     TimeGranularity dataGranularity = timeFieldSpec.getDataGranularity();
-    long startMillis = start.getMillis();
-    long endMillis = endExclusive.getMillis();
     long dataGranularityMillis = dataGranularity.toMillis();
 
     String timeField = timeFieldSpec.getColumnName();
     String timeFormat = timeFieldSpec.getFormat();
+
+    // epoch case
     if (timeFormat == null || TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFormat)) {
-      // Shrink start and end as per data granularity
-      long startAlignmentDelta = startMillis % dataGranularityMillis;
-      if (startAlignmentDelta != 0) {
-        long startMillisAligned = startMillis + dataGranularityMillis - startAlignmentDelta;
-        start = new DateTime(startMillisAligned);
+      long startUnits = (long) Math.ceil(start.getMillis() / (double) dataGranularityMillis);
+      long endUnits = (long) Math.ceil(endExclusive.getMillis() / (double) dataGranularityMillis);
+
+      // point query
+      if (startUnits == endUnits) {
+        return String.format(" %s = %d", timeField, startUnits);
       }
 
-      long endAligmentDelta = endMillis % dataGranularityMillis;
-      if (endAligmentDelta != 0) {
-        long endMillisAligned = endMillis - endAligmentDelta;
-        endExclusive = new DateTime(endMillisAligned);
-      }
+      return String.format(" %s >= %d AND %s < %d", timeField, startUnits, timeField, endUnits);
     }
 
-    String startQueryTime;
-    String endQueryTimeExclusive;
+    // NOTE:
+    // this is crazy. epoch rounds up, but timeFormat down
+    // we maintain this behavior for backward compatibility.
 
+    DateTimeFormatter inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(Utils.getDataTimeZone(dataset));
+    String startUnits = inputDataDateTimeFormatter.print(start);
+    String endUnits = inputDataDateTimeFormatter.print(endExclusive);
 
-    if (timeFormat == null || TimeSpec.SINCE_EPOCH_FORMAT.equals(timeFormat)) {
-      long startInConvertedUnits = dataGranularity.convertToUnit(start.getMillis());
-      long endInConvertedUnits = dataGranularity.convertToUnit(endExclusive.getMillis());
-      startQueryTime = String.valueOf(startInConvertedUnits);
-      endQueryTimeExclusive = (endInConvertedUnits == startInConvertedUnits + 1) ?
-          startQueryTime : String.valueOf(endInConvertedUnits);
-    } else {
-      DateTimeFormatter inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(Utils.getDataTimeZone(dataset));
-      startQueryTime = inputDataDateTimeFormatter.print(start);
-      endQueryTimeExclusive = inputDataDateTimeFormatter.print(endExclusive);
+    // point query
+    if (Objects.equals(startUnits, endUnits)) {
+      return String.format(" %s = %s", timeField, startUnits);
     }
 
-    if (startQueryTime.equals(endQueryTimeExclusive)) {
-      return String.format(" %s = %s", timeField, startQueryTime);
-    } else {
-      return String.format(" %s >= %s AND %s < %s", timeField, startQueryTime, timeField,
-          endQueryTimeExclusive);
-    }
+    return String.format(" %s >= %s AND %s < %s", timeField, startUnits, timeField, endUnits);
   }
 
   private static String getDimensionWhereClause(Multimap<String, String> dimensionValues) {

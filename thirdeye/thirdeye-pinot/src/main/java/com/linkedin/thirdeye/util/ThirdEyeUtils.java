@@ -495,7 +495,7 @@ public abstract class ThirdEyeUtils {
 
     // Initialize Cache Registry
     try {
-      ThirdEyeCacheRegistry.initializeCachesWithoutRefreshing(config);
+      ThirdEyeCacheRegistry.initializeCaches(config);
     } catch (Exception e) {
       LOG.error("Exception while loading caches:", e);
       throw new RuntimeException(e);

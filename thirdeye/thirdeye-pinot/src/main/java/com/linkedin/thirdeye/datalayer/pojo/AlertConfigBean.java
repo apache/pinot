@@ -121,10 +121,20 @@ public class AlertConfigBean extends AbstractBean {
     this.emailFormatterConfig = emailFormatterConfig;
   }
 
+
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class EmailConfig {
     long anomalyWatermark = 0l;
     List<Long> functionIds = new ArrayList<>();
+    List<Long> detectionConfigIds = new ArrayList<>();
+
+    public List<Long> getDetectionConfigIds() {
+      return detectionConfigIds;
+    }
+
+    public void setDetectionConfigIds(List<Long> detectionConfigIds) {
+      this.detectionConfigIds = detectionConfigIds;
+    }
 
     public List<Long> getFunctionIds() {
       return functionIds;

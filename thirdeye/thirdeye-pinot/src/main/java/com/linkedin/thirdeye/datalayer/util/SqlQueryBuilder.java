@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.util;
 
+import com.google.common.base.Preconditions;
 import java.lang.reflect.Array;
 import java.sql.Clob;
 import java.sql.Connection;
@@ -311,6 +312,7 @@ public class SqlQueryBuilder {
     for (Pair<String, Object> pair : parametersList) {
       String dbFieldName = pair.getKey();
       ColumnInfo info = columnInfoMap.get(dbFieldName);
+      Preconditions.checkNotNull(info, String.format("Found field '%s' but expected %s", dbFieldName, columnInfoMap.keySet()));
       prepareStatement.setObject(parameterIndex++, pair.getValue(), info.sqlType);
       LOG.debug("Setting {} to {}", pair.getKey(), pair.getValue());
     }
@@ -323,7 +325,9 @@ public class SqlQueryBuilder {
 
     if (predicate.getLhs() != null) {
       columnName = entityNameToDBNameMapping.get(predicate.getLhs());
+      Preconditions.checkNotNull(columnName, String.format("Found field '%s' but expected %s", predicate.getLhs(), entityNameToDBNameMapping.keySet()));
     }
+
     switch (predicate.getOper()) {
       case AND:
       case OR:

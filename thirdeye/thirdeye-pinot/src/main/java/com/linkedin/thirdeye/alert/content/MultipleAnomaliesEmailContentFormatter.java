@@ -1,13 +1,16 @@
 package com.linkedin.thirdeye.alert.content;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailScreenshotHelper;
 import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
+import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
+import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -39,7 +42,7 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
   private static final long EVENT_TIME_TOLERANCE = TimeUnit.DAYS.toMillis(2);
 
   private EventManager eventDAO = null;
-
+  private DetectionConfigManager configDAO = null;
 
   public MultipleAnomaliesEmailContentFormatter(){
 
@@ -50,6 +53,7 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
     super.init(properties, configuration);
     this.emailTemplate = properties.getProperty(EMAIL_TEMPLATE, DEFAULT_EMAIL_TEMPLATE);
     this.eventDAO = DAORegistry.getInstance().getEventDAO();
+    this.configDAO = DAORegistry.getInstance().getDetectionConfigManager();
   }
 
   @Override
@@ -94,6 +98,20 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
 
       String feedbackVal = getFeedbackValue(feedback);
 
+      String functionName = "Alerts";
+      Long id = -1L;
+
+      if (anomaly.getFunction() != null){
+        functionName = anomaly.getFunction().getFunctionName();
+        id = anomaly.getFunction().getId();
+      } else if ( anomaly.getDetectionConfigId() != null){
+        DetectionConfigDTO config = this.configDAO.findById(anomaly.getDetectionConfigId());
+        Preconditions.checkNotNull(config, String.format("Cannot find detection config %d", anomaly.getDetectionConfigId()));
+        functionName = config.getName();
+        id = config.getId();
+      }
+
+
       AnomalyReportEntity anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
           getAnomalyURL(anomaly, emailContentFormatterConfiguration.getDashboardHost()),
           ThirdEyeUtils.getRoundedValue(anomaly.getAvgBaselineVal()),
@@ -102,19 +120,13 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
           getDimensionsList(anomaly.getDimensions()),
           getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), // duration
           feedbackVal,
-          anomaly.getFunction().getFunctionName(),
+          functionName,
           anomaly.getMetric(),
           getDateString(anomaly.getStartTime(), dateTimeZone),
           getDateString(anomaly.getEndTime(), dateTimeZone),
           getTimezoneString(dateTimeZone),
           getIssueType(anomaly)
       );
-
-      // function name
-      String functionName = "Alerts";
-      if (anomaly.getFunction() != null) {
-        functionName = anomaly.getFunction().getFunctionName();
-      }
 
       // dimension filters / values
       for (Map.Entry<String, String> entry : anomaly.getDimensions().entrySet()) {
@@ -128,7 +140,7 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
         anomalyIds.add(anomalyReport.getAnomalyId());
         functionAnomalyReports.put(functionName, anomalyReport);
         metricAnomalyReports.put(anomaly.getMetric(), anomalyReport);
-        functionToId.put(functionName, anomaly.getFunction().getId());
+        functionToId.put(functionName, id);
       }
     }
 
