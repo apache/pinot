@@ -6,7 +6,7 @@ import hbs from 'htmlbars-inline-precompile';
 module('Integration | Component | rootcause-dimensions', function(hooks) {
   setupRenderingTest(hooks);
 
-  skip('it renders', async function(assert) {
+  test('it renders', async function(assert) {
     this.setProperties({
       metricUrn: 'dataset1:metric1:12345',
       entities: {
@@ -18,19 +18,25 @@ module('Integration | Component | rootcause-dimensions', function(hooks) {
         analysisRange: [ 1525806000000, 1526022000000 ],
         anomalyRange: [ 1525968000000, 1525978800000 ],
         compareMode: 'WoW'
-      }
+      },
+      selectedUrns: {},
+      onSelection: () => {}
     });
 
     await render(hbs`
       {{rootcause-dimensions
-        selectedUrn=metricUrn
         entities=entities
-        context=context
+        metricUrn=metricUrn
+        range=context.analysisRange
+        mode=context.compareMode
+        selectedUrns=selectedUrns
+        isLoading=true
+        onSelection=(action onSelection)
       }}
     `);
 
     const table = this.$('.rootcause-dimensions-table');
     assert.ok(table.length, 'It should render properly');
-    assert.ok(table.find('.table-header').length, 'It should have headers');
+    assert.ok(table.find('thead tr').length > 0, 'It should have headers');
   });
 });
