@@ -142,7 +142,9 @@ export default Component.extend({
 
     // Update the slider, by calling it's update method
     this.get('slider').update({
-      step: this.get('granularityOneWay')
+      step: this.get('granularityOneWay'),
+      min: this.get('minDisplayWindow').format('X'),
+      max: this.get('maxDisplayWindow').format('X')
     });
   },
 
