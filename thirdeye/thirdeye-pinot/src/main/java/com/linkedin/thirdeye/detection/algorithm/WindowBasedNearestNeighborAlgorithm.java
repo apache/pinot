@@ -41,7 +41,6 @@ public class WindowBasedNearestNeighborAlgorithm extends StaticDetectionPipeline
   private static final String PROP_TIMEZONE = "timezone";
   private static final String PROP_TIMEZONE_DEFAULT = "UTC";
 
-  private static final String PROP_DETECTION_DURATION_UNIT = "detectionDurationUnit";
   private static final String PROP_WINDOW_SIZE = "windowSize";
   private static final Logger LOG = LoggerFactory.getLogger(WindowBasedNearestNeighborAlgorithm.class);
 
@@ -49,8 +48,7 @@ public class WindowBasedNearestNeighborAlgorithm extends StaticDetectionPipeline
   private Baseline baseline;
   private final DateTimeZone timezone;
   private int windowSize;
-  private long detectionDurationUnit;
-  private double neighborPercentage;
+  private Double threshold;
 
   public WindowBasedNearestNeighborAlgorithm(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
@@ -60,11 +58,10 @@ public class WindowBasedNearestNeighborAlgorithm extends StaticDetectionPipeline
     String metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
     MetricEntity me = MetricEntity.fromURN(metricUrn, 1.0);
     this.slice = MetricSlice.from(me.getId(), this.startTime, this.endTime, me.getFilters());
-    this.detectionDurationUnit = MapUtils.getLong(config.getProperties(), PROP_DETECTION_DURATION_UNIT, 86400000L);
 
     // window size in terms of number of data points
     this.windowSize = MapUtils.getInteger(config.getProperties(), PROP_WINDOW_SIZE, 3);
-    this.neighborPercentage = MapUtils.getDouble(config.getProperties(), "neighborPercentage", 0.25);
+    this.threshold = MapUtils.getDouble(config.getProperties(), "threshold", null);
 
     this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), PROP_TIMEZONE, PROP_TIMEZONE_DEFAULT));
     int baselineWeeks = MapUtils.getIntValue(config.getProperties(), "baselineWeeks", 4);
@@ -91,23 +88,26 @@ public class WindowBasedNearestNeighborAlgorithm extends StaticDetectionPipeline
     DataFrame dfCurr = data.getTimeseries().get(this.slice);
     DataFrame dfBase = this.baseline.gather(this.slice, data.getTimeseries());
 
+    if (this.threshold == null) {
+      this.threshold =  0.1 * dfBase.getDoubles(COL_VALUE).std().getDouble(0);
+    }
     Set<DataFrame> currentWindowSlicedDataFrames = getWindowSlicedDataFrames(dfCurr);
     Set<DataFrame> baselineWindowSlicedDataFrames = getWindowSlicedDataFrames(dfBase);
 
-    List<MergedAnomalyResultDTO> anomalies = kNNThreshHold(currentWindowSlicedDataFrames, baselineWindowSlicedDataFrames, 3 * dfBase.getLongs(COL_VALUE).std().getDouble(0));
+    List<MergedAnomalyResultDTO> anomalies = kNNThreshHold(currentWindowSlicedDataFrames, baselineWindowSlicedDataFrames,  this.windowSize * this.threshold);
 
     return new DetectionPipelineResult(anomalies);
   }
 
-  private List<MergedAnomalyResultDTO> kNNThreshHold(Set<DataFrame> currentDfs, Set<DataFrame> baselineDfs, double threshHold) {
+  private List<MergedAnomalyResultDTO> kNNThreshHold(Set<DataFrame> currentDfs, Set<DataFrame> baselineDfs, double threshold) {
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     for (DataFrame currentDf : currentDfs) {
       List<Double> distances = new ArrayList<>();
       for (DataFrame baselineDf : baselineDfs) {
-        distances.add(euclideanDistance(currentDf, baselineDf));
+        distances.add(euclideanDistanceSquare(currentDf, baselineDf));
       }
       Collections.sort(distances);
-      if (distances.get((int) (distances.size() * neighborPercentage)) > threshHold * threshHold) {
+      if (distances.get((int) Math.sqrt(distances.size())) > threshold * threshold) {
         LongSeries timeStamps = currentDf.getLongs(COL_TIME);
         anomalies.add(makeAnomaly(this.slice.withStart(timeStamps.get(0)).withEnd(timeStamps.get(timeStamps.size() - 1))));
       }
@@ -115,7 +115,7 @@ public class WindowBasedNearestNeighborAlgorithm extends StaticDetectionPipeline
     return anomalies;
   }
 
-  private double euclideanDistance(DataFrame df1, DataFrame df2){
+  private double euclideanDistanceSquare(DataFrame df1, DataFrame df2){
     DoubleSeries df1Values = df1.getDoubles(COL_VALUE);
     DoubleSeries df2Values = df2.getDoubles(COL_VALUE);
     if (df1Values.size() != df2Values.size()) {
