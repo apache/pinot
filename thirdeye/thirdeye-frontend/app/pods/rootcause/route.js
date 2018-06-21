@@ -283,7 +283,12 @@ export default Route.extend(AuthenticatedRouteMixin, {
         const analysisRange = [analysisRangeStart, analysisRangeEnd];
 
         const anomalyDimNames = anomalyEntity.attributes['dimensions'] || [];
-        const anomalyFilters = anomalyDimNames.map(dimName => [dimName, anomalyEntity.attributes[dimName]]);
+        const anomalyFilters = [];
+        anomalyDimNames.forEach(dimName => {
+          anomalyEntity.attributes[dimName].forEach(dimValue => {
+            anomalyFilters.pushObject([dimName, dimValue]);
+          });
+        });
 
         const anomalyMetricUrnRaw = `thirdeye:metric:${anomalyEntity.attributes['metricId'][0]}`;
         const anomalyMetricUrn = appendFilters(anomalyMetricUrnRaw, anomalyFilters);

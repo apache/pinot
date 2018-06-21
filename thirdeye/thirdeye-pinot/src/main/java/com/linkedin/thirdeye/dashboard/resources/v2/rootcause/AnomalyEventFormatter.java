@@ -107,8 +107,11 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     List<String> dimensionStrings = new ArrayList<>();
     for (Map.Entry<String, String> entry : filters.entries()) {
       dimensionStrings.add(entry.getValue());
-      attributes.put(ATTR_DIMENSIONS, entry.getKey());
       attributes.put(entry.getKey(), entry.getValue());
+
+      if (!attributes.containsEntry(ATTR_DIMENSIONS, entry.getKey())) {
+        attributes.put(ATTR_DIMENSIONS, entry.getKey());
+      }
     }
 
     String dimensionString = "";
