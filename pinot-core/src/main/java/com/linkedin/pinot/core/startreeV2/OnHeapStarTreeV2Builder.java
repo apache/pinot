@@ -16,15 +16,16 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-
 import java.io.File;
 import java.util.Set;
 import java.util.Map;
 import java.util.List;
+import java.util.Queue;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.ArrayList;
 import java.io.IOException;
+import java.util.LinkedList;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.utils.Pairs;
@@ -319,100 +320,78 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
   /**
    * Helper function to create aggregated document for all nodes
-   * This is a bogus logic. Has to work on it. Wrote it for the sake of writing.
+   *
+   * @return void.
    */
   private void createAggregatedDocForAllNodes() {
-    Map<Object, TreeNode> children = _rootNode._children;
+    Queue<TreeNode> childNodes = new LinkedList<>();
 
+    Map<Object, TreeNode> children = _rootNode._children;
     for (Object key: children.keySet()) {
       TreeNode child = children.get(key);
-      int val = getAggregatedDocument(key, child._startDocId, child._endDocId);
+      childNodes.add(child);
     }
+
+    while (!childNodes.isEmpty()) {
+      TreeNode parent = childNodes.remove();
+      children = parent._children;
+      List<Object>aggregatedValues = getAggregatedDocument(parent._startDocId, parent._endDocId);
+      int aggDocId = appendAggregatedDocuments(aggregatedValues);
+      parent._aggDataDocumentId = aggDocId;
+
+      if ( children != null ) {
+        for (Object key: children.keySet()) {
+          TreeNode child = children.get(key);
+          childNodes.add(child);
+        }
+      }
+    }
+    return;
   }
 
   /**
    * Create a aggregated document for this range.
    *
-   * @param key column to work on.
    * @param startDocId Start document id of the range to be grouped
    * @param endDocId End document id (exclusive) of the range to be grouped
    *
    * @return list of all metric2aggfunc value.
    */
-  private int getAggregatedDocument(Object key, int startDocId, int endDocId) {
-    int val = 0;
-    for (Met2AggfuncPair pair : _met2aggfuncPairs) {
-      String metric = pair.getMetricValue();
-      String aggfunc = pair.getAggregatefunction();
+  private List<Object> getAggregatedDocument(int startDocId, int endDocId) {
+    Object val = null;
+    List<Object>aggregatedValues = new ArrayList<>();
+    for ( int i = 0; i < _met2aggfuncPairsCount; i++) {
+      int colId = _dimensionsCount + i;
+      List<Object> colData = _starTreeData.get(colId).subList(startDocId, endDocId);
+      String aggfunc = _met2aggfuncPairs.get(i).getAggregatefunction();
       if (aggfunc == "SUM") {
-        val = calculateSum(metric, startDocId, endDocId);
+        val = OnHeapStarTreeV2BuilderHelper.calculateSum(colData);
       } else if (aggfunc == "MAX") {
-        val = calculateMax(metric, startDocId, endDocId);
+        val = OnHeapStarTreeV2BuilderHelper.calculateMax(colData);
       } else if (aggfunc == "MIN") {
-        val = calculateMin(metric, startDocId, endDocId);
+        val = OnHeapStarTreeV2BuilderHelper.calculateMin(colData);
       }
+      aggregatedValues.add(val);
     }
-    return val;
+    return aggregatedValues;
   }
 
   /**
-   * Calculate SUM of the range.
+   * Append a aggregated document to star tree data.
    *
-   * @param metricName name of the metric for which sum has to be calculated.
-   * @param startDocId Start document id of the range to be grouped.
-   * @param endDocId End document id (exclusive) of the range to be grouped
-   *
-   * @return sum
-   */
-  private Integer calculateSum(String metricName, Integer startDocId, Integer endDocId) {
-    int sum = 0;
-    PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, metricName);
-    for (int i = startDocId; i < endDocId; i++) {
-      Object currentValue = columnReader.readInt(startDocId);;
-      sum += (int)currentValue;
-    }
-    return sum;
-  }
+   * @param aggregatedValues aggregated values for all met2aggfunc pairs.
 
-  /**
-   * Calculate MAX of the range.
-   *
-   * @param metricName name of the metric for which max has to be calculated.
-   * @param startDocId Start document id of the range to be grouped.
-   * @param endDocId End document id (exclusive) of the range to be grouped
-   *
-   * @return max
+   * @return aggregated document id.
    */
-  private Integer calculateMax(String metricName, Integer startDocId, Integer endDocId) {
-    int max = Integer.MIN_VALUE;
-    PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, metricName);
-    for (int i = startDocId; i < endDocId; i++) {
-      Object currentValue = columnReader.readInt(startDocId);;
-      if ((int)currentValue > max ) {
-        max = (int)currentValue;
-      }
+  private int appendAggregatedDocuments(List<Object>aggregatedValues) {
+    int size = _starTreeData.get(0).size();
+    for ( int i = 0; i < _dimensionsCount; i++) {
+      _starTreeData.get(0).add(StarTreeV2Constant.STAR_NODE);
     }
-    return max;
-  }
 
-  /**
-   * Calculate MIN of the range.
-   *
-   * @param metricName name of the metric for which min has to be calculated.
-   * @param startDocId Start document id of the range to be grouped.
-   * @param endDocId End document id (exclusive) of the range to be grouped
-   *
-   * @return min
-   */
-  private Integer calculateMin(String metricName, Integer startDocId, Integer endDocId) {
-    int min = Integer.MAX_VALUE;
-    PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, metricName);
-    for (int i = startDocId; i < endDocId; i++) {
-      Object currentValue = columnReader.readInt(startDocId);;
-      if ((int)currentValue < min ) {
-        min = (int)currentValue;
-      }
+    for ( int i = 0; i < _met2aggfuncPairsCount; i++) {
+      _starTreeData.get(_dimensionsCount + i).add(aggregatedValues.get(i));
     }
-    return min;
+    return size;
   }
 }
