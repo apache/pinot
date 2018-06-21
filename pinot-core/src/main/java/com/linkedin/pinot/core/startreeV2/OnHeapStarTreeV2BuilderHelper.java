@@ -174,4 +174,44 @@ public class OnHeapStarTreeV2BuilderHelper {
     int[] sortedDocId = sortStarTreeData(0, endDocId - startDocId, sortOrder, newFilteredData);
     return reArrangeStarTreeData(sortedDocId, newFilteredData);
   }
+
+  /**
+   * Calculate SUM of the range.
+   */
+  public static Object calculateSum(List<Object>data) {
+    int sum = 0;
+    for (int i = 0; i < data.size(); i++) {
+      Object currentValue = data.get(i);
+      sum += (int)currentValue;
+    }
+    return sum;
+  }
+
+  /**
+   * Calculate MAX of the range.
+   */
+  public static Object calculateMax(List<Object>data) {
+    int max = Integer.MIN_VALUE;
+    for (int i = 0; i < data.size(); i++) {
+      Object currentValue = data.get(i);
+      if ((int)currentValue > max ) {
+        max = (int)currentValue;
+      }
+    }
+    return max;
+  }
+
+  /**
+   * Calculate MIN of the range.
+   */
+  public static Object calculateMin(List<Object>data) {
+    int min = Integer.MAX_VALUE;
+    for (int i = 0; i < data.size(); i++) {
+      Object currentValue = data.get(i);
+      if ((int)currentValue < min ) {
+        min = (int)currentValue;
+      }
+    }
+    return min;
+  }
 }

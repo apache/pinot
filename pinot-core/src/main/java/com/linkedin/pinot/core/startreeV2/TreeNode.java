@@ -26,6 +26,6 @@ class TreeNode {
   int _endDocId;
   int _dimensionId;
   int _childDimensionId;
-  int aggDataDocumentId;
-  Map<Object, TreeNode> _children;
+  int _aggDataDocumentId;
+  Map<Object, TreeNode> _children = null;
 }
