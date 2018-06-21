@@ -42,18 +42,17 @@
     white-space: nowrap;
 
     &--blank {
-      border: none;
+      border-top: none;
     }
+  }
+  &__dimension-content {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
 
     &--first {
       margin-left: 10px;
       display: inline;
-    }
-
-    &--dynamic {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 180px;
     }
   }
   &__header {

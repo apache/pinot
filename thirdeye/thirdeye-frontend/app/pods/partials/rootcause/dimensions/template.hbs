@@ -1,23 +1,20 @@
 {{#shared/common-tabs selection=activeSubTabs.dimensions activeTab=activeSubTabs.dimensions as |subtab|}}
   {{#subtab.tablist as |subtablist|}}
-    {{#if model.isDevEnv}} {{!--  Remove conditional when table view is ready  --}}
-      {{#subtablist.tab name="table"}}Table{{/subtablist.tab}}
-    {{/if}}
+    {{#subtablist.tab name="table"}}Table{{/subtablist.tab}}
     {{#subtablist.tab name="heatmap"}}Heatmap{{/subtablist.tab}}
   {{/subtab.tablist}}
 
-  {{#if model.isDevEnv}} {{!--  Remove conditional when table view is ready --}}
-    {{#subtab.tabpanel name="table"}}
-      {{rootcause-dimensions
-        entities=entities
-        metricUrn=metricUrn
-        context=context
-        selectedUrns=selectedUrns
-        isLoading=true
-        onSelection=(action "onSelection")
-      }}
-    {{/subtab.tabpanel}}
-  {{/if}}
+  {{#subtab.tabpanel name="table"}}
+    {{rootcause-dimensions
+      entities=entities
+      metricUrn=metricUrn
+      range=context.analysisRange
+      mode=context.compareMode
+      selectedUrns=selectedUrns
+      isLoading=isDimensionLoading
+      onSelection=(action "onSelection")
+    }}
+  {{/subtab.tabpanel}}
 
   {{#subtab.tabpanel name="heatmap"}}
     {{#if isLoadingBreakdowns}}
