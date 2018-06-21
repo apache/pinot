@@ -20,7 +20,7 @@
  */
 
 import Component from '@ember/component';
-import { once } from '@ember/runloop'
+import { once, later } from '@ember/runloop'
 import { isPresent, isEmpty } from '@ember/utils';
 import { task, timeout } from 'ember-concurrency';
 import { inject as service } from '@ember/service';
@@ -93,6 +93,18 @@ export default Component.extend({
   overallChange: 'NA',
 
   /**
+   * URN state history in component
+   * @type {Array}
+   */
+  previousUrns: [],
+
+  /**
+   * Concatenated settings string
+   * @type {String}
+   */
+  previousSettings: '',
+
+  /**
    * Dimension data for models-table
    * @type {Array}
    */
@@ -129,34 +141,11 @@ export default Component.extend({
    * loading status for component
    * @type {boolean}
    */
-  isLoading: false,
+  isLoading: true,
 
-  didReceiveAttrs() {
+  init() {
     this._super(...arguments);
-
-    // We're pulling in the entities list here because its the only way to extract the metric name and dataset
-    const { entities, metricUrn, range, mode } = this.getProperties('entities', 'metricUrn', 'range', 'mode');
-    // Baseline start/end is dependent on 'compareMode' (WoW, Wo2W, etc)
-    const baselineRange = toBaselineRange(range, mode);
-    // If metric URN is found in entity list, proceed. Otherwise, we have no metadata to construct the call.
-    const metricEntity = entities[metricUrn];
-
-    if (metricEntity) {
-      const parsedMetric = metricEntity.label.split('::');
-      once(() => {
-        get(this, 'fetchDimensionAnalysisData').perform({
-          metric: parsedMetric[1],
-          dataset: parsedMetric[0],
-          currentStart: range[0],
-          currentEnd: range[1],
-          baselineStart: baselineRange[0],
-          baselineEnd: baselineRange[1],
-          summarySize: 20,
-          oneSideError: false,
-          depth: 3
-        });
-      });
-    }
+    this._fetchIfNewContext();
   },
 
   /**
@@ -252,6 +241,47 @@ export default Component.extend({
       return tableHeaders;
     }
   ),
+
+  /**
+   * Decides whether to fetch new table data and reload component
+   * @method _fetchIfNewContext
+   * @private
+   */
+  _fetchIfNewContext() {
+    const { previousUrns, previousSettings } = this.getProperties('previousUrns', 'previousSettings');
+    const { mode, range, entities, metricUrn } = this.getProperties('mode', 'range', 'entities', 'metricUrn');
+    const newUrns = [...get(this, 'selectedUrns')];
+    // Baseline start/end is dependent on 'compareMode' (WoW, Wo2W, etc)
+    const baselineRange = toBaselineRange(range, mode);
+    // If metric URN is found in entity list, proceed. Otherwise, we don't have metric & dataset names for the call.
+    const metricEntity = entities[metricUrn];
+    // Concatenate incoming settings for bulk comparison
+    const newConcatSettings = `${metricUrn}:${range[0]}:${range[1]}:${mode}`;
+    // Compare current and incoming settings
+    const isSameMetricSettings = previousSettings === newConcatSettings;
+    // Are previous and incoming URNs the same?
+    const isSameUrns = previousUrns.length === newUrns.length && newUrns.every(urn => previousUrns.includes(urn));
+    // If we have new settings, we can trigger fetch/reload. Otherwise, do nothing
+    if (metricEntity && (!isSameUrns || !isSameMetricSettings)) {
+      const parsedMetric = metricEntity.label.split('::');
+      get(this, 'fetchDimensionAnalysisData').perform({
+        metric: parsedMetric[1],
+        dataset: parsedMetric[0],
+        currentStart: range[0],
+        currentEnd: range[1],
+        baselineStart: baselineRange[0],
+        baselineEnd: baselineRange[1],
+        summarySize: 20,
+        oneSideError: false,
+        depth: 3
+      });
+      // Cache incoming settings and URNs
+      setProperties(this, {
+        previousSettings: newConcatSettings,
+        previousUrns: newUrns
+      });
+    }
+  },
 
   /**
    * Calculates offsets to use in positioning contribution bars based on aggregated widths
