@@ -114,7 +114,6 @@ public class StarTreeIndexTestSegmentHelper {
     driver.build();
 
     LOGGER.info("Built segment {} at {}", segmentName, segmentDirName);
-
     return schema;
   }
 }

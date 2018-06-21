@@ -141,15 +141,16 @@ public class OnHeapStarTreeV2BuilderHelper {
     List<List<Object>> newFilteredData = new ArrayList<>();
 
     for (int i = 0; i < starTreeData.size(); i++) {
-      if (i != dimensionIdToRemove) {
-        List<Object> col = starTreeData.get(i);
-        List<Object> newCol = new ArrayList<>();
-        for (int j = startDocId; j < endDocId; j++) {
+      List<Object> col = starTreeData.get(i);
+      List<Object> newCol = new ArrayList<>();
+      for (int j = startDocId; j < endDocId; j++) {
+        if (i != dimensionIdToRemove) {
           newCol.add(col.get(j));
+        } else {
+          newCol.add(StarTreeV2Constant.STAR_NODE);
         }
-        newFilteredData.add(newCol);
       }
-      sortOrder.remove(new Integer(dimensionIdToRemove));
+      newFilteredData.add(newCol);
       sortedDocId = sortStarTreeData(startDocId, endDocId, sortOrder, newFilteredData);
     }
     return reArrangeStarTreeData(sortedDocId, newFilteredData);
