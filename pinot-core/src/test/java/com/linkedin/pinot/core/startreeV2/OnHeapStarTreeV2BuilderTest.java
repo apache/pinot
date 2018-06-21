@@ -30,7 +30,7 @@ public class OnHeapStarTreeV2BuilderTest {
   private static File _indexDir;
   private static StarTreeV2Config _starTreeV2Config;
   private static final String SEGMENT_NAME = "starTreeSegment";
-  private static final String DATA_DIR = System.getProperty("java.io.tmpdir") + File.separator + "SumStarTreeIndexTest";
+  private static final String DATA_DIR = System.getProperty("java.io.tmpdir") + File.separator + "OnHeapStarTreeV2BuilderTest";
 
 
   @BeforeClass
