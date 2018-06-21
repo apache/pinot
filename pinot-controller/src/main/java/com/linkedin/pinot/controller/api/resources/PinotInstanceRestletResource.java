@@ -123,10 +123,8 @@ public class PinotInstanceRestletResource {
   })
   public SuccessResponse addInstance(Instance instance) {
     LOGGER.info("Instance creation request received for instance " + instance.toInstanceId());
-    final PinotResourceManagerResponse resp = pinotHelixResourceManager.addInstance(instance);
-    if (resp.status == PinotResourceManagerResponse.ResponseStatus.failure) {
-      throw new ControllerApplicationException(LOGGER, "Instance already exists",
-          Response.Status.CONFLICT);
+    if (!pinotHelixResourceManager.addInstance(instance).isSuccessful()) {
+      throw new ControllerApplicationException(LOGGER, "Instance already exists", Response.Status.CONFLICT);
     }
     return new SuccessResponse("Instance successfully created");
   }
