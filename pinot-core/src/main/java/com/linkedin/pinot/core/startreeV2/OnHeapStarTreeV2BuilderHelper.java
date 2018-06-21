@@ -66,9 +66,9 @@ public class OnHeapStarTreeV2BuilderHelper {
    */
   public static int[] sortStarTreeData(int startDocId, int endDocId, List<Integer> sortOrder, List<List<Object>> starTreeData) {
     int docsCount = endDocId - startDocId;
-    final int[] sortedDocIds = new int[docsCount];
+    int[] sortedDocIds = new int[docsCount];
     for (int i = 0; i < docsCount; i++) {
-      sortedDocIds[i] = i;
+      sortedDocIds[i] = i + startDocId;
     }
 
     IntComparator comparator = new IntComparator() {
@@ -102,7 +102,7 @@ public class OnHeapStarTreeV2BuilderHelper {
         sortedDocIds[j] = temp;
       }
     };
-    Arrays.quickSort(startDocId, endDocId, comparator, swapper);
+    Arrays.quickSort(0, docsCount, comparator, swapper);
 
     return sortedDocIds;
   }
@@ -127,19 +127,38 @@ public class OnHeapStarTreeV2BuilderHelper {
    */
   public static List<List<Object>> condenseData(List<List<Object>> starTreeData) {
     List<List<Object>> newData = new ArrayList<>();
+    for ( int i = 0; i < starTreeData.size(); i++) {
+      List<Object>col =  new ArrayList<>();
+      col.add(starTreeData.get(i).get(0));
+      newData.add(col);
+    }
 
-    // NOTE: fill this part.
+    for ( int i = 1; i < starTreeData.get(0).size(); i++) {
+      boolean flag = false;
+      for ( int j = 0; j < starTreeData.size(); j++) {
+        Object prev = starTreeData.get(j).get(i-1);
+        Object current = starTreeData.get(j).get(i);
+        if ( !prev.equals(current)) {
+          flag = true;
+          break;
+        }
+      }
+      if (flag == true) {
+        for ( int k = 0; k < starTreeData.size(); k++) {
+          newData.get(k).add(starTreeData.get(k).get(i));
+        }
+      }
+    }
 
-    return starTreeData;
+    return newData;
   }
 
   /**
    * Filter data by removing the dimension we don't need.
    */
   public static List<List<Object>> filterData(int startDocId, int endDocId, int dimensionIdToRemove, List<Integer>sortOrder, List<List<Object>>starTreeData) {
-    int[] sortedDocId = new int[endDocId - startDocId];
-    List<List<Object>> newFilteredData = new ArrayList<>();
 
+    List<List<Object>> newFilteredData = new ArrayList<>();
     for (int i = 0; i < starTreeData.size(); i++) {
       List<Object> col = starTreeData.get(i);
       List<Object> newCol = new ArrayList<>();
@@ -151,8 +170,8 @@ public class OnHeapStarTreeV2BuilderHelper {
         }
       }
       newFilteredData.add(newCol);
-      sortedDocId = sortStarTreeData(startDocId, endDocId, sortOrder, newFilteredData);
     }
+    int[] sortedDocId = sortStarTreeData(0, endDocId - startDocId, sortOrder, newFilteredData);
     return reArrangeStarTreeData(sortedDocId, newFilteredData);
   }
 }
