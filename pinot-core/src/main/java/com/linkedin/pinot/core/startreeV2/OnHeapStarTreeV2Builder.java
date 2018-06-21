@@ -220,7 +220,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
       TreeNode child = new TreeNode();
       int childStartDocId = range.getLeft();
       child._startDocId = childStartDocId;
-      int childEndDocId = range.getRight();
+      int childEndDocId = range.getRight() + 1;
       child._endDocId = childEndDocId;
       children.put(childDimensionValue, child);
       if (childEndDocId - childStartDocId > _maxNumLeafRecords) {
@@ -243,7 +243,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     children.put(StarTreeV2Constant.STAR_NODE, starChild);
     _nodesCount++;
 
-    List<List<Object>> sortedFilteredData = OnHeapStarTreeV2BuilderHelper.filterData(startDocId, endDocId, splitDimensionId, _dimensionsSplitOrder, _starTreeData);
+    List<List<Object>> sortedFilteredData = OnHeapStarTreeV2BuilderHelper.filterData(
+        startDocId, endDocId, splitDimensionId, _dimensionsSplitOrder, _starTreeData);
     List<List<Object>> condensedData = OnHeapStarTreeV2BuilderHelper.condenseData(sortedFilteredData);
 
     for ( int i = 0; i < _starTreeData.size(); i++) {
