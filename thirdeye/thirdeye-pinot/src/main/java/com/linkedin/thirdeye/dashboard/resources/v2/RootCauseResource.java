@@ -35,8 +35,8 @@ public class RootCauseResource {
 
   private static final int DEFAULT_FORMATTER_DEPTH = 1;
 
-  private static final long ANALYSIS_RANGE_MAX = TimeUnit.DAYS.toMillis(14);
-  private static final long ANOMALY_RANGE_MAX = TimeUnit.DAYS.toMillis(7);
+  private static final long ANALYSIS_RANGE_MAX = TimeUnit.DAYS.toMillis(32);
+  private static final long ANOMALY_RANGE_MAX = TimeUnit.DAYS.toMillis(32);
   private static final long BASELINE_RANGE_MAX = ANOMALY_RANGE_MAX;
 
   private final List<RootCauseEntityFormatter> formatters;
@@ -53,18 +53,18 @@ public class RootCauseResource {
   public List<RootCauseEntity> query(
       @ApiParam(value = "framework name")
       @QueryParam("framework") String framework,
-      @ApiParam(value = "start time of the anomalous time period for the metric under analysis")
-      @QueryParam("anomalyStart") Long anomalyStart,
-      @ApiParam(value = "end time of the anomalous time period for the metric under analysis")
-      @QueryParam("anomalyEnd") Long anomalyEnd,
-      @ApiParam(value = "baseline start time, e.g. anomaly start time offset by 1 week")
-      @QueryParam("baselineStart") Long baselineStart,
-      @ApiParam(value = "baseline end time, e.g. typically anomaly start time offset by 1 week")
-      @QueryParam("baselineEnd") Long baselineEnd,
       @ApiParam(value = "start overall time window to consider for events")
       @QueryParam("analysisStart") Long analysisStart,
       @ApiParam(value = "end of overall time window to consider for events")
       @QueryParam("analysisEnd") Long analysisEnd,
+      @ApiParam(value = "start time of the anomalous time period for the metric under analysis", defaultValue = "analysisStart")
+      @QueryParam("anomalyStart") Long anomalyStart,
+      @ApiParam(value = "end time of the anomalous time period for the metric under analysis", defaultValue = "analysisEnd")
+      @QueryParam("anomalyEnd") Long anomalyEnd,
+      @ApiParam(value = "baseline start time, e.g. anomaly start time offset by 1 week", defaultValue = "anomalyStart - 7 days")
+      @QueryParam("baselineStart") Long baselineStart,
+      @ApiParam(value = "baseline end time, e.g. typically anomaly start time offset by 1 week", defaultValue = "anomalyEnd - 7 days")
+      @QueryParam("baselineEnd") Long baselineEnd,
       @QueryParam("formatterDepth") Integer formatterDepth,
       @ApiParam(value = "URNs of metrics to analyze")
       @QueryParam("urns") List<String> urns) throws Exception {
@@ -74,26 +74,29 @@ public class RootCauseResource {
       throw new IllegalArgumentException(String.format("Could not resolve framework '%s'", framework));
 
     // input validation
-    if(anomalyStart == null)
-      throw new IllegalArgumentException("Must provide anomaly start timestamp (in milliseconds)");
-
-    if(anomalyEnd == null)
-      throw new IllegalArgumentException("Must provide anomaly end timestamp (in milliseconds)");
-
-    if(baselineStart == null)
-      throw new IllegalArgumentException("Must provide baseline start timestamp (in milliseconds)");
-
-    if(baselineEnd == null)
-      throw new IllegalArgumentException("Must provide baseline end timestamp (in milliseconds)");
-
     if(analysisStart == null)
       throw new IllegalArgumentException("Must provide analysis start timestamp (in milliseconds)");
 
     if(analysisEnd == null)
       throw new IllegalArgumentException("Must provide analysis end timestamp (in milliseconds)");
 
+    if(anomalyStart == null)
+      anomalyStart = analysisStart;
+
+    if(anomalyEnd == null)
+      anomalyEnd = analysisEnd;
+
+    if(baselineStart == null)
+      baselineStart = anomalyStart - TimeUnit.DAYS.toMillis(7);
+
+    if(baselineEnd == null)
+      baselineEnd = anomalyEnd - TimeUnit.DAYS.toMillis(7);
+
     if(formatterDepth == null)
       formatterDepth = DEFAULT_FORMATTER_DEPTH;
+
+    if(analysisEnd - analysisStart > ANALYSIS_RANGE_MAX)
+      throw new IllegalArgumentException(String.format("Analysis range cannot be longer than %d", ANALYSIS_RANGE_MAX));
 
     if(anomalyEnd - anomalyStart > ANOMALY_RANGE_MAX)
       throw new IllegalArgumentException(String.format("Anomaly range cannot be longer than %d", ANOMALY_RANGE_MAX));
@@ -101,12 +104,7 @@ public class RootCauseResource {
     if(baselineEnd - baselineStart > BASELINE_RANGE_MAX)
       throw new IllegalArgumentException(String.format("Baseline range cannot be longer than %d", BASELINE_RANGE_MAX));
 
-    if(analysisEnd - analysisStart > ANALYSIS_RANGE_MAX)
-      throw new IllegalArgumentException(String.format("Analysis range cannot be longer than %d", ANALYSIS_RANGE_MAX));
-
     urns = ResourceUtils.parseListParams(urns);
-    if(urns.isEmpty())
-      throw new IllegalArgumentException("Must provide entity urns");
 
     // validate window size
     long anomalyWindow = anomalyEnd - anomalyStart;
