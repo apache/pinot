@@ -30,8 +30,8 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 /**
- * Simple baseline algorithm. Computes a multi-week aggregate baseline and compares
- * the current value based on relative change or absolute difference.
+ * This algorithm compares the subsequence (default length is 3 data point) of current time series and baseline time series and
+ * calculate the euclidean distance between them. If the kth nearest distance is above a certain threshold, it marks it as an anomaly.
  */
 public class WindowBasedNearestNeighborAlgorithm extends StaticDetectionPipeline {
   private static final String PROP_METRIC_URN = "metricUrn";

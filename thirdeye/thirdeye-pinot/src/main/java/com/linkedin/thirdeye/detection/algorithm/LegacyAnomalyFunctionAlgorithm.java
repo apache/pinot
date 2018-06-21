@@ -37,6 +37,9 @@ import org.slf4j.LoggerFactory;
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
+/**
+ * The Legacy anomaly function algorithm. This can run existing anomaly functions.
+ */
 public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
   private static final Logger LOG = LoggerFactory.getLogger(LegacyAnomalyFunctionAlgorithm.class);
   private static String PROP_ANOMALY_FUNCTION_CLASS = "anomalyFunctionClassName";
@@ -48,6 +51,15 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
   private String metricUrn;
   private MetricEntity metricEntity;
 
+  /**
+   * Instantiates a new Legacy anomaly function algorithm.
+   *
+   * @param provider the provider
+   * @param config the config
+   * @param startTime the start time
+   * @param endTime the end time
+   * @throws Exception the exception
+   */
   public LegacyAnomalyFunctionAlgorithm(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
       throws Exception {
     super(provider, config, startTime, endTime);

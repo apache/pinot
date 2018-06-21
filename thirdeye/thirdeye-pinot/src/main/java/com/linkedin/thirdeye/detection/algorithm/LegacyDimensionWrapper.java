@@ -13,6 +13,9 @@ import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 
 
+/**
+ * The Legacy dimension wrapper. Do dimension exploration for existing anomaly functions.
+ */
 public class LegacyDimensionWrapper extends DimensionWrapper {
   private static String PROP_SPEC = "specs";
   private static String PROP_ANOMALY_FUNCTION_CLASS = "anomalyFunctionClassName";
@@ -22,6 +25,15 @@ public class LegacyDimensionWrapper extends DimensionWrapper {
   private Map<String, Object> anomalyFunctionSpecs;
   private String anomalyFunctionClassName;
 
+  /**
+   * Instantiates a new Legacy dimension wrapper.
+   *
+   * @param provider the provider
+   * @param config the config
+   * @param startTime the start time
+   * @param endTime the end time
+   * @throws Exception the exception
+   */
   public LegacyDimensionWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
       throws Exception {
     super(provider, config, startTime, endTime);
