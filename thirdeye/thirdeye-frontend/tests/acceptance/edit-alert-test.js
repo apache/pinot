@@ -9,6 +9,8 @@ module('Acceptance | edit alert', function(hooks) {
 
   test(`visiting ${selfServeConst.EDIT_LINK} and checking that fields render correctly and edit is successful`, async (assert) => {
     const alert = server.create('alert');
+    const editSuccessMsg = `Edit Alert Success! You have successfully edited alert ${alert.id}`;
+
     await visit(`/manage/alert/${alert.id}/edit`);
 
     assert.equal(
@@ -33,19 +35,8 @@ module('Acceptance | edit alert', function(hooks) {
     await click(selfServeConst.STATUS_TOGGLER);
     await click(selfServeConst.SUBMIT_BUTTON);
 
-    assert.equal(
-      currentURL(),
-      '/manage/alerts',
-      'correctly redirects to manage alerts page after edit'
-    );
-
-    assert.equal(
-      $(`${selfServeConst.NEW_FUNC_RESULT}[title='${selfServeConst.NEW_FUNC_NAME}']`).get(0).innerText,
-      selfServeConst.NEW_FUNC_NAME,
-      'after edit, alert name is saved correctly');
-    assert.equal(
-      $(selfServeConst.STATUS_RESULT).get(0).innerText,
-      'Inactive',
-      'after edit, alert status is saved correctly');
+    assert.ok(
+      $(selfServeConst.IMPORT_SUCCESS).get(0).innerText.includes(editSuccessMsg),
+      'after edit, alert is saved successfully');
   });
 });
