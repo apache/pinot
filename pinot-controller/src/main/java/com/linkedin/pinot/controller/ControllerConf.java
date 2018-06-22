@@ -17,6 +17,7 @@ package com.linkedin.pinot.controller;
 
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.controller.api.storage.SegmentVersion;
 import com.linkedin.pinot.filesystem.LocalPinotFS;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
@@ -95,6 +96,15 @@ public class ControllerConf extends PropertiesConfiguration {
   public static String constructDownloadUrl(String tableName, String segmentName, String vip) {
     try {
       return StringUtil.join("/", vip, "segments", tableName, URLEncoder.encode(segmentName, "UTF-8"));
+    } catch (UnsupportedEncodingException e) {
+      // Shouldn't happen
+      throw new AssertionError("UTF-8 encoding should always be supported", e);
+    }
+  }
+
+  public static String constructDownloadUrlWithVersion(String tableName, String segmentName, String vip, SegmentVersion segmentVersion) {
+    try {
+      return StringUtil.join("/", vip, "segments", tableName, URLEncoder.encode(segmentName, "UTF-8") + "?version=" + segmentVersion.toString());
     } catch (UnsupportedEncodingException e) {
       // Shouldn't happen
       throw new AssertionError("UTF-8 encoding should always be supported", e);
