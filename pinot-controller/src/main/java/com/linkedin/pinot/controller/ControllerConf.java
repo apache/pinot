@@ -105,8 +105,9 @@ public class ControllerConf extends PropertiesConfiguration {
     setProperty(PINOT_FS_FACTORY_CLASS_LOCAL, DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL);
     setProperty(PINOT_FS_FACTORY_CLASS_HADOOP, DEFAULT_PINOT_FS_FACTORY_CLASS_HADOOP);
 
-    pinotFSFactoryClasses.getKeys().forEachRemaining(
-        key -> setProperty((String) key, pinotFSFactoryClasses.getProperty((String) key)));
+    if (pinotFSFactoryClasses != null) {
+      pinotFSFactoryClasses.getKeys().forEachRemaining(key -> setProperty((String) key, pinotFSFactoryClasses.getProperty((String) key)));
+    }
   }
 
   public void setSplitCommit(boolean isSplitCommit) {

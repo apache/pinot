@@ -51,9 +51,10 @@ public class PinotSegmentUploadUtils {
   ControllerConf _controllerConf;
 
 
-  public URI constructFinalLocation(SegmentMetadata segmentMetadata, UUID version) throws Exception {
+  public URI constructFinalLocation(SegmentMetadata segmentMetadata, SegmentVersion version) throws Exception {
     FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
-    return new File(new File(new File(provider.getBaseDataDir(), segmentMetadata.getTableName()), segmentMetadata.getName()), version.toString()).toURI();
+    File destFile = new File(new File(new File(provider.getBaseDataDir(), segmentMetadata.getTableName()), segmentMetadata.getName()), version.toString());
+    return destFile.toURI();
   }
   /**
    * Updates zk metadata for uploaded segments
@@ -71,7 +72,7 @@ public class PinotSegmentUploadUtils {
     try {
       srcUri = new URI(segmentUploaderConfig.getHeaders().getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI));
       pinotFS = PinotFSFactory.getInstance().init(_controllerConf, srcUri);
-      dstUri = constructFinalLocation(segmentMetadata, version);
+      dstUri = constructFinalLocation(segmentMetadata, new SegmentVersion(Long.toString(System.currentTimeMillis()), version.toString()));
       pinotFS.copy(srcUri, dstUri);
     } catch (Exception e) {
       LOGGER.error("Could not copy file to final directory");

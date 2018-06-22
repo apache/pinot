@@ -16,6 +16,9 @@
 package com.linkedin.pinot.filesystem;
 
 import com.google.common.base.Strings;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.common.utils.retry.RetryPolicy;
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;

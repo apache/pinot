@@ -39,10 +39,14 @@ public class PinotFSFactory {
 
   public PinotFS init(Configuration config, URI uri) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
     String protocol = uri.getScheme();
+    if (protocol == null) {
+      // Assume local
+      protocol = "file";
+    }
     Configuration schemeConfig = config.subset("controller.storage.factory.class");
     String className = schemeConfig.getString(protocol);
 
-    Preconditions.checkNotNull(className, "No fetcher class defined for protocol: " + protocol);
+    Preconditions.checkNotNull(className, "No fs class defined for protocol: " + protocol);
     LOGGER.info("Creating a new pinot fs for fs: {} with class: {}", protocol, className);
 
     return (PinotFS) Class.forName(className).newInstance();
