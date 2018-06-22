@@ -1,4 +1,4 @@
-// screenshot script for reference only 
+// screenshot script for reference only
 // actual used script lives in /thirdeye-configs/prod-config
 "use strict";
 
@@ -59,7 +59,7 @@ page.onLoadFinished = function(status) {
 
     if (requestsArray.length === 0 && isReady) {
       system.stderr.writeLine('taking screenshot');
-      
+
       clearInterval(interval);
         var clipRect = page.evaluate(function () {
           return document.querySelector('#anomaly-screenshot').getBoundingClientRect();
@@ -73,7 +73,7 @@ page.onLoadFinished = function(status) {
         page.render(options.output);
         phantom.exit();
     }
-  }, 500);
+  }, 5000);
 
   interval();
 
