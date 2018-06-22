@@ -3,6 +3,9 @@ package com.linkedin.thirdeye.dashboard.resources.v2;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.TreeMultimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.constant.AnomalyResultSource;
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyClassificationType;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -27,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class ResourceUtils {
+
   private static final Logger LOG = LoggerFactory.getLogger(ResourceUtils.class);
   private static final Pattern PATTERN_UNMATCHED = Pattern.compile("\\$\\{");
 
@@ -283,5 +287,41 @@ public class ResourceUtils {
     }
   }
 
+  /**
+   * Resolves the (convoluted) anomaly feedback properties into a clear classification of
+   * {@code NONE, TRUE_POSITIVE, FALSE_POSITIVE, TRUE_NEGATIVE, FALSE_NEGATIVE}.
+   *
+   * @param anomaly anomaly dto
+   * @return feedback classification
+   */
+  public static AnomalyClassificationType getStatusClassification(MergedAnomalyResultDTO anomaly) {
+    if (anomaly.getAnomalyResultSource() != null) {
+      if (AnomalyResultSource.USER_LABELED_ANOMALY.equals(anomaly.getAnomalyResultSource())) {
+        if (anomaly.getFeedback() != null
+            && !AnomalyFeedbackType.NOT_ANOMALY.equals(anomaly.getFeedback().getFeedbackType())) {
+          return AnomalyClassificationType.TRUE_NEGATIVE;
+        }
 
+        // NOTE: includes user-created anomaly without feedback as false negative by default
+
+        return AnomalyClassificationType.FALSE_NEGATIVE;
+      }
+    }
+
+    if (anomaly.getFeedback() == null) {
+      return AnomalyClassificationType.NONE;
+    }
+
+    switch (anomaly.getFeedback().getFeedbackType()) {
+      case NO_FEEDBACK:
+        return AnomalyClassificationType.NONE;
+      case ANOMALY:
+      case ANOMALY_NEW_TREND:
+        return AnomalyClassificationType.TRUE_POSITIVE;
+      case NOT_ANOMALY:
+        return AnomalyClassificationType.TRUE_NEGATIVE;
+    }
+
+    throw new IllegalStateException(String.format("Could not classify feedback status of anomaly id %d", anomaly.getId()));
+  }
 }

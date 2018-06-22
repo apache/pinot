@@ -23,7 +23,6 @@ import com.linkedin.thirdeye.rootcause.impl.EventEntity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import org.apache.commons.lang.StringUtils;
 
 
@@ -43,6 +42,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
   public static final String ATTR_WEIGHT = "weight";
   public static final String ATTR_SCORE = "score";
   public static final String ATTR_METRIC_GRANULARITY = "metricGranularity";
+  public static final String ATTR_STATUS_CLASSIFICATION = "statusClassification";
 
   private final MergedAnomalyResultManager anomalyDAO;
   private final MetricConfigManager metricDAO;
@@ -120,6 +120,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     attributes.put(ATTR_SCORE, String.valueOf(anomaly.getScore()));
     attributes.put(ATTR_WEIGHT, String.valueOf(anomaly.getWeight()));
     attributes.put(ATTR_METRIC_GRANULARITY, dataset.bucketTimeGranularity().toAggregationGranularityString());
+    attributes.put(ATTR_STATUS_CLASSIFICATION, ResourceUtils.getStatusClassification(anomaly).toString());
 
     // external urls as attributes
     for (Map.Entry<String, String> entry : externalUrls.entrySet()) {

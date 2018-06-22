@@ -23,6 +23,7 @@ public class AnomalySummary {
   private String functionName;
   private long functionId;
   private String dataset;
+  private AnomalyClassificationType classification;
 
   public AnomalySummary() {
     // left blank
@@ -146,5 +147,13 @@ public class AnomalySummary {
 
   public void setComment(String comment) {
     this.comment = comment;
+  }
+
+  public AnomalyClassificationType getClassification() {
+    return classification;
+  }
+
+  public void setClassification(AnomalyClassificationType classification) {
+    this.classification = classification;
   }
 }
