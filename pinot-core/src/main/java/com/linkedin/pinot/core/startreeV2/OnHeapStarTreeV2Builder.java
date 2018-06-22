@@ -364,21 +364,9 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
    * @return list of all metric2aggfunc value.
    */
   private List<Object> getAggregatedDocument(int startDocId, int endDocId) {
-    Object val = null;
-    List<Object>aggregatedValues = new ArrayList<>();
-    for ( int i = 0; i < _met2aggfuncPairsCount; i++) {
-      int colId = _dimensionsCount + i;
-      List<Object> colData = _starTreeData.get(colId).getMetricValues();
-      String aggfunc = _met2aggfuncPairs.get(i).getAggregatefunction();
-      if (aggfunc == "SUM") {
-        val = OnHeapStarTreeV2BuilderHelper.calculateSum(colData);
-      } else if (aggfunc == "MAX") {
-        val = OnHeapStarTreeV2BuilderHelper.calculateMax(colData);
-      } else if (aggfunc == "MIN") {
-        val = OnHeapStarTreeV2BuilderHelper.calculateMin(colData);
-      }
-      aggregatedValues.add(val);
-    }
+
+    List<Object> aggregatedValues = OnHeapStarTreeV2BuilderHelper.aggregateMetrics(startDocId, endDocId, _starTreeData, _met2aggfuncPairs);
+
     return aggregatedValues;
   }
 
