@@ -25,13 +25,20 @@ export default Route.extend({
     }
   },
 
-  model(params, transition) {
-    const { id, alertData, allConfigGroups, allAppNames } = this.modelFor('manage.alert');
+  async model(params, transition) {
+    const {
+      id,
+      alertData,
+      allConfigGroups,
+      allAppNames
+    } = this.modelFor('manage.alert');
+
     if (!id) { return; }
+    const email = await fetch(selfServeApiCommon.configGroupByAlertId(id)).then(checkStatus);
 
     return RSVP.hash({
+      email,
       alertData,
-      email: fetch(selfServeApiCommon.configGroupByAlertId(id)).then(checkStatus),
       allConfigGroups,
       allAppNames
     });
@@ -126,7 +133,7 @@ export default Route.extend({
    * @return {RSVP.hash} A new list of functions (alerts)
    */
   fetchAlertDataById: task(function * (functionIds) {
-    const functionArray =  yield functionIds.map(id => fetch(selfServeApiCommon.alertById(id)).then(checkStatus));
+    const functionArray = yield functionIds.map(id => fetch(selfServeApiCommon.alertById(id)).then(checkStatus));
     return RSVP.hash(functionArray);
   }),
 
