@@ -22,7 +22,7 @@ import javax.annotation.Nonnull;
 
 
 public class MaxMVAggregationFunction extends MaxAggregationFunction {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.MAXMV.getName();
+  private static final String NAME = AggregationFunctionType.MAXMV.getName();
 
   @Nonnull
   @Override

@@ -25,7 +25,7 @@ import javax.annotation.Nonnull;
 
 
 public class CountAggregationFunction implements AggregationFunction<Long, Long> {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.COUNT.getName();
+  private static final String NAME = AggregationFunctionType.COUNT.getName();
   private static final double DEFAULT_INITIAL_VALUE = 0.0;
 
   @Nonnull

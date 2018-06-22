@@ -26,7 +26,7 @@ import javax.annotation.Nonnull;
 
 
 public class AvgAggregationFunction implements AggregationFunction<AvgPair, Double> {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.AVG.getName();
+  private static final String NAME = AggregationFunctionType.AVG.getName();
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   @Nonnull

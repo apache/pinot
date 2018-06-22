@@ -29,7 +29,7 @@ import javax.annotation.Nonnull;
 
 
 public class DistinctCountHLLAggregationFunction implements AggregationFunction<HyperLogLog, Long> {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.DISTINCTCOUNTHLL.getName();
+  private static final String NAME = AggregationFunctionType.DISTINCTCOUNTHLL.getName();
 
   @Nonnull
   @Override

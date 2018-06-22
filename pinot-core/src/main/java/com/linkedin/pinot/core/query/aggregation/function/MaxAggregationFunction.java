@@ -25,7 +25,7 @@ import javax.annotation.Nonnull;
 
 
 public class MaxAggregationFunction implements AggregationFunction<Double, Double> {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.MAX.getName();
+  private static final String NAME = AggregationFunctionType.MAX.getName();
   private static final double DEFAULT_INITIAL_VALUE = Double.NEGATIVE_INFINITY;
 
   @Nonnull

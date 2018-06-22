@@ -22,7 +22,7 @@ import javax.annotation.Nonnull;
 
 
 public class MinMVAggregationFunction extends MinAggregationFunction {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.MINMV.getName();
+  private static final String NAME = AggregationFunctionType.MINMV.getName();
 
   @Nonnull
   @Override

@@ -22,7 +22,7 @@ import javax.annotation.Nonnull;
 
 
 public class MinMaxRangeMVAggregationFunction extends MinMaxRangeAggregationFunction {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.MINMAXRANGEMV.getName();
+  private static final String NAME = AggregationFunctionType.MINMAXRANGEMV.getName();
 
   @Nonnull
   @Override

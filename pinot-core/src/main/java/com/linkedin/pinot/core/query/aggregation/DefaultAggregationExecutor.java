@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.query.aggregation;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
@@ -44,7 +44,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       _functions[i] = function;
       _resultHolders[i] = _functions[i].createAggregationResultHolder();
       // TODO: currently only support single argument aggregation
-      if (!function.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+      if (!function.getName().equals(AggregationFunctionType.COUNT.getName())) {
         _expressions[i] =
             TransformExpressionTree.compileToExpressionTree(functionContexts[i].getAggregationColumns()[0]);
       }
@@ -58,7 +58,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       AggregationFunction function = _functions[i];
       AggregationResultHolder resultHolder = _resultHolders[i];
 
-      if (function.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+      if (function.getName().equals(AggregationFunctionType.COUNT.getName())) {
         function.aggregate(length, resultHolder);
       } else {
         function.aggregate(length, resultHolder, transformBlock.getBlockValueSet(_expressions[i]));

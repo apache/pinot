@@ -27,7 +27,7 @@ import javax.annotation.Nonnull;
 
 
 public class DistinctCountAggregationFunction implements AggregationFunction<IntOpenHashSet, Integer> {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.DISTINCTCOUNT.getName();
+  private static final String NAME = AggregationFunctionType.DISTINCTCOUNT.getName();
 
   @Nonnull
   @Override

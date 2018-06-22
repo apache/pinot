@@ -29,7 +29,7 @@ import javax.annotation.Nonnull;
 
 
 public class FastHLLAggregationFunction implements AggregationFunction<HyperLogLog, Long> {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.FASTHLL.getName();
+  private static final String NAME = AggregationFunctionType.FASTHLL.getName();
 
   protected int _log2m = HllConstants.DEFAULT_LOG2M;
 
