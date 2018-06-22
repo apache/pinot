@@ -19,6 +19,10 @@ package com.linkedin.pinot.core.startreeV2;
 public class StarTreeV2Constant {
 
   public static final Integer STAR_NODE = -1;
-  public static final Integer DEFAULT_AGGREGATED_VALUE = -1;
 
+  public static class AggregateFunctions {
+    public static final String MAX = "max";
+    public static final String SUM = "sum";
+    public static final String MIN = "min";
+  }
 }
