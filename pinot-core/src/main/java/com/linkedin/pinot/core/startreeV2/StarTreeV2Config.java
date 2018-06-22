@@ -29,9 +29,10 @@ public class StarTreeV2Config {
   private List<String> _dimensionsWithoutStarNode;
   private List<Met2AggfuncPair> _metric2aggFuncPairs;
 
-  public StarTreeV2Config () {
+  public StarTreeV2Config() {
 
   }
+
   /**
    * Set the temporary directory for star tree.
    */

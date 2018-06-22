@@ -19,7 +19,7 @@ import java.util.List;
 
 
 public class Record {
-  int [] _dimensionValues;
+  int[] _dimensionValues;
   List<Object> _metricValues;
 
   /**
@@ -44,7 +44,7 @@ public class Record {
    *
    * @return 'String' value
    */
-  public int [] getDimensionValues() {
+  public int[] getDimensionValues() {
     return _dimensionValues;
   }
 
@@ -52,7 +52,7 @@ public class Record {
    * Set the dimension values for the record.
    *
    */
-  public void setDimensionValues(int [] dimensionValues) {
+  public void setDimensionValues(int[] dimensionValues) {
     _dimensionValues = dimensionValues;
   }
 }

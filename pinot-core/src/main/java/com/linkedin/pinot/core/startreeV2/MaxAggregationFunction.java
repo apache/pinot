@@ -31,7 +31,7 @@ public class MaxAggregationFunction implements AggregationFunction {
   @Override
   public Object aggregate(List<Object> data) {
     double max = Double.NEGATIVE_INFINITY;
-    List<Double>newData = RecordUtil.getDoubleValues(data);
+    List<Double> newData = RecordUtil.getDoubleValues(data);
     for (int i = 0; i < newData.size(); i++) {
       double value = newData.get(i);
       if (value > max) {

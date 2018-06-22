@@ -31,8 +31,8 @@ public class RecordUtil {
   public static List<Integer> getIntValues(List<Object> data) {
 
     List<Integer> intData = new ArrayList<>();
-    for ( int i = 0; i < data.size(); i++) {
-      intData.add((int)data.get(i));
+    for (int i = 0; i < data.size(); i++) {
+      intData.add((int) data.get(i));
     }
 
     return intData;
@@ -47,8 +47,8 @@ public class RecordUtil {
   public static List<Long> getLongValues(List<Object> data) {
 
     List<Long> longData = new ArrayList<>();
-    for ( int i = 0; i < data.size(); i++) {
-      longData.add((long)data.get(i));
+    for (int i = 0; i < data.size(); i++) {
+      longData.add((long) data.get(i));
     }
 
     return longData;
@@ -62,8 +62,8 @@ public class RecordUtil {
    */
   public static List<Float> getFloatValues(List<Object> data) {
     List<Float> floatData = new ArrayList<>();
-    for ( int i = 0; i < data.size(); i++) {
-      floatData.add((float)data.get(i));
+    for (int i = 0; i < data.size(); i++) {
+      floatData.add((float) data.get(i));
     }
 
     return floatData;
@@ -77,10 +77,22 @@ public class RecordUtil {
    */
   public static List<Double> getDoubleValues(List<Object> data) {
     List<Double> doubleData = new ArrayList<>();
-    for ( int i = 0; i < data.size(); i++) {
-      doubleData.add((double)data.get(i));
+    for (int i = 0; i < data.size(); i++) {
+      doubleData.add((double) data.get(i));
     }
 
     return doubleData;
+  }
+
+  public static boolean compareDimensions(int[] aD, int[] bD) {
+    if (aD.length != bD.length) {
+      return false;
+    }
+    for (int i = 0; i < aD.length; i++) {
+      if (aD[i] != bD[i]) {
+        return false;
+      }
+    }
+    return true;
   }
 }
