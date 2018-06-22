@@ -85,7 +85,7 @@ public class OnHeapStarTreeV2BuilderHelper {
     return newData;
   }
 
-  private static List<Object> aggregateMetrics(int start, int end, List<Record> starTreeData, List<Met2AggfuncPair> met2aggfuncPairs) {
+  public static List<Object> aggregateMetrics(int start, int end, List<Record> starTreeData, List<Met2AggfuncPair> met2aggfuncPairs) {
     List<Object> aggregatedMetricsValue = new ArrayList<>();
 
     List<List<Object>> metricValues = new ArrayList<>();
@@ -107,14 +107,26 @@ public class OnHeapStarTreeV2BuilderHelper {
     for (int i = 0; i < met2aggfuncPairs.size(); i++) {
       Met2AggfuncPair pair = met2aggfuncPairs.get(i);
       String aggfunc = pair.getAggregatefunction();
+      List<Object>data = metricValues.get(i);
+
       if (aggfunc == StarTreeV2Constant.AggregateFunctions.MAX) {
+        MaxAggregationFunction maxAggFunc = new MaxAggregationFunction();
+        aggregatedMetricsValue.add(maxAggFunc.aggregate(data));
 
       } else if (aggfunc == StarTreeV2Constant.AggregateFunctions.MIN) {
+        MinAggregationFunction minAggFunc = new MinAggregationFunction();
+        aggregatedMetricsValue.add(minAggFunc.aggregate(data));
 
       } else if (aggfunc == StarTreeV2Constant.AggregateFunctions.SUM) {
-
+        SumAggregationFunction sumAggFunc = new SumAggregationFunction();
+        aggregatedMetricsValue.add(sumAggFunc.aggregate(data));
       }
     }
+
+    // count(*)
+    List<Object>data = metricValues.get(met2aggfuncPairs.size());
+    SumAggregationFunction sumAggFunc = new SumAggregationFunction();
+    aggregatedMetricsValue.add(sumAggFunc.aggregate(data));
 
     return aggregatedMetricsValue;
   }
@@ -164,45 +176,5 @@ public class OnHeapStarTreeV2BuilderHelper {
       newData.add(newRecord);
     }
     return sortStarTreeData(0, newData.size(), sortOrder, newData);
-  }
-
-  /**
-   * Calculate SUM of the range.
-   */
-  public static Object calculateSum(List<Object>data) {
-    int sum = 0;
-    for (int i = 0; i < data.size(); i++) {
-      Object currentValue = data.get(i);
-      sum += (int)currentValue;
-    }
-    return sum;
-  }
-
-  /**
-   * Calculate MAX of the range.
-   */
-  public static Object calculateMax(List<Object>data) {
-    int max = Integer.MIN_VALUE;
-    for (int i = 0; i < data.size(); i++) {
-      Object currentValue = data.get(i);
-      if ((int)currentValue > max ) {
-        max = (int)currentValue;
-      }
-    }
-    return max;
-  }
-
-  /**
-   * Calculate MIN of the range.
-   */
-  public static Object calculateMin(List<Object>data) {
-    int min = Integer.MAX_VALUE;
-    for (int i = 0; i < data.size(); i++) {
-      Object currentValue = data.get(i);
-      if ((int)currentValue < min ) {
-        min = (int)currentValue;
-      }
-    }
-    return min;
   }
 }
