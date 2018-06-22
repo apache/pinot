@@ -133,7 +133,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
     // generating raw data for star tree.
     List<PinotSegmentColumnReader> dimensionColumnReaders = new ArrayList<>();
-    for (String name: _dimensionsName) {
+    for (String name : _dimensionsName) {
       PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, name);
       dimensionColumnReaders.add(columnReader);
     }
@@ -178,7 +178,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     }
 
     // sorting the data as per the sort order.
-    List<Record> rawSortedStarTreeData = OnHeapStarTreeV2BuilderHelper.sortStarTreeData(0, _rawDocsCount, _dimensionsSplitOrder, _rawStarTreeData);
+    List<Record> rawSortedStarTreeData =
+        OnHeapStarTreeV2BuilderHelper.sortStarTreeData(0, _rawDocsCount, _dimensionsSplitOrder, _rawStarTreeData);
     _starTreeData = OnHeapStarTreeV2BuilderHelper.condenseData(rawSortedStarTreeData, _met2aggfuncPairs);
 
     // Recursively construct the star tree
@@ -254,8 +255,9 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     children.put(StarTreeV2Constant.STAR_NODE, starChild);
     _nodesCount++;
 
-    List<Record> sortedFilteredData = OnHeapStarTreeV2BuilderHelper.filterData(
-        startDocId, endDocId, splitDimensionId, _dimensionsSplitOrder, _starTreeData);
+    List<Record> sortedFilteredData =
+        OnHeapStarTreeV2BuilderHelper.filterData(startDocId, endDocId, splitDimensionId, _dimensionsSplitOrder,
+            _starTreeData);
     List<Record> condensedData = OnHeapStarTreeV2BuilderHelper.condenseData(sortedFilteredData, _met2aggfuncPairs);
     _starTreeData.addAll(condensedData);
 
@@ -278,7 +280,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
    */
   private Map<Object, Pairs.IntPair> groupOnDimension(int startDocId, int endDocId, Integer dimensionId) {
     Map<Object, Pairs.IntPair> rangeMap = new HashMap<>();
-    int [] rowDimensions = _starTreeData.get(startDocId).getDimensionValues();
+    int[] rowDimensions = _starTreeData.get(startDocId).getDimensionValues();
     int currentValue = rowDimensions[dimensionId];
 
     int groupStartDocId = startDocId;
@@ -333,7 +335,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     Queue<TreeNode> childNodes = new LinkedList<>();
 
     Map<Object, TreeNode> children = _rootNode._children;
-    for (Object key: children.keySet()) {
+    for (Object key : children.keySet()) {
       TreeNode child = children.get(key);
       childNodes.add(child);
     }
@@ -341,12 +343,12 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     while (!childNodes.isEmpty()) {
       TreeNode parent = childNodes.remove();
       children = parent._children;
-      List<Object>aggregatedValues = getAggregatedDocument(parent._startDocId, parent._endDocId);
+      List<Object> aggregatedValues = getAggregatedDocument(parent._startDocId, parent._endDocId);
       int aggDocId = appendAggregatedDocuments(aggregatedValues);
       parent._aggDataDocumentId = aggDocId;
 
-      if ( children != null ) {
-        for (Object key: children.keySet()) {
+      if (children != null) {
+        for (Object key : children.keySet()) {
           TreeNode child = children.get(key);
           childNodes.add(child);
         }
@@ -365,7 +367,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
    */
   private List<Object> getAggregatedDocument(int startDocId, int endDocId) {
 
-    List<Object> aggregatedValues = OnHeapStarTreeV2BuilderHelper.aggregateMetrics(startDocId, endDocId, _starTreeData, _met2aggfuncPairs);
+    List<Object> aggregatedValues =
+        OnHeapStarTreeV2BuilderHelper.aggregateMetrics(startDocId, endDocId, _starTreeData, _met2aggfuncPairs);
 
     return aggregatedValues;
   }
@@ -377,12 +380,12 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
    * @return aggregated document id.
    */
-  private int appendAggregatedDocuments(List<Object>aggregatedValues) {
+  private int appendAggregatedDocuments(List<Object> aggregatedValues) {
     int size = _starTreeData.size();
 
     Record aggRecord = new Record();
-    int [] dimensionsValue = new int[_dimensionsCount];
-    for ( int i = 0; i < _dimensionsCount; i++) {
+    int[] dimensionsValue = new int[_dimensionsCount];
+    for (int i = 0; i < _dimensionsCount; i++) {
       dimensionsValue[i] = StarTreeV2Constant.STAR_NODE;
     }
     aggRecord.setDimensionValues(dimensionsValue);

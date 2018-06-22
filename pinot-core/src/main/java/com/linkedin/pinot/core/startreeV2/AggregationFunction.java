@@ -31,5 +31,5 @@ public interface AggregationFunction {
   /**
    * Perform aggregation on the given data
    */
-  Object aggregate(List<Object>data);
+  Object aggregate(List<Object> data);
 }

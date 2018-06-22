@@ -20,7 +20,7 @@ import java.util.List;
 import javax.annotation.Nonnull;
 
 
-public class SumAggregationFunction implements AggregationFunction{
+public class SumAggregationFunction implements AggregationFunction {
 
   @Nonnull
   @Override
@@ -31,10 +31,9 @@ public class SumAggregationFunction implements AggregationFunction{
   @Override
   public Object aggregate(List<Object> data) {
     double sum = 0;
-    List<Double>newData = RecordUtil.getDoubleValues(data);
+    List<Double> newData = RecordUtil.getDoubleValues(data);
     for (int i = 0; i < newData.size(); i++) {
-      double value = newData.get(i);
-      sum = sum + value;
+      sum += newData.get(i);
     }
     return sum;
   }

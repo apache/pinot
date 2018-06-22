@@ -20,7 +20,7 @@ import java.util.List;
 import javax.annotation.Nonnull;
 
 
-public class MinAggregationFunction implements AggregationFunction{
+public class MinAggregationFunction implements AggregationFunction {
 
   @Nonnull
   @Override
@@ -31,7 +31,7 @@ public class MinAggregationFunction implements AggregationFunction{
   @Override
   public Object aggregate(List<Object> data) {
     double min = Double.POSITIVE_INFINITY;
-    List<Double>newData = RecordUtil.getDoubleValues(data);
+    List<Double> newData = RecordUtil.getDoubleValues(data);
     for (int i = 0; i < newData.size(); i++) {
       double value = newData.get(i);
       if (value < min) {
