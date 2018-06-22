@@ -16,13 +16,13 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.startree.StarTreeIndexTestSegmentHelper;
 import java.io.File;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.ArrayList;
 import org.testng.annotations.Test;
 import org.testng.annotations.BeforeClass;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.startree.StarTreeIndexTestSegmentHelper;
 
 
 public class OnHeapStarTreeV2BuilderTest {
@@ -32,11 +32,10 @@ public class OnHeapStarTreeV2BuilderTest {
   private static final String SEGMENT_NAME = "starTreeSegment";
   private static final String DATA_DIR = System.getProperty("java.io.tmpdir") + File.separator + "OnHeapStarTreeV2BuilderTest";
 
-
   @BeforeClass
   void setUp() throws Exception {
+    //Schema schema = StarTreeV2SegmentHelper.buildSegment(DATA_DIR, SEGMENT_NAME);
     Schema schema = StarTreeIndexTestSegmentHelper.buildSegment(DATA_DIR, SEGMENT_NAME);
-
     _indexDir = new File(DATA_DIR, SEGMENT_NAME);
     _starTreeV2Config = new StarTreeV2Config();
 

@@ -31,60 +31,118 @@ public class OnHeapStarTreeV2BuilderHelperTest {
 
     Record r1 = new Record();
     r1.setDimensionValues(new int[]{ 4, 1, 0});
-    r1.setMetricValues(Arrays.asList(1, 2, 3));
+    r1.setMetricValues(Arrays.asList(1, 2, 3, 1));
     data.add(r1);
 
     Record r2 = new Record();
     r2.setDimensionValues(new int[]{ 5, 1, 1});
-    r2.setMetricValues(Arrays.asList(3, 2, 1));
+    r2.setMetricValues(Arrays.asList(3, 2, 1, 1));
     data.add(r2);
 
     Record r3 = new Record();
     r3.setDimensionValues(new int[]{ 1, 2, 1});
-    r3.setMetricValues(Arrays.asList(1, 2, 3));
+    r3.setMetricValues(Arrays.asList(1, 2, 3, 1));
     data.add(r3);
 
     Record r4 = new Record();
     r4.setDimensionValues(new int[]{ 1, 3, 1});
-    r4.setMetricValues(Arrays.asList(3, 2, 1));
+    r4.setMetricValues(Arrays.asList(3, 2, 1, 1));
     data.add(r4);
 
     Record r5 = new Record();
     r5.setDimensionValues(new int[]{ 1, 1, 2});
-    r5.setMetricValues(Arrays.asList(1, 2, 3));
+    r5.setMetricValues(Arrays.asList(1, 2, 3, 1));
     data.add(r5);
 
     Record r6 = new Record();
     r6.setDimensionValues(new int[]{ 4, 4, 3});
-    r6.setMetricValues(Arrays.asList(3, 2, 1));
+    r6.setMetricValues(Arrays.asList(3, 2, 1, 1));
     data.add(r6);
 
     return data;
   }
 
+  public List<Met2AggfuncPair> createMet2AggfuncPairs() {
+    List<Met2AggfuncPair> metric2aggFuncPairs = new ArrayList<>();
+    Met2AggfuncPair pair1 = new Met2AggfuncPair("m1", "sum");
+    metric2aggFuncPairs.add(pair1);
+    Met2AggfuncPair pair2 = new Met2AggfuncPair("m1", "min");
+    metric2aggFuncPairs.add(pair2);
+    Met2AggfuncPair pair3 = new Met2AggfuncPair("m2", "max");
+    metric2aggFuncPairs.add(pair3);
+
+    return metric2aggFuncPairs;
+  }
 
   public List<Record> expectedSortedData() {
     List<Record> data = new ArrayList<>();
 
     Record r1 = new Record();
     r1.setDimensionValues(new int[]{ 1, 1, 2});
-    r1.setMetricValues(Arrays.asList(1, 2, 3));
+    r1.setMetricValues(Arrays.asList(1, 2, 3, 1));
     data.add(r1);
 
     Record r2 = new Record();
     r2.setDimensionValues(new int[]{ 1, 2, 1});
-    r2.setMetricValues(Arrays.asList(1, 2, 3));
+    r2.setMetricValues(Arrays.asList(1, 2, 3, 1));
     data.add(r2);
 
     Record r3 = new Record();
     r3.setDimensionValues(new int[]{ 1, 3, 1});
-    r3.setMetricValues(Arrays.asList(3, 2, 1));
+    r3.setMetricValues(Arrays.asList(3, 2, 1, 1));
     data.add(r3);
 
-    Record r5 = new Record();
-    r5.setDimensionValues(new int[]{ 4, 4, 3});
-    r5.setMetricValues(Arrays.asList(3, 2, 1));
-    data.add(r5);
+    Record r4 = new Record();
+    r4.setDimensionValues(new int[]{ 4, 4, 3});
+    r4.setMetricValues(Arrays.asList(3, 2, 1, 1));
+    data.add(r4);
+
+    return data;
+  }
+
+  public List<Record> expectedFilteredData() {
+    List<Record> data = new ArrayList<>();
+
+    Record r1 = new Record();
+    r1.setDimensionValues(new int[]{ 1, -1, 1});
+    r1.setMetricValues(Arrays.asList(1, 2, 3, 1));
+    data.add(r1);
+
+    Record r2 = new Record();
+    r2.setDimensionValues(new int[]{ 1, -1, 1});
+    r2.setMetricValues(Arrays.asList(3, 2, 1, 1));
+    data.add(r2);
+
+    Record r3 = new Record();
+    r3.setDimensionValues(new int[]{ 1, -1, 2});
+    r3.setMetricValues(Arrays.asList(1, 2, 3, 1));
+    data.add(r3);
+
+    Record r4 = new Record();
+    r4.setDimensionValues(new int[]{ 5, -1, 1});
+    r4.setMetricValues(Arrays.asList(3, 2, 1, 1));
+    data.add(r4);
+
+    return data;
+  }
+
+  public List<Record> expectedCondensedData() {
+    List<Record> data = new ArrayList<>();
+
+    Record r1 = new Record();
+    r1.setDimensionValues(new int[]{ 1, -1, 1});
+    r1.setMetricValues(Arrays.asList(4, 2, 3, 2));
+    data.add(r1);
+
+    Record r2 = new Record();
+    r2.setDimensionValues(new int[]{ 1, -1, 2});
+    r2.setMetricValues(Arrays.asList(1, 2, 3, 1));
+    data.add(r2);
+
+    Record r3 = new Record();
+    r3.setDimensionValues(new int[]{ 5, -1, 1});
+    r3.setMetricValues(Arrays.asList(3, 2, 1, 1));
+    data.add(r3);
 
     return data;
   }
@@ -99,29 +157,27 @@ public class OnHeapStarTreeV2BuilderHelperTest {
     assertRecordsList(expected, actualData);
   }
 
-//  @Test
-//  public void testCondenseData() {
-//    List<Record> data = createData();
-//    List<List<Object>> filteredData = OnHeapStarTreeV2BuilderHelper.filterData(
-//       2, 8, 0,Arrays.asList(0, 1, 2), data);
-//   List<List<Object>> actual = OnHeapStarTreeV2BuilderHelper.condenseData(filteredData);
-//   List<List<Object>> expected = new ArrayList<>();
-//   expected.add(Arrays.asList(-1, -1, -1, -1));
-//   expected.add(Arrays.asList(1, 1, 2, 2));
-//   expected.add(Arrays.asList(0, 1, 1, 2));
-//   assert2DListEqual(expected, actual);
-//  }
-//
-//  @Test
-//  public void testFilterData() {
-//    List<List<Object>> data = createData();
-//    List<List<Object>> actual = OnHeapStarTreeV2BuilderHelper.filterData(
-//        2, 8, 0, Arrays.asList(0, 1, 2), data);
-//    List<List<Object>> expected = new ArrayList<>();
-//    expected.add(Arrays.asList(-1, -1, -1, -1, -1, -1));
-//    expected.add(Arrays.asList(1, 1, 1, 2, 2, 2));
-//    expected.add(Arrays.asList(0, 0, 1, 1, 1, 2));
-//  }
+  @Test
+  public void testFilterData() {
+    List<Record> data = createData();
+    List<Record> actualData = OnHeapStarTreeV2BuilderHelper.filterData(
+        1, 5, 1, Arrays.asList(0, 1, 2), data);
+
+    List<Record> expected = expectedFilteredData();
+    printRecordsList(expected);
+    assertRecordsList(expected, actualData);
+  }
+
+  @Test
+  public void testCondenseData() {
+    List<Record> data = expectedFilteredData();
+    List<Met2AggfuncPair> metric2aggFuncPairs = createMet2AggfuncPairs();
+    List<Record> actual = OnHeapStarTreeV2BuilderHelper.condenseData(data, metric2aggFuncPairs);
+
+    List<Record> expected = expectedCondensedData();
+    printRecordsList(expected);
+    assertRecordsList(expected, actual);
+  }
 
   private void assertRecordsList(List<Record> expected, List<Record> actual) {
     if (expected.size() == 0) {
