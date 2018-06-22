@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+import java.util.ArrayList;
 import java.util.List;
 
 
@@ -27,11 +28,11 @@ public class RecordUtil {
    * @param data list of Object
    * @return Integer array.
    */
-  public static int[] getIntValues(List<Object> data) {
+  public static List<Integer> getIntValues(List<Object> data) {
 
-    int [] intData = new int[data.size()];
+    List<Integer> intData = new ArrayList<>();
     for ( int i = 0; i < data.size(); i++) {
-      intData[i] = (int)data.get(i);
+      intData.add((int)data.get(i));
     }
 
     return intData;
@@ -43,11 +44,11 @@ public class RecordUtil {
    * @param data list of Object
    * @return Integer array.
    */
-  public static long[] getLongValues(List<Object> data) {
+  public static List<Long> getLongValues(List<Object> data) {
 
-    long [] longData = new long[data.size()];
+    List<Long> longData = new ArrayList<>();
     for ( int i = 0; i < data.size(); i++) {
-      longData[i] = (long)data.get(i);
+      longData.add((long)data.get(i));
     }
 
     return longData;
@@ -59,10 +60,10 @@ public class RecordUtil {
    * @param data list of Object
    * @return float array.
    */
-  public static float[] getFloatValues(List<Object> data) {
-    float [] floatData = new float[data.size()];
+  public static List<Float> getFloatValues(List<Object> data) {
+    List<Float> floatData = new ArrayList<>();
     for ( int i = 0; i < data.size(); i++) {
-      floatData[i] = (float)data.get(i);
+      floatData.add((float)data.get(i));
     }
 
     return floatData;
@@ -72,14 +73,14 @@ public class RecordUtil {
    * Get Double values for the given data.
    *
    * @param data list of Object
-   * @return float array.
+   * @return double array.
    */
-  double[] getDoubleValues(List<Object> data) {
-    double [] floatData = new double[data.size()];
+  public static List<Double> getDoubleValues(List<Object> data) {
+    List<Double> doubleData = new ArrayList<>();
     for ( int i = 0; i < data.size(); i++) {
-      floatData[i] = (double)data.get(i);
+      doubleData.add((double)data.get(i));
     }
 
-    return floatData;
+    return doubleData;
   }
 }
