@@ -17,11 +17,9 @@
 package com.linkedin.pinot.core.startreeV2;
 
 import java.util.List;
-import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Collections;
-import it.unimi.dsi.fastutil.ints.IntComparator;
 
 
 public class OnHeapStarTreeV2BuilderHelper {
@@ -87,10 +85,35 @@ public class OnHeapStarTreeV2BuilderHelper {
     return newData;
   }
 
-  private static List<Object> aggregateMetrics(int start, int end, List<Record> starTreeData) {
+  private static List<Object> aggregateMetrics(int start, int end, List<Record> starTreeData, List<Met2AggfuncPair> met2aggfuncPairs) {
     List<Object> aggregatedMetricsValue = new ArrayList<>();
 
+    List<List<Object>> metricValues = new ArrayList<>();
+    for (int i = 0; i <  met2aggfuncPairs.size(); i++) {
+        List<Object> l = new ArrayList<>();
+        metricValues.add(l);
+    }
+    List<Object> count = new ArrayList<>();
+    metricValues.add(count);
+
     for (int i = start; i < end; i++) {
+      Record r = starTreeData.get(i);
+      List<Object> metric = r.getMetricValues();
+      for (int j = 0; j < met2aggfuncPairs.size() + 1; j++) {
+        metricValues.get(j).add(metric.get(j));
+      }
+    }
+
+    for (int i = 0; i < met2aggfuncPairs.size(); i++) {
+      Met2AggfuncPair pair = met2aggfuncPairs.get(i);
+      String aggfunc = pair.getAggregatefunction();
+      if (aggfunc == StarTreeV2Constant.AggregateFunctions.MAX) {
+
+      } else if (aggfunc == StarTreeV2Constant.AggregateFunctions.MIN) {
+
+      } else if (aggfunc == StarTreeV2Constant.AggregateFunctions.SUM) {
+
+      }
     }
 
     return aggregatedMetricsValue;
@@ -99,7 +122,7 @@ public class OnHeapStarTreeV2BuilderHelper {
   /**
    * function to condense documents according to sorted order.
    */
-  public static List<Record> condenseData( List<Record> starTreeData) {
+  public static List<Record> condenseData( List<Record> starTreeData, List<Met2AggfuncPair> met2aggfuncPairs) {
     int start = 0;
     List<Record> newData = new ArrayList<>();
     Record prevRecord = starTreeData.get(0);
@@ -110,7 +133,7 @@ public class OnHeapStarTreeV2BuilderHelper {
       int [] nextDimensions = nextRecord.getDimensionValues();
 
       if (!prevDimensions.equals(nextDimensions)) {
-        List<Object> aggregatedMetricsValue = aggregateMetrics(start, i, starTreeData);
+        List<Object> aggregatedMetricsValue = aggregateMetrics(start, i, starTreeData, met2aggfuncPairs);
         prevRecord.setMetricValues(aggregatedMetricsValue);
         newData.add(prevRecord);
         newData.add(nextRecord);

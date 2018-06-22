@@ -132,18 +132,18 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     }
 
     // generating raw data for star tree.
-    List<PinotSegmentColumnReader> columnReaders = new ArrayList<>();
+    List<PinotSegmentColumnReader> dimensionColumnReaders = new ArrayList<>();
     for (String name: _dimensionsName) {
       PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, name);
-      columnReaders.add(columnReader);
+      dimensionColumnReaders.add(columnReader);
     }
 
     // gathering dimensions data.
     for (int i = 0; i < _rawDocsCount; i++) {
       Record record = new Record();
       int[] dimensionValues = new int[_dimensionsCount];
-      for (int j = 0; j < columnReaders.size(); j++) {
-        Integer dictId = columnReaders.get(j).getDictionaryId(j);
+      for (int j = 0; j < dimensionColumnReaders.size(); j++) {
+        Integer dictId = dimensionColumnReaders.get(j).getDictionaryId(j);
         dimensionValues[j] = dictId;
       }
       record.setDimensionValues(dimensionValues);
@@ -151,20 +151,20 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     }
 
     // gathering metric data.
-    columnReaders.clear();
+    List<PinotSegmentColumnReader> metricColumnReaders = new ArrayList<>();
     for (int i = 0; i < _met2aggfuncPairsCount; i++) {
       String metricName = _met2aggfuncPairs.get(i).getMetricName();
       PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, metricName);
-      columnReaders.add(columnReader);
+      metricColumnReaders.add(columnReader);
     }
 
     for (int i = 0; i < _rawDocsCount; i++) {
       Record record = _rawStarTreeData.get(i);
       List<Object> metricRawValues = new ArrayList<>();
       for (int j = 0; j < _met2aggfuncPairsCount; j++) {
-        String metricName = _met2aggfuncPairs.get(i).getMetricName();
+        String metricName = _met2aggfuncPairs.get(j).getMetricName();
         MetricFieldSpec metricFieldSpec = _metricsSpecMap.get(metricName);
-        Object val = readHelper(columnReaders.get(j), metricFieldSpec.getDataType(), j);
+        Object val = readHelper(metricColumnReaders.get(j), metricFieldSpec.getDataType(), j);
         metricRawValues.add(val);
       }
       metricRawValues.add(1);   // for the count(*)
@@ -179,7 +179,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
     // sorting the data as per the sort order.
     List<Record> rawSortedStarTreeData = OnHeapStarTreeV2BuilderHelper.sortStarTreeData(0, _rawDocsCount, _dimensionsSplitOrder, _rawStarTreeData);
-    _starTreeData = OnHeapStarTreeV2BuilderHelper.condenseData(rawSortedStarTreeData);
+    _starTreeData = OnHeapStarTreeV2BuilderHelper.condenseData(rawSortedStarTreeData, _met2aggfuncPairs);
 
     // Recursively construct the star tree
     constructStarTree(_rootNode, 0, _starTreeData.size(), 0);
@@ -256,7 +256,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
     List<Record> sortedFilteredData = OnHeapStarTreeV2BuilderHelper.filterData(
         startDocId, endDocId, splitDimensionId, _dimensionsSplitOrder, _starTreeData);
-    List<Record> condensedData = OnHeapStarTreeV2BuilderHelper.condenseData(sortedFilteredData);
+    List<Record> condensedData = OnHeapStarTreeV2BuilderHelper.condenseData(sortedFilteredData, _met2aggfuncPairs);
     _starTreeData.addAll(condensedData);
 
     int starChildEndDocId = _starTreeData.size();
