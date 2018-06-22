@@ -17,12 +17,10 @@
 package com.linkedin.pinot.core.startreeV2;
 
 import java.util.List;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Collections;
-import it.unimi.dsi.fastutil.Arrays;
-import it.unimi.dsi.fastutil.Swapper;
-import com.google.common.collect.BiMap;
 import it.unimi.dsi.fastutil.ints.IntComparator;
 
 
@@ -45,7 +43,7 @@ public class OnHeapStarTreeV2BuilderHelper {
   /**
    * compute a defualt split order.
    */
-  public static List<Integer> computeDefaultSplitOrder(int dimensionsCount, List<BiMap<Object, Integer>> dimensionDictionaries) {
+  public static List<Integer> computeDefaultSplitOrder(int dimensionsCount, List<Integer> dimensionCardinality) {
     List<Integer> defaultSplitOrder = new ArrayList<>();
     for (int i = 0; i < dimensionsCount; i++) {
       defaultSplitOrder.add(i);
@@ -54,7 +52,7 @@ public class OnHeapStarTreeV2BuilderHelper {
     Collections.sort(defaultSplitOrder, new Comparator<Integer>() {
       @Override
       public int compare(Integer o1, Integer o2) {
-        return dimensionDictionaries.get(o2).size() - dimensionDictionaries.get(o1).size();
+        return dimensionCardinality.get(o2) - dimensionCardinality.get(o1);
       }
     });
 
@@ -64,115 +62,85 @@ public class OnHeapStarTreeV2BuilderHelper {
   /**
    * sort the star tree data.
    */
-  public static int[] sortStarTreeData(int startDocId, int endDocId, List<Integer> sortOrder, List<List<Object>> starTreeData) {
-    int docsCount = endDocId - startDocId;
-    int[] sortedDocIds = new int[docsCount];
-    for (int i = 0; i < docsCount; i++) {
-      sortedDocIds[i] = i + startDocId;
+  public static List<Record> sortStarTreeData(int startDocId, int endDocId, List<Integer> sortOrder,
+      List<Record> starTreeData) {
+
+    List<Record> newData = new ArrayList<>();
+    for ( int i = startDocId; i < endDocId; i++) {
+      newData.add(starTreeData.get(i));
     }
 
-    IntComparator comparator = new IntComparator() {
+    Collections.sort(newData, new Comparator<Record>() {
       @Override
-      public int compare(int i1, int i2) {
-        int docId1 = sortedDocIds[i1];
-        int docId2 = sortedDocIds[i2];
-
+      public int compare(Record o1, Record o2) {
         int compare = 0;
         for (int index : sortOrder) {
-          List<Object> column = starTreeData.get(index);
-          compare = (int)column.get(docId1) - (int)column.get(docId2);
+          compare = o1.getDimensionValues()[index] - o2.getDimensionValues()[index];
           if (compare != 0) {
             return compare;
           }
         }
         return compare;
       }
+    });
 
-      @Override
-      public int compare(Integer o1, Integer o2) {
-        throw new UnsupportedOperationException();
-      }
-    };
-
-    Swapper swapper = new Swapper() {
-      @Override
-      public void swap(int i, int j) {
-        int temp = sortedDocIds[i];
-        sortedDocIds[i] = sortedDocIds[j];
-        sortedDocIds[j] = temp;
-      }
-    };
-    Arrays.quickSort(0, docsCount, comparator, swapper);
-
-    return sortedDocIds;
+    return newData;
   }
 
-  /**
-   * function to rearrange documents according to sorted order.
-   */
-  public static List<List<Object>> reArrangeStarTreeData(int [] sortOrder, List<List<Object>> starTreeData) {
-    List<List<Object>> newData = new ArrayList<>();
-    for (List<Object> col: starTreeData) {
-      List<Object> newCol = new ArrayList<>();
-      for (int id: sortOrder) {
-        newCol.add(col.get(id));
-      }
-      newData.add(newCol);
+  private static List<Object> aggregateMetrics(int start, int end, List<Record> starTreeData) {
+    List<Object> aggregatedMetricsValue = new ArrayList<>();
+
+    for (int i = start; i < end; i++) {
     }
-    return newData;
+
+    return aggregatedMetricsValue;
   }
 
   /**
    * function to condense documents according to sorted order.
    */
-  public static List<List<Object>> condenseData(List<List<Object>> starTreeData) {
-    List<List<Object>> newData = new ArrayList<>();
-    for ( int i = 0; i < starTreeData.size(); i++) {
-      List<Object>col =  new ArrayList<>();
-      col.add(starTreeData.get(i).get(0));
-      newData.add(col);
-    }
+  public static List<Record> condenseData( List<Record> starTreeData) {
+    int start = 0;
+    List<Record> newData = new ArrayList<>();
+    Record prevRecord = starTreeData.get(0);
 
-    for ( int i = 1; i < starTreeData.get(0).size(); i++) {
-      boolean flag = false;
-      for ( int j = 0; j < starTreeData.size(); j++) {
-        Object prev = starTreeData.get(j).get(i-1);
-        Object current = starTreeData.get(j).get(i);
-        if ( !prev.equals(current)) {
-          flag = true;
-          break;
-        }
-      }
-      if (flag == true) {
-        for ( int k = 0; k < starTreeData.size(); k++) {
-          newData.get(k).add(starTreeData.get(k).get(i));
-        }
+    for ( int i = 1; i < starTreeData.size(); i++) {
+      Record nextRecord = starTreeData.get(i);
+      int [] prevDimensions = prevRecord.getDimensionValues();
+      int [] nextDimensions = nextRecord.getDimensionValues();
+
+      if (!prevDimensions.equals(nextDimensions)) {
+        List<Object> aggregatedMetricsValue = aggregateMetrics(start, i, starTreeData);
+        prevRecord.setMetricValues(aggregatedMetricsValue);
+        newData.add(prevRecord);
+        newData.add(nextRecord);
+        prevRecord = nextRecord;
+        start = i;
       }
     }
-
     return newData;
   }
 
   /**
    * Filter data by removing the dimension we don't need.
    */
-  public static List<List<Object>> filterData(int startDocId, int endDocId, int dimensionIdToRemove, List<Integer>sortOrder, List<List<Object>>starTreeData) {
+  public static List<Record> filterData(int startDocId, int endDocId, int dimensionIdToRemove, List<Integer>sortOrder, List<Record>starTreeData) {
 
-    List<List<Object>> newFilteredData = new ArrayList<>();
-    for (int i = 0; i < starTreeData.size(); i++) {
-      List<Object> col = starTreeData.get(i);
-      List<Object> newCol = new ArrayList<>();
-      for (int j = startDocId; j < endDocId; j++) {
-        if (i != dimensionIdToRemove) {
-          newCol.add(col.get(j));
-        } else {
-          newCol.add(StarTreeV2Constant.STAR_NODE);
-        }
-      }
-      newFilteredData.add(newCol);
+    List<Record> newData = new ArrayList<>();
+
+    for (int i = startDocId; i < endDocId; i++) {
+      Record record = starTreeData.get(i);
+      int [] dimension = record.getDimensionValues().clone();
+      List<Object> metric = record.getMetricValues();
+      dimension[dimensionIdToRemove] = StarTreeV2Constant.STAR_NODE;
+
+      Record newRecord = new Record();
+      newRecord.setDimensionValues(dimension);
+      newRecord.setMetricValues(metric);
+
+      newData.add(newRecord);
     }
-    int[] sortedDocId = sortStarTreeData(0, endDocId - startDocId, sortOrder, newFilteredData);
-    return reArrangeStarTreeData(sortedDocId, newFilteredData);
+    return sortStarTreeData(0, newData.size(), sortOrder, newData);
   }
 
   /**
