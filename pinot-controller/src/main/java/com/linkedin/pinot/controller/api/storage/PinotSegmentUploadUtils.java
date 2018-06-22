@@ -25,6 +25,7 @@ import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.resources.FileUploadPathProvider;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.filesystem.LocalPinotFS;
 import com.linkedin.pinot.filesystem.PinotFS;
 import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
@@ -63,16 +64,24 @@ public class PinotSegmentUploadUtils {
    */
   public void pushMetadata(SegmentMetadata segmentMetadata, SegmentUploaderConfig segmentUploaderConfig)
       throws JSONException {
+    FileUploadPathProvider provider;
+    try {
+      provider = new FileUploadPathProvider(_controllerConf);
+    } catch (Exception e) {
+      LOGGER.error("Controller configuration is misconfigured");
+      throw new RuntimeException(e);
+    }
 
     logIncomingSegmentInformation(segmentUploaderConfig.getHeaders());
     UUID version = UUID.randomUUID();
+    SegmentVersion segmentVersion = new SegmentVersion(Long.toString(System.currentTimeMillis()), version.toString());
     PinotFS pinotFS;
     URI srcUri;
     URI dstUri;
     try {
       srcUri = new URI(segmentUploaderConfig.getHeaders().getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI));
       pinotFS = PinotFSFactory.getInstance().init(_controllerConf, srcUri);
-      dstUri = constructFinalLocation(segmentMetadata, new SegmentVersion(Long.toString(System.currentTimeMillis()), version.toString()));
+      dstUri = constructFinalLocation(segmentMetadata, segmentVersion);
       pinotFS.copy(srcUri, dstUri);
     } catch (Exception e) {
       LOGGER.error("Could not copy file to final directory");
@@ -88,7 +97,8 @@ public class PinotSegmentUploadUtils {
 
     // Brand new segment, not refresh, directly add the segment
     if (znRecord == null) {
-      _pinotHelixResourceManager.addNewSegment(segmentMetadata, dstUri.getPath());
+      String downloadUrl = constructDownloadUrl(tableName, segmentName, provider, pinotFS, dstUri, segmentVersion);
+      _pinotHelixResourceManager.addNewSegment(segmentMetadata, downloadUrl);
       return;
     }
 
@@ -127,6 +137,15 @@ public class PinotSegmentUploadUtils {
     }
   }
 
+  private String constructDownloadUrl(String tableName, String segmentName, FileUploadPathProvider provider, PinotFS pinotFS, URI dstUri, SegmentVersion segmentVersion) {
+    // For the local filesystem implementation, we always assume that servers are downloading remotely, aka, through NFS.
+    if (pinotFS instanceof LocalPinotFS) {
+      return ControllerConf.constructDownloadUrlWithVersion(tableName, segmentName, provider.getVip(), segmentVersion);
+    } else {
+      return dstUri.getPath();
+    }
+  }
+
   private void logIncomingSegmentInformation(HttpHeaders headers) {
     if (headers != null) {
       // TODO: Add these headers into open source hadoop jobs
@@ -145,5 +164,4 @@ public class PinotSegmentUploadUtils {
       return TableNameBuilder.REALTIME.tableNameWithType(tableName);
     }
   }
-
 }
