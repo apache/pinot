@@ -4,19 +4,37 @@
  * @exports manage/alert/edit/edit
  */
 import _ from 'lodash';
+import RSVP from 'rsvp';
+import fetch from 'fetch';
 import Route from '@ember/routing/route';
+import { task, timeout } from 'ember-concurrency';
+import { get, getWithDefault } from '@ember/object';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
+import { formatConfigGroupProps } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Route.extend({
-  model(params) {
-    const { id, alertData, email, allConfigGroups, allAppNames } = this.modelFor('manage.alert');
+
+/**
+ * Optional params to load a fresh view
+ */
+  queryParams: {
+    refresh: {
+      refreshModel: true,
+      replace: false
+    }
+  },
+
+  model(params, transition) {
+    const { id, alertData, allConfigGroups, allAppNames } = this.modelFor('manage.alert');
     if (!id) { return; }
 
-    return {
+    return RSVP.hash({
       alertData,
-      email,
+      email: fetch(selfServeApiCommon.configGroupByAlertId(id)).then(checkStatus),
       allConfigGroups,
       allAppNames
-    };
+    });
   },
 
   afterModel(model) {
@@ -97,8 +115,33 @@ export default Route.extend({
       granularity: `${bucketSize}_${bucketUnit}`
     });
 
-    controller.initialize();
+    // Populate 'alerts monitored' table with currently selected config group
+    get(this, 'prepareAlertList').perform(selectedConfigGroup);
   },
+
+  /**
+   * Fetch alert data for each function id that the currently selected group watches
+   * @method fetchAlertDataById
+   * @param {Object} functionIds - alert ids included in the currently selected group
+   * @return {RSVP.hash} A new list of functions (alerts)
+   */
+  fetchAlertDataById: task(function * (functionIds) {
+    const functionArray =  yield functionIds.map(id => fetch(selfServeApiCommon.alertById(id)).then(checkStatus));
+    return RSVP.hash(functionArray);
+  }),
+
+  /**
+   * Fetch alert data for each function id that the currently selected group watches
+   * @method prepareAlertList
+   * @param {Object} configGroup - currently selected config group
+   * @return {undefined}
+   */
+  prepareAlertList: task(function * (configGroup) {
+    const functionIds = getWithDefault(configGroup, 'emailConfig.functionIds', []);
+    const functionData = yield get(this, 'fetchAlertDataById').perform(functionIds);
+    const formattedData = _.values(functionData).map(data => formatConfigGroupProps(data));
+    this.controller.set('selectedGroupFunctions', formattedData);
+  }),
 
   actions: {
     /**
@@ -106,6 +149,13 @@ export default Route.extend({
      */
     refreshModel() {
       this.refresh();
+    },
+
+    /**
+    * Refresh anomaly data when changes are made
+    */
+    loadFunctionsTable(selectedConfigGroup) {
+      get(this, 'prepareAlertList').perform(selectedConfigGroup);
     }
   }
 });

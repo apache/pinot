@@ -70,6 +70,13 @@ const alertFunctionByAppName = appName => `/data/autocomplete/functionByAppname?
 const alertById = functionId => `/onboard/function/${functionId}`;
 
 /**
+ * GET config group records containing functionId in emailConfig property
+ * @param {String} id: alert function id
+ * @see {@link https://tinyurl.com/yc36oo2c|class EmailResource}
+ */
+const configGroupByAlertId = functionId => `/thirdeye/email/function/${functionId}`;
+
+/**
  * GET the timestamp for the end of the time range of available data for a given metric
  * @param {Numer} metricId
  * @see {@link https://tinyurl.com/y8vxqvg7|class DataResource}
@@ -133,6 +140,7 @@ export const selfServeApiCommon = {
   allConfigGroups,
   allApplications,
   alertFunctionByName,
+  configGroupByAlertId,
   alertFunctionByAppName,
   metricAutoComplete
 };
