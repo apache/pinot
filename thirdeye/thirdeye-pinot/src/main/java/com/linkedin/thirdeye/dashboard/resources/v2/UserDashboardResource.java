@@ -265,6 +265,8 @@ public class UserDashboardResource {
         summary.setComment(anomaly.getFeedback().getComment());
       }
 
+      summary.setClassification(ResourceUtils.getStatusClassification(anomaly));
+
       output.add(summary);
     }
 
