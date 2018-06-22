@@ -96,14 +96,14 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
 
   private class SegmentRefreshMessageHandler extends MessageHandler {
     private final String _segmentName;
-    private final String _tableName;
+    private final String _tableNameWithType;
     private final Logger _logger;
 
     public SegmentRefreshMessageHandler(SegmentRefreshMessage refreshMessage, NotificationContext context) {
       super(refreshMessage, context);
       _segmentName = refreshMessage.getPartitionName();
-      _tableName = refreshMessage.getResourceName();
-      _logger = LoggerFactory.getLogger(_tableName + "-" + SegmentRefreshMessageHandler.class);
+      _tableNameWithType = refreshMessage.getResourceName();
+      _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + SegmentRefreshMessageHandler.class);
     }
 
     @Override
@@ -113,7 +113,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       try {
         acquireSema(_segmentName, LOGGER);
         // The number of retry times depends on the retry count in SegmentOperations.
-        _fetcherAndLoader.addOrReplaceOfflineSegment(_tableName, _segmentName);
+        _fetcherAndLoader.addOrReplaceOfflineSegment(_tableNameWithType, _segmentName);
         result.setSuccess(true);
       } finally {
         releaseSema();
