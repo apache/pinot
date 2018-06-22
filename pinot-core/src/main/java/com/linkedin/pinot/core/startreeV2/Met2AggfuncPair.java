@@ -21,7 +21,7 @@ package com.linkedin.pinot.core.startreeV2;
  */
 public class Met2AggfuncPair {
 
-  String _metric;
+  String _metricName;
   String _aggregatefunction;
 
   /**
@@ -31,7 +31,7 @@ public class Met2AggfuncPair {
    * @param aggfunc 'String' aggregate function
    */
   public Met2AggfuncPair(String met, String aggfunc) {
-    _metric = met;
+    _metricName = met;
     _aggregatefunction = aggfunc;
   }
 
@@ -39,16 +39,16 @@ public class Met2AggfuncPair {
    * Sets the provided value into the 'met' field.
    * @param met Value to set
    */
-  public void setMetricValue(String met) {
-    _metric = met;
+  public void setMetricName(String met) {
+    _metricName = met;
   }
 
   /**
    * Returns the Metric in  pair
    * @return 'String' value
    */
-  public String getMetricValue() {
-    return _metric;
+  public String getMetricName() {
+    return _metricName;
   }
 
   /**
