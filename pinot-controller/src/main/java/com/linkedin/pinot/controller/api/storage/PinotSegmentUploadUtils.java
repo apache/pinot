@@ -97,7 +97,7 @@ public class PinotSegmentUploadUtils {
 
     // Brand new segment, not refresh, directly add the segment
     if (znRecord == null) {
-      String downloadUrl = constructDownloadUrl(tableName, segmentName, provider, pinotFS, dstUri, segmentVersion);
+      String downloadUrl = constructDownloadUrl(tableName, segmentName, provider, pinotFS, dstUri);
       _pinotHelixResourceManager.addNewSegment(segmentMetadata, downloadUrl);
       return;
     }
@@ -137,10 +137,10 @@ public class PinotSegmentUploadUtils {
     }
   }
 
-  private String constructDownloadUrl(String tableName, String segmentName, FileUploadPathProvider provider, PinotFS pinotFS, URI dstUri, SegmentVersion segmentVersion) {
+  private String constructDownloadUrl(String tableName, String segmentName, FileUploadPathProvider provider, PinotFS pinotFS, URI dstUri) {
     // For the local filesystem implementation, we always assume that servers are downloading remotely, aka, through NFS.
     if (pinotFS instanceof LocalPinotFS) {
-      return ControllerConf.constructDownloadUrlWithVersion(tableName, segmentName, provider.getVip(), segmentVersion);
+      return ControllerConf.constructDownloadUrl(tableName, segmentName, provider.getVip());
     } else {
       return dstUri.getPath();
     }

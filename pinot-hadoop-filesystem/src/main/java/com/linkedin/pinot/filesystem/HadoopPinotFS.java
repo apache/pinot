@@ -122,8 +122,33 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, URI dstUri) throws IOException {
-    hadoopFS.copyToLocalFile(new Path(srcUri), new Path(dstUri));
+  public void copyToLocalFile(URI srcUri, URI dstUri) throws Exception {
+    LOGGER.debug("starting to fetch segment from hdfs");
+    final String tempFilePath = dstUri.getPath();
+    try {
+      final Path remoteFile = new Path(srcUri);
+      final Path localFile = new Path(dstUri);
+
+      RetryPolicy fixDelayRetryPolicy = RetryPolicies.fixedDelayRetryPolicy(retryCount, retryWaitMs);
+      fixDelayRetryPolicy.attempt(() -> {
+        try {
+          if (hadoopFS == null) {
+            throw new RuntimeException("hadoopFS client is not initialized when trying to copy files");
+          }
+          long startMs = System.currentTimeMillis();
+          hadoopFS.copyToLocalFile(remoteFile, localFile);
+          LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms", srcUri.getPath(), tempFilePath,
+              new File(dstUri).length(), System.currentTimeMillis() - startMs);
+          return true;
+        } catch (IOException ex) {
+          LOGGER.warn(String.format("failed to fetch segment %s from hdfs, might retry", srcUri.getPath()), ex);
+          return false;
+        }
+      });
+    } catch (Exception ex) {
+      LOGGER.error(String.format("failed to fetch %s from hdfs to local %s", srcUri.getPath(), tempFilePath), ex);
+      throw ex;
+    }
   }
 
   @Override

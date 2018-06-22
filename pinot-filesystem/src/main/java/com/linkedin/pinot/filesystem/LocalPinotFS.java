@@ -107,7 +107,7 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, URI dstUri) throws IOException {
+  public void copyToLocalFile(URI srcUri, URI dstUri) throws Exception {
     copy(srcUri, dstUri);
   }
 
