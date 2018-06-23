@@ -26,6 +26,10 @@
     {{!-- Field: App Name --}}
     <div class="form-group col-xs-10">
       <label for="anomaly-form-app-name" class="control-label te-label required">Alert belongs to</label>
+      <span>
+        <i class="glyphicon glyphicon-question-sign"></i>
+        {{#tooltip-on-element}}Changing the application team will load the team's notification email groups below{{/tooltip-on-element}}
+      </span>
       {{#power-select
         options=allApplications
         selected=selectedApplication
@@ -83,6 +87,10 @@
     {{!--  Fields for new alert group creation --}}
     <div class="form-group te-form__new-sub col-sm-6">
       <label for="config-group-new-name" class="control-label te-label"><strong>Or</strong> create new subscription group</label>
+      <span>
+        <i class="glyphicon glyphicon-question-sign"></i>
+        {{#tooltip-on-element}}Before creating a new group, please check if you can simply add recipients to an existing one.{{/tooltip-on-element}}
+      </span>
       {{#if isGroupNameDuplicate}}
         <div class="te-form__alert--warning alert-warning">Warning: <strong>{{newConfigGroupName}}</strong> already exists. Please try another name.</div>
       {{/if}}
@@ -109,6 +117,10 @@
     <div class="form-group col-xs-12">
       <label for="config-group" class="control-label te-label">
         Recipients in subscription group:
+        <span>
+          <i class="glyphicon glyphicon-question-sign"></i>
+          {{#tooltip-on-element}}You may add recipients to this anomaly notification group. At this time we do not support removing recipients.{{/tooltip-on-element}}
+        </span>
         <div class="te-form__text-block te-form__text-block--faded">{{if selectedConfigGroupRecipients selectedConfigGroupRecipients "No recipients yet"}}</div>
       </label>
       {{#if isDuplicateEmail}}

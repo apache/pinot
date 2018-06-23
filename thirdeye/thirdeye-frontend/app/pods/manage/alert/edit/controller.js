@@ -21,6 +21,12 @@ import { formatConfigGroupProps } from 'thirdeye-frontend/utils/manage-alert-uti
 export default Controller.extend({
 
   /**
+   * Optional query param to refresh model
+   */
+  queryParams: ['refresh'],
+  refresh: null,
+
+  /**
    * Important initializations
    */
   isEmailError: false, // are new email addresses formatted ok
@@ -35,16 +41,6 @@ export default Controller.extend({
   isProcessingForm: false, // to trigger submit disable
   updatedRecipients: [], // placeholder for all email recipients
   isExiting: false, // exit detection
-
-  /**
-   * Set initial view values for selected config group alerts
-   * @method initialize
-   * @return {undefined}
-   */
-  initialize: async function() {
-    const functionData = await this.prepareFunctions(this.get('selectedConfigGroup'));
-    this.set('selectedGroupFunctions', functionData);
-  },
 
   /**
    * The config group that the current alert belongs to
@@ -134,17 +130,16 @@ export default Controller.extend({
   /**
    * Displays email recipients for each selected config group. It also updates the list
    * if new recipients are added and successfully saved.
-   * @method selectedConfigGroupRecipients
    * @return {String} comma-separated email addresses
    */
   selectedConfigGroupRecipients: computed(
-    'selectedConfigGroup',
-    'updatedRecipients',
+    'selectedConfigGroup.recipients', // string
+    'updatedRecipients', // array
     function() {
-      const newRecipients = this.get('updatedRecipients');
-      const originalRecipients = getWithDefault(this, 'selectedConfigGroup.recipients', []);
-      const finalRecipients = isPresent(newRecipients) ? newRecipients : originalRecipients;
-      return finalRecipients.replace(/,+$/g, '').replace(/,/g, ', ');
+      const newRecipientsArr = this.get('updatedRecipients');
+      const originalRecipientsArr = getWithDefault(this, 'selectedConfigGroup.recipients', '').split(',');
+      const finalRecipientsArr = isPresent(newRecipientsArr) ? newRecipientsArr : originalRecipientsArr;
+      return finalRecipientsArr.join(', ');
     }
   ),
 
@@ -270,10 +265,6 @@ export default Controller.extend({
    */
   confirmEditSuccess() {
     this.set('isEditAlertSuccess', true);
-    later(this, function() {
-      this.clearAll();
-      this.transitionToRoute('manage.alerts');
-    }, 2000);
   },
 
   /**
@@ -304,7 +295,6 @@ export default Controller.extend({
       alertConfigGroups: null,
       alertFunctionName: null,
       alertId: null,
-      allApplications: null,
       selectedConfigGroup: null,
       selectedApplication: null,
       selectedAppName: null,
@@ -380,7 +370,7 @@ export default Controller.extend({
       let nameIsDupe = false;
 
       if (name && name.trim().length) {
-        nameIsDupe = this.get('allAlertsConfigGroups')
+        nameIsDupe = this.get('alertConfigGroups')
           .map(group => group.name)
           .includes(name);
 
@@ -414,9 +404,7 @@ export default Controller.extend({
         selectedConfigGroupRecipients: emails.split(',').filter(e => String(e).trim()).join(', ')
       });
 
-      this.prepareFunctions(selectedObj).then(functionData => {
-        this.set('selectedGroupFunctions', functionData);
-      });
+      this.send('loadFunctionsTable', selectedObj);
     },
 
     /**
@@ -430,7 +418,9 @@ export default Controller.extend({
       });
       // Once computations settle, select the first item of the current config group set
       later(this, () => {
-        this.set('selectedConfigGroup', this.get('filteredConfigGroups')[0]);
+        const newConfigGroup = this.get('filteredConfigGroups')[0];
+        this.set('selectedConfigGroup', newConfigGroup);
+        this.send('loadFunctionsTable', newConfigGroup);
      });
 
     },
@@ -488,7 +478,7 @@ export default Controller.extend({
       const newEmailsArr = newEmails ? newEmails.replace(/ /g, '').split(',') : [];
       const existingEmailsArr = oldEmails ? oldEmails.replace(/ /g, '').split(',') : [];
       const newRecipientsArr = newEmailsArr.length ? existingEmailsArr.concat(newEmailsArr) : existingEmailsArr;
-      const cleanRecipientsArr = newRecipientsArr.filter(e => String(e).trim()).join(',');
+      const cleanRecipientsStr = newRecipientsArr.map(email => String(email).trim()).join(',');
       const postConfigBody = newGroupName ? newConfigGroupObj : selectedConfigGroup;
       const groupAlertIdArray = postConfigBody && postConfigBody.emailConfig ? postConfigBody.emailConfig.functionIds.concat([currentId]) : [];
       const dedupedGroupAlertIdArray = groupAlertIdArray.length ? Array.from(new Set(groupAlertIdArray)) : [currentId];
@@ -524,7 +514,7 @@ export default Controller.extend({
 
             // Whether its a new Config object or existing, assign new user-supplied values to these props:
             set(postConfigBody, 'application', newApplication);
-            set(postConfigBody, 'recipients', cleanRecipientsArr);
+            set(postConfigBody, 'recipients', cleanRecipientsStr);
 
             // Make sure current Id is part of new config array
             if (postConfigBody && postConfigBody.emailConfig) {
@@ -541,7 +531,7 @@ export default Controller.extend({
               .then((res) => checkStatus(res, 'post'))
               .then((saveConfigResponseA) => {
                 this.setProperties({
-                  selectedConfigGroupRecipients: cleanRecipientsArr,
+                  selectedConfigGroupRecipients: newRecipientsArr.join(', '),
                   alertGroupNewRecipient: null,
                   newConfigGroupName: null
                 });
@@ -553,9 +543,6 @@ export default Controller.extend({
                   return fetch(configUrl, postProps)
                     .then((res) => checkStatus(res, 'post'))
                     .then((saveConfigResponseB) => {
-
-                      // If save successful, update new config group name before model refresh (avoid big data delay)
-                      this.set('updatedRecipients', cleanRecipientsArr);
                       if (isPresent(newGroupName)) {
                         this.setProperties({
                           isNewConfigGroupSaved: true,

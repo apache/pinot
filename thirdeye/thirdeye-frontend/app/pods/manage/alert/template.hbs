@@ -107,7 +107,7 @@
       <div class="te-topcard-subnav">
         <div class="te-topcard-subnav__item">
           <span {{action "setEditModeActive"}}>
-            {{#link-to "manage.alert.edit" alertData.id class="thirdeye-link thirdeye-link--smaller thirdeye-link--nav" activeClass="thirdeye-link--active"}}
+            {{#link-to "manage.alert.edit" alertData.id (query-params refresh=true) class="thirdeye-link thirdeye-link--smaller thirdeye-link--nav" activeClass="thirdeye-link--active"}}
               Edit alert settings
             {{/link-to}}
           </span>

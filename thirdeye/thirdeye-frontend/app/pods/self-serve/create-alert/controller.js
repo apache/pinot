@@ -679,7 +679,7 @@ export default Controller.extend({
 
       // Conditionally send recipients property
       if (alertGroupNewRecipient) {
-        Object.assign(newAlertObj, { alertRecipients: alertGroupNewRecipient });
+        Object.assign(newAlertObj, { alertRecipients: alertGroupNewRecipient.replace(/ /g, '') });
       }
 
       // Do we have custom sensitivity settings to add?

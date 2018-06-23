@@ -243,6 +243,10 @@
     {{!-- Field: App Name --}}
     <div class="col-xs-12">
       <label for="anomaly-form-app-name" class="control-label te-label te-label--taller required">Alert belongs to</label>
+      <span>
+        <i class="glyphicon glyphicon-question-sign"></i>
+        {{#tooltip-on-element}}Changing the application team will load the team's notification/subscription groups below{{/tooltip-on-element}}
+      </span>
        {{#power-select
           options=allApplicationNames
           selected=selectedAppName
@@ -308,6 +312,10 @@
     {{!--  Fields for new alert group creation --}}
     <div class="col-sm-6">
       <label for="config-group-new-name" class="control-label te-label te-label--taller"><strong>Or</strong> create new subscription group</label>
+      <span>
+        <i class="glyphicon glyphicon-question-sign"></i>
+        {{#tooltip-on-element}}Before creating a new group, please check if you can simply add recipients to an existing one.{{/tooltip-on-element}}
+      </span>
       {{#if isGroupNameDuplicate}}
         <div class="te-form__alert--warning alert-warning">Warning: <strong>{{newConfigGroupName}}</strong> already exists. Please try another name.</div>
       {{/if}}
