@@ -61,10 +61,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TimeZone;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -282,6 +284,11 @@ public class AlertTaskRunnerV2 implements TaskRunner {
               );
         } else {
           emailContentFormatter.init(new Properties(), emailContemtFormatterConfig);
+        }
+
+        // whitelisted recipients only
+        if (!this.thirdeyeConfig.getEmailWhitelist().isEmpty()) {
+          recipientsForThisGroup = retainWhitelisted(recipientsForThisGroup, thirdeyeConfig.getEmailWhitelist());
         }
 
         EmailEntity emailEntity = emailContentFormatter
@@ -539,5 +546,17 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       }
     }
     return filteredGroupedAnomalies;
+  }
+
+  private static String retainWhitelisted(String recipients, Collection<String> whitelist) {
+    if (recipients.isEmpty()) {
+      return recipients;
+    }
+
+    List<String> emails = new ArrayList<>(Arrays.asList(recipients.split(EmailHelper.EMAIL_ADDRESS_SEPARATOR)));
+
+    emails.retainAll(whitelist);
+
+    return StringUtils.join(emails, EmailHelper.EMAIL_ADDRESS_SEPARATOR);
   }
 }
