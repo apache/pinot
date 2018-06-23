@@ -59,7 +59,6 @@ public class TableSizeReaderTest {
 
   private PinotHelixResourceManager helix;
   private Map<String, FakeSizeServer> serverMap = new HashMap<>();
-  private final int serverPortStart = 20000;
   private final String URI_PATH = "/table/";
   private final int timeoutMsec = 10000;
 
@@ -87,37 +86,37 @@ public class TableSizeReaderTest {
 
     int counter = 0;
     // server0
-    FakeSizeServer s = new FakeSizeServer(Arrays.asList("s1","s2", "s3"), serverPortStart + counter);
+    FakeSizeServer s = new FakeSizeServer(Arrays.asList("s1","s2", "s3"));
     s.start(URI_PATH, createHandler(200, s.sizes, 0));
     serverMap.put(serverName(counter), s);
     ++counter;
 
     // server1
-    s = new FakeSizeServer(Arrays.asList("s2","s5"), serverPortStart + counter);
+    s = new FakeSizeServer(Arrays.asList("s2","s5"));
     s.start(URI_PATH, createHandler(200, s.sizes, 0));
     serverMap.put(serverName(counter), s);
     ++counter;
 
     // server2
-    s = new FakeSizeServer(Arrays.asList("s3", "s6"), serverPortStart + counter);
+    s = new FakeSizeServer(Arrays.asList("s3", "s6"));
     s.start(URI_PATH, createHandler(404, s.sizes, 0));
     serverMap.put(serverName(counter), s);
     ++counter;
 
     // server3
-    s = new FakeSizeServer(Arrays.asList("r1", "r2"), serverPortStart + counter);
+    s = new FakeSizeServer(Arrays.asList("r1", "r2"));
     s.start(URI_PATH, createHandler(200, s.sizes, 0));
     serverMap.put(serverName(counter), s);
     ++counter;
 
     // server4
-    s = new FakeSizeServer(Arrays.asList("r2"), serverPortStart + counter);
+    s = new FakeSizeServer(Arrays.asList("r2"));
     s.start(URI_PATH, createHandler(200, s.sizes, 0));
     serverMap.put(serverName(counter), s);
     ++counter;
 
     // server5 ... timing out server
-    s = new FakeSizeServer(Arrays.asList("s3","s5"), serverPortStart + counter);
+    s = new FakeSizeServer(Arrays.asList("s3","s5"));
     s.start(URI_PATH, createHandler(200, s.sizes, timeoutMsec * 100));
     serverMap.put(serverName(counter), s);
     ++counter;
@@ -166,14 +165,12 @@ public class TableSizeReaderTest {
   private static class FakeSizeServer {
     List<String> segments;
     String endpoint;
-    int port;
+    InetSocketAddress socket = new InetSocketAddress(0);
     List<SegmentSizeInfo> sizes = new ArrayList<>();
     HttpServer httpServer;
 
-    FakeSizeServer(List<String> segments, int port) {
+    FakeSizeServer(List<String> segments) {
       this.segments = segments;
-      this.endpoint = "localhost:" + port;
-      this.port = port;
       populateSizes(segments);
     }
 
@@ -192,7 +189,7 @@ public class TableSizeReaderTest {
 
     private void  start(String path, HttpHandler handler)
         throws IOException {
-      httpServer = HttpServer.create(new InetSocketAddress(port), 0);
+      httpServer = HttpServer.create(socket, 0);
       httpServer.createContext(path, handler);
       new Thread(new Runnable() {
         @Override
@@ -200,6 +197,7 @@ public class TableSizeReaderTest {
           httpServer.start();
         }
       }).start();
+      endpoint = "localhost:" + httpServer.getAddress().getPort();
     }
   }
 
