@@ -38,6 +38,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -202,7 +203,12 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     File parentFile = indexDir.getParentFile();
     File segmentBackupDir =
         new File(parentFile, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
+
+    // This method might modify the file on disk. Use segment lock to prevent race condition
+    Lock segmentLock = SegmentLocks.getSegmentLock(tableNameWithType, segmentName);
     try {
+      segmentLock.lock();
+
       // First rename index directory to segment backup directory so that original segment have all file descriptors
       // point to the segment backup directory to ensure original segment serves queries properly
 
@@ -235,6 +241,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       FileUtils.deleteDirectory(segmentTempDir);
     } finally {
       LoaderUtils.reloadFailureRecovery(indexDir);
+      segmentLock.unlock();
     }
   }
 
