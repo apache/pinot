@@ -139,6 +139,10 @@ public class DetectionAlertTaskRunner implements TaskRunner {
       Set<String> recipients = entry.getKey();
       Set<MergedAnomalyResultDTO> anomalies = entry.getValue();
 
+      if (!this.thirdeyeConfig.getEmailWhitelist().isEmpty()) {
+        recipients.retainAll(this.thirdeyeConfig.getEmailWhitelist());
+      }
+
       EmailContentFormatter emailContentFormatter =
           EmailContentFormatterFactory.fromClassName(DEFAULT_EMAIL_FORMATTER_TYPE);
 
