@@ -25,23 +25,19 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 
 
 public class StarTreeV2SegmentHelper {
 
   private static final int numRows = 6;
-  private static final int METRIC_MAX_VALUE = 10000;
-  private static final Random RANDOM = new Random();
-
   private static final String [] names = {"Rahul", "Rahul", "Rahul", "Zackie", "Zackie", "Zackie"};
   private static final String [] country = {"IN", "IN", "CH", "CH", "CH", "US"};
   private static final String [] language = {"Hin", "Hin", "Eng", "Eng", "Eng", "Eng"};
 
+  private static final int [] metricValues = {3, 5, 2, 8, 9, 1};
 
-  public static Schema buildSegment(String segmentDirName, String segmentName) throws Exception {
+  public static Schema createSegmentchema() {
+
     Schema schema = new Schema();
 
     // dimension
@@ -63,16 +59,18 @@ public class StarTreeV2SegmentHelper {
     schema.addField(metricFieldSpec);
 
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
-    config.setOutDir(segmentDirName);
-    config.setSegmentName(segmentName);
+    return schema;
+  }
+
+  public static List<GenericRow> buildSegment(Schema schema) throws Exception {
+
 
     List<GenericRow> rows = new ArrayList<>(numRows);
     for (int rowId = 0; rowId < numRows; rowId++) {
       HashMap<String, Object> map = new HashMap<>();
 
       // dimension
-      dimName = schema.getDimensionFieldSpecs().get(0).getName();
+      String dimName = schema.getDimensionFieldSpecs().get(0).getName();
       map.put(dimName, names[rowId]);
       dimName = schema.getDimensionFieldSpecs().get(1).getName();
       map.put(dimName, country[rowId]);
@@ -81,16 +79,13 @@ public class StarTreeV2SegmentHelper {
 
       // metric
       String metName = schema.getMetricFieldSpecs().get(0).getName();
-      map.put(metName, RANDOM.nextInt(METRIC_MAX_VALUE));
+      map.put(metName, metricValues[rowId]);
 
       GenericRow genericRow = new GenericRow();
       genericRow.init(map);
       rows.add(genericRow);
     }
 
-    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new GenericRowRecordReader(rows, schema));
-
-    return schema;
+    return rows;
   }
 }
