@@ -117,6 +117,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     // other initialisation
     _maxNumLeafRecords = config.getMaxNumLeafRecords();
     _rootNode = new TreeNode();
+    _rootNode._dimensionId = StarTreeV2Constant.STAR_NODE;
     _nodesCount++;
   }
 
@@ -143,7 +144,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
       Record record = new Record();
       int[] dimensionValues = new int[_dimensionsCount];
       for (int j = 0; j < dimensionColumnReaders.size(); j++) {
-        Integer dictId = dimensionColumnReaders.get(j).getDictionaryId(j);
+        Integer dictId = dimensionColumnReaders.get(j).getDictionaryId(i);
         dimensionValues[j] = dictId;
       }
       record.setDimensionValues(dimensionValues);
@@ -183,6 +184,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     _starTreeData = OnHeapStarTreeV2BuilderHelper.condenseData(rawSortedStarTreeData, _met2aggfuncPairs);
 
     // Recursively construct the star tree
+    _rootNode._startDocId = 0;
+    _rootNode._endDocId = _starTreeData.size();
     constructStarTree(_rootNode, 0, _starTreeData.size(), 0);
 
     // create aggregated doc for all nodes.
@@ -216,23 +219,24 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     }
 
     int numDocs = endDocId - startDocId;
-    Integer splitDimensionId = _dimensionsSplitOrder.get(level);
-    Map<Object, Pairs.IntPair> dimensionRangeMap = groupOnDimension(startDocId, endDocId, splitDimensionId);
+    int splitDimensionId = _dimensionsSplitOrder.get(level);
+    Map<Integer, Pairs.IntPair> dimensionRangeMap = groupOnDimension(startDocId, endDocId, splitDimensionId);
 
     node._childDimensionId = splitDimensionId;
 
     // Reserve one space for star node
-    Map<Object, TreeNode> children = new HashMap<>(dimensionRangeMap.size() + 1);
+    Map<Integer, TreeNode> children = new HashMap<>(dimensionRangeMap.size() + 1);
 
     node._children = children;
-    for (Object key : dimensionRangeMap.keySet()) {
-      Object childDimensionValue = key;
+    for (Integer key : dimensionRangeMap.keySet()) {
+      int childDimensionValue = key;
       Pairs.IntPair range = dimensionRangeMap.get(childDimensionValue);
 
       TreeNode child = new TreeNode();
+      child._dimensionId = splitDimensionId;
       int childStartDocId = range.getLeft();
       child._startDocId = childStartDocId;
-      int childEndDocId = range.getRight() + 1;
+      int childEndDocId = range.getRight();
       child._endDocId = childEndDocId;
       children.put(childDimensionValue, child);
       if (childEndDocId - childStartDocId > _maxNumLeafRecords) {
@@ -278,18 +282,18 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
    *
    * @return Map from dimension value to a pair of start docId and end docId (exclusive)
    */
-  private Map<Object, Pairs.IntPair> groupOnDimension(int startDocId, int endDocId, Integer dimensionId) {
-    Map<Object, Pairs.IntPair> rangeMap = new HashMap<>();
+  private Map<Integer, Pairs.IntPair> groupOnDimension(int startDocId, int endDocId, Integer dimensionId) {
+    Map<Integer, Pairs.IntPair> rangeMap = new HashMap<>();
     int[] rowDimensions = _starTreeData.get(startDocId).getDimensionValues();
     int currentValue = rowDimensions[dimensionId];
 
     int groupStartDocId = startDocId;
 
     for (int i = startDocId + 1; i < endDocId; i++) {
-      rowDimensions = _starTreeData.get(startDocId).getDimensionValues();
+      rowDimensions = _starTreeData.get(i).getDimensionValues();
       int value = rowDimensions[dimensionId];
       if (value != currentValue) {
-        int groupEndDocId = i + 1;
+        int groupEndDocId = i;
         rangeMap.put(currentValue, new Pairs.IntPair(groupStartDocId, groupEndDocId));
         currentValue = value;
         groupStartDocId = groupEndDocId;
@@ -334,22 +338,26 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   private void createAggregatedDocForAllNodes() {
     Queue<TreeNode> childNodes = new LinkedList<>();
 
-    Map<Object, TreeNode> children = _rootNode._children;
-    for (Object key : children.keySet()) {
+    Map<Integer, TreeNode> children = _rootNode._children;
+    for (int key : children.keySet()) {
       TreeNode child = children.get(key);
+      child._value = key;
       childNodes.add(child);
     }
 
     while (!childNodes.isEmpty()) {
       TreeNode parent = childNodes.remove();
-      children = parent._children;
-      List<Object> aggregatedValues = getAggregatedDocument(parent._startDocId, parent._endDocId);
-      int aggDocId = appendAggregatedDocuments(aggregatedValues);
-      parent._aggDataDocumentId = aggDocId;
+      if (parent._value != StarTreeV2Constant.STAR_NODE) {
+        List<Object> aggregatedValues = getAggregatedDocument(parent._startDocId, parent._endDocId);
+        int aggDocId = appendAggregatedDocuments(aggregatedValues);
+        parent._aggDataDocumentId = aggDocId;
+      }
 
+      children = parent._children;
       if (children != null) {
-        for (Object key : children.keySet()) {
+        for (int key : children.keySet()) {
           TreeNode child = children.get(key);
+          child._value = key;
           childNodes.add(child);
         }
       }

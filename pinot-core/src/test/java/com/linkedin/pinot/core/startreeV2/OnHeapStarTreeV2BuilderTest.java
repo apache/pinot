@@ -19,36 +19,48 @@ package com.linkedin.pinot.core.startreeV2;
 import java.io.File;
 import java.util.List;
 import java.util.ArrayList;
+import com.google.common.io.Files;
 import org.testng.annotations.Test;
 import org.testng.annotations.BeforeClass;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.startree.StarTreeIndexTestSegmentHelper;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.readers.RecordReader;
+import com.linkedin.pinot.core.data.readers.PinotSegmentUtil;
+import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 
 
 public class OnHeapStarTreeV2BuilderTest {
 
+
   private static File _indexDir;
+  private List<GenericRow> _rows;
+  private String _segmentOutputDir;
+  private RecordReader _recordReader;
   private static StarTreeV2Config _starTreeV2Config;
-  private static final String SEGMENT_NAME = "starTreeV2Segment";
-  private static final String DATA_DIR =
-      System.getProperty("java.io.tmpdir") + File.separator + "StarTreeV2BuilderTest";
 
   @BeforeClass
   void setUp() throws Exception {
-    Schema schema = StarTreeV2SegmentHelper.buildSegment(DATA_DIR, SEGMENT_NAME);
-    //Schema schema = StarTreeIndexTestSegmentHelper.buildSegment(DATA_DIR, SEGMENT_NAME);
-    _indexDir = new File(DATA_DIR, SEGMENT_NAME);
+
+    Schema schema = StarTreeV2SegmentHelper.createSegmentchema();
+    String segmentName = "starTreeV2BuilderTest";
+    _segmentOutputDir = Files.createTempDir().toString();
+    //_rows = PinotSegmentUtil.createTestData(schema, NUM_ROWS);
+    _rows = StarTreeV2SegmentHelper.buildSegment(schema);
+    _recordReader = new GenericRowRecordReader(_rows, schema);
+
+    _indexDir = PinotSegmentUtil.createSegment(schema, segmentName, _segmentOutputDir, _recordReader);
+
     _starTreeV2Config = new StarTreeV2Config();
 
     List<Met2AggfuncPair> metric2aggFuncPairs = new ArrayList<>();
-    Met2AggfuncPair pair1 = new Met2AggfuncPair("salary", "SUM");
+    Met2AggfuncPair pair1 = new Met2AggfuncPair("salary", "sum");
     metric2aggFuncPairs.add(pair1);
-    Met2AggfuncPair pair2 = new Met2AggfuncPair("salary", "MAX");
+    Met2AggfuncPair pair2 = new Met2AggfuncPair("salary", "max");
     metric2aggFuncPairs.add(pair2);
-    Met2AggfuncPair pair3 = new Met2AggfuncPair("salary", "MIN");
+    Met2AggfuncPair pair3 = new Met2AggfuncPair("salary", "min");
     metric2aggFuncPairs.add(pair3);
     _starTreeV2Config.setDimensions(schema.getDimensionNames());
-    _starTreeV2Config.setMaxNumLeafRecords(10);
+    _starTreeV2Config.setMaxNumLeafRecords(1);
     _starTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs);
 
     return;
