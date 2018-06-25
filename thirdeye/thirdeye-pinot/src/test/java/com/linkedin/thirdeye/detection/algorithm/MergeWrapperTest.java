@@ -135,6 +135,33 @@ public class MergeWrapperTest {
   }
 
   @Test
+  public void testMergerMaxDurationOverlapping() throws Exception {
+    this.config.getProperties().put(PROP_MAX_GAP, 200);
+    this.config.getProperties().put(PROP_MAX_DURATION, 1250);
+
+    this.outputs.add(new MockPipelineOutput(Arrays.asList(
+        makeAnomaly(2800, 3700),
+        makeAnomaly(3700, 3800)
+    ), 3700));
+
+    Map<String, Object> nestedProperties = new HashMap<>();
+    nestedProperties.put(PROP_CLASS_NAME, "none");
+    nestedProperties.put(PROP_METRIC_URN, "thirdeye:metric:3");
+
+    this.nestedProperties.add(nestedProperties);
+
+    this.wrapper = new MergeWrapper(this.provider, this.config, 1000, 4000);
+    DetectionPipelineResult output = this.wrapper.run();
+
+    Assert.assertEquals(output.getAnomalies().size(), 4);
+    Assert.assertEquals(output.getLastTimestamp(), 3800);
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 3650)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(3650, 3800)));
+  }
+
+  @Test
   public void testMergerExecution() throws Exception {
     this.wrapper = new MergeWrapper(this.provider, this.config, 1000, 3000);
     this.wrapper.run();
