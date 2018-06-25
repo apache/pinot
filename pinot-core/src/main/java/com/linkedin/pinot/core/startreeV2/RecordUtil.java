@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.startreeV2;
 
 import java.util.ArrayList;
 import java.util.List;
+import scala.Int;
 
 
 public class RecordUtil {
@@ -78,7 +79,7 @@ public class RecordUtil {
   public static List<Double> getDoubleValues(List<Object> data) {
     List<Double> doubleData = new ArrayList<>();
     for (int i = 0; i < data.size(); i++) {
-      doubleData.add((double) data.get(i));
+      doubleData.add(Double.valueOf(data.get(i).toString()));
     }
 
     return doubleData;

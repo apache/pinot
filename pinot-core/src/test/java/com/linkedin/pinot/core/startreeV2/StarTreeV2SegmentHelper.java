@@ -21,7 +21,6 @@ import java.util.Random;
 import java.util.HashMap;
 import java.util.ArrayList;
 import com.linkedin.pinot.common.data.Schema;
-import org.apache.commons.math.util.MathUtils;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -33,26 +32,36 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
 
 public class StarTreeV2SegmentHelper {
 
-  private static final int NUM_METRICS = 3;
-  private static final int NUM_DIMENSIONS = 4;
+  private static final int numRows = 6;
   private static final int METRIC_MAX_VALUE = 10000;
   private static final Random RANDOM = new Random();
 
+  private static final String [] names = {"Rahul", "Rahul", "Rahul", "Zackie", "Zackie", "Zackie"};
+  private static final String [] country = {"IN", "IN", "CH", "CH", "CH", "US"};
+  private static final String [] language = {"Hin", "Hin", "Eng", "Eng", "Eng", "Eng"};
+
+
   public static Schema buildSegment(String segmentDirName, String segmentName) throws Exception {
     Schema schema = new Schema();
-    int numRows = (int) MathUtils.factorial(NUM_DIMENSIONS) * 3;
 
-    for (int i = 0; i < NUM_DIMENSIONS; i++) {
-      String dimName = "d" + (i + 1);
-      DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(dimName, FieldSpec.DataType.STRING, true);
-      schema.addField(dimensionFieldSpec);
-    }
+    // dimension
+    String dimName = "Name";
+    DimensionFieldSpec dimensionFieldSpec1 = new DimensionFieldSpec(dimName, FieldSpec.DataType.STRING, true);
+    schema.addField(dimensionFieldSpec1);
 
-    for (int i = 0; i < NUM_METRICS; i++) {
-      String metricName = "m" + (i + 1);
-      MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, FieldSpec.DataType.INT);
-      schema.addField(metricFieldSpec);
-    }
+    dimName = "Country";
+    DimensionFieldSpec dimensionFieldSpec2 = new DimensionFieldSpec(dimName, FieldSpec.DataType.STRING, true);
+    schema.addField(dimensionFieldSpec2);
+
+    dimName = "Language";
+    DimensionFieldSpec dimensionFieldSpec3 = new DimensionFieldSpec(dimName, FieldSpec.DataType.STRING, true);
+    schema.addField(dimensionFieldSpec3);
+
+    // metric
+    String metricName = "salary";
+    MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, FieldSpec.DataType.INT);
+    schema.addField(metricFieldSpec);
+
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
     config.setOutDir(segmentDirName);
@@ -61,22 +70,18 @@ public class StarTreeV2SegmentHelper {
     List<GenericRow> rows = new ArrayList<>(numRows);
     for (int rowId = 0; rowId < numRows; rowId++) {
       HashMap<String, Object> map = new HashMap<>();
-      // Dim columns.
-      for (int i = 0; i < NUM_DIMENSIONS / 2; i++) {
-        String dimName = schema.getDimensionFieldSpecs().get(i).getName();
-        map.put(dimName, dimName + "-v" + rowId % (NUM_DIMENSIONS - i));
-      }
-      // Random values make cardinality of d3, d4 column values larger to better test hll
-      for (int i = NUM_DIMENSIONS / 2; i < NUM_DIMENSIONS; i++) {
-        String dimName = schema.getDimensionFieldSpecs().get(i).getName();
-        map.put(dimName, dimName + "-v" + RANDOM.nextInt(i * 100));
-      }
 
-      // Metric columns.
-      for (int i = 0; i < NUM_METRICS; i++) {
-        String metName = schema.getMetricFieldSpecs().get(i).getName();
-        map.put(metName, RANDOM.nextInt(METRIC_MAX_VALUE));
-      }
+      // dimension
+      dimName = schema.getDimensionFieldSpecs().get(0).getName();
+      map.put(dimName, names[rowId]);
+      dimName = schema.getDimensionFieldSpecs().get(1).getName();
+      map.put(dimName, country[rowId]);
+      dimName = schema.getDimensionFieldSpecs().get(2).getName();
+      map.put(dimName, language[rowId]);
+
+      // metric
+      String metName = schema.getMetricFieldSpecs().get(0).getName();
+      map.put(metName, RANDOM.nextInt(METRIC_MAX_VALUE));
 
       GenericRow genericRow = new GenericRow();
       genericRow.init(map);

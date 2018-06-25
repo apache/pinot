@@ -147,11 +147,16 @@ public class OnHeapStarTreeV2BuilderHelper {
         List<Object> aggregatedMetricsValue = aggregateMetrics(start, i, starTreeData, met2aggfuncPairs);
         prevRecord.setMetricValues(aggregatedMetricsValue);
         newData.add(prevRecord);
-        newData.add(nextRecord);
         prevRecord = nextRecord;
         start = i;
       }
     }
+    Record record = new Record();
+    record.setDimensionValues(starTreeData.get(start).getDimensionValues());
+    List<Object> aggregatedMetricsValue = aggregateMetrics(start, starTreeData.size(), starTreeData, met2aggfuncPairs);
+    record.setMetricValues(aggregatedMetricsValue);
+    newData.add(record);
+
     return newData;
   }
 
