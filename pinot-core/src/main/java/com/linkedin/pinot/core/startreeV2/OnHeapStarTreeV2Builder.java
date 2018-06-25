@@ -164,7 +164,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
       for (int j = 0; j < _met2aggfuncPairsCount; j++) {
         String metricName = _met2aggfuncPairs.get(j).getMetricName();
         MetricFieldSpec metricFieldSpec = _metricsSpecMap.get(metricName);
-        Object val = readHelper(metricColumnReaders.get(j), metricFieldSpec.getDataType(), j);
+        Object val = readHelper(metricColumnReaders.get(j), metricFieldSpec.getDataType(), i);
         metricRawValues.add(val);
       }
       metricRawValues.add(1);   // for the count(*)
