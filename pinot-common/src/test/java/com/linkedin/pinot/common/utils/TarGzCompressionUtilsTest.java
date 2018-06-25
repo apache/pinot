@@ -33,8 +33,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-
-
 public class TarGzCompressionUtilsTest {
   private static final String SEGMENT_NAME = "mysegment";
 
@@ -138,26 +136,24 @@ public class TarGzCompressionUtilsTest {
     Assert.assertFalse(metaFile.isDirectory());
 
     File tarGzPath = new File(tarDir, SEGMENT_NAME + ".tar.gz");
-    mockIncorrectData(metaFile, tarGzPath);
+    createInvalidTarFile(metaFile, tarGzPath);
 
     try {
       TarGzCompressionUtils.unTar(tarGzPath, untarDir);
       Assert.fail("Did not get exception!!");
-    } catch (IOException e) {
-      Assert.assertTrue(e.getMessage().contains(TarGzCompressionUtils.EXTRACT_FILE_OUTSIDE_OF_TARGET_DIR));
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof IOException);
+      Assert.assertTrue(e.getMessage().startsWith("Tar file must not"));
     }
   }
 
-  private void mockIncorrectData(File nonDirFile, File tarGzPath) throws IOException {
-    FileOutputStream fOut = null;
-    BufferedOutputStream bOut = null;
-    GzipCompressorOutputStream gzOut = null;
-    TarArchiveOutputStream tOut = null;
-    try {
-      fOut = new FileOutputStream(new File(tarGzPath.getPath()));
-      bOut = new BufferedOutputStream(fOut);
-      gzOut = new GzipCompressorOutputStream(bOut);
-      tOut = new TarArchiveOutputStream(gzOut);
+  private void createInvalidTarFile(File nonDirFile, File tarGzPath) {
+    try (
+        FileOutputStream fOut = new FileOutputStream(new File(tarGzPath.getPath()));
+        BufferedOutputStream bOut = new BufferedOutputStream(fOut);
+        GzipCompressorOutputStream gzOut = new GzipCompressorOutputStream(bOut);
+        TarArchiveOutputStream tOut = new TarArchiveOutputStream(gzOut)
+    ) {
       tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
 
       // Mock the file that doesn't use the correct file name.
@@ -166,23 +162,8 @@ public class TarGzCompressionUtilsTest {
       tOut.putArchiveEntry(tarEntry);
       IOUtils.copy(new FileInputStream(nonDirFile), tOut);
       tOut.closeArchiveEntry();
-
-    }  catch (IOException e) {
+    } catch (IOException e) {
       Assert.fail("Unexpected Exception!!");
-    } finally {
-      if (tOut != null) {
-        tOut.finish();
-        tOut.close();
-      }
-      if (gzOut != null) {
-        gzOut.close();
-      }
-      if (bOut != null) {
-        bOut.close();
-      }
-      if (fOut != null) {
-        fOut.close();
-      }
     }
   }
 }
