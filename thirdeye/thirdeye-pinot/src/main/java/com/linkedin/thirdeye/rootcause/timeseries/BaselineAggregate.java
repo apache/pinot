@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Grouping;
 import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.Series;
+import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -14,9 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeFieldType;
 import org.joda.time.DateTimeZone;
-import org.joda.time.Partial;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
 
@@ -287,7 +286,7 @@ public class BaselineAggregate implements Baseline {
    * @return day-time-of-day series
    */
   private LongSeries toVirtualSeries(long origin, LongSeries timestampSeries) {
-    final DateTime dateOrigin = new DateTime(origin, this.timeZone).withFields(makeOriginPartial());
+    final DateTime dateOrigin = new DateTime(origin, this.timeZone).withFields(DataFrameUtils.makeOrigin(this.periodType));
     return timestampSeries.map(this.makeTimestampToVirtualFunction(dateOrigin));
   }
 
@@ -299,47 +298,8 @@ public class BaselineAggregate implements Baseline {
    * @return utc timestamp series
    */
   private LongSeries toTimestampSeries(long origin, LongSeries virtualSeries) {
-    final DateTime dateOrigin = new DateTime(origin, this.timeZone).withFields(makeOriginPartial());
+    final DateTime dateOrigin = new DateTime(origin, this.timeZone).withFields(DataFrameUtils.makeOrigin(this.periodType));
     return virtualSeries.map(this.makeVirtualToTimestampFunction(dateOrigin));
-  }
-
-  /**
-   * Returns partial to zero out date fields based on period type
-   *
-   * @return partial
-   */
-  private Partial makeOriginPartial() {
-    List<DateTimeFieldType> fields = new ArrayList<>();
-
-    if (PeriodType.millis().equals(this.periodType)) {
-      // left blank
-
-    } else if (PeriodType.seconds().equals(this.periodType)) {
-      fields.add(DateTimeFieldType.millisOfSecond());
-
-    } else if (PeriodType.minutes().equals(this.periodType)) {
-      fields.add(DateTimeFieldType.secondOfMinute());
-      fields.add(DateTimeFieldType.millisOfSecond());
-
-    } else if (PeriodType.hours().equals(this.periodType)) {
-      fields.add(DateTimeFieldType.minuteOfHour());
-      fields.add(DateTimeFieldType.secondOfMinute());
-      fields.add(DateTimeFieldType.millisOfSecond());
-
-    } else if (PeriodType.days().equals(this.periodType)) {
-      fields.add(DateTimeFieldType.hourOfDay());
-      fields.add(DateTimeFieldType.minuteOfHour());
-      fields.add(DateTimeFieldType.secondOfMinute());
-      fields.add(DateTimeFieldType.millisOfSecond());
-
-    } else {
-      throw new IllegalArgumentException(String.format("Unsupported PeriodType '%s'", this.periodType));
-    }
-
-    int[] zeros = new int[fields.size()];
-    Arrays.fill(zeros, 0);
-
-    return new Partial(fields.toArray(new DateTimeFieldType[fields.size()]), zeros);
   }
 
   /**
