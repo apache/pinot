@@ -249,7 +249,7 @@ public class PinotTableRestletResource {
       JSONObject tableConfigJson = new JSONObject(tableConfigStr);
       tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, "Invalid JSON", Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     }
 
     try {
