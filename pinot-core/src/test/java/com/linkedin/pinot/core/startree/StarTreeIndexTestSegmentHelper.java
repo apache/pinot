@@ -56,7 +56,7 @@ public class StarTreeIndexTestSegmentHelper {
   }
 
   private static Schema buildSegment(String segmentDirName, String segmentName, HllConfig hllConfig) throws Exception {
-    int numRows = (int) MathUtils.factorial(NUM_DIMENSIONS) * 3;
+    int numRows = (int) MathUtils.factorial(NUM_DIMENSIONS) * 100;
     Schema schema = new Schema();
 
     for (int i = 0; i < NUM_DIMENSIONS; i++) {

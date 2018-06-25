@@ -301,7 +301,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
   }
 
-  public void buildRaw()
+  private void buildRaw()
       throws Exception {
     // Count the number of documents and gather per-column statistics
     LOGGER.debug("Start building StatsCollector!");
