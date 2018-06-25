@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.resources.FileUploadPathProvider;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -30,6 +31,7 @@ import com.linkedin.pinot.filesystem.PinotFS;
 import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.util.UUID;
 import javax.inject.Inject;
 import javax.ws.rs.core.HttpHeaders;
@@ -54,7 +56,9 @@ public class PinotSegmentUploadUtils {
 
   public URI constructFinalLocation(SegmentMetadata segmentMetadata, SegmentVersion version) throws Exception {
     FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
-    File destFile = new File(new File(new File(provider.getBaseDataDir(), segmentMetadata.getTableName()), segmentMetadata.getName()), version.toString());
+    String filePath = StringUtil.join("/", provider.getBaseDataDir().getAbsolutePath(), segmentMetadata.getTableName(), URLEncoder
+        .encode(segmentMetadata.getName(), "UTF-8"), version.toString());
+    File destFile = new File(filePath);
     return destFile.toURI();
   }
   /**
@@ -68,7 +72,7 @@ public class PinotSegmentUploadUtils {
     try {
       provider = new FileUploadPathProvider(_controllerConf);
     } catch (Exception e) {
-      LOGGER.error("Controller configuration is misconfigured");
+      LOGGER.error("Could not create file-upload-provider, error is: ", e.getMessage());
       throw new RuntimeException(e);
     }
 
@@ -84,7 +88,7 @@ public class PinotSegmentUploadUtils {
       dstUri = constructFinalLocation(segmentMetadata, segmentVersion);
       pinotFS.copy(srcUri, dstUri);
     } catch (Exception e) {
-      LOGGER.error("Could not copy file to final directory");
+      LOGGER.error("Could not copy file to final directory, error is ", e.getMessage());
       throw new RuntimeException(e);
     }
 
@@ -106,39 +110,35 @@ public class PinotSegmentUploadUtils {
     OfflineSegmentZKMetadata existingSegmentZKMetadata = new OfflineSegmentZKMetadata(znRecord);
     long existingCrc = existingSegmentZKMetadata.getCrc();
 
-    try {
-      // Modify the custom map in segment ZK metadata
-      String segmentZKMetadataCustomMapModifierStr = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER);
-      SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier;
-      if (segmentZKMetadataCustomMapModifierStr != null) {
-        segmentZKMetadataCustomMapModifier =
-            new SegmentZKMetadataCustomMapModifier(segmentZKMetadataCustomMapModifierStr);
-      } else {
-        // By default, use REPLACE modify mode
-        segmentZKMetadataCustomMapModifier =
-            new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.REPLACE, null);
-      }
-      existingSegmentZKMetadata.setCustomMap(
-          segmentZKMetadataCustomMapModifier.modifyMap(existingSegmentZKMetadata.getCustomMap()));
+    // Modify the custom map in segment ZK metadata
+    String segmentZKMetadataCustomMapModifierStr = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER);
+    SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier;
+    if (segmentZKMetadataCustomMapModifierStr != null) {
+      segmentZKMetadataCustomMapModifier =
+          new SegmentZKMetadataCustomMapModifier(segmentZKMetadataCustomMapModifierStr);
+    } else {
+      // By default, use REPLACE modify mode
+      segmentZKMetadataCustomMapModifier =
+          new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.REPLACE, null);
+    }
+    existingSegmentZKMetadata.setCustomMap(
+        segmentZKMetadataCustomMapModifier.modifyMap(existingSegmentZKMetadata.getCustomMap()));
 
-      // Update ZK metadata and refresh the segment if necessary
-      long newCrc = Long.valueOf(segmentMetadata.getCrc());
-      if (newCrc == existingCrc) {
-        // New segment is the same as the existing one, only update ZK metadata without refresh the segment
-        if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata)) {
-          throw new RuntimeException(
-              "Failed to update ZK metadata for segment: " + segmentName + " of table: " + tableNameWithType);
-        }
-      } else {
-        _pinotHelixResourceManager.refreshSegment(segmentMetadata, existingSegmentZKMetadata, dstUri.getPath());
+    // Update ZK metadata and refresh the segment if necessary
+    long newCrc = Long.valueOf(segmentMetadata.getCrc());
+    if (newCrc == existingCrc) {
+      // New segment is the same as the existing one, only update ZK metadata without refresh the segment
+      if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata)) {
+        throw new RuntimeException(
+            "Failed to update ZK metadata for segment: " + segmentName + " of table: " + tableNameWithType);
       }
-    } catch (Exception e) {
-      throw e;
+    } else {
+      _pinotHelixResourceManager.refreshSegment(segmentMetadata, existingSegmentZKMetadata, dstUri.getPath());
     }
   }
 
   private String constructDownloadUrl(String tableName, String segmentName, FileUploadPathProvider provider, PinotFS pinotFS, URI dstUri, SegmentVersion segmentVersion) {
-    // For the local filesystem implementation, we always assume that servers are downloading remotely, aka, through NFS.
+    // For the local filesystem implementation, we always assume the download will happen through http
     if (pinotFS instanceof LocalPinotFS) {
       return ControllerConf.constructDownloadUrlWithVersion(tableName, segmentName, provider.getVip(), segmentVersion);
     } else {

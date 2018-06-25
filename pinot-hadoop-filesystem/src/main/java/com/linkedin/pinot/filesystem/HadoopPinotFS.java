@@ -158,7 +158,9 @@ public class HadoopPinotFS extends PinotFS {
 
   @Override
   public boolean canMoveBetweenLocations(URI srcUri, URI dstUri) {
-    return srcUri.getScheme().equals("hdfs") && dstUri.getScheme().equals("hdfs");
+    return srcUri.getScheme().equals("hdfs")
+        && dstUri.getScheme().equals("hdfs")
+        && srcUri.getHost().equals(dstUri.getHost());
   }
 
   private void authenticate(org.apache.hadoop.conf.Configuration hadoopConf, org.apache.commons.configuration.Configuration configs) {

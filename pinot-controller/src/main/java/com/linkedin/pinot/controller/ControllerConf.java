@@ -59,8 +59,7 @@ public class ControllerConf extends PropertiesConfiguration {
   // protection is enabled. If the upload does not finish within the timeout, next upload can override the previous one.
   private static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
 
-  // Defines the kind of storage and the underlying PinotFS implementation;
-  // each storage type will have a different factory class with this prefix
+  // Defines the kind of storage and the underlying PinotFS implementation
   private static final String PINOT_FS_FACTORY_CLASS_PREFIX = "controller.storage.factory.class";
   private static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.file";
   private static final String PINOT_FS_FACTORY_CLASS_HADOOP = "controller.storage.factory.class.hdfs";
@@ -98,7 +97,7 @@ public class ControllerConf extends PropertiesConfiguration {
       return StringUtil.join("/", vip, "segments", tableName, URLEncoder.encode(segmentName, "UTF-8"));
     } catch (UnsupportedEncodingException e) {
       // Shouldn't happen
-      throw new AssertionError("UTF-8 encoding should always be supported", e);
+      throw new AssertionError("Encountered error while encoding in UTF-8 format", e);
     }
   }
 
@@ -107,7 +106,7 @@ public class ControllerConf extends PropertiesConfiguration {
       return StringUtil.join("/", vip, "segments", tableName, URLEncoder.encode(segmentName, "UTF-8") + "?version=" + segmentVersion.toString());
     } catch (UnsupportedEncodingException e) {
       // Shouldn't happen
-      throw new AssertionError("UTF-8 encoding should always be supported", e);
+      throw new AssertionError("Encountered error while encoding in UTF-8 format", e);
     }
   }
 
