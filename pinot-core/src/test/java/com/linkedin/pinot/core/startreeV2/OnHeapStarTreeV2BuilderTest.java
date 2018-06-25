@@ -29,23 +29,23 @@ public class OnHeapStarTreeV2BuilderTest {
 
   private static File _indexDir;
   private static StarTreeV2Config _starTreeV2Config;
-  private static final String SEGMENT_NAME = "starTreeSegment";
+  private static final String SEGMENT_NAME = "starTreeV2Segment";
   private static final String DATA_DIR =
-      System.getProperty("java.io.tmpdir") + File.separator + "OnHeapStarTreeV2BuilderTest";
+      System.getProperty("java.io.tmpdir") + File.separator + "StarTreeV2BuilderTest";
 
   @BeforeClass
   void setUp() throws Exception {
-    //Schema schema = StarTreeV2SegmentHelper.buildSegment(DATA_DIR, SEGMENT_NAME);
-    Schema schema = StarTreeIndexTestSegmentHelper.buildSegment(DATA_DIR, SEGMENT_NAME);
+    Schema schema = StarTreeV2SegmentHelper.buildSegment(DATA_DIR, SEGMENT_NAME);
+    //Schema schema = StarTreeIndexTestSegmentHelper.buildSegment(DATA_DIR, SEGMENT_NAME);
     _indexDir = new File(DATA_DIR, SEGMENT_NAME);
     _starTreeV2Config = new StarTreeV2Config();
 
     List<Met2AggfuncPair> metric2aggFuncPairs = new ArrayList<>();
-    Met2AggfuncPair pair1 = new Met2AggfuncPair("m1", "SUM");
+    Met2AggfuncPair pair1 = new Met2AggfuncPair("salary", "SUM");
     metric2aggFuncPairs.add(pair1);
-    Met2AggfuncPair pair2 = new Met2AggfuncPair("m1", "MAX");
+    Met2AggfuncPair pair2 = new Met2AggfuncPair("salary", "MAX");
     metric2aggFuncPairs.add(pair2);
-    Met2AggfuncPair pair3 = new Met2AggfuncPair("m2", "MIN");
+    Met2AggfuncPair pair3 = new Met2AggfuncPair("salary", "MIN");
     metric2aggFuncPairs.add(pair3);
     _starTreeV2Config.setDimensions(schema.getDimensionNames());
     _starTreeV2Config.setMaxNumLeafRecords(10);

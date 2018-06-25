@@ -130,17 +130,17 @@ public class OnHeapStarTreeV2BuilderHelperTest {
 
     Record r1 = new Record();
     r1.setDimensionValues(new int[]{1, -1, 1});
-    r1.setMetricValues(Arrays.asList(4, 2, 3, 2));
+    r1.setMetricValues(Arrays.asList(4.0, 2.0, 3.0, 2.0));
     data.add(r1);
 
     Record r2 = new Record();
     r2.setDimensionValues(new int[]{1, -1, 2});
-    r2.setMetricValues(Arrays.asList(1, 2, 3, 1));
+    r2.setMetricValues(Arrays.asList(1.0, 2.0, 3.0, 1.0));
     data.add(r2);
 
     Record r3 = new Record();
     r3.setDimensionValues(new int[]{5, -1, 1});
-    r3.setMetricValues(Arrays.asList(3, 2, 1, 1));
+    r3.setMetricValues(Arrays.asList(3.0, 2.0, 1.0, 1.0));
     data.add(r3);
 
     return data;
@@ -172,6 +172,8 @@ public class OnHeapStarTreeV2BuilderHelperTest {
     List<Record> actual = OnHeapStarTreeV2BuilderHelper.condenseData(data, metric2aggFuncPairs);
 
     List<Record> expected = expectedCondensedData();
+    printRecordsList(actual);
+    System.out.println("hola");
     printRecordsList(expected);
     assertRecordsList(expected, actual);
   }
