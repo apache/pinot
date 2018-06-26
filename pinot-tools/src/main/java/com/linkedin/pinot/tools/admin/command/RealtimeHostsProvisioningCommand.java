@@ -17,6 +17,8 @@ package com.linkedin.pinot.tools.admin.command;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.DataSize;
+import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
 import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
@@ -29,8 +31,10 @@ import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +47,8 @@ import org.slf4j.LoggerFactory;
 public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand implements Command {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeHostsProvisioningCommand.class);
+  private static final int MEMORY_STR_LEN = 9;
+
   private static final String TMP_DIR = System.getProperty("java.io.tmpdir") + File.separator;
   private static final String STATS_FILE_NAME = "stats.ser";
 
@@ -61,8 +67,8 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
   @Option(name = "-sampleCompletedSegmentDir", required = true, metaVar = "<String>", usage = "Consume from the topic for n hours and provide the path of the segment dir after it completes")
   private String _sampleCompletedSegmentDir;
 
-  @Option(name = "-numHoursSampleSegmentConsumed", required = true, metaVar = "<int>", usage = "Number of hours for which the sample segment was consuming")
-  private int _numHoursSampleSegmentConsumed;
+  @Option(name = "-periodSampleSegmentConsumed", required = true, metaVar = "<String>", usage = "Period for which the sample segment was consuming in format 4h, 5h30m, 40m etc")
+  private String _periodSampleSegmentConsumed;
 
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
@@ -87,8 +93,8 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
     return this;
   }
 
-  public RealtimeHostsProvisioningCommand setNumHoursSampleSegmentConsumed(int numHoursSampleSegmentConsumed) {
-    _numHoursSampleSegmentConsumed = numHoursSampleSegmentConsumed;
+  public RealtimeHostsProvisioningCommand setPeriodSampleSegmentConsumed(String periodSampleSegmentConsumed) {
+    _periodSampleSegmentConsumed = periodSampleSegmentConsumed;
     return this;
   }
 
@@ -96,7 +102,7 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
   public String toString() {
     return ("RealtimeHostsProvisioningCommand  -numReplicas " + _numReplicas + " -numPartitions " + _numPartitions
         + " -retentionHours " + _retentionHours + " -sampleCompletedSegmentDir " + _sampleCompletedSegmentDir
-        + " -numHoursSampleSegmentConsumed " + _numHoursSampleSegmentConsumed);
+        + " -periodSampleSegmentConsumed " + _periodSampleSegmentConsumed);
   }
 
   @Override
@@ -108,7 +114,7 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
   public String description() {
     return
         "Given the num replicas, partitions, retention and a sample completed segment for a realtime table to be setup, "
-            + "this tool will provide memory used each host and an optimal segment size for various combinations of hours to consume and hosts";
+            + "this tool will provide memory used by each host and an optimal segment size for various combinations of hours to consume and hosts";
   }
 
   @Override
@@ -119,10 +125,12 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
   @Override
   public boolean execute() throws Exception {
     LOGGER.info("Executing command: {}", toString());
-    long[][] totalMemoryPerHostMB = new long[NUM_HOURS_TO_CONSUME.length][NUM_HOSTS.length];
-    long[][] optimalSegmentSizeMB = new long[NUM_HOURS_TO_CONSUME.length][NUM_HOSTS.length];
+    String[][] totalMemoryPerHost = new String[NUM_HOURS_TO_CONSUME.length][NUM_HOSTS.length];
+    String[][] optimalSegmentSize = new String[NUM_HOURS_TO_CONSUME.length][NUM_HOSTS.length];
 
     int totalConsumingPartitions = _numPartitions * _numReplicas;
+    long minutesSampleSegmentConsumed =
+        TimeUnit.MINUTES.convert(TimeUtils.convertPeriodToMillis(_periodSampleSegmentConsumed), TimeUnit.MILLISECONDS);
     File sampleCompletedSegmentFile = new File(_sampleCompletedSegmentDir);
     long sampleCompletedSegmentSizeBytes = FileUtils.sizeOfDirectory(sampleCompletedSegmentFile);
     SegmentMetadataImpl segmentMetadata;
@@ -140,14 +148,77 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
         .filter(column -> segmentMetadata.getColumnMetadataFor(column).hasInvertedIndex())
         .collect(Collectors.toSet());
     int avgMultiValues = getAvgMultiValues(sampleCompletedSegmentFile, segmentMetadata);
-    RealtimeIndexOffHeapMemoryManager memoryManager = new DirectMemoryManager(segmentMetadata.getName());
-    RealtimeSegmentZKMetadata segmentZKMetadata = getRealtimeSegmentZKMetadata(segmentMetadata);
 
     File tableDataDir = new File(TMP_DIR, segmentMetadata.getTableName());
     FileUtils.deleteDirectory(tableDataDir);
     tableDataDir.mkdir();
     File statsFile = new File(tableDataDir, STATS_FILE_NAME);
     RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
+
+    initializeStatsHistory(sampleCompletedSegmentFile, segmentMetadata, avgMultiValues, noDictionaryColumns,
+        invertedIndexColumns, statsHistory);
+
+    int i = 0;
+    for (int numHoursToConsume : NUM_HOURS_TO_CONSUME) {
+      long minutesToConsume = numHoursToConsume * 60;
+      // calculate completed component
+      // consuming for _numHoursSampleSegmentConsumed, and got size sampleCompletedSegmentSizeBytes
+      // hence, consuming for numHoursToConsume would give:
+      long completedSegmentSizeBytes =
+          (long) (((double) minutesToConsume / minutesSampleSegmentConsumed) * sampleCompletedSegmentSizeBytes);
+
+      long totalMemoryForCompletedSegmentsPerPartition =
+          calculateMemoryForCompletedSegmentsPerPartition(completedSegmentSizeBytes, numHoursToConsume);
+
+      int totalDocsInSampleSegment = segmentMetadata.getTotalDocs();
+      // numHoursSampleSegmentConsumed created totalDocsInSampleSegment num rows
+      // numHoursToConsume will create ? rows
+      int totalDocs = (int) (((double) minutesToConsume / minutesSampleSegmentConsumed) * totalDocsInSampleSegment);
+      RealtimeIndexOffHeapMemoryManager memoryManager = new DirectMemoryManager(segmentMetadata.getName());
+      RealtimeSegmentZKMetadata segmentZKMetadata = getRealtimeSegmentZKMetadata(segmentMetadata, totalDocs);
+      RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder = new RealtimeSegmentConfig.Builder().setSegmentName(segmentMetadata.getName())
+          .setStreamName(segmentMetadata.getTableName())
+          .setSchema(segmentMetadata.getSchema())
+          .setCapacity(totalDocs)
+          .setAvgNumMultiValues(avgMultiValues)
+          .setNoDictionaryColumns(noDictionaryColumns)
+          .setInvertedIndexColumns(invertedIndexColumns)
+          .setRealtimeSegmentZKMetadata(segmentZKMetadata)
+          .setOffHeap(true)
+          .setMemoryManager(memoryManager)
+          .setStatsHistory(statsHistory);
+
+      // create mutable segment impl
+      MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build());
+      long memoryForConsumingSegmentPerPartition = memoryManager.getTotalAllocatedBytes();
+      mutableSegmentImpl.destroy();
+
+      int j = 0;
+      for (int numHosts : NUM_HOSTS) {
+        // adjustment because we want ceiling of division and not floor, as some hosts will have an extra partition due to the remainder of the division
+        int totalConsumingPartitionsPerHost = (totalConsumingPartitions + numHosts - 1) / numHosts;
+
+        long totalMemoryForCompletedSegmentsPerHost =
+            totalMemoryForCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost;
+        long totalMemoryForConsumingSegmentsPerHost =
+            memoryForConsumingSegmentPerPartition * totalConsumingPartitionsPerHost;
+        long totalMemoryPerHostBytes = totalMemoryForCompletedSegmentsPerHost + totalMemoryForConsumingSegmentsPerHost;
+
+        totalMemoryPerHost[i][j] = DataSize.fromBytes(totalMemoryPerHostBytes);
+        optimalSegmentSize[i][j++] = DataSize.fromBytes(completedSegmentSizeBytes);
+      }
+      i++;
+    }
+
+    display(totalMemoryPerHost, optimalSegmentSize);
+    return true;
+  }
+
+  private void initializeStatsHistory(File sampleCompletedSegmentFile, SegmentMetadataImpl segmentMetadata,
+      int avgMultiValues, Set<String> noDictionaryColumns, Set<String> invertedIndexColumns,
+      RealtimeSegmentStatsHistory statsHistory) {
+    RealtimeIndexOffHeapMemoryManager memoryManager = new DirectMemoryManager(segmentMetadata.getName());
+    RealtimeSegmentZKMetadata segmentZKMetadata = getRealtimeSegmentZKMetadata(segmentMetadata);
 
     // create a config
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
@@ -166,11 +237,9 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build());
 
-    // read all rows and index them
-    try {
-      PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(sampleCompletedSegmentFile);
+    // read all rows and index them to populate stats.ser
+    try (PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(sampleCompletedSegmentFile);) {
       GenericRow row = new GenericRow();
-
       while (segmentRecordReader.hasNext()) {
         segmentRecordReader.next(row);
         mutableSegmentImpl.index(row);
@@ -180,98 +249,13 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
       throw new RuntimeException("Caught exception when indexing rows");
     }
     mutableSegmentImpl.destroy();
-
-    int i = 0;
-    for (int numHoursToConsume : NUM_HOURS_TO_CONSUME) {
-
-      // calculate completed component
-      // consuming for _numHoursSampleSegmentConsumed, and got size sampleCompletedSegmentSizeBytes
-      // hence, consuming for numHoursToConsume would give:
-      long completedSegmentSizeBytes =
-          (long) (((double) numHoursToConsume / _numHoursSampleSegmentConsumed) * sampleCompletedSegmentSizeBytes);
-      long totalMemoryForCompletedSegmentsPerPartition =
-          calculateMemoryForCompletedSegmentsPerPartition(completedSegmentSizeBytes, numHoursToConsume);
-
-      int totalDocsInSampleSegment = segmentMetadata.getTotalDocs();
-      // numHoursSampleSegmentConsumed created totalDocsInSampleSegment num rows
-      // numHoursToConsume will create ? rows
-      int totalDocs = (int) (((double) numHoursToConsume / _numHoursSampleSegmentConsumed) * totalDocsInSampleSegment);
-      memoryManager = new DirectMemoryManager(segmentMetadata.getName());
-      realtimeSegmentConfigBuilder = new RealtimeSegmentConfig.Builder().setSegmentName(segmentMetadata.getName())
-          .setStreamName(segmentMetadata.getTableName())
-          .setSchema(segmentMetadata.getSchema())
-          .setCapacity(totalDocs)
-          .setAvgNumMultiValues(avgMultiValues)
-          .setNoDictionaryColumns(noDictionaryColumns)
-          .setInvertedIndexColumns(invertedIndexColumns)
-          .setRealtimeSegmentZKMetadata(segmentZKMetadata)
-          .setOffHeap(true)
-          .setMemoryManager(memoryManager)
-          .setStatsHistory(statsHistory);
-
-      // create mutable segment impl
-      mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build());
-      long memoryForConsumingSegmentPerPartition = memoryManager.getTotalAllocatedBytes();
-      mutableSegmentImpl.destroy();
-
-      int j = 0;
-      for (int numHosts : NUM_HOSTS) {
-        // adjustment because we want ceiling of division and not floor, as some hosts will have an extra partition due to the remainder of the division
-        int totalConsumingPartitionsPerHost = (totalConsumingPartitions + numHosts - 1) / numHosts;
-
-        long totalMemoryForCompletedSegmentsPerHost =
-            totalMemoryForCompletedSegmentsPerPartition * totalConsumingPartitionsPerHost;
-        long totalMemoryForConsumingSegmentsPerHost =
-            memoryForConsumingSegmentPerPartition * totalConsumingPartitionsPerHost;
-        long totalMemoryPerHost = totalMemoryForCompletedSegmentsPerHost + totalMemoryForConsumingSegmentsPerHost;
-
-        totalMemoryPerHostMB[i][j] = (long) ((double) totalMemoryPerHost / (1024 * 1024));
-        optimalSegmentSizeMB[i][j++] = (long) ((double) completedSegmentSizeBytes / (1024 * 1024));
-      }
-      i++;
-    }
-    display(totalMemoryPerHostMB, optimalSegmentSizeMB);
-    return true;
   }
 
-  private void display(long[][] totalMemoryPerHostMB, long[][] optimalSegmentSizeMB) {
-    System.out.print("numHosts --> ");
-    for (int numHosts : NUM_HOSTS) {
-      System.out.print(numHosts);
-      System.out.print("      |");
-    }
-    System.out.println();
-
-    for (int r = 0; r < NUM_HOURS_TO_CONSUME.length; r++) {
-      System.out.print(NUM_HOURS_TO_CONSUME[r]);
-      System.out.print(" --->       ");
-      for (int c = 0; c < NUM_HOSTS.length; c++) {
-        System.out.print(totalMemoryPerHostMB[r][c]);
-        System.out.print("  |");
-      }
-      System.out.println();
-    }
-
-    System.out.println();
-
-    System.out.print("numHosts --> ");
-    for (int numHosts : NUM_HOSTS) {
-      System.out.print(numHosts);
-      System.out.print("   |");
-    }
-    System.out.println();
-
-    for (int r = 0; r < NUM_HOURS_TO_CONSUME.length; r++) {
-      System.out.print(NUM_HOURS_TO_CONSUME[r]);
-      System.out.print(" -->       ");
-      for (int c = 0; c < NUM_HOSTS.length; c++) {
-        System.out.print(optimalSegmentSizeMB[r][c]);
-        System.out.print("  |");
-      }
-      System.out.println();
-    }
-  }
-
+  /**
+   * Creates a sample realtime segment metadata for the realtime segment config
+   * @param segmentMetadata
+   * @return
+   */
   private RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(SegmentMetadataImpl segmentMetadata) {
     RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = new RealtimeSegmentZKMetadata();
     realtimeSegmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
@@ -285,6 +269,18 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
     return realtimeSegmentZKMetadata;
   }
 
+  private RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(SegmentMetadataImpl segmentMetadata, int totalDocs) {
+    RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = getRealtimeSegmentZKMetadata(segmentMetadata);
+    realtimeSegmentZKMetadata.setTotalRawDocs(totalDocs);
+    return realtimeSegmentZKMetadata;
+  }
+
+  /**
+   * Gets the average num multivalues across all multivalue columns in the data
+   * @param sampleCompletedSegmentFile
+   * @param segmentMetadata
+   * @return
+   */
   private int getAvgMultiValues(File sampleCompletedSegmentFile, SegmentMetadataImpl segmentMetadata) {
     int avgMultiValues = 0;
     Set<String> multiValueColumns = new HashSet<>();
@@ -313,11 +309,19 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
       } catch (Exception e) {
         throw new RuntimeException("Caught exception when calculating avg multi values");
       }
-      avgMultiValues = (int) ((double) multiValuesSum / numValues);
+      avgMultiValues = (int) (((double) multiValuesSum + numValues - 1) / numValues);
     }
     return avgMultiValues;
   }
 
+  /**
+   * Given the memory required by a completed segment, this method calculates the total memory required by completed segments at a time for a partition.
+   * This calculation takes into account the number of hours the completed segments need to be retained (configured retention - numHoursToConsume)
+   * It also takes into account that a new segment will be created every numHoursToConsume hours, and so we might need to keep multiple completed segments in memory at a time
+   * @param completedSegmentSizeBytes
+   * @param numHoursToConsume
+   * @return
+   */
   private long calculateMemoryForCompletedSegmentsPerPartition(long completedSegmentSizeBytes, int numHoursToConsume) {
 
     // if retention is set to x hours, of which we would be consuming for numHoursToConsume hours,
@@ -330,5 +334,53 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
         (numHoursToKeepSegmentInMemory + numHoursToConsume - 1) / numHoursToConsume; // adjustment for ceil
 
     return numCompletedSegmentsToKeepInMemory * completedSegmentSizeBytes;
+  }
+
+  /*******************************************************************
+   *
+   * Methods for displaying the results
+   * TODO: write better methods, or put these in a separate class
+   *
+   *****************************************************************/
+  private void display(String[][] totalMemoryPerHost, String[][] optimalSegmentSize) {
+
+    printNumHostsHeader();
+    printNumHoursHeader();
+    printOutputValues(totalMemoryPerHost);
+
+    printNumHostsHeader();
+    printNumHoursHeader();
+    printOutputValues(optimalSegmentSize);
+  }
+
+  private void printNumHostsHeader() {
+    System.out.println();
+    System.out.print("numHosts --> ");
+    for (int numHosts : NUM_HOSTS) {
+      System.out.print(getStringForDisplay(String.valueOf(numHosts)));
+      System.out.print("|");
+    }
+    System.out.println();
+  }
+
+  private void printNumHoursHeader() {
+    System.out.println("numHours");
+  }
+
+  private void printOutputValues(String[][] outputValues) {
+    for (int r = 0; r < NUM_HOURS_TO_CONSUME.length; r++) {
+      System.out.print(String.format("%2d", NUM_HOURS_TO_CONSUME[r]));
+      System.out.print(" --------> ");
+      for (int c = 0; c < NUM_HOSTS.length; c++) {
+        System.out.print(getStringForDisplay(outputValues[r][c]));
+        System.out.print("|");
+      }
+      System.out.println();
+    }
+  }
+
+  private String getStringForDisplay(String memoryStr) {
+    int numSpacesToPad = MEMORY_STR_LEN - memoryStr.length();
+    return memoryStr + StringUtils.repeat(" ", numSpacesToPad);
   }
 }
