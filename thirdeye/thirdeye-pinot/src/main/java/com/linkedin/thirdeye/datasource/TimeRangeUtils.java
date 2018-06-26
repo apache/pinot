@@ -90,7 +90,7 @@ public class TimeRangeUtils {
     int index = -1;
     switch (granularity.getUnit()) {
     case DAYS:
-      Days d = Days.daysBetween(start.toLocalDate(), current.toLocalDate());
+      Days d = Days.daysBetween(start, current);
       index = d.getDays() / granularity.getSize();
       break;
     default:

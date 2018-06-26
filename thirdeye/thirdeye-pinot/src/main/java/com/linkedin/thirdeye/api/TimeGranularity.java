@@ -1,11 +1,12 @@
 package com.linkedin.thirdeye.api;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
-
+import org.joda.time.DurationFieldType;
 import org.joda.time.Period;
+import org.joda.time.PeriodType;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class TimeGranularity {
   private final int size;
@@ -78,19 +79,18 @@ public class TimeGranularity {
   public Period toPeriod(int number) {
     int size = this.size * number;
     switch (unit) {
-    case DAYS:
-      return new Period(0, 0, 0, size, 0, 0, 0, 0);
-    case HOURS:
-      return new Period(0, 0, 0, 0, size, 0, 0, 0);
-    case MINUTES:
-      return new Period(0, 0, 0, 0, 0, size, 0, 0);
-    case SECONDS:
-      return new Period(0, 0, 0, 0, 0, 0, size, 0);
-    case MILLISECONDS:
-      return new Period(0, 0, 0, 0, 0, 0, 0, size);
-    default:
-      return new Period(0, 0, 0, 0, size, 0, 0, 0);
+      case DAYS:
+        return new Period().withPeriodType(PeriodType.days()).withField(DurationFieldType.days(), size);
+      case HOURS:
+        return new Period().withPeriodType(PeriodType.hours()).withField(DurationFieldType.hours(), size);
+      case MINUTES:
+        return new Period().withPeriodType(PeriodType.minutes()).withField(DurationFieldType.minutes(), size);
+      case SECONDS:
+        return new Period().withPeriodType(PeriodType.seconds()).withField(DurationFieldType.seconds(), size);
+      case MILLISECONDS:
+        return new Period().withPeriodType(PeriodType.millis()).withField(DurationFieldType.millis(), size);
     }
+    throw new IllegalArgumentException(String.format("Unsupported unit type %s", this.unit));
   }
 
   /**
