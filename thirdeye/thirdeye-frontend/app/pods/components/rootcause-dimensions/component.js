@@ -113,7 +113,7 @@ export default Component.extend({
    * Single record cache for previous row's dimension names array
    * @type {Array}
    */
-  previousDimensionNames: [],
+  previousDimensionValues: [],
 
   /**
    * Override for table classes
@@ -142,7 +142,7 @@ export default Component.extend({
    */
   isLoading: true,
 
-  init() {
+  didReceiveAttrs() {
     this._super(...arguments);
     this._fetchIfNewContext();
   },
@@ -157,7 +157,7 @@ export default Component.extend({
     'metricUrn',
     function () {
       const { dimensionsRawData, selectedUrns, metricUrn } = this.getProperties('dimensionsRawData', 'selectedUrns', 'metricUrn');
-      const toFixedIfDecimal = (number) => (number % 1 !== 0) ? number.toFixed(2) : number;
+      const toFixedIfDecimal = (number) => (number % 1 !== 0) ? number.toFixed(2).toLocaleString() : number.toLocaleString();
       const dimensionNames = dimensionsRawData.dimensions || [];
       const dimensionRows = dimensionsRawData.responseRows || [];
       let newDimensionRows = [];
@@ -168,7 +168,7 @@ export default Component.extend({
           let {
             dimensionArr, // Generate array of cell-specific objects for each dimension
             dimensionUrn // Generate URN for each record from dimension names/values
-          } = this._generateDimensionUrn(dimensionNames, record);
+          } = this._generateDimensionMeta(dimensionNames, record);
           let overallContribution = record.contributionToOverallChange;
 
           // New records of template-ready data
@@ -258,10 +258,9 @@ export default Component.extend({
     const newConcatSettings = `${metricUrn}:${range[0]}:${range[1]}:${mode}`;
     // Compare current and incoming settings
     const isSameMetricSettings = previousSettings === newConcatSettings;
-    // Are previous and incoming URNs the same?
-    const isSameUrns = previousUrns.length === newUrns.length && newUrns.every(urn => previousUrns.includes(urn));
     // If we have new settings, we can trigger fetch/reload. Otherwise, do nothing
-    if (metricEntity && (!isSameUrns || !isSameMetricSettings)) {
+    if (metricEntity && !isSameMetricSettings) {
+      set(this, 'isLoading', true);
       const parsedMetric = metricEntity.label.split('::');
       get(this, 'fetchDimensionAnalysisData').perform({
         metric: parsedMetric[1],
@@ -320,28 +319,30 @@ export default Component.extend({
 
   /**
    * Builds an array of objects with enough data for the dynamic dimension table columns to
-   * know how to render each cell. Based on this object 'dimensionArr', we also build a  rich URN
+   * know how to render each cell. Based on this object 'dimensionArr', we also build a rich URN
    * containing all the dimensions present in a record in a format that the RCA page understands.
-   * @method  _generateDimensionUrn
+   * @method  _generateDimensionMeta
    * @param {Array} dimensionNames - array of dimension names from root of response object
    * @param {Array} record - single current record
    * @returns {Object} name/value object for dimensions, plus the new URN
    * @private
    */
-  _generateDimensionUrn(dimensionNames, record) {
+  _generateDimensionMeta(dimensionNames, record) {
     // We cache the value of the previous row's dimension values for row grouping
-    const previousDimensionNames = get(this, 'previousDimensionNames');
+    const previousDimensionValues = get(this, 'previousDimensionValues');
     // We want to display excluded dimensions with value '(ALL)-' and having 'otherDimensionValues' prop
     const otherValues = isPresent(record, 'otherDimensionValues') ? record.otherDimensionValues : null;
 
     // Array to help dimension column component decide what to render in each cell
     const dimensionArr = dimensionNames.map((name, index) => {
       let dimensionValue = record.names[index];
+      let isExclusionRecord = dimensionValue === '(ALL)-';
+      let modifiedValue = isExclusionRecord ? 'Other' : dimensionValue;
       return {
         label: name.camelize(),
-        value: dimensionValue || '-',
-        isHidden: dimensionValue === previousDimensionNames[index], // if its a repeated value, hide it
-        otherValues: dimensionValue === '(ALL)-' ? otherValues : null
+        value: modifiedValue.replace('(ALL)', 'All') || '-',
+        isHidden: dimensionValue === previousDimensionValues[index], // if its a repeated value, hide it
+        otherValues: isExclusionRecord ? otherValues : null
       };
     });
 
@@ -352,7 +353,7 @@ export default Component.extend({
     // Append dimensions string to metricUrn. This will be sent to the graph legend for display
     const dimensionUrn = `${get(this, 'metricUrn')}:${encodedDimensions}`;
     // Now save the current record names as 'previous'
-    set(this, 'previousDimensionNames', record.names);
+    set(this, 'previousDimensionValues', record.names);
 
     return { dimensionArr, dimensionUrn };
   },
@@ -391,15 +392,15 @@ export default Component.extend({
     const dimensionsPayload = yield this.get('dimensionsApiService').queryDimensionsByMetric(dimensionObj);
     const dimensionNames = dimensionsPayload.dimensions || [];
     const ratio = dimensionsPayload.globalRatio;
-    const convertedChangeRate = (ratio) => `${Math.abs((ratio -1) * 100).toFixed(2)}%`;
+    const cobTotal = `${dimensionsPayload.currentTotal}/${dimensionsPayload.baselineTotal}`;
 
     this.setProperties({
       isLoading: false,
       dimensionsRawData: dimensionsPayload,
       cachedUrn: get(this, 'metricUrn'),
       isDimensionDataPresent: true,
-      overallChange: ratio ? convertedChangeRate(ratio) : 'N/A'
+      overallChange: ratio ? `${((ratio -1) * 100).toFixed(2)}%` : 'N/A'
     });
 
-  }).cancelOn('deactivate').drop()
+  }).drop()
 });

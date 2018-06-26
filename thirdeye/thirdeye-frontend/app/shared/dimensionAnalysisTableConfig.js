@@ -6,7 +6,7 @@ const COLUMN_CLASS = 'rootcause-dimensions-table__column';
  */
 export const groupedHeaders = (advDimensionCount, overallChange) => [
   [
-    {title: 'Dimensions', className: 'rootcause-dimensions-table__header', colspan: advDimensionCount},
+    {title: 'Top Anomalous Dimensions', className: 'rootcause-dimensions-table__header', colspan: advDimensionCount},
     {title: '', className: 'rootcause-dimensions-table__header', colspan: 1},
     {title: `Overall Change ${overallChange}`, className: 'rootcause-dimensions-table__header', colspan: 1},
     {title: '', className: 'rootcause-dimensions-table__header', colspan: 2}
@@ -36,6 +36,7 @@ export const baseColumns = [
   {
     propertyName: 'percentageChange',
     title: '% Change',
+    component: 'custom/dimensions-table/percent-change',
     className: `${COLUMN_CLASS} ${COLUMN_CLASS}--med-width`,
     disableSorting: true,
     disableFiltering: true
@@ -43,6 +44,7 @@ export const baseColumns = [
   {
     propertyName: 'contributionChange',
     title: 'Change in Contribution',
+    component: 'custom/dimensions-table/contribution-change',
     className: `${COLUMN_CLASS} ${COLUMN_CLASS}--med-width`,
     disableSorting: true,
     disableFiltering: true

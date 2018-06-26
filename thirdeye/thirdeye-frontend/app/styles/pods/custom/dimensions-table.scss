@@ -27,7 +27,7 @@
       width: 300px;
     }
     &--bar-cell {
-      min-width: 300px;
+      min-width: 325px;
       padding: 0;
     }
     &--blank-cell {
@@ -48,11 +48,12 @@
   &__dimension-content {
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 180px;
+    max-width: 164px;
 
     &--first {
       margin-left: 10px;
-      display: inline;
+      line-height: 14px;
+      display: inline-block;
     }
   }
   &__header {
@@ -85,5 +86,19 @@
     float: right;
     text-align: right;
     padding-right: 5px;
+    color: steelblue;
+
+    &--negative {
+      color: brown;
+    }
+  }
+  &__change-cell {
+    text-align: right;
+    padding-right: 5px;
+    color: steelblue;
+
+    &--negative {
+      color: brown;
+    }
   }
 }

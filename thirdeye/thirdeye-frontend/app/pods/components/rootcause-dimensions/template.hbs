@@ -1,8 +1,9 @@
-{{#if isLoading}}
+{{#if fetchDimensionAnalysisData.isRunning}}
   {{ember-spinner}}
 {{/if}}
 
 {{update-table
+  pageSize=25
   data=dimensionTableData
   columns=dimensionTableColumns
   groupedHeaders=dimensionTableHeaders
