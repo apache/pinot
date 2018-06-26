@@ -5,14 +5,12 @@
  * @property {String} metricUrn - URN of currently loaded metric
  * @property {Object} context - a representation of the current cached state of the RCA page (we only care about its 'analysisRange' and 'compareMode' for now)
  * @property {Array} selectedUrns - the list of currently selected and graphed metrics. We sync this with the table's 'isSelecte' row property.
- * @property {Boolean} isLoading - loading state
  * @example
     {{rootcause-dimensions
       entities=entities
       metricUrn=metricUrn
       context=context
       selectedUrns=selectedUrns
-      isLoading=(or isLoadingAggregates isLoadingScores)
       onSelection=(action "onSelection")
     }}
  * @exports rootcause-dimensions
@@ -136,12 +134,6 @@ export default Component.extend({
    */
   headerFilteringRowTemplate: 'custom/dimensions-table/header-row-filtering',
 
-  /**
-   * loading status for component
-   * @type {boolean}
-   */
-  isLoading: true,
-
   didReceiveAttrs() {
     this._super(...arguments);
     this._fetchIfNewContext();
@@ -260,7 +252,6 @@ export default Component.extend({
     const isSameMetricSettings = previousSettings === newConcatSettings;
     // If we have new settings, we can trigger fetch/reload. Otherwise, do nothing
     if (metricEntity && !isSameMetricSettings) {
-      set(this, 'isLoading', true);
       const parsedMetric = metricEntity.label.split('::');
       get(this, 'fetchDimensionAnalysisData').perform({
         metric: parsedMetric[1],
@@ -395,7 +386,6 @@ export default Component.extend({
     const cobTotal = `${dimensionsPayload.currentTotal}/${dimensionsPayload.baselineTotal}`;
 
     this.setProperties({
-      isLoading: false,
       dimensionsRawData: dimensionsPayload,
       cachedUrn: get(this, 'metricUrn'),
       isDimensionDataPresent: true,
