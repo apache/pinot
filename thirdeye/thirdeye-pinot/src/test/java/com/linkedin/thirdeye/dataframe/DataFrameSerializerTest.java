@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.dataframe;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.linkedin.thirdeye.dataframe.util.DataFrameSerializer;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.testng.Assert;
@@ -79,5 +80,36 @@ public class DataFrameSerializerTest {
 
     String serialized = this.mapper.writeValueAsString(map);
     Assert.assertEquals(serialized, "{\"first\":1,\"second\":\"Hi\",\"third\":{\"doubles\":[1.1,2.0,3.3,null,5.5]}}");
+  }
+
+  @Test
+  public void testSerializeNestedDeep() throws Exception {
+    MyPojo pojo = new MyPojo(Collections.singletonMap("one",
+        (Object) Collections.singletonMap("two",
+            Collections.singletonList(
+                new DataFrame().addSeries("doubles", 1.0, 2.2, DoubleSeries.NULL)
+            ))),
+        "test");
+
+    String serialized = this.mapper.writeValueAsString(pojo);
+    Assert.assertEquals(serialized, "{\"map\":{\"one\":{\"two\":[{\"doubles\":[1.0,2.2,null]}]}},\"value\":\"test\"}");
+  }
+
+  private static class MyPojo {
+    Map<String, Object> map;
+    String value;
+
+    public MyPojo(Map<String, Object> map, String value) {
+      this.map = map;
+      this.value = value;
+    }
+
+    public Map<String, Object> getMap() {
+      return map;
+    }
+
+    public String getValue() {
+      return value;
+    }
   }
 }

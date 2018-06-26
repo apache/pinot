@@ -1,13 +1,10 @@
 package com.linkedin.thirdeye.detection;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.DefaultAggregationLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.DefaultTimeSeriesLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.TimeSeriesLoader;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.util.DataFrameSerializer;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
@@ -41,7 +38,7 @@ import org.slf4j.LoggerFactory;
 @Produces(MediaType.APPLICATION_JSON)
 public class DetectionResource {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionResource.class);
-  private static final ObjectMapper OBJECT_MAPPER = makeMapper();
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
@@ -183,21 +180,5 @@ public class DetectionResource {
     }
 
     return Response.ok(result).build();
-  }
-
-  /**
-   * Helper for Object mapper with DataFrame support
-   *
-   * @return initialized ObjectMapper
-   */
-  private static ObjectMapper makeMapper() {
-    ObjectMapper mapper = new ObjectMapper();
-
-    SimpleModule module = new SimpleModule();
-    module.addSerializer(DataFrame.class, new DataFrameSerializer());
-
-    mapper.registerModule(module);
-
-    return mapper;
   }
 }

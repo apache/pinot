@@ -1,5 +1,10 @@
 package com.linkedin.thirdeye.common;
 
+import com.fasterxml.jackson.databind.Module;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.util.DataFrameSerializer;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -45,5 +50,16 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     datasetConfigDAO = DaoProviderUtil.getInstance(DatasetConfigManagerImpl.class);
     metricConfigDAO = DaoProviderUtil.getInstance(MetricConfigManagerImpl.class);
     functionAutotuneConfigDAO = DaoProviderUtil.getInstance(AutotuneConfigManagerImpl.class);
+  }
+
+  /**
+   * Helper for Object mapper with DataFrame support
+   *
+   * @return initialized ObjectMapper
+   */
+  protected static Module makeMapperModule() {
+    SimpleModule module = new SimpleModule();
+    module.addSerializer(DataFrame.class, new DataFrameSerializer());
+    return module;
   }
 }
