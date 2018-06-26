@@ -218,7 +218,7 @@ export default Controller.extend({
 
   _fetchAnomalies() {
     const analysisRange = get(this, 'analysisRange');
-    const url = `/detection/preview?start=${analysisRange[0]}&end=${analysisRange[1]}`;
+    const url = `/detection/preview?start=${analysisRange[0]}&end=${analysisRange[1]}&diagnostics=true`;
 
     const jsonString = get(this, 'detectionConfig');
 
@@ -226,6 +226,7 @@ export default Controller.extend({
 
     fetch(url, { method: 'POST', body: jsonString })
       .then(checkStatus)
+      .then(res => res.anomalies)
       .then(res => set(this, 'anomalies', this._filterAnomalies(res)))
       .then(res => set(this, 'output', 'got anomalies'))
       .catch(err => set(this, 'errorAnomalies', err));

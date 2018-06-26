@@ -51,7 +51,8 @@ public class AlgorithmUtilsTest {
 
   @Test
   public void testOutlier() {
-    Assert.assertEquals(AlgorithmUtils.getOutliers(this.outlierData, new Duration(86400000L)).sum().longValue(), 48);
+    // NOTE: spline smoothing effect expands window
+    Assert.assertEquals(AlgorithmUtils.getOutliers(this.outlierData, new Duration(86400000L)).sum().longValue(), 57);
   }
 
   @Test

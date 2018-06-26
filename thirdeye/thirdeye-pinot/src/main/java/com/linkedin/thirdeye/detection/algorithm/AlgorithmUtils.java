@@ -21,7 +21,7 @@ import org.joda.time.Duration;
  * TODO implement all detection methods. all the methods!
  */
 public class AlgorithmUtils {
-  private static final int DEFAULT_SPLINE_ITERATIONS = 4;
+  private static final int FAST_SPLINE_ITERATIONS = 4;
 
   private static final String COL_TIME = DataFrameUtils.COL_TIME;
   private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
@@ -38,29 +38,28 @@ public class AlgorithmUtils {
    * @param minDuration time series
    * @return outlier flag series
    */
-  static BooleanSeries getOutliers(DataFrame df, Duration minDuration) {
+  public static BooleanSeries getOutliers(DataFrame df, Duration minDuration) {
     if (df.isEmpty()) {
       return BooleanSeries.empty();
     }
 
     LongSeries time = df.getLongs(COL_TIME);
-    DoubleSeries value = df.getDoubles(COL_VALUE);
+    DoubleSeries value = fastBSpline(df.getDoubles(COL_VALUE), FAST_SPLINE_ITERATIONS);
 
     byte[] outlier = new byte[df.size()];
     Arrays.fill(outlier, (byte) 0);
 
-    // TODO expanding window from last change point
-    double upQuartile = value.quantile(0.75).doubleValue();
-    double downQuartile = value.quantile(0.25).doubleValue();
+    double upTercile = value.quantile(0.666).doubleValue();
+    double downTercile = value.quantile(0.333).doubleValue();
 
     int runStart = 0;
     int runSide = 0;
     for (int i = 0; i < df.size(); i++) {
       if (!value.isNull(i)) {
         int side = 0;
-        if (value.getDouble(i) > upQuartile)
+        if (value.getDouble(i) > upTercile)
           side = 1;
-        if (value.getDouble(i) < downQuartile)
+        if (value.getDouble(i) < downTercile)
           side = -1;
 
         // run side changed or last run
@@ -88,13 +87,13 @@ public class AlgorithmUtils {
    * @param minDuration time series
    * @return change points
    */
-  static TreeSet<Long> getChangePoints(DataFrame df, Duration minDuration) {
+  public static TreeSet<Long> getChangePoints(DataFrame df, Duration minDuration) {
     if (df.isEmpty()) {
       return new TreeSet<>();
     }
 
     LongSeries time = df.getLongs(COL_TIME);
-    DoubleSeries value = fastBSpline(df.getDoubles(COL_VALUE), DEFAULT_SPLINE_ITERATIONS);
+    DoubleSeries value = fastBSpline(df.getDoubles(COL_VALUE), FAST_SPLINE_ITERATIONS);
 
     TreeSet<Long> changePoints = new TreeSet<>();
 
@@ -130,10 +129,9 @@ public class AlgorithmUtils {
    * Helper for simulating B-spline with moving averages.
    *
    * @param s double series
-   * @param n number of iterations (e.g. 4 for cubic)
    * @return smoothed series
    */
-  static DoubleSeries fastBSpline(DoubleSeries s, int n) {
+  public static DoubleSeries fastBSpline(DoubleSeries s, int n) {
     // NOTE: rules-of-thumb from https://en.wikipedia.org/wiki/Gaussian_filter
     // four successive moving averages
 
@@ -157,7 +155,7 @@ public class AlgorithmUtils {
    * @param changePoints set of change points
    * @return re-scaled time series
    */
-  static DataFrame getRescaledSeries(DataFrame dfTimeseries, Collection<Long> changePoints) {
+  public static DataFrame getRescaledSeries(DataFrame dfTimeseries, Collection<Long> changePoints) {
     if (dfTimeseries.isEmpty()) {
       return dfTimeseries;
     }

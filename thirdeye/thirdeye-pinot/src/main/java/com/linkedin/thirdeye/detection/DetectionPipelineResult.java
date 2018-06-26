@@ -1,16 +1,20 @@
 package com.linkedin.thirdeye.detection;
 
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 public class DetectionPipelineResult {
+  Map<String, Object> diagnostics;
   List<MergedAnomalyResultDTO> anomalies;
   long lastTimestamp;
 
   public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies) {
     this.anomalies = anomalies;
     this.lastTimestamp = getMaxTime(anomalies);
+    this.diagnostics = new HashMap<>();
   }
 
   public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies, long lastTimestamp) {
@@ -22,16 +26,27 @@ public class DetectionPipelineResult {
     return anomalies;
   }
 
-  public void setAnomalies(List<MergedAnomalyResultDTO> anomalies) {
+  public DetectionPipelineResult setAnomalies(List<MergedAnomalyResultDTO> anomalies) {
     this.anomalies = anomalies;
+    return this;
   }
 
   public long getLastTimestamp() {
     return lastTimestamp;
   }
 
-  public void setLastTimestamp(long lastTimestamp) {
+  public DetectionPipelineResult setLastTimestamp(long lastTimestamp) {
     this.lastTimestamp = lastTimestamp;
+    return this;
+  }
+
+  public Map<String, Object> getDiagnostics() {
+    return diagnostics;
+  }
+
+  public DetectionPipelineResult setDiagnostics(Map<String, Object> diagnostics) {
+    this.diagnostics = diagnostics;
+    return this;
   }
 
   private static long getMaxTime(Iterable<MergedAnomalyResultDTO> anomalies) {

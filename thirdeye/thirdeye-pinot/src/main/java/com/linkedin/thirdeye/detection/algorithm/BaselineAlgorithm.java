@@ -16,6 +16,7 @@ import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.collections.MapUtils;
 import org.joda.time.DateTimeZone;
@@ -113,6 +114,7 @@ public class BaselineAlgorithm extends StaticDetectionPipeline {
 
     List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.slice, df, COL_ANOMALY);
 
-    return new DetectionPipelineResult(anomalies);
+    return new DetectionPipelineResult(anomalies)
+        .setDiagnostics(Collections.singletonMap("data", (Object) df.dropAllNullColumns()));
   }
 }

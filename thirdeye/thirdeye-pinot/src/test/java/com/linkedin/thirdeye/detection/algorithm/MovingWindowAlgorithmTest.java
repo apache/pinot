@@ -52,6 +52,7 @@ public class MovingWindowAlgorithmTest {
   private static final String PROP_OUTLIER_DURATION = "outlierDuration";
   private static final String PROP_CHANGE_DURATION = "changeDuration";
   private static final String PROP_BASELINE_WEEKS = "baselineWeeks";
+  private static final String PROP_SMOOTHING_PASSES = "smoothingPasses";
 
   private DataProvider provider;
   private MovingWindowAlgorithm algorithm;
@@ -257,7 +258,7 @@ public class MovingWindowAlgorithmTest {
   }
 
   //
-  // outlier and change point correction
+  // smoothing, outliers and change point correction
   //
 
   @Test
@@ -270,9 +271,10 @@ public class MovingWindowAlgorithmTest {
     this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 604800000L, 1209600000L);
     DetectionPipelineResult res = this.algorithm.run();
 
-    Assert.assertEquals(res.getAnomalies().size(), 7);
+    Assert.assertEquals(res.getAnomalies().size(), 8);
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(626400000L, 630000000L)));
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(705600000L, 709200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(813600000L, 817200000L)));
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(846000000L, 849600000L)));
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(892800000L, 896400000L)));
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(903600000L, 907200000L)));

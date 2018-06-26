@@ -103,7 +103,7 @@ public class DimensionWrapper extends DetectionPipeline {
     DataFrame aggregates = this.provider.fetchAggregates(Collections.singletonList(slice), this.dimensions).get(slice);
 
     if (aggregates.isEmpty()) {
-      return new DetectionPipelineResult(Collections.<MergedAnomalyResultDTO>emptyList(), -1);
+      return new DetectionPipelineResult(Collections.<MergedAnomalyResultDTO>emptyList());
     }
 
     final double total = aggregates.getDoubles(COL_VALUE).sum().fillNull().doubleValue();
@@ -134,8 +134,10 @@ public class DimensionWrapper extends DetectionPipeline {
     }
 
     if (aggregates.isEmpty()) {
-      return new DetectionPipelineResult(Collections.<MergedAnomalyResultDTO>emptyList(), -1);
+      return new DetectionPipelineResult(Collections.<MergedAnomalyResultDTO>emptyList());
     }
+
+    Map<String, Object> diagnostics = new HashMap<>();
 
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
 
@@ -152,10 +154,12 @@ public class DimensionWrapper extends DetectionPipeline {
         DetectionPipelineResult intermediate = this.runNested(targetMetric, properties);
 
         anomalies.addAll(intermediate.getAnomalies());
+        diagnostics.put(targetMetric.getUrn(), intermediate.getDiagnostics());
       }
     }
 
-    return new DetectionPipelineResult(anomalies);
+    return new DetectionPipelineResult(anomalies)
+        .setDiagnostics(diagnostics);
   }
 
   protected DetectionPipelineResult runNested(MetricEntity metric, Map<String, Object> template) throws Exception {

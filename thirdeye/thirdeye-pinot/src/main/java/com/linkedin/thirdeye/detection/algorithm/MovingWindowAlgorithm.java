@@ -211,7 +211,8 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
     List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.sliceDetection, df, COL_ANOMALY);
 
-    return new DetectionPipelineResult(anomalies);
+    return new DetectionPipelineResult(anomalies)
+        .setDiagnostics(Collections.singletonMap("data", (Object) df.dropAllNullColumns()));
   }
 
   /**
