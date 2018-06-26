@@ -189,7 +189,10 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     constructStarTree(_rootNode, 0, _starTreeData.size(), 0);
 
     // create aggregated doc for all nodes.
-    createAggregatedDocForAllNodes();
+    //createAggregatedDocForAllNodes();
+
+    createAggregatedDocForAllNodesBottom(_rootNode);
+    return;
   }
 
   @Override
@@ -330,40 +333,96 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     return null;
   }
 
+//  /**
+//   * Helper function to create aggregated document for all nodes
+//   *
+//   * @return void.
+//   */
+//  private void createAggregatedDocForAllNodes() {
+//    Queue<TreeNode> childNodes = new LinkedList<>();
+//
+//    Map<Integer, TreeNode> children = _rootNode._children;
+//    for (int key : children.keySet()) {
+//      TreeNode child = children.get(key);
+//      child._value = key;
+//      childNodes.add(child);
+//    }
+//
+//    while (!childNodes.isEmpty()) {
+//      TreeNode parent = childNodes.remove();
+//      if (parent._value != StarTreeV2Constant.STAR_NODE) {
+//        List<Object> aggregatedValues = getAggregatedDocument(parent._startDocId, parent._endDocId);
+//        int aggDocId = appendAggregatedDocuments(aggregatedValues);
+//        parent._aggDataDocumentId = aggDocId;
+//      }
+//
+//      children = parent._children;
+//      if (children != null) {
+//        for (int key : children.keySet()) {
+//          TreeNode child = children.get(key);
+//          child._value = key;
+//          childNodes.add(child);
+//        }
+//      }
+//    }
+//    return;
+//  }
+
   /**
    * Helper function to create aggregated document for all nodes
    *
    * @return void.
    */
-  private void createAggregatedDocForAllNodes() {
-    Queue<TreeNode> childNodes = new LinkedList<>();
+  private void createAggregatedDocForAllNodesBottom(TreeNode node) {
 
-    Map<Integer, TreeNode> children = _rootNode._children;
+    if (node._children == null) {
+      if (node._value == StarTreeV2Constant.STAR_NODE) {
+        return;
+      }
+
+      List<Object> aggregatedValues = getAggregatedDocument(node._startDocId, node._endDocId);
+      int aggDocId = appendAggregatedDocuments(aggregatedValues);
+      node._aggDataDocumentId = aggDocId;
+      return;
+    }
+
+    Map<Integer, TreeNode> children = node._children;
     for (int key : children.keySet()) {
       TreeNode child = children.get(key);
       child._value = key;
-      childNodes.add(child);
+      createAggregatedDocForAllNodesBottom(child);
     }
 
-    while (!childNodes.isEmpty()) {
-      TreeNode parent = childNodes.remove();
-      if (parent._value != StarTreeV2Constant.STAR_NODE) {
-        List<Object> aggregatedValues = getAggregatedDocument(parent._startDocId, parent._endDocId);
-        int aggDocId = appendAggregatedDocuments(aggregatedValues);
-        parent._aggDataDocumentId = aggDocId;
-      }
-
-      children = parent._children;
-      if (children != null) {
-        for (int key : children.keySet()) {
-          TreeNode child = children.get(key);
-          child._value = key;
-          childNodes.add(child);
-        }
-      }
+    if (node._value != StarTreeV2Constant.STAR_NODE) {
+      int aggDocId = calculateAggregatedDocumentFromChildren(node._children);
+      node._aggDataDocumentId = aggDocId;
     }
+
     return;
   }
+
+  /**
+   * Helper function to create aggregated document from children for a parent node.
+   *
+   * @return aggregated document id.
+   */
+  private Integer calculateAggregatedDocumentFromChildren(Map<Integer, TreeNode> children) {
+    List<Record> chilAggRecordsList = new ArrayList<>();
+    for (int key : children.keySet()) {
+      TreeNode child = children.get(key);
+      child._value = key;
+      if ( child._value == StarTreeV2Constant.STAR_NODE) {
+        return child._startDocId;
+      } else {
+        chilAggRecordsList.add(_starTreeData.get(child._aggDataDocumentId));
+      }
+    }
+    List<Object> aggregatedValues = OnHeapStarTreeV2BuilderHelper.aggregateMetrics(0, chilAggRecordsList.size(), chilAggRecordsList, _met2aggfuncPairs);
+    int aggDocId = appendAggregatedDocuments(aggregatedValues);
+
+    return aggDocId;
+  }
+
 
   /**
    * Create a aggregated document for this range.
