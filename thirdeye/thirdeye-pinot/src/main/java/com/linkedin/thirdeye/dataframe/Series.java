@@ -710,6 +710,18 @@ public abstract class Series {
   }
 
   /**
+   * Returns {@code true} if the series contains only {@code null} values or is empty.
+   *
+   * @return {@code true} if all null or empty, {@code false} otherwise.
+   */
+  public final boolean allNull() {
+    for(int i=0; i<this.size(); i++)
+      if(!this.isNull(i))
+        return false;
+    return true;
+  }
+
+  /**
    * Returns the number of non-null values in the series.
    *
    * @return count of non-null values

@@ -3933,6 +3933,50 @@ public class DataFrameTest {
     assertEquals(out.getLongs("one"), 1, 2, 3, 4);
   }
 
+  @Test
+  public void testSeriesHasNull() {
+    Assert.assertTrue(DataFrame.toSeries(1, 2, 3, LNULL, 5).hasNull());
+  }
+
+  @Test
+  public void testSeriesHasNullFail() {
+    Assert.assertFalse(DataFrame.toSeries(1, 2, 3, 4, 5).hasNull());
+  }
+
+  @Test
+  public void testSeriesHasNullEmpty() {
+    Assert.assertFalse(LongSeries.empty().hasNull());
+  }
+
+  @Test
+  public void testSeriesAllNull() {
+    Assert.assertTrue(DataFrame.toSeries(LNULL, LNULL, LNULL, LNULL, LNULL).allNull());
+  }
+
+  @Test
+  public void testSeriesAllNullFail() {
+    Assert.assertFalse(DataFrame.toSeries(LNULL, LNULL, 3, LNULL, LNULL).allNull());
+  }
+
+  @Test
+  public void testSeriesAllNullEmpty() {
+    Assert.assertTrue(LongSeries.empty().allNull());
+  }
+
+  @Test
+  public void testDropAllNull() {
+    DataFrame df = new DataFrame()
+        .addSeries("a", LNULL, 1, LNULL)
+        .addSeries("b", LNULL, LNULL, LNULL)
+        .addSeries("c", DNULL, 1.1, DNULL)
+        .addSeries("d", 1.2, 1.3, 1.4);
+
+    DataFrame dfOut = df.dropAllNullColumns();
+
+    Assert.assertEquals(df.getSeriesNames(), new HashSet<>(Arrays.asList("a", "b", "c", "d")));
+    Assert.assertEquals(dfOut.getSeriesNames(), new HashSet<>(Arrays.asList("a", "c", "d")));
+  }
+
   /* **************************************************************************
    * Helpers
    ***************************************************************************/

@@ -1626,6 +1626,21 @@ public class DataFrame {
   }
 
   /**
+   * Returns a copy of the DataFrame omitting series that contain only {@code null} values.
+   *
+   * @return DataFrame copy without all-null series
+   */
+  public DataFrame dropAllNullColumns() {
+    DataFrame df = new DataFrame(this);
+    df.series.clear();
+    for(Map.Entry<String, Series> e : this.getSeries().entrySet()) {
+      if(!e.getValue().allNull())
+        df.addSeries(e.getKey(), e.getValue());
+    }
+    return df;
+  }
+
+  /**
    * Returns a copy of the DataFrame with series {@code seriesNames} replacing {@code null}
    * values with its native default value.
    *
