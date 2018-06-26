@@ -217,12 +217,6 @@ export default Controller.extend({
    */
   sessionOwner: null,
 
-  /**
-   * rootcause dimension table default loading state
-   * @type {boolean}
-   */
-  isDimensionLoading: true,
-
   //
   // static component config
   //
@@ -804,8 +798,7 @@ export default Controller.extend({
 
       this.setProperties({
         selectedUrns: new Set(selectedUrns),
-        sessionModified: true,
-        isDimensionLoading: false
+        sessionModified: true
       });
     },
 

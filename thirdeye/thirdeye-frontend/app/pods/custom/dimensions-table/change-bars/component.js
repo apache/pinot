@@ -30,6 +30,7 @@ export default Component.extend({
   isRowSelected: false,
   onSelection: null,
   inputId: null,
+  isNegativeChange: false,
 
   init() {
     this._super(...arguments);
@@ -62,6 +63,7 @@ export default Component.extend({
     setProperties(this, {
       containerWidthNegative,
       containerWidthPositive,
+      isNegativeChange: toWidthNumber(this.record.contributionToOverallChange) < 0,
       barWidthNegative: negativeBarScale(toWidthNumber(this.record.elementWidth.negative)),
       barWidthPositive: positiveBarScale(toWidthNumber(this.record.elementWidth.positive))
     });
