@@ -980,6 +980,10 @@ public class PinotLLCRealtimeSegmentManager {
     return false;
   }
 
+  private boolean isAllInstancesInState(Map<String, String> instanceStateMap, String state) {
+    return instanceStateMap.values().stream().allMatch(value -> value.equals(state));
+  }
+
   /*
    * Validate LLC segments of a table.
    *
@@ -1097,7 +1101,7 @@ public class PinotLLCRealtimeSegmentManager {
 
           // Possible scenarios: for any of these scenarios, we need to create new metadata IN_PROGRESS and new CONSUMING segment
           // 1. all replicas OFFLINE and metadata IN_PROGRESS/DONE - a segment marked itself OFFLINE during consumption for some reason
-          // 2. all replicas ONLINE or mixture of ONLINE/OFFLINE and metadata DONE
+          // 2. all replicas ONLINE or mixture of ONLINE/OFFLINE and metadata DONE - Resolved in https://github.com/linkedin/pinot/pull/2890
           // This could happen due to a race condition with the retention manager where we lost the new segment
           // The retention manager saw the new segment metadata before it was updated in ideal state, and hence marked it for deletion
           // later the new segment was updated in the ideal state, but the retention manager would clean it out from the metadata and ideal state, having marked it earlier
@@ -1106,24 +1110,26 @@ public class PinotLLCRealtimeSegmentManager {
           // step-2 was undone by retention manager (i.e. new IN_PROGRESS metadata got deleted)
           // step 3 was partially undone by retention manager (i.e. marking old segment ONLINE was done but new CONSUMING segment was deleted)
 
-          // No instances are consuming, so create a new consuming segment.
-          int nextSeqNum = segmentName.getSequenceNumber() + 1;
-          LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", tableNameWithType, partition,
-              nextSeqNum);
-          // To begin with, set startOffset to the oldest available offset in kafka. Fix it to be the one we want,
-          // depending on what the prev segment had.
-          long startOffset = getKafkaPartitionOffset(streamMetadata, KAFKA_SMALLEST_OFFSET, partition);
-          LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableNameWithType, partition);
-          startOffset =
-              getBetterStartOffsetIfNeeded(tableNameWithType, partition, segmentName, startOffset, nextSeqNum);
-          LLCSegmentName newLLCSegmentName = new LLCSegmentName(segmentName.getTableName(), partition, nextSeqNum, now);
+          if (isAllInstancesInState(instanceStateMap, PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE) || !(isTooSoonToCorrect(tableNameWithType, segmentId, now))) {
+            // No instances are consuming, so create a new consuming segment.
+            int nextSeqNum = segmentName.getSequenceNumber() + 1;
+            LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", tableNameWithType, partition,
+                nextSeqNum);
+            // To begin with, set startOffset to the oldest available offset in kafka. Fix it to be the one we want,
+            // depending on what the prev segment had.
+            long startOffset = getKafkaPartitionOffset(streamMetadata, KAFKA_SMALLEST_OFFSET, partition);
+            LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableNameWithType, partition);
+            startOffset =
+                getBetterStartOffsetIfNeeded(tableNameWithType, partition, segmentName, startOffset, nextSeqNum);
+            LLCSegmentName newLLCSegmentName = new LLCSegmentName(segmentName.getTableName(), partition, nextSeqNum, now);
 
-          CommittingSegmentDescriptor committingSegmentDescriptor =
-              new CommittingSegmentDescriptor(segmentId, startOffset, 0);
-          createNewSegmentMetadataZNRecord(tableConfig, segmentName, newLLCSegmentName, partitionAssignment,
-              committingSegmentDescriptor);
+            CommittingSegmentDescriptor committingSegmentDescriptor =
+                new CommittingSegmentDescriptor(segmentId, startOffset, 0);
+            createNewSegmentMetadataZNRecord(tableConfig, segmentName, newLLCSegmentName, partitionAssignment,
+                committingSegmentDescriptor);
 
-          consumingSegments.add(newLLCSegmentName.getSegmentName());
+            consumingSegments.add(newLLCSegmentName.getSegmentName());
+          }
         }
 
       } else {
