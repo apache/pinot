@@ -627,7 +627,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
             // generate error scenario
             int randomlySelectedPartition = random.nextInt(nPartitions);
-            Map<String, LLCSegmentName> partitionToLatestSegments = segmentManager._partitionAssignmentGenerator.getPartitionToLatestSegments(idealState);
+            Map<String, LLCSegmentName> partitionToLatestSegments =
+                segmentManager._partitionAssignmentGenerator.getPartitionToLatestSegments(idealState);
             LLCSegmentName latestSegment = partitionToLatestSegments.get(String.valueOf(randomlySelectedPartition));
             LLCRealtimeSegmentZKMetadata latestMetadata =
                 segmentManager.getRealtimeSegmentZKMetadata(tableName, latestSegment.getSegmentName(), null);
@@ -639,13 +640,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
             nPartitions = expectedPartitionAssignment.getNumPartitions();
             IdealState idealStateCopy = new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
             Map<String, Map<String, String>> oldMapFields = idealStateCopy.getRecord().getMapFields();
-
-            if (tooSoonToCorrect) {
-              segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
-              // validate nothing changed and try again with disabled
-              verifyNoChangeToOldEntries(oldMapFields, idealState);
-              segmentManager.tooSoonToCorrect = false;
-            }
 
             segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
 

@@ -980,11 +980,6 @@ public class PinotLLCRealtimeSegmentManager {
     return false;
   }
 
-
-  private boolean isAllInstancesInState(Map<String, String> instanceStateMap, String state) {
-    return instanceStateMap.values().stream().allMatch(value -> value.equals(state));
-  }
-
   /*
    * Validate LLC segments of a table.
    *
@@ -1085,7 +1080,7 @@ public class PinotLLCRealtimeSegmentManager {
                     + "Old segment metadata {} has status DONE, but segments are still in CONSUMING state in ideal STATE",
                 tableNameWithType, partition, segmentId);
 
-            LLCSegmentName newLLCSegmentName = getNextLLCSegment(segmentName, partition, now);
+            LLCSegmentName newLLCSegmentName = makeNextLLCSegmentName(segmentName, partition, now);
             LOGGER.info("{}: Creating new segment metadata for {}", tableNameWithType,
                 newLLCSegmentName.getSegmentName());
 
@@ -1098,9 +1093,19 @@ public class PinotLLCRealtimeSegmentManager {
             consumingSegments.add(newLLCSegmentName.getSegmentName());
           }
           // else, the metadata should be IN_PROGRESS, which is the right state for a consuming segment.
-        } else if (isAllInstancesInState(instanceStateMap,
-            PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE)) {
-          // An in-progress segment marked itself offline for some reason the server could not consume.
+        } else { // no replica in CONSUMING state
+
+          // Possible scenarios: for any of these scenarios, we need to create new metadata IN_PROGRESS and new CONSUMING segment
+          // 1. all replicas OFFLINE and metadata IN_PROGRESS/DONE - a segment marked itself OFFLINE during consumption for some reason
+          // 2. all replicas ONLINE or mixture of ONLINE/OFFLINE and metadata DONE
+          // This could happen due to a race condition with the retention manager where we lost the new segment
+          // The retention manager saw the new segment metadata before it was updated in ideal state, and hence marked it for deletion
+          // later the new segment was updated in the ideal state, but the retention manager would clean it out from the metadata and ideal state, having marked it earlier
+          // So, in commmitSegmentMetadata:
+          // step-1 was done (i.e. marking old segment metadata as DONE)
+          // step-2 was undone by retention manager (i.e. new IN_PROGRESS metadata got deleted)
+          // step 3 was partially undone by retention manager (i.e. marking old segment ONLINE was done but new CONSUMING segment was deleted)
+
           // No instances are consuming, so create a new consuming segment.
           int nextSeqNum = segmentName.getSequenceNumber() + 1;
           LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", tableNameWithType, partition,
@@ -1119,32 +1124,6 @@ public class PinotLLCRealtimeSegmentManager {
               committingSegmentDescriptor);
 
           consumingSegments.add(newLLCSegmentName.getSegmentName());
-        } else if (isAllInstancesInState(instanceStateMap,
-            PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE)) { // else the segment is in ONLINE state
-          if (latestMetadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.DONE)) {
-            // could happen due to a race condition with the retention manager where we lost the new segment
-            // The retention manager saw the new segment metadata before it was updated in ideal state, and hence marked it for deletion
-            // later the new segment was updated in the ideal state, but the retention manager would clean it out from the metadata dn ideal state, having marked it earlier
-
-            // step-1 of commmitSegmentMetadata is done (i.e. marking old segment as DONE)
-            // step-2 was undone by retention manager (i.e. new metadata IN_PROGRESS for the next segment deleted)
-            // step 3 was partially undone by retention manager (i.e. marking old segment as ONLINE was done but and new segment as CONSUMING was deleted)
-
-            LOGGER.info("{}:Repairing segment for partition {}. "
-                    + "Old segment metadata {} has status DONE, and segments in ONLINE state in ideal state, however new segment metadata and ideal state entries are missing",
-                tableNameWithType, partition, segmentId);
-
-            LLCSegmentName newLLCSegmentName = getNextLLCSegment(segmentName, partition, now);
-            LOGGER.info("{}: Creating new segment metadata for {}", tableNameWithType,
-                newLLCSegmentName.getSegmentName());
-
-            CommittingSegmentDescriptor committingSegmentDescriptor =
-                new CommittingSegmentDescriptor(segmentId, latestMetadata.getEndOffset(), 0);
-            createNewSegmentMetadataZNRecord(tableConfig, segmentName, newLLCSegmentName, partitionAssignment,
-                committingSegmentDescriptor);
-
-            consumingSegments.add(newLLCSegmentName.getSegmentName());
-          }
         }
 
       } else {
@@ -1195,7 +1174,7 @@ public class PinotLLCRealtimeSegmentManager {
     return idealState;
   }
 
-  private LLCSegmentName getNextLLCSegment(LLCSegmentName segmentName, int partition, long now) {
+  private LLCSegmentName makeNextLLCSegmentName(LLCSegmentName segmentName, int partition, long now) {
     final int newSeqNum = segmentName.getSequenceNumber() + 1;
     LLCSegmentName newLLCSegmentName =
         new LLCSegmentName(segmentName.getTableName(), partition, newSeqNum, now);
