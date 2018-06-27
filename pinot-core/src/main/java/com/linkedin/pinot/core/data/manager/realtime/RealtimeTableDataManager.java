@@ -227,7 +227,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         return;
       }
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-      Preconditions.checkNotNull(schema);
+      if (schema == null) {
+        String errorMsg = "No schema for table: " + _tableNameWithType;
+        _logger.error(errorMsg);
+        throw new RuntimeException(errorMsg);
+      }
       if (!isValid(schema, tableConfig.getIndexingConfig())) {
         _logger.error("Not adding segment {}", segmentName);
         throw new RuntimeException("Mismatching schema/table config for " + _tableNameWithType);
