@@ -40,6 +40,12 @@ export default Controller.extend({
 
   anomalies: null,
 
+  diagnostics: null,
+
+  diagnosticsPath: null,
+
+  diagnosticsValue: null,
+
   timeseries: null,
 
   baseline: null,
@@ -68,23 +74,43 @@ export default Controller.extend({
 
   colorMapping: colorMapping,
 
-  axis: {
-    y: {
-      show: true
-    },
-    y2: {
-      show: false,
-      min: 0,
-      max: 1
-    },
-    x: {
-      type: 'timeseries',
-      show: true,
-      tick: {
-        fit: false
+  axis: computed('diagnosticsSeries', function () {
+    let base = {
+      y: {
+        show: true
+      },
+      y2: {
+        show: true
+      },
+      x: {
+        type: 'timeseries',
+        show: true,
+        tick: {
+          fit: false
+        }
       }
-    }
-  },
+    };
+
+    // const diagnosticsSeries = get(this, 'diagnosticsSeries');
+    // if (_.isEmpty(diagnosticsSeries)) {
+    //   base = Object.assign({
+    //     y2: {
+    //       show: false,
+    //       min: 0,
+    //       max: 1
+    //     }
+    //   });
+    //
+    // } else {
+    //   base = Object.assign({
+    //     y2: {
+    //       show: false
+    //     }
+    //   });
+    // }
+
+    return base;
+  }),
 
   zoom: {
     enabled: true,
@@ -117,57 +143,83 @@ export default Controller.extend({
     return output;
   }),
 
-  series: computed('anomalies', 'timeseries', 'baseline', function () {
-    const metricUrn = get(this, 'metricUrn');
-    const anomalies = get(this, 'anomalies');
-    const anomaliesGrouped = get(this, 'anomaliesGrouped');
-    const timeseries = get(this, 'timeseries');
-    const baseline = get(this, 'baseline');
+  series: computed(
+    'anomalies',
+    'timeseries',
+    'baseline',
+    'diagnosticsSeries',
+    function () {
+      const metricUrn = get(this, 'metricUrn');
+      const anomalies = get(this, 'anomalies');
+      const anomaliesGrouped = get(this, 'anomaliesGrouped');
+      const timeseries = get(this, 'timeseries');
+      const baseline = get(this, 'baseline');
+      const diagnosticsSeries = get(this, 'diagnosticsSeries');
 
-    const series = {};
+      const series = {};
 
-    if (!_.isEmpty(anomaliesGrouped)) {
-      const filters = toFilters(metricUrn);
-      const key = this._makeKey(toFilterMap(filters));
+      if (!_.isEmpty(anomaliesGrouped)) {
+        const filters = toFilters(metricUrn);
+        const key = this._makeKey(toFilterMap(filters));
 
-      let anomaliesList = [];
-      if (_.isEmpty(key)) {
-        anomaliesList = anomalies;
-      } else if (!_.isEmpty(anomaliesGrouped[key])) {
-        anomaliesList = anomaliesGrouped[key];
+        let anomaliesList = [];
+        if (_.isEmpty(key)) {
+          anomaliesList = anomalies;
+        } else if (!_.isEmpty(anomaliesGrouped[key])) {
+          anomaliesList = anomaliesGrouped[key];
+        }
+
+        anomaliesList.forEach(anomaly => {
+          series[this._formatAnomaly(anomaly)] = {
+            timestamps: [anomaly.startTime, anomaly.endTime],
+            values: [1, 1],
+            type: 'line',
+            color: 'teal',
+            axis: 'y2'
+          }
+        });
       }
 
-      anomaliesList.forEach(anomaly => {
-        series[this._formatAnomaly(anomaly)] = {
-          timestamps: [anomaly.startTime, anomaly.endTime],
-          values: [1, 1],
+      if (!_.isEmpty(timeseries)) {
+        series['current'] = {
+          timestamps: timeseries.timestamp,
+          values: timeseries.value,
           type: 'line',
-          color: 'teal',
-          axis: 'y2'
-        }
-      });
-    }
+          color: 'blue'
+        };
+      }
 
-    if (!_.isEmpty(timeseries)) {
-      series['current'] = {
-        timestamps: timeseries.timestamp,
-        values: timeseries.value,
-        type: 'line',
-        color: 'blue'
-      };
-    }
+      if (!_.isEmpty(baseline)) {
+        series['baseline'] = {
+          timestamps: baseline.timestamp,
+          values: baseline.value,
+          type: 'line',
+          color: 'light-blue'
+        };
+      }
 
-    if (!_.isEmpty(baseline)) {
-      series['baseline'] = {
-        timestamps: baseline.timestamp,
-        values: baseline.value,
-        type: 'line',
-        color: 'light-blue'
-      };
+      return Object.assign(series, diagnosticsSeries);
     }
+  ),
 
-    return series;
-  }),
+  diagnosticsSeries: computed(
+    'diagnostics',
+    'diagnosticsPath',
+    'diagnosticsKey',
+    function () {
+      const diagnosticsPath = get(this, 'diagnosticsPath');
+      const diagnosticsKey = get(this, 'diagnosticsKey');
+
+      const series = {};
+
+      const diagnosticsSeries = this._makeDiagnosticsSeries(diagnosticsPath, diagnosticsKey);
+      if (!_.isEmpty(diagnosticsSeries)) {
+        series['diagnosticsSeries'] = diagnosticsSeries;
+      }
+
+      return series;
+    }
+  ),
 
   _makeKey(dimensions) {
     return Object.values(dimensions).join(', ')
@@ -188,6 +240,27 @@ export default Controller.extend({
       grouping[key] = (grouping[key] || []).concat([anomaly]);
     });
     return grouping;
+  },
+
+  _makeDiagnosticsSeries(path, key) {
+    try {
+      const source = get(this, 'diagnostics.' + path);
+      console.log(get(this, 'diagnostics'));
+      console.log(source);
+
+      if (_.isEmpty(source.timestamp) || _.isEmpty(source[key])) { return; }
+
+      return {
+        timestamps: source.timestamp,
+        values: source[key],
+        type: 'line',
+        color: 'red',
+        axis: 'y2'
+      }
+
+    } catch (err) {
+      return undefined;
+    }
   },
 
   _fetchTimeseries() {
@@ -226,8 +299,10 @@ export default Controller.extend({
 
     fetch(url, { method: 'POST', body: jsonString })
       .then(checkStatus)
-      .then(res => res.anomalies)
-      .then(res => set(this, 'anomalies', this._filterAnomalies(res)))
+      .then(res => {
+        set(this, 'anomalies', this._filterAnomalies(res.anomalies));
+        set(this, 'diagnostics', res.diagnostics);
+      })
       .then(res => set(this, 'output', 'got anomalies'))
       .catch(err => set(this, 'errorAnomalies', err));
   },
