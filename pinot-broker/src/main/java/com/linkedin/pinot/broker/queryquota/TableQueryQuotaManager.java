@@ -153,6 +153,7 @@ public class TableQueryQuotaManager {
     }
 
     int onlineCount = otherOnlineBrokerCount + 1;
+    System.out.println("The number of online brokers for table " + tableName + " is " + onlineCount);
     LOGGER.info("The number of online brokers for table {} is {}", tableName, onlineCount);
 
     // Get the dynamic rate
@@ -168,6 +169,7 @@ public class TableQueryQuotaManager {
     double perBrokerRate =  overallRate / onlineCount;
     QueryQuotaConfig queryQuotaConfig = new QueryQuotaConfig(RateLimiter.create(perBrokerRate), new HitCounter(TIME_RANGE_IN_SECOND));
     _rateLimiterMap.put(tableName, queryQuotaConfig);
+    System.out.println("Overall rate: " + overallRate + ". Per-broker rate: " + perBrokerRate);
     LOGGER.info("Rate limiter for table: {} has been initialized. Overall rate: {}. Per-broker rate: {}. Number of online broker instances: {}",
         tableName, overallRate, perBrokerRate, onlineCount);
   }
@@ -280,12 +282,14 @@ public class TableQueryQuotaManager {
         removeRateLimiter(tableNameWithType);
         continue;
       }
-      int onlineBrokerCount = 0;
+      int otherOnlineBrokerCount = 0;
       for (Map.Entry<String, String> state : stateMap.entrySet()) {
-        if (state.getValue().equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)) {
-          onlineBrokerCount++;
+        if (!_helixManager.getInstanceName().equals(state.getKey())
+            && state.getValue().equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)) {
+          otherOnlineBrokerCount++;
         }
       }
+      int onlineBrokerCount = otherOnlineBrokerCount + 1;
 
       double overallRate = Double.parseDouble(quotaConfig.getMaxQueriesPerSecond());
       double latestRate = overallRate / onlineBrokerCount;
