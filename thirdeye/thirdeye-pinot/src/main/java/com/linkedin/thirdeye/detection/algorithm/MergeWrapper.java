@@ -120,21 +120,22 @@ public class MergeWrapper extends DetectionPipeline {
       MergedAnomalyResultDTO parent = parents.get(key);
 
       if (parent == null || anomaly.getStartTime() - parent.getEndTime() > this.maxGap) {
-        // new parent
+        // no parent, too far away
         parents.put(key, anomaly);
         output.add(anomaly);
 
-      } else if (anomaly.getEndTime() - parent.getStartTime() <= this.maxDuration) {
-        // merge, update existing
-        parent.setEndTime(anomaly.getEndTime());
+      } else if (anomaly.getEndTime() <= parent.getEndTime() || anomaly.getEndTime() - parent.getStartTime() <= this.maxDuration) {
+        // fully merge into existing
+        parent.setEndTime(Math.max(parent.getEndTime(), anomaly.getEndTime()));
 
       } else if (parent.getEndTime() >= anomaly.getStartTime()) {
-        // merge of overlapping, update existing, truncated new anomaly
+        // partially merge, truncate new
         long truncationTimestamp = Math.max(parent.getEndTime(), parent.getStartTime() + this.maxDuration);
 
         parent.setEndTime(truncationTimestamp);
-
         anomaly.setStartTime(Math.max(truncationTimestamp, anomaly.getStartTime()));
+        anomaly.setEndTime(Math.max(truncationTimestamp, anomaly.getEndTime()));
+
         parents.put(key, anomaly);
         output.add(anomaly);
 
