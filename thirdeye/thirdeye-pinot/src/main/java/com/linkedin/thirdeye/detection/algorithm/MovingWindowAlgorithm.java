@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.detection.algorithm;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
+import com.google.common.collect.Collections2;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
@@ -9,6 +12,7 @@ import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.detection.AnomalySlice;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detection.StaticDetectionPipeline;
@@ -22,10 +26,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.collections.MapUtils;
@@ -60,9 +64,8 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private static final Pattern PATTERN_PERIOD = Pattern.compile("([0-9]+)\\s*(\\S*)");
 
   private final MetricSlice sliceData;
-  private final MetricSlice sliceBaseline;
   private final MetricSlice sliceDetection;
-//  private final AnomalySlice anomalySlice;
+  private final AnomalySlice anomalySlice;
 
   private final Period windowSize;
   private final Period minLookback;
@@ -122,29 +125,34 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     DateTime dataStart = trainStart.minus(new Period().withField(DurationFieldType.weeks(), baselineWeeks));
 
     this.sliceData = MetricSlice.from(me.getId(), dataStart.getMillis(), endTime, me.getFilters());
-    this.sliceBaseline = MetricSlice.from(me.getId(), trainStart.getMillis(), endTime, me.getFilters());
     this.sliceDetection = MetricSlice.from(me.getId(), effectiveStartTime, endTime, me.getFilters());
 
-//    // TODO doesn't work with preview/replay. support anomalies by metric?
-//    this.anomalySlice = new AnomalySlice()
-//        .withConfigId(this.config.getId())
-//        .withStart(this.sliceData.getStart())
-//        .withEnd(this.sliceData.getEnd());
+    this.anomalySlice = new AnomalySlice()
+        .withConfigId(this.config.getId())
+        .withStart(this.sliceData.getStart())
+        .withEnd(this.sliceData.getEnd());
   }
 
   @Override
   public StaticDetectionPipelineModel getModel() {
-    return new StaticDetectionPipelineModel()
+    StaticDetectionPipelineModel model = new StaticDetectionPipelineModel()
         .withTimeseriesSlices(Collections.singleton(this.sliceData));
-//        .withAnomalySlices(Collections.singleton(this.anomalySlice));
+
+    if (this.config.getId() != null) {
+      model = model.withAnomalySlices(Collections.singleton(this.anomalySlice));
+    }
+
+    return model;
   }
 
   @Override
   public DetectionPipelineResult run(StaticDetectionPipelineData data) throws Exception {
     DataFrame df = data.getTimeseries().get(this.sliceData);
 
+    Collection<MergedAnomalyResultDTO> existingAnomalies = data.getAnomalies().get(this.anomalySlice);
+
     // change point rescaling
-    df = AlgorithmUtils.getRescaledSeries(df, getChangePoints(df));
+    df = AlgorithmUtils.getRescaledSeries(df, getChangePoints(df, existingAnomalies));
 
     // relative baseline
     if (this.baseline != null) {
@@ -284,15 +292,13 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   }
 
   /**
-   * Returns a merged set of change points computed from time seires and user-labeled anomalies.
+   * Returns a merged set of change points computed from time series and user-labeled anomalies.
    *
    * @param df data
    * @return set of change points
    */
-  Set<Long> getChangePoints(DataFrame df) {
-    // TODO purge near-duplicates
-
-    Set<Long> changePoints = new HashSet<>();
+  Set<Long> getChangePoints(DataFrame df, Collection<MergedAnomalyResultDTO> anomalies) {
+    Set<Long> changePoints = new TreeSet<>();
 
     // from time series
     if (this.changeDuration.toStandardDuration().getMillis() > 0) {
@@ -303,22 +309,20 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       changePoints.addAll(AlgorithmUtils.getChangePoints(diffSeries, this.changeDuration.toStandardDuration()));
     }
 
-    // TODO change points from user-labeled anomalies
+    // from anomalies
+    Collection<MergedAnomalyResultDTO> changePointAnomalies = Collections2.filter(anomalies,
+        new Predicate<MergedAnomalyResultDTO>() {
+          @Override
+          public boolean apply(MergedAnomalyResultDTO mergedAnomalyResultDTO) {
+            return mergedAnomalyResultDTO != null
+                && mergedAnomalyResultDTO.getFeedback() != null
+                && AnomalyFeedbackType.ANOMALY_NEW_TREND.equals(mergedAnomalyResultDTO.getFeedback().getFeedbackType());
+          }
+        });
 
-//    // from anomalies
-//    Collection<MergedAnomalyResultDTO> changePointAnomalies = Collections2.filter(
-//        data.getAnomalies().get(this.anomalySlice), new Predicate<MergedAnomalyResultDTO>() {
-//          @Override
-//          public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomalyResultDTO) {
-//            return mergedAnomalyResultDTO != null
-//                && mergedAnomalyResultDTO.getFeedback() != null
-//                && AnomalyFeedbackType.ANOMALY_NEW_TREND.equals(mergedAnomalyResultDTO.getFeedback().getFeedbackType());
-//          }
-//        });
-//
-//    for (MergedAnomalyResultDTO anomaly : changePointAnomalies) {
-//      changePoints.add(anomaly.getStartTime());
-//    }
+    for (MergedAnomalyResultDTO anomaly : changePointAnomalies) {
+      changePoints.add(anomaly.getStartTime());
+    }
 
     return changePoints;
   }
