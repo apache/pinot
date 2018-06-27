@@ -52,8 +52,8 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
   private static final String TMP_DIR = System.getProperty("java.io.tmpdir") + File.separator;
   private static final String STATS_FILE_NAME = "stats.ser";
 
-  private final int[] NUM_HOSTS = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
-  private final int[] NUM_HOURS_TO_CONSUME = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+  private final int[] NUM_HOSTS = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  private final int[] NUM_HOURS_TO_CONSUME = {2, 4, 6, 8, 9, 10, 11, 12};
 
   @Option(name = "-numReplicas", required = true, metaVar = "<int>", usage = "number of replicas for the table")
   private int _numReplicas;
@@ -344,10 +344,12 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
    *****************************************************************/
   private void display(String[][] totalMemoryPerHost, String[][] optimalSegmentSize) {
 
+    System.out.println("\nMemory used per host");
     printNumHostsHeader();
     printNumHoursHeader();
     printOutputValues(totalMemoryPerHost);
 
+    System.out.println("\nOptimal segment size");
     printNumHostsHeader();
     printNumHoursHeader();
     printOutputValues(optimalSegmentSize);
