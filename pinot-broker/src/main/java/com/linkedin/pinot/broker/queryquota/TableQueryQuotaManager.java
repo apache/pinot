@@ -267,7 +267,7 @@ public class TableQueryQuotaManager {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
 
-      // Get quota config for table.
+      // Get latest quota config for table.
       QuotaConfig quotaConfig = getQuotaConfigFromPropertyStore(rawTableName, tableType);
       if (quotaConfig == null || quotaConfig.getMaxQueriesPerSecond() == null || !quotaConfig.isMaxQueriesPerSecondValid()) {
         removeRateLimiter(tableNameWithType);
