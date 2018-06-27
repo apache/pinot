@@ -132,6 +132,7 @@ public class ClusterChangeMediator implements LiveInstanceChangeListener, Extern
     } else {
       LOGGER.warn("Deferred cluster updater thread is null or stopped, not deferring external view routing table rebuild");
       _helixExternalViewBasedRouting.processExternalViewChange();
+      _tableQueryQuotaManager.processQueryQuotaChange();
     }
   }
 
