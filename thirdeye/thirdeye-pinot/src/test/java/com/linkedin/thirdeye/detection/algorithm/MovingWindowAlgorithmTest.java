@@ -1,8 +1,11 @@
 package com.linkedin.thirdeye.detection.algorithm;
 
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -12,8 +15,10 @@ import com.linkedin.thirdeye.detection.DetectionTestUtils;
 import com.linkedin.thirdeye.detection.MockDataProvider;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.joda.time.DurationFieldType;
 import org.joda.time.Period;
@@ -53,6 +58,7 @@ public class MovingWindowAlgorithmTest {
   private DataFrame data;
   private Map<String, Object> properties;
   private DetectionConfigDTO config;
+  private List<MergedAnomalyResultDTO> anomalies;
 
   @BeforeMethod
   public void beforeMethod() throws Exception {
@@ -80,10 +86,12 @@ public class MovingWindowAlgorithmTest {
     this.config = new DetectionConfigDTO();
     this.config.setProperties(properties);
 
+    this.anomalies = new ArrayList<>();
+
     this.provider = new MockDataProvider()
         .setTimeseries(timeseries)
         .setMetrics(Collections.singletonList(metricConfigDTO))
-        .setAnomalies(Collections.<MergedAnomalyResultDTO>emptyList());
+        .setAnomalies(this.anomalies);
 
   }
 
@@ -253,7 +261,7 @@ public class MovingWindowAlgorithmTest {
   //
 
   @Test
-  public void testQuantileMaxOutlierCorrection() throws Exception {
+  public void testOutlierCorrection() throws Exception {
     this.data.set(COL_VALUE, this.data.getDoubles(COL_TIME).between(86400000L, 172800000L),
         this.data.getDoubles(COL_VALUE).add(500));
 
@@ -273,7 +281,7 @@ public class MovingWindowAlgorithmTest {
   }
 
   @Test
-  public void testQuantileMaxChangePointCorrection() throws Exception {
+  public void testChangePointFromData() throws Exception {
     this.data.set(COL_VALUE, this.data.getDoubles(COL_TIME).between(298800000L, 903600000L),
         this.data.getDoubles(COL_VALUE).multiply(1.77));
     this.data.set(COL_VALUE, this.data.getDoubles(COL_TIME).gte(903600000L),
@@ -293,7 +301,31 @@ public class MovingWindowAlgorithmTest {
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(950400000L, 954000000L)));
   }
 
-  // TODO test change points from user-labeled anomalies
+  @Test
+  public void testChangePointFromAnomaly() throws Exception {
+    this.data.set(COL_VALUE, this.data.getDoubles(COL_TIME).between(298800000L, 903600000L),
+        this.data.getDoubles(COL_VALUE).multiply(1.77));
+    this.data.set(COL_VALUE, this.data.getDoubles(COL_TIME).gte(903600000L),
+        this.data.getDoubles(COL_VALUE).multiply(3.61));
+
+    this.config.setId(1L);
+
+    this.anomalies.add(makeAnomalyChangePoint(1L, 298800000L, 300000000L));
+    this.anomalies.add(makeAnomalyChangePoint(1L, 903600000L, 910000000L));
+
+    this.properties.put(PROP_QUANTILE_MAX, 0.975);
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 604800000L, 1209600000L);
+    DetectionPipelineResult res = this.algorithm.run();
+
+    Assert.assertEquals(res.getAnomalies().size(), 7);
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1L, 626400000L, 630000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1L, 705600000L, 709200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1L, 846000000L, 849600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1L, 892800000L, 896400000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1L, 903600000L, 907200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1L, 918000000L, 921600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1L, 950400000L, 954000000L)));
+  }
 
   //
   // baselines
@@ -405,5 +437,19 @@ public class MovingWindowAlgorithmTest {
 
   private static MergedAnomalyResultDTO makeAnomaly(long start, long end) {
     return DetectionTestUtils.makeAnomaly(null, start, end, METRIC_NAME, DATASET_NAME, Collections.<String, String>emptyMap());
+  }
+
+  private static MergedAnomalyResultDTO makeAnomaly(Long configId, long start, long end) {
+    return DetectionTestUtils.makeAnomaly(configId, start, end, METRIC_NAME, DATASET_NAME, Collections.<String, String>emptyMap());
+  }
+
+  private static MergedAnomalyResultDTO makeAnomalyChangePoint(Long configId, long start, long end) {
+    AnomalyFeedback feedback = new AnomalyFeedbackDTO();
+    feedback.setFeedbackType(AnomalyFeedbackType.ANOMALY_NEW_TREND);
+
+    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(configId, start, end, METRIC_NAME, DATASET_NAME, Collections.<String, String>emptyMap());
+    anomaly.setFeedback(feedback);
+
+    return anomaly;
   }
 }
