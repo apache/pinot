@@ -26,26 +26,16 @@ public class ThresholdAlgorithm extends StaticDetectionPipeline {
   private final String COL_TOO_LOW = "tooLow";
   private final String COL_ANOMALY = "anomaly";
 
-  private final String PROP_METRIC_URN = "metricUrn";
-
-  private final String PROP_MIN = "min";
-  private final double PROP_MIN_DEFAULT = Double.NaN;
-
-  private final String PROP_MAX = "max";
-  private final double PROP_MAX_DEFAULT = Double.NaN;
-
-  // TODO granularity (+ timezone?)
-
   private final double min;
   private final double max;
   private final MetricSlice slice;
 
   public ThresholdAlgorithm(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
-    this.min = MapUtils.getDoubleValue(config.getProperties(), PROP_MIN, PROP_MIN_DEFAULT);
-    this.max = MapUtils.getDoubleValue(config.getProperties(), PROP_MAX, PROP_MAX_DEFAULT);
+    this.min = MapUtils.getDoubleValue(config.getProperties(), "min", Double.NaN);
+    this.max = MapUtils.getDoubleValue(config.getProperties(), "max", Double.NaN);
 
-    String metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
+    String metricUrn = MapUtils.getString(config.getProperties(), "metricUrn");
     MetricEntity me = MetricEntity.fromURN(metricUrn, 1.0);
     this.slice = MetricSlice.from(me.getId(), this.startTime, this.endTime, me.getFilters());
   }
