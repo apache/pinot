@@ -50,7 +50,6 @@ public class OnHeapStarTreeV2BuilderTest {
 
     _indexDir = PinotSegmentUtil.createSegment(schema, segmentName, _segmentOutputDir, _recordReader);
 
-    _starTreeV2Config = new StarTreeV2Config();
 
     List<Met2AggfuncPair> metric2aggFuncPairs = new ArrayList<>();
     Met2AggfuncPair pair1 = new Met2AggfuncPair("salary", "sum");
@@ -59,8 +58,11 @@ public class OnHeapStarTreeV2BuilderTest {
     metric2aggFuncPairs.add(pair2);
     Met2AggfuncPair pair3 = new Met2AggfuncPair("salary", "min");
     metric2aggFuncPairs.add(pair3);
-    _starTreeV2Config.setDimensions(schema.getDimensionNames());
+
+    _starTreeV2Config = new StarTreeV2Config();
+    _starTreeV2Config.setOutDir(_indexDir);
     _starTreeV2Config.setMaxNumLeafRecords(1);
+    _starTreeV2Config.setDimensions(schema.getDimensionNames());
     _starTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs);
 
     return;
@@ -76,5 +78,6 @@ public class OnHeapStarTreeV2BuilderTest {
     }
 
     onTest.build();
+    onTest.serialize();
   }
 }
