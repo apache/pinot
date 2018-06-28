@@ -18,7 +18,10 @@ package com.linkedin.pinot.core.startreeV2;
 
 public class StarTreeV2Constant {
 
-  public static final Integer STAR_NODE = -1;
+
+  public static final int STAR_NODE = -1;
+  public static final int INVALID_INDEX = -1;
+  public static final String STAR_TREE_INDEX_FILE_PREFIX = "star_tree";
 
   public static class AggregateFunctions {
     public static final String MAX = "max";
