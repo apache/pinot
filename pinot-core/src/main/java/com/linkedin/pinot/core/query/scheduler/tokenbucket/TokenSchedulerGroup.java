@@ -132,7 +132,7 @@ public class TokenSchedulerGroup extends AbstractSchedulerGroup {
     if (leftTokens < rightTokens) {
       return -1;
     }
-    return FCFSSchedulerGroup.compareTo(this, (SchedulerGroup)rhs);
+    return FCFSSchedulerGroup.compare(this, (SchedulerGroup)rhs);
   }
 
   public String toString() {
