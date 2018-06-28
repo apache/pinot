@@ -16,32 +16,41 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.core.startree.OffHeapStarTreeNode;
 import java.io.File;
 import java.util.Set;
 import java.util.Map;
 import java.util.List;
-import java.util.Queue;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.ArrayList;
 import java.io.IOException;
-import java.util.LinkedList;
 import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
 import com.linkedin.pinot.core.data.readers.PinotSegmentColumnReader;
-import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
+import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
+import xerial.larray.mmap.MMapBuffer;
+import xerial.larray.mmap.MMapMode;
 
 
 public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
   // Segment
+  private File _outDir;
   SegmentMetadata _segmentMetadata;
   ImmutableSegment _immutableSegment;
 
@@ -67,8 +76,10 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   private int _maxNumLeafRecords;
 
   // Star Tree
+  private int _starTreeCount = 0;
   private List<Record> _starTreeData = new ArrayList<>();
   private List<Record> _rawStarTreeData = new ArrayList<>();
+  private List<ForwardIndexCreator> _forwardIndexCreatorList;
 
   @Override
   public void init(File indexDir, StarTreeV2Config config) throws Exception {
@@ -115,6 +126,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     }
 
     // other initialisation
+    _starTreeCount++;
+    _outDir = config.getOutDir();
     _maxNumLeafRecords = config.getMaxNumLeafRecords();
     _rootNode = new TreeNode();
     _rootNode._dimensionId = StarTreeV2Constant.STAR_NODE;
@@ -196,15 +209,89 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   }
 
   @Override
-  public void serialize(File starTreeFile, Map<String, ColumnIndexCreationInfo> indexCreationInfoMap)
-      throws IOException {
+  public void serialize() throws Exception {
+    createIndexes();
+    serializeTree(new File(_outDir, StarTreeV2Constant.STAR_TREE_INDEX_FILE_PREFIX + Integer.toString(_starTreeCount)));
 
+    return;
   }
 
   @Override
   public List<String> getMetaData() {
     return null;
   }
+
+
+  /**
+   * Helper method to serialize the updated tree into a file.
+   *
+   * @return void.
+   */
+  private void serializeTree(File starTreeFile) throws IOException {
+    int headerSizeInBytes = OnHeapStarTreeV2BuilderHelper.computeHeaderSizeInBytes(_dimensionsName);
+    long totalSizeInBytes = headerSizeInBytes + _nodesCount * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES;
+
+    MMapBuffer dataBuffer = new MMapBuffer(starTreeFile, 0, totalSizeInBytes, MMapMode.READ_WRITE);
+
+    try {
+      long offset = OnHeapStarTreeV2BuilderHelper.writeHeader(dataBuffer, headerSizeInBytes, _dimensionsCount, _dimensionsName, _nodesCount);
+      OnHeapStarTreeV2BuilderHelper.writeNodes(dataBuffer, offset, _rootNode);
+
+    } finally {
+      dataBuffer.flush();
+      dataBuffer.close();
+    }
+  }
+
+  /**
+   * Helper function to create indexes and index values.
+   *
+   * @return void.
+   */
+  private void createIndexes() throws Exception {
+
+     _forwardIndexCreatorList = new ArrayList<>();
+
+     // 'SingleValueForwardIndexCreator' for dimensions.
+    for (String dimensionName: _dimensionsSpecMap.keySet()) {
+      DimensionFieldSpec spec = _dimensionsSpecMap.get(dimensionName);
+      int cardinality =_immutableSegment.getDictionary(dimensionName).length();
+      _forwardIndexCreatorList.add(new SingleValueUnsortedForwardIndexCreator(spec, _outDir, cardinality, _starTreeData.size(), _starTreeData.size(), false));
+    }
+
+    // 'SingleValueRawIndexCreator' for metrics
+    for (Met2AggfuncPair pair: _met2aggfuncPairs) {
+      String columnName = pair._metricName + '_' + pair._aggregatefunction;
+      SingleValueRawIndexCreator indexCreator =  new SingleValueFixedByteRawIndexCreator(_outDir,
+          ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, _starTreeData.size(), V1Constants.Numbers.DOUBLE_SIZE);
+      _forwardIndexCreatorList.add(indexCreator);
+    }
+
+    // 'SingleValueRawIndexCreator' for count(*)
+    String columnName = "count";
+    SingleValueRawIndexCreator indexCreator =  new SingleValueFixedByteRawIndexCreator(_outDir,
+        ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, _starTreeData.size(), V1Constants.Numbers.DOUBLE_SIZE);
+    _forwardIndexCreatorList.add(indexCreator);
+
+    // indexing each record.
+    for (int i = 0; i < _starTreeData.size(); i++) {
+      Record row = _starTreeData.get(i);
+      int [] dimension = row.getDimensionValues();
+      List<Object> metric = row.getMetricValues();
+
+      for (int j = 0; j < dimension.length; j++) {
+        ((SingleValueForwardIndexCreator) _forwardIndexCreatorList.get(j)).index(i, dimension[j]);
+      }
+
+      int index = dimension.length;
+      for (int j = 0; j < metric.size(); j++) {
+        ((SingleValueRawIndexCreator) _forwardIndexCreatorList.get(index + j)).index(i, metric.get(j));
+      }
+    }
+
+    return;
+  }
+
 
   /**
    * Helper function to construct a star tree.
@@ -332,41 +419,6 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
     return null;
   }
-
-//  /**
-//   * Helper function to create aggregated document for all nodes
-//   *
-//   * @return void.
-//   */
-//  private void createAggregatedDocForAllNodes() {
-//    Queue<TreeNode> childNodes = new LinkedList<>();
-//
-//    Map<Integer, TreeNode> children = _rootNode._children;
-//    for (int key : children.keySet()) {
-//      TreeNode child = children.get(key);
-//      child._value = key;
-//      childNodes.add(child);
-//    }
-//
-//    while (!childNodes.isEmpty()) {
-//      TreeNode parent = childNodes.remove();
-//      if (parent._value != StarTreeV2Constant.STAR_NODE) {
-//        List<Object> aggregatedValues = getAggregatedDocument(parent._startDocId, parent._endDocId);
-//        int aggDocId = appendAggregatedDocuments(aggregatedValues);
-//        parent._aggDataDocumentId = aggDocId;
-//      }
-//
-//      children = parent._children;
-//      if (children != null) {
-//        for (int key : children.keySet()) {
-//          TreeNode child = children.get(key);
-//          child._value = key;
-//          childNodes.add(child);
-//        }
-//      }
-//    }
-//    return;
-//  }
 
   /**
    * Helper function to create aggregated document for all nodes

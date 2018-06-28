@@ -38,7 +38,7 @@ public interface StarTreeV2Builder {
   /**
    * Serialize the star tree into a file.
    */
-  void serialize(File starTreeFile, Map<String, ColumnIndexCreationInfo> indexCreationInfoMap) throws IOException;
+  void serialize() throws Exception;
 
   /**
    * Returns the Meta Data of the Star tree.
