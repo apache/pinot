@@ -78,11 +78,6 @@ public class SegmentPreProcessor implements AutoCloseable {
     }
 
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
-      // Create column inverted indices according to the index config.
-      InvertedIndexHandler invertedIndexHandler =
-          new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
-      invertedIndexHandler.createInvertedIndices();
-
       // Update default columns according to the schema.
       // NOTE: This step may modify the segment metadata. When adding new steps after this, reload the metadata.
       if (_indexLoadingConfig.isEnableDefaultColumns() && (_schema != null)) {
@@ -90,6 +85,13 @@ public class SegmentPreProcessor implements AutoCloseable {
             DefaultColumnHandlerFactory.getDefaultColumnHandler(_indexDir, _schema, _segmentMetadata, segmentWriter);
         defaultColumnHandler.updateDefaultColumns();
       }
+
+      // Create column inverted indices according to the index config.
+      // Reload the metadata.
+      _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+      InvertedIndexHandler invertedIndexHandler =
+          new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+      invertedIndexHandler.createInvertedIndices();
 
       // Add min/max value to column metadata according to the prune mode.
       // For star-tree index, because it can only increase the range, so min/max value can still be used in pruner.
