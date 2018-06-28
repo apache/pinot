@@ -48,12 +48,15 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeHostsProvisioningCommand.class);
   private static final int MEMORY_STR_LEN = 9;
+  private static final long MAX_MEMORY_BYTES = DataSize.toBytes("48G");
+  private static final String NOT_APPLICABLE = "NA";
 
   private static final String TMP_DIR = System.getProperty("java.io.tmpdir") + File.separator;
   private static final String STATS_FILE_NAME = "stats.ser";
+  private static final String STATS_FILE_COPY_NAME = "stats.copy.ser";
 
-  private final int[] NUM_HOSTS = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-  private final int[] NUM_HOURS_TO_CONSUME = {2, 4, 6, 8, 9, 10, 11, 12};
+  private final int[] NUM_HOSTS = {2, 4, 6, 8, 9, 10, 12, 14, 15, 20};
+  private final int[] NUM_HOURS_TO_CONSUME = {2, 3, 4, 6, 8, 9, 10, 11, 12};
 
   @Option(name = "-numReplicas", required = true, metaVar = "<int>", usage = "number of replicas for the table")
   private int _numReplicas;
@@ -127,6 +130,7 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
     LOGGER.info("Executing command: {}", toString());
     String[][] totalMemoryPerHost = new String[NUM_HOURS_TO_CONSUME.length][NUM_HOSTS.length];
     String[][] optimalSegmentSize = new String[NUM_HOURS_TO_CONSUME.length][NUM_HOSTS.length];
+    String[][] consumingMemoryPerHost = new String[NUM_HOURS_TO_CONSUME.length][NUM_HOSTS.length];
 
     int totalConsumingPartitions = _numPartitions * _numReplicas;
     long minutesSampleSegmentConsumed =
@@ -153,10 +157,10 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
     FileUtils.deleteDirectory(tableDataDir);
     tableDataDir.mkdir();
     File statsFile = new File(tableDataDir, STATS_FILE_NAME);
-    RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
+    RealtimeSegmentStatsHistory initialStatsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
 
     initializeStatsHistory(sampleCompletedSegmentFile, segmentMetadata, avgMultiValues, noDictionaryColumns,
-        invertedIndexColumns, statsHistory);
+        invertedIndexColumns, initialStatsHistory);
 
     int i = 0;
     for (int numHoursToConsume : NUM_HOURS_TO_CONSUME) {
@@ -175,6 +179,11 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
       // numHoursToConsume will create ? rows
       int totalDocs = (int) (((double) minutesToConsume / minutesSampleSegmentConsumed) * totalDocsInSampleSegment);
       RealtimeIndexOffHeapMemoryManager memoryManager = new DirectMemoryManager(segmentMetadata.getName());
+
+      File statsFileCopy = new File(tableDataDir, STATS_FILE_COPY_NAME);
+      FileUtils.copyFile(statsFile, statsFileCopy);
+      RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFileCopy);
+
       RealtimeSegmentZKMetadata segmentZKMetadata = getRealtimeSegmentZKMetadata(segmentMetadata, totalDocs);
       RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder = new RealtimeSegmentConfig.Builder().setSegmentName(segmentMetadata.getName())
           .setStreamName(segmentMetadata.getTableName())
@@ -192,9 +201,15 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
       MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build());
       long memoryForConsumingSegmentPerPartition = memoryManager.getTotalAllocatedBytes();
       mutableSegmentImpl.destroy();
+      FileUtils.deleteQuietly(statsFileCopy);
+
+      // TODO: should this be a function of total docs? if not this can just be done once at the beginning
+      //memoryForConsumingSegmentPerPartition += getMemoryForInvertedIndex(segmentMetadata, invertedIndexColumns, totalDocs);
+      memoryForConsumingSegmentPerPartition += getMemoryForInvertedIndex(memoryForConsumingSegmentPerPartition, segmentMetadata, invertedIndexColumns);
 
       int j = 0;
       for (int numHosts : NUM_HOSTS) {
+
         // adjustment because we want ceiling of division and not floor, as some hosts will have an extra partition due to the remainder of the division
         int totalConsumingPartitionsPerHost = (totalConsumingPartitions + numHosts - 1) / numHosts;
 
@@ -204,19 +219,65 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
             memoryForConsumingSegmentPerPartition * totalConsumingPartitionsPerHost;
         long totalMemoryPerHostBytes = totalMemoryForCompletedSegmentsPerHost + totalMemoryForConsumingSegmentsPerHost;
 
-        totalMemoryPerHost[i][j] = DataSize.fromBytes(totalMemoryPerHostBytes);
-        optimalSegmentSize[i][j++] = DataSize.fromBytes(completedSegmentSizeBytes);
+        if (totalMemoryPerHostBytes > MAX_MEMORY_BYTES) {
+          totalMemoryPerHost[i][j] = NOT_APPLICABLE;
+          consumingMemoryPerHost[i][j] = NOT_APPLICABLE;
+          optimalSegmentSize[i][j++] = NOT_APPLICABLE;
+        } else {
+          totalMemoryPerHost[i][j] = DataSize.fromBytes(totalMemoryPerHostBytes);
+          consumingMemoryPerHost[i][j] = DataSize.fromBytes(totalMemoryForConsumingSegmentsPerHost);
+          optimalSegmentSize[i][j++] = DataSize.fromBytes(completedSegmentSizeBytes);
+        }
       }
       i++;
     }
 
-    display(totalMemoryPerHost, optimalSegmentSize);
+
+    System.out.println("\nMemory used per host");
+    display(totalMemoryPerHost);
+    System.out.println("\nOptimal segment size");
+    display(optimalSegmentSize);
+    System.out.println("\nConsuming memory");
+    display(consumingMemoryPerHost);
     return true;
+  }
+
+  /**
+   * Method to compute memory used by inverted indexes
+   * This is an estimation based on some experimentation done with MutableRoaringBitmap
+   * @param segmentMetadata
+   * @param invertedIndexColumns
+   * @param totalDocs
+   * @return
+   */
+  private long getMemoryForInvertedIndex(SegmentMetadataImpl segmentMetadata, Set<String> invertedIndexColumns, int totalDocs) {
+    long totalInvertedIndexSizeBytes = 0;
+    for (String invIndexColumn : invertedIndexColumns) {
+      int cardinality = segmentMetadata.getColumnMetadataFor(invIndexColumn).getCardinality();
+      // TODO: instead of 100K, should it be a function of total docs?
+      // How we got to 100K: created a MutableRoaringBitmap.
+      // Assuming we have total 1million docs, put 1/3 of them into the bitmap, randomly, but maintaining an ascending order in doc ids
+      // This number stayed fairly constant across varying number of doc ids put in. (80k heap for 500k docs, 100k for 1 million docs, 110k for 10 million docs)
+      // It mattered that we put doc ids in an ascending manner (ascending improves compression), not completely consecutive (non consecutive reduces compression)
+      long invertedIndexSizeBytes = cardinality * DataSize.toBytes("100K");
+      totalInvertedIndexSizeBytes += invertedIndexSizeBytes;
+    }
+    return totalInvertedIndexSizeBytes;
+  }
+
+  private long getMemoryForInvertedIndex(long totalMemoryForConsumingSegment, SegmentMetadataImpl segmentMetadata, Set<String> invertedIndexColumns) {
+    long totalInvertedIndexSizeBytes = 0;
+    if (!invertedIndexColumns.isEmpty()) {
+      long memoryForEachColumn = totalMemoryForConsumingSegment / segmentMetadata.getAllColumns().size();
+      totalInvertedIndexSizeBytes = (long) (memoryForEachColumn * 0.3 * invertedIndexColumns.size());
+    }
+    return totalInvertedIndexSizeBytes;
   }
 
   private void initializeStatsHistory(File sampleCompletedSegmentFile, SegmentMetadataImpl segmentMetadata,
       int avgMultiValues, Set<String> noDictionaryColumns, Set<String> invertedIndexColumns,
       RealtimeSegmentStatsHistory statsHistory) {
+
     RealtimeIndexOffHeapMemoryManager memoryManager = new DirectMemoryManager(segmentMetadata.getName());
     RealtimeSegmentZKMetadata segmentZKMetadata = getRealtimeSegmentZKMetadata(segmentMetadata);
 
@@ -342,6 +403,13 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
    * TODO: write better methods, or put these in a separate class
    *
    *****************************************************************/
+
+  private void display(String[][] data) {
+    printNumHostsHeader();
+    printNumHoursHeader();
+    printOutputValues(data);
+  }
+
   private void display(String[][] totalMemoryPerHost, String[][] optimalSegmentSize) {
 
     System.out.println("\nMemory used per host");
