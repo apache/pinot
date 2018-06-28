@@ -397,6 +397,11 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           Template template = freemarkerConfig.getTemplate("data-report-by-metric-dimension.ftl");
           template.process(templateData, out);
 
+          String recipients = alertConfig.getRecipients();
+          if (!this.thirdeyeConfig.getEmailWhitelist().isEmpty()) {
+            recipients = retainWhitelisted(recipients, thirdeyeConfig.getEmailWhitelist());
+          }
+
           // Send email
           HtmlEmail email = new HtmlEmail();
           String alertEmailSubject =
@@ -404,7 +409,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
           EmailHelper
               .sendEmailWithHtml(email, thirdeyeConfig.getSmtpConfiguration(), alertEmailSubject,
-                  alertEmailHtml, alertConfig.getFromAddress(), alertConfig.getRecipients());
+                  alertEmailHtml, alertConfig.getFromAddress(), recipients);
 
         } catch (Exception e) {
           throw new JobExecutionException(e);
