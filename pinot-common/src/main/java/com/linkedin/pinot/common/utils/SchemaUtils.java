@@ -59,8 +59,7 @@ public class SchemaUtils {
   /**
    * Wrap {@link Schema} into a {@link ZNRecord}.
    */
-  public static ZNRecord toZNRecord(@Nonnull Schema schema)
-      throws IllegalArgumentException, IllegalAccessException {
+  public static ZNRecord toZNRecord(@Nonnull Schema schema) {
     ZNRecord record = new ZNRecord(schema.getSchemaName());
     record.setSimpleField("schemaJSON", schema.getJSONSchema());
     return record;
