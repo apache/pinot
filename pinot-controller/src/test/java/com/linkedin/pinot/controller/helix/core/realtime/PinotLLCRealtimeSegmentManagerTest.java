@@ -641,6 +641,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
             IdealState idealStateCopy = new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
             Map<String, Map<String, String>> oldMapFields = idealStateCopy.getRecord().getMapFields();
 
+            if (tooSoonToCorrect) {
+              segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+              // validate nothing changed and try again with disabled
+              verifyNoChangeToOldEntries(oldMapFields, idealState);
+              segmentManager.tooSoonToCorrect = false;
+            }
             segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
 
             verifyRepairs(tableConfig, idealState, expectedPartitionAssignment, segmentManager, oldMapFields);

@@ -1110,7 +1110,8 @@ public class PinotLLCRealtimeSegmentManager {
           // step-2 was undone by retention manager (i.e. new IN_PROGRESS metadata got deleted)
           // step 3 was partially undone by retention manager (i.e. marking old segment ONLINE was done but new CONSUMING segment was deleted)
 
-          if (isAllInstancesInState(instanceStateMap, PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE) || !(isTooSoonToCorrect(tableNameWithType, segmentId, now))) {
+          if (isAllInstancesInState(instanceStateMap, PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE)
+              || !(isTooSoonToCorrect(tableNameWithType, segmentId, now))) {
             // No instances are consuming, so create a new consuming segment.
             int nextSeqNum = segmentName.getSequenceNumber() + 1;
             LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", tableNameWithType, partition,
