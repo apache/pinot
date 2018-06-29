@@ -1107,8 +1107,8 @@ public class PinotLLCRealtimeSegmentManager {
 
             // No instances are consuming, so create a new consuming segment.
             LLCSegmentName newLLCSegmentName = makeNextLLCSegmentName(segmentName, partition, now);
-            LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", tableNameWithType, partition,
-                newLLCSegmentName.getSequenceNumber());
+            LOGGER.info("Creating CONSUMING segment {} for {} partition {}", newLLCSegmentName.getSegmentName(),
+                tableNameWithType, partition);
 
             // To begin with, set startOffset to the oldest available offset in kafka. Fix it to be the one we want,
             // depending on what the prev segment had.
