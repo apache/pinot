@@ -153,7 +153,6 @@ public class TableQueryQuotaManager {
     }
 
     int onlineCount = otherOnlineBrokerCount + 1;
-    System.out.println("The number of online brokers for table " + tableName + " is " + onlineCount);
     LOGGER.info("The number of online brokers for table {} is {}", tableName, onlineCount);
 
     // Get the dynamic rate
@@ -169,7 +168,6 @@ public class TableQueryQuotaManager {
     double perBrokerRate =  overallRate / onlineCount;
     QueryQuotaConfig queryQuotaConfig = new QueryQuotaConfig(RateLimiter.create(perBrokerRate), new HitCounter(TIME_RANGE_IN_SECOND));
     _rateLimiterMap.put(tableName, queryQuotaConfig);
-    System.out.println("Overall rate: " + overallRate + ". Per-broker rate: " + perBrokerRate);
     LOGGER.info("Rate limiter for table: {} has been initialized. Overall rate: {}. Per-broker rate: {}. Number of online broker instances: {}",
         tableName, overallRate, perBrokerRate, onlineCount);
   }
@@ -253,12 +251,18 @@ public class TableQueryQuotaManager {
    * Process query quota change when number of online brokers has changed.
    */
   public void processQueryQuotaChange() {
+    LOGGER.info("Start processing qps quota change.");
     long startTime = System.currentTimeMillis();
 
     ExternalView currentBrokerResource = HelixHelper.getExternalViewForResource(_helixManager.getClusterManagmentTool(),
         _helixManager.getClusterName(), BROKER_RESOURCE_INSTANCE);
+    if (currentBrokerResource == null) {
+      LOGGER.warn("Finish processing qps quota change: external view for broker resource is null!");
+      return;
+    }
     int currentVersionNumber = currentBrokerResource.getRecord().getVersion();
     if (currentVersionNumber == _lastKnownBrokerResourceVersion.get()) {
+      LOGGER.info("No qps quota change: external view for broker resource remains the same.");
       return;
     }
 

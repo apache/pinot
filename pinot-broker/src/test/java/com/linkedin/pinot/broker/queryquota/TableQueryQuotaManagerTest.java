@@ -50,6 +50,7 @@ public class TableQueryQuotaManagerTest {
   private static String RAW_TABLE_NAME = "testTable";
   private static String OFFLINE_TABLE_NAME = RAW_TABLE_NAME + "_OFFLINE";
   private static String REALTIME_TABLE_NAME = RAW_TABLE_NAME + "_REALTIME";
+  private static final String BROKER_INSTANCE_ID = "broker_instance_1";
 
 
   @BeforeTest
@@ -64,7 +65,7 @@ public class TableQueryQuotaManagerTest {
   }
 
   private HelixManager initHelixManager(String helixClusterName) {
-    return new FakeHelixManager(helixClusterName, helixClusterName + "_1", InstanceType.CONTROLLER, ZkStarter.DEFAULT_ZK_STR);
+    return new FakeHelixManager(helixClusterName, BROKER_INSTANCE_ID, InstanceType.PARTICIPANT, ZkStarter.DEFAULT_ZK_STR);
   }
 
   public class FakeHelixManager extends ZKHelixManager {
@@ -184,7 +185,7 @@ public class TableQueryQuotaManagerTest {
   @Test
   public void testBothTableHaveQpsQuotaConfig() throws Exception {
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
-    brokerResource.setState(REALTIME_TABLE_NAME, "broker_instance_1", "ONLINE");
+    brokerResource.setState(REALTIME_TABLE_NAME, BROKER_INSTANCE_ID, "ONLINE");
     brokerResource.setState(REALTIME_TABLE_NAME, "broker_instance_2", "OFFLINE");
 
     QuotaConfig quotaConfig = new QuotaConfig();
@@ -369,7 +370,7 @@ public class TableQueryQuotaManagerTest {
 
   private ExternalView generateBrokerResource(String tableName) {
     ExternalView brokerResource = new ExternalView(BROKER_RESOURCE_INSTANCE);
-    brokerResource.setState(tableName, "broker_instance_1", "ONLINE");
+    brokerResource.setState(tableName, BROKER_INSTANCE_ID, "ONLINE");
     brokerResource.setState(tableName, "broker_instance_2", "OFFLINE");
     return brokerResource;
   }
