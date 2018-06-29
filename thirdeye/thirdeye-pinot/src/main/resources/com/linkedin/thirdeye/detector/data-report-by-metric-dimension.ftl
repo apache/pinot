@@ -23,7 +23,7 @@
     <tr>
       <td><b>
         <p>${reportCount} - <a
-            href="${dashboardHost}/app/#/rootcause?metricId=${metricReport.metricId}">
+            href="${dashboardHost}/app/#/rootcause?metricId=${metricReport.metricId?c}">
         ${metricReport.metricName} by ${metricReport.dimensionName}</a>  (baseline : ${metricReport.compareMode})
         </p>
       </b></td>
