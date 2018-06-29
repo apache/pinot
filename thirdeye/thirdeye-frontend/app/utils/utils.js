@@ -1,6 +1,7 @@
+import d3 from 'd3';
 import { isNone } from '@ember/utils';
 import moment from 'moment';
-import d3 from 'd3';
+import { splitFilterFragment } from 'thirdeye-frontend/utils/rca-utils';
 
 /**
  * The Promise returned from fetch() won't reject on HTTP error status even if the response is an HTTP 404 or 500.
@@ -109,6 +110,21 @@ export function parseProps(filters) {
 }
 
 /**
+ * Takes a raw filter string and processes it via 'splitFilterFragment' into a API-compatible JSON-formatted string.
+ * "filter1=value;filter2=value"
+ * @method makeFilterString
+ * @param {Array} filtersRaw - single current record
+ * @private
+ */
+export function makeFilterString(filtersRaw) {
+  try {
+    return JSON.stringify(toFilterMap(filtersRaw.split(';').map(splitFilterFragment)));
+  } catch (ignore) {
+    return '';
+  }
+}
+
+/**
  * Preps post object and stringifies post data
  * @param {Object} data to post
  * @returns {Object}
@@ -134,6 +150,7 @@ export default {
   humanizeFloat,
   humanizeChange,
   humanizeScore,
+  makeFilterString,
   parseProps,
   postProps,
   toIso

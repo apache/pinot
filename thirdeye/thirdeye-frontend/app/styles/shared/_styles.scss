@@ -80,6 +80,12 @@ body {
     &--two-share {
       width: 49%;
     }
+
+    &--hz-micro {
+      width: 50%;
+      float: left;
+      clear: right;
+    }
   }
 
   &__list {

@@ -1,0 +1,106 @@
+<fieldset class="te-form__section te-form__section--micro row" id="select-target1">
+  <div class="te-form__group col-xs-12">
+    <label for="report-select-dimension" class="control-label te-label te-label--small">Dimensions to INCLUDE</label>
+
+    {{#power-select-multiple
+      selected=selectedIncludeDimensions
+      options=dimensionOptionsInclude
+      searchEnabled=false
+      renderInPlace=true
+      onchange=(action "onInput" "selectedIncludeDimensions")
+      placeholder="Select a dimension to include"
+      triggerId="dimension-select-include"
+      triggerClass="te-form__select"
+      verticalPosition="below"
+      as |dimension|
+    }}
+      {{dimension}}
+    {{/power-select-multiple}}
+
+    <div class="te-form__sub-label te-form__sub-label--micro">Show only these dimensions</div>
+    {{input
+      type="checkbox"
+      id=(concat dimensionId index)
+      checked=true}}
+    <label for="report-select-dimension" class="control-label te-label te-label--small">Maintain this order</label>
+  </div>
+</fieldset>
+
+<fieldset class="te-form__section te-form__section--micro row" id="select-target1">
+  <div class="te-form__group col-xs-12">
+    <label for="report-select-dimension" class="control-label te-label te-label--small">Dimensions to EXCLUDE</label>
+
+    {{#power-select-multiple
+      selected=selectedExcludeDimensions
+      options=dimensionOptionsExclude
+      searchEnabled=false
+      renderInPlace=true
+      onchange=(action "onInput" "selectedExcludeDimensions")
+      placeholder="Select a dimension to exclude"
+      triggerId="dimension-select-exclude"
+      triggerClass="te-form__select"
+      verticalPosition="below"
+      as |dimension|
+    }}
+      {{dimension}}
+    {{/power-select-multiple}}
+
+
+    <div class="te-form__sub-label te-form__sub-label--micro">Remove these dimensions</div>
+  </div>
+</fieldset>
+
+<fieldset class="te-form__section te-form__section--micro row" id="select-target1">
+  <div class="te-form__group te-form__group--hz-micro col-xs-6">
+    <label for="report-select-dimension" class="control-label te-label te-label--small">Number of top contributors</label>
+    {{input
+      type="text"
+      id="num-top-contibutors"
+      class="form-control te-input"
+      focus-out=(action "onInput" "topContributors")
+      placeholder="Links to JIRAs, InGraph Dashboards, etc"
+      value=topContributors
+    }}
+    <div class="te-form__sub-label te-form__sub-label--micro">Group all other contributors as Others</div>
+  </div>
+
+  <div class="te-form__group te-form__group--hz-micro col-xs-6">
+    <label for="report-select-dimension" class="control-label te-label te-label--small">Levels of dimension (max 3)</label>
+    {{#power-select
+      triggerId="dimension-select-levels"
+      triggerClass="te-form__select"
+      verticalPosition="below"
+      placeholder="Select a dimension"
+      renderInPlace=true
+      options=dimensionLevels
+      searchEnabled=false
+      selected=selectedDimensionLevel
+      onchange=(action "onInput" "selectedDimensionLevel")
+      as |levels|
+    }}
+      {{levels}}
+    {{/power-select}}
+    <div class="te-form__sub-label te-form__sub-label--micro">Levels of dimension to slice by</div>
+  </div>
+</fieldset>
+
+<fieldset class="te-form__section te-form__section--micro row" id="select-target1">
+  <div class="te-form__group col-xs-6">
+    <label for="report-select-dimension" class="control-label te-label te-label--small">One side error</label>
+    {{#power-select
+      triggerId="dimension-select-error"
+      triggerClass="te-form__select"
+      verticalPosition="below"
+      placeholder="Select a dimension"
+      renderInPlace=true
+      options=errorOptions
+      searchEnabled=false
+      selected=selectedErrorOption
+      onchange=(action "onInput" "selectedErrorOption")
+      as |errorOption|
+    }}
+      {{errorOption}}
+    {{/power-select}}
+    <div class="te-form__sub-label te-form__sub-label--micro">description</div>
+  </div>
+</fieldset>

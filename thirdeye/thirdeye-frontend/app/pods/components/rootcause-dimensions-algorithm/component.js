@@ -17,14 +17,19 @@
  * @author smcclung
  */
 
+import fetch from 'fetch';
+import moment from 'moment';
 import Component from '@ember/component';
 import { isPresent, isEmpty } from '@ember/utils';
 import { task, timeout } from 'ember-concurrency';
 import { inject as service } from '@ember/service';
+import { checkStatus, makeFilterString } from 'thirdeye-frontend/utils/utils';
+import { selfServeApiGraph } from 'thirdeye-frontend/utils/api/self-serve';
 import { computed, get, set, getProperties, setProperties } from '@ember/object';
 import {
   toCurrentUrn,
   toBaselineUrn,
+  toFilterMap,
   hasPrefix,
   toWidthNumber,
   toBaselineRange
@@ -60,16 +65,12 @@ export default Component.extend({
   entities: {},
 
   /**
-   * Incoming metric URN
-   * @type {String}
-   */
-  metricUrn: '',
-
-  /**
-   * Incoming metric URN
-   * @type {String}
+   * Incoming metric-related properties
    */
   selectedUrns: '',
+  metricId: null,
+  metricUrn: '',
+  filters: '',
 
     /**
    * Existing metric URN
@@ -90,6 +91,31 @@ export default Component.extend({
   overallChange: 'NA',
 
   /**
+   * Modal open/close flag
+   * @type {Boolean}
+   */
+  openSettingsModal: false,
+  renderModalContent: false,
+
+  /**
+   * These are defaults we want the modal to open with
+   * @type {Object}
+   */
+  customTableSettings: {
+    depth: '3',
+    dimensions: [],
+    summarySize: 20,
+    oneSideError: 'false',
+    excludedDimensions: []
+  },
+
+  /**
+   * Flag to help with table refresh logic (override caching)
+   * @type {Boolean}
+   */
+  isUserCustomizingRequest: false,
+
+  /**
    * URN state history in component
    * @type {Array}
    */
@@ -106,6 +132,7 @@ export default Component.extend({
    * @type {Array}
    */
   dimensionsRawData: [],
+  dimensionOptions: [],
 
   /**
    * Single record cache for previous row's dimension names array
@@ -239,35 +266,65 @@ export default Component.extend({
    * @private
    */
   _fetchIfNewContext() {
-    const { previousUrns, previousSettings } = this.getProperties('previousUrns', 'previousSettings');
-    const { mode, range, entities, metricUrn } = this.getProperties('mode', 'range', 'entities', 'metricUrn');
-    const newUrns = [...get(this, 'selectedUrns')];
+    const { mode, range, entities, metricUrn, previousUrns } = this.getProperties(
+      'mode',
+      'range',
+      'entities',
+      'metricUrn',
+      'previousUrns'
+    );
+    const { previousSettings, customTableSettings, isUserCustomizingRequest } = this.getProperties(
+      'previousSettings',
+      'customTableSettings',
+      'isUserCustomizingRequest'
+    );
+    // Labels to omit from URN when isolating filter keys
+    const baseUrnArr = ['thirdeye', 'metric'];
+    // Stringifying any custom settings so that we can append to our caching key
+    const customSettings = Object.values(customTableSettings).join(':');
+    // Isolate filter keys/values from incoming metric URN
+    const rawFilterStr = metricUrn.split(':').filter((urnFragment) => {
+      return isNaN(urnFragment) && !baseUrnArr.includes(urnFragment);
+    }).join(';');
+    // Construct API-ready filter string
+    const finalFilterStr = makeFilterString(decodeURIComponent(rawFilterStr));
     // Baseline start/end is dependent on 'compareMode' (WoW, Wo2W, etc)
     const baselineRange = toBaselineRange(range, mode);
     // If metric URN is found in entity list, proceed. Otherwise, we don't have metric & dataset names for the call.
     const metricEntity = entities[metricUrn];
     // Concatenate incoming settings for bulk comparison
-    const newConcatSettings = `${metricUrn}:${range[0]}:${range[1]}:${mode}`;
+    const newConcatSettings = `${metricUrn}:${range[0]}:${range[1]}:${mode}:${customSettings}`;
     // Compare current and incoming settings
     const isSameMetricSettings = previousSettings === newConcatSettings;
     // If we have new settings, we can trigger fetch/reload. Otherwise, do nothing
-    if (metricEntity && !isSameMetricSettings) {
+    if ((metricEntity && !isSameMetricSettings) || isUserCustomizingRequest) {
       const parsedMetric = metricEntity.label.split('::');
-      get(this, 'fetchDimensionAnalysisData').perform({
+      const requestObj = {
         metric: parsedMetric[1],
         dataset: parsedMetric[0],
         currentStart: range[0],
         currentEnd: range[1],
         baselineStart: baselineRange[0],
         baselineEnd: baselineRange[1],
-        summarySize: 20,
-        oneSideError: false,
-        depth: 3
-      });
+        summarySize: customTableSettings.summarySize,
+        oneSideError: customTableSettings.oneSideError,
+        depth: customTableSettings.depth,
+        filters: rawFilterStr.length ? finalFilterStr : ''
+      };
+      // Add dimensions/exclusions into query if not empty
+      if (customTableSettings.dimensions.length) {
+        Object.assign(requestObj, { dimensions: customTableSettings.dimensions.join(',') });
+      }
+      if (customTableSettings.excludedDimensions.length) {
+        Object.assign(requestObj, { excludedDimensions: customTableSettings.excludedDimensions.join(',') });
+      }
+      get(this, 'fetchDimensionAnalysisData').perform(requestObj);
+      // Fetch dimension options
+      get(this, 'fetchDimensionOptions').perform(get(this, 'metricId'));
       // Cache incoming settings and URNs
       setProperties(this, {
         previousSettings: newConcatSettings,
-        previousUrns: newUrns
+        previousUrns: [...get(this, 'selectedUrns')]
       });
     }
   },
@@ -326,12 +383,12 @@ export default Component.extend({
 
     // Array to help dimension column component decide what to render in each cell
     const dimensionArr = dimensionNames.map((name, index) => {
-      let dimensionValue = record.names[index];
+      let dimensionValue = record.names[index] || null;
       let isExclusionRecord = dimensionValue === '(ALL)-';
       let modifiedValue = isExclusionRecord ? 'Other' : dimensionValue;
       return {
         label: name.camelize(),
-        value: modifiedValue.replace('(ALL)', 'All') || '-',
+        value: modifiedValue ? modifiedValue.replace('(ALL)', 'All') : '-',
         isHidden: dimensionValue === previousDimensionValues[index], // if its a repeated value, hide it
         otherValues: isExclusionRecord ? otherValues : null
       };
@@ -350,12 +407,38 @@ export default Component.extend({
   },
 
   actions: {
+
+    /**
+     * Handle submission of custom settings from settings modal
+     */
+    onSave(data) {
+      set(this, 'isUserCustomizingRequest', true);
+      set(this, 'renderModalContent', false);
+      debugger;
+      this._fetchIfNewContext();
+    },
+
+    /**
+     * Handle custom settings modal cancel
+     */
+    onCancel() {
+      //set(this, 'renderModalContent', false);
+    },
+
+    /**
+     * Handle custom settings modal open
+     */
+    onClickDimensionOptions() {
+      set(this, 'openSettingsModal', true);
+      set(this, 'renderModalContent', true);
+    },
+
     /**
      * Triggered on row selection
      * Updates the currently selected urns based on user selection on the table
      * @param {Object} eventObj
      */
-    displayDataChanged (eventObj) {
+    displayDataChanged(eventObj) {
       if (isEmpty(eventObj.selectedItems)) { return; }
       const { selectedUrns, onSelection } = this.getProperties('selectedUrns', 'onSelection');
       const selectedRows = eventObj.selectedItems;
@@ -371,6 +454,18 @@ export default Component.extend({
       onSelection(updates);
     }
   },
+
+  /**
+   * Concurrency task to return a list of dimension options for the selected metric
+   * @method fetchDimensionOptions
+   * @param {Object} dimensionObj - required params for query
+   * @returns {Generator object}
+   * @private
+   */
+  fetchDimensionOptions: task(function * (metricId) {
+    const dimensionList = yield fetch(selfServeApiGraph.metricDimensions(metricId)).then(checkStatus);
+    set(this, 'dimensionOptions', dimensionList);
+  }).drop(),
 
   /**
    * Concurrency task to call for either cached or new dimension data from store

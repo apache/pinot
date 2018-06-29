@@ -61,6 +61,7 @@
     max-height: 80vh;
     overflow-x: hidden;
     overflow-y: scroll;
+    //overflow: auto;
   }
 
   &__footer {
@@ -159,4 +160,8 @@
   &__settings {
     margin: $te-spacing--lg;
   }
+}
+
+.te-modal-micro {
+  width: 560px;
 }
