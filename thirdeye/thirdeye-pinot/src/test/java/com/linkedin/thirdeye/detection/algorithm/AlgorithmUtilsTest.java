@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.detection.algorithm;
 
-import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import java.io.InputStreamReader;
@@ -93,6 +92,30 @@ public class AlgorithmUtilsTest {
     Assert.assertTrue(equals(AlgorithmUtils.getRescaledSeries(this.outlierData, changePoints), this.data, 50));
   }
 
+  @Test
+  public void testFastBSplineNoData() {
+    DoubleSeries s = DoubleSeries.buildFrom();
+    Assert.assertTrue(equals(AlgorithmUtils.fastBSpline(s, 1), DoubleSeries.buildFrom(), 0.001));
+  }
+
+  @Test
+  public void testFastBSplineOneElement() {
+    DoubleSeries s = DoubleSeries.buildFrom(5);
+    Assert.assertTrue(equals(AlgorithmUtils.fastBSpline(s, 1), DoubleSeries.buildFrom(5), 0.001));
+  }
+
+  @Test
+  public void testFastBSplineTwoElements() {
+    DoubleSeries s = DoubleSeries.buildFrom(5, 6);
+    Assert.assertTrue(equals(AlgorithmUtils.fastBSpline(s, 1), DoubleSeries.buildFrom(5.5, 5.5), 0.001));
+  }
+
+  @Test
+  public void testFastBSpline() {
+    DoubleSeries s = DoubleSeries.buildFrom(1, 2, 3, 1, 2, 3, 1, 3, 2);
+    Assert.assertTrue(equals(AlgorithmUtils.fastBSpline(s, 4), DoubleSeries.buildFrom(2, 2, 2, 2, 2, 2, 2, 2, 2), 0.25));
+  }
+
   private static boolean equals(DataFrame a, DataFrame b, double epsilon) {
     if (!a.getSeriesNames().equals(b.getSeriesNames())) {
       return false;
@@ -105,8 +128,10 @@ public class AlgorithmUtilsTest {
     DoubleSeries valA = a.getDoubles(COL_VALUE);
     DoubleSeries valB = b.getDoubles(COL_VALUE);
 
-    BooleanSeries output = valA.lte(valB.add(epsilon)).and(valA.gte(valB.subtract(epsilon)));
+    return equals(valA, valB, epsilon);
+  }
 
-    return !output.hasFalse();
+  private static boolean equals(DoubleSeries a, DoubleSeries b, double epsilon) {
+    return !a.lte(b.add(epsilon)).and(a.gte(b.subtract(epsilon))).hasFalse();
   }
 }
