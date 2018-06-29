@@ -16,6 +16,10 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+import com.linkedin.pinot.core.data.readers.RecordReader;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import java.io.File;
 import java.util.List;
 import java.util.Random;
 import java.util.HashMap;
@@ -62,7 +66,7 @@ public class StarTreeV2SegmentHelper {
     return schema;
   }
 
-  public static List<GenericRow> buildSegment(Schema schema) throws Exception {
+  public static List<GenericRow> buildSegmentData(Schema schema) throws Exception {
 
 
     List<GenericRow> rows = new ArrayList<>(numRows);
@@ -87,5 +91,21 @@ public class StarTreeV2SegmentHelper {
     }
 
     return rows;
+  }
+
+  public static File createSegment(Schema schema, String segmentName, String segmentOutputDir, RecordReader recordReader)
+      throws Exception {
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
+    segmentGeneratorConfig.setTableName(segmentName);
+    segmentGeneratorConfig.setOutDir(segmentOutputDir);
+    segmentGeneratorConfig.setSegmentName(segmentName);
+    segmentGeneratorConfig.setEnableStarTreeIndex(true);
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(segmentGeneratorConfig, recordReader);
+    driver.build();
+    File segmentIndexDir = new File(segmentOutputDir, segmentName);
+
+    return segmentIndexDir;
   }
 }

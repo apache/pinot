@@ -25,6 +25,7 @@ import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
+import com.linkedin.pinot.core.startreeV2.StarTreeV2Metadata;
 import com.linkedin.pinot.startree.hll.HllConstants;
 import java.io.DataInputStream;
 import java.io.File;
@@ -81,6 +82,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private SegmentVersion _segmentVersion;
   private boolean _hasStarTree;
   private StarTreeMetadata _starTreeMetadata = null;
+  private List<StarTreeV2Metadata> _starTreeV2Metadata = null;
   private String _creatorName;
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
   private int _hllLog2m = HllConstants.DEFAULT_LOG2M;
@@ -286,6 +288,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _hasStarTree = _segmentMetadataPropertiesConfiguration.getBoolean(MetadataKeys.StarTree.STAR_TREE_ENABLED, false);
     if (_hasStarTree) {
       initStarTreeMetadata();
+      initStarTreeV2Metadata();
     }
   }
 
@@ -340,6 +343,64 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       _starTreeMetadata.setSkipMaterializationCardinality(Integer.parseInt(skipMaterializationCardinalityString));
     }
   }
+
+
+  /**
+   * Reads and initializes the star tree v2 metadata from segment metadata properties.
+   */
+  private void initStarTreeV2Metadata() {
+
+    List<StarTreeV2Metadata> _starTreeV2Metadata = new ArrayList<>();
+    return;
+
+
+
+//    // Set the splitOrder
+//    Iterator<String> iterator =
+//        _segmentMetadataPropertiesConfiguration.getList(MetadataKeys.StarTree.STAR_TREE_SPLIT_ORDER).iterator();
+//    List<String> splitOrder = new ArrayList<String>();
+//    while (iterator.hasNext()) {
+//      final String splitColumn = iterator.next();
+//      splitOrder.add(splitColumn);
+//    }
+//    _starTreeMetadata.setDimensionsSplitOrder(splitOrder);
+//
+//    // Set dimensions for which star node creation is to be skipped.
+//    iterator = _segmentMetadataPropertiesConfiguration.getList(
+//        MetadataKeys.StarTree.STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS).iterator();
+//    List<String> skipStarNodeCreationForDimensions = new ArrayList<String>();
+//    while (iterator.hasNext()) {
+//      final String column = iterator.next();
+//      skipStarNodeCreationForDimensions.add(column);
+//    }
+//    _starTreeMetadata.setSkipStarNodeCreationForDimensions(skipStarNodeCreationForDimensions);
+//
+//    // Set dimensions for which to skip materialization.
+//    iterator = _segmentMetadataPropertiesConfiguration.getList(
+//        MetadataKeys.StarTree.STAR_TREE_SKIP_MATERIALIZATION_FOR_DIMENSIONS).iterator();
+//    List<String> skipMaterializationForDimensions = new ArrayList<String>();
+//
+//    while (iterator.hasNext()) {
+//      final String column = iterator.next();
+//      skipMaterializationForDimensions.add(column);
+//    }
+//    _starTreeMetadata.setSkipMaterializationForDimensions(skipMaterializationForDimensions);
+//
+//    // Set the maxLeafRecords
+//    String maxLeafRecordsString =
+//        _segmentMetadataPropertiesConfiguration.getString(MetadataKeys.StarTree.STAR_TREE_MAX_LEAF_RECORDS);
+//    if (maxLeafRecordsString != null) {
+//      _starTreeMetadata.setMaxLeafRecords(Integer.parseInt(maxLeafRecordsString));
+//    }
+//
+//    // Skip skip materialization cardinality.
+//    String skipMaterializationCardinalityString = _segmentMetadataPropertiesConfiguration.getString(
+//        MetadataKeys.StarTree.STAR_TREE_SKIP_MATERIALIZATION_CARDINALITY);
+//    if (skipMaterializationCardinalityString != null) {
+//      _starTreeMetadata.setSkipMaterializationCardinality(Integer.parseInt(skipMaterializationCardinalityString));
+//    }
+  }
+
 
   public ColumnMetadata getColumnMetadataFor(String column) {
     return _columnMetadataMap.get(column);
@@ -495,6 +556,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public StarTreeMetadata getStarTreeMetadata() {
     return _starTreeMetadata;
+  }
+
+  @Override
+  public List<StarTreeMetadata> getStarTreeV2Metadata() {
+    return null;
   }
 
   @Override
