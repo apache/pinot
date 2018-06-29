@@ -208,14 +208,16 @@ export default Controller.extend({
     'diagnosticsKey',
     function () {
       const diagnosticsPath = get(this, 'diagnosticsPath');
-      const diagnosticsKey = get(this, 'diagnosticsKey');
+      const diagnosticsKeys = (get(this, 'diagnosticsKey') || '').split(',');
 
       const series = {};
 
-      const diagnosticsSeries = this._makeDiagnosticsSeries(diagnosticsPath, diagnosticsKey);
-      if (!_.isEmpty(diagnosticsSeries)) {
-        series['diagnosticsSeries'] = diagnosticsSeries;
-      }
+      diagnosticsKeys.forEach(key => {
+        const diagnostics = this._makeDiagnosticsSeries(diagnosticsPath, key);
+        if (!_.isEmpty(diagnostics)) {
+          series[`diagnostics-${key}`] = diagnostics;
+        }
+      });
 
       return series;
     }
@@ -254,7 +256,6 @@ export default Controller.extend({
         timestamps: source.timestamp,
         values: source[key],
         type: 'line',
-        color: 'red',
         axis: 'y2'
       }
 
