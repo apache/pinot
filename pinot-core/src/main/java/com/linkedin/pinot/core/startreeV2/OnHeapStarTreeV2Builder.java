@@ -16,8 +16,7 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.startree.OffHeapStarTreeNode;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.util.Set;
 import java.util.Map;
@@ -26,12 +25,16 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.ArrayList;
 import java.io.IOException;
+import org.apache.commons.configuration.ConfigurationException;
+import xerial.larray.mmap.MMapMode;
+import xerial.larray.mmap.MMapBuffer;
 import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.core.startree.OffHeapStarTreeNode;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
 import com.linkedin.pinot.core.data.readers.PinotSegmentColumnReader;
@@ -41,10 +44,9 @@ import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
-import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
+import com.linkedin.pinot.core.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
-import xerial.larray.mmap.MMapBuffer;
-import xerial.larray.mmap.MMapMode;
 
 
 public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
@@ -202,9 +204,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     constructStarTree(_rootNode, 0, _starTreeData.size(), 0);
 
     // create aggregated doc for all nodes.
-    //createAggregatedDocForAllNodes();
-
-    createAggregatedDocForAllNodesBottom(_rootNode);
+    createAggregatedDocForAllNodes(_rootNode);
     return;
   }
 
@@ -212,21 +212,41 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   public void serialize() throws Exception {
     createIndexes();
     serializeTree(new File(_outDir, StarTreeV2Constant.STAR_TREE_INDEX_FILE_PREFIX + Integer.toString(_starTreeCount)));
-
+    convertFromV1toV3(_outDir);
     return;
   }
 
   @Override
   public List<String> getMetaData() {
+
+
     return null;
   }
 
-
   /**
-   * Helper method to serialize the updated tree into a file.
+   * Helper method to convert from v1 to v3.
    *
    * @return void.
    */
+  private void convertFromV1toV3(File starTreeIndexDir) throws Exception {
+    SegmentV1V2ToV3FormatConverter converter = new SegmentV1V2ToV3FormatConverter();
+    File v3TempDirectory = converter.v3ConversionTempDirectory(starTreeIndexDir);
+    converter.setDirectoryPermissions(v3TempDirectory);
+    converter.createMetadataFile(new File(starTreeIndexDir, "v3"), v3TempDirectory);
+    converter.copyCreationMetadataIfExists(new File(starTreeIndexDir, "v3"), v3TempDirectory);
+
+    SegmentMetadataImpl v2Metadata = new SegmentMetadataImpl(starTreeIndexDir);
+    converter.copyIndexData(starTreeIndexDir, v2Metadata, v3TempDirectory);
+
+
+    return;
+  }
+
+    /**
+     * Helper method to serialize the updated tree into a file.
+     *
+     * @return void.
+     */
   private void serializeTree(File starTreeFile) throws IOException {
     int headerSizeInBytes = OnHeapStarTreeV2BuilderHelper.computeHeaderSizeInBytes(_dimensionsName);
     long totalSizeInBytes = headerSizeInBytes + _nodesCount * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES;
@@ -262,16 +282,21 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     // 'SingleValueRawIndexCreator' for metrics
     for (Met2AggfuncPair pair: _met2aggfuncPairs) {
       String columnName = pair._metricName + '_' + pair._aggregatefunction;
-      SingleValueRawIndexCreator indexCreator =  new SingleValueFixedByteRawIndexCreator(_outDir,
-          ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, _starTreeData.size(), V1Constants.Numbers.DOUBLE_SIZE);
-      _forwardIndexCreatorList.add(indexCreator);
+      MetricFieldSpec spec = _metricsSpecMap.get(pair._metricName);
+
+      SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(
+          _outDir, ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, spec.getDataType(),
+          _starTreeData.size(), V1Constants.Numbers.DOUBLE_SIZE);
+
+      _forwardIndexCreatorList.add(rawIndexCreator);
     }
 
     // 'SingleValueRawIndexCreator' for count(*)
     String columnName = "count";
-    SingleValueRawIndexCreator indexCreator =  new SingleValueFixedByteRawIndexCreator(_outDir,
-        ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, _starTreeData.size(), V1Constants.Numbers.DOUBLE_SIZE);
-    _forwardIndexCreatorList.add(indexCreator);
+    SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(
+        _outDir, ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, FieldSpec.DataType.DOUBLE,
+        _starTreeData.size(), V1Constants.Numbers.DOUBLE_SIZE);
+    _forwardIndexCreatorList.add(rawIndexCreator);
 
     // indexing each record.
     for (int i = 0; i < _starTreeData.size(); i++) {
@@ -287,6 +312,10 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
       for (int j = 0; j < metric.size(); j++) {
         ((SingleValueRawIndexCreator) _forwardIndexCreatorList.get(index + j)).index(i, metric.get(j));
       }
+    }
+
+    for (int i = 0; i < _forwardIndexCreatorList.size(); i++) {
+      _forwardIndexCreatorList.get(i).close();
     }
 
     return;
@@ -425,7 +454,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
    *
    * @return void.
    */
-  private void createAggregatedDocForAllNodesBottom(TreeNode node) {
+  private void createAggregatedDocForAllNodes(TreeNode node) {
 
     if (node._children == null) {
       if (node._value == StarTreeV2Constant.STAR_NODE) {
@@ -442,7 +471,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     for (int key : children.keySet()) {
       TreeNode child = children.get(key);
       child._value = key;
-      createAggregatedDocForAllNodesBottom(child);
+      createAggregatedDocForAllNodes(child);
     }
 
     if (node._value != StarTreeV2Constant.STAR_NODE) {
