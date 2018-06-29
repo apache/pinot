@@ -230,7 +230,7 @@ export default Route.extend({
       baseEnd,
       baseStart,
       exploreDimensions,
-      filters: makeFilterString(filtersRaw)
+      filters: filtersRaw ? makeFilterString(filtersRaw) : ''
     };
 
     // Load endpoints for projected metrics. TODO: consolidate into CP if duplicating this logic
