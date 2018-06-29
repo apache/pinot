@@ -635,6 +635,17 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return this.set(this.eq(find), by);
   }
 
+  public int find(long value) {
+    return this.find(value, 0);
+  }
+
+  public int find(long value, int startOffset) {
+    for(int i=startOffset; i<this.values.length; i++)
+      if(this.values[i]==value)
+        return i;
+    return -1;
+  }
+
   @Override
   public LongSeries filter(BooleanSeries filter) {
     return this.set(filter.fillNull().not(), NULL);

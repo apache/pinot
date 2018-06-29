@@ -864,6 +864,19 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return this.set(this.eq(find), by);
   }
 
+  public int find(double value, double epsilon) {
+    return this.find(value, epsilon, 0);
+  }
+
+  public int find(double value, double epsilon, int startOffset) {
+    for(int i=startOffset; i<this.values.length; i++)
+      if((this.values[i] >= value - epsilon
+          && this.values[i] <= value + epsilon)
+          || isNull(this.values[i]) && isNull(value))
+        return i;
+    return -1;
+  }
+
   @Override
   public DoubleSeries filter(BooleanSeries filter) {
     return this.set(filter.fillNull().not(), NULL);
