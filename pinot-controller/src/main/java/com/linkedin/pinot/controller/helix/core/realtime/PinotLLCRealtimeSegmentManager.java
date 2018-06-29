@@ -974,7 +974,7 @@ public class PinotLLCRealtimeSegmentManager {
     LLCRealtimeSegmentZKMetadata metadata = getRealtimeSegmentZKMetadata(tableNameWithType, segmentId, stat);
     long metadataUpdateTime = stat.getMtime();
     if (now < metadataUpdateTime + TimeUnit.MILLISECONDS.convert(MAX_SEGMENT_COMPLETION_TIME_MINS, TimeUnit.MINUTES)) {
-      // too soon to correct
+      LOGGER.info("Too soon to correct segment:{} updateTime: {} now:{}", segmentId, metadataUpdateTime, now);
       return true;
     }
     return false;
@@ -1077,7 +1077,6 @@ public class PinotLLCRealtimeSegmentManager {
             // but step-2 is not done (i.e. adding new metadata for the next segment)
             // and ideal state update (i.e. marking old segment as ONLINE and new segment as CONSUMING) is not done either.
             if (isTooSoonToCorrect(tableNameWithType, segmentId, now)) {
-              LOGGER.info("Skipping correction of segment {} (too soon to correct)", segmentId);
               continue;
             }
             LOGGER.info("{}:Repairing segment for partition {}. "
@@ -1101,28 +1100,23 @@ public class PinotLLCRealtimeSegmentManager {
 
           // Possible scenarios: for any of these scenarios, we need to create new metadata IN_PROGRESS and new CONSUMING segment
           // 1. all replicas OFFLINE and metadata IN_PROGRESS/DONE - a segment marked itself OFFLINE during consumption for some reason
-          // 2. all replicas ONLINE or mixture of ONLINE/OFFLINE and metadata DONE - Resolved in https://github.com/linkedin/pinot/pull/2890
-          // This could happen due to a race condition with the retention manager where we lost the new segment
-          // The retention manager saw the new segment metadata before it was updated in ideal state, and hence marked it for deletion
-          // later the new segment was updated in the ideal state, but the retention manager would clean it out from the metadata and ideal state, having marked it earlier
-          // So, in commmitSegmentMetadata:
-          // step-1 was done (i.e. marking old segment metadata as DONE)
-          // step-2 was undone by retention manager (i.e. new IN_PROGRESS metadata got deleted)
-          // step 3 was partially undone by retention manager (i.e. marking old segment ONLINE was done but new CONSUMING segment was deleted)
-
+          // 2. all replicas ONLINE and metadata DONE - Resolved in https://github.com/linkedin/pinot/pull/2890
+          // 3. we should never end up with some replicas ONLINE and some OFFLINE.
           if (isAllInstancesInState(instanceStateMap, PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE)
               || !(isTooSoonToCorrect(tableNameWithType, segmentId, now))) {
+
             // No instances are consuming, so create a new consuming segment.
-            int nextSeqNum = segmentName.getSequenceNumber() + 1;
+            LLCSegmentName newLLCSegmentName = makeNextLLCSegmentName(segmentName, partition, now);
             LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", tableNameWithType, partition,
-                nextSeqNum);
+                newLLCSegmentName.getSequenceNumber());
+
             // To begin with, set startOffset to the oldest available offset in kafka. Fix it to be the one we want,
             // depending on what the prev segment had.
             long startOffset = getKafkaPartitionOffset(streamMetadata, KAFKA_SMALLEST_OFFSET, partition);
-            LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableNameWithType, partition);
-            startOffset =
-                getBetterStartOffsetIfNeeded(tableNameWithType, partition, segmentName, startOffset, nextSeqNum);
-            LLCSegmentName newLLCSegmentName = new LLCSegmentName(segmentName.getTableName(), partition, nextSeqNum, now);
+            LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableNameWithType,
+                partition);
+            startOffset = getBetterStartOffsetIfNeeded(tableNameWithType, partition, segmentName, startOffset,
+                newLLCSegmentName.getSequenceNumber());
 
             CommittingSegmentDescriptor committingSegmentDescriptor =
                 new CommittingSegmentDescriptor(segmentId, startOffset, 0);
@@ -1140,7 +1134,6 @@ public class PinotLLCRealtimeSegmentManager {
         // and creating new segment metadata (new segment metadata state = IN_PROGRESS),
         // but before updating ideal state (new segment ideal missing from ideal state)
         if (isTooSoonToCorrect(tableNameWithType, segmentId, now)) {
-          LOGGER.info("Skipping correction of segment {} (too soon to correct)", segmentId);
           continue;
         }
 
