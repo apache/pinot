@@ -55,9 +55,12 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
   private static final String STATS_FILE_NAME = "stats.ser";
   private static final String STATS_FILE_COPY_NAME = "stats.copy.ser";
 
+  // TODO: allow override of numHosts and numHours
   private final int[] NUM_HOSTS = {2, 4, 6, 8, 9, 10, 12, 14, 15, 20};
   private final int[] NUM_HOURS_TO_CONSUME = {2, 3, 4, 6, 8, 9, 10, 11, 12};
 
+  // TODO: pick these details from table config, allow override for retention
+  // TODO: add numReplicas as a variable in the output?
   @Option(name = "-numReplicas", required = true, metaVar = "<int>", usage = "number of replicas for the table")
   private int _numReplicas;
 
@@ -67,14 +70,23 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
   @Option(name = "-retentionHours", required = true, metaVar = "<int>", usage = "number of hours we would require this segment to be in memory")
   private int _retentionHours;
 
+  @Option(name = "-numHosts", metaVar = "<String>", usage = "number of hosts as comma separated values")
+  private String _numHosts;
+
+  @Option(name = "-numHours", metaVar = "<String>", usage = "number of hours to consume as comma separated values")
+  private String _numHours;
+
   @Option(name = "-sampleCompletedSegmentDir", required = true, metaVar = "<String>", usage = "Consume from the topic for n hours and provide the path of the segment dir after it completes")
   private String _sampleCompletedSegmentDir;
 
   @Option(name = "-periodSampleSegmentConsumed", required = true, metaVar = "<String>", usage = "Period for which the sample segment was consuming in format 4h, 5h30m, 40m etc")
   private String _periodSampleSegmentConsumed;
 
+  // TODO: write out all the assumptions made in the help and also in the output
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
+
+  // TODO: document all the inputs
 
   public RealtimeHostsProvisioningCommand setNumReplicas(int numReplicas) {
     _numReplicas = numReplicas;
@@ -90,6 +102,16 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
     _retentionHours = retentionHours;
     return this;
   }
+  public RealtimeHostsProvisioningCommand setNumHosts(String numHosts) {
+    _numHosts = numHosts;
+    return this;
+  }
+
+  public RealtimeHostsProvisioningCommand setNumHours(String numHours) {
+    _numHours = numHours;
+    return this;
+  }
+
 
   public RealtimeHostsProvisioningCommand setSampleCompletedSegmentDir(String sampleCompletedSegmentDir) {
     _sampleCompletedSegmentDir = sampleCompletedSegmentDir;
@@ -135,6 +157,10 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
     int totalConsumingPartitions = _numPartitions * _numReplicas;
     long minutesSampleSegmentConsumed =
         TimeUnit.MINUTES.convert(TimeUtils.convertPeriodToMillis(_periodSampleSegmentConsumed), TimeUnit.MILLISECONDS);
+
+    // TODO: allow multiple segments. What would that mean for the memory calculations?
+    // Consuming: Build statsHistory using multiple segments. Use multiple data points of (totalDocs,numHoursConsumed) to calculate totalDocs for our numHours
+    // Completed: Use multiple (completedSize,numHours) data points to calculate completed size for our numHours
     File sampleCompletedSegmentFile = new File(_sampleCompletedSegmentDir);
     long sampleCompletedSegmentSizeBytes = FileUtils.sizeOfDirectory(sampleCompletedSegmentFile);
     SegmentMetadataImpl segmentMetadata;
@@ -203,8 +229,7 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
       mutableSegmentImpl.destroy();
       FileUtils.deleteQuietly(statsFileCopy);
 
-      // TODO: should this be a function of total docs? if not this can just be done once at the beginning
-      //memoryForConsumingSegmentPerPartition += getMemoryForInvertedIndex(segmentMetadata, invertedIndexColumns, totalDocs);
+      // TODO: better way to estimate inverted indexes memory utilization
       memoryForConsumingSegmentPerPartition += getMemoryForInvertedIndex(memoryForConsumingSegmentPerPartition, segmentMetadata, invertedIndexColumns);
 
       int j = 0;
@@ -232,7 +257,8 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
       i++;
     }
 
-
+    // TODO: Add caveats, that we could be off by x% - what is this x?
+    // TODO: Make a recommendation of what config to choose
     System.out.println("\nMemory used per host");
     display(totalMemoryPerHost);
     System.out.println("\nOptimal segment size");
@@ -243,28 +269,13 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
   }
 
   /**
-   * Method to compute memory used by inverted indexes
-   * This is an estimation based on some experimentation done with MutableRoaringBitmap
+   * Computes the memory by the inverted indexes in the consuming segment
+   * This is just an estimation. We use MutableRoaringBitmap for inverted indexes, which use heap memory.
+   * @param totalMemoryForConsumingSegment
    * @param segmentMetadata
    * @param invertedIndexColumns
-   * @param totalDocs
    * @return
    */
-  private long getMemoryForInvertedIndex(SegmentMetadataImpl segmentMetadata, Set<String> invertedIndexColumns, int totalDocs) {
-    long totalInvertedIndexSizeBytes = 0;
-    for (String invIndexColumn : invertedIndexColumns) {
-      int cardinality = segmentMetadata.getColumnMetadataFor(invIndexColumn).getCardinality();
-      // TODO: instead of 100K, should it be a function of total docs?
-      // How we got to 100K: created a MutableRoaringBitmap.
-      // Assuming we have total 1million docs, put 1/3 of them into the bitmap, randomly, but maintaining an ascending order in doc ids
-      // This number stayed fairly constant across varying number of doc ids put in. (80k heap for 500k docs, 100k for 1 million docs, 110k for 10 million docs)
-      // It mattered that we put doc ids in an ascending manner (ascending improves compression), not completely consecutive (non consecutive reduces compression)
-      long invertedIndexSizeBytes = cardinality * DataSize.toBytes("100K");
-      totalInvertedIndexSizeBytes += invertedIndexSizeBytes;
-    }
-    return totalInvertedIndexSizeBytes;
-  }
-
   private long getMemoryForInvertedIndex(long totalMemoryForConsumingSegment, SegmentMetadataImpl segmentMetadata, Set<String> invertedIndexColumns) {
     long totalInvertedIndexSizeBytes = 0;
     if (!invertedIndexColumns.isEmpty()) {
