@@ -24,8 +24,8 @@ public class StarTreeV2Config {
 
   private File _outDir;
   private int _maxNumLeafRecords;
-  private List<String> _dimensionsSplitOrder;
   private List<String> _dimensions;
+  private List<String> _dimensionsSplitOrder;
   private List<String> _dimensionsWithoutStarNode;
   private List<Met2AggfuncPair> _metric2aggFuncPairs;
 
