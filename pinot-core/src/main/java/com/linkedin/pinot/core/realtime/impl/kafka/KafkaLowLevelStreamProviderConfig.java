@@ -16,11 +16,15 @@
 
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.DataSize;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -28,9 +32,12 @@ import java.util.Map;
  */
 public class KafkaLowLevelStreamProviderConfig extends KafkaHighLevelStreamProviderConfig {
   private static final int NOT_DEFINED = Integer.MIN_VALUE;
+  private static final long DEFAULT_DESIRED_SEGMENT_SIZE_BYTES = 200 * 1024 * 1024;
+  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaLowLevelStreamProviderConfig.class);
 
   private long llcSegmentTimeInMillis = NOT_DEFINED;
   private int llcRealtimeRecordsThreshold = NOT_DEFINED;
+  private long desiredSegmentSizeBytes = DEFAULT_DESIRED_SEGMENT_SIZE_BYTES;
 
   @Override
   public void init(TableConfig tableConfig, InstanceZKMetadata instanceMetadata, Schema schema) {
@@ -44,6 +51,16 @@ public class KafkaLowLevelStreamProviderConfig extends KafkaHighLevelStreamProvi
     if (tableConfig.getIndexingConfig().getStreamConfigs().containsKey(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_TIME)) {
       llcSegmentTimeInMillis =
           Long.parseLong(tableConfig.getIndexingConfig().getStreamConfigs().get(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_TIME));
+    }
+
+    String desiredSegmentSizeStr = tableConfig.getIndexingConfig().getStreamConfigs().get(CommonConstants.Helix.DataSource.Realtime.REALTIME_DESIRED_SEGMENT_SIZE);
+    if (desiredSegmentSizeStr != null) {
+      long longVal = DataSize.toBytes(tableConfig.getIndexingConfig().getStreamConfigs().get(CommonConstants.Helix.DataSource.Realtime.REALTIME_DESIRED_SEGMENT_SIZE));
+      if (longVal > 0) {
+        desiredSegmentSizeBytes = longVal;
+      } else {
+        LOGGER.warn("Invalid value '{}' for {}. Ignored", desiredSegmentSizeStr, CommonConstants.Helix.DataSource.Realtime.REALTIME_DESIRED_SEGMENT_SIZE);
+      }
     }
   }
 
@@ -78,5 +95,14 @@ public class KafkaLowLevelStreamProviderConfig extends KafkaHighLevelStreamProvi
     } else {
       return super.getTimeThresholdToFlushSegment();
     }
+  }
+
+  public long getDesiredSegmentSizeBytes() {
+    return desiredSegmentSizeBytes;
+  }
+
+  @VisibleForTesting
+  public static long getDefaultDesiredSegmentSizeBytes() {
+    return DEFAULT_DESIRED_SEGMENT_SIZE_BYTES;
   }
 }

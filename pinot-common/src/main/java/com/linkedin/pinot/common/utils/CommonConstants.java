@@ -109,8 +109,30 @@ public class CommonConstants {
          * Keep in mind that this NOT a hard threshold, as other tables can also be assigned to this server, and that in
          * certain conditions (eg. if the number of servers, replicas of Kafka partitions changes) where Kafka partition
          * to server assignment changes, it's possible to end up with more (or less) than this number of rows in memory.
+         *
+         * If this value is set to 0, then the consumers adjust the number of rows consumed by a partition such that
+         * the size of the completed segment is the desired size (see REALTIME_DESIRED_SEGMENT_SIZE), unless
+         * REALTIME_SEGMENT_FLUSH_TIME is reached first)
          */
         public static final String REALTIME_SEGMENT_FLUSH_SIZE = "realtime.segment.flush.threshold.size";
+        /*
+         * The desired size of a completed realtime segment.
+         * This config is used only if REALTIME_SEGMENT_FLUSH_SIZE (or REALTIME_SEGMENT_FLUSH_SIZE  + ".llc") is set
+         * to 0. Default value of REALTIME_SEGMENT_FLUSH_SIZE is "200M". Values are parsed using DataSize class.
+         *
+         * The value for this configuration should be chosen based on the amount of memory available on consuming
+         * machines, the number of completed segments that are expected to be resident on the machine and the amount
+         * of memory used by consuming machines. In other words:
+         *
+         *    numPartitionsInMachine * (consumingPartitionMemory + numPartitionsRetained * REALTIME_SEGMENT_FLUSH_SIZE)
+         *
+         * must be less than or equal to the total memory available to store pinot data.
+         *
+         * Note that consumingPartitionMemory will vary depending on the rows that are consumed.
+         *
+         * Not included here is any heap memory used (currently inverted index uses heap memory for consuming partitions).
+         */
+        public static final String REALTIME_DESIRED_SEGMENT_SIZE = "realtime.segment.flush.segment.desired.size";
         public static final String LLC_PROPERTY_SUFFIX = ".llc";
         public static final String LLC_REALTIME_SEGMENT_FLUSH_SIZE = REALTIME_SEGMENT_FLUSH_SIZE + LLC_PROPERTY_SUFFIX;
         public static final String LLC_REALTIME_SEGMENT_FLUSH_TIME = REALTIME_SEGMENT_FLUSH_TIME + LLC_PROPERTY_SUFFIX;

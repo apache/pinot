@@ -37,11 +37,6 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentSizeBasedFlushThresholdUpdater.class);
 
-  private static final long IDEAL_SEGMENT_SIZE_BYTES = 200 * 1024 * 1024;
-  /** Below this size, we double the rows threshold */
-  private static final double OPTIMAL_SEGMENT_SIZE_BYTES_MIN = IDEAL_SEGMENT_SIZE_BYTES / 2;
-  /** Above this size we half the row threshold */
-  private static final double OPTIMAL_SEGMENT_SIZE_BYTES_MAX = IDEAL_SEGMENT_SIZE_BYTES * 1.5;
   private static final int INITIAL_ROWS_THRESHOLD = 100_000;
 
   private static final double CURRENT_SEGMENT_RATIO_WEIGHT = 0.1;
@@ -49,10 +44,12 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   private static final double ROWS_MULTIPLIER_WHEN_TIME_THRESHOLD_HIT = 1.1;
   private static final int MINIMUM_NUM_ROWS_THRESHOLD = 10_000;
 
-  @VisibleForTesting
-  long getIdealSegmentSizeBytes() {
-    return IDEAL_SEGMENT_SIZE_BYTES;
-  }
+  private final long _desiredSegmentSizeBytes;
+
+  /** Below this size, we double the rows threshold */
+  private final double _optimalSegmentSizeBytesMin;
+  /** Above this size we half the row threshold */
+  private final double _optimalSegmentSizeBytesMax;
 
   @VisibleForTesting
   int getInitialRowsThreshold() {
@@ -70,12 +67,23 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   }
 
   @VisibleForTesting
+  long getDesiredSegmentSizeBytes() {
+    return _desiredSegmentSizeBytes;
+  }
+
+  @VisibleForTesting
   double getLatestSegmentRowsToSizeRatio() {
     return _latestSegmentRowsToSizeRatio;
   }
 
   // num rows to segment size ratio of last committed segment for this table
   private double _latestSegmentRowsToSizeRatio = 0;
+
+  public SegmentSizeBasedFlushThresholdUpdater(long desiredSegmentSizeBytes) {
+    _desiredSegmentSizeBytes = desiredSegmentSizeBytes;
+    _optimalSegmentSizeBytesMin = _desiredSegmentSizeBytes / 2;
+    _optimalSegmentSizeBytesMax = _desiredSegmentSizeBytes * 1.5;
+  }
 
   // synchronized since this method could be called for multiple partitions of the same table in different threads
   @Override
@@ -86,7 +94,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     final String newSegmentName = newSegmentZKMetadata.getSegmentName();
     if (committingSegmentZKMetadata == null) { // first segment of the partition, hence committing segment is null
       if (_latestSegmentRowsToSizeRatio > 0) { // new partition added case
-        long targetSegmentNumRows = (long) (IDEAL_SEGMENT_SIZE_BYTES * _latestSegmentRowsToSizeRatio);
+        long targetSegmentNumRows = (long) (_desiredSegmentSizeBytes * _latestSegmentRowsToSizeRatio);
         targetSegmentNumRows = capNumRowsIfOverflow(targetSegmentNumRows);
         LOGGER.info(
             "Committing segment zk metadata is not available, using prev ratio {}, setting rows threshold for {} as {}",
@@ -147,15 +155,15 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     }
 
     long targetSegmentNumRows;
-    if (committingSegmentSizeBytes < OPTIMAL_SEGMENT_SIZE_BYTES_MIN) {
+    if (committingSegmentSizeBytes < _optimalSegmentSizeBytesMin) {
       targetSegmentNumRows = numRowsConsumed + numRowsConsumed / 2;
-    } else if (committingSegmentSizeBytes > OPTIMAL_SEGMENT_SIZE_BYTES_MAX) {
+    } else if (committingSegmentSizeBytes > _optimalSegmentSizeBytesMax) {
       targetSegmentNumRows = numRowsConsumed / 2;
     } else {
       if (_latestSegmentRowsToSizeRatio > 0) {
-        targetSegmentNumRows = (long) (IDEAL_SEGMENT_SIZE_BYTES * _latestSegmentRowsToSizeRatio);
+        targetSegmentNumRows = (long) (_desiredSegmentSizeBytes * _latestSegmentRowsToSizeRatio);
       } else {
-        targetSegmentNumRows = (long) (IDEAL_SEGMENT_SIZE_BYTES * currentRatio);
+        targetSegmentNumRows = (long) (_desiredSegmentSizeBytes * currentRatio);
       }
     }
     targetSegmentNumRows = capNumRowsIfOverflow(targetSegmentNumRows);

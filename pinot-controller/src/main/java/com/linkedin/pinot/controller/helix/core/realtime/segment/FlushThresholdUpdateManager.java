@@ -17,8 +17,7 @@
 package com.linkedin.pinot.controller.helix.core.realtime.segment;
 
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -45,14 +44,17 @@ public class FlushThresholdUpdateManager {
    * @return
    */
   public FlushThresholdUpdater getFlushThresholdUpdater(TableConfig realtimeTableConfig) {
-    String tableName = realtimeTableConfig.getTableName();
+    final String tableName = realtimeTableConfig.getTableName();
+    final KafkaLowLevelStreamProviderConfig streamProviderConfig = new KafkaLowLevelStreamProviderConfig();
+    // We instantiate KafkaLowLevelStreamProviderConfig locally here,
+    // so it is ok to pass null for schema and instancezk metadata
+    streamProviderConfig.init(realtimeTableConfig, null, null);
 
-    int tableFlushSize = getLLCRealtimeTableFlushSize(realtimeTableConfig);
-    if (tableFlushSize < 0) {
-      tableFlushSize = KafkaHighLevelStreamProviderConfig.getDefaultMaxRealtimeRowsCount();
-    }
+    final int tableFlushSize = streamProviderConfig.getSizeThresholdToFlushSegment();
+    final long desiredSegmentSize = streamProviderConfig.getDesiredSegmentSizeBytes();
+
     if (tableFlushSize == 0) {
-      return _flushThresholdUpdaterMap.computeIfAbsent(tableName, k -> new SegmentSizeBasedFlushThresholdUpdater());
+      return _flushThresholdUpdaterMap.computeIfAbsent(tableName, k -> new SegmentSizeBasedFlushThresholdUpdater(desiredSegmentSize));
     } else {
       _flushThresholdUpdaterMap.remove(tableName);
       return new DefaultFlushThresholdUpdater(tableFlushSize);
@@ -78,28 +80,9 @@ public class FlushThresholdUpdateManager {
    */
   private int getLLCRealtimeTableFlushSize(TableConfig tableConfig) {
     final Map<String, String> streamConfigs = tableConfig.getIndexingConfig().getStreamConfigs();
-    String flushSizeStr;
-    if (streamConfigs == null) {
-      return -1;
-    }
-    if (streamConfigs.containsKey(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_SIZE)) {
-      flushSizeStr = streamConfigs.get(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_SIZE);
-      try {
-        return Integer.parseInt(flushSizeStr);
-      } catch (Exception e) {
-        LOGGER.warn("Failed to parse LLC flush size of {} for table {}", flushSizeStr, tableConfig.getTableName(), e);
-      }
-    }
-
-    if (streamConfigs.containsKey(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE)) {
-      flushSizeStr = streamConfigs.get(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE);
-      try {
-        return Integer.parseInt(flushSizeStr);
-      } catch (Exception e) {
-        LOGGER.warn("Failed to parse flush size of {} for table {}", flushSizeStr, tableConfig.getTableName(), e);
-      }
-    }
-    return -1;
+    KafkaLowLevelStreamProviderConfig streamProviderConfig = new KafkaLowLevelStreamProviderConfig();
+    // We instantiate streamproviderconfig locally here, so it is ok to pass null for schema.
+    streamProviderConfig.init(streamConfigs, null);
+    return streamProviderConfig.getSizeThresholdToFlushSegment();
   }
-
 }

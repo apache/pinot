@@ -21,7 +21,8 @@ import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,6 +36,7 @@ import org.testng.annotations.Test;
 
 
 public class FlushThresholdUpdaterTest {
+  private static final long DESIRED_SEGMENT_SIZE = KafkaLowLevelStreamProviderConfig.getDefaultDesiredSegmentSizeBytes();
   private Random _random;
   private Map<String, double[][]> datasetGraph;
 
@@ -158,13 +160,13 @@ public class FlushThresholdUpdaterTest {
     for (Map.Entry<String, double[][]> entry : datasetGraph.entrySet()) {
 
       SegmentSizeBasedFlushThresholdUpdater segmentSizeBasedFlushThresholdUpdater =
-          new SegmentSizeBasedFlushThresholdUpdater();
+          new SegmentSizeBasedFlushThresholdUpdater(DESIRED_SEGMENT_SIZE);
 
       double[][] numRowsToSegmentSize = entry.getValue();
 
       int numRuns = 500;
       double checkRunsAfter = 400;
-      long idealSegmentSize = segmentSizeBasedFlushThresholdUpdater.getIdealSegmentSizeBytes();
+      long idealSegmentSize = segmentSizeBasedFlushThresholdUpdater.getDesiredSegmentSizeBytes();
       long segmentSizeSwivel = (long) (idealSegmentSize * 0.5);
       int numRowsLowerLimit = 0;
       int numRowsUpperLimit = 0;
@@ -277,22 +279,10 @@ public class FlushThresholdUpdaterTest {
     TableConfig realtimeTableConfig;
 
     FlushThresholdUpdater flushThresholdUpdater;
-
-    // null stream configs - default flush size
-    realtimeTableConfig = tableConfigBuilder.build();
-    flushThresholdUpdater = manager.getFlushThresholdUpdater(realtimeTableConfig);
-    Assert.assertEquals(flushThresholdUpdater.getClass(), DefaultFlushThresholdUpdater.class);
-    Assert.assertEquals(((DefaultFlushThresholdUpdater) flushThresholdUpdater).getTableFlushSize(),
-        KafkaHighLevelStreamProviderConfig.getDefaultMaxRealtimeRowsCount());
-
-    // nothing set - default flush size
     Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX, CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE),
+        CommonConstants.Helix.DataSource.Realtime.Kafka.ConsumerType.simple.toString());
     tableConfigBuilder.setStreamConfigs(streamConfigs);
-    realtimeTableConfig = tableConfigBuilder.build();
-    flushThresholdUpdater = manager.getFlushThresholdUpdater(realtimeTableConfig);
-    Assert.assertEquals(flushThresholdUpdater.getClass(), DefaultFlushThresholdUpdater.class);
-    Assert.assertEquals(((DefaultFlushThresholdUpdater) flushThresholdUpdater).getTableFlushSize(),
-        KafkaHighLevelStreamProviderConfig.getDefaultMaxRealtimeRowsCount());
 
     // flush size set
     streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, "10000");
@@ -309,22 +299,6 @@ public class FlushThresholdUpdaterTest {
     Assert.assertEquals(flushThresholdUpdater.getClass(), DefaultFlushThresholdUpdater.class);
     Assert.assertEquals(((DefaultFlushThresholdUpdater) flushThresholdUpdater).getTableFlushSize(), 5000);
 
-    // invalid string flush size set
-    streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_SIZE, "aaa");
-    realtimeTableConfig = tableConfigBuilder.build();
-    flushThresholdUpdater = manager.getFlushThresholdUpdater(realtimeTableConfig);
-    Assert.assertEquals(flushThresholdUpdater.getClass(), DefaultFlushThresholdUpdater.class);
-    Assert.assertEquals(((DefaultFlushThresholdUpdater) flushThresholdUpdater).getTableFlushSize(),
-        KafkaHighLevelStreamProviderConfig.getDefaultMaxRealtimeRowsCount());
-
-    // negative flush size set
-    streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_SIZE, "-10");
-    realtimeTableConfig = tableConfigBuilder.build();
-    flushThresholdUpdater = manager.getFlushThresholdUpdater(realtimeTableConfig);
-    Assert.assertEquals(flushThresholdUpdater.getClass(), DefaultFlushThresholdUpdater.class);
-    Assert.assertEquals(((DefaultFlushThresholdUpdater) flushThresholdUpdater).getTableFlushSize(),
-        KafkaHighLevelStreamProviderConfig.getDefaultMaxRealtimeRowsCount());
-
     // 0 flush size set
     streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_SIZE, "0");
     realtimeTableConfig = tableConfigBuilder.build();
@@ -338,6 +312,8 @@ public class FlushThresholdUpdaterTest {
     FlushThresholdUpdater flushThresholdUpdaterSame = manager.getFlushThresholdUpdater(realtimeTableConfig);
     Assert.assertEquals(flushThresholdUpdaterSame.getClass(), SegmentSizeBasedFlushThresholdUpdater.class);
     Assert.assertEquals(flushThresholdUpdater, flushThresholdUpdaterSame);
+    Assert.assertEquals(((SegmentSizeBasedFlushThresholdUpdater)(flushThresholdUpdater)).getDesiredSegmentSizeBytes(),
+        KafkaLowLevelStreamProviderConfig.getDefaultDesiredSegmentSizeBytes());
 
     // flush size reset to some number - default received, map cleared of segmentsize based
     streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, "20000");
@@ -345,6 +321,29 @@ public class FlushThresholdUpdaterTest {
     flushThresholdUpdater = manager.getFlushThresholdUpdater(realtimeTableConfig);
     Assert.assertEquals(flushThresholdUpdater.getClass(), DefaultFlushThresholdUpdater.class);
     Assert.assertEquals(((DefaultFlushThresholdUpdater) flushThresholdUpdater).getTableFlushSize(), 20000);
+
+    // optimal segment size set to invalid value. Defailt remains the same.
+    streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, "0");
+    streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_DESIRED_SEGMENT_SIZE, "Invalid");
+    realtimeTableConfig = tableConfigBuilder.build();
+    flushThresholdUpdater = manager.getFlushThresholdUpdater(realtimeTableConfig);
+    Assert.assertEquals(flushThresholdUpdater.getClass(), SegmentSizeBasedFlushThresholdUpdater.class);
+    Assert.assertEquals(((SegmentSizeBasedFlushThresholdUpdater)(flushThresholdUpdater)).getDesiredSegmentSizeBytes(),
+        KafkaLowLevelStreamProviderConfig.getDefaultDesiredSegmentSizeBytes());
+
+    // Clear the flush threshold updater for this table.
+    streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, "20000");
+    realtimeTableConfig = tableConfigBuilder.build();
+    flushThresholdUpdater = manager.getFlushThresholdUpdater(realtimeTableConfig);
+
+    // optimal segment size set to 500M
+    long desiredSegSize = 500 * 1024 * 1024;
+    streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, "0");
+    streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_DESIRED_SEGMENT_SIZE, Long.toString(desiredSegSize));
+    realtimeTableConfig = tableConfigBuilder.build();
+    flushThresholdUpdater = manager.getFlushThresholdUpdater(realtimeTableConfig);
+    Assert.assertEquals(((SegmentSizeBasedFlushThresholdUpdater)(flushThresholdUpdater)).getDesiredSegmentSizeBytes(),
+        desiredSegSize);
   }
 
   /**
@@ -381,7 +380,7 @@ public class FlushThresholdUpdaterTest {
     Assert.assertNull(metadata0.getTimeThresholdToFlushSegment());
 
     // before committing segment, we switched to size based updation - verify that new thresholds are set as per size based strategy
-    flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
+    flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater(DESIRED_SEGMENT_SIZE);
 
     startOffset += 1000;
     updateCommittingSegmentMetadata(metadata0, startOffset, 250_000);
@@ -420,7 +419,7 @@ public class FlushThresholdUpdaterTest {
 
     // initial segment
     LLCRealtimeSegmentZKMetadata metadata0 = getNextSegmentMetadata(tableName, startOffset, partitionId, seqNum++);
-    SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
+    SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater(DESIRED_SEGMENT_SIZE);
     committingSegmentDescriptor = new CommittingSegmentDescriptor(metadata0.getSegmentName(), startOffset, 0);
     flushThresholdUpdater.updateFlushThreshold(metadata0, null, committingSegmentDescriptor, null);
     Assert.assertEquals(metadata0.getSizeThresholdToFlushSegment(), flushThresholdUpdater.getInitialRowsThreshold());
@@ -460,7 +459,7 @@ public class FlushThresholdUpdaterTest {
     LLCSegmentName seg0SegmentName = new LLCSegmentName(tableName, partitionId, seqNum, seg0time);
     LLCRealtimeSegmentZKMetadata metadata0 = getNextSegmentMetadata(tableName, startOffset, partitionId, seqNum++);
     metadata0.setSegmentName(seg0SegmentName.getSegmentName());
-    SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
+    SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater(DESIRED_SEGMENT_SIZE);
     committingSegmentDescriptor = new CommittingSegmentDescriptor(seg0SegmentName.getSegmentName(), startOffset, 10_000);
     metadata0.setTotalRawDocs(15);
     metadata0.setCreationTime(seg0time);
@@ -493,7 +492,7 @@ public class FlushThresholdUpdaterTest {
     long now = System.currentTimeMillis();
     long seg0time = now - 1334_650;
     long seg1time = seg0time + 14_000;
-    SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
+    SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater(DESIRED_SEGMENT_SIZE);
 
     // Initial update is from partition 1
     LLCSegmentName seg0SegmentName = new LLCSegmentName(tableName, 1, seqNum, seg0time);
