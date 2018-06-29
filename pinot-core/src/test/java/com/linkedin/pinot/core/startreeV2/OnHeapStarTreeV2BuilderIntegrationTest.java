@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+
 import java.io.File;
 import java.util.List;
 import java.util.ArrayList;
@@ -24,19 +25,25 @@ import org.testng.annotations.Test;
 import org.testng.annotations.BeforeClass;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.data.readers.PinotSegmentUtil;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 
 
-public class OnHeapStarTreeV2BuilderTest {
-
+public class OnHeapStarTreeV2BuilderIntegrationTest {
 
   private static File _indexDir;
   private List<GenericRow> _rows;
   private String _segmentOutputDir;
   private RecordReader _recordReader;
-  private static StarTreeV2Config _starTreeV2Config;
+
+
+  SegmentMetadata _segmentMetadata;
+  ImmutableSegment _immutableSegment;
+  private static List<StarTreeV2Config> _starTreeV2ConfigList = new ArrayList<>();
 
   @BeforeClass
   void setUp() throws Exception {
@@ -44,26 +51,33 @@ public class OnHeapStarTreeV2BuilderTest {
     Schema schema = StarTreeV2SegmentHelper.createSegmentchema();
     String segmentName = "starTreeV2BuilderTest";
     _segmentOutputDir = Files.createTempDir().toString();
-    //_rows = PinotSegmentUtil.createTestData(schema, NUM_ROWS);
-    _rows = StarTreeV2SegmentHelper.buildSegment(schema);
+    _rows = StarTreeV2SegmentHelper.buildSegmentData(schema);
     _recordReader = new GenericRowRecordReader(_rows, schema);
+    _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, _segmentOutputDir, _recordReader);
 
-    _indexDir = PinotSegmentUtil.createSegment(schema, segmentName, _segmentOutputDir, _recordReader);
 
+    List<Met2AggfuncPair> metric2aggFuncPairs1 = new ArrayList<>();
+    List<Met2AggfuncPair> metric2aggFuncPairs2 = new ArrayList<>();
 
-    List<Met2AggfuncPair> metric2aggFuncPairs = new ArrayList<>();
     Met2AggfuncPair pair1 = new Met2AggfuncPair("salary", "sum");
-    metric2aggFuncPairs.add(pair1);
     Met2AggfuncPair pair2 = new Met2AggfuncPair("salary", "max");
-    metric2aggFuncPairs.add(pair2);
     Met2AggfuncPair pair3 = new Met2AggfuncPair("salary", "min");
-    metric2aggFuncPairs.add(pair3);
 
-    _starTreeV2Config = new StarTreeV2Config();
+    metric2aggFuncPairs1.add(pair1);
+    metric2aggFuncPairs1.add(pair2);
+    metric2aggFuncPairs2.add(pair3);
+    metric2aggFuncPairs2.add(pair1);
+
+    StarTreeV2Config _starTreeV2Config = new StarTreeV2Config();
     _starTreeV2Config.setOutDir(_indexDir);
     _starTreeV2Config.setMaxNumLeafRecords(1);
     _starTreeV2Config.setDimensions(schema.getDimensionNames());
-    _starTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs);
+    _starTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs1);
+    _starTreeV2ConfigList.add(_starTreeV2Config);
+
+    _starTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs2);
+    _starTreeV2ConfigList.add(_starTreeV2Config);
+
 
     return;
   }
@@ -72,12 +86,16 @@ public class OnHeapStarTreeV2BuilderTest {
   public void testBuild() throws Exception {
     OnHeapStarTreeV2Builder onTest = new OnHeapStarTreeV2Builder();
     try {
-      onTest.init(_indexDir, _starTreeV2Config);
+      _immutableSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.mmap);
+      _segmentMetadata = _immutableSegment.getSegmentMetadata();
+
+      for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
+        onTest.init(_indexDir, _starTreeV2ConfigList.get(i));
+        onTest.build();
+        onTest.serialize();
+      }
     } catch (Exception e) {
       e.printStackTrace();
     }
-
-    onTest.build();
-    onTest.serialize();
   }
 }

@@ -16,22 +16,26 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-public class StarTreeV2Constant {
+import java.util.List;
 
 
-  public static final int STAR_NODE = -1;
-  public static final int INVALID_INDEX = -1;
-  public static final String STAR_TREE = "startree";
+public class StarTreeV2Metadata {
+  private List<String> _dimensionsSplitOrder;
+  private List<Met2AggfuncPair> _met2AggfuncPairs;
 
-  public static class AggregateFunctions {
-    public static final String MAX = "max";
-    public static final String SUM = "sum";
-    public static final String MIN = "min";
+  public void setDimensionsSplitOrder(List<String> dimensionsSplitOrder) {
+    _dimensionsSplitOrder = dimensionsSplitOrder;
   }
 
-  public static class StarTreeMetadata {
-    public static final String STAR_TREE_SPLIT_ORDER = "split.order";
-    public static final String STAR_TREE_MAT2FUNC_MAP = "met2func.map";
-    public static final String STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS = "skip.star.node.creation.for.dimensions";
+  public List<String> getDimensionsSplitOrder() {
+    return _dimensionsSplitOrder;
+  }
+
+  public List<Met2AggfuncPair> getMet2AggfuncPairs() {
+    return _met2AggfuncPairs;
+  }
+
+  public void setMet2AggfuncPairs(List<Met2AggfuncPair> met2AggfuncPairs) {
+    _met2AggfuncPairs = met2AggfuncPairs;
   }
 }
