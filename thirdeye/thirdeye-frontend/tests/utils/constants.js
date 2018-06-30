@@ -99,6 +99,15 @@ export const rootCauseConst = {
 };
 
 /**
+ * General root-cause element selectors
+ */
+export const generalConst = {
+  MODAL: '.te-modal',
+  MICRO_MODAL: '.te-modal-micro',
+  MODAL_TITLE: '.te-modal__title'
+};
+
+/**
  * Converts list options to comma-separated string
  */
 export const optionsToString = ($optionList) => {
@@ -108,5 +117,6 @@ export const optionsToString = ($optionList) => {
 export default {
   selfServeConst,
   rootCauseConst,
+  generalConst,
   optionsToString
 };

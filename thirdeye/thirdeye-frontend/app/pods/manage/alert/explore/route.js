@@ -222,7 +222,6 @@ export default Route.extend({
 
     // Set initial value for metricId for early transition cases
     const config = {
-      filters,
       startStamp,
       endStamp,
       bucketSize,

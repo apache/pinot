@@ -1,6 +1,6 @@
-<fieldset class="te-form__section te-form__section--micro row" id="select-target1">
+<fieldset class="te-form__section te-form__section--micro row" id="dimensions-include">
   <div class="te-form__group col-xs-12">
-    <label for="report-select-dimension" class="control-label te-label te-label--small">Dimensions to INCLUDE</label>
+    <label for="dimension-select-include" class="control-label te-label te-label--small">Dimensions to INCLUDE</label>
 
     {{#power-select-multiple
       selected=selectedIncludeDimensions
@@ -20,15 +20,15 @@
     <div class="te-form__sub-label te-form__sub-label--micro">Show only these dimensions</div>
     {{input
       type="checkbox"
-      id=(concat dimensionId index)
+      id="dimension-order"
       checked=true}}
-    <label for="report-select-dimension" class="control-label te-label te-label--small">Maintain this order</label>
+    <label for="dimension-order" class="control-label te-label te-label--small">Maintain this order</label>
   </div>
 </fieldset>
 
-<fieldset class="te-form__section te-form__section--micro row" id="select-target1">
+<fieldset class="te-form__section te-form__section--micro row" id="dimensions-exclude">
   <div class="te-form__group col-xs-12">
-    <label for="report-select-dimension" class="control-label te-label te-label--small">Dimensions to EXCLUDE</label>
+    <label for="dimension-select-exclude" class="control-label te-label te-label--small">Dimensions to EXCLUDE</label>
 
     {{#power-select-multiple
       selected=selectedExcludeDimensions
@@ -45,14 +45,13 @@
       {{dimension}}
     {{/power-select-multiple}}
 
-
     <div class="te-form__sub-label te-form__sub-label--micro">Remove these dimensions</div>
   </div>
 </fieldset>
 
-<fieldset class="te-form__section te-form__section--micro row" id="select-target1">
+<fieldset class="te-form__section te-form__section--micro row" id="dimensions-settings">
   <div class="te-form__group te-form__group--hz-micro col-xs-6">
-    <label for="report-select-dimension" class="control-label te-label te-label--small">Number of top contributors</label>
+    <label for="num-top-contibutors" class="control-label te-label te-label--small">Number of top contributors</label>
     {{input
       type="text"
       id="num-top-contibutors"
@@ -65,7 +64,7 @@
   </div>
 
   <div class="te-form__group te-form__group--hz-micro col-xs-6">
-    <label for="report-select-dimension" class="control-label te-label te-label--small">Levels of dimension (max 3)</label>
+    <label for="dimension-select-levels" class="control-label te-label te-label--small">Levels of dimension (max 3)</label>
     {{#power-select
       triggerId="dimension-select-levels"
       triggerClass="te-form__select"
@@ -84,9 +83,9 @@
   </div>
 </fieldset>
 
-<fieldset class="te-form__section te-form__section--micro row" id="select-target1">
+<fieldset class="te-form__section te-form__section--micro row" id="dimensions-error">
   <div class="te-form__group col-xs-6">
-    <label for="report-select-dimension" class="control-label te-label te-label--small">One side error</label>
+    <label for="dimension-select-error" class="control-label te-label te-label--small">One side error</label>
     {{#power-select
       triggerId="dimension-select-error"
       triggerClass="te-form__select"

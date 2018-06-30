@@ -1,4 +1,5 @@
-import { module, test, skip } from 'qunit';
+import $ from 'jquery';
+import { module, test } from 'qunit';
 import { setupRenderingTest } from 'ember-qunit';
 import { render } from '@ember/test-helpers';
 import hbs from 'htmlbars-inline-precompile';
@@ -19,34 +20,53 @@ module('Integration | Component | rootcause-dimensions-settings', function(hooks
         summarySize: 20,
         oneSideError: 'false',
         excludedDimensions: []
-      },
-      onCancel: () => {},
-      onSave: () => {}
+      }
     });
 
     await render(hbs`
-      {{#te-modal
-        isMicroModal=true
-        cancelButtonText="Cancel"
-        submitButtonText="Save"
-        submitAction=(action "onSave")
-        cancelAction=(action "onCancel")
-        isShowingModal=true
-        headerText=modalTitle
-      }}
-        {{rootcause-dimensions-settings
-          dimensionOptions=dimensionOptions
-          customTableSettings=customTableSettings
-        }}
-      {{/te-modal}}
-    `);
+      {{rootcause-dimensions-settings
+        dimensionOptions=dimensionOptions
+        customTableSettings=customTableSettings
+      }}`);
 
-    assert.ok($(genEl.MICRO_MODAL).get(0).length, 'Modal renders properly');
+    const $selectInclude = this.$('#dimension-select-include').get(0);
+    const $selectExclude = this.$('#dimension-select-exclude').get(0);
+    const $settingsFields = this.$('#dimensions-settings').get(0);
+    const $selectErrorLabels = this.$('#dimensions-error').get(0);
+    const $selectErrorField = this.$('#dimension-select-error').find('.ember-power-select-selected-item').get(0);
+
+    assert.ok(
+      $selectInclude.innerText.includes('Select a dimension to include')
+    );
+
+    assert.ok(
+      $selectExclude.innerText.includes('Select a dimension to exclude')
+    );
+
+    assert.ok(
+      $settingsFields.innerText.includes('Number of top contributors')
+    );
+
+    assert.ok(
+      $settingsFields.innerText.includes('Levels of dimension (max 3)')
+    );
+
+    assert.ok(
+      $settingsFields.innerText.includes('Levels of dimension to slice by')
+    );
+
+    assert.ok(
+      $selectErrorLabels.innerText.includes('One side error')
+    );
+
+    assert.ok(
+      $selectErrorLabels.innerText.includes('One side error')
+    );
 
     assert.equal(
-      $(enEl.MODAL_TITLE).get(0).innerText,
-      modalTitle,
-      'Modal title renders correctly'
+      $selectErrorField.innerText,
+      'false',
+      'One-side-error default value is false'
     );
 
     // TODO: more assertions to come...

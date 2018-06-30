@@ -1,7 +1,7 @@
 import d3 from 'd3';
 import { isNone } from '@ember/utils';
 import moment from 'moment';
-import { splitFilterFragment } from 'thirdeye-frontend/utils/rca-utils';
+import { splitFilterFragment, toFilterMap } from 'thirdeye-frontend/utils/rca-utils';
 
 /**
  * The Promise returned from fetch() won't reject on HTTP error status even if the response is an HTTP 404 or 500.
