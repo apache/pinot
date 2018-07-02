@@ -43,6 +43,11 @@ public interface StarTreeV2Builder {
   /**
    * Returns the Meta Data of the Star tree.
    */
-  List<String> getMetaData();
+  Map<String, String> getMetaData();
+
+  /**
+   * convert star tree indexes from v1 to v3
+   */
+  void convertFromV1toV3(int starTreeId) throws Exception;
 }
 
