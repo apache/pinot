@@ -34,7 +34,6 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.core.startree.OffHeapStarTreeNode;
 import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
@@ -226,67 +225,44 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   @Override
   public void serialize() throws Exception {
     createIndexes();
-    addToSegmentMetadata();
     serializeTree(new File(_outDir, _starTree));
-    convertFromV1toV3(_outDir);
+
     return;
   }
 
   @Override
-  public List<String> getMetaData() {
+  public Map<String, String> getMetaData() {
+    Map<String, String>metadata = new HashMap<>();
 
-
-    return null;
-  }
-
-  /**
-   * Helper method to add startree v2 to segment meta data.
-   *
-   * @return void.
-   */
-  private void addToSegmentMetadata() throws ConfigurationException {
-    File metadataFile = new File(new File(_outDir, "v3"), V1Constants.MetadataKeys.METADATA_FILE_NAME);
-    PropertiesConfiguration properties = new PropertiesConfiguration(metadataFile);
-
-    // dimension split order.
     String startTreeSplitOrder = _starTree + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SPLIT_ORDER;
-    properties.setProperty(startTreeSplitOrder, _dimensionSplitOrderString);
+    metadata.put(startTreeSplitOrder, _dimensionSplitOrderString);
 
-    // metric to aggregate func pair.
-    String met2aggfuncPairs = _met2aggfuncPairsString + "count";
     String startTreeMet2aggfuncPairs = _starTree + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAT2FUNC_MAP;
-    properties.setProperty(startTreeMet2aggfuncPairs, met2aggfuncPairs);
+    metadata.put(startTreeMet2aggfuncPairs, _met2aggfuncPairsString + "count");
 
-    properties.save();
+    return metadata;
+  }
+
+  @Override
+  public void convertFromV1toV3(int starTreeId) throws Exception {
+    SegmentV1V2ToV3FormatConverter converter = new SegmentV1V2ToV3FormatConverter();
+    converter.starTreeIndexes();
+//    converter.setDirectoryPermissions(v3TempDirectory);
+//    converter.createMetadataFile(new File(starTreeIndexDir, "v3"), v3TempDirectory);
+//    converter.copyCreationMetadataIfExists(new File(starTreeIndexDir, "v3"), v3TempDirectory);
+//
+//    SegmentMetadataImpl v2Metadata = new SegmentMetadataImpl(starTreeIndexDir);
+//    converter.copyIndexData(starTreeIndexDir, v2Metadata, v3TempDirectory);
+
 
     return;
   }
 
-
   /**
-   * Helper method to convert from v1 to v3.
+   * Helper method to serialize the updated tree into a file.
    *
    * @return void.
    */
-  private void convertFromV1toV3(File starTreeIndexDir) throws Exception {
-    SegmentV1V2ToV3FormatConverter converter = new SegmentV1V2ToV3FormatConverter();
-    File v3TempDirectory = converter.v3ConversionTempDirectory(starTreeIndexDir);
-    converter.setDirectoryPermissions(v3TempDirectory);
-    converter.createMetadataFile(new File(starTreeIndexDir, "v3"), v3TempDirectory);
-    converter.copyCreationMetadataIfExists(new File(starTreeIndexDir, "v3"), v3TempDirectory);
-
-    SegmentMetadataImpl v2Metadata = new SegmentMetadataImpl(starTreeIndexDir);
-    converter.copyIndexData(starTreeIndexDir, v2Metadata, v3TempDirectory);
-
-
-    return;
-  }
-
-    /**
-     * Helper method to serialize the updated tree into a file.
-     *
-     * @return void.
-     */
   private void serializeTree(File starTreeFile) throws IOException {
     int headerSizeInBytes = OnHeapStarTreeV2BuilderHelper.computeHeaderSizeInBytes(_dimensionsName);
     long totalSizeInBytes = headerSizeInBytes + _nodesCount * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES;

@@ -40,7 +40,7 @@ public class StarTreeV2SegmentHelper {
 
   private static final int [] metricValues = {3, 5, 2, 8, 9, 1};
 
-  public static Schema createSegmentchema() {
+  public static Schema createSegmentSchema() {
 
     Schema schema = new Schema();
 
@@ -66,7 +66,7 @@ public class StarTreeV2SegmentHelper {
     return schema;
   }
 
-  public static List<GenericRow> buildSegmentData(Schema schema) throws Exception {
+  public static List<GenericRow> createSegmentData(Schema schema) throws Exception {
 
 
     List<GenericRow> rows = new ArrayList<>(numRows);
