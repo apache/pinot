@@ -23,7 +23,7 @@ import org.testng.annotations.Test;
  */
 public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterIntegrationTest {
   private static final int NUM_BROKERS = 2;
-  private static final int NUM_SERVERS = 3;
+  private static final int NUM_SERVERS = 10;
 
   @Override
   protected int getNumBrokers() {

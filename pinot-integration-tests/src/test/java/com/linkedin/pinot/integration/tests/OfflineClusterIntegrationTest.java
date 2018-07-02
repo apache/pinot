@@ -81,7 +81,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   protected int getNumReplicas(){
-    return 3;
+    return 2;
   }
 
   @BeforeClass

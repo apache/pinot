@@ -3,7 +3,7 @@
   "tableType": "OFFLINE",
   "segmentsConfig": {
     "segmentPushType": "APPEND",
-    "segmentAssignmentStrategy": "BalanceSizeSegmentAssignmentStrategy",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "replication": "3"
   },
   "tenants": {
