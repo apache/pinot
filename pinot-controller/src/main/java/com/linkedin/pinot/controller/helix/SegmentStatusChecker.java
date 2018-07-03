@@ -64,6 +64,10 @@ public class SegmentStatusChecker {
   private final int _waitForPushTimeSeconds;
   private final TableSizeReader _tableSizeReader;
 
+  // log messages about disabled tables atmost once a day
+  private static final long DISABLED_TABLE_LOG_INTERVAL_MS = TimeUnit.DAYS.toMillis(1);
+  private long _lastDisabledTableLogTimestamp = 0;
+
   /**
    * Constructs the segment status checker.
    * @param pinotHelixResourceManager The resource checker used to interact with Helix
@@ -105,7 +109,9 @@ public class SegmentStatusChecker {
       public void run() {
         try {
           updateSegmentMetrics();
-        } catch (Exception e) {
+        } catch (Throwable e) {
+          // catch all errors to prevent subsequent exeuctions from being silently suppressed
+          // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService.html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-
           LOGGER.warn("Caught exception while running segment status checker", e);
         }
       }
@@ -153,7 +159,18 @@ public class SegmentStatusChecker {
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     int realTimeTableCount = 0;
     int offlineTableCount = 0;
+    int disabledTableCount = 0;
     ZkHelixPropertyStore<ZNRecord> propertyStore= _pinotHelixResourceManager.getPropertyStore();
+
+    // check if we need to log disabled tables log messages
+    boolean logDisabledTables = false;
+    long now = System.currentTimeMillis();
+    if (now -_lastDisabledTableLogTimestamp >= DISABLED_TABLE_LOG_INTERVAL_MS) {
+      logDisabledTables = true;
+      _lastDisabledTableLogTimestamp = now;
+    } else {
+      logDisabledTables = false;
+    }
 
     for (String tableName : allTableNames) {
       try {
@@ -177,6 +194,16 @@ public class SegmentStatusChecker {
           _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, 100);
           continue;
         }
+
+        if (!idealState.isEnabled()) {
+          if (logDisabledTables) {
+            LOGGER.warn("Table {} is disabled. Skipping segment status checks", tableName);
+          }
+          resetTableMetrics(tableName);
+          disabledTableCount++;
+          continue;
+        }
+
         _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
         ExternalView externalView = helixAdmin.getResourceExternalView(helixClusterName, tableName);
 
@@ -264,15 +291,13 @@ public class SegmentStatusChecker {
         LOGGER.warn("Caught exception while updating segment status for table {}", e, tableName);
 
         // Remove the metric for this table
-        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS, Long.MIN_VALUE);
-        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS, Long.MIN_VALUE);
-        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE, Long.MIN_VALUE);
-        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, Long.MIN_VALUE);
+        resetTableMetrics(tableName);
       }
     }
 
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, realTimeTableCount);
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, offlineTableCount);
+    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT, disabledTableCount);
     long totalNanos = System.nanoTime() - startTime;
     LOGGER.info("Segment status metrics completed in {}ms",
         TimeUnit.MILLISECONDS.convert(totalNanos, TimeUnit.NANOSECONDS));
@@ -282,10 +307,14 @@ public class SegmentStatusChecker {
     List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
 
     for (String tableName : allTableNames) {
-      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS, Long.MIN_VALUE);
-      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS, Long.MIN_VALUE);
-      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE, Long.MIN_VALUE);
-      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, Long.MIN_VALUE);
+      resetTableMetrics(tableName);
     }
+  }
+
+  private void resetTableMetrics(String tableName) {
+    _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS, Long.MIN_VALUE);
+    _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS, Long.MIN_VALUE);
+    _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE, Long.MIN_VALUE);
+    _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, Long.MIN_VALUE);
   }
 }
