@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.segment.PrefetchMode;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.primitive.ByteArray;
@@ -250,7 +251,7 @@ public class SegmentGenerationWithBytesTypeTest {
     driver.init(config, recordReader);
     driver.build();
 
-    SegmentDirectory.createFromLocalFS(driver.getOutputDirectory(), ReadMode.mmap);
+    SegmentDirectory.createFromLocalFS(driver.getOutputDirectory(), ReadMode.mmap, PrefetchMode.DEFAULT_PREFETCH_MODE);
     recordReader.rewind();
     return recordReader;
   }

@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.data.manager;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 
 
@@ -25,8 +24,10 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 public abstract class SegmentDataManager {
   private int _referenceCount = 1;
 
-  @VisibleForTesting
-  synchronized int getReferenceCount() {
+  /**
+   * Returns the current reference count for the segment.
+   */
+  public synchronized int getReferenceCount() {
     return _referenceCount;
   }
 

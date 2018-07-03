@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.segment.store;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.segment.PrefetchMode;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -42,7 +43,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
   // matches most systems
   private static final int PAGE_SIZE_BYTES = 4096;
   // Prefetch limit...arbitrary but related to common server memory and data size profiles
-  private static final long MAX_MMAP_PREFETCH_PAGES = 100 * 1024 * 1024 * 1024L / PAGE_SIZE_BYTES;
+  private static final long MAX_MMAP_PREFETCH_PAGES = 24 * 1024 * 1024 * 1024L / PAGE_SIZE_BYTES;
   private static final double PREFETCH_SLOWDOWN_PCT = 0.67;
   private static AtomicLong prefetchedPages = new AtomicLong(0);
 
@@ -50,19 +51,20 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
   SegmentLock segmentLock;
   private SegmentMetadataImpl segmentMetadata;
   private ReadMode readMode;
+  private PrefetchMode prefetchMode;
 
   private ColumnIndexDirectory columnIndexDirectory;
 
   SegmentLocalFSDirectory(String directoryPath, SegmentMetadataImpl metadata, ReadMode readMode) {
-    this(new File(directoryPath), metadata, readMode);
+    this(new File(directoryPath), metadata, readMode, PrefetchMode.DEFAULT_PREFETCH_MODE);
   }
 
-  SegmentLocalFSDirectory (File directory, ReadMode readMode)
+  SegmentLocalFSDirectory (File directory, ReadMode readMode, PrefetchMode prefetchMode)
       throws IOException, ConfigurationException {
-    this(directory, loadSegmentMetadata(directory), readMode);
+    this(directory, loadSegmentMetadata(directory), readMode, prefetchMode);
   }
 
-  SegmentLocalFSDirectory(File directoryFile, SegmentMetadataImpl metadata, ReadMode readMode) {
+  SegmentLocalFSDirectory(File directoryFile, SegmentMetadataImpl metadata, ReadMode readMode, PrefetchMode prefetchMode) {
 
     Preconditions.checkNotNull(directoryFile);
     Preconditions.checkNotNull(metadata);
@@ -73,6 +75,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     segmentLock = new SegmentLock();
     this.segmentMetadata = metadata;
     this.readMode = readMode;
+    this.prefetchMode = prefetchMode;
     try {
       load();
     } catch (IOException | ConfigurationException e) {
@@ -243,26 +246,56 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     return buffer;
   }
 
+  /**
+   * Prefetches segment pages based on configuration.
+   *
+   * Background: mmap mode causes high number of major page faults after server restart or when
+   * segments are reloaded at runtime. This impacts latency especially for prod "online" use cases
+   * that require low latency. This function proactively loads pages in memory to lower the variance
+   * in latencies after server startup or segment reload.
+   *
+   * The prefetch can be controlled via the configured prefetch mode:
+   * PREFETCH_TO_LIMIT:
+   * =================
+   * This mode kicks in at server startup time. This has to handle two different data size profiles:
+   * 1. Servers with data size close to main memory size
+   * 2. Servers with very large data sizes (terabytes)
+   * To prevent it from loading terabytes of data on startup, we put a limit
+   * on the number of pages this will prefetch (OS will do something more on top of this)
+   * The logic here is as follows:
+   * Server doesn't know total data size it is expected to serve. So this will
+   * load all data till 2/3rd (PREFETCH_SLOWDOWN_PCT) of the configured limit. After that it will only
+   * read the header page. We read headers because that has more frequently accessed
+   * information which will have bigger impact on the latency. This can go over the limit
+   * because it doesn't stop at any point. But that's not an issue considering this is
+   * an optimization.
+   * NOTE: Prefetch limit and slowdown percentage are arbitrary
+   *
+   * ALWAYS_PREFETCH:
+   * ================
+   * In this mode, pages are always prefetched. This should be used only when there is a very high
+   * certainity that the pages will indeed be used (for ex, when a "hot" segment is being reloaded).
+   *
+   * NO_PREFETCH:
+   * ============
+   * This mode helps by-pass the default behavior, for situations when its clear that the pages
+   * won't be needed.
+   *
+   * @param buffer to prefetch data for
+   */
   private void prefetchMmapData(PinotDataBuffer buffer) {
-    // mmap mode causes high number of major page faults after server restart.
-    // This impacts latency especially for prod "online" use cases that require low latency.
-    // This function proactively loads pages in memory to lower the variance in
-    // latencies after server startup.
 
-    // This has to handle two different data size profiles
-    // 1. Servers with data size close to main memory size
-    // 2. Servers with very large data sizes (terabytes)
-    // To prevent it from loading terabytes of data on startup, we put a limit
-    // on the number of pages this will prefetch (OS will do something more on top of this)
-    // The logic here is as follows:
-    // Server doesn't know total data size it is expected to serve. So this will
-    // load all data till 2/3rd (PREFETCH_SLOWDOWN_PCT) of the configured limit. After that it will only
-    // read the header page. We read headers because that has more frequently accessed
-    // information which will have bigger impact on the latency. This can go over the limit
-    // because it doesn't stop at any point. But that's not an issue considering this is
-    // an optimization.
+    if (prefetchMode == PrefetchMode.NO_PREFETCH) {
+      return;
+    }
 
-    // Prefetch limit and slowdown percentage are arbitrary
+    if (prefetchMode == PrefetchMode.ALWAYS_PREFETCH) {
+      for (long pos = 0; pos < buffer.size(); pos += PAGE_SIZE_BYTES) {
+        buffer.getByte((int) pos);
+      }
+      return;
+    }
+
     if (prefetchedPages.get() >= MAX_MMAP_PREFETCH_PAGES) {
       return;
     }

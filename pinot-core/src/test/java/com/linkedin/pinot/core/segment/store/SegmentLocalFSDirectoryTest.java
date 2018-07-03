@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.store;
 
+import com.linkedin.pinot.common.segment.PrefetchMode;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -45,7 +46,7 @@ public class SegmentLocalFSDirectoryTest {
     FileUtils.deleteQuietly(TEST_DIRECTORY);
     TEST_DIRECTORY.mkdirs();
     metadata = ColumnIndexDirectoryTestHelper.writeMetadata(SegmentVersion.v1);
-    segmentDirectory = new SegmentLocalFSDirectory(TEST_DIRECTORY, metadata, ReadMode.mmap);
+    segmentDirectory = new SegmentLocalFSDirectory(TEST_DIRECTORY, metadata, ReadMode.mmap, PrefetchMode.DEFAULT_PREFETCH_MODE);
   }
 
   @AfterClass
@@ -157,14 +158,14 @@ public class SegmentLocalFSDirectoryTest {
         FileUtils.deleteQuietly(sizeTestDirectory);
       }
       FileUtils.copyDirectoryToDirectory(segmentDirectory.getPath().toFile(), sizeTestDirectory);
-      SegmentDirectory sizeSegment = SegmentLocalFSDirectory.createFromLocalFS(sizeTestDirectory, metadata, ReadMode.mmap);
+      SegmentDirectory sizeSegment = SegmentLocalFSDirectory.createFromLocalFS(sizeTestDirectory, metadata, ReadMode.mmap, PrefetchMode.DEFAULT_PREFETCH_MODE);
       Assert.assertEquals(sizeSegment.getDiskSizeBytes(), segmentDirectory.getDiskSizeBytes());
 
       Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(sizeTestDirectory, SegmentVersion.v3).exists());
       File v3SizeDir = new File(sizeTestDirectory, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
       // the destination is not exactly v3 but does not matter
       FileUtils.copyDirectoryToDirectory(segmentDirectory.getPath().toFile(), v3SizeDir);
-      SegmentDirectory sizeV3Segment = SegmentDirectory.createFromLocalFS(v3SizeDir, metadata, ReadMode.mmap);
+      SegmentDirectory sizeV3Segment = SegmentDirectory.createFromLocalFS(v3SizeDir, metadata, ReadMode.mmap, PrefetchMode.DEFAULT_PREFETCH_MODE);
       Assert.assertEquals(sizeSegment.getDiskSizeBytes(), sizeV3Segment.getDiskSizeBytes());
 
       // now drop v3

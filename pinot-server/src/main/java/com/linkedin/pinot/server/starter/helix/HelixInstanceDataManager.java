@@ -28,8 +28,6 @@ import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.TableDataManager;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import java.io.File;
@@ -219,13 +217,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       // Copy from segment backup directory back to index directory
       FileUtils.copyDirectory(segmentBackupDir, indexDir);
 
-      // Load from index directory
-      ImmutableSegment immutableSegment =
-          ImmutableSegmentLoader.load(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig),
-              schema);
-
       // Replace the old segment in memory
-      _tableDataManagerMap.get(tableNameWithType).addSegment(immutableSegment);
+      _tableDataManagerMap.get(tableNameWithType).addSegment(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig));
 
       // Rename segment backup directory to segment temporary directory (atomic)
       // The reason to first rename then delete is that, renaming is an atomic operation, but deleting is not. When we

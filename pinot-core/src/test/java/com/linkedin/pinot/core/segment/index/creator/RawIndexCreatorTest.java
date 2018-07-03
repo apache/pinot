@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.segment.index.creator;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.segment.PrefetchMode;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.data.GenericRow;
@@ -228,7 +229,8 @@ public class RawIndexCreatorTest {
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, recordReader);
     driver.build();
-    _segmentDirectory = SegmentDirectory.createFromLocalFS(driver.getOutputDirectory(), ReadMode.mmap);
+    _segmentDirectory = SegmentDirectory.createFromLocalFS(driver.getOutputDirectory(), ReadMode.mmap,
+        PrefetchMode.DEFAULT_PREFETCH_MODE);
     _segmentReader = _segmentDirectory.createReader();
     recordReader.rewind();
     return recordReader;

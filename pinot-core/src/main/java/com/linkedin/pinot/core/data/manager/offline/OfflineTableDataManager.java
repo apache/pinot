@@ -17,7 +17,9 @@ package com.linkedin.pinot.core.data.manager.offline;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.segment.PrefetchMode;
 import com.linkedin.pinot.core.data.manager.BaseTableDataManager;
+import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
@@ -46,6 +48,12 @@ public class OfflineTableDataManager extends BaseTableDataManager {
   @Override
   public void addSegment(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig) throws Exception {
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
-    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
+
+    // if existing segment is being used (indicated by refcount > 1, then prefetch the pages
+    // as its likely that the new segment will be queried immediately as well
+    SegmentDataManager mgr = _segmentDataManagerMap.get(indexDir.getName());
+    long refCount = (mgr != null) ? mgr.getReferenceCount() : 0;
+    PrefetchMode mode = refCount > 1 ? PrefetchMode.ALWAYS_PREFETCH : PrefetchMode.DEFAULT_PREFETCH_MODE;
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema, mode));
   }
 }

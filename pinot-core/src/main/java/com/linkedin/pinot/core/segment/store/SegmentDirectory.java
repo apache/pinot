@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.store;
 
+import com.linkedin.pinot.common.segment.PrefetchMode;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
@@ -103,14 +104,15 @@ public abstract class SegmentDirectory implements AutoCloseable {
   // In future, we will have this class load metadata rather than
   // passing it in.
   public static SegmentDirectory createFromLocalFS(File directory,
-      SegmentMetadataImpl metadata, ReadMode readMode) {
-    return new SegmentLocalFSDirectory(directory, metadata, readMode);
+      SegmentMetadataImpl metadata, ReadMode readMode, PrefetchMode prefetchMode) {
+    return new SegmentLocalFSDirectory(directory, metadata, readMode, prefetchMode);
   }
 
-  public static SegmentDirectory createFromLocalFS(File directory, ReadMode readMode)
+  public static SegmentDirectory createFromLocalFS(File directory, ReadMode readMode, PrefetchMode prefetchMode)
       throws IOException, ConfigurationException {
-    return new SegmentLocalFSDirectory(directory, readMode);
+    return new SegmentLocalFSDirectory(directory, readMode, prefetchMode);
   }
+
   public static SegmentMetadataImpl loadSegmentMetadata(File directory)
       throws IOException, ConfigurationException {
     return SegmentLocalFSDirectory.loadSegmentMetadata(directory);

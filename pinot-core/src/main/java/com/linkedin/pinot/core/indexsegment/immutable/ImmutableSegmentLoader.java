@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.indexsegment.immutable;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.segment.PrefetchMode;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
@@ -51,7 +52,7 @@ public class ImmutableSegmentLoader {
   public static ImmutableSegment load(@Nonnull File indexDir, @Nonnull ReadMode readMode) throws Exception {
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
     defaultIndexLoadingConfig.setReadMode(readMode);
-    return load(indexDir, defaultIndexLoadingConfig, null);
+    return load(indexDir, defaultIndexLoadingConfig, null, PrefetchMode.DEFAULT_PREFETCH_MODE);
   }
 
   /**
@@ -59,14 +60,14 @@ public class ImmutableSegmentLoader {
    */
   public static ImmutableSegment load(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    return load(indexDir, indexLoadingConfig, null);
+    return load(indexDir, indexLoadingConfig, null, PrefetchMode.DEFAULT_PREFETCH_MODE);
   }
 
   /**
    * For segments from OFFLINE table.
    */
   public static ImmutableSegment load(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig,
-      @Nullable Schema schema) throws Exception {
+      @Nullable Schema schema, PrefetchMode prefetchMode) throws Exception {
     Preconditions.checkArgument(indexDir.isDirectory(), "Index directory: {} does not exist or is not a directory",
         indexDir);
 
@@ -100,7 +101,7 @@ public class ImmutableSegmentLoader {
 
     // Load the segment
     ReadMode readMode = indexLoadingConfig.getReadMode();
-    SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, segmentMetadata, readMode);
+    SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, segmentMetadata, readMode, prefetchMode);
     SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
     Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
     for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {

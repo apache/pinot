@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.segment.index.loader;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.segment.PrefetchMode;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -142,7 +143,8 @@ public class LoaderTest {
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor("name");
     Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.LEGACY_STRING_PAD_CHAR);
-    SegmentDirectory segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, segmentMetadata, ReadMode.heap);
+    SegmentDirectory segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, segmentMetadata, ReadMode.heap,
+        PrefetchMode.DEFAULT_PREFETCH_MODE);
     SegmentDirectory.Reader reader = segmentDir.createReader();
     PinotDataBuffer dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
     StringDictionary dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(),
@@ -162,7 +164,7 @@ public class LoaderTest {
     segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
     columnMetadata = segmentMetadata.getColumnMetadataFor("name");
     Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.LEGACY_STRING_PAD_CHAR);
-    segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, segmentMetadata, ReadMode.heap);
+    segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, segmentMetadata, ReadMode.heap, PrefetchMode.DEFAULT_PREFETCH_MODE);
     reader = segmentDir.createReader();
     dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
     dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(),
@@ -182,7 +184,7 @@ public class LoaderTest {
     segmentMetadata = new SegmentMetadataImpl(segmentDirectory);
     columnMetadata = segmentMetadata.getColumnMetadataFor("name");
     Assert.assertEquals(columnMetadata.getPaddingCharacter(), V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
-    segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, segmentMetadata, ReadMode.heap);
+    segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, segmentMetadata, ReadMode.heap, PrefetchMode.DEFAULT_PREFETCH_MODE);
     reader = segmentDir.createReader();
     dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
     dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(),
@@ -204,12 +206,12 @@ public class LoaderTest {
     schema.addField(new DimensionFieldSpec("SVString", FieldSpec.DataType.STRING, true, ""));
     schema.addField(new DimensionFieldSpec("MVString", FieldSpec.DataType.STRING, false, ""));
 
-    IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, _v1IndexLoadingConfig, schema);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, _v1IndexLoadingConfig, schema, PrefetchMode.DEFAULT_PREFETCH_MODE);
     Assert.assertEquals(indexSegment.getDataSource("SVString").getDictionary().get(0), "");
     Assert.assertEquals(indexSegment.getDataSource("MVString").getDictionary().get(0), "");
     indexSegment.destroy();
 
-    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, schema);
+    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, schema, PrefetchMode.DEFAULT_PREFETCH_MODE);
     Assert.assertEquals(indexSegment.getDataSource("SVString").getDictionary().get(0), "");
     Assert.assertEquals(indexSegment.getDataSource("MVString").getDictionary().get(0), "");
     indexSegment.destroy();

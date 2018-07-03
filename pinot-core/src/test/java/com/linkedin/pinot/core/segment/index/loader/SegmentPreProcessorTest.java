@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.segment.index.loader;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.segment.PrefetchMode;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -194,7 +195,7 @@ public class SegmentPreProcessorTest {
     // Create inverted index the first time.
     checkInvertedIndexCreation(false);
     long addedLength = 0L;
-    try (SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(segmentDirectoryPath, ReadMode.mmap);
+    try (SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(segmentDirectoryPath, ReadMode.mmap, PrefetchMode.DEFAULT_PREFETCH_MODE);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       // 8 bytes overhead is for checking integrity of the segment.
       try (PinotDataBuffer col1Buffer = reader.getIndexFor(COLUMN1_NAME, ColumnIndexType.INVERTED_INDEX)) {
@@ -219,7 +220,7 @@ public class SegmentPreProcessorTest {
   }
 
   private void checkInvertedIndexCreation(boolean reCreate) throws Exception {
-    try (SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(_indexDir, ReadMode.mmap);
+    try (SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(_indexDir, ReadMode.mmap, PrefetchMode.DEFAULT_PREFETCH_MODE);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       if (reCreate) {
         Assert.assertTrue(reader.hasIndexFor(COLUMN1_NAME, ColumnIndexType.INVERTED_INDEX));
@@ -238,7 +239,7 @@ public class SegmentPreProcessorTest {
       processor.process();
     }
 
-    try (SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(_indexDir, ReadMode.mmap);
+    try (SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(_indexDir, ReadMode.mmap, PrefetchMode.DEFAULT_PREFETCH_MODE);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       Assert.assertTrue(reader.hasIndexFor(COLUMN1_NAME, ColumnIndexType.INVERTED_INDEX));
       Assert.assertTrue(reader.hasIndexFor(COLUMN13_NAME, ColumnIndexType.INVERTED_INDEX));
@@ -336,7 +337,8 @@ public class SegmentPreProcessorTest {
     Assert.assertEquals(columnMetadata.getDefaultNullValueString(), "null");
 
     // Check dictionary and forward index exist.
-    try (SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(_indexDir, ReadMode.mmap);
+    try (SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(_indexDir, ReadMode.mmap,
+        PrefetchMode.DEFAULT_PREFETCH_MODE);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       Assert.assertTrue(reader.hasIndexFor(NEW_INT_METRIC_COLUMN_NAME, ColumnIndexType.DICTIONARY));
       Assert.assertTrue(reader.hasIndexFor(NEW_INT_METRIC_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX));

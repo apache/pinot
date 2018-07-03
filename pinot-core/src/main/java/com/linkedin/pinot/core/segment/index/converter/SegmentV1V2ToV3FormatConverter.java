@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.segment.index.converter;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.segment.PrefetchMode;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -123,8 +124,11 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   private void copyIndexData(File v2Directory, SegmentMetadataImpl v2Metadata, File v3Directory)
       throws Exception {
     SegmentMetadataImpl v3Metadata = new SegmentMetadataImpl(v3Directory);
-    try (SegmentDirectory v2Segment = SegmentDirectory.createFromLocalFS(v2Directory, v2Metadata, ReadMode.mmap);
-        SegmentDirectory v3Segment = SegmentDirectory.createFromLocalFS(v3Directory, v3Metadata, ReadMode.mmap) ) {
+    // load the v2 segment without prefetching the pages - the required pages will be loaded as needed
+    try (SegmentDirectory v2Segment = SegmentDirectory.createFromLocalFS(v2Directory, v2Metadata,
+        ReadMode.mmap, PrefetchMode.NO_PREFETCH);
+        SegmentDirectory v3Segment = SegmentDirectory.createFromLocalFS(v3Directory, v3Metadata,
+            ReadMode.mmap, PrefetchMode.NO_PREFETCH) ) {
 
       // for each dictionary and each fwdIndex, copy that to newDirectory buffer
       Set<String> allColumns = v2Metadata.getAllColumns();

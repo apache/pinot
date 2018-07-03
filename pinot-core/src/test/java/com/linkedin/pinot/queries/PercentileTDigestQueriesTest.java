@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.response.broker.AggregationResult;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
+import com.linkedin.pinot.common.segment.PrefetchMode;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.primitive.ByteArray;
@@ -36,7 +37,6 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.operator.DocIdSetOperator;
 import com.linkedin.pinot.core.operator.ProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -329,7 +329,8 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     driver.init(config, recordReader);
     driver.build();
 
-    SegmentDirectory.createFromLocalFS(driver.getOutputDirectory(), ReadMode.mmap);
+    SegmentDirectory.createFromLocalFS(driver.getOutputDirectory(), ReadMode.mmap,
+        PrefetchMode.DEFAULT_PREFETCH_MODE);
     recordReader.rewind();
 
     TDigest actual = new TDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);

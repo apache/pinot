@@ -16,6 +16,7 @@
 package com.linkedin.pinot.perf;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.segment.PrefetchMode;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
@@ -108,7 +109,7 @@ public class BenchmarkOfflineIndexReader {
 
     File indexDir = new File(dataDir, TABLE_NAME);
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, segmentMetadata, ReadMode.mmap);
+    SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, segmentMetadata, ReadMode.mmap, PrefetchMode.DEFAULT_PREFETCH_MODE);
     SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
 
     // Forward index

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.segment.index.loader;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.segment.PrefetchMode;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -56,7 +57,7 @@ public class SegmentPreProcessor implements AutoCloseable {
 
     // Always use mmap to load the segment because it is safest and performs well without impact from -Xmx params.
     // This is not the final load of the segment.
-    _segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, _segmentMetadata, ReadMode.mmap);
+    _segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, _segmentMetadata, ReadMode.mmap, PrefetchMode.DEFAULT_PREFETCH_MODE);
   }
 
   public void process() throws Exception {
