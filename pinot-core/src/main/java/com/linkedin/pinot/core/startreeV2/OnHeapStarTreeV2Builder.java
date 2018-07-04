@@ -245,15 +245,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
   @Override
   public void convertFromV1toV3(int starTreeId) throws Exception {
-    SegmentV1V2ToV3FormatConverter converter = new SegmentV1V2ToV3FormatConverter();
-    converter.starTreeIndexes();
-//    converter.setDirectoryPermissions(v3TempDirectory);
-//    converter.createMetadataFile(new File(starTreeIndexDir, "v3"), v3TempDirectory);
-//    converter.copyCreationMetadataIfExists(new File(starTreeIndexDir, "v3"), v3TempDirectory);
-//
-//    SegmentMetadataImpl v2Metadata = new SegmentMetadataImpl(starTreeIndexDir);
-//    converter.copyIndexData(starTreeIndexDir, v2Metadata, v3TempDirectory);
-
+    StarTreeV1ToV2Converter converter = new StarTreeV1ToV2Converter();
+    converter.convert(_outDir,  starTreeId);
 
     return;
   }

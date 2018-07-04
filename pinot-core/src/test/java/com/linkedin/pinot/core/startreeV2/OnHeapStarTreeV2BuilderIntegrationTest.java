@@ -107,6 +107,7 @@ public class OnHeapStarTreeV2BuilderIntegrationTest {
           String value = metadata.get(key);
           properties.setProperty(key, value);
         }
+        //properties.setProperty(Integer.toString(StarTreeV2Constant.STAR_TREES_COUNT), i+1);
         properties.save();
         onTest.convertFromV1toV3(i);
       }
