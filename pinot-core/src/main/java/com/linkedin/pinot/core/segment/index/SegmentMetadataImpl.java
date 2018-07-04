@@ -25,6 +25,8 @@ import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
+import com.linkedin.pinot.core.startreeV2.Met2AggfuncPair;
+import com.linkedin.pinot.core.startreeV2.StarTreeV2Constant;
 import com.linkedin.pinot.core.startreeV2.StarTreeV2Metadata;
 import com.linkedin.pinot.startree.hll.HllConstants;
 import java.io.DataInputStream;
@@ -82,7 +84,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private SegmentVersion _segmentVersion;
   private boolean _hasStarTree;
   private StarTreeMetadata _starTreeMetadata = null;
-  private List<StarTreeV2Metadata> _starTreeV2Metadata = null;
+  private List<StarTreeV2Metadata> _starTreeV2MetadataList = null;
   private String _creatorName;
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
   private int _hllLog2m = HllConstants.DEFAULT_LOG2M;
@@ -350,55 +352,42 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    */
   private void initStarTreeV2Metadata() {
 
-    List<StarTreeV2Metadata> _starTreeV2Metadata = new ArrayList<>();
+    String starTreeCount = _segmentMetadataPropertiesConfiguration.getString(Integer.toString(StarTreeV2Constant.STAR_TREES_COUNT));
+    int starTreesCount = Integer.parseInt(starTreeCount);
+
+    if (starTreesCount > 0) {
+      _starTreeV2MetadataList = new ArrayList<>();
+      for ( int i = 0; i < starTreesCount;  i++ ) {
+        StarTreeV2Metadata metadata = new StarTreeV2Metadata();
+
+
+        String met2agg = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAT2FUNC_MAP;
+        Iterator<String> iterator = _segmentMetadataPropertiesConfiguration.getList(met2agg).iterator();
+        List<Met2AggfuncPair> met2AggfuncPairs = new ArrayList<>();
+        while(iterator.hasNext()) {
+          String pair = iterator.next();
+          String[] part = pair.split("-");
+          if (part[0].equals("count")) {
+            continue;
+          }
+          Met2AggfuncPair met2AggfuncPair = new Met2AggfuncPair(part[0], part[1]);
+          met2AggfuncPairs.add(met2AggfuncPair);
+        }
+        metadata.setMet2AggfuncPairs(met2AggfuncPairs);
+
+
+        String splitOrder = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SPLIT_ORDER;
+        iterator = _segmentMetadataPropertiesConfiguration.getList(splitOrder).iterator();
+        List<String> dimensionsSplitOrder = new ArrayList<>();
+        while (iterator.hasNext()) {
+          final String splitColumn = iterator.next();
+          dimensionsSplitOrder.add(splitColumn);
+        }
+        metadata.setDimensionsSplitOrder(dimensionsSplitOrder);
+      }
+    }
+
     return;
-
-
-
-//    // Set the splitOrder
-//    Iterator<String> iterator =
-//        _segmentMetadataPropertiesConfiguration.getList(MetadataKeys.StarTree.STAR_TREE_SPLIT_ORDER).iterator();
-//    List<String> splitOrder = new ArrayList<String>();
-//    while (iterator.hasNext()) {
-//      final String splitColumn = iterator.next();
-//      splitOrder.add(splitColumn);
-//    }
-//    _starTreeMetadata.setDimensionsSplitOrder(splitOrder);
-//
-//    // Set dimensions for which star node creation is to be skipped.
-//    iterator = _segmentMetadataPropertiesConfiguration.getList(
-//        MetadataKeys.StarTree.STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS).iterator();
-//    List<String> skipStarNodeCreationForDimensions = new ArrayList<String>();
-//    while (iterator.hasNext()) {
-//      final String column = iterator.next();
-//      skipStarNodeCreationForDimensions.add(column);
-//    }
-//    _starTreeMetadata.setSkipStarNodeCreationForDimensions(skipStarNodeCreationForDimensions);
-//
-//    // Set dimensions for which to skip materialization.
-//    iterator = _segmentMetadataPropertiesConfiguration.getList(
-//        MetadataKeys.StarTree.STAR_TREE_SKIP_MATERIALIZATION_FOR_DIMENSIONS).iterator();
-//    List<String> skipMaterializationForDimensions = new ArrayList<String>();
-//
-//    while (iterator.hasNext()) {
-//      final String column = iterator.next();
-//      skipMaterializationForDimensions.add(column);
-//    }
-//    _starTreeMetadata.setSkipMaterializationForDimensions(skipMaterializationForDimensions);
-//
-//    // Set the maxLeafRecords
-//    String maxLeafRecordsString =
-//        _segmentMetadataPropertiesConfiguration.getString(MetadataKeys.StarTree.STAR_TREE_MAX_LEAF_RECORDS);
-//    if (maxLeafRecordsString != null) {
-//      _starTreeMetadata.setMaxLeafRecords(Integer.parseInt(maxLeafRecordsString));
-//    }
-//
-//    // Skip skip materialization cardinality.
-//    String skipMaterializationCardinalityString = _segmentMetadataPropertiesConfiguration.getString(
-//        MetadataKeys.StarTree.STAR_TREE_SKIP_MATERIALIZATION_CARDINALITY);
-//    if (skipMaterializationCardinalityString != null) {
-//      _starTreeMetadata.setSkipMaterializationCardinality(Integer.parseInt(skipMaterializationCardinalityString));
-//    }
   }
 
 
