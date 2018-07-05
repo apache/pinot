@@ -110,6 +110,14 @@ public class StorageQuotaChecker {
       throw e;
     }
 
+    if (tableSubtypeSize.estimatedSizeInBytes == -1) {
+      String msg = String.format("Failed to get size estimate for table %s.",
+          tableNameWithType);
+      // don't fail the quota check in this case
+      return new QuotaCheckerResponse(true,
+          "Failed to get size estimate for table: " + tableNameWithType);
+    }
+
     // If the segment exists(refresh), get the existing size
     TableSizeReader.SegmentSizeDetails sizeDetails = tableSubtypeSize.segments.get(segmentName);
     long existingSegmentSizeBytes = sizeDetails != null ?  sizeDetails.estimatedSizeInBytes : 0;
@@ -118,6 +126,10 @@ public class StorageQuotaChecker {
     // tableSubtypeSize.estimatedSizeInBytes is the offline table size.
     _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE, tableSubtypeSize.estimatedSizeInBytes);
 
+    LOGGER.info("Table {}'s estimatedSizeInBytes is {}. ReportedSizeInBytes (actual reports from servers) is {}",
+        tableName,
+        tableSubtypeSize.estimatedSizeInBytes,
+        tableSubtypeSize.reportedSizeInBytes);
     long estimatedFinalSizeBytes = tableSubtypeSize.estimatedSizeInBytes - existingSegmentSizeBytes + incomingSegmentSizeBytes;
     if (estimatedFinalSizeBytes <= allowedStorageBytes) {
       String message = String.format("Estimated size: %d bytes is within the configured quota of %d (bytes) for table %s. Incoming segment size: %d (bytes)",

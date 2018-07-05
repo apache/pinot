@@ -194,26 +194,33 @@ public class TableSizeReader {
       // after iterating over all servers update summary reported and estimated size of the segment
       if (errors != segmentSizes.serverInfo.size()) {
         // atleast one server reported size for this segment
+        LOGGER.info("Could not get size for segment {} from {} servers. Using segmentLevelMax {} to estimate the size",
+            segmentEntry.getKey(), errors, segmentLevelMax);
         segmentSizes.estimatedSizeInBytes = segmentSizes.reportedSizeInBytes + errors * segmentLevelMax;
         tableLevelMax = Math.max(tableLevelMax, segmentLevelMax);
         subTypeSizeDetails.reportedSizeInBytes += segmentSizes.reportedSizeInBytes;
         subTypeSizeDetails.estimatedSizeInBytes += segmentSizes.estimatedSizeInBytes;
       } else {
+        LOGGER.warn("Could not get size report from any server for segment {}", segmentEntry.getKey());
         segmentSizes.reportedSizeInBytes = -1;
         segmentSizes.estimatedSizeInBytes = -1;
       }
     }
     if (tableLevelMax == -1) {
+      LOGGER.warn("Could not get size from any of the servers for table {}. Setting size estimate to -1",
+          tableNameWithType);
       // no server reported size
       subTypeSizeDetails.reportedSizeInBytes = -1;
       subTypeSizeDetails.estimatedSizeInBytes = -1;
     } else {
+      LOGGER.info("Table {} max segment size is {}", tableNameWithType, tableLevelMax);
       // For segments with no reported sizes, use max table-level segment size as an estimate
       for (Map.Entry<String, SegmentSizeDetails> segmentSizeDetailsEntry : segmentMap.entrySet()) {
         SegmentSizeDetails sizeDetails = segmentSizeDetailsEntry.getValue();
         if (sizeDetails.reportedSizeInBytes != -1) {
           continue;
         }
+        LOGGER.info("Using tableLevelMax {} for segment {} size estimation", tableLevelMax, segmentSizeDetailsEntry.getKey());
         sizeDetails.estimatedSizeInBytes += sizeDetails.serverInfo.size() * tableLevelMax;
         subTypeSizeDetails.estimatedSizeInBytes += sizeDetails.estimatedSizeInBytes;
       }
