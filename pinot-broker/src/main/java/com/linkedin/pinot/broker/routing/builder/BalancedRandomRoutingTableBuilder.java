@@ -70,6 +70,7 @@ public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
       }
     }
 
+    routingTables = SimpleServerBlackList.applyBlackList(routingTables);
     setRoutingTables(routingTables);
   }
 }
