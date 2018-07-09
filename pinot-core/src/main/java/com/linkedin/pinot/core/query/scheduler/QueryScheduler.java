@@ -201,7 +201,7 @@ public abstract class QueryScheduler {
     }
 
     responseSerializationTimer.stopAndRecord();
-    timerContext.startNewPhaseTimerAtNs(ServerQueryPhase.TOTAL_QUERY_TIME, timerContext.getQueryArrivalTimeNs())
+    timerContext.startNewPhaseTimer(ServerQueryPhase.TOTAL_QUERY_TIME, timerContext.getQueryArrivalTimeMs())
         .stopAndRecord();
 
     return responseByte;

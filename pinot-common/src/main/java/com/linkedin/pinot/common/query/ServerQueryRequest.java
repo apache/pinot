@@ -41,12 +41,13 @@ public class ServerQueryRequest {
 
   private int _segmentCountAfterPruning = -1;
 
-  public ServerQueryRequest(@Nonnull InstanceRequest instanceRequest, @Nonnull ServerMetrics serverMetrics) {
+  public ServerQueryRequest(@Nonnull InstanceRequest instanceRequest, @Nonnull ServerMetrics serverMetrics,
+      long queryArrivalTimeMs) {
     _instanceRequest = instanceRequest;
     _serverMetrics = serverMetrics;
     _brokerRequest = instanceRequest.getQuery();
     _filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
-    _timerContext = new TimerContext(_brokerRequest, serverMetrics);
+    _timerContext = new TimerContext(_brokerRequest, serverMetrics, queryArrivalTimeMs);
   }
 
   /**

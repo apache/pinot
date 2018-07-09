@@ -179,13 +179,13 @@ public class MultiLevelPriorityQueueTest {
   @Test
   public void testNoPendingAfterTrim() throws OutOfCapacityException, BrokenBarrierException, InterruptedException {
     MultiLevelPriorityQueue queue = createQueue();
-    queue.put(createQueryRequest(groupOne, metrics));
-    queue.put(createQueryRequest(groupTwo, metrics));
+    // Pick a query arrival time older than the query deadline of 30s
+    long queryArrivalTimeMs = System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(100);
+    queue.put(createQueryRequest(groupOne, metrics, queryArrivalTimeMs));
+    queue.put(createQueryRequest(groupTwo, metrics, queryArrivalTimeMs));
     // group one has higher priority but it's above soft thread limit
     TestSchedulerGroup testGroupOne = groupFactory.groupMap.get(groupOne);
     TestSchedulerGroup testGroupTwo = groupFactory.groupMap.get(groupTwo);
-    testGroupOne.peekFirst().getQueryRequest().getTimerContext().setQueryArrivalTimeNs(1000);
-    testGroupTwo.peekFirst().getQueryRequest().getTimerContext().setQueryArrivalTimeNs(1000);
     QueueReader reader = new QueueReader(queue);
     reader.startAndWaitForQueueWakeup();
     assertTrue(reader.readQueries.isEmpty());
@@ -197,7 +197,6 @@ public class MultiLevelPriorityQueueTest {
 
   private MultiLevelPriorityQueue createQueue() {
     PropertiesConfiguration conf = new PropertiesConfiguration();
-    conf.setProperty(MultiLevelPriorityQueue.QUERY_DEADLINE_SECONDS_KEY, 100000);
     return createQueue(conf, new UnboundedResourceManager(conf));
   }
 

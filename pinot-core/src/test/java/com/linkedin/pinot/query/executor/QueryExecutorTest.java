@@ -118,7 +118,8 @@ public class QueryExecutorTest {
     String query = "SELECT COUNT(*) FROM " + TABLE_NAME;
     InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
-    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics);
+    ServerQueryRequest queryRequest =
+        new ServerQueryRequest(instanceRequest, _serverMetrics, System.currentTimeMillis());
     DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getLong(0, 0), 400002L);
   }
@@ -128,7 +129,8 @@ public class QueryExecutorTest {
     String query = "SELECT SUM(met) FROM " + TABLE_NAME;
     InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
-    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics);
+    ServerQueryRequest queryRequest =
+        new ServerQueryRequest(instanceRequest, _serverMetrics, System.currentTimeMillis());
     DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 40000200000.0);
   }
@@ -138,7 +140,8 @@ public class QueryExecutorTest {
     String query = "SELECT MAX(met) FROM " + TABLE_NAME;
     InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
-    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics);
+    ServerQueryRequest queryRequest =
+        new ServerQueryRequest(instanceRequest, _serverMetrics, System.currentTimeMillis());
     DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 200000.0);
   }
@@ -148,7 +151,8 @@ public class QueryExecutorTest {
     String query = "SELECT MIN(met) FROM " + TABLE_NAME;
     InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
-    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics);
+    ServerQueryRequest queryRequest =
+        new ServerQueryRequest(instanceRequest, _serverMetrics, System.currentTimeMillis());
     DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 0.0);
   }
