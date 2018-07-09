@@ -18,7 +18,6 @@ package com.linkedin.pinot.controller.helix.core.realtime.segment;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.slf4j.Logger;
@@ -63,26 +62,5 @@ public class FlushThresholdUpdateManager {
 
   public void clearFlushThresholdUpdater(TableConfig tableConfig) {
     _flushThresholdUpdaterMap.remove(tableConfig.getTableName());
-  }
-
-  /**
-   * Returns the max number of rows that a host holds across all consuming LLC partitions.
-   * This number should be divided by the number of partitions on the host, so as to get
-   * the flush limit for each segment.
-   *
-   * If flush threshold is configured for LLC, return it, otherwise, if flush threshold is
-   * configured for HLC, then return that value, else return -1.
-   *
-   * Flush threshold will be set to 0 for autotuning the thresholds
-   *
-   * @param tableConfig
-   * @return -1 if tableConfig is null, or neither value is configured
-   */
-  private int getLLCRealtimeTableFlushSize(TableConfig tableConfig) {
-    final Map<String, String> streamConfigs = tableConfig.getIndexingConfig().getStreamConfigs();
-    KafkaLowLevelStreamProviderConfig streamProviderConfig = new KafkaLowLevelStreamProviderConfig();
-    // We instantiate streamproviderconfig locally here, so it is ok to pass null for schema.
-    streamProviderConfig.init(streamConfigs, null);
-    return streamProviderConfig.getSizeThresholdToFlushSegment();
   }
 }

@@ -124,7 +124,7 @@ public class CommonConstants {
          * machines, the number of completed segments that are expected to be resident on the machine and the amount
          * of memory used by consuming machines. In other words:
          *
-         *    numPartitionsInMachine * (consumingPartitionMemory + numPartitionsRetained * REALTIME_SEGMENT_FLUSH_SIZE)
+         *    numPartitionsInMachine * (consumingPartitionMemory + numPartitionsRetained * REALTIME_DESIRED_SEGMENT_SIZE)
          *
          * must be less than or equal to the total memory available to store pinot data.
          *
@@ -132,7 +132,7 @@ public class CommonConstants {
          *
          * Not included here is any heap memory used (currently inverted index uses heap memory for consuming partitions).
          */
-        public static final String REALTIME_DESIRED_SEGMENT_SIZE = "realtime.segment.flush.segment.desired.size";
+        public static final String REALTIME_DESIRED_SEGMENT_SIZE = "realtime.segment.flush.desired.size";
         public static final String LLC_PROPERTY_SUFFIX = ".llc";
         public static final String LLC_REALTIME_SEGMENT_FLUSH_SIZE = REALTIME_SEGMENT_FLUSH_SIZE + LLC_PROPERTY_SUFFIX;
         public static final String LLC_REALTIME_SEGMENT_FLUSH_TIME = REALTIME_SEGMENT_FLUSH_TIME + LLC_PROPERTY_SUFFIX;
