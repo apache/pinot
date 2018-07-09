@@ -93,15 +93,31 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     if (schedulerWaitTimer != null) {
       schedulerWaitTimer.stopAndRecord();
     }
+    long querySchedulingTimeMs = System.currentTimeMillis() - timerContext.getQueryArrivalTimeMs();
     TimerContext.Timer queryProcessingTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PROCESSING);
 
     InstanceRequest instanceRequest = queryRequest.getInstanceRequest();
     long requestId = instanceRequest.getRequestId();
     BrokerRequest brokerRequest = instanceRequest.getQuery();
     LOGGER.debug("Incoming request Id: {}, query: {}", requestId, brokerRequest);
-    String tableName = brokerRequest.getQuerySource().getTableName();
-    TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableName);
-    Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: {}", tableName);
+    String tableNameWithType = brokerRequest.getQuerySource().getTableName();
+    long queryTimeoutMs = _resourceTimeOutMsMap.getOrDefault(tableNameWithType, _defaultTimeOutMs);
+    long remainingTimeMs = queryTimeoutMs - querySchedulingTimeMs;
+
+    // Query scheduler wait time already exceeds query timeout, directly return
+    if (remainingTimeMs <= 0) {
+      _serverMetrics.addMeteredQueryValue(brokerRequest, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
+      String errorMessage =
+          String.format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
+              queryTimeoutMs);
+      DataTable dataTable = new DataTableImplV2();
+      dataTable.addException(QueryException.getException(QueryException.QUERY_SCHEDULING_TIMEOUT_ERROR, errorMessage));
+      LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
+      return dataTable;
+    }
+
+    TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
+    Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: {}", tableNameWithType);
     List<SegmentDataManager> queryableSegmentDataManagerList =
         acquireQueryableSegments(tableDataManager, instanceRequest);
     boolean enableTrace = instanceRequest.isEnableTrace();
@@ -129,7 +145,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
         Plan globalQueryPlan =
             _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, executorService,
-                getResourceTimeOut(brokerRequest));
+                remainingTimeMs);
         planBuildTimer.stopAndRecord();
 
         if (PRINT_QUERY_PLAN) {
@@ -177,13 +193,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     LOGGER.debug("InstanceResponse for request Id - {}: {}", requestId, dataTable);
     return dataTable;
   }
-
-  /**
-   * Helper method to identify if a query is simple count(*) query without any predicates and group by's.
-   *
-   * @param brokerRequest Broker request for the query
-   * @return True if simple count star query, false otherwise.
-   */
 
   /**
    * Helper method to acquire segments that can be queried for the request.
@@ -255,18 +264,5 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public void updateResourceTimeOutInMs(String resource, long timeOutMs) {
     _resourceTimeOutMsMap.put(resource, timeOutMs);
-  }
-
-  private long getResourceTimeOut(BrokerRequest brokerRequest) {
-    try {
-      String resourceName = brokerRequest.getQuerySource().getTableName();
-      if (_resourceTimeOutMsMap.containsKey(resourceName)) {
-        return _resourceTimeOutMsMap.get(resourceName);
-      }
-    } catch (Exception e) {
-      // Return the default timeout value
-      LOGGER.warn("Caught exception while obtaining resource timeout", e);
-    }
-    return _defaultTimeOutMs;
   }
 }
