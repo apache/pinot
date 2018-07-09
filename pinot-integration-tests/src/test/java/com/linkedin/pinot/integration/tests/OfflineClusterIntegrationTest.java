@@ -17,6 +17,7 @@ package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -122,6 +123,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Create the table
     addOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, getInvertedIndexColumns(),
         getTaskConfig());
+
+    completeTableConfiguration();
 
     // Upload all segments
     uploadSegments(_tarDir);
@@ -513,5 +516,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Check if '/CONFIGS/PARTICIPANT/<serverName>' has been erased correctly
     String configPath = "/" + _clusterName + "/CONFIGS/PARTICIPANT/" + serverName;
     Assert.assertFalse(_propertyStore.exists(configPath, 0));
+  }
+
+  @Override
+  protected boolean isUsingNewConfigFormat() {
+    return true;
   }
 }

@@ -137,6 +137,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
         getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, TENANT_NAME,
         TENANT_NAME, getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getRawIndexColumns(),
         getTaskConfig());
+
+    completeTableConfiguration();
   }
 
   protected List<File> getAllAvroFiles() throws Exception {
@@ -291,5 +293,10 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
    */
   protected void cleanup() throws Exception {
     FileUtils.deleteDirectory(_tempDir);
+  }
+
+  @Override
+  protected boolean isUsingNewConfigFormat() {
+    return true;
   }
 }

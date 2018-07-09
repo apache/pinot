@@ -131,6 +131,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables");
   }
 
+  public String forNewTableCreate() {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "v2", "tables");
+  }
+
   public String forUpdateTableConfig(String tableName) {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName);
   }
