@@ -16,12 +16,8 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import java.io.File;
 import java.util.List;
-import java.util.Random;
 import java.util.HashMap;
 import java.util.ArrayList;
 import com.linkedin.pinot.common.data.Schema;
@@ -29,6 +25,9 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.core.data.readers.RecordReader;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 
 
 public class StarTreeV2SegmentHelper {
@@ -99,7 +98,7 @@ public class StarTreeV2SegmentHelper {
     segmentGeneratorConfig.setTableName(segmentName);
     segmentGeneratorConfig.setOutDir(segmentOutputDir);
     segmentGeneratorConfig.setSegmentName(segmentName);
-    segmentGeneratorConfig.setEnableStarTreeIndex(true);
+    segmentGeneratorConfig.setEnableStarTreeIndex(false);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig, recordReader);

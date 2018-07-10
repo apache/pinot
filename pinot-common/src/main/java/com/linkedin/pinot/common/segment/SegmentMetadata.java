@@ -76,7 +76,7 @@ public interface SegmentMetadata {
 
   StarTreeMetadata getStarTreeMetadata();
 
-  List<StarTreeMetadata> getStarTreeV2Metadata();
+  List<StarTreeV2Metadata> getStarTreeV2Metadata();
 
   String getForwardIndexFileName(String column);
 
