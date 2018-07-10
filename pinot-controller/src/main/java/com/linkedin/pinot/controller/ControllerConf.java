@@ -17,11 +17,13 @@ package com.linkedin.pinot.controller;
 
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.filesystem.LocalPinotFS;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 
@@ -57,6 +59,10 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
   private static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = "controller.realtime.segment.metadata.commit.numLocks";
 
+  // Defines the kind of storage and the underlying PinotFS implementation
+  private static final String PINOT_FS_FACTORY_CLASS_PREFIX = "controller.storage.factory.class";
+  private static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.file";
+
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
   private static final int DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
@@ -74,6 +80,8 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
 
+  private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
+
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
   }
@@ -87,7 +95,15 @@ public class ControllerConf extends PropertiesConfiguration {
       return StringUtil.join("/", vip, "segments", tableName, URLEncoder.encode(segmentName, "UTF-8"));
     } catch (UnsupportedEncodingException e) {
       // Shouldn't happen
-      throw new AssertionError("UTF-8 encoding should always be supported", e);
+      throw new AssertionError("Encountered error while encoding in UTF-8 format", e);
+    }
+  }
+
+  public void setPinotFSFactoryClass(Configuration pinotFSFactoryClasses) {
+    setProperty(PINOT_FS_FACTORY_CLASS_LOCAL, DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL);
+
+    if (pinotFSFactoryClasses != null) {
+      pinotFSFactoryClasses.getKeys().forEachRemaining(key -> setProperty((String) key, pinotFSFactoryClasses.getProperty((String) key)));
     }
   }
 
@@ -209,6 +225,10 @@ public class ControllerConf extends PropertiesConfiguration {
   @Override
   public String toString() {
     return super.toString();
+  }
+
+  public Configuration getPinotFSFactoryClasses() {
+    return this.subset(PINOT_FS_FACTORY_CLASS_PREFIX);
   }
 
   public boolean getAcceptSplitCommit() {
