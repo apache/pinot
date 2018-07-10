@@ -151,6 +151,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Update table config and trigger reload
     updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1,
         UPDATED_INVERTED_INDEX_COLUMNS, getTaskConfig());
+
+    updateTableConfiguration();
+
     sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
 
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
@@ -209,6 +212,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     } else {
       sendSchema(SCHEMA_WITH_MISSING_COLUMNS);
     }
+
+    updateTableConfiguration();
 
     // Trigger reload
     sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);

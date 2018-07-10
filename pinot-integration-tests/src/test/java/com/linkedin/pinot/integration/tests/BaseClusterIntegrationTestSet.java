@@ -376,9 +376,17 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       CombinedConfig combinedConfig = new CombinedConfig(_offlineTableConfig, _realtimeTableConfig, _schema);
       try {
         sendPostRequest(_controllerRequestURLBuilder.forNewTableCreate(), Serializer.serializeToString(combinedConfig));
-        _offlineTableConfig = null;
-        _realtimeTableConfig = null;
-        _schema = null;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  protected void updateTableConfiguration() {
+    if (isUsingNewConfigFormat()) {
+      CombinedConfig combinedConfig = new CombinedConfig(_offlineTableConfig, _realtimeTableConfig, _schema);
+      try {
+        sendPutRequest(_controllerRequestURLBuilder.forNewUpdateTableConfig(_offlineTableConfig.getTableName()), Serializer.serializeToString(combinedConfig));
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
