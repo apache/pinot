@@ -25,14 +25,10 @@ import org.testng.annotations.Test;
 import org.testng.annotations.BeforeClass;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 
 
 public class OnHeapStarTreeV2BuilderIntegrationTest {
@@ -41,10 +37,6 @@ public class OnHeapStarTreeV2BuilderIntegrationTest {
   private List<GenericRow> _rows;
   private String _segmentOutputDir;
   private RecordReader _recordReader;
-
-
-  SegmentMetadata _segmentMetadata;
-  ImmutableSegment _immutableSegment;
   private static List<StarTreeV2Config> _starTreeV2ConfigList = new ArrayList<>();
 
   @BeforeClass
@@ -84,7 +76,6 @@ public class OnHeapStarTreeV2BuilderIntegrationTest {
     _starTreeV2Config2.setMetric2aggFuncPairs(metric2aggFuncPairs2);
     _starTreeV2ConfigList.add(_starTreeV2Config2);
 
-
     return;
   }
 
@@ -92,11 +83,11 @@ public class OnHeapStarTreeV2BuilderIntegrationTest {
   public void testBuild() throws Exception {
     OnHeapStarTreeV2Builder onTest = new OnHeapStarTreeV2Builder();
     try {
-      _immutableSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.mmap);
-      _segmentMetadata = _immutableSegment.getSegmentMetadata();
 
       File metadataFile = new File(new File(_indexDir, "v3"), V1Constants.MetadataKeys.METADATA_FILE_NAME);
       PropertiesConfiguration properties = new PropertiesConfiguration(metadataFile);
+      properties.setProperty(V1Constants.MetadataKeys.StarTree.STAR_TREE_ENABLED, true);
+      properties.save();
 
       for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
         onTest.init(_indexDir, _starTreeV2ConfigList.get(i));
@@ -107,8 +98,11 @@ public class OnHeapStarTreeV2BuilderIntegrationTest {
           String value = metadata.get(key);
           properties.setProperty(key, value);
         }
-        //properties.setProperty(Integer.toString(StarTreeV2Constant.STAR_TREES_COUNT), i+1);
+        properties.setProperty(StarTreeV2Constant.STAR_TREE_V2_COUNT, i+1);
+        properties.setProperty(StarTreeV2Constant.STAR_TREE_V2_ENABLED, true);
+
         properties.save();
+
         onTest.convertFromV1toV3(i);
       }
     } catch (Exception e) {

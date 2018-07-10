@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.linkedin.pinot.core.startreeV2;
+package com.linkedin.pinot.common.segment;
 
 import java.util.List;
 
 
 public class StarTreeV2Metadata {
   private List<String> _dimensionsSplitOrder;
-  private List<Met2AggfuncPair> _met2AggfuncPairs;
+  private List<String> _met2AggfuncPairs;
 
   public void setDimensionsSplitOrder(List<String> dimensionsSplitOrder) {
     _dimensionsSplitOrder = dimensionsSplitOrder;
@@ -31,11 +31,11 @@ public class StarTreeV2Metadata {
     return _dimensionsSplitOrder;
   }
 
-  public List<Met2AggfuncPair> getMet2AggfuncPairs() {
+  public List<String> getMet2AggfuncPairs() {
     return _met2AggfuncPairs;
   }
 
-  public void setMet2AggfuncPairs(List<Met2AggfuncPair> met2AggfuncPairs) {
+  public void setMet2AggfuncPairs(List<String> met2AggfuncPairs) {
     _met2AggfuncPairs = met2AggfuncPairs;
   }
 }
