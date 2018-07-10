@@ -16,17 +16,22 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+
 public class StarTreeV2Constant {
 
   // final strings
   public static final int STAR_NODE = -1;
   public static final int INVALID_INDEX = -1;
   public static final String STAR_TREE = "startree";
+  public static final String STAR_TREE_V2_COUNT = "startreeV2.count";
+  public static final String STAR_TREE_V2_ENABLED = "startreeV2.enabled";
+
+  public static final String STAR_TREE_V2_COlUMN_FILE = "startreev2.column.psf";
+  public static final String STAR_TREE_V2_INDEX_MAP_FILE = "startreev2.index.map";
 
 
-  // variable strings
-  public static int STAR_TREES_COUNT = 0;
-
+  public static final String METRIC_RAW_INDEX_SUFFIX = ".sv.raw.fwd";
+  public static final String DIMENSION_FWD_INDEX_SUFFIX = ".sv.unsorted.fwd";
 
   // aggregate functions name.
   public static class AggregateFunctions {

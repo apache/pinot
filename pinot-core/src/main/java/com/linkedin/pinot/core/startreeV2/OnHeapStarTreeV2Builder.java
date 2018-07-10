@@ -16,6 +16,8 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.Set;
 import java.util.Map;
@@ -33,9 +35,7 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.core.startree.OffHeapStarTreeNode;
-import org.apache.commons.configuration.ConfigurationException;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
 import com.linkedin.pinot.core.data.readers.PinotSegmentColumnReader;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
@@ -45,7 +45,6 @@ import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
-import com.linkedin.pinot.core.segment.index.converter.SegmentV1V2ToV3FormatConverter;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 
 
@@ -53,8 +52,9 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
   // Segment
   private File _outDir;
-  SegmentMetadata _segmentMetadata;
-  ImmutableSegment _immutableSegment;
+  private SegmentMetadata _segmentMetadata;
+  private ImmutableSegment _immutableSegment;
+  private IndexLoadingConfig _v3IndexLoadingConfig;
 
   // Dimensions
   private int _dimensionsCount;
@@ -91,7 +91,11 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   public void init(File indexDir, StarTreeV2Config config) throws Exception {
 
     // segment
-    _immutableSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
+    _v3IndexLoadingConfig = new IndexLoadingConfig();
+    _v3IndexLoadingConfig.setReadMode(ReadMode.mmap);
+    _v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
+
+    _immutableSegment = ImmutableSegmentLoader.load(indexDir, _v3IndexLoadingConfig);
     _segmentMetadata = _immutableSegment.getSegmentMetadata();
     _rawDocsCount = _segmentMetadata.getTotalRawDocs();
 

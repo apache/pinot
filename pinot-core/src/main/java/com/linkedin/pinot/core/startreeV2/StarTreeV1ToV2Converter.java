@@ -16,43 +16,165 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+
 import java.io.File;
+import java.util.List;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.attribute.PosixFilePermission;
-import java.util.EnumSet;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import java.io.InputStream;
+import java.io.PrintWriter;
+import java.nio.ByteBuffer;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.RandomAccessFile;
+import java.io.FileNotFoundException;
+import java.nio.channels.FileChannel;
+import com.linkedin.pinot.common.segment.StarTreeV2Metadata;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 public class StarTreeV1ToV2Converter implements StarTreeFormatConverter {
 
-  private static final String V3_TEMP_DIR_SUFFIX = ".v3.tmp";
-
+  private List<StarTreeV2Metadata> _starTreeV2MetadataList;
 
   @Override
   public void convert(File indexStarTreeDir, int starTreeId) throws Exception {
-    File v3TempDirectory = v3ConversionTempDirectory(indexStarTreeDir);
-    setDirectoryPermissions(v3TempDirectory);
+
+    SegmentMetadataImpl v2Metadata = new SegmentMetadataImpl(indexStarTreeDir);
+    createFilesIfNotExist(indexStarTreeDir);
+    copyIndexData(indexStarTreeDir, v2Metadata, starTreeId);
 
     return;
   }
 
-  public File v3ConversionTempDirectory(File v2SegmentDirectory) throws IOException {
-    File v3TempDirectory = Files.createTempDirectory(v2SegmentDirectory.toPath(), v2SegmentDirectory.getName() + V3_TEMP_DIR_SUFFIX).toFile();
+  private void copyIndexData(File v2Directory, SegmentMetadataImpl v2Metadata, int starTreeId)
+      throws Exception {
 
-    return v3TempDirectory;
+    _starTreeV2MetadataList = v2Metadata.getStarTreeV2Metadata();
+    StarTreeV2Metadata metaData = _starTreeV2MetadataList.get(starTreeId);
+
+    List<String> dimensionsSplitOrder = metaData.getDimensionsSplitOrder();
+    List<String> met2aggfuncPairs = metaData.getMet2AggfuncPairs();
+
+    for (String dimension: dimensionsSplitOrder) {
+      appendToFile(v2Directory, dimension, "DIMENSION", starTreeId);
+    }
+
+    //readFromFile(v2Directory);
+
+    for (String pair: met2aggfuncPairs) {
+      appendToFile(v2Directory, pair, "METRIC", starTreeId);
+    }
+
+    return;
   }
 
-  private void setDirectoryPermissions(File v3Directory)
-      throws IOException {
-    EnumSet<PosixFilePermission> permissions = EnumSet
-        .of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,
-            PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_WRITE, PosixFilePermission.GROUP_EXECUTE,
-            PosixFilePermission.OTHERS_READ, PosixFilePermission.OTHERS_EXECUTE);
+  private void createFilesIfNotExist(File indexStarTreeDir) throws IOException {
 
-    Files.setPosixFilePermissions(v3Directory.toPath(), permissions);
+    File index_file = new File(indexStarTreeDir, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE);
+    if (!index_file.exists()) {
+      index_file.createNewFile();
+    }
+
+    File data_file = new File(indexStarTreeDir, StarTreeV2Constant.STAR_TREE_V2_COlUMN_FILE);
+    if (!data_file.exists()) {
+      data_file.createNewFile();
+    }
+
+    File temp_file = new File(indexStarTreeDir, "temp.tmp");
+    if (!temp_file.exists()) {
+      temp_file.createNewFile();
+    }
+    return;
+  }
+
+  private void appendToFile(File path, String column, String type, int starTreeId) throws IOException {
+    String readerFile = "";
+    if (type.equals("DIMENSION")) {
+      readerFile = new File(path, column + StarTreeV2Constant.DIMENSION_FWD_INDEX_SUFFIX).getPath();
+    } else {
+      readerFile = new File(path, column + StarTreeV2Constant.METRIC_RAW_INDEX_SUFFIX).getPath();
+    }
+
+    String indexWriterFile = new File(path, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE).getPath();
+    String columnWriterFile = new File(path, StarTreeV2Constant.STAR_TREE_V2_COlUMN_FILE).getPath();
+
+    try {
+      int b;
+      File inFile = new File(readerFile);
+      ByteBuffer buf = ByteBuffer.allocateDirect((int)inFile.length());
+      InputStream is = new FileInputStream(inFile);
+      while ((b=is.read())!=-1) {
+        buf.put((byte)b);
+      }
+
+      File file = new File(columnWriterFile);
+      boolean append = true;
+      FileChannel channel = new FileOutputStream(file, append).getChannel();
+      long start = channel.size();
+      buf.flip();
+      long end = start + buf.remaining();
+      channel.write(buf);
+      channel.close();
+
+      PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(indexWriterFile, true)));
+      out.println("startree" + starTreeId + "." + column + ".start:" + start);
+      out.println("startree" + starTreeId + "." + column + ".end:" + end);
+      out.close();
+
+    }
+    catch(FileNotFoundException ex) {
+      System.out.println("Unable to open file '" + indexWriterFile + "'");
+    }
+    catch(IOException ex) {
+      System.out.println("Error reading file '" + readerFile + "'");
+    }
+  }
+
+  private void readFromFile(File path) throws IOException {
+    String[] column = new String[10];
+
+    try {
+      String indexWriterFile = new File(path, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE).getPath();
+      File file = new File(indexWriterFile);
+      FileReader fileReader = new FileReader(file);
+      BufferedReader bufferedReader = new BufferedReader(fileReader);
+      StringBuffer stringBuffer = new StringBuffer();
+      String line;
+
+      int i = 0;
+      while ((line = bufferedReader.readLine()) != null) {
+        column[i] = line.toString();
+        i = i + 1;
+        System.out.println(line.toString());
+      }
+      fileReader.close();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+
+    String columnWriterFile = new File(path, StarTreeV2Constant.STAR_TREE_V2_COlUMN_FILE).getPath();
+
+    for ( int i = 0; i < column.length; i += 2) {
+      String a = column[i];
+      String b = column[i+1];
+
+      String [] aparts = a.split(":");
+      String [] bparts = b.split(":");
+
+      long start = Integer.valueOf(aparts[1]);
+      long end = Integer.valueOf(bparts[1]);
+
+      byte[] magic = new byte[(int) end];
+      RandomAccessFile raf = new RandomAccessFile(columnWriterFile, "rw");
+      raf.seek(start);
+      raf.readFully(magic);
+      System.out.println(new String(magic));
+
+
+    }
   }
 }
