@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin;
 
+import com.linkedin.pinot.tools.admin.command.ApplyTableConfigCommand;
 import com.linkedin.pinot.tools.admin.command.MoveReplicaGroup;
 
 import com.linkedin.pinot.tools.admin.command.RealtimeProvisioningHelperCommand;
@@ -93,6 +94,8 @@ public class PinotAdministrator {
       @SubCommand(name = "ConvertPinotSegment", impl = PinotSegmentConvertCommand.class),
       @SubCommand(name = "MoveReplicaGroup", impl = MoveReplicaGroup.class),
       @SubCommand(name = "BackfillSegmentColumn", impl = BackfillDateTimeColumnCommand.class),
+      @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class),
+      @SubCommand(name = "ApplyTableConfig", impl = ApplyTableConfigCommand.class),
       @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class),
       @SubCommand(name = "RealtimeProvisioningHelper", impl = RealtimeProvisioningHelperCommand.class)
   })
