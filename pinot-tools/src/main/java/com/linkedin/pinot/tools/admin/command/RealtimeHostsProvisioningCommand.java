@@ -158,11 +158,11 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
     memoryEstimator.estimateMemoryUsed(sampleStatsHistory, numHosts, numHours, totalConsumingPartitions, _retentionHours);
 
     // TODO: Make a recommendation of what config to choose by considering more inputs such as qps
-    System.out.println("\nMemory used per host");
+    LOGGER.info("\nMemory used per host");
     displayResults(memoryEstimator.getTotalMemoryPerHost(), numHosts, numHours);
-    System.out.println("\nOptimal segment size");
+    LOGGER.info("\nOptimal segment size");
     displayResults(memoryEstimator.getOptimalSegmentSize(), numHosts, numHours);
-    System.out.println("\nConsuming memory");
+    LOGGER.info("\nConsuming memory");
     displayResults(memoryEstimator.getConsumingMemoryPerHost(), numHosts, numHours);
     return true;
   }
