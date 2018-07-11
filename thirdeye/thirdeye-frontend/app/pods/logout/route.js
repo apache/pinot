@@ -10,11 +10,8 @@ import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-rout
 export default Route.extend(AuthenticatedRouteMixin, {
   session: service(),
 
-  routeIfAlreadyAuthenticated: 'rca',
-
   beforeModel() {
     this._super(...arguments);
-
     this.get('session').invalidate();
   }
 });
