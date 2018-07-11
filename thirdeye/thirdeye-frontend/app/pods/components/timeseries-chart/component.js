@@ -89,7 +89,7 @@ export default Component.extend({
   },
 
   line: { // on init only
-    connectNull: true
+    connectNull: false
   },
 
   _makeDiffConfig() {
