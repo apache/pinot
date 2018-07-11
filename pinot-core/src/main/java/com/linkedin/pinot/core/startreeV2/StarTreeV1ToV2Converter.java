@@ -16,28 +16,26 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-
 import java.io.File;
 import java.util.List;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.nio.ByteBuffer;
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.RandomAccessFile;
 import java.io.FileNotFoundException;
 import java.nio.channels.FileChannel;
+import org.apache.commons.io.FileUtils;
 import com.linkedin.pinot.common.segment.StarTreeV2Metadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 public class StarTreeV1ToV2Converter implements StarTreeFormatConverter {
 
+  private int _docsCount = 0;
   private List<StarTreeV2Metadata> _starTreeV2MetadataList;
 
   @Override
@@ -50,6 +48,11 @@ public class StarTreeV1ToV2Converter implements StarTreeFormatConverter {
     return;
   }
 
+  /**
+   * Helper function to copy indexes to single file.
+   *
+   * @return void.
+   */
   private void copyIndexData(File v2Directory, SegmentMetadataImpl v2Metadata, int starTreeId)
       throws Exception {
 
@@ -58,12 +61,11 @@ public class StarTreeV1ToV2Converter implements StarTreeFormatConverter {
 
     List<String> dimensionsSplitOrder = metaData.getDimensionsSplitOrder();
     List<String> met2aggfuncPairs = metaData.getMet2AggfuncPairs();
+    _docsCount = metaData.getDocsCount();
 
     for (String dimension: dimensionsSplitOrder) {
       appendToFile(v2Directory, dimension, "DIMENSION", starTreeId);
     }
-
-    //readFromFile(v2Directory);
 
     for (String pair: met2aggfuncPairs) {
       appendToFile(v2Directory, pair, "METRIC", starTreeId);
@@ -72,6 +74,11 @@ public class StarTreeV1ToV2Converter implements StarTreeFormatConverter {
     return;
   }
 
+  /**
+   * Helper function to create files if not exist.
+   *
+   * @return void.
+   */
   private void createFilesIfNotExist(File indexStarTreeDir) throws IOException {
 
     File index_file = new File(indexStarTreeDir, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE);
@@ -84,19 +91,23 @@ public class StarTreeV1ToV2Converter implements StarTreeFormatConverter {
       data_file.createNewFile();
     }
 
-    File temp_file = new File(indexStarTreeDir, "temp.tmp");
-    if (!temp_file.exists()) {
-      temp_file.createNewFile();
-    }
     return;
   }
 
+  /**
+   * Helper function to append data from one file to another.
+   *
+   * @return void.
+   */
   private void appendToFile(File path, String column, String type, int starTreeId) throws IOException {
-    String readerFile = "";
+    File readerFile = null;
+    String readerFilePath = "";
     if (type.equals("DIMENSION")) {
-      readerFile = new File(path, column + StarTreeV2Constant.DIMENSION_FWD_INDEX_SUFFIX).getPath();
+      readerFile = new File(path, column + StarTreeV2Constant.DIMENSION_FWD_INDEX_SUFFIX);
+      readerFilePath = readerFile.getPath();
     } else {
-      readerFile = new File(path, column + StarTreeV2Constant.METRIC_RAW_INDEX_SUFFIX).getPath();
+      readerFile = new File(path, column + StarTreeV2Constant.METRIC_RAW_INDEX_SUFFIX);
+      readerFilePath = readerFile.getPath();
     }
 
     String indexWriterFile = new File(path, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE).getPath();
@@ -104,7 +115,7 @@ public class StarTreeV1ToV2Converter implements StarTreeFormatConverter {
 
     try {
       int b;
-      File inFile = new File(readerFile);
+      File inFile = new File(readerFilePath);
       ByteBuffer buf = ByteBuffer.allocateDirect((int)inFile.length());
       InputStream is = new FileInputStream(inFile);
       while ((b=is.read())!=-1) {
@@ -116,65 +127,22 @@ public class StarTreeV1ToV2Converter implements StarTreeFormatConverter {
       FileChannel channel = new FileOutputStream(file, append).getChannel();
       long start = channel.size();
       buf.flip();
-      long end = start + buf.remaining();
+      long end = buf.remaining();
       channel.write(buf);
       channel.close();
 
       PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(indexWriterFile, true)));
       out.println("startree" + starTreeId + "." + column + ".start:" + start);
-      out.println("startree" + starTreeId + "." + column + ".end:" + end);
+      out.println("startree" + starTreeId + "." + column + ".size:" + end);
       out.close();
 
+      FileUtils.deleteQuietly(readerFile);
     }
     catch(FileNotFoundException ex) {
       System.out.println("Unable to open file '" + indexWriterFile + "'");
     }
     catch(IOException ex) {
-      System.out.println("Error reading file '" + readerFile + "'");
-    }
-  }
-
-  private void readFromFile(File path) throws IOException {
-    String[] column = new String[10];
-
-    try {
-      String indexWriterFile = new File(path, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE).getPath();
-      File file = new File(indexWriterFile);
-      FileReader fileReader = new FileReader(file);
-      BufferedReader bufferedReader = new BufferedReader(fileReader);
-      StringBuffer stringBuffer = new StringBuffer();
-      String line;
-
-      int i = 0;
-      while ((line = bufferedReader.readLine()) != null) {
-        column[i] = line.toString();
-        i = i + 1;
-        System.out.println(line.toString());
-      }
-      fileReader.close();
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-
-    String columnWriterFile = new File(path, StarTreeV2Constant.STAR_TREE_V2_COlUMN_FILE).getPath();
-
-    for ( int i = 0; i < column.length; i += 2) {
-      String a = column[i];
-      String b = column[i+1];
-
-      String [] aparts = a.split(":");
-      String [] bparts = b.split(":");
-
-      long start = Integer.valueOf(aparts[1]);
-      long end = Integer.valueOf(bparts[1]);
-
-      byte[] magic = new byte[(int) end];
-      RandomAccessFile raf = new RandomAccessFile(columnWriterFile, "rw");
-      raf.seek(start);
-      raf.readFully(magic);
-      System.out.println(new String(magic));
-
-
+      System.out.println("Error reading file '" + readerFilePath + "'");
     }
   }
 }
