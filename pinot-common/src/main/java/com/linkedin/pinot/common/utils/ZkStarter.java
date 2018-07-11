@@ -139,13 +139,17 @@ public class ZkStarter {
   public synchronized static ZookeeperInstance startLocalZkServer(final int port, final String dataDirPath) {
     // Start the local ZK server
     try {
+      long startTime = System.currentTimeMillis();
       final PublicZooKeeperServerMain zookeeperServerMain = new PublicZooKeeperServerMain();
       final String[] args = new String[] { Integer.toString(port), dataDirPath };
       new Thread() {
         @Override
         public void run() {
           try {
+            long zookeeperStartTime = System.currentTimeMillis();
             zookeeperServerMain.initializeAndRun(args);
+            long zookeeperEndTime = System.currentTimeMillis();
+            System.out.println("Total run time for zookeeper is: " + (zookeeperEndTime - zookeeperStartTime) + ". dataDirPath: " + dataDirPath);
           } catch (QuorumPeerConfig.ConfigException e) {
             LOGGER.warn("Caught exception while starting ZK", e);
           } catch (IOException e) {
@@ -157,6 +161,8 @@ public class ZkStarter {
       // Wait until the ZK server is started
       ZkClient client = new ZkClient("localhost:" + port, 10000);
       client.waitUntilConnected(10L, TimeUnit.SECONDS);
+      long endTime = System.currentTimeMillis();
+      System.out.println("Initialized zk connection successfully! Duration: " + (endTime - startTime));
       client.close();
 
       return new ZookeeperInstance(zookeeperServerMain, dataDirPath);
@@ -180,6 +186,7 @@ public class ZkStarter {
   public synchronized static void stopLocalZkServer(final ZookeeperInstance instance, final boolean deleteDataDir) {
     if (instance._serverMain != null) {
       try {
+        long startTime = System.currentTimeMillis();
         // Shut down ZK
         instance._serverMain.shutdown();
         instance._serverMain = null;
@@ -188,6 +195,8 @@ public class ZkStarter {
         if (deleteDataDir) {
           org.apache.commons.io.FileUtils.deleteDirectory(new File(instance._dataDirPath));
         }
+        long endTime = System.currentTimeMillis();
+        System.out.println("Shut down zk connection successfully! Duration: " + (endTime - startTime));
       } catch (Exception e) {
         LOGGER.warn("Caught exception while stopping ZK server", e);
         throw new RuntimeException(e);
