@@ -1,13 +1,17 @@
 .metrics-table {
   &__column {
     vertical-align: middle !important; // override ember-models-table
+    &--checkbox {
+      width: 24px;
+    }
+
     &--small {
-      width: 100px;
+      width: 80px;
       text-align: right;
     }
 
     &--large {
-      width: 440px;
+      min-width: 450px;
     }
   }
 

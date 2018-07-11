@@ -29,7 +29,7 @@ export default Component.extend({
   metricsTableColumns: [
     {
       template: 'custom/table-checkbox',
-      className: 'metrics-table__column'
+      className: 'metrics-table__column  metrics-table__column--checkbox'
     }, {
       propertyName: 'label',
       title: 'Metric',
