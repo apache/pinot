@@ -38,8 +38,11 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
+import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
@@ -326,9 +329,59 @@ public class RootCauseMetricResource {
     logSlices(baseSlice, slices);
 
     Map<MetricSlice, DataFrame> data = fetchTimeSeries(slices);
-    DataFrame result = range.gather(baseSlice, data);
+    DataFrame rawResult = range.gather(baseSlice, data);
 
-    return makeTimeSeriesMap(result);
+    DataFrame imputedResult = this.imputeExpectedTimestamps(rawResult, baseSlice, timezone);
+
+    return makeTimeSeriesMap(imputedResult);
+  }
+
+  /**
+   * Generates expected timestamps for the underlying time series and merges them with the
+   * actual time series. This allows the front end to distinguish between un-expected and
+   * missing data.
+   *
+   * @param data time series dataframe
+   * @param slice metric slice
+   * @return time series dataframe with nulls for expected but missing data
+   */
+  private DataFrame imputeExpectedTimestamps(DataFrame data, MetricSlice slice, String timezone) {
+    if (data.size() <= 1) {
+      return data;
+    }
+
+    MetricConfigDTO metric = this.metricDAO.findById(slice.getMetricId());
+    if (metric == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve metric id %d", slice.getMetricId()));
+    }
+
+    DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
+    if (dataset == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for metric id %d", metric.getDataset(), slice.getMetricId()));
+    }
+
+    TimeGranularity granularity = dataset.bucketTimeGranularity();
+    if (!MetricSlice.NATIVE_GRANULARITY.equals(slice.getGranularity())
+        && slice.getGranularity().toMillis() >= granularity.toMillis()) {
+      granularity = slice.getGranularity();
+    }
+
+    DateTimeZone tz = DateTimeZone.forID(timezone);
+    long start = data.getLongs(COL_TIME).min().longValue();
+    long end = slice.getEnd();
+    Period stepSize = granularity.toPeriod();
+
+    DateTime current = new DateTime(start, tz);
+    List<Long> timestamps = new ArrayList<>();
+    while (current.getMillis() < end) {
+      timestamps.add(current.getMillis());
+      current = current.plus(stepSize);
+    }
+
+    LongSeries sExpected = LongSeries.buildFrom(ArrayUtils.toPrimitive(timestamps.toArray(new Long[timestamps.size()])));
+    DataFrame dfExpected = new DataFrame(COL_TIME, sExpected);
+
+    return data.joinOuter(dfExpected).sortedBy(COL_TIME);
   }
 
   /**
@@ -338,11 +391,9 @@ public class RootCauseMetricResource {
    * @return map of lists of double or long (keyed by series name)
    */
   private static Map<String, List<? extends Number>> makeTimeSeriesMap(DataFrame data) {
-    DataFrame trimmed = data.dropNull();
-
     Map<String, List<? extends Number>> output = new HashMap<>();
-    output.put(COL_TIME, trimmed.getLongs(COL_TIME).toList());
-    output.put(COL_VALUE, trimmed.getDoubles(COL_VALUE).toList());
+    output.put(COL_TIME, data.getLongs(COL_TIME).toList());
+    output.put(COL_VALUE, data.getDoubles(COL_VALUE).toList());
     return output;
   }
 
