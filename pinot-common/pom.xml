@@ -295,6 +295,7 @@
                   <goal>shade</goal>
                 </goals>
                 <configuration>
+                  <shadedArtifactAttached>true</shadedArtifactAttached>
                   <relocations>
                     <relocation>
                       <pattern>org.apache.http</pattern>

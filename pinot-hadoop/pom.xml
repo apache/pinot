@@ -49,6 +49,7 @@
                   <goal>shade</goal>
                 </goals>
                 <configuration>
+                  <shadedArtifactAttached>true</shadedArtifactAttached>
                   <transformers>
                     <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
                     <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
@@ -72,7 +73,18 @@
           <groupId>commons-lang</groupId>
           <artifactId>commons-lang</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>com.linkedin.pinot</groupId>
+          <artifactId>pinot-common</artifactId>
+        </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-common</artifactId>
+      <version>${project.version}</version>
+      <classifier>shaded</classifier>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -146,25 +158,6 @@
             </filters>
           </configuration>
         </plugin>
-      <plugin>
-        <artifactId>maven-assembly-plugin</artifactId>
-        <version>2.3</version>
-        <configuration>
-          <descriptorRefs>
-            <descriptorRef>jar-with-dependencies</descriptorRef>
-          </descriptorRefs>
-
-        </configuration>
-        <executions>
-          <execution>
-            <id>assemble-all</id>
-            <phase>package</phase>
-            <goals>
-              <goal>single</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
     </plugins>
   </build>
 </project>
