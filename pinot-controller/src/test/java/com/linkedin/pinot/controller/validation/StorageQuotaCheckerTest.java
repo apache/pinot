@@ -33,8 +33,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 public class StorageQuotaCheckerTest {
@@ -106,7 +105,10 @@ public class StorageQuotaCheckerTest {
     try (FileOutputStream ostr = new FileOutputStream(tempFile)) {
       ostr.write(data);
     }
-    setupTableSegmentSize(5800, 900);
+    setupTableSegmentSize(4800, 900);
+//    doReturn(_quotaConfig).when(_tableConfig.getQuotaConfig());
+//    doReturn(3000L).when(_quotaConfig.storageSizeBytes());
+//    doReturn("3K").when(_quotaConfig.getStorage());
     when(_tableConfig.getQuotaConfig()).thenReturn(_quotaConfig);
     when(_quotaConfig.storageSizeBytes()).thenReturn(3000L);
     when(_quotaConfig.getStorage()).thenReturn("3K");
