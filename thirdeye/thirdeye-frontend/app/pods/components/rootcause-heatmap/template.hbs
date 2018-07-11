@@ -11,7 +11,6 @@
     {{#unless hasBaseline}}
       <div class="rootcause-message rootcause-message__warning">No data for baseline range</div>
     {{/unless}}
-
   </div>
   <div class="col-xs-4 pull-right">
     <label class="te-label te-label--small" for="select-heatmap-mode">Color heatmap by: </label>
@@ -26,7 +25,9 @@
   </div>
 </div>
 
-{{heatmap-chart
-  cells=cells
-  onHeatmapClick=(action "onHeatmapClick")
-}}
+<div>
+  {{heatmap-chart
+    cells=cells
+    onHeatmapClick=(action "onHeatmapClick")
+  }}
+</div>

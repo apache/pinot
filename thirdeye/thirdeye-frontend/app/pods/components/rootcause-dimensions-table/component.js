@@ -1,4 +1,4 @@
-import { computed } from '@ember/object';
+import { computed, getProperties } from '@ember/object';
 import Component from '@ember/component';
 import {
   toCurrentUrn,
@@ -7,7 +7,8 @@ import {
   toColorDirection,
   makeSortable,
   appendFilters,
-  hasPrefix
+  hasPrefix,
+  isAdditive
 } from 'thirdeye-frontend/utils/rca-utils';
 import {
   humanizeChange,
@@ -107,6 +108,33 @@ export default Component.extend({
   //
 
   /**
+   * Tracks presence of breakdown values for base metric
+   * @type {boolean}
+   */
+  hasCurrent: computed('metricUrn', 'breakdowns', function () {
+    const { metricUrn, breakdowns } = getProperties(this, 'metricUrn', 'breakdowns');
+    return !_.isEmpty(breakdowns[toCurrentUrn(metricUrn)]);
+  }),
+
+  /**
+   * Tracks presence of breakdown baseline for base metric
+   * @type {boolean}
+   */
+  hasBaseline: computed('metricUrn', 'breakdowns', function () {
+    const { metricUrn, breakdowns } = getProperties(this, 'metricUrn', 'breakdowns');
+    return !_.isEmpty(breakdowns[toBaselineUrn(metricUrn)]);
+  }),
+
+  /**
+   * Tracks additive flag state of base metric
+   * @type {boolean}
+   */
+  isAdditive: computed('metricUrn', 'entities', function () {
+    const { metricUrn, entities } = getProperties(this, 'metricUrn', 'entities');
+    return isAdditive(metricUrn, entities);
+  }),
+
+  /**
    * Data for metrics table
    * @type Object[] - array of objects, each corresponding to a row in the table
    */
@@ -117,7 +145,7 @@ export default Component.extend({
     'metricUrn',
     function() {
       const { selectedUrns, entities, breakdowns, metricUrn } =
-        this.getProperties('selectedUrns', 'entities', 'breakdowns', 'metricUrn');
+        getProperties(this, 'selectedUrns', 'entities', 'breakdowns', 'metricUrn');
 
       const current = breakdowns[toCurrentUrn(metricUrn)];
       const baseline = breakdowns[toBaselineUrn(metricUrn)];
@@ -125,6 +153,8 @@ export default Component.extend({
       if (_.isEmpty(current) || _.isEmpty(baseline)) { return []; }
 
       const rows = [];
+
+      const inverse = isInverse(metricUrn, entities);
 
       const contribTransform = (v) => Math.round(v * 10000) / 100.0;
 
@@ -146,19 +176,15 @@ export default Component.extend({
           const changeContribution = curr / currTotal - base / baseTotal;
           const contributionToChange =  (curr - base) / baseTotal;
 
-          // TODO support inverse metric color
-
-          // TODO disable changeContribution and contributionToChange on non-additive metric
-
           rows.pushObject({
             urn,
             isSelected: selectedUrns.has(urn),
             label: `${value} (${name})`,
             current: humanizeFloat(curr),
             baseline: humanizeFloat(base),
-            change: this._makeRecord(change, humanizeChange),
-            changeContribution: this._makeRecord(changeContribution, contribTransform),
-            contributionToChange: this._makeRecord(contributionToChange, contribTransform),
+            change: this._makeRecord(change, inverse, humanizeChange),
+            changeContribution: this._makeRecord(changeContribution, inverse, contribTransform),
+            contributionToChange: this._makeRecord(contributionToChange, inverse, contribTransform),
             sortable_current: makeSortable(curr),
             sortable_baseline: makeSortable(base),
             sortable_change: makeSortable(change),
@@ -186,15 +212,16 @@ export default Component.extend({
   /**
    * Generates template records for change-related columns.
    *
-   * @param {float} change
-   * @param {function} transform
+   * @param {float} change change amount
+   * @param {boolena} inverse inverse metric flag
+   * @param {function} transform string transformation
    * @returns {object}
    * @private
    */
-  _makeRecord(change, transform) {
+  _makeRecord(change, inverse, transform) {
     return {
       change: transform(change),
-      direction: toColorDirection(change)
+      direction: toColorDirection(change * (inverse ? -1 : 1))
     };
   },
 
@@ -219,7 +246,7 @@ export default Component.extend({
     displayDataChanged (e) {
       if (_.isEmpty(e.selectedItems)) { return; }
 
-      const { selectedUrns, onSelection } = this.getProperties('selectedUrns', 'onSelection');
+      const { selectedUrns, onSelection } = getProperties(this, 'selectedUrns', 'onSelection');
 
       if (!onSelection) { return; }
 
