@@ -20,8 +20,17 @@ import java.util.List;
 
 
 public class StarTreeV2Metadata {
+  private int _docsCount;
   private List<String> _dimensionsSplitOrder;
   private List<String> _met2AggfuncPairs;
+
+  public void setDocsCount(int count) {
+    _docsCount = count;
+  }
+
+  public int getDocsCount() {
+    return _docsCount;
+  }
 
   public void setDimensionsSplitOrder(List<String> dimensionsSplitOrder) {
     _dimensionsSplitOrder = dimensionsSplitOrder;

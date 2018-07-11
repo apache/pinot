@@ -43,6 +43,7 @@ public class StarTreeV2Constant {
 
   // star tree meta data.
   public static class StarTreeMetadata {
+    public static final String STAR_TREE_DOCS_COUNT = "docs.count";
     public static final String STAR_TREE_SPLIT_ORDER = "split.order";
     public static final String STAR_TREE_MAT2FUNC_MAP = "met2func.map";
     public static final String STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS = "skip.star.node.creation.for.dimensions";

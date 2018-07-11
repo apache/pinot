@@ -16,8 +16,6 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.Set;
 import java.util.Map;
@@ -39,6 +37,8 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
 import com.linkedin.pinot.core.data.readers.PinotSegmentColumnReader;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
@@ -81,7 +81,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
   // Star Tree
   private int _starTreeCount = 0;
-  private String _starTree = null;
+  private String _starTreeId = null;
   private StarTreeV2Config _config;
   private List<Record> _starTreeData = new ArrayList<>();
   private List<Record> _rawStarTreeData = new ArrayList<>();
@@ -139,7 +139,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
     // other initialisation
     this._config = config;
-    _starTree = StarTreeV2Constant.STAR_TREE + '_' + Integer.toString(_starTreeCount);
+    _starTreeId = StarTreeV2Constant.STAR_TREE + '_' + Integer.toString(_starTreeCount);
     _outDir = config.getOutDir();
     _maxNumLeafRecords = config.getMaxNumLeafRecords();
     _rootNode = new TreeNode();
@@ -229,7 +229,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   @Override
   public void serialize() throws Exception {
     createIndexes();
-    serializeTree(new File(_outDir, _starTree));
+    serializeTree(new File(_outDir, _starTreeId));
 
     return;
   }
@@ -238,10 +238,13 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   public Map<String, String> getMetaData() {
     Map<String, String>metadata = new HashMap<>();
 
-    String startTreeSplitOrder = _starTree + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SPLIT_ORDER;
+    String starTreeDocsCount = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_DOCS_COUNT;
+    metadata.put(starTreeDocsCount, Integer.toString(_starTreeData.size()));
+
+    String startTreeSplitOrder = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SPLIT_ORDER;
     metadata.put(startTreeSplitOrder, _dimensionSplitOrderString);
 
-    String startTreeMet2aggfuncPairs = _starTree + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAT2FUNC_MAP;
+    String startTreeMet2aggfuncPairs = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAT2FUNC_MAP;
     metadata.put(startTreeMet2aggfuncPairs, _met2aggfuncPairsString + "count");
 
     return metadata;

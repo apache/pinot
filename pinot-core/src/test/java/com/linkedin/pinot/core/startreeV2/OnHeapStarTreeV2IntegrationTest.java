@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.ArrayList;
 import com.google.common.io.Files;
 import org.testng.annotations.Test;
-import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeTest;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
@@ -31,15 +31,16 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 
 
-public class OnHeapStarTreeV2BuilderIntegrationTest {
+public class OnHeapStarTreeV2IntegrationTest {
 
+  private File _filepath;
   private static File _indexDir;
   private List<GenericRow> _rows;
   private String _segmentOutputDir;
   private RecordReader _recordReader;
   private static List<StarTreeV2Config> _starTreeV2ConfigList = new ArrayList<>();
 
-  @BeforeClass
+  @BeforeTest
   void setUp() throws Exception {
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
@@ -48,7 +49,7 @@ public class OnHeapStarTreeV2BuilderIntegrationTest {
     _rows = StarTreeV2SegmentHelper.createSegmentData(schema);
     _recordReader = new GenericRowRecordReader(_rows, schema);
     _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, _segmentOutputDir, _recordReader);
-    File filepath = new File(_indexDir, "v3");
+    _filepath = new File(_indexDir, "v3");
 
     List<Met2AggfuncPair> metric2aggFuncPairs1 = new ArrayList<>();
     List<Met2AggfuncPair> metric2aggFuncPairs2 = new ArrayList<>();
@@ -63,14 +64,14 @@ public class OnHeapStarTreeV2BuilderIntegrationTest {
     metric2aggFuncPairs2.add(pair1);
 
     StarTreeV2Config _starTreeV2Config1 = new StarTreeV2Config();
-    _starTreeV2Config1.setOutDir(filepath);
+    _starTreeV2Config1.setOutDir(_filepath);
     _starTreeV2Config1.setMaxNumLeafRecords(1);
     _starTreeV2Config1.setDimensions(schema.getDimensionNames());
     _starTreeV2Config1.setMetric2aggFuncPairs(metric2aggFuncPairs1);
     _starTreeV2ConfigList.add(_starTreeV2Config1);
 
     StarTreeV2Config _starTreeV2Config2 = new StarTreeV2Config();
-    _starTreeV2Config2.setOutDir(filepath);
+    _starTreeV2Config2.setOutDir(_filepath);
     _starTreeV2Config2.setMaxNumLeafRecords(1);
     _starTreeV2Config2.setDimensions(schema.getDimensionNames());
     _starTreeV2Config2.setMetric2aggFuncPairs(metric2aggFuncPairs2);
@@ -80,31 +81,32 @@ public class OnHeapStarTreeV2BuilderIntegrationTest {
   }
 
   @Test
-  public void testBuild() throws Exception {
-    OnHeapStarTreeV2Builder onTest = new OnHeapStarTreeV2Builder();
+  public void testBuildAndLoad() throws Exception {
+    OnHeapStarTreeV2Builder buildTest = new OnHeapStarTreeV2Builder();
+    OnHeapStarTreeV2Loader loadTest = new OnHeapStarTreeV2Loader();
     try {
 
       File metadataFile = new File(new File(_indexDir, "v3"), V1Constants.MetadataKeys.METADATA_FILE_NAME);
       PropertiesConfiguration properties = new PropertiesConfiguration(metadataFile);
-      properties.setProperty(V1Constants.MetadataKeys.StarTree.STAR_TREE_ENABLED, true);
-      properties.save();
 
       for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
-        onTest.init(_indexDir, _starTreeV2ConfigList.get(i));
-        onTest.build();
-        onTest.serialize();
-        Map<String, String> metadata = onTest.getMetaData();
+        buildTest.init(_indexDir, _starTreeV2ConfigList.get(i));
+        buildTest.build();
+        buildTest.serialize();
+        Map<String, String> metadata = buildTest.getMetaData();
         for (String key : metadata.keySet()) {
           String value = metadata.get(key);
           properties.setProperty(key, value);
         }
         properties.setProperty(StarTreeV2Constant.STAR_TREE_V2_COUNT, i+1);
-        properties.setProperty(StarTreeV2Constant.STAR_TREE_V2_ENABLED, true);
-
         properties.save();
 
-        onTest.convertFromV1toV3(i);
+        buildTest.convertFromV1toV3(i);
       }
+
+      loadTest.init(_filepath);
+      loadTest.load();
+      StarTreeV2DataSource source = loadTest.returnDataSource(0);
     } catch (Exception e) {
       e.printStackTrace();
     }
