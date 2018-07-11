@@ -91,6 +91,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private final Map<String, String> _hllDerivedColumnMap = new HashMap<>();
   private int _totalDocs;
   private int _totalRawDocs;
+  private int _starTreesCount;
   private long _segmentStartTime;
   private long _segmentEndTime;
 
@@ -291,9 +292,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     if (_hasStarTree) {
       initStarTreeMetadata();
     }
-    _hasStarTreeV2 = _segmentMetadataPropertiesConfiguration.getBoolean(StarTreeV2Constant.STAR_TREE_V2_ENABLED, false);
-    if (_hasStarTreeV2) {
-      initStarTreeV2Metadata();
+
+    // Build star tree v2 metadata.
+    String starTreeCount = _segmentMetadataPropertiesConfiguration.getString(StarTreeV2Constant.STAR_TREE_V2_COUNT);
+    _starTreesCount = starTreeCount != null ? Integer.parseInt(starTreeCount) : 0;
+
+    if (_starTreesCount > 0) {
+      initStarTreeV2Metadata(_starTreesCount);
     }
   }
 
@@ -353,38 +358,40 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   /**
    * Reads and initializes the star tree v2 metadata from segment metadata properties.
    */
-  private void initStarTreeV2Metadata() {
+  private void initStarTreeV2Metadata(int starTreesCount) {
 
-    String starTreeCount = _segmentMetadataPropertiesConfiguration.getString(StarTreeV2Constant.STAR_TREE_V2_COUNT);
-    int starTreesCount = Integer.parseInt(starTreeCount);
+    _starTreeV2MetadataList = new ArrayList<>();
+    for ( int i = 0; i < starTreesCount;  i++ ) {
+      StarTreeV2Metadata metadata = new StarTreeV2Metadata();
 
-    if (starTreesCount > 0) {
-      _starTreeV2MetadataList = new ArrayList<>();
-      for ( int i = 0; i < starTreesCount;  i++ ) {
-        StarTreeV2Metadata metadata = new StarTreeV2Metadata();
-
-
-        String met2agg = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAT2FUNC_MAP;
-        Iterator<String> iterator = _segmentMetadataPropertiesConfiguration.getList(met2agg).iterator();
-        List<String> met2AggfuncPairs = new ArrayList<>();
-        while (iterator.hasNext()) {
-          final String pair = iterator.next();
-          met2AggfuncPairs.add(pair);
-        }
-        metadata.setMet2AggfuncPairs(met2AggfuncPairs);
-
-
-        String splitOrder = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SPLIT_ORDER;
-        iterator = _segmentMetadataPropertiesConfiguration.getList(splitOrder).iterator();
-        List<String> dimensionsSplitOrder = new ArrayList<>();
-        while (iterator.hasNext()) {
-          final String splitColumn = iterator.next();
-          dimensionsSplitOrder.add(splitColumn);
-        }
-        metadata.setDimensionsSplitOrder(dimensionsSplitOrder);
-
-        _starTreeV2MetadataList.add(metadata);
+      // met2agg func pairs
+      String met2agg = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAT2FUNC_MAP;
+      Iterator<String> iterator = _segmentMetadataPropertiesConfiguration.getList(met2agg).iterator();
+      List<String> met2AggfuncPairs = new ArrayList<>();
+      while (iterator.hasNext()) {
+        final String pair = iterator.next();
+        met2AggfuncPairs.add(pair);
       }
+      metadata.setMet2AggfuncPairs(met2AggfuncPairs);
+
+      // dimension split order
+      String splitOrder = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SPLIT_ORDER;
+      iterator = _segmentMetadataPropertiesConfiguration.getList(splitOrder).iterator();
+      List<String> dimensionsSplitOrder = new ArrayList<>();
+      while (iterator.hasNext()) {
+        final String splitColumn = iterator.next();
+        dimensionsSplitOrder.add(splitColumn);
+      }
+      metadata.setDimensionsSplitOrder(dimensionsSplitOrder);
+
+      // number of aggregated docs.
+      String aggregatedDocsCount = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_DOCS_COUNT;
+      String docsCount = _segmentMetadataPropertiesConfiguration.getString(aggregatedDocsCount);
+      if (docsCount != null) {
+        metadata.setDocsCount(Integer.parseInt(docsCount));
+      }
+
+      _starTreeV2MetadataList.add(metadata);
     }
 
     return;
@@ -550,6 +557,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public List<StarTreeV2Metadata> getStarTreeV2Metadata() {
     return _starTreeV2MetadataList;
+  }
+
+  @Override
+  public int getStarTreeV2Count() {
+    return _starTreesCount;
   }
 
   @Override

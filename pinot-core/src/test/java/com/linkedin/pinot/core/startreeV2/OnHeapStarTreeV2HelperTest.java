@@ -23,7 +23,7 @@ import java.util.ArrayList;
 import org.testng.annotations.Test;
 
 
-public class OnHeapStarTreeV2BuilderHelperTest {
+public class OnHeapStarTreeV2HelperTest {
 
   public List<Record> createData() {
     List<Record> data = new ArrayList<>();

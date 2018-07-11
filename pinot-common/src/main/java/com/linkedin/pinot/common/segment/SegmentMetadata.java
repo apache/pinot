@@ -78,6 +78,8 @@ public interface SegmentMetadata {
 
   List<StarTreeV2Metadata> getStarTreeV2Metadata();
 
+  int getStarTreeV2Count();
+
   String getForwardIndexFileName(String column);
 
   String getDictionaryFileName(String column);
