@@ -16,6 +16,8 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 import java.io.File;
 import java.util.Map;
 import java.util.List;
@@ -107,6 +109,25 @@ public class OnHeapStarTreeV2IntegrationTest {
       loadTest.init(_filepath);
       loadTest.load();
       StarTreeV2DataSource source = loadTest.returnDataSource(0);
+
+      Map<String, FixedBitSingleValueReader> _dimensionIndexReader = source.getDimensionForwardIndexReader();
+      for ( String s: _dimensionIndexReader.keySet()) {
+        System.out.println(s);
+        FixedBitSingleValueReader index = _dimensionIndexReader.get(s);
+        for ( int i = 0; i < 21; i++) {
+         System.out.println(index.getInt(i));
+        }
+      }
+
+      Map<String, FixedByteChunkSingleValueReader> _metricRawIndexreader = source.getMetricRawIndexReader();
+      for ( String s: _metricRawIndexreader.keySet()) {
+        System.out.println(s);
+        FixedByteChunkSingleValueReader index = _metricRawIndexreader.get(s);
+        for ( int i = 0; i < 21; i++) {
+          System.out.println(index.getDouble(i));
+        }
+      }
+
     } catch (Exception e) {
       e.printStackTrace();
     }
