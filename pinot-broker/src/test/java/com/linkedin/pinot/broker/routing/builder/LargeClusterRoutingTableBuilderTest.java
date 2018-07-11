@@ -26,7 +26,6 @@ import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
-import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -42,10 +41,6 @@ public class LargeClusterRoutingTableBuilderTest {
   private interface RoutingTableValidator {
     boolean isRoutingTableValid(Map<String, List<String>> routingTable, ExternalView externalView,
         List<InstanceConfig> instanceConfigs);
-  }
-
-  @BeforeSuite
-  public void setUp() {
   }
 
   @Test
