@@ -82,11 +82,11 @@ public class StarTreeV2DataSource {
     return;
   }
 
-  public FixedBitSingleValueReader getDimensionForwardIndexReader(String key) {
-    return _dimensionIndexReader.get(key);
+  public Map<String, FixedBitSingleValueReader> getDimensionForwardIndexReader() {
+    return _dimensionIndexReader;
   }
 
-  public FixedByteChunkSingleValueReader getMetricRawIndexReader(String key) {
-    return _metricRawIndexReader.get(key);
+  public Map<String, FixedByteChunkSingleValueReader> getMetricRawIndexReader() {
+    return _metricRawIndexReader;
   }
 }
