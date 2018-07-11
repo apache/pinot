@@ -20,6 +20,9 @@ public class JobConfigConstants {
   public static final String PATH_TO_INPUT = "path.to.input";
   public static final String PATH_TO_OUTPUT = "path.to.output";
 
+  // Leave this for backward compatibility. We prefer to use the schema fetched from the controller.
+  public static final String PATH_TO_SCHEMA = "path.to.schema";
+
   public static final String TARGZ = ".tar.gz";
 
   public static final String TIME_COLUMN_NAME = "table.time.column.name";
@@ -30,5 +33,4 @@ public class JobConfigConstants {
 
   public static final String PUSH_TO_HOSTS = "push.to.hosts";
   public static final String PUSH_TO_PORT = "push.to.port";
-
 }

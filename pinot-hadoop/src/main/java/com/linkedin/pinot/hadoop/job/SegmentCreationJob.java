@@ -16,6 +16,7 @@
 package com.linkedin.pinot.hadoop.job;
 
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.hadoop.job.mapper.HadoopSegmentCreationMapReduceJob;
@@ -44,12 +45,10 @@ import org.slf4j.LoggerFactory;
 
 
 public class SegmentCreationJob extends Configured {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCreationJob.class);
 
   private static final String PATH_TO_DEPS_JAR = "path.to.deps.jar";
   private static final String TEMP = "temp";
-  private static final String PATH_TO_SCHEMA = "path.to.schema";
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCreationJob.class);
 
   private final String _jobName;
   private final Properties _properties;
@@ -71,7 +70,7 @@ public class SegmentCreationJob extends Configured {
     _properties = properties;
 
     _inputSegmentDir = _properties.getProperty(JobConfigConstants.PATH_TO_INPUT);
-    String schemaFilePath = _properties.getProperty(PATH_TO_SCHEMA);
+    String schemaFilePath = _properties.getProperty(JobConfigConstants.PATH_TO_SCHEMA);
     _outputDir = getOutputDir();
     _stagingDir = new File(_outputDir, TEMP).getAbsolutePath();
     _depsJarPath = _properties.getProperty(PATH_TO_DEPS_JAR, null);
@@ -146,8 +145,9 @@ public class SegmentCreationJob extends Configured {
     for (int seqId = 0; seqId < inputDataFiles.size(); ++seqId) {
       FileStatus file = inputDataFiles.get(seqId);
       String completeFilePath = " " + file.getPath().toString() + " " + seqId;
-      Path newOutPutFile = new Path((_stagingDir + "/input/" +
-          file.getPath().toString().replace('.', '_').replace('/', '_').replace(':', '_') + ".txt"));
+      Path newOutPutFile = new Path(
+          (_stagingDir + "/input/" + file.getPath().toString().replace('.', '_').replace('/', '_').replace(':', '_')
+              + ".txt"));
       FSDataOutputStream stream = fs.create(newOutPutFile);
       stream.writeUTF(completeFilePath);
       stream.flush();
@@ -206,34 +206,55 @@ public class SegmentCreationJob extends Configured {
   }
 
   protected void setAdditionalJobProperties(Job job) throws Exception {
+    // Check host and port information before set table config dependent properties
     if (_hosts == null || _port == 0) {
-      LOGGER.warn("Unable to set TableConfig-dependent properties. Please set host {} and port {}", JobConfigConstants.PUSH_TO_HOSTS, JobConfigConstants.PUSH_TO_PORT);
+      LOGGER.warn("Unable to set TableConfig-dependent properties. Please set host {} ({}) and port {} ({})",
+          JobConfigConstants.PUSH_TO_HOSTS, _port, JobConfigConstants.PUSH_TO_PORT, _port);
       return;
     }
 
+    // Add push locations
     List<PushLocation> pushLocations = new ArrayList<>();
-
     for (String host : _hosts) {
-      pushLocations.add(new PushLocation.PushLocationBuilder()
-          .setHost(host)
-          .setPort(_port)
-          .build());
+      pushLocations.add(new PushLocation.PushLocationBuilder().setHost(host).setPort(_port).build());
     }
 
     ControllerRestApi controllerRestApiObject = new ControllerRestApi(pushLocations, _tableName);
 
+    // Fetch table config from controller API
     TableConfig tableConfig = controllerRestApiObject.getTableConfig();
-    job.getConfiguration()
-        .set(JobConfigConstants.TABLE_PUSH_TYPE, tableConfig.getValidationConfig().getSegmentPushType());
-    if (tableConfig.getValidationConfig().getSegmentPushType().equalsIgnoreCase(TableConfigConstants.APPEND)) {
-      LOGGER.info("For append use cases, {} and {} must be set", JobConfigConstants.TIME_COLUMN_NAME, JobConfigConstants.TIME_COLUMN_TYPE);
-      job.getConfiguration()
-          .set(JobConfigConstants.TIME_COLUMN_NAME, tableConfig.getValidationConfig().getTimeColumnName());
-      job.getConfiguration().set(JobConfigConstants.TIME_COLUMN_TYPE, tableConfig.getValidationConfig().getTimeType());
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    if (validationConfig == null) {
+      throw new RuntimeException(
+          "Segment validation config should not be null. Please configure them correctly in the table config");
+    }
+
+    // Check if pushType is set correctly
+    String segmentPushType = validationConfig.getSegmentPushType();
+    if (segmentPushType == null) {
+      throw new RuntimeException("Segment push type is null. Please configure the value correctly in the table config. "
+          + "We support APPEND or REFRESH for push types.");
+    }
+
+    // Update table push type
+    job.getConfiguration().set(JobConfigConstants.TABLE_PUSH_TYPE, segmentPushType);
+
+    if (segmentPushType.equalsIgnoreCase(TableConfigConstants.APPEND)) {
+      // For append use cases, timeColumnName and timeType must be set
+      String timeColumnName = validationConfig.getTimeColumnName();
+      String timeColumnType = validationConfig.getTimeType();
+      if (timeColumnName == null || timeColumnType == null) {
+        throw new RuntimeException("Time column or time column type is null. Both are required for APPEND use case. "
+            + "Please configure them correctly in the table config.");
+      }
+      LOGGER.info("Time column: {}, time column type: {}", timeColumnName, timeColumnType);
+      job.getConfiguration().set(JobConfigConstants.TIME_COLUMN_NAME, timeColumnName);
+      job.getConfiguration().set(JobConfigConstants.TIME_COLUMN_TYPE, timeColumnType);
     } else {
       LOGGER.info("Refresh use case. Not setting timeColumnName and timeColumnType for table: " + _tableName);
     }
 
+    // Fetch schema from controller API and set it to the job configuration
     String schema = controllerRestApiObject.getSchema();
     LOGGER.info("Setting schema for tableName {} to {}", _tableName, schema);
     job.getConfiguration().set(JobConfigConstants.SCHEMA, schema);
@@ -250,7 +271,6 @@ public class SegmentCreationJob extends Configured {
   protected Job setMapperClass(Job job) {
     job.setMapperClass(HadoopSegmentCreationMapReduceJob.HadoopSegmentCreationMapper.class);
     return job;
-
   }
 
   private void addDepsJarToDistributedCache(Path path, Job job) throws IOException {
@@ -295,5 +315,4 @@ public class SegmentCreationJob extends Configured {
     }
     return dataFileStatusList;
   }
-
 }
