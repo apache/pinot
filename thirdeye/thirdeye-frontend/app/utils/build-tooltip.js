@@ -67,11 +67,11 @@ const getValues = (hoverUrns, hoverTimestamp, lookup, entities) => {
     // find first smaller or equal element
     const currentLookup = (lookup[toCurrentUrn(urn)] || []).reverse();
     const currentTimeseries = currentLookup.find(t => t[0] <= hoverTimestamp);
-    const current = currentTimeseries ? currentTimeseries[1] ? currentTimeseries[1] : Number.NaN : Number.NaN;
+    const current = currentTimeseries && currentTimeseries[1] ? currentTimeseries[1] : Number.NaN;
 
     const baselineLookup = (lookup[toBaselineUrn(urn)] || []).reverse();
     const baselineTimeseries = baselineLookup.find(t => t[0] <= hoverTimestamp);
-    const baseline = baselineTimeseries ? baselineTimeseries[1] ? baselineTimeseries[1] : Number.NaN : Number.NaN;
+    const baseline = baselineTimeseries && baselineTimeseries[1] ? baselineTimeseries[1] : Number.NaN;
 
     const change = current / baseline - 1;
 
