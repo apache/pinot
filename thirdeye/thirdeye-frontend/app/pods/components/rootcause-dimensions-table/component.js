@@ -14,6 +14,7 @@ import {
   humanizeChange,
   humanizeFloat
 } from 'thirdeye-frontend/utils/utils';
+import DIMENSIONS_TABLE_COLUMNS from 'thirdeye-frontend/shared/dimensionsTableColumns';
 import _ from 'lodash';
 
 const ROOTCAUSE_TRUNCATION_FRACTION = 0.0001;
@@ -23,51 +24,9 @@ export default Component.extend({
 
   /**
    * Columns for dimensions table
-   * @type Object[]
+   * @type {Array}
    */
-  dimensionsTableColumns: [
-    {
-      template: 'custom/table-checkbox',
-      className: 'metrics-table__column metrics-table__column--checkbox'
-    }, {
-      propertyName: 'label',
-      title: 'Dimension',
-      className: 'metrics-table__column metrics-table__column--large'
-    }, {
-      propertyName: 'current',
-      sortedBy: 'sortable_current',
-      title: 'current',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      propertyName: 'baseline',
-      sortedBy: 'sortable_baseline',
-      title: 'baseline',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      template: 'custom/dimensions-table-change',
-      propertyName: 'change',
-      sortedBy: 'sortable_change',
-      title: 'Percentage Change',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      template: 'custom/dimensions-table-change',
-      propertyName: 'changeContribution',
-      sortedBy: 'sortable_changeContribution',
-      title: 'Change in Contribution',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      template: 'custom/dimensions-table-change',
-      propertyName: 'contributionToChange',
-      sortedBy: 'sortable_contributionToChange',
-      title: 'Contribution to Change',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }
-  ],
+  dimensionsTableColumns: DIMENSIONS_TABLE_COLUMNS,
 
   //
   // external properties
@@ -136,7 +95,7 @@ export default Component.extend({
 
   /**
    * Data for metrics table
-   * @type Object[] - array of objects, each corresponding to a row in the table
+   * @type {Array}
    */
   dimensionsTableData: computed(
     'selectedUrns',
@@ -199,6 +158,18 @@ export default Component.extend({
   ),
 
   /**
+   * Keeps track of items that are selected in the table
+   * @type {Array}
+   */
+  preselectedItems: computed(
+    'metricsTableData',
+    'selectedUrns',
+    function () {
+      return []; // FIXME: this is broken across all of RCA and works by accident only
+    }
+  ),
+
+  /**
    * Sums all values for a given dimension name
    *
    * @param breakdown dimension contribution breakdown
@@ -213,7 +184,7 @@ export default Component.extend({
    * Generates template records for change-related columns.
    *
    * @param {float} change change amount
-   * @param {boolena} inverse inverse metric flag
+   * @param {boolean} inverse inverse metric flag
    * @param {function} transform string transformation
    * @returns {object}
    * @private
@@ -224,18 +195,6 @@ export default Component.extend({
       direction: toColorDirection(change * (inverse ? -1 : 1))
     };
   },
-
-  /**
-   * Keeps track of items that are selected in the table
-   * @type {Array}
-   */
-  preselectedItems: computed(
-    'metricsTableData',
-    'selectedUrns',
-    function () {
-      return []; // FIXME: this is broken across all of RCA and works by accident only
-    }
-  ),
 
   actions: {
     /**

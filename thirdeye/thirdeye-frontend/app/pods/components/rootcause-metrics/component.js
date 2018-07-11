@@ -16,6 +16,7 @@ import {
   humanizeFloat,
   humanizeScore
 } from 'thirdeye-frontend/utils/utils';
+import METRICS_TABLE_COLUMNS from 'thirdeye-frontend/shared/metricsTableColumns';
 import _ from 'lodash';
 
 export default Component.extend({
@@ -26,71 +27,7 @@ export default Component.extend({
    * @type Object[]
    */
   // TODO move this to shared
-  metricsTableColumns: [
-    {
-      template: 'custom/table-checkbox',
-      className: 'metrics-table__column  metrics-table__column--checkbox'
-    }, {
-      propertyName: 'label',
-      title: 'Metric',
-      className: 'metrics-table__column metrics-table__column--large'
-    }, {
-      propertyName: 'current',
-      template: 'custom/metrics-table-current',
-      sortedBy: 'sortable_current',
-      title: 'current',
-      disableFiltering: true,
-      disableSorting: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      propertyName: 'baseline',
-      template: 'custom/metrics-table-offset',
-      sortedBy: 'sortable_baseline',
-      title: 'baseline',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      propertyName: 'wo1w',
-      template: 'custom/metrics-table-offset',
-      sortedBy: 'sortable_wo1w',
-      title: 'WoW',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      propertyName: 'wo2w',
-      template: 'custom/metrics-table-offset',
-      sortedBy: 'sortable_wo2w',
-      title: 'Wo2W',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      propertyName: 'wo3w',
-      template: 'custom/metrics-table-offset',
-      sortedBy: 'sortable_wo3w',
-      title: 'Wo3W',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      propertyName: 'wo4w',
-      template: 'custom/metrics-table-offset',
-      sortedBy: 'sortable_wo4w',
-      title: 'Wo4W',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      propertyName: 'score',
-      title: 'Outlier',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      template: 'custom/rca-metric-links',
-      propertyName: 'links',
-      title: 'Links',
-      disableFiltering: true,
-      disableSorting: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }
-  ],
+  metricsTableColumns: METRICS_TABLE_COLUMNS,
 
   //
   // external properties
