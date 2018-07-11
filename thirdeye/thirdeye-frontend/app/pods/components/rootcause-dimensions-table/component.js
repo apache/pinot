@@ -122,20 +122,20 @@ export default Component.extend({
       const current = breakdowns[toCurrentUrn(metricUrn)];
       const baseline = breakdowns[toBaselineUrn(metricUrn)];
 
-      if (_.isEmpty(current) || _.isEmpty(baseline)) { return {}; }
+      if (_.isEmpty(current) || _.isEmpty(baseline)) { return []; }
 
       const rows = [];
 
       const contribTransform = (v) => Math.round(v * 10000) / 100.0;
 
-      Object.keys(current).map(name => {
+      Object.keys(current).forEach(name => {
         const currTotal = this._sum(current, name);
         const baseTotal = this._sum(baseline, name);
 
-        Object.keys(current[name]).map(value => {
+        Object.keys(current[name]).forEach(value => {
           const urn = appendFilters(metricUrn, [[name, value]]);
-          const curr = current[name][value] || 0;
-          const base = baseline[name][value] || 0;
+          const curr = (current[name] || {})[value] || 0;
+          const base = (baseline[name] || {})[value] || 0;
 
           if (curr === 0 && base === 0) { return; }
 
@@ -180,7 +180,7 @@ export default Component.extend({
    * @returns {float}
    */
   _sum(breakdown, name) {
-    return Object.values(breakdown[name]).reduce((sum, v) => sum + v, 0);
+    return Object.values((breakdown || {})[name] || {}).reduce((sum, v) => sum + v || 0, 0.0);
   },
 
   /**
