@@ -28,6 +28,5 @@ class TreeNode {
   int _dimensionValue = -1;
   int _childDimensionId = -1;
   int _aggDataDocumentId = -1;
-  boolean _isStarNode = false;
   Map<Integer, TreeNode> _children = null;
 }

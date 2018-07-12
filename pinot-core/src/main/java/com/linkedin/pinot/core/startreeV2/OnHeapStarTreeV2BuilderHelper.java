@@ -156,8 +156,10 @@ public class OnHeapStarTreeV2BuilderHelper {
 
       if (!RecordUtil.compareDimensions(prevDimensions, nextDimensions)) {
         List<Object> aggregatedMetricsValue = aggregateMetrics(start, i, starTreeData, met2aggfuncPairs, dataSource);
-        prevRecord.setMetricValues(aggregatedMetricsValue);
-        newData.add(prevRecord);
+        Record newRecord = new Record();
+        newRecord.setMetricValues(aggregatedMetricsValue);
+        newRecord.setDimensionValues(prevRecord.getDimensionValues());
+        newData.add(newRecord);
         prevRecord = nextRecord;
         start = i;
       }

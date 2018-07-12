@@ -114,7 +114,7 @@ public class OnHeapStarTreeV2IntegrationTest {
       for ( String s: _dimensionIndexReader.keySet()) {
         System.out.println(s);
         FixedBitSingleValueReader index = _dimensionIndexReader.get(s);
-        for ( int i = 0; i < 21; i++) {
+        for ( int i = 0; i < 24; i++) {
          System.out.println(index.getInt(i));
         }
       }
@@ -124,11 +124,11 @@ public class OnHeapStarTreeV2IntegrationTest {
         System.out.println(s);
         FixedByteChunkSingleValueReader index = _metricRawIndexreader.get(s);
         if (s.equals("count")) {
-          for ( int i = 0; i < 21; i++) {
+          for ( int i = 0; i < 24; i++) {
             System.out.println(index.getInt(i));
           }
         } else {
-          for ( int i = 0; i < 21; i++) {
+          for ( int i = 0; i < 24; i++) {
             System.out.println(index.getDouble(i));
           }
         }
