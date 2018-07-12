@@ -106,9 +106,6 @@ public class StorageQuotaCheckerTest {
       ostr.write(data);
     }
     setupTableSegmentSize(4800, 900);
-//    doReturn(_quotaConfig).when(_tableConfig.getQuotaConfig());
-//    doReturn(3000L).when(_quotaConfig.storageSizeBytes());
-//    doReturn("3K").when(_quotaConfig.getStorage());
     when(_tableConfig.getQuotaConfig()).thenReturn(_quotaConfig);
     when(_quotaConfig.storageSizeBytes()).thenReturn(3000L);
     when(_quotaConfig.getStorage()).thenReturn("3K");
