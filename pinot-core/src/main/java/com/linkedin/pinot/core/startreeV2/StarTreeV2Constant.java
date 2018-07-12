@@ -21,8 +21,9 @@ public class StarTreeV2Constant {
 
   // final strings
   public static final int STAR_NODE = -1;
-  public static final int SKIP_VALUE = 0;
+  public static final int SKIP_VALUE = -1;
   public static final int INVALID_INDEX = -1;
+  public static final int VALID_INDEX_VALUE = 0;
   public static final String STAR_TREE = "startree";
   public static final String STAR_TREE_V2_COUNT = "startreeV2.count";
   public static final String STAR_TREE_V2_COlUMN_FILE = "startreev2.column.psf";
