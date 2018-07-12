@@ -123,18 +123,26 @@ public class StorageQuotaChecker {
         tableSubtypeSize.estimatedSizeInBytes - existingSegmentSizeBytes + (incomingSegmentSizeBytes * numReplicas);
     if (estimatedFinalSizeBytes <= allowedStorageBytes) {
       String message = String.format(
-          "Estimated size: %d bytes ( = current usage among all replicas: %d bytes - (existing segment sizes among all replicas: %d bytes) + (incoming compressed segment size: %d bytes * number of replicas: %d)) is within the total configured quota of %d bytes ( = configured quota: %d bytes * number of replicas: %d ) for table %s.",
+          "Newly estimated size: %d bytes ( = existing estimated uncompressed size of all replicas: %d bytes - (existing segment sizes of all replicas: %d bytes) + (incoming compressed segment size: %d bytes * number replicas: %d)) is within total allowed storage size: %d bytes ( = configured quota: %d bytes * number replicas: %d) for table %s.",
           estimatedFinalSizeBytes, tableSubtypeSize.estimatedSizeInBytes, existingSegmentSizeBytes,
           incomingSegmentSizeBytes, numReplicas, allowedStorageBytes, quotaConfig.storageSizeBytes(), numReplicas,
           tableName);
       LOGGER.info(message);
       return new QuotaCheckerResponse(true, message);
     } else {
-      String message = String.format(
-          "Estimated size: %d bytes ( = current usage among all replicas: %d bytes - (existing segment sizes among all replicas: %d bytes) + (incoming compressed segment size: %d bytes * number of replicas: %d)) exceeds the total configured quota of %d bytes ( = configured quota: %d bytes * number of replicas: %d ) for table %s.",
-          estimatedFinalSizeBytes, tableSubtypeSize.estimatedSizeInBytes, existingSegmentSizeBytes,
-          incomingSegmentSizeBytes, numReplicas, allowedStorageBytes, quotaConfig.storageSizeBytes(), numReplicas,
-          tableName);
+      String message;
+      if (tableSubtypeSize.estimatedSizeInBytes > allowedStorageBytes) {
+        message = String.format(
+            "Table %s already over quota. Existing estimated uncompressed size of all replicas: %d bytes > total allowed storage size: %d bytes ( = configured quota: %d bytes * num replicas: %d). Check if indexes were enabled recently and adjust table quota accordingly.",
+            tableName, tableSubtypeSize.estimatedSizeInBytes, allowedStorageBytes, quotaConfig.storageSizeBytes(),
+            numReplicas);
+      } else {
+        message = String.format(
+            "Storage quota exceeded. Newly estimated size: %d bytes ( = existing estimated uncompressed size of all replicas: %d bytes - (existing segment sizes of all replicas: %d bytes) + (incoming compressed segment size: %d bytes * number replicas: %d)) > total allowed storage size: %d bytes ( = configured quota: %d bytes * number replicas: %d) for table %s.",
+            estimatedFinalSizeBytes, tableSubtypeSize.estimatedSizeInBytes, existingSegmentSizeBytes,
+            incomingSegmentSizeBytes, numReplicas, allowedStorageBytes, quotaConfig.storageSizeBytes(), numReplicas,
+            tableName);
+      }
       LOGGER.warn(message);
       return new QuotaCheckerResponse(false, message);
     }
