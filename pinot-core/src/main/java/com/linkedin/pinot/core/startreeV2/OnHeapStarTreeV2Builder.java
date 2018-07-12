@@ -298,7 +298,6 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
       _dimensionForwardIndexCreatorList.add(new SingleValueUnsortedForwardIndexCreator(spec, _outDir, cardinality, _starTreeData.size(), _starTreeData.size(), false));
     }
 
-
     // 'SingleValueRawIndexCreator' for metrics
     for (Met2AggfuncPair pair: _met2aggfuncPairs) {
       String columnName = pair._metricName + '_' + pair._aggregatefunction;
@@ -318,36 +317,6 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
         _starTreeData.size(), V1Constants.Numbers.DOUBLE_SIZE);
     _metricForwardIndexCreatorList.add(rawIndexCreator);
 
-
-//    int cardinality =_immutableSegment.getDictionary("Name").length();
-//
-//    SingleValueForwardIndexCreator temp = new SingleValueUnsortedForwardIndexCreator(_dimensionsSpecMap.get("Name"), _outDir, cardinality, _starTreeData.size(), _starTreeData.size(), false);
-//    for (int i = 0; i < _starTreeData.size(); i++) {
-//      Record row = _starTreeData.get(i);
-//      int [] dimension = row.getDimensionValues();
-//      System.out.println(dimension[0]);
-//      (temp).index(i, dimension[0]);
-//    }
-//    temp.close();
-//    System.out.println("hello");
-
-
-//    SegmentMetadataImpl temSegemnt = new SegmentMetadataImpl(_outDir);
-//    File forwardIndexFile = new File(_outDir, "Name" + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-//    PinotDataBuffer buffer = PinotDataBuffer.fromFile(forwardIndexFile, ReadMode.mmap, FileChannel.MapMode.READ_WRITE, "testing");
-//    ColumnMetadata meta = temSegemnt.getColumnMetadataFor("Name");
-//    DataFileReader fwdIndex = new FixedBitSingleValueReader(buffer, _starTreeData.size(), meta.getBitsPerElement());
-//
-//    FixedBitSingleValueReader svFwdIndex = (FixedBitSingleValueReader) fwdIndex;
-//
-//    for ( int i = 0; i < _starTreeData.size(); i++) {
-//      System.out.println(svFwdIndex.getInt(i));
-//    }
-//    fwdIndex.close();
-//    svFwdIndex.close();
-
-
-
     // indexing each record.
     for (int i = 0; i < _starTreeData.size(); i++) {
       Record row = _starTreeData.get(i);
@@ -355,7 +324,13 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
       List<Object> metric = row.getMetricValues();
 
       for (int j = 0; j < dimension.length; j++) {
-        ((SingleValueForwardIndexCreator) _dimensionForwardIndexCreatorList.get(j)).index(i, dimension[j]);
+        int val = dimension[j];
+
+        // step to skip -1 value for star nodes.
+        if (dimension[j] == StarTreeV2Constant.SKIP_VALUE) {
+          val = StarTreeV2Constant.VALID_INDEX_VALUE;
+        }
+        ((SingleValueForwardIndexCreator) _dimensionForwardIndexCreatorList.get(j)).index(i, val);
       }
 
       for (int j = 0; j < metric.size(); j++) {
@@ -405,6 +380,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
       Pairs.IntPair range = dimensionRangeMap.get(childDimensionValue);
 
       TreeNode child = new TreeNode();
+      child._dimensionValue = key;
       child._dimensionId = splitDimensionId;
       int childStartDocId = range.getLeft();
       child._startDocId = childStartDocId;
@@ -424,10 +400,10 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
     // Create star node
     TreeNode starChild = new TreeNode();
-    starChild._isStarNode = true;
     starChild._dimensionId = splitDimensionId;
     int starChildStartDocId = _starTreeData.size();
     starChild._startDocId = starChildStartDocId;
+    starChild._dimensionValue = StarTreeV2Constant.STAR_NODE;
 
     children.put(StarTreeV2Constant.STAR_NODE, starChild);
     _nodesCount++;
@@ -511,12 +487,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   private void createAggregatedDocForAllNodes(TreeNode node) {
 
     if (node._children == null) {
-      if (node._isStarNode) {
-        return;
-      }
-
       List<Object> aggregatedValues = getAggregatedDocument(node._startDocId, node._endDocId);
-      int aggDocId = appendAggregatedDocuments(aggregatedValues);
+      int aggDocId = appendAggregatedDocuments(aggregatedValues, node);
       node._aggDataDocumentId = aggDocId;
       return;
     }
@@ -524,14 +496,11 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     Map<Integer, TreeNode> children = node._children;
     for (int key : children.keySet()) {
       TreeNode child = children.get(key);
-      child._dimensionValue = key;
       createAggregatedDocForAllNodes(child);
     }
 
-    if (!node._isStarNode) {
-      int aggDocId = calculateAggregatedDocumentFromChildren(node._children);
-      node._aggDataDocumentId = aggDocId;
-    }
+    int aggDocId = calculateAggregatedDocumentFromChildren(node);
+    node._aggDataDocumentId = aggDocId;
 
     return;
   }
@@ -541,23 +510,24 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
    *
    * @return aggregated document id.
    */
-  private Integer calculateAggregatedDocumentFromChildren(Map<Integer, TreeNode> children) {
+  private Integer calculateAggregatedDocumentFromChildren(TreeNode parent) {
+    Map<Integer, TreeNode> children = parent._children;
     List<Record> chilAggRecordsList = new ArrayList<>();
+
     for (int key : children.keySet()) {
       TreeNode child = children.get(key);
       child._dimensionValue = key;
-      if (child._isStarNode) {
-        return child._startDocId;
+      if (child._dimensionValue == StarTreeV2Constant.STAR_NODE) {
+        return child._aggDataDocumentId;
       } else {
         chilAggRecordsList.add(_starTreeData.get(child._aggDataDocumentId));
       }
     }
     List<Object> aggregatedValues = OnHeapStarTreeV2BuilderHelper.aggregateMetrics(0, chilAggRecordsList.size(), chilAggRecordsList, _met2aggfuncPairs, StarTreeV2Constant.AGGREGATED_DATA);
-    int aggDocId = appendAggregatedDocuments(aggregatedValues);
+    int aggDocId = appendAggregatedDocuments(aggregatedValues, parent);
 
     return aggDocId;
   }
-
 
   /**
    * Create a aggregated document for this range.
@@ -579,10 +549,11 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
    * Append a aggregated document to star tree data.
    *
    * @param aggregatedValues aggregated values for all met2aggfunc pairs.
-
+   * @param node tree node
+   *
    * @return aggregated document id.
    */
-  private int appendAggregatedDocuments(List<Object> aggregatedValues) {
+  private int appendAggregatedDocuments(List<Object> aggregatedValues, TreeNode node) {
     int size = _starTreeData.size();
 
     Record aggRecord = new Record();
@@ -590,6 +561,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     for (int i = 0; i < _dimensionsCount; i++) {
       dimensionsValue[i] = StarTreeV2Constant.SKIP_VALUE;
     }
+    dimensionsValue[node._dimensionId] = node._dimensionValue;
+
     aggRecord.setDimensionValues(dimensionsValue);
     aggRecord.setMetricValues(aggregatedValues);
     _starTreeData.add(aggRecord);
