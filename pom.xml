@@ -307,6 +307,16 @@
         <version>19.0</version>
       </dependency>
       <dependency>
+      <groupId>com.microsoft.azure</groupId>
+      <artifactId>azure-data-lake-store-sdk</artifactId>
+      <version>2.3.1</version>
+    </dependency>
+      <dependency>
+        <groupId>com.microsoft.azure</groupId>
+        <artifactId>azure-storage</artifactId>
+        <version>2.1.0</version>
+      </dependency>
+      <dependency>
         <groupId>com.yammer.metrics</groupId>
         <artifactId>metrics-core</artifactId>
         <version>2.2.0</version>
@@ -402,6 +412,11 @@
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-log4j12</artifactId>
         <version>1.7.7</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-nop</artifactId>
+        <version>1.7.21</version>
       </dependency>
       <dependency>
         <groupId>org.apache.helix</groupId>
@@ -525,6 +540,11 @@
             <artifactId>jackson-xc</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-azure-datalake</artifactId>
+        <version>3.1.0</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
