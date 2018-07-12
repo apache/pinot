@@ -42,6 +42,7 @@ public class TimeBoundaryServiceTest {
   private ZkClient _zkClient;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
+  private static final int ZK_CONNECT_TIMEOUT_IN_SECOND = 10;
 
   @BeforeTest
   public void beforeTest() {
@@ -49,6 +50,7 @@ public class TimeBoundaryServiceTest {
 
     _zkClient = new ZkClient(StringUtil.join("/", StringUtils.chomp(ZkStarter.DEFAULT_ZK_STR, "/")),
         ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
+    _zkClient.waitUntilConnected(ZK_CONNECT_TIMEOUT_IN_SECOND, TimeUnit.SECONDS);
     String helixClusterName = "TestTimeBoundaryService";
     _zkClient.deleteRecursive("/" + helixClusterName + "/PROPERTYSTORE");
     _zkClient.createPersistent("/" + helixClusterName + "/PROPERTYSTORE", true);
