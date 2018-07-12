@@ -33,8 +33,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 public class StorageQuotaCheckerTest {
@@ -106,7 +105,8 @@ public class StorageQuotaCheckerTest {
     try (FileOutputStream ostr = new FileOutputStream(tempFile)) {
       ostr.write(data);
     }
-    setupTableSegmentSize(5800, 900);
+    setupTableSegmentSize(4800L, 900);
+    when(_tableConfig.getTableName()).thenReturn("testTable");
     when(_tableConfig.getQuotaConfig()).thenReturn(_quotaConfig);
     when(_quotaConfig.storageSizeBytes()).thenReturn(3000L);
     when(_quotaConfig.getStorage()).thenReturn("3K");
@@ -115,6 +115,14 @@ public class StorageQuotaCheckerTest {
         checker.isSegmentStorageWithinQuota(TEST_DIR, "testTable", "segment1", 1000);
     Assert.assertTrue(response.isSegmentWithinQuota);
 
+    // Quota exceeded.
+    when(_quotaConfig.storageSizeBytes()).thenReturn(2800L);
+    when(_quotaConfig.getStorage()).thenReturn("2.8K");
+    response = checker.isSegmentStorageWithinQuota(TEST_DIR, "testTable", "segment1", 1000);
+    Assert.assertFalse(response.isSegmentWithinQuota);
+
+    // Table already over quota.
+    setupTableSegmentSize(6000L, 900);
     when(_quotaConfig.storageSizeBytes()).thenReturn(2800L);
     when(_quotaConfig.getStorage()).thenReturn("2.8K");
     response = checker.isSegmentStorageWithinQuota(TEST_DIR, "testTable", "segment1", 1000);
