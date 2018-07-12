@@ -16,8 +16,10 @@
 package com.linkedin.pinot.hadoop.job;
 
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.hadoop.job.mapper.HadoopSegmentCreationMapReduceJob;
+import com.linkedin.pinot.hadoop.utils.PushLocation;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -58,6 +60,10 @@ public class SegmentCreationJob extends Configured {
   private final String _depsJarPath;
   private final String _outputDir;
 
+  private final String[] _hosts;
+  private final int _port;
+  private final String _tableName;
+
   public SegmentCreationJob(String jobName, Properties properties) throws Exception {
     super(new Configuration());
     getConf().set("mapreduce.job.user.classpath.first", "true");
@@ -69,6 +75,9 @@ public class SegmentCreationJob extends Configured {
     _outputDir = getOutputDir();
     _stagingDir = new File(_outputDir, TEMP).getAbsolutePath();
     _depsJarPath = _properties.getProperty(PATH_TO_DEPS_JAR, null);
+    _hosts = _properties.getProperty("push.to.hosts").split(",");
+    _port = Integer.parseInt(_properties.getProperty("push.to.port"));
+    _tableName = _properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME);
 
     Utils.logVersions();
 
@@ -162,7 +171,7 @@ public class SegmentCreationJob extends Configured {
 
     job.getConfiguration().setInt(JobContext.NUM_MAPS, inputDataFiles.size());
     if (_dataSchema != null) {
-      job.getConfiguration().set("data.schema", _dataSchema.toString());
+      job.getConfiguration().set(JobConfigConstants.SCHEMA, _dataSchema.toString());
     }
     setOutputPath(job.getConfiguration());
 
@@ -190,7 +199,31 @@ public class SegmentCreationJob extends Configured {
   }
 
   protected void setAdditionalJobProperties(Job job) throws Exception {
+    List<PushLocation> pushLocations = new ArrayList<>();
 
+    for (String host : _hosts) {
+      pushLocations.add(new PushLocation.PushLocationBuilder()
+          .setHost(host)
+          .setPort(_port)
+          .build());
+    }
+
+    ControllerRestApi controllerRestApiObject = new ControllerRestApi(pushLocations, _tableName);
+
+    TableConfig tableConfig = controllerRestApiObject.getTableConfig();
+    job.getConfiguration()
+        .set(JobConfigConstants.TABLE_PUSH_TYPE, tableConfig.getValidationConfig().getSegmentPushType());
+    if (tableConfig.getValidationConfig().getSegmentPushType().equalsIgnoreCase(TableConfigConstants.APPEND)) {
+      job.getConfiguration()
+          .set(JobConfigConstants.TIME_COLUMN_NAME, tableConfig.getValidationConfig().getTimeColumnName());
+      job.getConfiguration().set(JobConfigConstants.TIME_COLUMN_TYPE, tableConfig.getValidationConfig().getTimeType());
+    } else {
+      LOGGER.info("Refresh use case. Not setting timeColumnName and timeColumnType: " + _tableName);
+    }
+
+    String schema = controllerRestApiObject.getSchema();
+    LOGGER.info("Setting schema for tableName {} to {}", _tableName, schema);
+    job.getConfiguration().set(JobConfigConstants.SCHEMA, schema);
   }
 
   protected void moveToOutputDirectory(FileSystem fs) throws Exception {
