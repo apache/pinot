@@ -169,11 +169,10 @@ public class OnHeapStarTreeV2HelperTest {
   public void testCondenseData() {
     List<Record> data = expectedFilteredData();
     List<Met2AggfuncPair> metric2aggFuncPairs = createMet2AggfuncPairs();
-    List<Record> actual = OnHeapStarTreeV2BuilderHelper.condenseData(data, metric2aggFuncPairs);
+    List<Record> actual = OnHeapStarTreeV2BuilderHelper.condenseData(data, metric2aggFuncPairs, StarTreeV2Constant.AGGREGATED_DATA);
 
     List<Record> expected = expectedCondensedData();
     printRecordsList(actual);
-    System.out.println("hola");
     printRecordsList(expected);
     assertRecordsList(expected, actual);
   }
