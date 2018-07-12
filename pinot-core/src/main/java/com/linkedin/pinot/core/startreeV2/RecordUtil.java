@@ -16,9 +16,8 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import java.util.ArrayList;
 import java.util.List;
-import scala.Int;
+import java.util.ArrayList;
 
 
 public class RecordUtil {

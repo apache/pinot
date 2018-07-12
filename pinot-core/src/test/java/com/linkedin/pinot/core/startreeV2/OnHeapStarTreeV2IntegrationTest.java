@@ -16,8 +16,6 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 import java.io.File;
 import java.util.Map;
 import java.util.List;
@@ -31,6 +29,8 @@ import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 
 
 public class OnHeapStarTreeV2IntegrationTest {
@@ -123,11 +123,16 @@ public class OnHeapStarTreeV2IntegrationTest {
       for ( String s: _metricRawIndexreader.keySet()) {
         System.out.println(s);
         FixedByteChunkSingleValueReader index = _metricRawIndexreader.get(s);
-        for ( int i = 0; i < 21; i++) {
-          System.out.println(index.getDouble(i));
+        if (s.equals("count")) {
+          for ( int i = 0; i < 21; i++) {
+            System.out.println(index.getInt(i));
+          }
+        } else {
+          for ( int i = 0; i < 21; i++) {
+            System.out.println(index.getDouble(i));
+          }
         }
       }
-
     } catch (Exception e) {
       e.printStackTrace();
     }

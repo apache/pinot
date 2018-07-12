@@ -18,9 +18,10 @@ package com.linkedin.pinot.core.startreeV2;
 
 import java.util.List;
 import javax.annotation.Nonnull;
+import com.linkedin.pinot.common.data.FieldSpec;
 
 
-public class MinAggregationFunction implements AggregationFunction {
+public class MinAggregationFunction implements AggregationFunction<Number, Double> {
 
   @Nonnull
   @Override
@@ -28,16 +29,27 @@ public class MinAggregationFunction implements AggregationFunction {
     return StarTreeV2Constant.AggregateFunctions.MIN;
   }
 
+  @Nonnull
   @Override
-  public Object aggregate(List<Object> data) {
-    double min = Double.POSITIVE_INFINITY;
-    List<Double> newData = RecordUtil.getDoubleValues(data);
-    for (int i = 0; i < newData.size(); i++) {
-      double value = newData.get(i);
-      if (value < min) {
-        min = value;
-      }
+  public FieldSpec.DataType getDatatype() {
+    return FieldSpec.DataType.DOUBLE;
+  }
+
+  @Override
+  public Double aggregateRaw(List<Number> data) {
+    double max = Double.POSITIVE_INFINITY;
+    for (Number number : data) {
+      max = Math.min(max, number.doubleValue());
     }
-    return min;
+    return max;
+  }
+
+  @Override
+  public Double aggregatePreAggregated(List<Double> data) {
+    double max = Double.POSITIVE_INFINITY;
+    for (Double number : data) {
+      max = Math.min(max, number);
+    }
+    return max;
   }
 }

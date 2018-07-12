@@ -22,11 +22,12 @@ import java.util.Map;
  * Helper class to represent a tree node.
  */
 class TreeNode {
-  int _value = -1;
   int _startDocId = -1;
   int _endDocId = -1;
   int _dimensionId = -1;
+  int _dimensionValue = -1;
   int _childDimensionId = -1;
   int _aggDataDocumentId = -1;
+  boolean _isStarNode = false;
   Map<Integer, TreeNode> _children = null;
 }
