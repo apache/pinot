@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.metrics;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.yammer.metrics.core.MetricName;
@@ -364,6 +365,16 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       }
     } else {
       _gaugeValues.get(gaugeName).set(value);
+    }
+  }
+
+  @VisibleForTesting
+  public long getValueOfGlobalGauge(final G gauge) {
+    String gaugeName = gauge.getGaugeName();
+    if (!_gaugeValues.containsKey(gaugeName)) {
+      return 0;
+    } else {
+      return _gaugeValues.get(gaugeName).get();
     }
   }
 
