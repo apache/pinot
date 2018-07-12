@@ -21,33 +21,33 @@ import java.util.List;
 import javax.annotation.Nonnull;
 
 
-public class SumAggregationFunction implements AggregationFunction<Number, Double> {
+public class CountAggregationFunction implements AggregationFunction <Number, Integer>{
 
   @Nonnull
   @Override
   public String getName() {
-    return StarTreeV2Constant.AggregateFunctions.SUM;
+    return StarTreeV2Constant.AggregateFunctions.COUNT;
   }
 
   @Nonnull
   @Override
   public FieldSpec.DataType getDatatype() {
-    return FieldSpec.DataType.DOUBLE;
+    return FieldSpec.DataType.INT;
   }
 
   @Override
-  public Double aggregateRaw(List<Number> data) {
-    double sum = 0;
+  public Integer aggregateRaw(List<Number> data) {
+    Integer sum = 0;
     for (Number number : data) {
-      sum = sum +  number.doubleValue();
+      sum = sum + number.intValue();
     }
     return sum;
   }
 
   @Override
-  public Double aggregatePreAggregated(List<Double> data) {
-    double sum = 0;
-    for (double number : data) {
+  public Integer aggregatePreAggregated(List<Integer> data) {
+    Integer sum = 0;
+    for (Integer number : data) {
       sum = sum + number;
     }
     return sum;

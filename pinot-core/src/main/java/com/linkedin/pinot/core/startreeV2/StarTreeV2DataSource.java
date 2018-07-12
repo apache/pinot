@@ -26,6 +26,7 @@ import com.linkedin.pinot.common.segment.StarTreeV2Metadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
+import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 
 
 public class StarTreeV2DataSource {
@@ -64,7 +65,8 @@ public class StarTreeV2DataSource {
       int start = _columnIndexInfoMap.get(a);
       int size = _columnIndexInfoMap.get(b);
       ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(dimension);
-      FixedBitSingleValueReader svFwdIndex = _dataSource.getDimensionDataSource(start, size, _docsCount, columnMetadata.getBitsPerElement());
+      int maxNumberOfBits = columnMetadata.getBitsPerElement();
+      FixedBitSingleValueReader svFwdIndex = _dataSource.getDimensionDataSource(start, size, _docsCount, maxNumberOfBits);
 
       _dimensionIndexReader.put(dimension, svFwdIndex);
     }

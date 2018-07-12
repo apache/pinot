@@ -25,7 +25,7 @@ import com.linkedin.pinot.common.segment.StarTreeV2Metadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
-public class OnHeapStarTreeV2Loader implements StarTreeV2Loader {
+public class OnHeapStarTreeV2Loader implements StarTreeV2Loader{
 
   // segment
   private SegmentMetadataImpl _segmentMetadata;
@@ -62,6 +62,7 @@ public class OnHeapStarTreeV2Loader implements StarTreeV2Loader {
       _starTreeV2DataSources.add(a);
       starTreeId += 1;
     }
+
     return;
   }
 
