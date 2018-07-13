@@ -18,15 +18,13 @@ package com.linkedin.pinot.core.startreeV2;
 
 import java.io.File;
 import java.util.Map;
-import java.util.List;
 import java.io.IOException;
-import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 
 
 public interface StarTreeV2Builder {
 
   /**
-   * Initialize the builder, called before append().
+   * Initialize the builder.
    */
   void init(File indexDir, StarTreeV2Config config) throws Exception;
 
@@ -44,10 +42,5 @@ public interface StarTreeV2Builder {
    * Returns the Meta Data of the Star tree.
    */
   Map<String, String> getMetaData();
-
-  /**
-   * convert star tree indexes from v1 to v3
-   */
-  void convertFromV1toV3(int starTreeId) throws Exception;
 }
 

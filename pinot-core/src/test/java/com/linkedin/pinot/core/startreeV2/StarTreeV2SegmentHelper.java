@@ -33,11 +33,11 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
 public class StarTreeV2SegmentHelper {
 
   private static final int numRows = 6;
-  private static final String [] names = {"Rahul", "Rahul", "Rahul", "Zackie", "Zackie", "Zackie"};
-  private static final String [] country = {"IN", "IN", "CH", "CH", "CH", "US"};
-  private static final String [] language = {"Hin", "Hin", "Eng", "Eng", "Eng", "Eng"};
+  private static final String[] names = {"Rahul", "Rahul", "Rahul", "Zackie", "Zackie", "Zackie"};
+  private static final String[] country = {"IN", "IN", "CH", "CH", "CH", "US"};
+  private static final String[] language = {"Hin", "Hin", "Eng", "Eng", "Eng", "Eng"};
 
-  private static final int [] metricValues = {3, 5, 2, 8, 9, 1};
+  private static final int[] metricValues = {3, 5, 2, 8, 9, 1};
 
   public static Schema createSegmentSchema() {
 
@@ -61,12 +61,10 @@ public class StarTreeV2SegmentHelper {
     MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, FieldSpec.DataType.INT);
     schema.addField(metricFieldSpec);
 
-
     return schema;
   }
 
   public static List<GenericRow> createSegmentData(Schema schema) throws Exception {
-
 
     List<GenericRow> rows = new ArrayList<>(numRows);
     for (int rowId = 0; rowId < numRows; rowId++) {
@@ -92,8 +90,8 @@ public class StarTreeV2SegmentHelper {
     return rows;
   }
 
-  public static File createSegment(Schema schema, String segmentName, String segmentOutputDir, RecordReader recordReader)
-      throws Exception {
+  public static File createSegment(Schema schema, String segmentName, String segmentOutputDir,
+      RecordReader recordReader) throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
     segmentGeneratorConfig.setTableName(segmentName);
     segmentGeneratorConfig.setOutDir(segmentOutputDir);

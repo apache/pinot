@@ -16,33 +16,32 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import java.util.List;
 import javax.annotation.Nonnull;
+import com.linkedin.pinot.common.data.FieldSpec;
 
 
 public interface AggregationFunction<R, A> {
 
   /**
-   * Get the name of the aggregation function.
+   * Get the name of an aggregation function.
    */
   @Nonnull
   String getName();
 
   /**
-   * Get the datatype aggregation function returns.
+   * Get the return datatype of an aggregation function.
    */
   @Nonnull
   FieldSpec.DataType getDatatype();
 
   /**
-   * Perform aggregation on the given raw data
+   * Perform aggregation on the given raw data.
    */
   A aggregateRaw(List<R> data);
 
   /**
-   * Perform aggregation on the given specific data type data
+   * Perform aggregation on the pre aggregated data.
    */
   A aggregatePreAggregated(List<A> data);
-
 }

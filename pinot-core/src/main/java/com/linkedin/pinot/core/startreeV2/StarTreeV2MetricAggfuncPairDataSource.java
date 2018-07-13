@@ -34,7 +34,7 @@ import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 
 
-public class StarTreeV2MetricDataSource extends DataSource {
+public class StarTreeV2MetricAggfuncPairDataSource extends DataSource {
 
   private int _numDocs;
   private boolean _isSingleValue;
@@ -45,11 +45,14 @@ public class StarTreeV2MetricDataSource extends DataSource {
   private DataFileReader _forwardIndex;
   private DataSourceMetadata _metadata;
 
-  public StarTreeV2MetricDataSource(File dataFile, String columnName, int numDocs, int start, int size, FieldSpec.DataType dataType) throws IOException {
+  public StarTreeV2MetricAggfuncPairDataSource(File dataFile, String columnName, int numDocs, int start, int size,
+      FieldSpec.DataType dataType) throws IOException {
     _columnDataFile = dataFile;
     _operatorName = "ColumnDataSource [" + columnName + "]";
 
-    PinotDataBuffer buffer = PinotDataBuffer.fromFile(_columnDataFile, start, size, ReadMode.mmap, FileChannel.MapMode.READ_WRITE, "testing");
+    PinotDataBuffer buffer =
+        PinotDataBuffer.fromFile(_columnDataFile, start, size, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
+            "testing");
     _forwardIndex = new FixedByteChunkSingleValueReader(buffer);
 
     _numDocs = numDocs;

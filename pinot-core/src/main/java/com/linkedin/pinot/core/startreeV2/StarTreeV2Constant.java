@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-
 public class StarTreeV2Constant {
 
   // final strings
@@ -29,13 +28,11 @@ public class StarTreeV2Constant {
   public static final String STAR_TREE_V2_COlUMN_FILE = "startreev2.column.psf";
   public static final String STAR_TREE_V2_INDEX_MAP_FILE = "startreev2.index.map";
 
-
   public static final String METRIC_RAW_INDEX_SUFFIX = ".sv.raw.fwd";
   public static final String DIMENSION_FWD_INDEX_SUFFIX = ".sv.unsorted.fwd";
 
   public static final String RAW_DATA = "raw";
   public static final String AGGREGATED_DATA = "aggregated";
-
 
   // aggregate functions name.
   public static class AggregateFunctions {
@@ -58,6 +55,7 @@ public class StarTreeV2Constant {
     public static final String STAR_TREE_DOCS_COUNT = "docs.count";
     public static final String STAR_TREE_SPLIT_ORDER = "split.order";
     public static final String STAR_TREE_MAT2FUNC_MAP = "met2func.map";
-    public static final String STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS = "skip.star.node.creation.for.dimensions";
+    public static final String STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS =
+        "skip.star.node.creation.for.dimensions";
   }
 }

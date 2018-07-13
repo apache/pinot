@@ -38,11 +38,11 @@ public class StarTreeV2DataSource {
   SegmentMetadataImpl _segmentMetadataImpl;
   Map<String, Integer> _columnIndexInfoMap;
   AggregationFunctionFactory _aggregationFunctionFactory;
-  Map<String, StarTreeV2MetricDataSource> _metricRawIndexReader;
+  Map<String, StarTreeV2MetricAggfuncPairDataSource> _metricRawIndexReader;
   Map<String, StarTreeV2DimensionDataSource> _dimensionIndexReader;
 
-
-  public StarTreeV2DataSource(ImmutableSegment immutableSegment, SegmentMetadataImpl segmentMetadataImpl, StarTreeV2Metadata metadata, Map<String, Integer> columnIndexInfoMap, File indexDataFile) {
+  public StarTreeV2DataSource(ImmutableSegment immutableSegment, SegmentMetadataImpl segmentMetadataImpl,
+      StarTreeV2Metadata metadata, Map<String, Integer> columnIndexInfoMap, File indexDataFile) {
     _indexDataFile = indexDataFile;
     _columnIndexInfoMap = columnIndexInfoMap;
 
@@ -61,7 +61,7 @@ public class StarTreeV2DataSource {
 
   public void loadDataSource(int starTreeId) throws IOException {
 
-    for (String dimension: _dimensionsSplitOrder) {
+    for (String dimension : _dimensionsSplitOrder) {
       String a = "startree" + starTreeId + "." + dimension + ".start";
       String b = "startree" + starTreeId + "." + dimension + ".size";
 
@@ -69,12 +69,14 @@ public class StarTreeV2DataSource {
       int size = _columnIndexInfoMap.get(b);
       ColumnMetadata columnMetadata = _segmentMetadataImpl.getColumnMetadataFor(dimension);
       int maxNumberOfBits = columnMetadata.getBitsPerElement();
-      StarTreeV2DimensionDataSource starTreeV2DimensionDataSource = new StarTreeV2DimensionDataSource(_indexDataFile, dimension, _immutableSegment, columnMetadata, _docsCount, start, size, maxNumberOfBits);
+      StarTreeV2DimensionDataSource starTreeV2DimensionDataSource =
+          new StarTreeV2DimensionDataSource(_indexDataFile, dimension, _immutableSegment, columnMetadata, _docsCount,
+              start, size, maxNumberOfBits);
       _dimensionIndexReader.put(dimension, starTreeV2DimensionDataSource);
     }
 
     AggregationFunction function;
-    for (String pair: _met2aggfuncPairs) {
+    for (String pair : _met2aggfuncPairs) {
       String a = "startree" + starTreeId + "." + pair + ".start";
       String b = "startree" + starTreeId + "." + pair + ".size";
       int start = _columnIndexInfoMap.get(a);
@@ -87,8 +89,9 @@ public class StarTreeV2DataSource {
         function = _aggregationFunctionFactory.getAggregationFunction(parts[1]);
       }
 
-      StarTreeV2MetricDataSource starTreeV2MetricDataSource = new StarTreeV2MetricDataSource(_indexDataFile, pair, _docsCount, start, size, function.getDatatype());
-      _metricRawIndexReader.put(pair, starTreeV2MetricDataSource);
+      StarTreeV2MetricAggfuncPairDataSource starTreeV2MetricAggfuncPairDataSource =
+          new StarTreeV2MetricAggfuncPairDataSource(_indexDataFile, pair, _docsCount, start, size, function.getDatatype());
+      _metricRawIndexReader.put(pair, starTreeV2MetricAggfuncPairDataSource);
     }
 
     return;
