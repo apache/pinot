@@ -496,13 +496,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           boolean success;
           switch (status) {
             case NOT_LEADER:
-              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.LLC_CONTROLLER_RESPONSE_NOT_LEADER, 1);
               // Retain the same state
               segmentLogger.warn("Got not leader response");
               hold();
               break;
             case CATCH_UP:
-              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.LLC_CONTROLLER_RESPONSE_CATCH_UP, 1);
               if (rspOffset <= _currentOffset) {
                 // Something wrong with the controller. Back off and try again.
                 segmentLogger.error("Invalid catchup offset {} in controller response, current offset {}", rspOffset,
@@ -516,16 +514,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               }
               break;
             case HOLD:
-              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.LLC_CONTROLLER_RESPONSE_HOLD, 1);
               hold();
               break;
             case DISCARD:
-              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.LLC_CONTROLLER_RESPONSE_DISCARD, 1);
               // Keep this in memory, but wait for the online transition, and download when it comes in.
               _state = State.DISCARDED;
               break;
             case KEEP:
-              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.LLC_CONTROLLER_RESPONSE_KEEP, 1);
               _state = State.RETAINING;
               success = buildSegmentAndReplace();
               if (success) {
@@ -536,7 +531,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               }
               break;
             case COMMIT:
-              _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT, 1);
               _state = State.COMMITTING;
               long buildTimeSeconds = response.getBuildTimeSeconds();
               buildSegmentForCommit(buildTimeSeconds * 1000L);
@@ -751,6 +745,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // if that succeeds, swap in-memory segment with the one built.
       returnedResponse = postSegmentCommitMsg();
     }
+
     if (!returnedResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
       return false;
     }
@@ -980,7 +975,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _instanceId = _realtimeTableDataManager.getServerInstance();
     _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_instanceId);
-    _protocolHandler = new ServerSegmentCompletionProtocolHandler();
+    _protocolHandler = new ServerSegmentCompletionProtocolHandler(_serverMetrics);
 
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,20 +53,20 @@ public class SegmentBuildTimeLeaseExtender {
     return INSTANCE_TO_LEASE_EXTENDER.get(instanceId);
   }
 
-  public static synchronized  SegmentBuildTimeLeaseExtender create(final String instanceId) {
+  public static synchronized  SegmentBuildTimeLeaseExtender create(final String instanceId, ServerMetrics serverMetrics) {
     SegmentBuildTimeLeaseExtender leaseExtender = INSTANCE_TO_LEASE_EXTENDER.get(instanceId);
     if (leaseExtender != null) {
       LOGGER.warn("Instance already exists");
     } else {
-      leaseExtender = new SegmentBuildTimeLeaseExtender(instanceId);
+      leaseExtender = new SegmentBuildTimeLeaseExtender(instanceId, serverMetrics);
       INSTANCE_TO_LEASE_EXTENDER.put(instanceId, leaseExtender);
     }
     return leaseExtender;
   }
 
-  private SegmentBuildTimeLeaseExtender(String instanceId) {
+  private SegmentBuildTimeLeaseExtender(String instanceId, ServerMetrics serverMetrics) {
     _instanceId = instanceId;
-    _protocolHandler = new ServerSegmentCompletionProtocolHandler();
+    _protocolHandler = new ServerSegmentCompletionProtocolHandler(serverMetrics);
     _executor = new ScheduledThreadPoolExecutor(1);
   }
 

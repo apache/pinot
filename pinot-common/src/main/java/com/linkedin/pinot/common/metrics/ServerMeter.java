@@ -40,14 +40,18 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   ROWS_NEEDING_CONVERSIONS("rows", false),
   ROWS_WITH_NULL_VALUES("rows", false),
   COLUMNS_WITH_NULL_VALUES("columns", false),
-  LLC_CONTROLLER_RESPONSE_COMMIT("messages", false),
-  LLC_CONTROLLER_RESPONSE_HOLD("messages", false),
-  LLC_CONTROLLER_RESPONSE_CATCH_UP("messages", false),
-  LLC_CONTROLLER_RESPONSE_DISCARD("messages", false),
-  LLC_CONTROLLER_RESPONSE_KEEP("messages", false),
-  LLC_CONTROLLER_RESPONSE_NOT_LEADER("messages", false),
-  LLC_CONTROLLER_RESPONSE_FAILED("messages", false),
-  LLC_CONTROLLER_RESPONSE_COMMIT_SUCCESS("messages", false);
+  LLC_CONTROLLER_RESPONSE_NOT_SENT("messages", true),
+  LLC_CONTROLLER_RESPONSE_COMMIT("messages", true),
+  LLC_CONTROLLER_RESPONSE_HOLD("messages", true),
+  LLC_CONTROLLER_RESPONSE_CATCH_UP("messages", true),
+  LLC_CONTROLLER_RESPONSE_DISCARD("messages", true),
+  LLC_CONTROLLER_RESPONSE_KEEP("messages", true),
+  LLC_CONTROLLER_RESPONSE_NOT_LEADER("messages", true),
+  LLC_CONTROLLER_RESPONSE_FAILED("messages", true),
+  LLC_CONTROLLER_RESPONSE_COMMIT_SUCCESS("messages", true),
+  LLC_CONTROLLER_RESPONSE_COMMIT_CONTINUE("messages", true),
+  LLC_CONTROLLER_RESPONSE_PROCESSED("messages", true),
+  LLC_CONTROLLER_RESPONSE_UPLOAD_SUCCESS("messages", true);
 
   private final String meterName;
   private final String unit;
