@@ -21,27 +21,28 @@ import java.util.Map;
 import java.util.List;
 import java.util.HashMap;
 import java.io.IOException;
+import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.common.segment.StarTreeV2Metadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
-import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 
 
 public class StarTreeV2DataSource {
 
   int _docsCount;
   File _indexDataFile;
-  DataSource _dataSource;
   List<String> _met2aggfuncPairs;
   List<String> _dimensionsSplitOrder;
-  SegmentMetadataImpl _segmentMetadata;
+  ImmutableSegment _immutableSegment;
+  SegmentMetadataImpl _segmentMetadataImpl;
   Map<String, Integer> _columnIndexInfoMap;
-  Map<String, FixedBitSingleValueReader> _dimensionIndexReader;
-  Map<String, FixedByteChunkSingleValueReader> _metricRawIndexReader;
+  AggregationFunctionFactory _aggregationFunctionFactory;
+  Map<String, StarTreeV2MetricDataSource> _metricRawIndexReader;
+  Map<String, StarTreeV2DimensionDataSource> _dimensionIndexReader;
 
-  public StarTreeV2DataSource(SegmentMetadataImpl segmentMetadata, StarTreeV2Metadata metadata, Map<String, Integer> columnIndexInfoMap, File indexDataFile) {
+
+  public StarTreeV2DataSource(ImmutableSegment immutableSegment, SegmentMetadataImpl segmentMetadataImpl, StarTreeV2Metadata metadata, Map<String, Integer> columnIndexInfoMap, File indexDataFile) {
     _indexDataFile = indexDataFile;
     _columnIndexInfoMap = columnIndexInfoMap;
 
@@ -49,11 +50,13 @@ public class StarTreeV2DataSource {
     _met2aggfuncPairs = metadata.getMet2AggfuncPairs();
     _dimensionsSplitOrder = metadata.getDimensionsSplitOrder();
 
-    _segmentMetadata = segmentMetadata;
-    _dataSource = new DataSource(_indexDataFile);
+    _immutableSegment = immutableSegment;
+    _segmentMetadataImpl = segmentMetadataImpl;
 
     _dimensionIndexReader = new HashMap<>();
     _metricRawIndexReader = new HashMap<>();
+
+    _aggregationFunctionFactory = new AggregationFunctionFactory();
   }
 
   public void loadDataSource(int starTreeId) throws IOException {
@@ -64,31 +67,38 @@ public class StarTreeV2DataSource {
 
       int start = _columnIndexInfoMap.get(a);
       int size = _columnIndexInfoMap.get(b);
-      ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(dimension);
+      ColumnMetadata columnMetadata = _segmentMetadataImpl.getColumnMetadataFor(dimension);
       int maxNumberOfBits = columnMetadata.getBitsPerElement();
-      FixedBitSingleValueReader svFwdIndex = _dataSource.getDimensionDataSource(start, size, _docsCount, maxNumberOfBits);
-
-      _dimensionIndexReader.put(dimension, svFwdIndex);
+      StarTreeV2DimensionDataSource starTreeV2DimensionDataSource = new StarTreeV2DimensionDataSource(_indexDataFile, dimension, _immutableSegment, columnMetadata, _docsCount, start, size, maxNumberOfBits);
+      _dimensionIndexReader.put(dimension, starTreeV2DimensionDataSource);
     }
 
+    AggregationFunction function;
     for (String pair: _met2aggfuncPairs) {
       String a = "startree" + starTreeId + "." + pair + ".start";
       String b = "startree" + starTreeId + "." + pair + ".size";
       int start = _columnIndexInfoMap.get(a);
       int size = _columnIndexInfoMap.get(b);
-      FixedByteChunkSingleValueReader svRawIndex = _dataSource.getMetricDataSource(start, size);
 
-      _metricRawIndexReader.put(pair, svRawIndex);
+      String parts[] = pair.split("_");
+      if (parts[0].equals(StarTreeV2Constant.AggregateFunctions.COUNT)) {
+        function = _aggregationFunctionFactory.getAggregationFunction(parts[0]);
+      } else {
+        function = _aggregationFunctionFactory.getAggregationFunction(parts[1]);
+      }
+
+      StarTreeV2MetricDataSource starTreeV2MetricDataSource = new StarTreeV2MetricDataSource(_indexDataFile, pair, _docsCount, start, size, function.getDatatype());
+      _metricRawIndexReader.put(pair, starTreeV2MetricDataSource);
     }
 
     return;
   }
 
-  public Map<String, FixedBitSingleValueReader> getDimensionForwardIndexReader() {
-    return _dimensionIndexReader;
+  public DataSource getDimensionForwardIndexReader(String column) {
+    return _dimensionIndexReader.get(column);
   }
 
-  public Map<String, FixedByteChunkSingleValueReader> getMetricRawIndexReader() {
-    return _metricRawIndexReader;
+  public DataSource getMetricRawIndexReader(String column) {
+    return _metricRawIndexReader.get(column);
   }
 }

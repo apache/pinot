@@ -325,7 +325,6 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
       for (int j = 0; j < dimension.length; j++) {
         int val = dimension[j];
-
         // step to skip -1 value for star nodes.
         if (dimension[j] == StarTreeV2Constant.SKIP_VALUE) {
           val = StarTreeV2Constant.VALID_INDEX_VALUE;

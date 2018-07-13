@@ -21,17 +21,24 @@ import java.util.Map;
 import java.util.List;
 import java.io.IOException;
 import java.util.ArrayList;
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.StarTreeV2Metadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 
 
 public class OnHeapStarTreeV2Loader implements StarTreeV2Loader{
 
   // segment
-  private SegmentMetadataImpl _segmentMetadata;
+  private ImmutableSegment _immutableSegment;
+  private IndexLoadingConfig _v3IndexLoadingConfig;
+  private SegmentMetadataImpl _segmentMetadataImpl;
 
   // star tree
-  private int _starTreesCount;
   private File _starTreeIndexDataFile;
   private String _starTreeIndexMapFile;
   private Map<String, Integer> _starTreeIndexMetadata;
@@ -41,11 +48,15 @@ public class OnHeapStarTreeV2Loader implements StarTreeV2Loader{
   @Override
   public void init(File indexDir) throws Exception {
     // segment
-    _segmentMetadata = new SegmentMetadataImpl(indexDir);
+    _v3IndexLoadingConfig = new IndexLoadingConfig();
+    _v3IndexLoadingConfig.setReadMode(ReadMode.mmap);
+    _v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
+    _immutableSegment = ImmutableSegmentLoader.load(indexDir, _v3IndexLoadingConfig);
+
+    _segmentMetadataImpl = new SegmentMetadataImpl(indexDir);
 
     // star tree
-    _starTreesCount = _segmentMetadata.getStarTreeV2Count();
-    _starTreeV2MetadataList = _segmentMetadata.getStarTreeV2Metadata();
+    _starTreeV2MetadataList = _segmentMetadataImpl.getStarTreeV2Metadata();
     _starTreeIndexDataFile = new File(indexDir, StarTreeV2Constant.STAR_TREE_V2_COlUMN_FILE);
     _starTreeIndexMapFile = new File(indexDir, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE).getPath();
   }
@@ -57,7 +68,7 @@ public class OnHeapStarTreeV2Loader implements StarTreeV2Loader{
 
     int starTreeId = 0;
     for (StarTreeV2Metadata metaData: _starTreeV2MetadataList) {
-      StarTreeV2DataSource a = new StarTreeV2DataSource(_segmentMetadata, metaData, _starTreeIndexMetadata, _starTreeIndexDataFile);
+      StarTreeV2DataSource a = new StarTreeV2DataSource(_immutableSegment, _segmentMetadataImpl, metaData, _starTreeIndexMetadata, _starTreeIndexDataFile);
       a.loadDataSource(starTreeId);
       _starTreeV2DataSources.add(a);
       starTreeId += 1;
@@ -67,7 +78,12 @@ public class OnHeapStarTreeV2Loader implements StarTreeV2Loader{
   }
 
   @Override
-  public StarTreeV2DataSource returnDataSource(int starTreeId) throws Exception {
-    return _starTreeV2DataSources.get(starTreeId);
+  public DataSource getDimensionDataSource(int starTreeId, String column) throws Exception {
+    return _starTreeV2DataSources.get(starTreeId).getDimensionForwardIndexReader(column);
+  }
+
+  @Override
+  public DataSource getMetricAggPairDataSource(int starTreeId, String column) throws Exception {
+    return _starTreeV2DataSources.get(starTreeId).getMetricRawIndexReader(column);
   }
 }
