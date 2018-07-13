@@ -16,12 +16,12 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import java.util.List;
 import javax.annotation.Nonnull;
+import com.linkedin.pinot.common.data.FieldSpec;
 
 
-public class CountAggregationFunction implements AggregationFunction <Number, Integer>{
+public class CountAggregationFunction implements AggregationFunction<Number, Long> {
 
   @Nonnull
   @Override
@@ -32,12 +32,12 @@ public class CountAggregationFunction implements AggregationFunction <Number, In
   @Nonnull
   @Override
   public FieldSpec.DataType getDatatype() {
-    return FieldSpec.DataType.INT;
+    return FieldSpec.DataType.LONG;
   }
 
   @Override
-  public Integer aggregateRaw(List<Number> data) {
-    Integer sum = 0;
+  public Long aggregateRaw(List<Number> data) {
+    Long sum = 0L;
     for (Number number : data) {
       sum = sum + number.intValue();
     }
@@ -45,9 +45,9 @@ public class CountAggregationFunction implements AggregationFunction <Number, In
   }
 
   @Override
-  public Integer aggregatePreAggregated(List<Integer> data) {
-    Integer sum = 0;
-    for (Integer number : data) {
+  public Long aggregatePreAggregated(List<Long> data) {
+    Long sum = 0L;
+    for (Long number : data) {
       sum = sum + number;
     }
     return sum;

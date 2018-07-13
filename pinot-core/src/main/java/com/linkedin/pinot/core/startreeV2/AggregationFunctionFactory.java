@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-
 public class AggregationFunctionFactory {
 
   private static SumAggregationFunction _sumFunction;

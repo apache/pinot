@@ -40,7 +40,7 @@ public class OnHeapStarTreeV2LoaderHelper {
 
       while ((line = bufferedReader.readLine()) != null) {
         String s = line.toString();
-        String [] parts = s.split(":");
+        String[] parts = s.split(":");
         metadata.put(parts[0], Integer.parseInt(parts[1]));
       }
       fileReader.close();

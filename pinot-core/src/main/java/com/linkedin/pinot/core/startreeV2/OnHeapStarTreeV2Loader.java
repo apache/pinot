@@ -31,7 +31,7 @@ import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 
 
-public class OnHeapStarTreeV2Loader implements StarTreeV2Loader{
+public class OnHeapStarTreeV2Loader implements StarTreeV2Loader {
 
   // segment
   private ImmutableSegment _immutableSegment;
@@ -67,8 +67,10 @@ public class OnHeapStarTreeV2Loader implements StarTreeV2Loader{
     _starTreeV2DataSources = new ArrayList<>();
 
     int starTreeId = 0;
-    for (StarTreeV2Metadata metaData: _starTreeV2MetadataList) {
-      StarTreeV2DataSource a = new StarTreeV2DataSource(_immutableSegment, _segmentMetadataImpl, metaData, _starTreeIndexMetadata, _starTreeIndexDataFile);
+    for (StarTreeV2Metadata metaData : _starTreeV2MetadataList) {
+      StarTreeV2DataSource a =
+          new StarTreeV2DataSource(_immutableSegment, _segmentMetadataImpl, metaData, _starTreeIndexMetadata,
+              _starTreeIndexDataFile);
       a.loadDataSource(starTreeId);
       _starTreeV2DataSources.add(a);
       starTreeId += 1;
