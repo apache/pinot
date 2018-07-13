@@ -65,7 +65,7 @@ public class ServerTableSizeReader {
     }
 
     MultiGetRequest mget = new MultiGetRequest(executor, connectionManager);
-    LOGGER.info("Reading segment sizes from servers for table: {}, timeoutMsec: {}", table, timeoutMsec);
+    LOGGER.info("Reading segment sizes from {} servers for table: {}, timeoutMsec: {}", serverUrls.size(), table, timeoutMsec);
     CompletionService<GetMethod> completionService = mget.execute(serverUrls, timeoutMsec);
 
     Map<String, List<SegmentSizeInfo>> serverSegmentSizes = new HashMap<>(serverEndPoints.size());
