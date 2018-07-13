@@ -23,14 +23,16 @@ import java.util.ArrayList;
 import com.google.common.io.Files;
 import org.testng.annotations.Test;
 import org.testng.annotations.BeforeTest;
+import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.data.readers.RecordReader;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 
 
 public class OnHeapStarTreeV2IntegrationTest {
@@ -108,31 +110,23 @@ public class OnHeapStarTreeV2IntegrationTest {
 
       loadTest.init(_filepath);
       loadTest.load();
-      StarTreeV2DataSource source = loadTest.returnDataSource(0);
 
-      Map<String, FixedBitSingleValueReader> _dimensionIndexReader = source.getDimensionForwardIndexReader();
-      for ( String s: _dimensionIndexReader.keySet()) {
-        System.out.println(s);
-        FixedBitSingleValueReader index = _dimensionIndexReader.get(s);
-        for ( int i = 0; i < 24; i++) {
-         System.out.println(index.getInt(i));
-        }
+//      DataSource source = loadTest.getDimensionDataSource(0, "Name");
+//      Block block = source.nextBlock();
+//      BlockValSet blockValSet = block.getBlockValueSet();
+//      BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
+//      while(itr.hasNext()) {
+//        System.out.println(itr.nextIntVal());
+//      }
+
+      DataSource source = loadTest.getMetricAggPairDataSource(0, "salary_sum");
+      Block block = source.nextBlock();
+      BlockValSet blockValSet = block.getBlockValueSet();
+      BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
+      while(itr.hasNext()) {
+        System.out.println(itr.nextIntVal());
       }
 
-      Map<String, FixedByteChunkSingleValueReader> _metricRawIndexreader = source.getMetricRawIndexReader();
-      for ( String s: _metricRawIndexreader.keySet()) {
-        System.out.println(s);
-        FixedByteChunkSingleValueReader index = _metricRawIndexreader.get(s);
-        if (s.equals("count")) {
-          for ( int i = 0; i < 24; i++) {
-            System.out.println(index.getInt(i));
-          }
-        } else {
-          for ( int i = 0; i < 24; i++) {
-            System.out.println(index.getDouble(i));
-          }
-        }
-      }
     } catch (Exception e) {
       e.printStackTrace();
     }
