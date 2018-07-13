@@ -173,7 +173,7 @@ public class PinotLLCRealtimeSegmentManager {
     _clusterName = clusterName;
     _controllerConf = controllerConf;
     _controllerMetrics = controllerMetrics;
-    _numIdealStateUpdateLocks = controllerConf.getRealtimeSegmentIdealStateUpdateNumLocks();
+    _numIdealStateUpdateLocks = controllerConf.getRealtimeSegmentMetadataCommitNumLocks();
     _idealstateUpdateLocks = new Lock[_numIdealStateUpdateLocks];
     for (int i = 0; i < _numIdealStateUpdateLocks; i++) {
       _idealstateUpdateLocks[i] = new ReentrantLock();
