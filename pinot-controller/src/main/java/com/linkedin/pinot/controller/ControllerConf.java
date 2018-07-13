@@ -55,6 +55,7 @@ public class ControllerConf extends PropertiesConfiguration {
   // Amount of the time the segment can take from the beginning of upload to the end of upload. Used when parallel push
   // protection is enabled. If the upload does not finish within the timeout, next upload can override the previous one.
   private static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
+  private static final String REALTIME_SEGMENT_IDEAL_STATE_UPDATE_NUM_LOCKS = "controller.realtime.ideal.state.update.num.locks";
 
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
@@ -71,6 +72,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
       "com.linkedin.pinot.controller.api.access.AllowAllAccessFactory";
   private static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
+  private static final int DEFAULT_REALTIME_SEGMENT_IDEAL_STATE_UPDATE_NUM_LOCKS = 64;
 
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
@@ -362,5 +364,13 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setSegmentUploadTimeoutInMillis(long segmentUploadTimeoutInMillis) {
     setProperty(SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS, segmentUploadTimeoutInMillis);
+  }
+
+  public int getRealtimeSegmentIdealStateUpdateNumLocks() {
+    return getInt(REALTIME_SEGMENT_IDEAL_STATE_UPDATE_NUM_LOCKS, DEFAULT_REALTIME_SEGMENT_IDEAL_STATE_UPDATE_NUM_LOCKS);
+  }
+
+  public void setRealtimeSegmentIdealStateUpdateNumLocks(int realtimeSegmentIdealStateUpdateNumLocks) {
+    setProperty(REALTIME_SEGMENT_IDEAL_STATE_UPDATE_NUM_LOCKS, realtimeSegmentIdealStateUpdateNumLocks);
   }
 }

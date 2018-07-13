@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 public class ServerSegmentCompletionProtocolHandler {
   private static Logger LOGGER = LoggerFactory.getLogger(ServerSegmentCompletionProtocolHandler.class);
   private static final int SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 30_000;
-  private static final int OTHER_REQUESTS_TIMEOUT = 5_000;
+  private static final int OTHER_REQUESTS_TIMEOUT = 10_000;
   private static final String HTTPS_PROTOCOL = "https";
   private static final String HTTP_PROTOCOL = "http";
 
