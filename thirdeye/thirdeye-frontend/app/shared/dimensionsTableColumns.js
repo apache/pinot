@@ -1,6 +1,11 @@
 // rootcause dimensions table columns
 export default [
   {
+    propertyName: 'isSelected',
+    isHidden: true,
+    sortDirection: 'desc',
+    sortPrecedence: 0
+  }, {
     template: 'custom/table-checkbox',
     className: 'metrics-table__column metrics-table__column--checkbox'
   }, {
@@ -32,7 +37,9 @@ export default [
     sortedBy: 'sortable_changeContribution',
     title: 'Change in Contribution',
     disableFiltering: true,
-    className: 'metrics-table__column metrics-table__column--small'
+    className: 'metrics-table__column metrics-table__column--small',
+    sortDirection: 'desc',
+    sortPrecedence: 1
   }, {
     template: 'custom/dimensions-table-change',
     propertyName: 'contributionToChange',

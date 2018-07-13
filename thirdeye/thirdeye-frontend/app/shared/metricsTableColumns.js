@@ -1,6 +1,11 @@
 // rootcause metrics table columns mock
 export default [
   {
+    propertyName: 'isSelected',
+    isHidden: true,
+    sortDirection: 'desc',
+    sortPrecedence: 0
+  }, {
     template: 'custom/table-checkbox',
     className: 'metrics-table__column  metrics-table__column--checkbox'
   }, {
@@ -54,7 +59,9 @@ export default [
     propertyName: 'score',
     title: 'Outlier',
     disableFiltering: true,
-    className: 'metrics-table__column metrics-table__column--small'
+    className: 'metrics-table__column metrics-table__column--small',
+    sortDirection: 'desc',
+    sortPrecedence: 1
   }, {
     template: 'custom/rca-metric-links',
     propertyName: 'links',

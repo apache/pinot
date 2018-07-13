@@ -1,4 +1,4 @@
-import { computed, getProperties } from '@ember/object';
+import { computed, getProperties, set } from '@ember/object';
 import Component from '@ember/component';
 import {
   toCurrentUrn,
@@ -153,7 +153,7 @@ export default Component.extend({
         });
       });
 
-      return _.sortBy(rows, (row) => -1 * Math.abs(row.changeContribution));
+      return _.sortBy(rows, (row) => row.label);
     }
   ),
 
@@ -161,13 +161,7 @@ export default Component.extend({
    * Keeps track of items that are selected in the table
    * @type {Array}
    */
-  preselectedItems: computed(
-    'metricsTableData',
-    'selectedUrns',
-    function () {
-      return []; // FIXME: this is broken across all of RCA and works by accident only
-    }
-  ),
+  preselectedItems: [], // FIXME: this is broken across all of RCA and works by accident only
 
   /**
    * Sums all values for a given dimension name
@@ -218,6 +212,7 @@ export default Component.extend({
         updates[toBaselineUrn(urn)] = state;
       }
 
+      set(this, 'preselectedItems', []);
       onSelection(updates);
     }
   }

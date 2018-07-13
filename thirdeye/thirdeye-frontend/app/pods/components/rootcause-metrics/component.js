@@ -1,4 +1,4 @@
-import { computed } from '@ember/object';
+import { computed, getProperties, set } from '@ember/object';
 import Component from '@ember/component';
 import {
   toCurrentUrn,
@@ -89,7 +89,7 @@ export default Component.extend({
   links: computed(
     'entities',
     function() {
-      const { entities } = this.getProperties('entities');
+      const { entities } = getProperties(this, 'entities');
       let metricUrlMapping = {};
 
       filterPrefix(Object.keys(entities), 'thirdeye:metric:')
@@ -125,7 +125,7 @@ export default Component.extend({
     'links',
     function() {
       const { selectedUrns, entities, aggregates, scores, links } =
-        this.getProperties('selectedUrns', 'entities', 'aggregates', 'scores', 'links');
+        getProperties(this, 'selectedUrns', 'entities', 'aggregates', 'scores', 'links');
 
       const rows = filterPrefix(Object.keys(entities), 'thirdeye:metric:')
         .map(urn => {
@@ -150,7 +150,7 @@ export default Component.extend({
           };
         });
 
-      return _.sortBy(rows, (row) => -1 * scores[row.urn]);
+      return _.sortBy(rows, (row) => row.label);
     }
   ),
 
@@ -194,14 +194,7 @@ export default Component.extend({
    * Keeps track of items that are selected in the table
    * @type {Array}
    */
-  preselectedItems: computed(
-    'metricsTableData',
-    'selectedUrns',
-    function () {
-      const { metricsTableData, selectedUrns } = this.getProperties('metricsTableData', 'selectedUrns');
-      return [...selectedUrns].filter(urn => metricsTableData[urn]).map(urn => metricsTableData[urn]);
-    }
-  ),
+  preselectedItems: [], // FIXME: this is broken across all of RCA and works by accident only
 
   actions: {
     /**
@@ -212,7 +205,7 @@ export default Component.extend({
     displayDataChanged (e) {
       if (_.isEmpty(e.selectedItems)) { return; }
 
-      const { selectedUrns, onSelection } = this.getProperties('selectedUrns', 'onSelection');
+      const { selectedUrns, onSelection } = getProperties(this, 'selectedUrns', 'onSelection');
 
       if (!onSelection) { return; }
 
@@ -225,6 +218,7 @@ export default Component.extend({
         updates[toBaselineUrn(urn)] = state;
       }
 
+      set(this, 'preselectedItems', []);
       onSelection(updates);
     }
   }
