@@ -17,7 +17,7 @@ package com.linkedin.pinot.tools.admin;
 
 import com.linkedin.pinot.tools.admin.command.MoveReplicaGroup;
 
-import com.linkedin.pinot.tools.admin.command.RealtimeHostsProvisioningCommand;
+import com.linkedin.pinot.tools.admin.command.RealtimeProvisioningHelperCommand;
 import java.lang.reflect.Field;
 
 import org.kohsuke.args4j.Argument;
@@ -94,7 +94,7 @@ public class PinotAdministrator {
       @SubCommand(name = "MoveReplicaGroup", impl = MoveReplicaGroup.class),
       @SubCommand(name = "BackfillSegmentColumn", impl = BackfillDateTimeColumnCommand.class),
       @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class),
-      @SubCommand(name = "RealtimeHostsProvisioning", impl = RealtimeHostsProvisioningCommand.class)
+      @SubCommand(name = "RealtimeProvisioningHelper", impl = RealtimeProvisioningHelperCommand.class)
   })
   Command _subCommand;
   // @formatter:on

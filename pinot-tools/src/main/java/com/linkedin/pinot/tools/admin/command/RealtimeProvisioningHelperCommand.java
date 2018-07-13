@@ -31,9 +31,9 @@ import org.slf4j.LoggerFactory;
  * Given a set of input params, output a table of num hosts to num hours and the memory required per host
  *
  */
-public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand implements Command {
+public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand implements Command {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeHostsProvisioningCommand.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeProvisioningHelperCommand.class);
 
   private static final int MEMORY_STR_LEN = 9;
   private static final String COMMA_SEPARATOR = ",";
@@ -52,9 +52,9 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
   @Option(name = "-retentionHours", metaVar = "<int>",
       usage = "number of hours we would require this segment to be in memory. "
       + "\nThis would depend on the retention set in the table config for the table, as well as the frequency of offline flows. "
-      + "\nWhen the offline segments become available, those will be used for querying instead of the realtime segments."
-      + "\neg. If daily flows exist, we would need realtime segments in memory only for 2 days.")
-  private int _retentionHours = 48;
+      + "\nIf offline segments are available until time N, TimeBoundaryService will query offline until N-1 and realtime for >=N"
+      + "\neg. If daily flows exist, assuming the flow runs everyday, we would need realtime segments in memory for a little over 2 days")
+  private int _retentionHours = 72;
 
   @Option(name = "-numHosts", metaVar = "<String>",
       usage = "number of hosts as comma separated values (default 2,4,6,8,10,12,14,16)")
@@ -76,44 +76,44 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
   private boolean _help = false;
 
 
-  public RealtimeHostsProvisioningCommand setNumReplicas(int numReplicas) {
+  public RealtimeProvisioningHelperCommand setNumReplicas(int numReplicas) {
     _numReplicas = numReplicas;
     return this;
   }
 
-  public RealtimeHostsProvisioningCommand setNumPartitions(int numPartitions) {
+  public RealtimeProvisioningHelperCommand setNumPartitions(int numPartitions) {
     _numPartitions = numPartitions;
     return this;
   }
 
-  public RealtimeHostsProvisioningCommand setRetentionHours(int retentionHours) {
+  public RealtimeProvisioningHelperCommand setRetentionHours(int retentionHours) {
     _retentionHours = retentionHours;
     return this;
   }
-  public RealtimeHostsProvisioningCommand setNumHosts(String numHosts) {
+  public RealtimeProvisioningHelperCommand setNumHosts(String numHosts) {
     _numHosts = numHosts;
     return this;
   }
 
-  public RealtimeHostsProvisioningCommand setNumHours(String numHours) {
+  public RealtimeProvisioningHelperCommand setNumHours(String numHours) {
     _numHours = numHours;
     return this;
   }
 
 
-  public RealtimeHostsProvisioningCommand setSampleCompletedSegmentDir(String sampleCompletedSegmentDir) {
+  public RealtimeProvisioningHelperCommand setSampleCompletedSegmentDir(String sampleCompletedSegmentDir) {
     _sampleCompletedSegmentDir = sampleCompletedSegmentDir;
     return this;
   }
 
-  public RealtimeHostsProvisioningCommand setPeriodSampleSegmentConsumed(String periodSampleSegmentConsumed) {
+  public RealtimeProvisioningHelperCommand setPeriodSampleSegmentConsumed(String periodSampleSegmentConsumed) {
     _periodSampleSegmentConsumed = periodSampleSegmentConsumed;
     return this;
   }
 
   @Override
   public String toString() {
-    return ("RealtimeHostsProvisioningCommand -numReplicas " + _numReplicas + " -numPartitions " + _numPartitions
+    return ("RealtimeProvisioningHelperCommand -numReplicas " + _numReplicas + " -numPartitions " + _numPartitions
         + " -retentionHours " + _retentionHours + " -numHosts " + _numHosts + " -numHours " + _numHours
         + " -sampleCompletedSegmentDir " + _sampleCompletedSegmentDir
         + " -periodSampleSegmentConsumed " + _periodSampleSegmentConsumed);
@@ -121,7 +121,7 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
 
   @Override
   public final String getName() {
-    return "RealtimeHostsProvisioningCommand";
+    return "RealtimeProvisioningHelperCommand";
   }
 
   @Override
@@ -145,15 +145,15 @@ public class RealtimeHostsProvisioningCommand extends AbstractBaseAdminCommand i
 
     int totalConsumingPartitions = _numPartitions * _numReplicas;
 
-    // TODO: allow multiple segments. What would that mean for the memory calculations?
+    // TODO: allow multiple segments.
     // Consuming: Build statsHistory using multiple segments. Use multiple data points of (totalDocs,numHoursConsumed) to calculate totalDocs for our numHours
     // Completed: Use multiple (completedSize,numHours) data points to calculate completed size for our numHours
     File sampleCompletedSegmentFile = new File(_sampleCompletedSegmentDir);
 
-    long minutesSampleSegmentConsumed =
-        TimeUnit.MINUTES.convert(TimeUtils.convertPeriodToMillis(_periodSampleSegmentConsumed), TimeUnit.MILLISECONDS);
+    long sampleSegmentConsumedSeconds =
+        TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(_periodSampleSegmentConsumed), TimeUnit.MILLISECONDS);
 
-    MemoryEstimator memoryEstimator = new MemoryEstimator(sampleCompletedSegmentFile, minutesSampleSegmentConsumed);
+    MemoryEstimator memoryEstimator = new MemoryEstimator(sampleCompletedSegmentFile, sampleSegmentConsumedSeconds);
     File sampleStatsHistory = memoryEstimator.initializeStatsHistory();
     memoryEstimator.estimateMemoryUsed(sampleStatsHistory, numHosts, numHours, totalConsumingPartitions, _retentionHours);
 

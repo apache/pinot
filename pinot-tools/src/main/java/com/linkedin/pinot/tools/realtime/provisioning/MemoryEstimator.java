@@ -45,7 +45,7 @@ public class MemoryEstimator {
   private static final String STATS_FILE_COPY_NAME = "stats.copy.ser";
 
   private File _sampleCompletedSegment;
-  private long _minutesSampleSegmentConsumed;
+  private long _sampleSegmentConsumedSeconds;
 
   private SegmentMetadataImpl _segmentMetadata;
   private long _sampleCompletedSegmentSizeBytes;
@@ -58,9 +58,9 @@ public class MemoryEstimator {
   private String[][] _optimalSegmentSize;
   private String[][] _consumingMemoryPerHost;
 
-  public MemoryEstimator(File sampleCompletedSegment, long minutesSampleSegmentConsumed) {
+  public MemoryEstimator(File sampleCompletedSegment, long sampleSegmentConsumedSeconds) {
     _sampleCompletedSegment = sampleCompletedSegment;
-    _minutesSampleSegmentConsumed = minutesSampleSegmentConsumed;
+    _sampleSegmentConsumedSeconds = sampleSegmentConsumedSeconds;
 
     _sampleCompletedSegmentSizeBytes = FileUtils.sizeOfDirectory(_sampleCompletedSegment);
     try {
@@ -144,12 +144,33 @@ public class MemoryEstimator {
   }
 
   /**
-   * Given a sample stats file, retention and total consuming partitions, estimates the amount of memory required per host
-   * @param statsFile - stats file from a sample segment for the same table
-   * @param numHosts - list of number of hosts that are to be provisioned
-   * @param numHours - list of number of hours to be consumed
-   * @param totalConsumingPartitions - total consuming partitions we are provisioning for
-   * @param retentionHours - what is the amount of retention in memory expected for completed segments
+   * Algorithm:
+   * <br>Given numReplicas and numPartitions, we can find out total consuming partitions per host, for various numHosts
+   * <br><b>totalConsumingPartitionsPerHost = (numReplicas * numPartitions)/numHosts</b>
+   * <br>
+   * <br>Given a sample realtime completed segment (with size s), and how long it consumed for (t),
+   * <br>we can estimate how much memory the table would require for various combinations of num hosts and num hours
+   * <br>
+   * <br>For completed segments-
+   * <br>For each numHoursToConsume we compute:
+   * <br>If a segment with size s takes time t to complete, then consuming for time numHoursToConsume would create segment with size <b>estimatedSize = (numHoursToConsume/t)*s</b>
+   * <br>If retention for completed segments in memory is rt hours, then the segment would be in memory for <b>(rt-numHoursToConsume) hours</b>
+   * <br>A segment would complete every numHoursToConsume hours, so we would have at a time <b>numCompletedSegmentsAtATime = (rt-numHoursToConsume)/numHoursToConsume</b> to hold in memory
+   * <br>As a result, <b>totalCompletedSegmentsMemory per ConsumingPartition = estimatedSize * numCompletedSegmentsAtATime</b>
+   * <br>
+   * <br>For consuming segments-
+   * <br>Using the sample segment, we initialize the stats history
+   * <br>For each numHoursToConsume we compute:
+   * <br>If totalDocs in sample segment is n when it consumed for time t, then consuming for time numHoursToConsume would create <b>totalDocs = (numHoursToConsume/t)*n</b>
+   * <br>We create a {@link MutableSegmentImpl} using the totalDocs, and then fetch the memory used by the memory manager, to get totalConsumingSegmentMemory per ConsumingPartition
+   * <br>
+   * <br><b>totalMemory = (totalCompletedMemory per ConsumingPartition + totalConsumingMemory per ConsumingPartition) * totalConsumingPartitionsPerHost</b>
+   * <br>
+   * @param statsFile stats file from a sample segment for the same table
+   * @param numHosts list of number of hosts that are to be provisioned
+   * @param numHours list of number of hours to be consumed
+   * @param totalConsumingPartitions total consuming partitions we are provisioning for
+   * @param retentionHours what is the amount of retention in memory expected for completed segments
    * @throws IOException
    */
   public void estimateMemoryUsed(File statsFile, int[] numHosts, int[] numHours, int totalConsumingPartitions,
@@ -158,13 +179,13 @@ public class MemoryEstimator {
     _optimalSegmentSize = new String[numHours.length][numHosts.length];
     _consumingMemoryPerHost = new String[numHours.length][numHosts.length];
 
-    int i = 0;
-    for (int numHoursToConsume : numHours) {
-      long minutesToConsume = numHoursToConsume * 60;
+    for (int i = 0; i < numHours.length; i++) {
+      int numHoursToConsume = numHours[i];
+      long secondsToConsume = numHoursToConsume * 3600;
       // consuming for _numHoursSampleSegmentConsumed, gives size sampleCompletedSegmentSizeBytes
       // hence, consuming for numHoursToConsume would give:
       long completedSegmentSizeBytes =
-          (long) (((double) minutesToConsume / _minutesSampleSegmentConsumed) * _sampleCompletedSegmentSizeBytes);
+          (long) (((double) secondsToConsume / _sampleSegmentConsumedSeconds) * _sampleCompletedSegmentSizeBytes);
 
       long totalMemoryForCompletedSegmentsPerPartition =
           calculateMemoryForCompletedSegmentsPerPartition(completedSegmentSizeBytes, numHoursToConsume, retentionHours);
@@ -172,8 +193,10 @@ public class MemoryEstimator {
       int totalDocsInSampleSegment = _segmentMetadata.getTotalDocs();
       // numHoursSampleSegmentConsumed created totalDocsInSampleSegment num rows
       // numHoursToConsume will create ? rows
-      int totalDocs = (int) (((double) minutesToConsume / _minutesSampleSegmentConsumed) * totalDocsInSampleSegment);
+      int totalDocs = (int) (((double) secondsToConsume / _sampleSegmentConsumedSeconds) * totalDocsInSampleSegment);
 
+      // We don't want the stats history to get updated from all our dummy runs
+      // So we copy over the original stats history every time we start
       File statsFileCopy = new File(_tableDataDir, STATS_FILE_COPY_NAME);
       FileUtils.copyFile(statsFile, statsFileCopy);
       RealtimeSegmentStatsHistory statsHistory;
@@ -207,9 +230,9 @@ public class MemoryEstimator {
 
       memoryForConsumingSegmentPerPartition += getMemoryForInvertedIndex(memoryForConsumingSegmentPerPartition);
 
-      int j = 0;
-      for (int numHostsToProvision : numHosts) {
+      for (int j = 0; j < numHosts.length; j++) {
 
+        int numHostsToProvision = numHosts[j];
         // adjustment because we want ceiling of division and not floor, as some hosts will have an extra partition due to the remainder of the division
         int totalConsumingPartitionsPerHost =
             (totalConsumingPartitions + numHostsToProvision - 1) / numHostsToProvision;
@@ -223,14 +246,13 @@ public class MemoryEstimator {
         if (totalMemoryPerHostBytes > MAX_MEMORY_BYTES) {
           _totalMemoryPerHost[i][j] = NOT_APPLICABLE;
           _consumingMemoryPerHost[i][j] = NOT_APPLICABLE;
-          _optimalSegmentSize[i][j++] = NOT_APPLICABLE;
+          _optimalSegmentSize[i][j] = NOT_APPLICABLE;
         } else {
           _totalMemoryPerHost[i][j] = DataSize.fromBytes(totalMemoryPerHostBytes);
           _consumingMemoryPerHost[i][j] = DataSize.fromBytes(totalMemoryForConsumingSegmentsPerHost);
-          _optimalSegmentSize[i][j++] = DataSize.fromBytes(completedSegmentSizeBytes);
+          _optimalSegmentSize[i][j] = DataSize.fromBytes(completedSegmentSizeBytes);
         }
       }
-      i++;
     }
   }
 
