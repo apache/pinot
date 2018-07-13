@@ -38,8 +38,8 @@ public class StarTreeV2DataSource {
   SegmentMetadataImpl _segmentMetadataImpl;
   Map<String, Integer> _columnIndexInfoMap;
   AggregationFunctionFactory _aggregationFunctionFactory;
-  Map<String, StarTreeV2MetricAggfuncPairDataSource> _metricRawIndexReader;
   Map<String, StarTreeV2DimensionDataSource> _dimensionIndexReader;
+  Map<String, StarTreeV2MetricAggfuncPairDataSource> _metricRawIndexReader;
 
   public StarTreeV2DataSource(ImmutableSegment immutableSegment, SegmentMetadataImpl segmentMetadataImpl,
       StarTreeV2Metadata metadata, Map<String, Integer> columnIndexInfoMap, File indexDataFile) {
