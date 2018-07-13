@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.utils;
 
 import java.math.BigDecimal;
+import java.text.DecimalFormat;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -34,6 +35,7 @@ public class DataSize {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataSize.class);
 
   static final Pattern STORAGE_VAL_PATTERN = Pattern.compile("([\\d.]+)([TGMK])?$", Pattern.CASE_INSENSITIVE);
+  private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.##");
 
   static final Map<String, Long> MULTIPLIER;
   static {
@@ -68,5 +70,19 @@ public class DataSize {
     long multiplier = MULTIPLIER.get(unit.toUpperCase());
     BigDecimal bytes = new BigDecimal(number);
     return bytes.multiply(BigDecimal.valueOf(multiplier)).longValue();
+  }
+
+  public static String fromBytes(long bytes) {
+    if (bytes < MULTIPLIER.get("K")) {
+      return String.valueOf(bytes) + "B";
+    } else if (bytes < MULTIPLIER.get("M")){
+      return DECIMAL_FORMAT.format(((double) bytes) / MULTIPLIER.get("K")) + "KB";
+    } else if (bytes < MULTIPLIER.get("G")) {
+      return DECIMAL_FORMAT.format(((double) bytes) / MULTIPLIER.get("M")) + "MB";
+    } else if (bytes < MULTIPLIER.get("T")){
+      return DECIMAL_FORMAT.format(((double) bytes) / MULTIPLIER.get("G")) + "GB";
+    } else {
+      return DECIMAL_FORMAT.format(((double) bytes) / MULTIPLIER.get("T")) + "TB";
+    }
   }
 }
