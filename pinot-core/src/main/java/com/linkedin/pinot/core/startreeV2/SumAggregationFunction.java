@@ -16,9 +16,9 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import java.util.List;
 import javax.annotation.Nonnull;
+import com.linkedin.pinot.common.data.FieldSpec;
 
 
 public class SumAggregationFunction implements AggregationFunction<Number, Double> {
