@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,8 +90,9 @@ public class MemoryEstimator {
 
   /**
    * Initialize the stats file using the sample segment provided.
-   * This involves indexing each row of the sample segment using MutableSegmentImpl.
-   * Invoking a destroy on the MutableSegmentImpl at the end will dump the collected stats into the stats.ser file provided in the statsHistory.
+   * <br>This involves indexing each row of the sample segment using MutableSegmentImpl. This is equivalent to consuming the rows of a segment.
+   * Although they will be in a different order than consumed by the host, the stats should be equivalent.
+   * <br>Invoking a destroy on the MutableSegmentImpl at the end will dump the collected stats into the stats.ser file provided in the statsHistory.
    */
   public File initializeStatsHistory() {
 
@@ -144,21 +145,23 @@ public class MemoryEstimator {
   }
 
   /**
-   * Algorithm:
+   * Given a sample segment, the time for which it consumed, numReplicas and numPartitions, estimate how much memory would be required per host for this table
+   * <br>
+   * <br>Algorithm:
    * <br>Given numReplicas and numPartitions, we can find out total consuming partitions per host, for various numHosts
    * <br><b>totalConsumingPartitionsPerHost = (numReplicas * numPartitions)/numHosts</b>
    * <br>
    * <br>Given a sample realtime completed segment (with size s), and how long it consumed for (t),
    * <br>we can estimate how much memory the table would require for various combinations of num hosts and num hours
    * <br>
-   * <br>For completed segments-
+   * <br>For estimating the memory occupied by completed segments-
    * <br>For each numHoursToConsume we compute:
    * <br>If a segment with size s takes time t to complete, then consuming for time numHoursToConsume would create segment with size <b>estimatedSize = (numHoursToConsume/t)*s</b>
    * <br>If retention for completed segments in memory is rt hours, then the segment would be in memory for <b>(rt-numHoursToConsume) hours</b>
    * <br>A segment would complete every numHoursToConsume hours, so we would have at a time <b>numCompletedSegmentsAtATime = (rt-numHoursToConsume)/numHoursToConsume</b> to hold in memory
    * <br>As a result, <b>totalCompletedSegmentsMemory per ConsumingPartition = estimatedSize * numCompletedSegmentsAtATime</b>
    * <br>
-   * <br>For consuming segments-
+   * <br>For estimating the memory occupied by consuming segments-
    * <br>Using the sample segment, we initialize the stats history
    * <br>For each numHoursToConsume we compute:
    * <br>If totalDocs in sample segment is n when it consumed for time t, then consuming for time numHoursToConsume would create <b>totalDocs = (numHoursToConsume/t)*n</b>
