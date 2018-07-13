@@ -104,7 +104,6 @@ public class PinotLLCRealtimeSegmentManager {
   private static final String KAFKA_SMALLEST_OFFSET = "smallest";
   protected static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
   protected static final long END_OFFSET_FOR_CONSUMING_SEGMENTS = Long.MAX_VALUE;
-  private static final int NUM_LOCKS = 4;
 
   private static final String METADATA_TEMP_DIR_SUFFIX = ".metadata.tmp";
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
@@ -128,6 +127,7 @@ public class PinotLLCRealtimeSegmentManager {
   private boolean _amILeader = false;
   private final ControllerConf _controllerConf;
   private final ControllerMetrics _controllerMetrics;
+  private final int _numIdealStateUpdateLocks;
   private final Lock[] _idealstateUpdateLocks;
   private final TableConfigCache _tableConfigCache;
   private final StreamPartitionAssignmentGenerator _streamPartitionAssignmentGenerator;
@@ -173,8 +173,9 @@ public class PinotLLCRealtimeSegmentManager {
     _clusterName = clusterName;
     _controllerConf = controllerConf;
     _controllerMetrics = controllerMetrics;
-    _idealstateUpdateLocks = new Lock[NUM_LOCKS];
-    for (int i = 0; i < NUM_LOCKS; i++) {
+    _numIdealStateUpdateLocks = controllerConf.getRealtimeSegmentMetadataCommitNumLocks();
+    _idealstateUpdateLocks = new Lock[_numIdealStateUpdateLocks];
+    for (int i = 0; i < _numIdealStateUpdateLocks; i++) {
       _idealstateUpdateLocks[i] = new ReentrantLock();
     }
     _tableConfigCache = new TableConfigCache(_propertyStore);
@@ -459,7 +460,7 @@ public class PinotLLCRealtimeSegmentManager {
     // to reduce this contention. We may still contend with RetentionManager, or other updates
     // to idealstate from other controllers, but then we have the retry mechanism to get around that.
     // hash code can be negative, so make sure we are getting a positive lock index
-    int lockIndex = (realtimeTableName.hashCode() & Integer.MAX_VALUE) % NUM_LOCKS;
+    int lockIndex = (realtimeTableName.hashCode() & Integer.MAX_VALUE) % _numIdealStateUpdateLocks;
     Lock lock = _idealstateUpdateLocks[lockIndex];
     try {
       lock.lock();
