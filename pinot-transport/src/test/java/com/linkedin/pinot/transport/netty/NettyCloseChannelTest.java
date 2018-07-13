@@ -34,7 +34,7 @@ public class NettyCloseChannelTest {
   private CountDownLatch _countDownLatch;
   private NettyTCPServer _nettyTCPServer;
   private NettyTCPClientConnection _nettyTCPClientConnection;
-  private final long CONNECTION_TIMEOUT = 10 * 1000L; // 10 seconds
+  private final long RESPONSE_TIMEOUT = 10L; // 10 seconds
 
   @BeforeMethod
   public void setUp()
@@ -73,7 +73,7 @@ public class NettyCloseChannelTest {
     _countDownLatch.countDown();
     byte[] serverResponse = null;
     try {
-      serverResponse = responseFuture.getOne(CONNECTION_TIMEOUT, TimeUnit.MILLISECONDS);
+      serverResponse = responseFuture.getOne(RESPONSE_TIMEOUT, TimeUnit.SECONDS);
     } catch (TimeoutException te) {
       Assert.fail("Timeout when sending request to server!");
     }
@@ -98,7 +98,7 @@ public class NettyCloseChannelTest {
     _countDownLatch.countDown();
     byte[] serverResponse = null;
     try {
-      serverResponse = responseFuture.getOne(CONNECTION_TIMEOUT, TimeUnit.MILLISECONDS);
+      serverResponse = responseFuture.getOne(RESPONSE_TIMEOUT, TimeUnit.SECONDS);
     } catch (TimeoutException te) {
       Assert.fail("Timeout when sending request to server!");
     }
