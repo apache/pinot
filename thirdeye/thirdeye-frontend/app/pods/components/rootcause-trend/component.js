@@ -1,4 +1,4 @@
-import { computed } from '@ember/object';
+import { computed, getProperties, set } from '@ember/object';
 import Component from '@ember/component';
 import {
   toCurrentUrn,
@@ -77,7 +77,7 @@ export default Component.extend({
     'context',
     'desiredStartTime',
     function () {
-      const { context, desiredStartTime } = this.getProperties('context', 'desiredStartTime');
+      const { context, desiredStartTime } = getProperties(this, 'context', 'desiredStartTime');
 
       const startTime = desiredStartTime || context.analysisRange[0];
       if (startTime < context.analysisRange[0]
@@ -94,14 +94,15 @@ export default Component.extend({
    * @type {string}
    */
   startTimeFormatted: computed('startTime', function () {
-    return this._formatTime(this.get('startTime'));
+    const { startTime } = getProperties(this, 'startTime');
+    return this._formatTime(startTime);
   }),
 
   /**
    * Start time options for dropdown
    */
   startTimeOptions: computed('availableBuckets', function () {
-    const availableBuckets = this.get('availableBuckets');
+    const { availableBuckets } = getProperties(this, 'availableBuckets');
 
     const options = [];
     for (let i = 0; i < availableBuckets.length; i += ROOTCAUSE_TREND_MAX_COLUMNS) {
@@ -115,7 +116,7 @@ export default Component.extend({
    * Reverse lookup mapping for start time options for dropdown
    */
   startTimeOptionsMapping: computed('availableBuckets', function () {
-    const availableBuckets = this.get('availableBuckets');
+    const { availableBuckets } = getProperties(this, 'availableBuckets');
 
     const options = {};
     for (let i = 0; i < availableBuckets.length; i += ROOTCAUSE_TREND_MAX_COLUMNS) {
@@ -130,7 +131,7 @@ export default Component.extend({
    * @type {int[]}
    */
   availableBuckets: computed('context', function () {
-    const context = this.get('context');
+    const { context } = getProperties(this, 'context');
 
     const buckets = [];
     const [stepSize, stepUnit] = context.granularity.split('_').map(s => s.toLowerCase());
@@ -152,7 +153,7 @@ export default Component.extend({
     'availableBuckets',
     'startTime',
     function () {
-      const { availableBuckets, startTime } = this.getProperties('availableBuckets', 'startTime');
+      const { availableBuckets, startTime } = getProperties(this, 'availableBuckets', 'startTime');
 
       const startOffset = startTime || availableBuckets[0];
       const startIndex = availableBuckets.findIndex(t => t >= startOffset);
@@ -166,10 +167,15 @@ export default Component.extend({
    * @type {object[]}
    */
   columns: computed('buckets', function () {
-    const buckets = this.get('buckets');
+    const { buckets } = getProperties(this, 'buckets');
 
     const columns = [
       {
+        propertyName: 'isSelected',
+        isHidden: true,
+        sortDirection: 'desc',
+        sortPrecedence: 0
+      }, {
         template: 'custom/table-checkbox',
         className: 'metrics-table__column'
       }, {
@@ -212,7 +218,7 @@ export default Component.extend({
     'buckets',
     function () {
       const { entities, timeseries, buckets } =
-        this.getProperties('entities', 'timeseries', 'buckets');
+        getProperties(this, 'entities', 'timeseries', 'buckets');
 
       const changes = {};
       const metricUrns = filterPrefix(Object.keys(entities), 'thirdeye:metric:');
@@ -259,7 +265,7 @@ export default Component.extend({
     'selectedUrns',
     function () {
       const { entities, buckets, changes, links, selectedUrns } =
-        this.getProperties('entities', 'buckets', 'changes', 'links', 'selectedUrns');
+        getProperties(this, 'entities', 'buckets', 'changes', 'links', 'selectedUrns');
 
       const metricUrns = filterPrefix(Object.keys(entities), 'thirdeye:metric:');
 
@@ -283,7 +289,7 @@ export default Component.extend({
         return row;
       });
 
-      return rows;
+      return _.sortBy(rows, (row) => row.label);
     }
   ),
 
@@ -301,7 +307,7 @@ export default Component.extend({
    * }
    */
   links: computed('entities', function() {
-    const entities = this.get('entities');
+    const { entities } = getProperties(this, 'entities');
     let metricUrlMapping = {};
 
     filterPrefix(Object.keys(entities), 'thirdeye:metric:')
@@ -328,14 +334,7 @@ export default Component.extend({
    * Keeps track of items that are selected in the table
    * @type {Array}
    */
-  preselectedItems: computed(
-    'data',
-    'selectedUrns',
-    function () {
-      const { data, selectedUrns } = this.getProperties('data', 'selectedUrns');
-      return [...selectedUrns].filter(urn => data[urn]).map(urn => data[urn]);
-    }
-  ),
+  preselectedItems: [], // FIXME: this is broken across all of RCA and works by accident only
 
   /**
    * Helper to format time stamp specifically for trend table
@@ -356,7 +355,7 @@ export default Component.extend({
     displayDataChanged (e) {
       if (_.isEmpty(e.selectedItems)) { return; }
 
-      const { selectedUrns, onSelection } = this.getProperties('selectedUrns', 'onSelection');
+      const { selectedUrns, onSelection } = getProperties(this, 'selectedUrns', 'onSelection');
 
       if (!onSelection) { return; }
 
@@ -369,6 +368,7 @@ export default Component.extend({
         updates[toBaselineUrn(urn)] = state;
       }
 
+      set(this, 'preselectedItems', []);
       onSelection(updates);
     },
 
@@ -376,8 +376,8 @@ export default Component.extend({
      * Triggered by drop down on change of selection
      */
     startTimeChanged(timestamp) {
-      const lookup = this.get('startTimeOptionsMapping');
-      this.set('desiredStartTime', lookup[timestamp]);
+      const { lookup } = getProperties(this, 'startTimeOptionsMapping');
+      set(this, 'desiredStartTime', lookup[timestamp]);
     }
   }
 });
