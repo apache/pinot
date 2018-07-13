@@ -22,6 +22,8 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -32,6 +34,7 @@ public class NettyCloseChannelTest {
   private CountDownLatch _countDownLatch;
   private NettyTCPServer _nettyTCPServer;
   private NettyTCPClientConnection _nettyTCPClientConnection;
+  private final long CONNECTION_TIMEOUT = 10 * 1000L; // 10 seconds
 
   @BeforeMethod
   public void setUp()
@@ -68,7 +71,12 @@ public class NettyCloseChannelTest {
     NettyTestUtils.closeClientConnection(_nettyTCPClientConnection);
 
     _countDownLatch.countDown();
-    byte[] serverResponse = responseFuture.getOne();
+    byte[] serverResponse = null;
+    try {
+      serverResponse = responseFuture.getOne(CONNECTION_TIMEOUT, TimeUnit.MILLISECONDS);
+    } catch (TimeoutException te) {
+      Assert.fail("Timeout when sending request to server!");
+    }
     Assert.assertNull(serverResponse);
     Assert.assertFalse(responseFuture.isCancelled());
     Assert.assertNotNull(responseFuture.getError());
@@ -88,7 +96,12 @@ public class NettyCloseChannelTest {
     NettyTestUtils.closeServerConnection(_nettyTCPServer);
 
     _countDownLatch.countDown();
-    byte[] serverResponse = responseFuture.getOne();
+    byte[] serverResponse = null;
+    try {
+      serverResponse = responseFuture.getOne(CONNECTION_TIMEOUT, TimeUnit.MILLISECONDS);
+    } catch (TimeoutException te) {
+      Assert.fail("Timeout when sending request to server!");
+    }
     Assert.assertNull(serverResponse);
     Assert.assertFalse(responseFuture.isCancelled());
     Assert.assertNotNull(responseFuture.getError());

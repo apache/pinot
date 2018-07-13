@@ -194,12 +194,12 @@ public abstract class NettyServer implements Runnable {
 
       currentTime = System.currentTimeMillis();
       if (endTime > currentTime) {
-        bossGroupFuture.awaitUninterruptibly(endTime - currentTime, TimeUnit.MINUTES);
+        bossGroupFuture.awaitUninterruptibly(endTime - currentTime, TimeUnit.MILLISECONDS);
       }
 
       currentTime = System.currentTimeMillis();
       if (endTime > currentTime) {
-        workerGroupFuture.awaitUninterruptibly(endTime - currentTime, TimeUnit.MINUTES);
+        workerGroupFuture.awaitUninterruptibly(endTime - currentTime, TimeUnit.MILLISECONDS);
       }
 
       Preconditions.checkState(channelFuture.isDone(), "Unable to close the channel in %s ms", millis);
