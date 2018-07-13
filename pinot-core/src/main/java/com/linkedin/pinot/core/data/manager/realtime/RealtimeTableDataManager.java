@@ -78,7 +78,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Override
   protected void doInit() {
-    _leaseExtender = SegmentBuildTimeLeaseExtender.create(_instanceId);
+    _leaseExtender = SegmentBuildTimeLeaseExtender.create(_instanceId, _serverMetrics);
     int maxParallelBuilds = _tableDataManagerConfig.getMaxParallelSegmentBuilds();
     if (maxParallelBuilds > 0) {
       _segmentBuildSemaphore = new Semaphore(maxParallelBuilds, true);

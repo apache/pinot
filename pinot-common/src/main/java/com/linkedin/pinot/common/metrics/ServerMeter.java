@@ -48,7 +48,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   LLC_CONTROLLER_RESPONSE_KEEP("messages", true),
   LLC_CONTROLLER_RESPONSE_NOT_LEADER("messages", true),
   LLC_CONTROLLER_RESPONSE_FAILED("messages", true),
-  LLC_CONTROLLER_RESPONSE_COMMIT_SUCCESS("messages", true);
+  LLC_CONTROLLER_RESPONSE_COMMIT_SUCCESS("messages", true),
+  LLC_CONTROLLER_RESPONSE_COMMIT_CONTINUE("messages", true),
+  LLC_CONTROLLER_RESPONSE_PROCESSED("messages", true),
+  LLC_CONTROLLER_RESPONSE_UPLOAD_SUCCESS("messages", true);
 
   private final String meterName;
   private final String unit;
