@@ -110,8 +110,6 @@ public class StorageQuotaChecker {
     }
 
     if (tableSubtypeSize.estimatedSizeInBytes == -1) {
-      String msg = String.format("Failed to get size estimate for table %s.",
-          tableNameWithType);
       // don't fail the quota check in this case
       return new QuotaCheckerResponse(true,
           "Failed to get size estimate for table: " + tableNameWithType);
