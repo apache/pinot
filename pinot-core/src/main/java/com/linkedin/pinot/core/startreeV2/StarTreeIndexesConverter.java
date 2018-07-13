@@ -33,7 +33,7 @@ import com.linkedin.pinot.common.segment.StarTreeV2Metadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
-public class StarTreeV1ToV2Converter implements StarTreeFormatConverter {
+public class StarTreeIndexesConverter implements StarTreeFormatConverter {
 
   private int _docsCount = 0;
   private List<StarTreeV2Metadata> _starTreeV2MetadataList;
@@ -44,38 +44,13 @@ public class StarTreeV1ToV2Converter implements StarTreeFormatConverter {
     SegmentMetadataImpl v2Metadata = new SegmentMetadataImpl(indexStarTreeDir);
     createFilesIfNotExist(indexStarTreeDir);
     copyIndexData(indexStarTreeDir, v2Metadata, starTreeId);
+    copyStarTreeData(indexStarTreeDir, starTreeId);
 
     return;
   }
 
   /**
-   * Helper function to copy indexes to single file.
-   *
-   * @return void.
-   */
-  private void copyIndexData(File v2Directory, SegmentMetadataImpl v2Metadata, int starTreeId)
-      throws Exception {
-
-    _starTreeV2MetadataList = v2Metadata.getStarTreeV2Metadata();
-    StarTreeV2Metadata metaData = _starTreeV2MetadataList.get(starTreeId);
-
-    List<String> dimensionsSplitOrder = metaData.getDimensionsSplitOrder();
-    List<String> met2aggfuncPairs = metaData.getMet2AggfuncPairs();
-    _docsCount = metaData.getDocsCount();
-
-    for (String dimension: dimensionsSplitOrder) {
-      appendToFile(v2Directory, dimension, "DIMENSION", starTreeId);
-    }
-
-    for (String pair: met2aggfuncPairs) {
-      appendToFile(v2Directory, pair, "METRIC", starTreeId);
-    }
-
-    return;
-  }
-
-  /**
-   * Helper function to create files if not exist.
+   * Helper function to create files if do not exist to hold star tree information.
    *
    * @return void.
    */
@@ -95,6 +70,41 @@ public class StarTreeV1ToV2Converter implements StarTreeFormatConverter {
   }
 
   /**
+   * Helper function to copy indexes to single file.
+   *
+   * @return void.
+   */
+  private void copyIndexData(File v2Directory, SegmentMetadataImpl v2Metadata, int starTreeId) throws Exception {
+
+    _starTreeV2MetadataList = v2Metadata.getStarTreeV2Metadata();
+    StarTreeV2Metadata metaData = _starTreeV2MetadataList.get(starTreeId);
+
+    List<String> dimensionsSplitOrder = metaData.getDimensionsSplitOrder();
+    List<String> met2aggfuncPairs = metaData.getMet2AggfuncPairs();
+    _docsCount = metaData.getDocsCount();
+
+    for (String dimension : dimensionsSplitOrder) {
+      appendToFile(v2Directory, dimension, "DIMENSION", starTreeId);
+    }
+
+    for (String pair : met2aggfuncPairs) {
+      appendToFile(v2Directory, pair, "METRIC", starTreeId);
+    }
+
+    return;
+  }
+
+  /**
+   * Helper function to copy star tree to a single file.
+   *
+   * @return void.
+   */
+  private void copyStarTreeData(File v2Directory, int starTreeId) throws Exception {
+    appendToFile(v2Directory, "root", "STARTREE", starTreeId);
+    return;
+  }
+
+  /**
    * Helper function to append data from one file to another.
    *
    * @return void.
@@ -105,9 +115,14 @@ public class StarTreeV1ToV2Converter implements StarTreeFormatConverter {
     if (type.equals("DIMENSION")) {
       readerFile = new File(path, column + StarTreeV2Constant.DIMENSION_FWD_INDEX_SUFFIX);
       readerFilePath = readerFile.getPath();
-    } else {
+    } else if (type.equals("METRIC")) {
       readerFile = new File(path, column + StarTreeV2Constant.METRIC_RAW_INDEX_SUFFIX);
       readerFilePath = readerFile.getPath();
+    } else if (type.equals("STARTREE")) {
+      readerFile = new File(path, StarTreeV2Constant.STAR_TREE + "_" + Integer.toString(starTreeId));
+      readerFilePath = readerFile.getPath();
+    } else {
+      return;
     }
 
     String indexWriterFile = new File(path, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE).getPath();
@@ -116,10 +131,10 @@ public class StarTreeV1ToV2Converter implements StarTreeFormatConverter {
     try {
       int b;
       File inFile = new File(readerFilePath);
-      ByteBuffer buf = ByteBuffer.allocateDirect((int)inFile.length());
+      ByteBuffer buf = ByteBuffer.allocateDirect((int) inFile.length());
       InputStream is = new FileInputStream(inFile);
-      while ((b=is.read())!=-1) {
-        buf.put((byte)b);
+      while ((b = is.read()) != -1) {
+        buf.put((byte) b);
       }
 
       File file = new File(columnWriterFile);
@@ -137,11 +152,9 @@ public class StarTreeV1ToV2Converter implements StarTreeFormatConverter {
       out.close();
 
       FileUtils.deleteQuietly(readerFile);
-    }
-    catch(FileNotFoundException ex) {
+    } catch (FileNotFoundException ex) {
       System.out.println("Unable to open file '" + indexWriterFile + "'");
-    }
-    catch(IOException ex) {
+    } catch (IOException ex) {
       System.out.println("Error reading file '" + readerFilePath + "'");
     }
   }

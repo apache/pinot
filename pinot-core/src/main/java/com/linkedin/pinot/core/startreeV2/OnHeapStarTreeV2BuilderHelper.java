@@ -96,7 +96,8 @@ public class OnHeapStarTreeV2BuilderHelper {
   /**
    * aggregate metric values ( raw or aggregated )
    */
-  public static List<Object> aggregateMetrics(int start, int end, List<Record> starTreeData, List<Met2AggfuncPair> met2aggfuncPairs, String dataSource) {
+  public static List<Object> aggregateMetrics(int start, int end, List<Record> starTreeData,
+      List<Met2AggfuncPair> met2aggfuncPairs, String dataSource) {
     List<Object> aggregatedMetricsValue = new ArrayList<>();
 
     List<List<Object>> metricValues = new ArrayList<>();
@@ -125,7 +126,7 @@ public class OnHeapStarTreeV2BuilderHelper {
     }
     List<Object> data = metricValues.get(met2aggfuncPairs.size());
     AggregationFunction function = functionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.COUNT);
-    aggregatedMetricsValue.add(aggregate(function, StarTreeV2Constant.AGGREGATED_DATA, data));
+    aggregatedMetricsValue.add(aggregate(function, dataSource, data));
 
     return aggregatedMetricsValue;
   }
@@ -133,7 +134,7 @@ public class OnHeapStarTreeV2BuilderHelper {
   /**
    * aggregate raw or pre aggregated data.
    */
-  public static Object aggregate( AggregationFunction function, String dataSource, List<Object> data) {
+  public static Object aggregate(AggregationFunction function, String dataSource, List<Object> data) {
     if (dataSource.equals(StarTreeV2Constant.RAW_DATA)) {
       return function.aggregateRaw(data);
     } else {
@@ -144,7 +145,8 @@ public class OnHeapStarTreeV2BuilderHelper {
   /**
    * function to condense documents according to sorted order.
    */
-  public static List<Record> condenseData(List<Record> starTreeData, List<Met2AggfuncPair> met2aggfuncPairs, String dataSource) {
+  public static List<Record> condenseData(List<Record> starTreeData, List<Met2AggfuncPair> met2aggfuncPairs,
+      String dataSource) {
     int start = 0;
     List<Record> newData = new ArrayList<>();
     Record prevRecord = starTreeData.get(0);
@@ -166,7 +168,8 @@ public class OnHeapStarTreeV2BuilderHelper {
     }
     Record record = new Record();
     record.setDimensionValues(starTreeData.get(start).getDimensionValues());
-    List<Object> aggregatedMetricsValue = aggregateMetrics(start, starTreeData.size(), starTreeData, met2aggfuncPairs, dataSource);
+    List<Object> aggregatedMetricsValue =
+        aggregateMetrics(start, starTreeData.size(), starTreeData, met2aggfuncPairs, dataSource);
     record.setMetricValues(aggregatedMetricsValue);
     newData.add(record);
 
@@ -216,7 +219,8 @@ public class OnHeapStarTreeV2BuilderHelper {
   /**
    * Helper method to write the header into the data buffer.
    */
-  public static long writeHeader(MMapBuffer dataBuffer, int headerSizeInBytes, int dimensionCount, List<String> dimensionsName, int nodesCount) {
+  public static long writeHeader(MMapBuffer dataBuffer, int headerSizeInBytes, int dimensionCount,
+      List<String> dimensionsName, int nodesCount) {
     long offset = 0L;
     dataBuffer.putLong(offset, OffHeapStarTree.MAGIC_MARKER);
     offset += V1Constants.Numbers.LONG_SIZE;
@@ -263,7 +267,8 @@ public class OnHeapStarTreeV2BuilderHelper {
       TreeNode node = queue.remove();
 
       if (node._children == null) {
-        offset = writeNode(dataBuffer, node, offset, StarTreeV2Constant.INVALID_INDEX, StarTreeV2Constant.INVALID_INDEX);
+        offset =
+            writeNode(dataBuffer, node, offset, StarTreeV2Constant.INVALID_INDEX, StarTreeV2Constant.INVALID_INDEX);
       } else {
         int startChildrenIndex = index + queue.size() + 1;
         int endChildrenIndex = startChildrenIndex + node._children.size() - 1;

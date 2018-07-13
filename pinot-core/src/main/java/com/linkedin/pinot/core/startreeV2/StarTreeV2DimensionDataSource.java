@@ -45,19 +45,20 @@ public class StarTreeV2DimensionDataSource extends DataSource {
   private FieldSpec.DataType _dataType;
   private InvertedIndexReader _invertedIndex;
 
-
   private File _columnDataFile;
   private String _operatorName;
   private Dictionary _dictionary;
   private DataFileReader _forwardIndex;
   private DataSourceMetadata _metadata;
 
-
-  public StarTreeV2DimensionDataSource(File dataFile, String columnName, ImmutableSegment immutableSegment, ColumnMetadata columnMetadata, int numDocs, int start, int size, int bits) throws IOException {
+  public StarTreeV2DimensionDataSource(File dataFile, String columnName, ImmutableSegment immutableSegment,
+      ColumnMetadata columnMetadata, int numDocs, int start, int size, int bits) throws IOException {
     _columnDataFile = dataFile;
     _operatorName = "ColumnDataSource [" + columnName + "]";
 
-    PinotDataBuffer buffer = PinotDataBuffer.fromFile(_columnDataFile, start, size, ReadMode.mmap, FileChannel.MapMode.READ_WRITE, "testing");
+    PinotDataBuffer buffer =
+        PinotDataBuffer.fromFile(_columnDataFile, start, size, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
+            "testing");
     _forwardIndex = new FixedBitSingleValueReader(buffer, numDocs, bits);
 
     _dictionary = immutableSegment.getDictionary(columnName);
@@ -105,7 +106,6 @@ public class StarTreeV2DimensionDataSource extends DataSource {
         return _dictionary != null;
       }
     };
-
   }
 
   @Override

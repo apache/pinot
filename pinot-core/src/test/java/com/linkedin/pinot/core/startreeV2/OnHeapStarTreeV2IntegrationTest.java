@@ -17,7 +17,6 @@
 package com.linkedin.pinot.core.startreeV2;
 
 import java.io.File;
-import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
 import com.google.common.io.Files;
@@ -30,8 +29,6 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 
 
@@ -90,43 +87,29 @@ public class OnHeapStarTreeV2IntegrationTest {
     OnHeapStarTreeV2Loader loadTest = new OnHeapStarTreeV2Loader();
     try {
 
-      File metadataFile = new File(new File(_indexDir, "v3"), V1Constants.MetadataKeys.METADATA_FILE_NAME);
-      PropertiesConfiguration properties = new PropertiesConfiguration(metadataFile);
-
       for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
         buildTest.init(_indexDir, _starTreeV2ConfigList.get(i));
         buildTest.build();
         buildTest.serialize();
-        Map<String, String> metadata = buildTest.getMetaData();
-        for (String key : metadata.keySet()) {
-          String value = metadata.get(key);
-          properties.setProperty(key, value);
-        }
-        properties.setProperty(StarTreeV2Constant.STAR_TREE_V2_COUNT, i+1);
-        properties.save();
-
-        buildTest.convertFromV1toV3(i);
       }
-
       loadTest.init(_filepath);
       loadTest.load();
 
-//      DataSource source = loadTest.getDimensionDataSource(0, "Name");
-//      Block block = source.nextBlock();
-//      BlockValSet blockValSet = block.getBlockValueSet();
-//      BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
-//      while(itr.hasNext()) {
-//        System.out.println(itr.nextIntVal());
-//      }
-
-      DataSource source = loadTest.getMetricAggPairDataSource(0, "salary_sum");
+      DataSource source = loadTest.getDimensionDataSource(0, "Name");
       Block block = source.nextBlock();
       BlockValSet blockValSet = block.getBlockValueSet();
       BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
-      while(itr.hasNext()) {
+      while (itr.hasNext()) {
         System.out.println(itr.nextIntVal());
       }
 
+      source = loadTest.getMetricAggPairDataSource(0, "salary_sum");
+      block = source.nextBlock();
+      blockValSet = block.getBlockValueSet();
+      itr = (BlockSingleValIterator) blockValSet.iterator();
+      while (itr.hasNext()) {
+        System.out.println(itr.nextDoubleVal());
+      }
     } catch (Exception e) {
       e.printStackTrace();
     }

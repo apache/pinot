@@ -39,7 +39,7 @@ public class SumAggregationFunction implements AggregationFunction<Number, Doubl
   public Double aggregateRaw(List<Number> data) {
     double sum = 0;
     for (Number number : data) {
-      sum = sum +  number.doubleValue();
+      sum = sum + number.doubleValue();
     }
     return sum;
   }

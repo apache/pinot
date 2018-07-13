@@ -42,5 +42,4 @@ public interface StarTreeV2Loader {
    * return data source for particular star tree.
    */
   DataSource getMetricAggPairDataSource(int starTreeId, String column) throws Exception;
-
 }
