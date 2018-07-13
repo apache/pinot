@@ -84,7 +84,6 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
   // Star Tree
   private int _starTreeCount = 0;
-  private StarTreeV2Config _config;
   private String _starTreeId = null;
   private List<Record> _starTreeData = new ArrayList<>();
   private List<Record> _rawStarTreeData = new ArrayList<>();
@@ -137,12 +136,11 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     List<MetricFieldSpec> _metricsSpecList = _segmentMetadata.getSchema().getMetricFieldSpecs();
     for (MetricFieldSpec metric : _metricsSpecList) {
       if (_metricsName.contains(metric.getName())) {
-        _metricsSpecMap.put(metric.getName(), metric);
+          _metricsSpecMap.put(metric.getName(), metric);
       }
     }
 
     // other initialisation
-    this._config = config;
     _starTreeId = StarTreeV2Constant.STAR_TREE + '_' + Integer.toString(_starTreeCount);
     _outDir = config.getOutDir();
     _maxNumLeafRecords = config.getMaxNumLeafRecords();
@@ -150,6 +148,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     _rootNode._dimensionId = StarTreeV2Constant.STAR_NODE;
     _nodesCount++;
     _starTreeCount++;
+    _aggregationFunctionFactory = new AggregationFunctionFactory();
 
     File metadataFile = new File(new File(indexDir, "v3"), V1Constants.MetadataKeys.METADATA_FILE_NAME);
     _properties = new PropertiesConfiguration(metadataFile);
@@ -173,7 +172,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
       dimensionColumnReaders.add(columnReader);
     }
 
-    // gathering dimensions data ( encoded dictionary id )
+    // gathering dimensions data ( dictionary encoded id )
     for (int i = 0; i < _rawDocsCount; i++) {
       Record record = new Record();
       int[] dimensionValues = new int[_dimensionsCount];
@@ -193,7 +192,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
       metricColumnReaders.add(columnReader);
     }
 
-    // gathering dimensions data ( raw data )
+    // gathering metric data ( raw data )
     for (int i = 0; i < _rawDocsCount; i++) {
       Record record = _rawStarTreeData.get(i);
       List<Object> metricRawValues = new ArrayList<>();
@@ -203,7 +202,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
         Object val = readHelper(metricColumnReaders.get(j), metricFieldSpec.getDataType(), i);
         metricRawValues.add(val);
       }
-      metricRawValues.add(1);   // for the count(*)
+      metricRawValues.add(1L);   // for the count, initially '1' for single document.
       record.setMetricValues(metricRawValues);
     }
 
@@ -216,6 +215,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
       for (int i = 0; i < _dimensionsSplitOrder.size(); i++) {
         dimensionSplitOrderStringList.add(_dimensionsName.get(_dimensionsSplitOrder.get(i)));
       }
+
       _dimensionSplitOrderString = String.join(",", dimensionSplitOrderStringList);
     }
 
@@ -232,6 +232,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
     // create aggregated doc for all nodes.
     createAggregatedDocForAllNodes(_rootNode);
+
     return;
   }
 
@@ -240,6 +241,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     createIndexes();
     serializeTree(new File(_outDir, _starTreeId));
 
+    // updating segment metadata by adding star tree meta data.
     Map<String, String> metadata = getMetaData();
     for (String key : metadata.keySet()) {
       String value = metadata.get(key);
@@ -265,6 +267,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
     String startTreeMet2aggfuncPairs = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAT2FUNC_MAP;
     metadata.put(startTreeMet2aggfuncPairs, _met2aggfuncPairsString + "count");
+
+    // TODO: have to add logic for SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS
 
     return metadata;
   }
@@ -314,9 +318,10 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     _metricForwardIndexCreatorList = new ArrayList<>();
 
     // 'SingleValueForwardIndexCreator' for dimensions.
-    for (String dimensionName : _dimensionsSpecMap.keySet()) {
+    for (String dimensionName : _dimensionsName) {
       DimensionFieldSpec spec = _dimensionsSpecMap.get(dimensionName);
       int cardinality = _immutableSegment.getDictionary(dimensionName).length();
+
       _dimensionForwardIndexCreatorList.add(
           new SingleValueUnsortedForwardIndexCreator(spec, _outDir, cardinality, _starTreeData.size(),
               _starTreeData.size(), false));
@@ -341,6 +346,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(_outDir,
         ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getDatatype(), _starTreeData.size(),
         V1Constants.Numbers.DOUBLE_SIZE);
+
     _metricForwardIndexCreatorList.add(rawIndexCreator);
 
     // indexing each record.
@@ -351,7 +357,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
       for (int j = 0; j < dimension.length; j++) {
         int val = dimension[j];
-        // step to skip -1 value for star nodes.
+
+        // if condition to skip -1 value for star nodes.
         if (dimension[j] == StarTreeV2Constant.SKIP_VALUE) {
           val = StarTreeV2Constant.VALID_INDEX_VALUE;
         }
@@ -363,6 +370,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
       }
     }
 
+    // closing all the opened index creator.
     for (int i = 0; i < _dimensionForwardIndexCreatorList.size(); i++) {
       _dimensionForwardIndexCreatorList.get(i).close();
     }
@@ -390,7 +398,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
     node._childDimensionId = splitDimensionId;
 
-    // Reserve one space for star node
+    // reserve one space for star node
     Map<Integer, TreeNode> children = new HashMap<>(dimensionRangeMap.size() + 1);
 
     node._children = children;
@@ -412,12 +420,12 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
       _nodesCount++;
     }
 
-    // Directly return if we don't need to create star-node
+    // directly return if we don't need to create star-node
     if (_dimensionsWithoutStarNode != null && _dimensionsWithoutStarNode.contains(splitDimensionId)) {
       return;
     }
 
-    // Create star node
+    // create a star node
     TreeNode starChild = new TreeNode();
     starChild._dimensionId = splitDimensionId;
     int starChildStartDocId = _starTreeData.size();

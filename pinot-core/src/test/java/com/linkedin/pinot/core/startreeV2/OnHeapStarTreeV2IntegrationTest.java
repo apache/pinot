@@ -92,6 +92,7 @@ public class OnHeapStarTreeV2IntegrationTest {
         buildTest.build();
         buildTest.serialize();
       }
+
       loadTest.init(_filepath);
       loadTest.load();
 
