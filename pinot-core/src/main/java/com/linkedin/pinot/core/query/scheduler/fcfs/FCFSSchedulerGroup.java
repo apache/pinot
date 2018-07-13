@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,32 +37,24 @@ public class FCFSSchedulerGroup extends AbstractSchedulerGroup {
    */
   @Override
   public int compareTo(SchedulerGroupAccountant rhs) {
-    return compareTo(this, ((SchedulerGroup) rhs));
+    return compare(this, ((SchedulerGroup) rhs));
   }
 
-  public static int compareTo(SchedulerGroup lhs, SchedulerGroup rhs) {
-    if (rhs == null) {
-      return 1;
-    }
-
+  public static int compare(SchedulerGroup lhs, SchedulerGroup rhs) {
     if (lhs == rhs) {
       return 0;
+    }
+    if (rhs == null) {
+      return 1;
     }
 
     SchedulerQueryContext lhsFirst = lhs.peekFirst();
     SchedulerQueryContext rhsFirst = rhs.peekFirst();
     if (lhsFirst != null && rhsFirst != null) {
-      long lhsArrivalMs = lhsFirst.getArrivalTimeMs();
-      long rhsArrivalMs = rhsFirst.getArrivalTimeMs();
-      if (lhsArrivalMs < rhsArrivalMs) {
-        return 1;
-      } else if (lhsArrivalMs > rhsArrivalMs) {
-        return -1;
-      }
-      return 0;
-    } else if (lhsFirst != null && rhsFirst == null) {
+      return Long.compare(rhsFirst.getArrivalTimeMs(), lhsFirst.getArrivalTimeMs());
+    } else if (lhsFirst != null) {
       return 1;
-    } else if (lhsFirst == null && rhsFirst != null) {
+    } else if (rhsFirst != null) {
       return -1;
     } else {
       return 0;

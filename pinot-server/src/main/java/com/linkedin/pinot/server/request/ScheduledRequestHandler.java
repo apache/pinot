@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
 
   @Override
   public ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
-    final long queryStartTimeNs = System.nanoTime();
+    long queryArrivalTimeMs = System.currentTimeMillis();
     serverMetrics.addMeteredGlobalValue(ServerMeter.QUERIES, 1);
 
     LOGGER.debug("Processing request : {}", request);
@@ -67,10 +67,10 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
       return Futures.immediateFuture(null);
     }
 
-    final ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, serverMetrics);
-    final TimerContext timerContext = queryRequest.getTimerContext();
-    timerContext.setQueryArrivalTimeNs(queryStartTimeNs);
-    timerContext.startNewPhaseTimerAtNs(ServerQueryPhase.REQUEST_DESERIALIZATION, queryStartTimeNs).stopAndRecord();
+    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, serverMetrics, queryArrivalTimeMs);
+    queryRequest.getTimerContext()
+        .startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
+        .stopAndRecord();
 
     LOGGER.debug("Processing requestId:{},request={}", instanceRequest.getRequestId(), instanceRequest);
     return queryScheduler.submit(queryRequest);

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,15 +21,12 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.QuerySource;
 import java.util.Arrays;
-import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class TestHelper {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TestHelper.class);
 
-  public static ServerQueryRequest createServerQueryRequest(String table, ServerMetrics metrics) {
+  public static ServerQueryRequest createServerQueryRequest(String table, ServerMetrics metrics,
+      long queryArrivalTimeMs) {
     InstanceRequest request = new InstanceRequest();
     request.setBrokerId("broker");
     request.setEnableTrace(false);
@@ -40,15 +37,18 @@ public class TestHelper {
     qs.setTableName(table);
     br.setQuerySource(qs);
     request.setQuery(br);
-    ServerQueryRequest qr = new ServerQueryRequest(request, metrics);
-    qr.getTimerContext().setQueryArrivalTimeNs(
-        TimeUnit.NANOSECONDS.convert(
-            System.currentTimeMillis(), TimeUnit.MILLISECONDS));
-    return qr;
+    return new ServerQueryRequest(request, metrics, queryArrivalTimeMs);
+  }
+
+  public static ServerQueryRequest createServerQueryRequest(String table, ServerMetrics metrics) {
+    return createServerQueryRequest(table, metrics, System.currentTimeMillis());
+  }
+
+  public static SchedulerQueryContext createQueryRequest(String table, ServerMetrics metrics, long queryArrivalTimeMs) {
+    return new SchedulerQueryContext(createServerQueryRequest(table, metrics, queryArrivalTimeMs));
   }
 
   public static SchedulerQueryContext createQueryRequest(String table, ServerMetrics metrics) {
-    return new SchedulerQueryContext(createServerQueryRequest(table, metrics));
+    return createQueryRequest(table, metrics, System.currentTimeMillis());
   }
-
 }
