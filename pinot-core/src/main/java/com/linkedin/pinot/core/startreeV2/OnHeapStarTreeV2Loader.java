@@ -17,12 +17,20 @@
 package com.linkedin.pinot.core.startreeV2;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.nio.channels.FileChannel;
 import java.util.Map;
 import java.util.List;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.io.FileOutputStream;
+import java.io.RandomAccessFile;
+import java.io.BufferedOutputStream;
+import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.startree.StarTreeNode;
+import com.linkedin.pinot.core.startree.OffHeapStarTree;
 import com.linkedin.pinot.common.segment.StarTreeV2Metadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -39,6 +47,8 @@ public class OnHeapStarTreeV2Loader implements StarTreeV2Loader {
   private SegmentMetadataImpl _segmentMetadataImpl;
 
   // star tree
+  private File _indexDir;
+  private File _starTreeFile;
   private File _starTreeIndexDataFile;
   private String _starTreeIndexMapFile;
   private Map<String, Integer> _starTreeIndexMetadata;
@@ -48,17 +58,18 @@ public class OnHeapStarTreeV2Loader implements StarTreeV2Loader {
   @Override
   public void init(File indexDir) throws Exception {
     // segment
+    _indexDir = indexDir;
     _v3IndexLoadingConfig = new IndexLoadingConfig();
     _v3IndexLoadingConfig.setReadMode(ReadMode.mmap);
     _v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
     _immutableSegment = ImmutableSegmentLoader.load(indexDir, _v3IndexLoadingConfig);
-
     _segmentMetadataImpl = new SegmentMetadataImpl(indexDir);
 
     // star tree
     _starTreeV2MetadataList = _segmentMetadataImpl.getStarTreeV2Metadata();
     _starTreeIndexDataFile = new File(indexDir, StarTreeV2Constant.STAR_TREE_V2_COlUMN_FILE);
     _starTreeIndexMapFile = new File(indexDir, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE).getPath();
+    _starTreeFile = new File(indexDir, StarTreeV2Constant.STAR_TREE_V2_TEMP_FILE);
   }
 
   @Override
@@ -77,6 +88,28 @@ public class OnHeapStarTreeV2Loader implements StarTreeV2Loader {
     }
 
     return;
+  }
+
+  @Override
+  public StarTree getStarTree(int starTreeId) throws IOException {
+
+    String sa = "startree" + starTreeId + ".root.start";
+    String sb = "startree" + starTreeId + ".root.size";
+
+    int start = _starTreeIndexMetadata.get(sa);
+    int size = _starTreeIndexMetadata.get(sb);
+
+
+    FileChannel src = new FileInputStream(_starTreeIndexDataFile).getChannel();
+    FileChannel dest = new FileOutputStream(_starTreeFile).getChannel();
+    src.transferTo(start, size, dest);
+
+    src.close();
+    dest.close();
+
+    StarTree s = new OffHeapStarTree(_starTreeFile, ReadMode.mmap);
+
+    return s;
   }
 
   @Override
