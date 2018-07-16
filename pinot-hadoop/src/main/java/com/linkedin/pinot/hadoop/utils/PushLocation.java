@@ -54,4 +54,9 @@ public class PushLocation {
       return new PushLocation(this);
     }
   }
+
+  @Override
+  public String toString() {
+    return _host + ":" + _port;
+  }
 }

@@ -89,9 +89,9 @@ public class FileUploadDownloadClient implements Closeable {
   private static final String HTTPS = "https";
   private static final String SCHEMA_PATH = "/schemas";
   private static final String SEGMENT_PATH = "/segments";
-  private static final String GET_TABLES_PATH = "/tables";
-  private static final String GET_SCHEMA_PATH = "/schema";
+  private static final String TABLES_PATH = "/tables";
   private static final String TYPE_DELIMITER = "?type=";
+  private static final String SLASH = "/";
 
   private final CloseableHttpClient _httpClient;
 
@@ -115,14 +115,14 @@ public class FileUploadDownloadClient implements Closeable {
     return new URI(scheme, null, host, port, path, null, null);
   }
 
-  public static URI getRetrieveTableConfigURI(String host, int port, String tableType, String tableName) throws URISyntaxException {
-    String path = GET_TABLES_PATH + tableName + TYPE_DELIMITER + tableType;
+  public static URI getRetrieveTableConfigURI(String host, int port, String tableName) throws URISyntaxException {
+    String path = TABLES_PATH + SLASH + tableName;
     return getURI(HTTP, host, port, path);
   }
 
   public static URI getRetrieveSchemaHttpURI(String host, int port, String tableName) throws URISyntaxException {
-    String path = GET_TABLES_PATH + tableName + GET_SCHEMA_PATH;
-    return getURI(HTTP, host, port, SCHEMA_PATH);
+    String path = SCHEMA_PATH + SLASH + tableName;
+    return getURI(HTTP, host, port, path);
   }
 
   public static URI getUploadSchemaHttpURI(String host, int port) throws URISyntaxException {

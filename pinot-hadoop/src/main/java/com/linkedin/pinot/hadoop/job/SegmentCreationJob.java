@@ -39,6 +39,7 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.apache.helix.task.JobConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,10 +60,10 @@ public class SegmentCreationJob extends Configured {
   private final Schema _dataSchema;
   private final String _depsJarPath;
   private final String _outputDir;
-
-  private final String[] _hosts;
-  private final int _port;
   private final String _tableName;
+
+  private String[] _hosts;
+  private int _port;
 
   public SegmentCreationJob(String jobName, Properties properties) throws Exception {
     super(new Configuration());
@@ -75,8 +76,15 @@ public class SegmentCreationJob extends Configured {
     _outputDir = getOutputDir();
     _stagingDir = new File(_outputDir, TEMP).getAbsolutePath();
     _depsJarPath = _properties.getProperty(PATH_TO_DEPS_JAR, null);
-    _hosts = _properties.getProperty("push.to.hosts").split(",");
-    _port = Integer.parseInt(_properties.getProperty("push.to.port"));
+    String hostsString = _properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS);
+    String portString = _properties.getProperty(JobConfigConstants.PUSH_TO_PORT);
+
+    // For backwards compatibility, we want to allow users to create segments without setting push location parameters
+    // in their creation jobs.
+    if (hostsString != null && portString != null) {
+      _hosts = hostsString.split(",");
+      _port = Integer.parseInt(portString);
+    }
     _tableName = _properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME);
 
     Utils.logVersions();
@@ -149,7 +157,11 @@ public class SegmentCreationJob extends Configured {
 
     Job job = Job.getInstance(getConf());
 
-    setAdditionalJobProperties(job);
+    if (_hosts != null && _port != 0) {
+      setAdditionalJobProperties(job);
+    } else {
+      LOGGER.warn("Unable to set TableConfig-dependent properties. Please set {} and {}", JobConfigConstants.PUSH_TO_HOSTS, JobConfigConstants.PUSH_TO_PORT);
+    }
 
     job.setJarByClass(SegmentCreationJob.class);
     job.setJobName(_jobName);
@@ -214,11 +226,12 @@ public class SegmentCreationJob extends Configured {
     job.getConfiguration()
         .set(JobConfigConstants.TABLE_PUSH_TYPE, tableConfig.getValidationConfig().getSegmentPushType());
     if (tableConfig.getValidationConfig().getSegmentPushType().equalsIgnoreCase(TableConfigConstants.APPEND)) {
+      LOGGER.info("For append use cases, {} and {} must be set", JobConfigConstants.TIME_COLUMN_NAME, JobConfigConstants.TIME_COLUMN_TYPE);
       job.getConfiguration()
           .set(JobConfigConstants.TIME_COLUMN_NAME, tableConfig.getValidationConfig().getTimeColumnName());
       job.getConfiguration().set(JobConfigConstants.TIME_COLUMN_TYPE, tableConfig.getValidationConfig().getTimeType());
     } else {
-      LOGGER.info("Refresh use case. Not setting timeColumnName and timeColumnType: " + _tableName);
+      LOGGER.info("Refresh use case. Not setting timeColumnName and timeColumnType for table: " + _tableName);
     }
 
     String schema = controllerRestApiObject.getSchema();

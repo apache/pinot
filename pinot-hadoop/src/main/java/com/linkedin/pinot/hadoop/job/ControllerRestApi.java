@@ -33,7 +33,7 @@ public class ControllerRestApi {
   private final List<PushLocation> _pushLocations;
   private final String _tableName;
 
-  private static final String OFFLINE = "offline";
+  private static final String OFFLINE = "OFFLINE";
 
   public ControllerRestApi(List<PushLocation> pushLocations, String tableName) {
     LOGGER.info("Push Locations are: " + pushLocations);
@@ -46,7 +46,7 @@ public class ControllerRestApi {
     List<URI> tableConfigURIs = new ArrayList<>();
     try {
       for (PushLocation pushLocation : _pushLocations) {
-        tableConfigURIs.add(FileUploadDownloadClient.getRetrieveTableConfigURI(pushLocation.getHost(), pushLocation.getPort(), _tableName, OFFLINE));
+        tableConfigURIs.add(FileUploadDownloadClient.getRetrieveTableConfigURI(pushLocation.getHost(), pushLocation.getPort(), _tableName));
       }
     } catch (URISyntaxException e) {
       LOGGER.error("Could not construct table config URI for table {}", _tableName);
@@ -58,9 +58,9 @@ public class ControllerRestApi {
       try {
         SimpleHttpResponse response = fileUploadDownloadClient.getTableConfig(uri);
         JSONObject queryResponse = new JSONObject(response.getResponse());
-        JSONObject offlineTableConfig = queryResponse.getJSONObject("OFFLINE");
+        JSONObject offlineTableConfig = queryResponse.getJSONObject(OFFLINE);
         LOGGER.info("Got table config {}", offlineTableConfig);
-        if (!queryResponse.isNull("OFFLINE")) {
+        if (!queryResponse.isNull(OFFLINE)) {
           return TableConfig.fromJSONConfig(offlineTableConfig);
         }
       } catch (Exception e) {

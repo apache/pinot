@@ -28,4 +28,7 @@ public class JobConfigConstants {
   public static final String SCHEMA = "data.schema";
   public static final String SEGMENT_TABLE_NAME = "segment.table.name";
 
+  public static final String PUSH_TO_HOSTS = "push.to.hosts";
+  public static final String PUSH_TO_PORT = "push.to.port";
+
 }
