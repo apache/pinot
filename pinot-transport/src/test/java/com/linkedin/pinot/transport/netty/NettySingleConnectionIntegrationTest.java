@@ -66,7 +66,7 @@ public class NettySingleConnectionIntegrationTest {
     _requestHandler.setResponse(NettyTestUtils.DUMMY_RESPONSE);
     NettyTestUtils.LatchControlledRequestHandlerFactory handlerFactory =
         new NettyTestUtils.LatchControlledRequestHandlerFactory(_requestHandler);
-    _nettyTCPServer = new NettyTCPServer(NettyTestUtils.DEFAULT_PORT, handlerFactory, null);
+    _nettyTCPServer = new NettyTCPServer(NettyTestUtils.DEFAULT_PORT, handlerFactory, null, 100, 1, 6);
     Thread serverThread = new Thread(_nettyTCPServer, "NettyTCPServer");
     serverThread.start();
     // Wait for at most 10 seconds for server to start

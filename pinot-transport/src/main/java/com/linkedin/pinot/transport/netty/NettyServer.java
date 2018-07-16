@@ -105,8 +105,8 @@ public abstract class NettyServer implements Runnable {
   //TODO: Need configs to control number of threads
   // NOTE/atumbde: With ScheduledRequestHandler, queries are executed asynchronously.
   // So, these netty threads are not blocked. Config is still important
-  protected final EventLoopGroup _bossGroup = new NioEventLoopGroup(1);
-  protected final EventLoopGroup _workerGroup = new NioEventLoopGroup(20);
+  protected final EventLoopGroup _bossGroup;
+  protected final EventLoopGroup _workerGroup;
 
   // Netty Channel
   protected volatile Channel _channel = null;
@@ -123,11 +123,18 @@ public abstract class NettyServer implements Runnable {
   protected final long _defaultLargeQueryLatencyMs;
 
   public NettyServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry, long defaultLargeQueryLatencyMs) {
+    this(port, handlerFactory, registry, defaultLargeQueryLatencyMs, 1, 20);
+  }
+
+  public NettyServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry, long defaultLargeQueryLatencyMs,
+      int numThreadsForBossGroup, int numThreadsForWorkerGroup) {
     _port = port;
     _handlerFactory = handlerFactory;
     _metricsRegistry = registry;
     _metrics = new AggregatedTransportServerMetrics(_metricsRegistry, AGGREGATED_SERVER_METRICS_NAME + port + "_");
     _defaultLargeQueryLatencyMs = defaultLargeQueryLatencyMs;
+    _bossGroup = new NioEventLoopGroup(numThreadsForBossGroup);
+    _workerGroup = new NioEventLoopGroup(numThreadsForWorkerGroup);
   }
 
   @Override

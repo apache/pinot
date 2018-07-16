@@ -46,6 +46,11 @@ public class NettyTCPServer extends NettyServer {
     this(port, handlerFactory, registry, 100);
   }
 
+  public NettyTCPServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry, long defaultLargeQueryLatencyMs,
+      int numThreadsForBossGroup, int numThreadsForWorkerGroup) {
+    super(port, handlerFactory, registry, defaultLargeQueryLatencyMs, numThreadsForBossGroup, numThreadsForWorkerGroup);
+  }
+
   @Override
   protected ServerBootstrap getServerBootstrap() {
     ServerBootstrap b = new ServerBootstrap();
