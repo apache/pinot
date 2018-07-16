@@ -127,11 +127,26 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
-  public String listTableConfigs() {
+  public String listTableConfigs(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     try {
-      List<String> rawTables = _pinotHelixResourceManager.getAllRawTables();
-      Collections.sort(rawTables);
-      JSONArray tableArray = new JSONArray(rawTables);
+      List<String> tableNames;
+      CommonConstants.Helix.TableType tableType = null;
+      if (tableTypeStr != null) {
+        tableType = CommonConstants.Helix.TableType.valueOf(tableTypeStr.toUpperCase());
+      }
+
+      if (tableType == null) {
+        tableNames = _pinotHelixResourceManager.getAllRawTables();
+      } else {
+        if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+          tableNames = _pinotHelixResourceManager.getAllRealtimeTables();
+        } else {
+          tableNames = _pinotHelixResourceManager.getAllOfflineTables();
+        }
+      }
+
+      Collections.sort(tableNames);
+      JSONArray tableArray = new JSONArray(tableNames);
       JSONObject resultObject = new JSONObject();
       resultObject.put("tables", tableArray);
       return resultObject.toString();

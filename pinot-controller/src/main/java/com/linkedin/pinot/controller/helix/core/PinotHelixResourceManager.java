@@ -371,6 +371,22 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get all Pinot offline table names
+   * @return List of Pinot realtime table names
+   */
+  @Nonnull
+  public List<String> getAllOfflineTables() {
+    List<String> resourceNames = getAllResources();
+    Iterator<String> iterator = resourceNames.iterator();
+    while (iterator.hasNext()) {
+      if (!TableNameBuilder.OFFLINE.tableHasTypeSuffix(iterator.next())) {
+        iterator.remove();
+      }
+    }
+    return resourceNames;
+  }
+
+  /**
    * Get all Pinot raw table names.
    *
    * @return Set of Pinot raw table names
