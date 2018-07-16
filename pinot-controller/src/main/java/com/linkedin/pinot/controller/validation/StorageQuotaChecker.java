@@ -139,14 +139,14 @@ public class StorageQuotaChecker {
       String message;
       if (sizeDetails == null) {
         // append use case
-        message = String.format("Appending segment %s of Table %s is within quota. Total allowed storage size: %s ( = configured quota: %s * number replicas: %d). New estimated table size of all replicas: %s. Current table size of all replicas: %s. Incoming uncompressed segment size of all replicas: %s ( = single incoming uncompressed segment size: %s * number replicas: %d). Formula: New estimated size = current table size + incoming segment size",
+        message = String.format("Appending Segment %s of Table %s is within quota. Total allowed storage size: %s ( = configured quota: %s * number replicas: %d). New estimated table size of all replicas: %s. Current table size of all replicas: %s. Incoming uncompressed segment size of all replicas: %s ( = single incoming uncompressed segment size: %s * number replicas: %d). Formula: New estimated size = current table size + incoming segment size",
             segmentName, tableName, DataSize.fromBytes(allowedStorageBytes), DataSize.fromBytes(quotaConfig.storageSizeBytes()), numReplicas, DataSize.fromBytes(estimatedFinalSizeBytes), DataSize.fromBytes(tableSubtypeSize.estimatedSizeInBytes), DataSize.fromBytes(totalIncomingSegmentSizeBytes), DataSize.fromBytes(incomingSegmentSizeBytes), numReplicas);
       } else  {
         // refresh use case
-        message = String.format("Refreshing segment %s of Table %s is within quota. Total allowed storage size: %s ( = configured quota: %s * number replicas: %d). New estimated table size of all replicas: %s. Current table size of all replicas: %s. Incoming uncompressed segment size of all replicas: %s ( = single incoming uncompressed segment size: %s * number replicas: %d). Existing same segment size of all replicas: %s. Formula: New estimated size = current table size - existing same segment size + incoming segment size",
+        message = String.format("Refreshing Segment %s of Table %s is within quota. Total allowed storage size: %s ( = configured quota: %s * number replicas: %d). New estimated table size of all replicas: %s. Current table size of all replicas: %s. Incoming uncompressed segment size of all replicas: %s ( = single incoming uncompressed segment size: %s * number replicas: %d). Existing same segment size of all replicas: %s. Formula: New estimated size = current table size - existing same segment size + incoming segment size",
             segmentName, tableName, DataSize.fromBytes(allowedStorageBytes), DataSize.fromBytes(quotaConfig.storageSizeBytes()), numReplicas, DataSize.fromBytes(estimatedFinalSizeBytes), DataSize.fromBytes(tableSubtypeSize.estimatedSizeInBytes), DataSize.fromBytes(totalIncomingSegmentSizeBytes), DataSize.fromBytes(incomingSegmentSizeBytes), numReplicas, DataSize.fromBytes(existingSegmentSizeBytes));
       }
-      LOGGER.warn(message);
+      LOGGER.info(message);
       return new QuotaCheckerResponse(true, message);
     } else {
       String message;
@@ -157,10 +157,9 @@ public class StorageQuotaChecker {
             numReplicas);
       } else {
         message = String.format(
-            "Storage quota exceeded. Newly estimated size: %s ( = existing estimated uncompressed size of all replicas: %s - (existing segment sizes of all replicas: %s) + (incoming compressed segment size: %s * number replicas: %d)) > total allowed storage size: %s ( = configured quota: %s * number replicas: %d) for table %s.",
-            DataSize.fromBytes(estimatedFinalSizeBytes), DataSize.fromBytes(tableSubtypeSize.estimatedSizeInBytes), DataSize.fromBytes(existingSegmentSizeBytes),
-            DataSize.fromBytes(incomingSegmentSizeBytes), numReplicas, DataSize.fromBytes(allowedStorageBytes), DataSize.fromBytes(quotaConfig.storageSizeBytes()), numReplicas,
-            tableName);
+            "Storage quota exceeded for Table %s. New estimated size: %s > total allowed storage size: %s, where new estimated size = existing estimated uncompressed size of all replicas: %s - existing segment sizes of all replicas: %s + (incoming uncompressed segment size: %s * number replicas: %d), total allowed storage size = configured quota: %s * number replicas: %d",
+            tableName, DataSize.fromBytes(estimatedFinalSizeBytes), DataSize.fromBytes(allowedStorageBytes), DataSize.fromBytes(tableSubtypeSize.estimatedSizeInBytes), DataSize.fromBytes(existingSegmentSizeBytes),
+            DataSize.fromBytes(incomingSegmentSizeBytes), numReplicas, DataSize.fromBytes(quotaConfig.storageSizeBytes()), numReplicas);
       }
       LOGGER.warn(message);
       return new QuotaCheckerResponse(false, message);
