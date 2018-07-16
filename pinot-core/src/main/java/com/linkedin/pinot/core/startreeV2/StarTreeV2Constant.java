@@ -27,6 +27,7 @@ public class StarTreeV2Constant {
   public static final String STAR_TREE_V2_COUNT = "startreeV2.count";
   public static final String STAR_TREE_V2_COlUMN_FILE = "startreev2.column.psf";
   public static final String STAR_TREE_V2_INDEX_MAP_FILE = "startreev2.index.map";
+  public static final String STAR_TREE_V2_TEMP_FILE = "startree.temp";
 
   public static final String METRIC_RAW_INDEX_SUFFIX = ".sv.raw.fwd";
   public static final String DIMENSION_FWD_INDEX_SUFFIX = ".sv.unsorted.fwd";

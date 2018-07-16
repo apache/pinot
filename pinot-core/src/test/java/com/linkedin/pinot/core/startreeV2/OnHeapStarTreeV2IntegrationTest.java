@@ -16,10 +16,13 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.startree.StarTreeNode;
 import java.io.File;
 import java.util.List;
 import java.util.ArrayList;
 import com.google.common.io.Files;
+import org.apache.commons.io.FileUtils;
 import org.testng.annotations.Test;
 import org.testng.annotations.BeforeTest;
 import com.linkedin.pinot.core.common.Block;
@@ -95,6 +98,11 @@ public class OnHeapStarTreeV2IntegrationTest {
 
       loadTest.init(_filepath);
       loadTest.load();
+      StarTree s = loadTest.getStarTree(0);
+      List<String> dimensionNames = s.getDimensionNames();
+      StarTreeNode starTreeRootNode = s.getRoot();
+
+      //FileUtils.deleteQuietly(readerFile);
 
       DataSource source = loadTest.getDimensionDataSource(0, "Name");
       Block block = source.nextBlock();

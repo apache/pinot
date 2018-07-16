@@ -19,6 +19,7 @@ package com.linkedin.pinot.core.startreeV2;
 import java.io.File;
 import java.io.IOException;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.startree.StarTree;
 
 
 public interface StarTreeV2Loader {
@@ -33,6 +34,7 @@ public interface StarTreeV2Loader {
    */
   void load() throws IOException;
 
+  StarTree getStarTree(int starTreeId) throws IOException;
   /**
    * return data source for particular star tree.
    */
