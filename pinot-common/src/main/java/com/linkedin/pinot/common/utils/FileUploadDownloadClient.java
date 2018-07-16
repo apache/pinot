@@ -83,11 +83,15 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   public static final int DEFAULT_SOCKET_TIMEOUT_MS = 600 * 1000; // 10 minutes
+  public static final int GET_REQUEST_SOCKET_TIMEOUT_MS = 5 * 1000; // 5 seconds
 
   private static final String HTTP = "http";
   private static final String HTTPS = "https";
   private static final String SCHEMA_PATH = "/schemas";
   private static final String SEGMENT_PATH = "/segments";
+  private static final String TABLES_PATH = "/tables";
+  private static final String TYPE_DELIMITER = "?type=";
+  private static final String SLASH = "/";
 
   private final CloseableHttpClient _httpClient;
 
@@ -109,6 +113,16 @@ public class FileUploadDownloadClient implements Closeable {
 
   private static URI getURI(String scheme, String host, int port, String path) throws URISyntaxException {
     return new URI(scheme, null, host, port, path, null, null);
+  }
+
+  public static URI getRetrieveTableConfigURI(String host, int port, String tableName) throws URISyntaxException {
+    String path = TABLES_PATH + SLASH + tableName;
+    return getURI(HTTP, host, port, path);
+  }
+
+  public static URI getRetrieveSchemaHttpURI(String host, int port, String tableName) throws URISyntaxException {
+    String path = SCHEMA_PATH + SLASH + tableName;
+    return getURI(HTTP, host, port, path);
   }
 
   public static URI getUploadSchemaHttpURI(String host, int port) throws URISyntaxException {
@@ -140,6 +154,13 @@ public class FileUploadDownloadClient implements Closeable {
         RequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
     addHeadersAndParameters(requestBuilder, headers, parameters);
     setTimeout(requestBuilder, socketTimeoutMs);
+    return requestBuilder.build();
+  }
+
+  private static HttpUriRequest constructGetRequest(URI uri) {
+    RequestBuilder requestBuilder = RequestBuilder.get(uri)
+        .setVersion(HttpVersion.HTTP_1_1);
+    setTimeout(requestBuilder, GET_REQUEST_SOCKET_TIMEOUT_MS);
     return requestBuilder.build();
   }
 
@@ -266,6 +287,30 @@ public class FileUploadDownloadClient implements Closeable {
           String.format("%s to controller: %s, version: %s", errorMessage, controllerHost, controllerVersion);
     }
     return errorMessage;
+  }
+
+  /**
+   * Get request to retrieve table config
+   * @param uri URI
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse getTableConfig(URI uri)
+      throws IOException, HttpErrorStatusException {
+    return sendRequest(constructGetRequest(uri));
+  }
+
+  /**
+   * Get request to retrieve schema
+   * @param uri URI
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse getSchema(URI uri)
+      throws IOException, HttpErrorStatusException {
+    return sendRequest(constructGetRequest(uri));
   }
 
   /**

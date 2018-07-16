@@ -38,9 +38,9 @@ public class SegmentTarPushJob extends Configured {
 
   public SegmentTarPushJob(String name, Properties properties) {
     super(new Configuration());
-    _segmentPath = properties.getProperty("path.to.output") + "/";
-    _hosts = properties.getProperty("push.to.hosts").split(",");
-    _port = Integer.parseInt(properties.getProperty("push.to.port"));
+    _segmentPath = properties.getProperty(JobConfigConstants.PATH_TO_OUTPUT) + "/";
+    _hosts = properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS).split(",");
+    _port = Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_TO_PORT));
   }
 
   public void run() throws Exception {
@@ -77,7 +77,7 @@ public class SegmentTarPushJob extends Configured {
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       for (String host : _hosts) {
         try (InputStream inputStream = fs.open(path)) {
-          fileName = fileName.split(".tar.gz")[0];
+          fileName = fileName.split(JobConfigConstants.TARGZ)[0];
           LOGGER.info("******** Uploading file: {} to Host: {} and Port: {} *******", fileName, host, _port);
           SimpleHttpResponse response =
               fileUploadDownloadClient.uploadSegment(FileUploadDownloadClient.getUploadSegmentHttpURI(host, _port),
