@@ -416,7 +416,6 @@ public class DataFrameUtils {
   }
 
   /**
-<<<<<<< HEAD
    * Returns partial to zero out date fields based on period type
    *
    * @return partial
@@ -473,10 +472,7 @@ public class DataFrameUtils {
   }
 
   /**
-   * Helper: Returns a pre-populated ThirdeyeRequestBuilder instance.
-=======
    * Helper: Returns a pre-populated ThirdeyeRequestBuilder instance. Removes invalid filter values.
->>>>>>> add support for filter on metrics
    *
    * @param slice metric data slice
    * @param metric metric dto
