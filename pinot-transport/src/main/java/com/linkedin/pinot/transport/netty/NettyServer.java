@@ -190,9 +190,9 @@ public abstract class NettyServer implements Runnable {
       LOGGER.info("Closing the server channel");
       long endTime = System.currentTimeMillis() + millis;
 
-      ChannelFuture channelFuture = _channel.close();
       Future<?> bossGroupFuture = _bossGroup.shutdownGracefully();
       Future<?> workerGroupFuture = _workerGroup.shutdownGracefully();
+      ChannelFuture channelFuture = _channel.close();
 
       long currentTime = System.currentTimeMillis();
       if (endTime > currentTime) {
@@ -206,6 +206,7 @@ public abstract class NettyServer implements Runnable {
 
       currentTime = System.currentTimeMillis();
       if (endTime > currentTime) {
+        System.out.println(String.format("%d ms left to shutdown worker group", (endTime - currentTime)));
         workerGroupFuture.awaitUninterruptibly(endTime - currentTime, TimeUnit.MILLISECONDS);
       }
 

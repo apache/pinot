@@ -38,8 +38,6 @@ import org.testng.annotations.Test;
 public class PinotResourceManagerTest {
   private final static String HELIX_CLUSTER_NAME = "testCluster";
   private final static String TABLE_NAME = "testTable";
-  private static final int ZK_CONNECT_TIMEOUT_IN_SECOND = 10;
-
 
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private ZkClient _zkClient;
@@ -50,7 +48,6 @@ public class PinotResourceManagerTest {
   public void setUp() throws Exception {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
-    _zkClient.waitUntilConnected(ZK_CONNECT_TIMEOUT_IN_SECOND, TimeUnit.SECONDS);
 
     final String instanceId = "localhost_helixController";
     _pinotHelixResourceManager =

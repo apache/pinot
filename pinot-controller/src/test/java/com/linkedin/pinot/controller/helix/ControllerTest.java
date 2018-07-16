@@ -33,7 +33,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
@@ -60,7 +59,6 @@ public abstract class ControllerTest {
   private static final int DEFAULT_CONTROLLER_PORT = 8998;
   private static final String DEFAULT_DATA_DIR =
       FileUtils.getTempDirectoryPath() + File.separator + "test-controller-" + System.currentTimeMillis();
-  private static final int ZK_CONNECT_TIMEOUT = 10; // 10 seconds
 
   protected int _controllerPort;
   protected String _controllerBaseApiUrl;
@@ -123,7 +121,6 @@ public abstract class ControllerTest {
 
     String zkStr = config.getZkStr();
     _zkClient = new ZkClient(zkStr);
-    _zkClient.waitUntilConnected(ZK_CONNECT_TIMEOUT, TimeUnit.SECONDS);
     if (_zkClient.exists("/" + helixClusterName)) {
       _zkClient.deleteRecursive("/" + helixClusterName);
     }

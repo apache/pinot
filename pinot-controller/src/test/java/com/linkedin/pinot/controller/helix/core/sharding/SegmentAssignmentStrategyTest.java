@@ -35,7 +35,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -53,7 +52,6 @@ public class SegmentAssignmentStrategyTest {
   private final static String TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT = "testReplicaGroupPartitionAssignment";
   private final static String TABLE_NAME_TABLE_LEVEL_REPLICA_GROUP = "testTableLevelReplicaGroup";
   private final static String TABLE_NAME_PARTITION_LEVEL_REPLICA_GROUP = "testPartitionLevelReplicaGroup";
-  private static final int ZK_CONNECT_TIMEOUT_IN_SECOND = 10;
 
   private static final Random random = new Random();
   private final static String PARTITION_COLUMN = "memberId";
@@ -71,7 +69,6 @@ public class SegmentAssignmentStrategyTest {
   public void setup() throws Exception {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZK_SERVER);
-    _zkClient.waitUntilConnected(ZK_CONNECT_TIMEOUT_IN_SECOND, TimeUnit.SECONDS);
     final String zkPath = "/" + HELIX_CLUSTER_NAME;
     if (_zkClient.exists(zkPath)) {
       _zkClient.deleteRecursive(zkPath);

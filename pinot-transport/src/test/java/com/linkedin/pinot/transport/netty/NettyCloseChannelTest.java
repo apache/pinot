@@ -45,7 +45,7 @@ public class NettyCloseChannelTest {
     requestHandler.setResponse(NettyTestUtils.DUMMY_RESPONSE);
     NettyTestUtils.LatchControlledRequestHandlerFactory handlerFactory =
         new NettyTestUtils.LatchControlledRequestHandlerFactory(requestHandler);
-    _nettyTCPServer = new NettyTCPServer(NettyTestUtils.DEFAULT_PORT, handlerFactory, null, 100, 1, 2);
+    _nettyTCPServer = new NettyTCPServer(NettyTestUtils.DEFAULT_PORT, handlerFactory, null, 100, 1, 1);
     Thread serverThread = new Thread(_nettyTCPServer, "NettyTCPServer");
     serverThread.start();
     // Wait for at most 10 seconds for server to start
@@ -95,11 +95,14 @@ public class NettyCloseChannelTest {
   public void testCloseServerChannel()
       throws Exception {
     Assert.assertTrue(_nettyTCPClientConnection.connect());
+    Assert.assertTrue(_nettyTCPServer.isStarted());
     ResponseFuture responseFuture =
         _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(NettyTestUtils.DUMMY_REQUEST.getBytes()), 1L,
             5000L);
 
-    NettyTestUtils.closeServerConnection(_nettyTCPServer);
+    if (!_nettyTCPServer.isShutdownComplete()) {
+      NettyTestUtils.closeServerConnection(_nettyTCPServer);
+    }
 
     _countDownLatch.countDown();
     byte[] serverResponse = null;
@@ -116,7 +119,11 @@ public class NettyCloseChannelTest {
   @AfterMethod
   public void tearDown()
       throws Exception {
-    NettyTestUtils.closeClientConnection(_nettyTCPClientConnection);
-    NettyTestUtils.closeServerConnection(_nettyTCPServer);
+    if (!_nettyTCPClientConnection.isSelfClose()) {
+      NettyTestUtils.closeClientConnection(_nettyTCPClientConnection);
+    }
+    if (!_nettyTCPServer.isShutdownComplete()) {
+      NettyTestUtils.closeServerConnection(_nettyTCPServer);
+    }
   }
 }

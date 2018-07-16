@@ -58,7 +58,6 @@ public class ValidationManagerTest {
   private static final String TEST_TABLE_NAME = "testTable";
   private static final String TEST_TABLE_TWO = "testTable2";
   private static final String TEST_SEGMENT_NAME = "testSegment";
-  private static final int ZK_CONNECT_TIMEOUT_IN_SECOND = 10;
 
   private ZkClient _zkClient;
 
@@ -71,7 +70,7 @@ public class ValidationManagerTest {
   public void setUp() throws Exception {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZK_STR);
-    _zkClient.waitUntilConnected(ZK_CONNECT_TIMEOUT_IN_SECOND, TimeUnit.SECONDS);
+    Thread.sleep(1000);
 
     _pinotHelixResourceManager =
         new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 1000L, true, /*isUpdateStateModel=*/

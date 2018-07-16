@@ -301,7 +301,11 @@ public class NettySingleConnectionIntegrationTest {
   @AfterMethod
   public void tearDown()
       throws Exception {
-    NettyTestUtils.closeClientConnection(_nettyTCPClientConnection);
-    NettyTestUtils.closeServerConnection(_nettyTCPServer);
+    if (!_nettyTCPClientConnection.isSelfClose()) {
+      NettyTestUtils.closeClientConnection(_nettyTCPClientConnection);
+    }
+    if (!_nettyTCPServer.isShutdownComplete()) {
+      NettyTestUtils.closeServerConnection(_nettyTCPServer);
+    }
   }
 }

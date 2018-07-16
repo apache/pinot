@@ -51,8 +51,6 @@ public class HelixBrokerStarterTest {
   private static final String RAW_DINING_TABLE_NAME = "dining";
   private static final String DINING_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_DINING_TABLE_NAME);
   private static final String COFFEE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType("coffee");
-  private static final int ZK_CONNECT_TIMEOUT_IN_SECOND = 10;
-
 
   private ZkClient _zkClient;
   private HelixAdmin _helixAdmin;
@@ -63,7 +61,6 @@ public class HelixBrokerStarterTest {
   public void setUp() throws Exception {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
-    _zkClient.waitUntilConnected(ZK_CONNECT_TIMEOUT_IN_SECOND, TimeUnit.SECONDS);
     final String instanceId = "localhost_helixController";
     _pinotResourceManager =
         new PinotHelixResourceManager(ZkStarter.DEFAULT_ZK_STR, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true, /*isUpdateStateModel=*/false);

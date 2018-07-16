@@ -27,6 +27,8 @@ import org.apache.zookeeper.server.quorum.QuorumPeerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.kafka.common.security.JaasUtils.*;
+
 
 public class ZkStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkStarter.class);
@@ -91,7 +93,7 @@ public class ZkStarter {
           tickTime = getTickTime();
           minSessionTimeout = getMinSessionTimeout();
           maxSessionTimeout = getMaxSessionTimeout();
-          maxClientCnxns = 0;
+          maxClientCnxns = 60;
           return 0;
         }
 
@@ -137,6 +139,8 @@ public class ZkStarter {
    * @param dataDirPath The path for the Zk data directory
    */
   public synchronized static ZookeeperInstance startLocalZkServer(final int port, final String dataDirPath) {
+    // Disable SASL-authenticated for starting local zk server
+    String isSaslEnable = System.setProperty(ZK_SASL_CLIENT, "false");
     // Start the local ZK server
     try {
       long startTime = System.currentTimeMillis();
@@ -149,12 +153,17 @@ public class ZkStarter {
             long zookeeperStartTime = System.currentTimeMillis();
             zookeeperServerMain.initializeAndRun(args);
             long zookeeperEndTime = System.currentTimeMillis();
-            System.out.println("Total run time for zookeeper is: " + (zookeeperEndTime - zookeeperStartTime) + ". dataDirPath: " + dataDirPath);
+            if (isSaslEnable != null) {
+              System.setProperty(ZK_SASL_CLIENT, isSaslEnable);
+            }
+            System.out.println("Total run time for zookeeper is: " + (zookeeperEndTime - zookeeperStartTime) + "ms. dataDirPath: " + dataDirPath);
           } catch (QuorumPeerConfig.ConfigException e) {
             System.out.println("Caught exception while starting ZK" + e.getMessage());
+            e.printStackTrace();
             LOGGER.warn("Caught exception while starting ZK", e);
           } catch (IOException e) {
             System.out.println("Caught exception while starting ZK" + e.getMessage());
+            e.printStackTrace();
             LOGGER.warn("Caught exception while starting ZK", e);
           }
         }
@@ -170,6 +179,7 @@ public class ZkStarter {
       return new ZookeeperInstance(zookeeperServerMain, dataDirPath);
     } catch (Exception e) {
       System.out.println("Caught exception while starting ZK" + e.getMessage());
+      e.printStackTrace();
       LOGGER.warn("Caught exception while starting ZK", e);
       throw new RuntimeException(e);
     }

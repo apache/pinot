@@ -51,7 +51,6 @@ public class TableQueryQuotaManagerTest {
   private static String RAW_TABLE_NAME = "testTable";
   private static String OFFLINE_TABLE_NAME = RAW_TABLE_NAME + "_OFFLINE";
   private static String REALTIME_TABLE_NAME = RAW_TABLE_NAME + "_REALTIME";
-  private static final int ZK_CONNECT_TIMEOUT_IN_SECOND = 10;
 
   @BeforeTest
   public void beforeTest() {
@@ -75,10 +74,9 @@ public class TableQueryQuotaManagerTest {
       super(clusterName, instanceName, instanceType, zkAddress);
       super._zkclient = new ZkClient(StringUtil.join("/", StringUtils.chomp(ZkStarter.DEFAULT_ZK_STR, "/")),
           ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
-      _zkclient.waitUntilConnected(ZK_CONNECT_TIMEOUT_IN_SECOND, TimeUnit.SECONDS);
       _zkclient.deleteRecursive("/" + clusterName + "/PROPERTYSTORE");
       _zkclient.createPersistent("/" + clusterName + "/PROPERTYSTORE", true);
-      _zkclient.waitUntilExists("/" + clusterName + "/PROPERTYSTORE", TimeUnit.SECONDS, ZK_CONNECT_TIMEOUT_IN_SECOND);
+      _zkclient.waitUntilExists("/" + clusterName + "/PROPERTYSTORE", TimeUnit.SECONDS, 10L);
       setPropertyStore(clusterName);
     }
 
