@@ -1,23 +1,16 @@
 package com.linkedin.thirdeye.detection.alert.filter;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.collect.Collections2;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.AnomalySlice;
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.alert.AlertUtils;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
 import com.linkedin.thirdeye.detection.alert.StatefulDetectionAlertFilter;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,27 +50,9 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
 
     final long minId = getMinId(highWaterMark);
 
-    for (Long detectionConfigId : this.detectionConfigIds) {
-      long startTime = MapUtils.getLong(vectorClocks, detectionConfigId, 0L);
+    Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
 
-      AnomalySlice slice = new AnomalySlice().withConfigId(detectionConfigId).withStart(startTime).withEnd(this.endTime);
-      Collection<MergedAnomalyResultDTO> candidates = this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice);
-
-      Collection<MergedAnomalyResultDTO> anomalies =
-          Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
-            @Override
-            public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomalyResultDTO) {
-              return mergedAnomalyResultDTO != null
-                  && !mergedAnomalyResultDTO.isChild()
-                  && !AlertUtils.hasFeedback(mergedAnomalyResultDTO)
-                  && (mergedAnomalyResultDTO.getId() == null || mergedAnomalyResultDTO.getId() >= minId);
-            }
-          });
-
-      result.addMapping(this.recipients, new HashSet<>(anomalies));
-    }
-
-    return result;
+    return result.addMapping(this.recipients, anomalies);
   }
 
   private long getMinId(long highWaterMark) {
