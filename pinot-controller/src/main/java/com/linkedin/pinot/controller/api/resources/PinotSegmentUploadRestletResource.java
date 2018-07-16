@@ -522,18 +522,17 @@ public class PinotSegmentUploadRestletResource {
 
       // Update ZK metadata and refresh the segment if necessary
       long newCrc = Long.valueOf(segmentMetadata.getCrc());
-      LOGGER.info("CRC for segment {}, existing: {} new: {}", segmentName, existingCrc, newCrc);
       if (newCrc == existingCrc) {
-        LOGGER.info("New segment {} is same as existing one, updating ZK metadata without refreshing the segment",
-            segmentName);
+        LOGGER.info("New segment crc {} is same as existing segment crc {} for segment {}. Updating ZK metadata without refreshing the segment {}",
+            newCrc, existingCrc, segmentName);
         if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata)) {
           throw new RuntimeException(
               "Failed to update ZK metadata for segment: " + segmentName + " of table: " + offlineTableName);
         }
       } else {
         // New segment is different with the existing one, update ZK metadata and refresh the segment
-        LOGGER.info("New segment {} is different than the existing one, updating ZK metadata and refresh segment",
-            segmentName);
+        LOGGER.info("New segment crc {} is different than the existing segment crc {}. Updating ZK metadata and refreshing segment {}",
+            newCrc, existingCrc, segmentName);
         if (downloadUrl == null) {
           downloadUrl = moveSegmentToPermanentDirectory(provider, rawTableName, segmentName, tempTarredSegmentFile);
         }
