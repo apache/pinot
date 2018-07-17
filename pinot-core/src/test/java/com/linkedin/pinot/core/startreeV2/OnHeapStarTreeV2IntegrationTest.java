@@ -16,22 +16,19 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import com.linkedin.pinot.core.startree.StarTree;
-import com.linkedin.pinot.core.startree.StarTreeNode;
 import java.io.File;
+import java.util.Map;
 import java.util.List;
+import java.util.HashMap;
 import java.util.ArrayList;
 import com.google.common.io.Files;
-import org.apache.commons.io.FileUtils;
 import org.testng.annotations.Test;
 import org.testng.annotations.BeforeTest;
-import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 
 
@@ -43,6 +40,7 @@ public class OnHeapStarTreeV2IntegrationTest {
   private String _segmentOutputDir;
   private RecordReader _recordReader;
   private static List<StarTreeV2Config> _starTreeV2ConfigList = new ArrayList<>();
+  private List<Map<String, DataSource>> _starTreeDataSourcesList = new ArrayList<>();
 
   @BeforeTest
   void setUp() throws Exception {
@@ -85,9 +83,8 @@ public class OnHeapStarTreeV2IntegrationTest {
   }
 
   @Test
-  public void testBuildAndLoad() throws Exception {
+  public void testBuilder() throws Exception {
     OnHeapStarTreeV2Builder buildTest = new OnHeapStarTreeV2Builder();
-    OnHeapStarTreeV2Loader loadTest = new OnHeapStarTreeV2Loader();
     try {
 
       for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
@@ -96,29 +93,60 @@ public class OnHeapStarTreeV2IntegrationTest {
         buildTest.serialize();
       }
 
+
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  @Test
+  public void testLoader() throws Exception {
+    OnHeapStarTreeV2Loader loadTest = new OnHeapStarTreeV2Loader();
+    try {
       loadTest.init(_filepath);
       loadTest.load();
-      StarTree s = loadTest.getStarTree(0);
-      List<String> dimensionNames = s.getDimensionNames();
-      StarTreeNode starTreeRootNode = s.getRoot();
+      for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
 
-      //FileUtils.deleteQuietly(readerFile);
+        StarTree s = loadTest.getStarTree(i);
+        StarTreeV2LoaderHelper.printStarTree(s);
+        Map<String, DataSource> startTreeDataSources = new HashMap<>();
+
+        for (String dimension: _starTreeV2ConfigList.get(i).getDimensions()) {
+          DataSource source = loadTest.getDimensionDataSource(i, dimension);
+          startTreeDataSources.put(dimension, source);
+        }
+
+        for (Met2AggfuncPair pair: _starTreeV2ConfigList.get(i).getMetric2aggFuncPairs()) {
+          String metpair = pair.getMetricName() + "_" + pair.getAggregatefunction();
+          DataSource source = loadTest.getMetricAggPairDataSource(i, metpair);
+          startTreeDataSources.put(metpair, source);
+        }
+
+        DataSource source = loadTest.getMetricAggPairDataSource(i, "count");
+        startTreeDataSources.put("count", source);
+        _starTreeDataSourcesList.add(startTreeDataSources);
+
+      }
 
       DataSource source = loadTest.getDimensionDataSource(0, "Name");
-      Block block = source.nextBlock();
-      BlockValSet blockValSet = block.getBlockValueSet();
-      BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
-      while (itr.hasNext()) {
-        System.out.println(itr.nextIntVal());
+      StarTreeV2LoaderHelper.printDimensionDataFromDataSource(source);
+      source = loadTest.getMetricAggPairDataSource(0, "salary_sum");
+      StarTreeV2LoaderHelper.printMetricAggfuncDataFromDataSource(source);
+
+      StarTreeV2ExecutorHelper.loadSegment(_filepath);
+      for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
+        StarTreeV2ExecutorHelper.execute(_starTreeV2ConfigList, _starTreeDataSourcesList, i);
       }
 
-      source = loadTest.getMetricAggPairDataSource(0, "salary_sum");
-      block = source.nextBlock();
-      blockValSet = block.getBlockValueSet();
-      itr = (BlockSingleValIterator) blockValSet.iterator();
-      while (itr.hasNext()) {
-        System.out.println(itr.nextDoubleVal());
-      }
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+  }
+
+  @Test
+  public void testExecutor() throws Exception {
+    try {
+     // to be filled.
     } catch (Exception e) {
       e.printStackTrace();
     }
