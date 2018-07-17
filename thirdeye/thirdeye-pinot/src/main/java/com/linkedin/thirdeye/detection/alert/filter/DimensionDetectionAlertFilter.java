@@ -2,32 +2,24 @@ package com.linkedin.thirdeye.detection.alert.filter;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.collect.Collections2;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.AnomalySlice;
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.alert.AlertUtils;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
 import com.linkedin.thirdeye.detection.alert.StatefulDetectionAlertFilter;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static com.linkedin.thirdeye.detection.alert.filter.DetectionAlertFilterUtils.*;
 
 
 /**
@@ -73,30 +65,10 @@ public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter 
 
     final long minId = getMinId(highWaterMark);
 
-    // retrieve all candidate anomalies
-    Set<MergedAnomalyResultDTO> allAnomalies = new HashSet<>();
-    for (Long detectionConfigId : this.detectionConfigIds) {
-      long startTime = MapUtils.getLong(vectorClocks, detectionConfigId, 0L);
-
-      AnomalySlice slice = new AnomalySlice().withConfigId(detectionConfigId).withStart(startTime).withEnd(this.endTime);
-      Collection<MergedAnomalyResultDTO> candidates = this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice);
-
-      Collection<MergedAnomalyResultDTO> anomalies =
-          Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
-            @Override
-            public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomalyResultDTO) {
-              return mergedAnomalyResultDTO != null
-                  && !mergedAnomalyResultDTO.isChild()
-                  && !AlertUtils.hasFeedback(mergedAnomalyResultDTO)
-                  && (mergedAnomalyResultDTO.getId() == null || mergedAnomalyResultDTO.getId() >= minId);
-            }
-          });
-
-      allAnomalies.addAll(anomalies);
-    }
+    Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
 
     // group anomalies by dimensions value
-    Multimap<String, MergedAnomalyResultDTO> grouped = Multimaps.index(allAnomalies, new Function<MergedAnomalyResultDTO, String>() {
+    Multimap<String, MergedAnomalyResultDTO> grouped = Multimaps.index(anomalies, new Function<MergedAnomalyResultDTO, String>() {
       @Override
       public String apply(MergedAnomalyResultDTO mergedAnomalyResultDTO) {
         return MapUtils.getString(mergedAnomalyResultDTO.getDimensions(), DimensionDetectionAlertFilter.this.dimension, "");
