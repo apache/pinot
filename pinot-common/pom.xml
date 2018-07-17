@@ -295,57 +295,6 @@
                   <goal>shade</goal>
                 </goals>
                 <configuration>
-                  <artifactSet>
-                    <excludes>
-                      <exclude>commons-beanutils:commons-beanutils</exclude>
-                      <exclude>commons-beanutils:commons-beanutils-core</exclude>
-                      <exclude>commons-cli:commons-cli</exclude>
-                      <exclude>commons-codec:commons-codec</exclude>
-                      <exclude>commons-collections:commons-collections</exclude>
-                      <exclude>commons-configuration:commons-configuration</exclude>
-                      <exclude>commons-digester:commons-digester</exclude>
-                      <exclude>commons-httpclient:commons-httpclient</exclude>
-                      <exclude>commons-io:commons-io</exclude>
-                      <exclude>commons-lang:commons-lang</exclude>
-                      <exclude>commons-logging:commons-logging</exclude>
-                      <exclude>com.101tec:zkclient</exclude>
-                      <exclude>com.alibaba:fastjson</exclude>
-                      <exclude>com.fasterxml.jackson.core:jackson-annotations</exclude>
-                      <exclude>com.google.code.findbugs:jsr305</exclude>
-                      <exclude>com.google.code.gson:gson</exclude>
-                      <exclude>com.google.guava:guava</exclude>
-                      <exclude>com.thoughtworks.paranamer:paranamer</exclude>
-                      <exclude>com.typesafe:config</exclude>
-                      <exclude>com.yammer.metrics:metrics-core</exclude>
-                      <exclude>io.dropwizard.metrics:metrics-core</exclude>
-                      <exclude>io.netty:netty</exclude>
-                      <exclude>io.vavr:vavr</exclude>
-                      <exclude>io.vavr:vavr-match</exclude>
-                      <exclude>jline:jline</exclude>
-                      <exclude>joda-time:joda-time</exclude>
-                      <exclude>log4j:log4j</exclude>
-                      <exclude>net.jpountz.lz4:lz4</exclude>
-                      <exclude>net.sf.jopt-simple:jopt-simple</exclude>
-                      <exclude>org.antlr:antlr4-maven-plugin</exclude>
-                      <exclude>org.antlr:antlr4-runtime</exclude>
-                      <exclude>org.apache.avro:avro</exclude>
-                      <exclude>org.apache.commons:commons-compress</exclude>
-                      <exclude>org.apache.commons:commons-math</exclude>
-                      <exclude>org.apache.helix:helix-core</exclude>
-                      <exclude>org.apache.kafka:kafka_2.10</exclude>
-                      <exclude>org.apache.kafka:kafka-clients</exclude>
-                      <exclude>org.apache.thrift:libthrift</exclude>
-                      <exclude>org.apache.zookeeper:zookeeper</exclude>
-                      <exclude>org.codehaus.jackson:jackson-core-asl</exclude>
-                      <exclude>org.codehaus.jackson:jackson-mapper-asl</exclude>
-                      <exclude>org.json:json</exclude>
-                      <exclude>org.scala-lang:scala-library</exclude>
-                      <exclude>org.slf4j:slf4j-api</exclude>
-                      <exclude>org.slf4j:slf4j-log4j12</exclude>
-                      <exclude>org.xerial.snappy:snappy-java</exclude>
-                      <exclude>org.yaml:snakeyaml</exclude>
-                    </excludes>
-                  </artifactSet>
                   <relocations>
                     <relocation>
                       <pattern>org.apache.http</pattern>
