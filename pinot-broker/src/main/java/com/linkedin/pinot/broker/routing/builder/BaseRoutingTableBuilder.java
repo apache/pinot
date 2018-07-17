@@ -17,11 +17,12 @@
 package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.util.*;
 
 
 /**
@@ -29,6 +30,7 @@ import java.util.Random;
  */
 public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
   protected final Random _random = new Random();
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseRoutingTableBuilder.class);
 
   // Set variable as volatile so all threads can get the up-to-date routing tables
   private volatile List<Map<String, List<String>>> _routingTables;
@@ -61,7 +63,11 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
 
   @Override
   public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
-    return _routingTables.get(_random.nextInt(_routingTables.size()));
+    //LOGGER.info("routing table size: {}",_routingTables.size());
+    int randIndex = _random.nextInt(_routingTables.size());
+    //LOGGER.info("routing table {} key set: {}",randIndex,_routingTables.get(randIndex).keySet().toString());
+    //LOGGER.info("routing table {} value set: {}",randIndex,_routingTables.get(randIndex).values().toString());
+    return _routingTables.get(randIndex);
   }
 
   @Override
