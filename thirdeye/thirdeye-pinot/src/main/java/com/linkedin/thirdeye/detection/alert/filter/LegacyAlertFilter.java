@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.AnomalySlice;
+import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilter;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
@@ -20,8 +21,6 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
-
-import static com.linkedin.thirdeye.detection.alert.filter.DetectionAlertFilterUtils.*;
 
 
 public class LegacyAlertFilter extends DetectionAlertFilter {
@@ -39,8 +38,8 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
 
   public LegacyAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) throws Exception {
     super(provider, config, endTime);
-    String alertConfigStr =
-        OBJECT_MAPPER.writeValueAsString(MapUtils.getMap(config.getProperties(), PROP_LEGACY_ALERT_CONFIG));
+
+    String alertConfigStr = OBJECT_MAPPER.writeValueAsString(MapUtils.getMap(config.getProperties(), PROP_LEGACY_ALERT_CONFIG));
     alertConfig = OBJECT_MAPPER.readValue(alertConfigStr, AlertConfigDTO.class);
     alertFilter = new DummyAlertFilter();
     if (config.getProperties().containsKey(PROP_LEGACY_ALERT_FILTER_CLASS_NAME)) {
@@ -48,7 +47,7 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
       alertFilter = (BaseAlertFilter) Class.forName(className).newInstance();
       alertFilter.setParameters(MapUtils.getMap(config.getProperties(), PROP_LEGACY_ALERT_FILTER_CONFIG));
     }
-    this.detectionConfigIds = extractLongs((Collection<Number>) this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
+    this.detectionConfigIds = ConfigUtils.getLongs(this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
     this.vectorClocks = this.config.getVectorClocks();
   }
 

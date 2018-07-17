@@ -13,6 +13,7 @@ import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.AnomalySlice;
+import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detection.StaticDetectionPipeline;
@@ -61,8 +62,6 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
   private static final String PROP_METRIC_URN = "metricUrn";
 
-  private static final Pattern PATTERN_PERIOD = Pattern.compile("([0-9]+)\\s*(\\S*)");
-
   private final MetricSlice sliceData;
   private final MetricSlice sliceDetection;
   private final AnomalySlice anomalySlice;
@@ -97,10 +96,10 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     this.aucMin = MapUtils.getDoubleValue(config.getProperties(), "zscoreAUCMin", Double.NaN);
     this.aucMax = MapUtils.getDoubleValue(config.getProperties(), "zscoreAUCMax", Double.NaN);
     this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), "timezone", "UTC"));
-    this.windowSize = parsePeriod(MapUtils.getString(config.getProperties(), "windowSize", "1week"));
-    this.minLookback = parsePeriod(MapUtils.getString(config.getProperties(), "minLookback", "1day"));
-    this.outlierDuration = parsePeriod(MapUtils.getString(config.getProperties(), "outlierDuration", "0"));
-    this.changeDuration = parsePeriod(MapUtils.getString(config.getProperties(), "changeDuration", "0"));
+    this.windowSize = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "windowSize", "1week"));
+    this.minLookback = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "minLookback", "1day"));
+    this.outlierDuration = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "outlierDuration", "0"));
+    this.changeDuration = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "changeDuration", "0"));
 
     int baselineWeeks = MapUtils.getIntValue(config.getProperties(), "baselineWeeks", 0);
     BaselineAggregateType baselineType = BaselineAggregateType.valueOf(MapUtils.getString(config.getProperties(), "baselineType", "MEDIAN"));
@@ -121,7 +120,6 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     this.effectiveStartTime = effectiveStartTime;
 
     DateTime trainStart = new DateTime(effectiveStartTime, this.timezone).minus(this.windowSize);
-
     DateTime dataStart = trainStart.minus(new Period().withField(DurationFieldType.weeks(), baselineWeeks));
 
     this.sliceData = MetricSlice.from(me.getId(), dataStart.getMillis(), endTime, me.getFilters());
@@ -439,62 +437,4 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     return df;
   }
 
-  /**
-   * Helper for parsing a period string from config (e.g. '3 days', '1min', '3600000')
-   *
-   * @param period
-   * @return
-   */
-  static Period parsePeriod(String period) {
-    Matcher m = PATTERN_PERIOD.matcher(period);
-    if (!m.find()) {
-      throw new IllegalArgumentException(String.format("Could not parse period expression '%s'", period));
-    }
-
-    int size = Integer.valueOf(m.group(1).trim());
-
-    PeriodType t = PeriodType.millis();
-    if (m.group(2).length() > 0) {
-      t = parsePeriodType(m.group(2).trim());
-    }
-
-    return new Period().withFieldAdded(t.getFieldType(0), size);
-  }
-
-  /**
-   * Helper for heuristically parsing period unit from config (e.g. 'millis', 'hour', 'd')
-   *
-   * @param type period type string
-   * @return PeriodType
-   */
-  static PeriodType parsePeriodType(String type) {
-    type = type.toLowerCase();
-
-    if (type.startsWith("y") || type.startsWith("a")) {
-      return PeriodType.years();
-    }
-    if (type.startsWith("mo")) {
-      return PeriodType.months();
-    }
-    if (type.startsWith("w")) {
-      return PeriodType.weeks();
-    }
-    if (type.startsWith("d")) {
-      return PeriodType.days();
-    }
-    if (type.startsWith("h")) {
-      return PeriodType.hours();
-    }
-    if (type.startsWith("s")) {
-      return PeriodType.seconds();
-    }
-    if (type.startsWith("mill") || type.startsWith("ms")) {
-      return PeriodType.millis();
-    }
-    if (type.startsWith("m")) {
-      return PeriodType.minutes();
-    }
-
-    throw new IllegalArgumentException(String.format("Invalid period type '%s'", type));
-  }
 }

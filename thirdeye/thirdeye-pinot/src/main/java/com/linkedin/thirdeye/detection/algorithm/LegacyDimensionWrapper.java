@@ -48,11 +48,8 @@ public class LegacyDimensionWrapper extends DimensionWrapper {
     }
   }
 
-
   @Override
   protected DetectionPipelineResult runNested(MetricEntity metric, Map<String, Object> template) throws Exception {
-
-
     Map<String, Object> properties = new HashMap<>(template);
 
     properties.put(this.nestedMetricUrnKey, metric.getUrn());

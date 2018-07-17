@@ -71,7 +71,6 @@ public class WindowBasedNearestNeighborAlgorithm extends StaticDetectionPipeline
     } else {
       this.baseline = BaselineAggregate.fromWeekOverWeek(baselineType, baselineWeeks, 1, this.timezone);
     }
-
   }
 
   @Override
