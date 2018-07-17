@@ -7,7 +7,7 @@
     "timeType": "SECONDS",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "schemaName": "ProfileViewSchema",
-    "replication": "1"
+    "replication": "3"
   },
   "tenants": {
   },
