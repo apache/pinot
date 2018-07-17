@@ -21,10 +21,12 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
+import com.linkedin.pinot.common.segment.StarTreeV2Metadata;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
+import com.linkedin.pinot.core.startreeV2.StarTreeV2Constant;
 import com.linkedin.pinot.startree.hll.HllConstants;
 import java.io.DataInputStream;
 import java.io.File;
@@ -80,13 +82,16 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _refreshTime = Long.MIN_VALUE;
   private SegmentVersion _segmentVersion;
   private boolean _hasStarTree;
+  private boolean _hasStarTreeV2;
   private StarTreeMetadata _starTreeMetadata = null;
+  private List<StarTreeV2Metadata> _starTreeV2MetadataList = null;
   private String _creatorName;
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
   private int _hllLog2m = HllConstants.DEFAULT_LOG2M;
   private final Map<String, String> _hllDerivedColumnMap = new HashMap<>();
   private int _totalDocs;
   private int _totalRawDocs;
+  private int _starTreesCount;
   private long _segmentStartTime;
   private long _segmentEndTime;
 
@@ -287,6 +292,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     if (_hasStarTree) {
       initStarTreeMetadata();
     }
+
+    // Build star tree v2 metadata.
+    String starTreeCount = _segmentMetadataPropertiesConfiguration.getString(StarTreeV2Constant.STAR_TREE_V2_COUNT);
+    _starTreesCount = starTreeCount != null ? Integer.parseInt(starTreeCount) : 0;
+
+    if (_starTreesCount > 0) {
+      initStarTreeV2Metadata(_starTreesCount);
+    }
   }
 
   /**
@@ -340,6 +353,50 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       _starTreeMetadata.setSkipMaterializationCardinality(Integer.parseInt(skipMaterializationCardinalityString));
     }
   }
+
+
+  /**
+   * Reads and initializes the star tree v2 metadata from segment metadata properties.
+   */
+  private void initStarTreeV2Metadata(int starTreesCount) {
+
+    _starTreeV2MetadataList = new ArrayList<>();
+    for ( int i = 0; i < starTreesCount;  i++ ) {
+      StarTreeV2Metadata metadata = new StarTreeV2Metadata();
+
+      // met2agg func pairs
+      String met2agg = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAT2FUNC_MAP;
+      Iterator<String> iterator = _segmentMetadataPropertiesConfiguration.getList(met2agg).iterator();
+      List<String> met2AggfuncPairs = new ArrayList<>();
+      while (iterator.hasNext()) {
+        final String pair = iterator.next();
+        met2AggfuncPairs.add(pair);
+      }
+      metadata.setMet2AggfuncPairs(met2AggfuncPairs);
+
+      // dimension split order
+      String splitOrder = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SPLIT_ORDER;
+      iterator = _segmentMetadataPropertiesConfiguration.getList(splitOrder).iterator();
+      List<String> dimensionsSplitOrder = new ArrayList<>();
+      while (iterator.hasNext()) {
+        final String splitColumn = iterator.next();
+        dimensionsSplitOrder.add(splitColumn);
+      }
+      metadata.setDimensionsSplitOrder(dimensionsSplitOrder);
+
+      // number of aggregated docs.
+      String aggregatedDocsCount = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_DOCS_COUNT;
+      String docsCount = _segmentMetadataPropertiesConfiguration.getString(aggregatedDocsCount);
+      if (docsCount != null) {
+        metadata.setDocsCount(Integer.parseInt(docsCount));
+      }
+
+      _starTreeV2MetadataList.add(metadata);
+    }
+
+    return;
+  }
+
 
   public ColumnMetadata getColumnMetadataFor(String column) {
     return _columnMetadataMap.get(column);
@@ -495,6 +552,16 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public StarTreeMetadata getStarTreeMetadata() {
     return _starTreeMetadata;
+  }
+
+  @Override
+  public List<StarTreeV2Metadata> getStarTreeV2Metadata() {
+    return _starTreeV2MetadataList;
+  }
+
+  @Override
+  public int getStarTreeV2Count() {
+    return _starTreesCount;
   }
 
   @Override

@@ -17,6 +17,7 @@ package com.linkedin.pinot.common.segment;
 
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -74,6 +75,10 @@ public interface SegmentMetadata {
   boolean hasStarTree();
 
   StarTreeMetadata getStarTreeMetadata();
+
+  List<StarTreeV2Metadata> getStarTreeV2Metadata();
+
+  int getStarTreeV2Count();
 
   String getForwardIndexFileName(String column);
 
