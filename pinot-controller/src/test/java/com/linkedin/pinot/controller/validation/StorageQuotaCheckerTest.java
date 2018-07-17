@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.util.TableSizeReader;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -40,6 +41,7 @@ public class StorageQuotaCheckerTest {
   private TableSizeReader _tableSizeReader;
   private TableConfig _tableConfig;
   private ControllerMetrics _controllerMetrics;
+  private PinotHelixResourceManager _pinotHelixResourceManager;
   private QuotaConfig _quotaConfig;
   private SegmentsValidationAndRetentionConfig _validationConfig;
   private static final File TEST_DIR = new File(StorageQuotaCheckerTest.class.getName());
@@ -51,8 +53,10 @@ public class StorageQuotaCheckerTest {
     _quotaConfig = mock(QuotaConfig.class);
     _controllerMetrics = mock(ControllerMetrics.class);
     _validationConfig = mock(SegmentsValidationAndRetentionConfig.class);
+    _pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
     when(_tableConfig.getValidationConfig()).thenReturn(_validationConfig);
     when(_validationConfig.getReplicationNumber()).thenReturn(2);
+    when(_pinotHelixResourceManager.isLeader()).thenReturn(true);
     TEST_DIR.mkdirs();
   }
 
@@ -63,7 +67,7 @@ public class StorageQuotaCheckerTest {
 
   @Test
   public void testNoQuota() throws InvalidConfigException {
-    StorageQuotaChecker checker = new StorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics);
+    StorageQuotaChecker checker = new StorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics, _pinotHelixResourceManager);
     when(_tableConfig.getQuotaConfig()).thenReturn(null);
     StorageQuotaChecker.QuotaCheckerResponse res =
         checker.isSegmentStorageWithinQuota(TEST_DIR, "myTable", "segment", 1000);
@@ -72,7 +76,7 @@ public class StorageQuotaCheckerTest {
 
   @Test
   public void testNoStorageQuotaConfig() throws InvalidConfigException {
-    StorageQuotaChecker checker = new StorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics);
+    StorageQuotaChecker checker = new StorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics, _pinotHelixResourceManager);
     when(_tableConfig.getQuotaConfig()).thenReturn(_quotaConfig);
     when(_quotaConfig.storageSizeBytes()).thenReturn(-1L);
     StorageQuotaChecker.QuotaCheckerResponse res =
@@ -110,7 +114,7 @@ public class StorageQuotaCheckerTest {
     when(_tableConfig.getQuotaConfig()).thenReturn(_quotaConfig);
     when(_quotaConfig.storageSizeBytes()).thenReturn(3000L);
     when(_quotaConfig.getStorage()).thenReturn("3K");
-    StorageQuotaChecker checker = new StorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics);
+    StorageQuotaChecker checker = new StorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics, _pinotHelixResourceManager);
     StorageQuotaChecker.QuotaCheckerResponse response =
         checker.isSegmentStorageWithinQuota(TEST_DIR, "testTable", "segment1", 1000);
     Assert.assertTrue(response.isSegmentWithinQuota);

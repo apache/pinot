@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.metrics.ControllerGauge;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.DataSize;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.util.TableSizeReader;
 import java.io.File;
 import javax.annotation.Nonnegative;
@@ -42,12 +43,14 @@ public class StorageQuotaChecker {
   private final TableSizeReader _tableSizeReader;
   private final TableConfig _tableConfig;
   private final ControllerMetrics _controllerMetrics;
+  private final PinotHelixResourceManager _pinotHelixResourceManager;
 
   public StorageQuotaChecker(TableConfig tableConfig, TableSizeReader tableSizeReader,
-      ControllerMetrics controllerMetrics) {
+      ControllerMetrics controllerMetrics, PinotHelixResourceManager pinotHelixResourceManager) {
     _tableConfig = tableConfig;
     _tableSizeReader = tableSizeReader;
     _controllerMetrics = controllerMetrics;
+    _pinotHelixResourceManager = pinotHelixResourceManager;
   }
 
   public class QuotaCheckerResponse {
@@ -129,6 +132,15 @@ public class StorageQuotaChecker {
         tableName,
         tableSubtypeSize.estimatedSizeInBytes,
         tableSubtypeSize.reportedSizeInBytes);
+
+    // Only emit the real percentage of storage quota usage by lead controller, otherwise emit 0L.
+    if (_pinotHelixResourceManager.isLeader()) {
+      long existingStorageQuotaUtilization = tableSubtypeSize.estimatedSizeInBytes / allowedStorageBytes * 100;
+      _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.TABLE_STORAGE_QUOTA_UTILIZATION,
+          existingStorageQuotaUtilization);
+    } else {
+      _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.TABLE_STORAGE_QUOTA_UTILIZATION, 0L);
+    }
 
     // Note: incomingSegmentSizeBytes is uncompressed data size for just 1 replica,
     // while estimatedFinalSizeBytes is for all replicas of all segments put together.
