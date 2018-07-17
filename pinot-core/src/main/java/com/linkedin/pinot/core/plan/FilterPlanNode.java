@@ -58,7 +58,7 @@ public class FilterPlanNode implements PlanNode {
     if (RequestUtils.isFitForStarTreeIndex(_segment.getSegmentMetadata(), _brokerRequest, rootFilterNode)) {
       return new StarTreeIndexBasedFilterOperator(_segment, _brokerRequest, rootFilterNode);
     } else if (_starTreeId != null) {
-      return null;
+      return new StarTreeIndexBasedFilterOperator(_segment, _brokerRequest, rootFilterNode, _starTreeId);
     } else {
       return constructPhysicalOperator(rootFilterNode, _segment);
     }

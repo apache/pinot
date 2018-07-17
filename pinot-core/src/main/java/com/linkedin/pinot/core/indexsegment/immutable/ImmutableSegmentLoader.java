@@ -115,6 +115,7 @@ public class ImmutableSegmentLoader {
       starTree = new OffHeapStarTree(segmentReader.getStarTreeFile(), readMode);
     }
 
+
     return new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTree);
   }
 }
