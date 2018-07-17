@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.AnomalySlice;
+import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipeline;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
@@ -62,9 +63,7 @@ public class MergeWrapper extends DetectionPipeline {
     this.maxGap = MapUtils.getLongValue(config.getProperties(), "maxGap", 0);
     this.maxDuration = MapUtils.getLongValue(config.getProperties(), "maxDuration", Long.MAX_VALUE);
     this.slice = new AnomalySlice().withStart(startTime).withEnd(endTime).withConfigId(config.getId());
-    this.nestedProperties = config.getProperties().containsKey(PROP_NESTED) ?
-        new ArrayList<>((Collection<Map<String, Object>>) config.getProperties().get(PROP_NESTED)) :
-        Collections.<Map<String,Object>>emptyList();
+    this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
   }
 
   @Override

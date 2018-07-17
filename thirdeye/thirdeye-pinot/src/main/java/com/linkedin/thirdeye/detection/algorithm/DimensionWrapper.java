@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipeline;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
@@ -79,9 +80,7 @@ public class DimensionWrapper extends DetectionPipeline {
     this.minValue = MapUtils.getDoubleValue(config.getProperties(), PROP_MIN_VALUE, PROP_MIN_VALUE_DEFAULT);
     this.minContribution = MapUtils.getDoubleValue(config.getProperties(), PROP_MIN_CONTRIBUTION, PROP_MIN_CONTRIBUTION_DEFAULT);
     this.k = MapUtils.getIntValue(config.getProperties(), PROP_K, PROP_K_DEFAULT);
-    this.dimensions = config.getProperties().containsKey(PROP_DIMENSIONS) ?
-        new ArrayList<>((Collection<String>) config.getProperties().get(PROP_DIMENSIONS)) :
-        new ArrayList<String>();
+    this.dimensions = ConfigUtils.getList(config.getProperties().get(PROP_DIMENSIONS));
     this.lookback = MapUtils.getLongValue(config.getProperties(), PROP_LOOKBACK, PROP_LOOKBACK_DEFAULT);
 
     // prototyping
@@ -89,9 +88,7 @@ public class DimensionWrapper extends DetectionPipeline {
 
     this.nestedMetricUrn = MapUtils.getString(config.getProperties(), PROP_NESTED_METRIC_URN, this.metricUrn);
     this.nestedMetricUrnKey = MapUtils.getString(config.getProperties(), PROP_NESTED_METRIC_URN_KEY, PROP_NESTED_METRIC_URN_KEY_DEFAULT);
-    this.nestedProperties = config.getProperties().containsKey(PROP_NESTED) ?
-        new ArrayList<>((Collection<Map<String, Object>>) config.getProperties().get(PROP_NESTED)) :
-        Collections.<Map<String,Object>>emptyList();
+    this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
   }
 
   @Override

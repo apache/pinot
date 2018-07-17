@@ -8,18 +8,16 @@ import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
 import com.linkedin.thirdeye.detection.alert.StatefulDetectionAlertFilter;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.MapUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -28,8 +26,6 @@ import org.slf4j.LoggerFactory;
  * of a specified anomaly dimension
  */
 public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter {
-
-  private static final Logger LOG = LoggerFactory.getLogger(DimensionDetectionAlertFilter.class);
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   private static final String PROP_RECIPIENTS = "recipients";
   private static final String PROP_DIMENSION = "dimension";
@@ -45,17 +41,11 @@ public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter 
   public DimensionDetectionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
     super(provider, config, endTime);
     Preconditions.checkNotNull(config.getProperties().get(PROP_DIMENSION), "Dimension name not specified");
-    Preconditions.checkNotNull(config.getProperties().get(PROP_RECIPIENTS), "Recipients not found.");
-    Preconditions.checkArgument(config.getProperties().get(PROP_RECIPIENTS) instanceof Collection, "Read recipients failed.");
-    Preconditions.checkNotNull(config.getProperties().get(PROP_DIMENSION_RECIPIENTS), "Dimension recipients not found.");
-    Preconditions.checkArgument(config.getProperties().get(PROP_DIMENSION_RECIPIENTS) instanceof Map, "Read dimension recipients failed.");
-    Preconditions.checkNotNull(config.getProperties().get(PROP_DETECTION_CONFIG_IDS), "Detection config ids not found.");
-    Preconditions.checkArgument(config.getProperties().get(PROP_DETECTION_CONFIG_IDS) instanceof Collection, "Read detection config ids failed.");
 
     this.dimension = MapUtils.getString(this.config.getProperties(), PROP_DIMENSION);
-    this.recipients = new ArrayList<>((Collection<String>) this.config.getProperties().get(PROP_RECIPIENTS));
-    this.dimensionRecipients = extractNestedMap((Map<String, Collection<String>>) this.config.getProperties().get(PROP_DIMENSION_RECIPIENTS));
-    this.detectionConfigIds = extractLongs((Collection<Number>) this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
+    this.recipients = ConfigUtils.getList(this.config.getProperties().get(PROP_RECIPIENTS));
+    this.dimensionRecipients = HashMultimap.create(ConfigUtils.<String, String>getMultimap(this.config.getProperties().get(PROP_DIMENSION_RECIPIENTS)));
+    this.detectionConfigIds = ConfigUtils.getLongs(this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
     this.sendOnce = MapUtils.getBoolean(this.config.getProperties(), PROP_SEND_ONCE, true);
   }
 
@@ -77,15 +67,20 @@ public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter 
 
     // generate recipients-anomalies mapping
     for (Map.Entry<String, Collection<MergedAnomalyResultDTO>> entry : grouped.asMap().entrySet()) {
-      Set<String> receipients = new HashSet<>(this.recipients);
-      if (this.dimensionRecipients.containsKey(entry.getKey())) {
-        receipients.addAll(this.dimensionRecipients.get(entry.getKey()));
-      }
+      Set<String> recipients = this.makeGroupRecipients(entry.getKey());
 
-      result.addMapping(receipients, new HashSet<>(entry.getValue()));
+      result.addMapping(recipients, new HashSet<>(entry.getValue()));
     }
 
     return result;
+  }
+
+  protected Set<String> makeGroupRecipients(String key) {
+    Set<String> recipients = new HashSet<>(this.recipients);
+    if (this.dimensionRecipients.containsKey(key)) {
+      recipients.addAll(this.dimensionRecipients.get(key));
+    }
+    return recipients;
   }
 
   private long getMinId(long highWaterMark) {
@@ -94,26 +89,5 @@ public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter 
     } else {
       return 0;
     }
-  }
-
-  private static List<Long> extractLongs(Collection<Number> numbers) {
-    List<Long> output = new ArrayList<>();
-    for (Number n : numbers) {
-      if (n == null) {
-        continue;
-      }
-      output.add(n.longValue());
-    }
-    return output;
-  }
-
-  private static SetMultimap<String, String> extractNestedMap(Map<String, Collection<String>> nestedMap) {
-    SetMultimap<String, String> output = HashMultimap.create();
-    for (Map.Entry<String, Collection<String>> entry : nestedMap.entrySet()) {
-      for (String value : entry.getValue()) {
-        output.put(entry.getKey(), value);
-      }
-    }
-    return output;
   }
 }

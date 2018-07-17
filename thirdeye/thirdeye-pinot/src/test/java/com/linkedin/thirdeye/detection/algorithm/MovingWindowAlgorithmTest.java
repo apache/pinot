@@ -389,48 +389,6 @@ public class MovingWindowAlgorithmTest {
     Assert.assertEquals(window, output);
   }
 
-  @Test
-  public void testPeriodParser() {
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriod("3600"), new Period().withField(DurationFieldType.millis(), 3600));
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriod("1d"), new Period().withField(DurationFieldType.days(), 1));
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriod("2hours"), new Period().withField(DurationFieldType.hours(), 2));
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriod("24 hrs"), new Period().withField(DurationFieldType.hours(), 24));
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriod("1 year"), new Period().withField(DurationFieldType.years(), 1));
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriod("  3   w  "), new Period().withField(DurationFieldType.weeks(), 3));
-  }
-
-  @Test
-  public void testPeriodTypeParser() {
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("ms"), PeriodType.millis());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("millis"), PeriodType.millis());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("s"), PeriodType.seconds());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("sec"), PeriodType.seconds());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("secs"), PeriodType.seconds());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("seconds"), PeriodType.seconds());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("m"), PeriodType.minutes());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("min"), PeriodType.minutes());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("mins"), PeriodType.minutes());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("minutes"), PeriodType.minutes());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("h"), PeriodType.hours());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("hour"), PeriodType.hours());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("hours"), PeriodType.hours());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("d"), PeriodType.days());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("day"), PeriodType.days());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("days"), PeriodType.days());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("w"), PeriodType.weeks());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("week"), PeriodType.weeks());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("weeks"), PeriodType.weeks());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("mon"), PeriodType.months());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("mons"), PeriodType.months());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("month"), PeriodType.months());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("months"), PeriodType.months());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("y"), PeriodType.years());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("year"), PeriodType.years());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("years"), PeriodType.years());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("a"), PeriodType.years());
-    Assert.assertEquals(MovingWindowAlgorithm.parsePeriodType("ans"), PeriodType.years());
-  }
-
   //
   // utils
   //
