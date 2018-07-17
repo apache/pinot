@@ -42,8 +42,10 @@ public class FilterPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(FilterPlanNode.class);
   private final BrokerRequest _brokerRequest;
   private final IndexSegment _segment;
+  private Integer _starTreeId;
 
   public FilterPlanNode(IndexSegment segment, BrokerRequest brokerRequest) {
+    _starTreeId = null;
     _segment = segment;
     _brokerRequest = brokerRequest;
   }
@@ -51,8 +53,12 @@ public class FilterPlanNode implements PlanNode {
   @Override
   public BaseFilterOperator run() {
     FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(_brokerRequest);
+    _starTreeId = RequestUtils.returnStarTreeForQuery(_segment.getSegmentMetadata(), _brokerRequest, rootFilterNode);
+
     if (RequestUtils.isFitForStarTreeIndex(_segment.getSegmentMetadata(), _brokerRequest, rootFilterNode)) {
       return new StarTreeIndexBasedFilterOperator(_segment, _brokerRequest, rootFilterNode);
+    } else if (_starTreeId != null) {
+      return null;
     } else {
       return constructPhysicalOperator(rootFilterNode, _segment);
     }
