@@ -6,9 +6,7 @@ import Controller from '@ember/controller';
 import {
   filterObject,
   filterPrefix,
-  hasPrefix,
   toBaselineUrn,
-  toBaselineRange,
   toCurrentUrn,
   toOffsetUrn,
   toFilters,
@@ -43,6 +41,7 @@ const ROOTCAUSE_SERVICE_ANOMALY_FUNCTIONS = 'anomalyFunctions';
 const ROOTCAUSE_SERVICE_ALL = 'all';
 
 const ROOTCAUSE_SESSION_TIMER_INTERVAL = 300000;
+const ROOTCAUSE_SESSION_DEBOUNCE_INTERVAL = 5000;
 
 const ROOTCAUSE_SESSION_PERMISSIONS_READ = 'READ';
 const ROOTCAUSE_SESSION_PERMISSIONS_READ_WRITE = 'READ_WRITE';
@@ -216,6 +215,20 @@ export default Controller.extend({
    * @type {string}
    */
   sessionOwner: null,
+
+  /**
+   * anomaly feedback type. To be overridden by manual update
+   * @type {string}
+   */
+  anomalyFeedback: computed('anomalyUrn', 'entities', function () {
+    const { anomalyUrn, entities } = this.getProperties('anomalyUrn', 'entities');
+
+    try {
+      return entities[anomalyUrn].attributes.status[0];
+    } catch (ignore) {
+      return 'NO_FEEDBACK';
+    }
+  }),
 
   //
   // static component config
@@ -400,11 +413,13 @@ export default Controller.extend({
 
   /**
    * Subscribed entities cache
+   * @type {object}
    */
   entities: reads('entitiesService.entities'),
 
   /**
    * Subscribed timeseries cache (metrics, anomaly baselines)
+   * @type {object}
    */
   timeseries: computed(
     'timeseriesService.timeseries',
@@ -434,21 +449,25 @@ export default Controller.extend({
 
   /**
    * Subscribed aggregates cache
+   * @type {object}
    */
   aggregates: reads('aggregatesService.aggregates'),
 
   /**
    * Subscribed breakdowns cache
+   * @type {object}
    */
   breakdowns: reads('breakdownsService.breakdowns'),
 
   /**
    * Subscribed scores cache
+   * @type {object}
    */
   scores: reads('scoresService.scores'),
 
   /**
    * Primary metric urn for rootcause search
+   * @type {string}
    */
   metricUrn: computed(
     'context',
@@ -463,7 +482,25 @@ export default Controller.extend({
   ),
 
   /**
+   * Primary anomaly urn for anomaly header
+   * @type {string}
+   */
+  anomalyUrn: computed(
+    'anomalyUrns',
+    function () {
+      const { context } = this.getProperties('context');
+
+      const anomalyEventUrn = filterPrefix(context.anomalyUrns, 'thirdeye:event:anomaly:');
+
+      if (!anomalyEventUrn) { return; }
+
+      return anomalyEventUrn[0];
+    }
+  ),
+
+  /**
    * Visible series and events in timeseries chart
+   * @type {array}
    */
   chartSelectedUrns: computed(
     'entities',
@@ -482,6 +519,7 @@ export default Controller.extend({
 
   /**
    * (Event) entities for event table as filtered by the side bar
+   * @type {object}
    */
   eventTableEntities: computed(
     'entities',
@@ -494,11 +532,13 @@ export default Controller.extend({
 
   /**
    * Columns config for event table
+   * @type {object}
    */
   eventTableColumns: EVENT_TABLE_COLUMNS,
 
   /**
    * (Event) entities for filtering in the side bar
+   * @type {object}
    */
   eventFilterEntities: computed(
     'entities',
@@ -510,6 +550,7 @@ export default Controller.extend({
 
   /**
    * Visible entities for tooltip
+   * @type {object}
    */
   tooltipEntities: computed(
     'entities',
@@ -703,6 +744,32 @@ export default Controller.extend({
     this._checkSession();
   },
 
+  /**
+   * Updates anomaly feedback without session
+   *
+   * @private
+   */
+  _updateAnomalyFeedback() {
+    debounce(this, this._updateAnomalyFeedbackDebounce, ROOTCAUSE_SESSION_DEBOUNCE_INTERVAL);
+  },
+
+  /**
+   * Debounced implementation for updating anomaly feedback without session
+   *
+   * @private
+   */
+  _updateAnomalyFeedbackDebounce() {
+    const { anomalyUrn, anomalyFeedback, sessionText } =
+      this.getProperties('anomalyUrn', 'anomalyFeedback', 'sessionText');
+
+    // debounce: do not run if destroyed
+    if (this.isDestroyed) { return; }
+
+    const id = anomalyUrn.split(':')[3];
+    const jsonString = JSON.stringify({ feedbackType: anomalyFeedback, comment: sessionText });
+    fetch(`/dashboard/anomaly-merged-result/feedback/${id}`, { method: 'POST', body: jsonString });
+  },
+
   //
   // default selection
   //
@@ -809,8 +876,6 @@ export default Controller.extend({
      * @param {Array} urns
      */
     onLegendHover(urns) {
-      const { context } = this.getProperties('context');
-
       const focusUrns = new Set(urns);
 
       filterPrefix(focusUrns, 'thirdeye:metric:').forEach(urn => {
@@ -892,12 +957,7 @@ export default Controller.extend({
         sessionText: text,
         sessionModified: true
       });
-      const { sessionid, anomalyId } = this.getProperties('sessionid', 'anomalyId');
-
-      if(!sessionid){
-        const jsonString = JSON.stringify({ feedbackType: null, comment: text });
-        fetch(`/dashboard/anomaly-merged-result/feedback/${anomalyId}`, { method: 'POST', body: jsonString });
-      }
+      this._updateAnomalyFeedback();
     },
 
     /**
@@ -955,12 +1015,10 @@ export default Controller.extend({
      *
      * @param {String} anomalyUrn anomaly entity urn
      * @param {String} feedback anomaly feedback type string
-     * @param {String} comment anomaly comment
      */
-    onFeedback(anomalyUrn, feedback, comment) {
-      const id = anomalyUrn.split(':')[3];
-      const jsonString = JSON.stringify({ feedbackType: feedback, comment });
-      return fetch(`/dashboard/anomaly-merged-result/feedback/${id}`, { method: 'POST', body: jsonString });
+    onFeedback(anomalyUrn, feedback) {
+      this.set('anomalyFeedback', feedback);
+      this._updateAnomalyFeedback();
     },
 
     /**

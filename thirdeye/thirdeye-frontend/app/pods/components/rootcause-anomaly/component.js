@@ -318,7 +318,7 @@ export default Component.extend({
       const { onFeedback, anomalyUrn } = getProperties(this, 'onFeedback', 'anomalyUrn');
 
       if (onFeedback) {
-        onFeedback(anomalyUrn, status, '');
+        onFeedback(anomalyUrn, status);
       }
 
       // TODO reload anomaly entity instead
