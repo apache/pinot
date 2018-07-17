@@ -16,7 +16,9 @@
 package com.linkedin.pinot.core.indexsegment.generator;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
@@ -41,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
@@ -143,6 +146,44 @@ public class SegmentGeneratorConfig {
     _simpleDateFormat = config._simpleDateFormat;
     _onHeap = config._onHeap;
   }
+
+  public SegmentGeneratorConfig(TableConfig tableConfig, Schema schema) {
+    Preconditions.checkNotNull(schema);
+    _schema = schema;
+
+    if (tableConfig != null) {
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      if (indexingConfig != null) {
+        List<String> noDictionaryColumns = tableConfig.getIndexingConfig().getNoDictionaryColumns();
+        Map<String, String> noDictionaryColumnMap = tableConfig.getIndexingConfig().getnoDictionaryConfig();
+
+        if (noDictionaryColumns != null) {
+          this.setRawIndexCreationColumns(noDictionaryColumns);
+
+          if (noDictionaryColumnMap != null) {
+            Map<String, ChunkCompressorFactory.CompressionType> serializedNoDictionaryColumnMap =
+                noDictionaryColumnMap.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                    e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType.valueOf(e.getValue())));
+            this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
+          }
+        }
+
+        SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+        _segmentPartitionConfig = segmentPartitionConfig;
+
+        StarTreeIndexSpec starTreeIndexSpec = tableConfig.getIndexingConfig().getStarTreeIndexSpec();
+        _starTreeIndexSpec = starTreeIndexSpec;
+
+        HllConfig hllConfig = tableConfig.getValidationConfig().getHllConfig();
+        _hllConfig = hllConfig;
+
+        List<String> invertedIndexColumns = tableConfig.getIndexingConfig().getInvertedIndexColumns();
+        _invertedIndexCreationColumns = invertedIndexColumns;
+      }
+    }
+  }
+
 
   public SegmentGeneratorConfig(Schema schema) {
     _schema = schema;

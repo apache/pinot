@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.hadoop.job.mapper;
 
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.DataSize;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
@@ -25,7 +26,8 @@ import com.linkedin.pinot.core.data.readers.ThriftRecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.hadoop.job.JobConfigConstants;
-
+import java.io.File;
+import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -34,11 +36,9 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
 
 
 public class HadoopSegmentCreationMapReduceJob {
@@ -68,6 +68,8 @@ public class HadoopSegmentCreationMapReduceJob {
 
     // Temporary local disk path for output segment directory
     private String _localDiskOutputSegmentDir;
+
+    private TableConfig _tableConfig = null;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -99,6 +101,17 @@ public class HadoopSegmentCreationMapReduceJob {
             "Missing configs: " + "\n\toutputPath: " + _properties.get(JobConfigConstants.PATH_TO_OUTPUT)
                 + "\n\ttableName: " + _properties.get(JobConfigConstants.SEGMENT_TABLE_NAME));
       }
+
+        String tableConfigString = _properties.get(JobConfigConstants.TABLE_CONFIG);
+        if (tableConfigString != null) {
+          try {
+            _tableConfig = TableConfig.init(tableConfigString);
+          } catch (JSONException e) {
+            // Though we get table config directly from the controller of hosts and port of push location are set,
+            // it is possible for the user to pass in a table config as a parameter
+            LOGGER.error("Table config {} isn't passed in correctly", tableConfigString);
+          }
+        }
     }
 
     protected String getTableName() {
@@ -197,7 +210,8 @@ public class HadoopSegmentCreationMapReduceJob {
 
     protected String createSegment(String dataFilePath, Schema schema, Integer seqId, Path hdfsInputFilePath,
         File localInputDataDir, FileSystem fs) throws Exception {
-      SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
+      SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, schema);
+
       segmentGeneratorConfig.setTableName(_tableName);
       setSegmentNameGenerator(segmentGeneratorConfig, seqId, hdfsInputFilePath, localInputDataDir);
 
