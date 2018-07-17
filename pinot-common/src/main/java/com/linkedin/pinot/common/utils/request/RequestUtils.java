@@ -28,6 +28,7 @@ import com.linkedin.pinot.common.request.HavingFilterQueryMap;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
+import com.linkedin.pinot.common.segment.StarTreeV2Metadata;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -238,6 +239,77 @@ public class RequestUtils {
     return rootFilterNode == null || checkPredicatesForStarTree(rootFilterNode, metrics, unMaterializedDimensions);
   }
 
+  public static Integer returnStarTreeForQuery(SegmentMetadata segmentMetadata, BrokerRequest brokerRequest, FilterQueryTree rootFilterNode) {
+
+    // Check whether segment contains star tree v2.
+    if (segmentMetadata.getStarTreeV2Count() == 0) {
+      return null;
+    }
+
+    // Check whether star tree is disabled explicitly in BrokerRequest
+    Map<String, String> debugOptions = brokerRequest.getDebugOptions();
+    if (debugOptions != null && StringUtils.compareIgnoreCase(debugOptions.get(USE_STAR_TREE_KEY), "false") == 0) {
+      return null;
+    }
+
+    // Check whether all group-by columns are materialized dimensions
+    Set<String> groupByColumns = null;
+    GroupBy groupBy = brokerRequest.getGroupBy();
+    if (groupBy != null) {
+      groupByColumns = getAllGroupByColumns(groupBy);
+    }
+
+    // code for checking all the met2Aggfunc pairs.
+    List<String> queryMetric2AggFuncPair = new ArrayList<>();
+    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
+    if (aggregationsInfo == null) {
+      return null;
+    }
+
+    for (AggregationInfo aggregationInfo : aggregationsInfo) {
+      String a = aggregationInfo.getAggregationType().toLowerCase() + "_" + aggregationInfo.getAggregationParams().get("column").trim();
+      queryMetric2AggFuncPair.add(a);
+    }
+
+    // check if the metric and aggregation function is supported by the tree.
+    Integer startTeeId = null;
+    Set<String> metrics = null;
+    List<StarTreeV2Metadata> starTreeV2MetadataList = segmentMetadata.getStarTreeV2Metadata();
+    for (StarTreeV2Metadata metadata : starTreeV2MetadataList) {
+
+      Boolean allPairMatched = true;
+      metrics = new HashSet<>();
+      List<String> metric2Aggfunc = metadata.getMet2AggfuncPairs();
+      for (String pair: metric2Aggfunc) {
+        String met = pair.split("_")[0];
+        if (!met.equals("count")) {
+          metrics.add(met);
+        }
+      }
+
+      for (String pair: queryMetric2AggFuncPair) {
+        if (!metric2Aggfunc.contains(pair)) {
+          allPairMatched = false;
+          break;
+        }
+      }
+
+      Boolean dimensionsMatched = true;
+      List<String> dimensions = metadata.getDimensionsSplitOrder();
+      for (String column: groupByColumns) {
+        if (!dimensions.contains(column)) {
+          dimensionsMatched = false;
+        }
+      }
+
+      if (dimensionsMatched && allPairMatched && (rootFilterNode == null || checkPredicatesForStarTreeV2(rootFilterNode, metrics))) {
+        startTeeId = starTreeV2MetadataList.indexOf(metadata);
+        return startTeeId;
+      }
+    }
+    return null;
+  }
+
   /**
    * Helper method to check whether all columns in predicates are materialized dimensions, and all predicates are
    * conjoined by AND. This is a pre-requisite in order to use star tree.
@@ -258,5 +330,27 @@ public class RequestUtils {
     }
     String column = filterNode.getColumn();
     return !metrics.contains(column) && !unMaterializedDimensions.contains(column);
+  }
+
+  /**
+   * Helper method to check whether all columns in predicates are dimensions, and all predicates are
+   * conjoined by AND. This is a pre-requisite in order to use star tree V2.
+   */
+  private static boolean checkPredicatesForStarTreeV2(FilterQueryTree filterNode, Set<String> metrics) {
+    FilterOperator operator = filterNode.getOperator();
+    if (operator == FilterOperator.OR) {
+      return false;
+    }
+    if (operator == FilterOperator.AND) {
+      for (FilterQueryTree child : filterNode.getChildren()) {
+        if (!checkPredicatesForStarTreeV2(child, metrics)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    String column = filterNode.getColumn();
+    return !metrics.contains(column);
   }
 }
