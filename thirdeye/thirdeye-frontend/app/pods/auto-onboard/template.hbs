@@ -1,0 +1,72 @@
+<div class="container">
+  <h3>Dataset auto onboard</h3>
+
+  <div class="row">
+    <div class="col-xs-6">
+      <label>Dataset Name</label>{{input value=datasetName}}
+      <button onClick={{action "onSave"}}>save</button>
+    </div>
+  </div>
+
+  {{#if metricUrn}}
+  <div class="row">
+    <div class="col-xs-2">
+    metric name
+    </div>
+    <div class="col-xs-2">
+      top k
+    </div>
+    <div class="col-xs-2">
+      min value
+    </div>
+    <div class="col-xs-2">
+      min contribution
+    </div>
+    <div class="col-xs-4">
+    filters
+    </div>
+  </div>
+  {{/if}}
+
+  {{#each metrics as |metric|}}
+    <div>
+      <div class="col-xs-2">
+      {{metric.name}}
+      <input type="checkbox"
+             checked=checkboxDefault
+             onclick={{action "toggleCheckBox" metric.name}}/>
+      </div>
+      <div class="col-xs-2">
+
+      <input type="text"
+             onChange={{action (action "onChangeValue" "topk" metric.name) value="target.value"}}/>
+      </div>
+      <div class="col-xs-2">
+
+      <input type="text"
+             onChange={{action (action "onChangeValue" "minvalue" metric.name) value="target.value"}}/>
+      </div>
+      <div class="col-xs-2">
+
+      <input type="text"
+             onChange={{action (action "onChangeValue" "mincontribution" metric.name) value="target.value"}}/>
+      </div>
+      <div class="col-xs-4">
+
+      {{#if metricUrn}}
+
+        {{filter-select
+          options=filterOptions
+          onChange=(action "onFilters" metric.name)
+        }}
+      {{/if}}
+      </div>
+
+
+    </div>
+
+  {{/each}}
+
+  <button onClick={{action "onSubmit"}}>submit</button>
+
+</div>
