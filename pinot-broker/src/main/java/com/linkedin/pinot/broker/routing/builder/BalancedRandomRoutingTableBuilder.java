@@ -50,6 +50,7 @@ public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
   */
 
   private List<Map<String, List<String>>> _lastRoutingTables;
+  private Map<String, List<String>> _lastSegment2ServerMap;
 
   //private boolean isIAwareLBDaemonStarted = false;
 
@@ -61,6 +62,7 @@ public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
   public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _numRoutingTables = configuration.getInt(NUM_ROUTING_TABLES_KEY, DEFAULT_NUM_ROUTING_TABLES);
     _lastRoutingTables = new ArrayList<>();
+    _lastSegment2ServerMap = new HashMap<String, List<String>>();
 
     //if(!isIAwareLBDaemonStarted)
     //{
@@ -78,8 +80,10 @@ public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
   }
 
   @Override
-  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
-      List<InstanceConfig> instanceConfigs) {
+  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView, List<InstanceConfig> instanceConfigs) {
+
+    _lastSegment2ServerMap.clear();
+
     List<Map<String, List<String>>> routingTables = new ArrayList<>(_numRoutingTables);
     for (int i = 0; i < _numRoutingTables; i++) {
       routingTables.add(new HashMap<String, List<String>>());
@@ -95,12 +99,14 @@ public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
           servers.add(serverName);
         }
       }
+
       int numServers = servers.size();
       if (numServers != 0) {
         for (Map<String, List<String>> routingTable : routingTables) {
           // Assign the segment to the server with least segments assigned
           routingTable.get(getServerWithLeastSegmentsAssigned(servers, routingTable)).add(segmentName);
         }
+        _lastSegment2ServerMap.put(segmentName,servers);
       }
     }
 
@@ -124,7 +130,7 @@ public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
 
     iAwareLBControllerDaemon.setRoutingTableBuilder(this);
 
-    routingTables = WorkerWeightDeployer.applyWorkerWeights(routingTables);
+    routingTables = WorkerWeightDeployer.applyWorkerWeights(routingTables, _lastSegment2ServerMap);
     setRoutingTables(routingTables);
 
 
@@ -148,7 +154,7 @@ public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
     for (int i = 0; i < _numRoutingTables; i++) {
       routingTables.add(new HashMap<String, List<String>>());
     }
-    routingTables = WorkerWeightDeployer.applyWorkerWeights(_lastRoutingTables);
+    routingTables = WorkerWeightDeployer.applyWorkerWeights(_lastRoutingTables, _lastSegment2ServerMap);
     setRoutingTables(routingTables);
   }
 
