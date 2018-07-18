@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.startreeV2.StarTreeV2Impl;
 import java.util.Set;
 
 
@@ -74,4 +75,11 @@ public interface IndexSegment {
    * Destroys segment in memory and closes file handlers if in MMAP mode.
    */
   void destroy();
+
+  /**
+   * Returns the Star-tree v2 index.
+   *
+   * @return Star-tree V2 index
+   */
+  StarTreeV2Impl getStarTree(int starTreeId);
 }

@@ -82,7 +82,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _refreshTime = Long.MIN_VALUE;
   private SegmentVersion _segmentVersion;
   private boolean _hasStarTree;
-  private boolean _hasStarTreeV2;
   private StarTreeMetadata _starTreeMetadata = null;
   private List<StarTreeV2Metadata> _starTreeV2MetadataList = null;
   private String _creatorName;
@@ -91,7 +90,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private final Map<String, String> _hllDerivedColumnMap = new HashMap<>();
   private int _totalDocs;
   private int _totalRawDocs;
-  private int _starTreesCount;
+  private int _starTreesV2Count;
   private long _segmentStartTime;
   private long _segmentEndTime;
 
@@ -295,10 +294,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     // Build star tree v2 metadata.
     String starTreeCount = _segmentMetadataPropertiesConfiguration.getString(StarTreeV2Constant.STAR_TREE_V2_COUNT);
-    _starTreesCount = starTreeCount != null ? Integer.parseInt(starTreeCount) : 0;
+    _starTreesV2Count = starTreeCount != null ? Integer.parseInt(starTreeCount) : 0;
 
-    if (_starTreesCount > 0) {
-      initStarTreeV2Metadata(_starTreesCount);
+    if (_starTreesV2Count > 0) {
+      initStarTreeV2Metadata(_starTreesV2Count);
     }
   }
 
@@ -561,7 +560,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public int getStarTreeV2Count() {
-    return _starTreesCount;
+    return _starTreesV2Count;
   }
 
   @Override

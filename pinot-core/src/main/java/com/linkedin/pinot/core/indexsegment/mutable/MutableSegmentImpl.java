@@ -35,12 +35,15 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
 import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.startreeV2.StarTreeV2Impl;
 import com.linkedin.pinot.core.util.FixedIntArray;
 import com.linkedin.pinot.core.util.FixedIntArrayOffHeapIdMap;
 import com.linkedin.pinot.core.util.IdMap;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.roaringbitmap.IntIterator;
@@ -82,6 +85,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _minTime = Long.MAX_VALUE;
   private volatile long _maxTime = Long.MIN_VALUE;
   private final int _numKeyColumns;
+
+  private final List<StarTreeV2Impl> _starTreeV2List;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
@@ -166,6 +171,8 @@ public class MutableSegmentImpl implements MutableSegment {
         _invertedIndexMap.put(column, new RealtimeInvertedIndexReader());
       }
     }
+
+    _starTreeV2List = new ArrayList<>();
   }
 
   public SegmentPartitionConfig getSegmentPartitionConfig() {
@@ -443,6 +450,15 @@ public class MutableSegmentImpl implements MutableSegment {
     if (_recordIdMap != null) {
       _recordIdMap.clear();
     }
+  }
+
+  @Override
+  public StarTreeV2Impl getStarTree(int starTreeId) {
+    if (_starTreeV2List.size() > 0) {
+      return _starTreeV2List.get(starTreeId);
+    }
+
+    return null;
   }
 
   private IntIterator[] getSortedBitmapIntIteratorsForIntColumn(String column) {
