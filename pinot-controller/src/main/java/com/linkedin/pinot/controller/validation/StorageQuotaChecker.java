@@ -134,8 +134,8 @@ public class StorageQuotaChecker {
         tableSubtypeSize.reportedSizeInBytes);
 
     // Only emit the real percentage of storage quota usage by lead controller, otherwise emit 0L.
-    if (_pinotHelixResourceManager.isLeader()) {
-      long existingStorageQuotaUtilization = tableSubtypeSize.estimatedSizeInBytes / allowedStorageBytes * 100;
+    if (_pinotHelixResourceManager.isLeader() && allowedStorageBytes != 0L) {
+      long existingStorageQuotaUtilization = tableSubtypeSize.estimatedSizeInBytes  * 100 / allowedStorageBytes;
       _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.TABLE_STORAGE_QUOTA_UTILIZATION,
           existingStorageQuotaUtilization);
     } else {
