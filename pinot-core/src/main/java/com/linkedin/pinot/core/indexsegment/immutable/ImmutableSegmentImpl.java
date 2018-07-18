@@ -27,7 +27,9 @@ import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.v2.StarTreeV2;
+import com.linkedin.pinot.core.startreeV2.StarTreeV2Impl;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,6 +44,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private final SegmentMetadataImpl _segmentMetadata;
   private final Map<String, ColumnIndexContainer> _indexContainerMap;
   private final StarTree _starTree;
+  private final List<StarTreeV2Impl> _starTreeV2List;
 
   public ImmutableSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
       Map<String, ColumnIndexContainer> columnIndexContainerMap, StarTree starTree) {
@@ -49,6 +52,17 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     _segmentMetadata = segmentMetadata;
     _indexContainerMap = columnIndexContainerMap;
     _starTree = starTree;
+    _starTreeV2List = new ArrayList<>();
+
+  }
+
+  public ImmutableSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
+      Map<String, ColumnIndexContainer> columnIndexContainerMap, StarTree starTree, List<StarTreeV2Impl> starTreeV2List) {
+    _segmentDirectory = segmentDirectory;
+    _segmentMetadata = segmentMetadata;
+    _indexContainerMap = columnIndexContainerMap;
+    _starTree = starTree;
+    _starTreeV2List = starTreeV2List;
   }
 
   @Override
