@@ -66,14 +66,18 @@ public class WorkerWeightDeployer {
 
         for (int i=0; i < configLine.size();  i++)
         {
-            String tokens[] = configLine.get(i).split(" ");
-            String server = tokens[0];
-            List<Float> weights = new ArrayList <>();
-            for(int j=1; j<4;j++)
+
+            if(configLine.get(i).contains("Server"))
             {
-                weights.add(Float.parseFloat(tokens[j]));
+                String tokens[] = configLine.get(i).split(" ");
+                String server = tokens[0];
+                List<Float> weights = new ArrayList <>();
+                for(int j=1; j<4;j++)
+                {
+                    weights.add(Float.parseFloat(tokens[j]));
+                }
+                workerList.put(server,weights);
             }
-            workerList.put(server,weights);
         }
 
         for (Map.Entry<String, List<Float>> entry : workerList.entrySet())
