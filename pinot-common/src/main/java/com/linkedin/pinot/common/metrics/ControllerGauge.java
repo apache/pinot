@@ -39,7 +39,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   REALTIME_TABLE_ESTIMATED_SIZE("RealtimeTableEstimatedSize", false), // Estimated size of realtime table.
   OFFLINE_TABLE_ESTIMATED_SIZE("OfflineTableEstimatedSize", false),   // Estimated size of offline table.
 
-  TABLE_QUOTA("TableQuotaBasedOnTableConfig", false); // Table quota based on setting in table config.
+  TABLE_QUOTA("TableQuotaBasedOnTableConfig", false), // Table quota based on setting in table config.
+
+  TABLE_STORAGE_QUOTA_UTILIZATION("TableStorageQuotaUtilization", false); // Table storage quota utilization.
 
   private final String gaugeName;
   private final String unit;
