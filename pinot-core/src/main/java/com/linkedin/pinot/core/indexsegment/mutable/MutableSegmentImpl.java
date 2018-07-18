@@ -35,6 +35,7 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
 import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.startreeV2.StarTreeV2;
 import com.linkedin.pinot.core.startreeV2.StarTreeV2Impl;
 import com.linkedin.pinot.core.util.FixedIntArray;
 import com.linkedin.pinot.core.util.FixedIntArrayOffHeapIdMap;
@@ -86,7 +87,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _maxTime = Long.MIN_VALUE;
   private final int _numKeyColumns;
 
-  private final List<StarTreeV2Impl> _starTreeV2List;
+  private final List<StarTreeV2> _starTreeV2List;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
@@ -453,7 +454,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
-  public StarTreeV2Impl getStarTree(int starTreeId) {
+  public StarTreeV2 getStarTreeV2(int starTreeId) {
     if (_starTreeV2List.size() > 0) {
       return _starTreeV2List.get(starTreeId);
     }

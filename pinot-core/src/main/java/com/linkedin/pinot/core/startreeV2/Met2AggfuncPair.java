@@ -21,8 +21,8 @@ package com.linkedin.pinot.core.startreeV2;
  */
 public class Met2AggfuncPair {
 
-  String _metricName;
-  String _aggregatefunction;
+  protected String _metricName;
+  protected String _aggregatefunction;
 
   /**
    * Constructor for the class

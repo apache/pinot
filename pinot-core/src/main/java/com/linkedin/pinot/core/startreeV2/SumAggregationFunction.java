@@ -17,11 +17,12 @@
 package com.linkedin.pinot.core.startreeV2;
 
 import java.util.List;
+import java.io.IOException;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
 
 
-public class SumAggregationFunction implements AggregationFunction<Number, Double> {
+public class SumAggregationFunction implements AggregationFunction<Number, Double, Double> {
 
   @Nonnull
   @Override
@@ -31,7 +32,7 @@ public class SumAggregationFunction implements AggregationFunction<Number, Doubl
 
   @Nonnull
   @Override
-  public FieldSpec.DataType getDatatype() {
+  public FieldSpec.DataType getDataType() {
     return FieldSpec.DataType.DOUBLE;
   }
 
@@ -51,5 +52,15 @@ public class SumAggregationFunction implements AggregationFunction<Number, Doubl
       sum = sum + number;
     }
     return sum;
+  }
+
+  @Override
+  public Double serialize(Double obj) throws IOException {
+    return obj;
+  }
+
+  @Override
+  public Double deserialize(Double obj) throws IOException {
+    return obj;
   }
 }

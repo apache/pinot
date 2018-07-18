@@ -21,7 +21,7 @@ import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
 
 
-public class CountAggregationFunction implements AggregationFunction<Number, Long> {
+public class CountAggregationFunction implements AggregationFunction<Number, Long, Long> {
 
   @Nonnull
   @Override
@@ -31,7 +31,7 @@ public class CountAggregationFunction implements AggregationFunction<Number, Lon
 
   @Nonnull
   @Override
-  public FieldSpec.DataType getDatatype() {
+  public FieldSpec.DataType getDataType() {
     return FieldSpec.DataType.LONG;
   }
 
@@ -51,5 +51,15 @@ public class CountAggregationFunction implements AggregationFunction<Number, Lon
       sum = sum + number;
     }
     return sum;
+  }
+
+  @Override
+  public Long serialize(Long obj) {
+    return obj;
+  }
+
+  @Override
+  public Long deserialize(Long obj) {
+    return obj;
   }
 }

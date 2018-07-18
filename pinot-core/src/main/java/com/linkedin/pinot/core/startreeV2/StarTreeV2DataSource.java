@@ -24,48 +24,43 @@ import java.io.IOException;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.nio.channels.FileChannel;
+import org.apache.commons.io.FileUtils;
 import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.startree.OffHeapStarTree;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.common.segment.StarTreeV2Metadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 
 
 public class StarTreeV2DataSource {
 
-  int _docsCount;
-  File _indexDataFile;
-  List<String> _met2aggfuncPairs;
-  List<String> _dimensionsSplitOrder;
-  ImmutableSegment _immutableSegment;
-  SegmentMetadataImpl _segmentMetadataImpl;
-  Map<String, Integer> _columnIndexInfoMap;
-  AggregationFunctionFactory _aggregationFunctionFactory;
-  Map<String, StarTreeV2DimensionDataSource> _dimensionIndexReader;
-  Map<String, StarTreeV2MetricAggfuncPairDataSource> _metricRawIndexReader;
+  private int _docsCount;
+  private File _indexDataFile;
+  private List<String> _met2aggfuncPairs;
+  private List<String> _dimensionsSplitOrder;
+  private SegmentMetadataImpl _segmentMetadataImpl;
+  private Map<String, Integer> _columnIndexInfoMap;
+  private AggregationFunctionFactory _aggregationFunctionFactory;
+  private Map<String, StarTreeV2DimensionDataSource> _dimensionIndexReader;
+  private Map<String, StarTreeV2MetricAggfuncPairDataSource> _metricRawIndexReader;
 
   private File _starTreeFile;
-  private String _starTreeIndexMapFile;
+  private File _starTreeIndexMapFile;
 
+  public StarTreeV2DataSource(SegmentMetadataImpl segmentMetadataImpl, StarTreeV2Metadata metadata, File indexDir) {
 
-
-  public StarTreeV2DataSource(ImmutableSegment immutableSegment, SegmentMetadataImpl segmentMetadataImpl,
-      StarTreeV2Metadata metadata, File indexDir) {
-
-    _starTreeIndexMapFile = new File(indexDir, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE).getPath();
+    _starTreeIndexMapFile = StarTreeV2Util.findFormatFile(indexDir, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE);
     _columnIndexInfoMap = OnHeapStarTreeV2LoaderHelper.readMetaData(_starTreeIndexMapFile);
 
-
     _starTreeFile = new File(indexDir, StarTreeV2Constant.STAR_TREE_V2_TEMP_FILE);
-    _indexDataFile = new File(indexDir, StarTreeV2Constant.STAR_TREE_V2_COlUMN_FILE);;
+    _indexDataFile = StarTreeV2Util.findFormatFile(indexDir, StarTreeV2Constant.STAR_TREE_V2_COlUMN_FILE);
+    ;
 
     _docsCount = metadata.getDocsCount();
     _met2aggfuncPairs = metadata.getMet2AggfuncPairs();
     _dimensionsSplitOrder = metadata.getDimensionsSplitOrder();
 
-    _immutableSegment = immutableSegment;
     _segmentMetadataImpl = segmentMetadataImpl;
 
     _dimensionIndexReader = new HashMap<>();
@@ -82,7 +77,6 @@ public class StarTreeV2DataSource {
     int start = _columnIndexInfoMap.get(sa);
     int size = _columnIndexInfoMap.get(sb);
 
-
     FileChannel src = new FileInputStream(_indexDataFile).getChannel();
     FileChannel dest = new FileOutputStream(_starTreeFile).getChannel();
     src.transferTo(start, size, dest);
@@ -91,6 +85,7 @@ public class StarTreeV2DataSource {
     dest.close();
 
     StarTree s = new OffHeapStarTree(_starTreeFile, ReadMode.mmap);
+    FileUtils.deleteQuietly(_starTreeFile);
 
     return s;
   }
@@ -106,8 +101,8 @@ public class StarTreeV2DataSource {
       ColumnMetadata columnMetadata = _segmentMetadataImpl.getColumnMetadataFor(dimension);
       int maxNumberOfBits = columnMetadata.getBitsPerElement();
       StarTreeV2DimensionDataSource starTreeV2DimensionDataSource =
-          new StarTreeV2DimensionDataSource(_indexDataFile, dimension, _immutableSegment, columnMetadata, _docsCount,
-              start, size, maxNumberOfBits);
+          new StarTreeV2DimensionDataSource(_indexDataFile, dimension, columnMetadata, _docsCount, start, size,
+              maxNumberOfBits);
       _dimensionIndexReader.put(dimension, starTreeV2DimensionDataSource);
     }
 
@@ -126,7 +121,8 @@ public class StarTreeV2DataSource {
       }
 
       StarTreeV2MetricAggfuncPairDataSource starTreeV2MetricAggfuncPairDataSource =
-          new StarTreeV2MetricAggfuncPairDataSource(_indexDataFile, pair, _docsCount, start, size, function.getDatatype());
+          new StarTreeV2MetricAggfuncPairDataSource(_indexDataFile, pair, _docsCount, start, size,
+              function.getDataType());
       _metricRawIndexReader.put(pair, starTreeV2MetricAggfuncPairDataSource);
     }
 

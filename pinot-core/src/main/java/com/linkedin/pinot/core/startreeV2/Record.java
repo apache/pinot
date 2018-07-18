@@ -19,8 +19,8 @@ import java.util.List;
 
 
 public class Record {
-  int[] _dimensionValues;
-  List<Object> _metricValues;
+  protected int[] _dimensionValues;
+  protected List<Object> _metricValues;
 
   /**
    * Return the metric values for the record.

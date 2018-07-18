@@ -28,7 +28,8 @@ public class StarTreeV2Impl implements StarTreeV2 {
   private final Map<String, StarTreeV2DimensionDataSource> _dimensionDataSources;
   private final Map<String, StarTreeV2MetricAggfuncPairDataSource> _metricaggFuncPairSources;
 
-  public StarTreeV2Impl(StarTree starTree, Map<String, StarTreeV2DimensionDataSource> dimensionDataSources,  Map<String, StarTreeV2MetricAggfuncPairDataSource> metricaggFuncPairSources) {
+  public StarTreeV2Impl(StarTree starTree, Map<String, StarTreeV2DimensionDataSource> dimensionDataSources,
+      Map<String, StarTreeV2MetricAggfuncPairDataSource> metricaggFuncPairSources) {
 
     _starTree = starTree;
     _dimensionDataSources = dimensionDataSources;
@@ -41,12 +42,11 @@ public class StarTreeV2Impl implements StarTreeV2 {
   }
 
   @Override
-  public DataSource getDimensionDataSource(String column) throws Exception {
-    return _dimensionDataSources.get(column);
-  }
-
-  @Override
-  public DataSource getMetricAggPairDataSource(String column) throws Exception {
-    return _metricaggFuncPairSources.get(column);
+  public DataSource getDataSource(String column) throws Exception {
+    if (_dimensionDataSources.containsKey(column)) {
+      return _dimensionDataSources.get(column);
+    } else {
+      return _metricaggFuncPairSources.get(column);
+    }
   }
 }

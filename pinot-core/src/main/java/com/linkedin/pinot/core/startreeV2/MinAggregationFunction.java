@@ -16,12 +16,13 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+import java.io.IOException;
 import java.util.List;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
 
 
-public class MinAggregationFunction implements AggregationFunction<Number, Double> {
+public class MinAggregationFunction implements AggregationFunction<Number, Double, Double> {
 
   @Nonnull
   @Override
@@ -31,7 +32,7 @@ public class MinAggregationFunction implements AggregationFunction<Number, Doubl
 
   @Nonnull
   @Override
-  public FieldSpec.DataType getDatatype() {
+  public FieldSpec.DataType getDataType() {
     return FieldSpec.DataType.DOUBLE;
   }
 
@@ -51,5 +52,15 @@ public class MinAggregationFunction implements AggregationFunction<Number, Doubl
       max = Math.min(max, number);
     }
     return max;
+  }
+
+  @Override
+  public Double serialize(Double obj) throws IOException {
+    return obj;
+  }
+
+  @Override
+  public Double deserialize(Double obj) throws IOException {
+    return obj;
   }
 }

@@ -170,7 +170,7 @@ public class OnHeapStarTreeV2HelperTest {
     List<Record> data = expectedFilteredData();
     List<Met2AggfuncPair> metric2aggFuncPairs = createMet2AggfuncPairs();
     List<Record> actual =
-        OnHeapStarTreeV2BuilderHelper.condenseData(data, metric2aggFuncPairs, StarTreeV2Constant.RAW_DATA);
+        OnHeapStarTreeV2BuilderHelper.condenseData(data, metric2aggFuncPairs, StarTreeV2Constant.IS_RAW_DATA);
 
     List<Record> expected = expectedCondensedData();
     printRecordsList(actual);
