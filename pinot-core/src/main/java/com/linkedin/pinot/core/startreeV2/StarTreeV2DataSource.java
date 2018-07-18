@@ -21,7 +21,12 @@ import java.util.Map;
 import java.util.List;
 import java.util.HashMap;
 import java.io.IOException;
-import com.linkedin.pinot.core.common.DataSource;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.nio.channels.FileChannel;
+import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.startree.OffHeapStarTree;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.common.segment.StarTreeV2Metadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -41,10 +46,20 @@ public class StarTreeV2DataSource {
   Map<String, StarTreeV2DimensionDataSource> _dimensionIndexReader;
   Map<String, StarTreeV2MetricAggfuncPairDataSource> _metricRawIndexReader;
 
+  private File _starTreeFile;
+  private String _starTreeIndexMapFile;
+
+
+
   public StarTreeV2DataSource(ImmutableSegment immutableSegment, SegmentMetadataImpl segmentMetadataImpl,
-      StarTreeV2Metadata metadata, Map<String, Integer> columnIndexInfoMap, File indexDataFile) {
-    _indexDataFile = indexDataFile;
-    _columnIndexInfoMap = columnIndexInfoMap;
+      StarTreeV2Metadata metadata, File indexDir) {
+
+    _starTreeIndexMapFile = new File(indexDir, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE).getPath();
+    _columnIndexInfoMap = OnHeapStarTreeV2LoaderHelper.readMetaData(_starTreeIndexMapFile);
+
+
+    _starTreeFile = new File(indexDir, StarTreeV2Constant.STAR_TREE_V2_TEMP_FILE);
+    _indexDataFile = new File(indexDir, StarTreeV2Constant.STAR_TREE_V2_COlUMN_FILE);;
 
     _docsCount = metadata.getDocsCount();
     _met2aggfuncPairs = metadata.getMet2AggfuncPairs();
@@ -59,7 +74,28 @@ public class StarTreeV2DataSource {
     _aggregationFunctionFactory = new AggregationFunctionFactory();
   }
 
-  public void loadDataSource(int starTreeId) throws IOException {
+  public StarTree loadStarTree(int starTreeId) throws IOException {
+
+    String sa = "startree" + starTreeId + ".root.start";
+    String sb = "startree" + starTreeId + ".root.size";
+
+    int start = _columnIndexInfoMap.get(sa);
+    int size = _columnIndexInfoMap.get(sb);
+
+
+    FileChannel src = new FileInputStream(_indexDataFile).getChannel();
+    FileChannel dest = new FileOutputStream(_starTreeFile).getChannel();
+    src.transferTo(start, size, dest);
+
+    src.close();
+    dest.close();
+
+    StarTree s = new OffHeapStarTree(_starTreeFile, ReadMode.mmap);
+
+    return s;
+  }
+
+  public void loadColumnsDataSource(int starTreeId) throws IOException {
 
     for (String dimension : _dimensionsSplitOrder) {
       String a = "startree" + starTreeId + "." + dimension + ".start";
@@ -97,11 +133,11 @@ public class StarTreeV2DataSource {
     return;
   }
 
-  public DataSource getDimensionForwardIndexReader(String column) {
-    return _dimensionIndexReader.get(column);
+  public Map<String, StarTreeV2DimensionDataSource> getDimensionForwardIndexReader() {
+    return _dimensionIndexReader;
   }
 
-  public DataSource getMetricRawIndexReader(String column) {
-    return _metricRawIndexReader.get(column);
+  public Map<String, StarTreeV2MetricAggfuncPairDataSource> getMetricRawIndexReader() {
+    return _metricRawIndexReader;
   }
 }

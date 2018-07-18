@@ -16,32 +16,25 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import java.io.File;
 import java.io.IOException;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.startree.StarTree;
 
 
-public interface StarTreeV2Loader {
-
-  /**
-   * Initialize the loader
-   */
-  void init(File indexDir) throws Exception;
+public interface StarTreeV2 {
 
   /**
    * load all data sources.
    */
-  void load() throws IOException;
-
-  StarTree getStarTree(int starTreeId) throws IOException;
-  /**
-   * return data source for particular star tree.
-   */
-  DataSource getDimensionDataSource(int starTreeId, String column) throws Exception;
+  StarTree getStarTree() throws IOException;
 
   /**
    * return data source for particular star tree.
    */
-  DataSource getMetricAggPairDataSource(int starTreeId, String column) throws Exception;
+  DataSource getDimensionDataSource(String column) throws Exception;
+
+  /**
+   * return data source for particular star tree.
+   */
+  DataSource getMetricAggPairDataSource(String column) throws Exception;
 }
