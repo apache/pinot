@@ -19,7 +19,6 @@ package com.linkedin.pinot.core.startreeV2;
 import java.io.File;
 import java.util.Map;
 import java.util.List;
-import java.util.HashMap;
 import java.util.ArrayList;
 import com.google.common.io.Files;
 import org.testng.annotations.Test;
@@ -100,38 +99,29 @@ public class OnHeapStarTreeV2IntegrationTest {
   }
 
   @Test
-  public void testLoader() throws Exception {
+  public void testLoaderAndExecutor() throws Exception {
     OnHeapStarTreeV2Loader loadTest = new OnHeapStarTreeV2Loader();
     try {
       loadTest.init(_filepath);
-      loadTest.load();
-      for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
+      List<StarTreeV2Impl> starTreeImplList = loadTest.load();
 
-        StarTree s = loadTest.getStarTree(i);
+      int starTreeId = 0;
+      for ( StarTreeV2Impl impl: starTreeImplList) {
+        StarTree s = impl.getStarTree();
         StarTreeV2LoaderHelper.printStarTree(s);
-        Map<String, DataSource> startTreeDataSources = new HashMap<>();
 
-        for (String dimension: _starTreeV2ConfigList.get(i).getDimensions()) {
-          DataSource source = loadTest.getDimensionDataSource(i, dimension);
-          startTreeDataSources.put(dimension, source);
+        for (String dimension: _starTreeV2ConfigList.get(starTreeId).getDimensions()) {
+          DataSource source = impl.getDimensionDataSource(dimension);
+          StarTreeV2LoaderHelper.printDimensionDataFromDataSource(source);
         }
 
-        for (Met2AggfuncPair pair: _starTreeV2ConfigList.get(i).getMetric2aggFuncPairs()) {
+        for (Met2AggfuncPair pair: _starTreeV2ConfigList.get(starTreeId).getMetric2aggFuncPairs()) {
           String metpair = pair.getMetricName() + "_" + pair.getAggregatefunction();
-          DataSource source = loadTest.getMetricAggPairDataSource(i, metpair);
-          startTreeDataSources.put(metpair, source);
+          DataSource source = impl.getMetricAggPairDataSource(metpair);
+          StarTreeV2LoaderHelper.printMetricAggfuncDataFromDataSource(source);
         }
-
-        DataSource source = loadTest.getMetricAggPairDataSource(i, "count");
-        startTreeDataSources.put("count", source);
-        _starTreeDataSourcesList.add(startTreeDataSources);
-
+        starTreeId += 1;
       }
-
-      DataSource source = loadTest.getDimensionDataSource(0, "Name");
-      StarTreeV2LoaderHelper.printDimensionDataFromDataSource(source);
-      source = loadTest.getMetricAggPairDataSource(0, "salary_sum");
-      StarTreeV2LoaderHelper.printMetricAggfuncDataFromDataSource(source);
 
       StarTreeV2ExecutorHelper.loadSegment(_filepath);
       for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
