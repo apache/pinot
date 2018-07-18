@@ -22,12 +22,16 @@ public class AggregationFunctionFactory {
   private static MinAggregationFunction _minFunction;
   private static MaxAggregationFunction _maxFunction;
   private static CountAggregationFunction _countFunction;
+  private static DistinctCountHLLAggregationFunction _distinctCountHLLFunction;
+  private static PercentileTDigestAggregationFunction _percentileTDigestFunction;
 
   public AggregationFunctionFactory() {
     _sumFunction = new SumAggregationFunction();
     _minFunction = new MinAggregationFunction();
     _maxFunction = new MaxAggregationFunction();
     _countFunction = new CountAggregationFunction();
+    _distinctCountHLLFunction = new DistinctCountHLLAggregationFunction();
+    _percentileTDigestFunction = new PercentileTDigestAggregationFunction();
   }
 
   public static AggregationFunction getAggregationFunction(String functionName) {
@@ -41,6 +45,10 @@ public class AggregationFunctionFactory {
         return _maxFunction;
       case StarTreeV2Constant.AggregateFunctions.COUNT:
         return _countFunction;
+      case StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL:
+        return _distinctCountHLLFunction;
+      case StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST:
+        return _percentileTDigestFunction;
       default:
         throw new UnsupportedOperationException();
     }

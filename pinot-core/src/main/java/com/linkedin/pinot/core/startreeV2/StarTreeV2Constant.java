@@ -41,14 +41,8 @@ public class StarTreeV2Constant {
     public static final String SUM = "sum";
     public static final String MIN = "min";
     public static final String COUNT = "count";
-  }
-
-  // aggregate functions name.
-  public static class AggregateFunctionDatatypes {
-    public static final String LONG = "long";
-    public static final String DOUBLE = "double";
-    public static final String INT = "int";
-    public static final String FLOAT = "float";
+    public static final String DISTINCTCOUNTHLL = "distinctcounthll";
+    public static final String PERCENTILETDIGEST = "percentileTDigest";
   }
 
   // star tree meta data.
