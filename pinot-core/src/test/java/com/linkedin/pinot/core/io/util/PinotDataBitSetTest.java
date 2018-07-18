@@ -16,6 +16,8 @@
 package com.linkedin.pinot.core.io.util;
 
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.io.IOException;
+import java.nio.ByteOrder;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -26,14 +28,14 @@ public class PinotDataBitSetTest {
   private static final int NUM_ITERATIONS = 1000;
 
   @Test
-  public void testReadWriteInt() {
+  public void testReadWriteInt() throws IOException {
     int numBitsPerValue = RANDOM.nextInt(10) + 1;
     int maxAllowedValue = 1 << numBitsPerValue;
     int numValues = 100;
     int[] values = new int[numValues];
     int dataBufferSize = (numValues * numBitsPerValue + Byte.SIZE - 1) / Byte.SIZE;
 
-    try (PinotDataBitSet dataBitSet = new PinotDataBitSet(PinotDataBuffer.allocateDirect(dataBufferSize))) {
+    try (PinotDataBitSet dataBitSet = getEmptyBitSet(dataBufferSize)) {
       for (int i = 0; i < numValues; i++) {
         int value = RANDOM.nextInt(maxAllowedValue);
         values[i] = value;
@@ -73,10 +75,10 @@ public class PinotDataBitSetTest {
   }
 
   @Test
-  public void testSetUnsetBit() {
+  public void testSetUnsetBit() throws IOException {
     int dataBufferSize = RANDOM.nextInt(100) + 1;
     boolean bits[] = new boolean[dataBufferSize * Byte.SIZE];
-    try (PinotDataBitSet dataBitSet = new PinotDataBitSet(PinotDataBuffer.allocateDirect(dataBufferSize))) {
+    try (PinotDataBitSet dataBitSet = getEmptyBitSet(dataBufferSize)) {
       for (int i = 0; i < NUM_ITERATIONS; i++) {
         int bitOffset = RANDOM.nextInt(dataBufferSize * Byte.SIZE);
         if (bits[bitOffset]) {
@@ -98,7 +100,7 @@ public class PinotDataBitSetTest {
   }
 
   @Test
-  public void testGetNextSetBitOffset() {
+  public void testGetNextSetBitOffset() throws IOException {
     int[] setBitOffsets = new int[NUM_ITERATIONS];
     int bitOffset = RANDOM.nextInt(10);
     for (int i = 0; i < NUM_ITERATIONS; i++) {
@@ -106,7 +108,7 @@ public class PinotDataBitSetTest {
       bitOffset += RANDOM.nextInt(10) + 1;
     }
     int dataBufferSize = setBitOffsets[NUM_ITERATIONS - 1] / Byte.SIZE + 1;
-    try (PinotDataBitSet dataBitSet = new PinotDataBitSet(PinotDataBuffer.allocateDirect(dataBufferSize))) {
+    try (PinotDataBitSet dataBitSet = getEmptyBitSet(dataBufferSize)) {
       for (int i = 0; i < NUM_ITERATIONS; i++) {
         dataBitSet.setBit(setBitOffsets[i]);
       }
@@ -124,5 +126,13 @@ public class PinotDataBitSetTest {
             setBitOffsets[i] + RANDOM.nextInt(setBitOffsets[i + 1] - setBitOffsets[i]) + 1, n), setBitOffsets[i + n]);
       }
     }
+  }
+
+  private PinotDataBitSet getEmptyBitSet(int size) {
+    PinotDataBuffer pinotDataBuffer = PinotDataBuffer.allocateDirect(size, ByteOrder.BIG_ENDIAN, null);
+    for (int i = 0; i < size; i++) {
+      pinotDataBuffer.readFrom(0, new byte[size]);
+    }
+    return new PinotDataBitSet(pinotDataBuffer);
   }
 }

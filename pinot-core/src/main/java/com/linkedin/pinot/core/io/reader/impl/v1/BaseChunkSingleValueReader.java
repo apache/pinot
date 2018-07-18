@@ -100,8 +100,8 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
   }
 
   @Override
-  public void close() {
-    // Nothing to close here.
+  public void close() throws IOException {
+    _dataBuffer.close();
   }
 
   /**

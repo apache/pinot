@@ -22,10 +22,11 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.TagNameUtils;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metrics.ServerMeter;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -33,7 +34,6 @@ import com.linkedin.pinot.server.starter.ServerInstance;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationUtils;
@@ -42,7 +42,6 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
-import org.apache.helix.PreConnectCallback;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
@@ -141,19 +140,10 @@ public class HelixServerStarter {
     _helixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
 
-    _serverInstance.getServerMetrics().addCallbackGauge("helix.connected", new Callable<Long>() {
-      @Override
-      public Long call() throws Exception {
-        return _helixManager.isConnected() ? 1L : 0L;
-      }
-    });
-
-    _helixManager.addPreConnectCallback(new PreConnectCallback() {
-      @Override
-      public void onPreConnect() {
-        _serverInstance.getServerMetrics().addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
-      }
-    });
+    final ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
+    serverMetrics.addCallbackGauge("helix.connected", () -> _helixManager.isConnected() ? 1L : 0L);
+    _helixManager.addPreConnectCallback(
+        () -> serverMetrics.addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
     // Register the service status handler
     ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
@@ -167,33 +157,11 @@ public class HelixServerStarter {
     LOGGER.info("Pinot server ready");
 
     // Create metrics for mmap stuff
-    _serverInstance.getServerMetrics().addCallbackGauge("memory.directByteBufferUsage", new Callable<Long>() {
-      @Override
-      public Long call() throws Exception {
-        return MmapUtils.getDirectByteBufferUsage();
-      }
-    });
-
-    _serverInstance.getServerMetrics().addCallbackGauge("memory.mmapBufferUsage", new Callable<Long>() {
-      @Override
-      public Long call() throws Exception {
-        return MmapUtils.getMmapBufferUsage();
-      }
-    });
-
-    _serverInstance.getServerMetrics().addCallbackGauge("memory.mmapBufferCount", new Callable<Long>() {
-      @Override
-      public Long call() throws Exception {
-        return MmapUtils.getMmapBufferCount();
-      }
-    });
-
-    _serverInstance.getServerMetrics().addCallbackGauge("memory.allocationFailureCount", new Callable<Long>() {
-      @Override
-      public Long call() throws Exception {
-        return (long) MmapUtils.getAllocationFailureCount();
-      }
-    });
+    serverMetrics.addCallbackGauge("memory.directBufferCount", PinotDataBuffer::getDirectBufferCount);
+    serverMetrics.addCallbackGauge("memory.directBufferUsage", PinotDataBuffer::getDirectBufferUsage);
+    serverMetrics.addCallbackGauge("memory.mmapBufferCount", PinotDataBuffer::getMmapBufferCount);
+    serverMetrics.addCallbackGauge("memory.mmapBufferUsage", PinotDataBuffer::getMmapBufferUsage);
+    serverMetrics.addCallbackGauge("memory.allocationFailureCount", PinotDataBuffer::getAllocationFailureCount);
   }
 
   private void updateInstanceConfigInHelix(int adminApiPort, boolean shuttingDown) {

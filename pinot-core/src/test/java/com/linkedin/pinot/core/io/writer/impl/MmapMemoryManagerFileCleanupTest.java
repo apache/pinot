@@ -29,7 +29,7 @@ public class MmapMemoryManagerFileCleanupTest {
 
   @BeforeClass
   public void setUp() {
-    _tmpDir = System.getProperty("java.io.tmpdir") + "/" + MmapMemoryManagerTest.class.getSimpleName();
+    _tmpDir = System.getProperty("java.io.tmpdir") + "/" + MmapMemoryManagerFileCleanupTest.class.getSimpleName();
     File dir = new File(_tmpDir);
     FileUtils.deleteQuietly(dir);
     dir.mkdir();
@@ -48,14 +48,15 @@ public class MmapMemoryManagerFileCleanupTest {
     final String someColumn = "column";
     final long firstAlloc = 20;
     final long allocAfterRestart = 200;
-    PinotDataBufferMemoryManager memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
-    memoryManager.allocate(firstAlloc, someColumn);
-    // Now, if the host restarts, we will have a file left behind for the same consuming segment.
-    // and we should not see any exception.
-    memoryManager = new MmapMemoryManager(_tmpDir, segmentName);
-    memoryManager.allocate(allocAfterRestart, someColumn);
-    // We should not see the first allocation in the total.
-    Assert.assertEquals(memoryManager.getTotalAllocatedBytes(), allocAfterRestart);
-    memoryManager.close();
+    try (PinotDataBufferMemoryManager memoryManager1 = new MmapMemoryManager(_tmpDir, segmentName)) {
+      memoryManager1.allocate(firstAlloc, someColumn);
+      // Now, if the host restarts, we will have a file left behind for the same consuming segment.
+      // and we should not see any exception.
+      try (PinotDataBufferMemoryManager memoryManager2 = new MmapMemoryManager(_tmpDir, segmentName)) {
+        memoryManager2.allocate(allocAfterRestart, someColumn);
+        // We should not see the first allocation in the total.
+        Assert.assertEquals(memoryManager2.getTotalAllocatedBytes(), allocAfterRestart);
+      }
+    }
   }
 }

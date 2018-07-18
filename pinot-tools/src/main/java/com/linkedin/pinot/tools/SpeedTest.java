@@ -15,9 +15,7 @@
  */
 package com.linkedin.pinot.tools;
 
-import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.DataOutputStream;
-import java.io.File;
 import java.io.FileOutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -52,7 +50,7 @@ public class SpeedTest {
     }
     out.close();
     RandomAccessFile raf = new RandomAccessFile(FILE_NAME, "rw");
-    mmappedByteBuffer = MmapUtils.mmapFile(raf, MapMode.READ_WRITE, 0L, raf.length(), new File(FILE_NAME), " Speed test mmappedByteBuffer");
+    mmappedByteBuffer = raf.getChannel().map(MapMode.READ_WRITE, 0L, raf.length());
     mmappedByteBuffer.load();
 
     int toSelect = (int) (SIZE * readPercentage);

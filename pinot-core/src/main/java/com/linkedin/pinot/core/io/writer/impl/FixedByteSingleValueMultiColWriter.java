@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.io.writer.impl;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -41,8 +42,9 @@ public class FixedByteSingleValueMultiColWriter {
       rowSizeInBytes += colSize;
     }
     int totalSize = rowSizeInBytes * rows;
-    indexDataBuffer = PinotDataBuffer.fromFile(file, 0, totalSize, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
-        file.getAbsolutePath() + this.getClass().getCanonicalName());
+    // Backward-compatible: index file is always big-endian
+    indexDataBuffer =
+        PinotDataBuffer.mapFile(file, false, 0, totalSize, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
   }
 
   public FixedByteSingleValueMultiColWriter(PinotDataBuffer dataBuffer, int rows, int cols,
@@ -98,10 +100,10 @@ public class FixedByteSingleValueMultiColWriter {
 
   public void setBytes(int row, int col, byte[] bytes) {
     int offset = rowSizeInBytes * row + columnOffsets[col];
-    indexDataBuffer.readFrom(bytes, offset);
+    indexDataBuffer.readFrom(offset, bytes);
   }
 
-  public void close() {
+  public void close() throws IOException {
     this.indexDataBuffer.close();
     this.indexDataBuffer = null;
   }

@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.index.readerwriter;
 
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
 import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
@@ -24,7 +23,6 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
@@ -88,19 +86,18 @@ public class VarByteChunkSingleValueReaderWriteTest {
 
     writer.close();
 
-    PinotDataBuffer pinotDataBuffer =
-        PinotDataBuffer.fromFile(outFile, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, getClass().getName());
+    try (VarByteChunkSingleValueReader reader = new VarByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(outFile))) {
+      ChunkReaderContext context = reader.createContext();
 
-    VarByteChunkSingleValueReader reader = new VarByteChunkSingleValueReader(pinotDataBuffer);
-    ChunkReaderContext context = reader.createContext();
-
-    for (int i = 0; i < NUM_ENTRIES; i += 2) {
-      String actual = reader.getString(i, context);
-      Assert.assertEquals(actual, expected[i]);
-      Assert.assertEquals(actual.getBytes(UTF_8), expected[i].getBytes(UTF_8));
-      Assert.assertEquals(reader.getBytes(i + 1), expected[i].getBytes(UTF_8));
+      for (int i = 0; i < NUM_ENTRIES; i += 2) {
+        String actual = reader.getString(i, context);
+        Assert.assertEquals(actual, expected[i]);
+        Assert.assertEquals(actual.getBytes(UTF_8), expected[i].getBytes(UTF_8));
+        Assert.assertEquals(reader.getBytes(i + 1), expected[i].getBytes(UTF_8));
+      }
     }
-    reader.close();
+
     FileUtils.deleteQuietly(outFile);
   }
 
@@ -122,18 +119,15 @@ public class VarByteChunkSingleValueReaderWriteTest {
     }
 
     File file = new File(resource.getFile());
+    try (VarByteChunkSingleValueReader reader = new VarByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(file))) {
+      ChunkReaderContext context = reader.createContext();
 
-    PinotDataBuffer pinotDataBuffer =
-        PinotDataBuffer.fromFile(file, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, getClass().getName());
-
-    VarByteChunkSingleValueReader reader = new VarByteChunkSingleValueReader(pinotDataBuffer);
-    ChunkReaderContext context = reader.createContext();
-
-    int numEntries = 1009; // Number of entries in the input file.
-    for (int i = 0; i < numEntries; i++) {
-      String actual = reader.getString(i, context);
-      Assert.assertEquals(actual, expected[i % expected.length]);
+      int numEntries = 1009; // Number of entries in the input file.
+      for (int i = 0; i < numEntries; i++) {
+        String actual = reader.getString(i, context);
+        Assert.assertEquals(actual, expected[i % expected.length]);
+      }
     }
-    reader.close();
   }
 }

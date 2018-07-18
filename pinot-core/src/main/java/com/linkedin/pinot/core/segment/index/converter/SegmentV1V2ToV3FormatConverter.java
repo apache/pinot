@@ -184,19 +184,11 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     }
   }
 
-  private void readCopyBuffers(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer,
-      String column, ColumnIndexType indexType)
-      throws IOException {
-
+  private void readCopyBuffers(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column,
+      ColumnIndexType indexType) throws IOException {
     PinotDataBuffer oldBuffer = reader.getIndexFor(column, indexType);
-    Preconditions.checkState(oldBuffer.size() >= 0 && oldBuffer.size() < Integer.MAX_VALUE,
-        "Buffer sizes of greater than 2GB is not supported. segment: " + reader.toString() +
-            ", column: " + column);
-    PinotDataBuffer newDictBuffer =
-        writer.newIndexFor(column, indexType, (int) oldBuffer.size());
-    // this shouldn't copy data
-    ByteBuffer bb = oldBuffer.toDirectByteBuffer(0, (int) oldBuffer.size());
-    newDictBuffer.readFrom(bb, 0, 0, bb.limit());
+    PinotDataBuffer newDictBuffer = writer.newIndexFor(column, indexType, (int) oldBuffer.size());
+    oldBuffer.copyTo(0, newDictBuffer, 0, oldBuffer.size());
   }
 
   private void createMetadataFile(File currentDir, File v3Dir)

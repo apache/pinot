@@ -17,7 +17,6 @@ package com.linkedin.pinot.segments.v1.creator;
 
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
@@ -25,7 +24,6 @@ import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
@@ -143,9 +141,8 @@ public class BitmapInvertedIndexCreatorTest {
   }
 
   private void validate(File invertedIndex, Set<Integer>[] postingLists) throws IOException {
-    try (PinotDataBuffer dataBuffer = PinotDataBuffer.fromFile(invertedIndex, ReadMode.mmap,
-        FileChannel.MapMode.READ_ONLY, "BitmapInvertedIndexCreatorTest")) {
-      BitmapInvertedIndexReader reader = new BitmapInvertedIndexReader(dataBuffer, CARDINALITY);
+    try (BitmapInvertedIndexReader reader = new BitmapInvertedIndexReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(invertedIndex), CARDINALITY)) {
       for (int dictId = 0; dictId < CARDINALITY; dictId++) {
         ImmutableRoaringBitmap bitmap = reader.getDocIds(dictId);
         Set<Integer> expected = postingLists[dictId];

@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.index.readerwriter;
 
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
@@ -25,7 +24,6 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
@@ -54,8 +52,7 @@ public class FixedByteChunkSingleValueReaderWriteTest {
   private static final int BYTES_LENGTH = 101;
 
   @Test
-  public void testWithCompression()
-      throws Exception {
+  public void testWithCompression() throws Exception {
     ChunkCompressorFactory.CompressionType compressionType = ChunkCompressorFactory.CompressionType.SNAPPY;
     testInt(compressionType);
     testLong(compressionType);
@@ -65,8 +62,7 @@ public class FixedByteChunkSingleValueReaderWriteTest {
   }
 
   @Test
-  public void testWithoutCompression()
-      throws Exception {
+  public void testWithoutCompression() throws Exception {
     ChunkCompressorFactory.CompressionType compressionType = ChunkCompressorFactory.CompressionType.PASS_THROUGH;
     testInt(compressionType);
     testLong(compressionType);
@@ -75,8 +71,7 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     testBytes(compressionType);
   }
 
-  public void testInt(ChunkCompressorFactory.CompressionType compressionType)
-      throws Exception {
+  public void testInt(ChunkCompressorFactory.CompressionType compressionType) throws Exception {
     int[] expected = new int[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
       expected[i] = _random.nextInt();
@@ -94,27 +89,25 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     }
     writer.close();
 
-    PinotDataBuffer pinotDataBuffer =
-        PinotDataBuffer.fromFile(outFile, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, getClass().getName());
+    try (FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(outFile))) {
+      ChunkReaderContext context = reader.createContext();
 
-    FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(pinotDataBuffer);
-    ChunkReaderContext context = reader.createContext();
-
-    for (int i = 0; i < NUM_VALUES; i++) {
-      int actual = reader.getInt(i, context);
-      Assert.assertEquals(actual, expected[i]);
-
-      if (compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH)) {
-        actual = reader.getInt(i);
+      for (int i = 0; i < NUM_VALUES; i++) {
+        int actual = reader.getInt(i, context);
         Assert.assertEquals(actual, expected[i]);
+
+        if (compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH)) {
+          actual = reader.getInt(i);
+          Assert.assertEquals(actual, expected[i]);
+        }
       }
     }
-    reader.close();
+
     FileUtils.deleteQuietly(outFile);
   }
 
-  public void testLong(ChunkCompressorFactory.CompressionType compressionType)
-      throws Exception {
+  public void testLong(ChunkCompressorFactory.CompressionType compressionType) throws Exception {
     long[] expected = new long[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
       expected[i] = _random.nextLong();
@@ -132,27 +125,25 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     }
     writer.close();
 
-    PinotDataBuffer pinotDataBuffer =
-        PinotDataBuffer.fromFile(outFile, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, getClass().getName());
+    try (FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(outFile))) {
+      ChunkReaderContext context = reader.createContext();
 
-    FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(pinotDataBuffer);
-    ChunkReaderContext context = reader.createContext();
-
-    for (int i = 0; i < NUM_VALUES; i++) {
-      long actual = reader.getLong(i, context);
-      Assert.assertEquals(actual, expected[i]);
-
-      if (compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH)) {
-        actual = reader.getLong(i);
+      for (int i = 0; i < NUM_VALUES; i++) {
+        long actual = reader.getLong(i, context);
         Assert.assertEquals(actual, expected[i]);
+
+        if (compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH)) {
+          actual = reader.getLong(i);
+          Assert.assertEquals(actual, expected[i]);
+        }
       }
     }
-    reader.close();
+
     FileUtils.deleteQuietly(outFile);
   }
 
-  public void testFloat(ChunkCompressorFactory.CompressionType compressionType)
-      throws Exception {
+  public void testFloat(ChunkCompressorFactory.CompressionType compressionType) throws Exception {
     float[] expected = new float[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
       expected[i] = _random.nextFloat();
@@ -170,27 +161,25 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     }
     writer.close();
 
-    PinotDataBuffer pinotDataBuffer =
-        PinotDataBuffer.fromFile(outFile, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, getClass().getName());
+    try (FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(outFile))) {
+      ChunkReaderContext context = reader.createContext();
 
-    FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(pinotDataBuffer);
-    ChunkReaderContext context = reader.createContext();
-
-    for (int i = 0; i < NUM_VALUES; i++) {
-      float actual = reader.getFloat(i, context);
-      Assert.assertEquals(actual, expected[i]);
-
-      if (compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH)) {
-        actual = reader.getFloat(i);
+      for (int i = 0; i < NUM_VALUES; i++) {
+        float actual = reader.getFloat(i, context);
         Assert.assertEquals(actual, expected[i]);
+
+        if (compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH)) {
+          actual = reader.getFloat(i);
+          Assert.assertEquals(actual, expected[i]);
+        }
       }
     }
-    reader.close();
+
     FileUtils.deleteQuietly(outFile);
   }
 
-  public void testDouble(ChunkCompressorFactory.CompressionType compressionType)
-      throws Exception {
+  public void testDouble(ChunkCompressorFactory.CompressionType compressionType) throws Exception {
     double[] expected = new double[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
       expected[i] = _random.nextDouble();
@@ -208,27 +197,25 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     }
     writer.close();
 
-    PinotDataBuffer pinotDataBuffer =
-        PinotDataBuffer.fromFile(outFile, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, getClass().getName());
+    try (FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(outFile))) {
+      ChunkReaderContext context = reader.createContext();
 
-    FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(pinotDataBuffer);
-    ChunkReaderContext context = reader.createContext();
-
-    for (int i = 0; i < NUM_VALUES; i++) {
-      double actual = reader.getDouble(i, context);
-      Assert.assertEquals(actual, expected[i]);
-
-      if (compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH)) {
-        actual = reader.getDouble(i);
+      for (int i = 0; i < NUM_VALUES; i++) {
+        double actual = reader.getDouble(i, context);
         Assert.assertEquals(actual, expected[i]);
+
+        if (compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH)) {
+          actual = reader.getDouble(i);
+          Assert.assertEquals(actual, expected[i]);
+        }
       }
     }
-    reader.close();
+
     FileUtils.deleteQuietly(outFile);
   }
 
-  public void testBytes(ChunkCompressorFactory.CompressionType compressionType)
-      throws Exception {
+  public void testBytes(ChunkCompressorFactory.CompressionType compressionType) throws Exception {
     byte[][] expected = new byte[NUM_VALUES][BYTES_LENGTH];
     for (int i = 0; i < NUM_VALUES; i++) {
       expected[i] = RandomStringUtils.randomAscii(50).getBytes(UTF_8);
@@ -245,31 +232,30 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     }
     writer.close();
 
-    PinotDataBuffer pinotDataBuffer =
-        PinotDataBuffer.fromFile(outFile, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, getClass().getName());
+    try (FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(outFile))) {
+      ChunkReaderContext context = reader.createContext();
 
-    FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(pinotDataBuffer);
-    ChunkReaderContext context = reader.createContext();
-
-    for (int i = 0; i < NUM_VALUES; i++) {
-      byte[] actual = reader.getBytes(i, context);
-      Assert.assertEquals(actual, expected[i]);
-
-      if (compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH)) {
-        actual = reader.getBytes(i);
+      for (int i = 0; i < NUM_VALUES; i++) {
+        byte[] actual = reader.getBytes(i, context);
         Assert.assertEquals(actual, expected[i]);
+
+        if (compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH)) {
+          actual = reader.getBytes(i);
+          Assert.assertEquals(actual, expected[i]);
+        }
       }
     }
-    reader.close();
+
     FileUtils.deleteQuietly(outFile);
   }
+
   /**
    * This test ensures that the reader can read in an data file from version 1.
    * @throws IOException
    */
   @Test
-  public void testBackwardCompatibility()
-      throws IOException {
+  public void testBackwardCompatibility() throws IOException {
     // Get v1 from resources folder
     ClassLoader classLoader = getClass().getClassLoader();
     String fileName = "data/fixedByteSVRDoubles.v1";
@@ -279,18 +265,15 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     }
 
     File file = new File(resource.getFile());
+    try (FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(file))) {
+      ChunkReaderContext context = reader.createContext();
 
-    PinotDataBuffer pinotDataBuffer =
-        PinotDataBuffer.fromFile(file, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, getClass().getName());
-
-    FixedByteChunkSingleValueReader reader = new FixedByteChunkSingleValueReader(pinotDataBuffer);
-    ChunkReaderContext context = reader.createContext();
-
-    int numEntries = 10009; // Number of entries in the input file.
-    for (int i = 0; i < numEntries; i++) {
-      double actual = reader.getDouble(i, context);
-      Assert.assertEquals(actual, (double) i);
+      int numEntries = 10009; // Number of entries in the input file.
+      for (int i = 0; i < numEntries; i++) {
+        double actual = reader.getDouble(i, context);
+        Assert.assertEquals(actual, (double) i);
+      }
     }
-    reader.close();
   }
 }

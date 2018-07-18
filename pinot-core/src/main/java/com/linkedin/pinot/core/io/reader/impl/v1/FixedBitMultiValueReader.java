@@ -21,6 +21,7 @@ import com.linkedin.pinot.core.io.util.FixedBitIntReaderWriter;
 import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
 import com.linkedin.pinot.core.io.util.PinotDataBitSet;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.io.IOException;
 
 
 /**
@@ -137,7 +138,7 @@ public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueRe
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     _chunkOffsetReader.close();
     _bitmapReader.close();
     _rawDataReader.close();

@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.io.util;
 
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
+import java.io.IOException;
 import java.nio.charset.Charset;
 
 
@@ -108,7 +109,7 @@ public final class FixedByteValueReaderWriter implements Closeable {
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     _dataBuffer.close();
   }
 }

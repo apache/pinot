@@ -26,7 +26,7 @@ import java.io.Closeable;
 public interface PinotDataBufferMemoryManager extends Closeable {
 
   /**
-   * Allocates and returns a PinotDataBuffer of specified size.
+   * Allocates and returns a PinotDataBuffer of specified size with native byte order.
    *
    * @param size Size of the data buffer to be allocated.
    * @param allocationContext Context for allocation.
