@@ -116,6 +116,30 @@ public class AlgorithmUtilsTest {
     Assert.assertTrue(equals(AlgorithmUtils.fastBSpline(s, 4), DoubleSeries.buildFrom(2, 2, 2, 2, 2, 2, 2, 2, 2), 0.25));
   }
 
+  @Test
+  public void testRobustMeanNoData() {
+    DoubleSeries s = DoubleSeries.buildFrom();
+    Assert.assertTrue(equals(AlgorithmUtils.robustMean(s, 1), s, 0.001));
+  }
+
+  @Test
+  public void testRobustMeanSingleWindow() {
+    DoubleSeries s = DoubleSeries.buildFrom(1, 2, 3);
+    Assert.assertTrue(equals(AlgorithmUtils.robustMean(s, 1), DoubleSeries.buildFrom(1, 2, 3), 0.001));
+  }
+
+  @Test
+  public void testRobustMeanSmallWindow() {
+    DoubleSeries s = DoubleSeries.buildFrom(1, 2, 3);
+    Assert.assertTrue(equals(AlgorithmUtils.robustMean(s, 2), DoubleSeries.buildFrom(Double.NaN, 1.5, 2.5), 0.001));
+  }
+
+  @Test
+  public void testRobustMean() {
+    DoubleSeries s = DoubleSeries.buildFrom(1, 2, 3, 4, 5, 6);
+    Assert.assertTrue(equals(AlgorithmUtils.robustMean(s, 4), DoubleSeries.buildFrom(Double.NaN, Double.NaN, Double.NaN, 2.5, 3.5, 4.5), 0.001));
+  }
+
   private static boolean equals(DataFrame a, DataFrame b, double epsilon) {
     if (!a.getSeriesNames().equals(b.getSeriesNames())) {
       return false;

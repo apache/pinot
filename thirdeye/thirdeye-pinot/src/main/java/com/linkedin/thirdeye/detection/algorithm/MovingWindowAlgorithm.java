@@ -46,6 +46,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private static final String COL_QUANTILE_MIN = "quantileMin";
   private static final String COL_QUANTILE_MAX = "quantileMax";
   private static final String COL_ZSCORE = "zscore";
+  private static final String COL_ZSUM = "zsum";
   private static final String COL_KERNEL = "kernel";
   private static final String COL_KERNEL_VIOLATION = "kernelViolation";
   private static final String COL_ANOMALY = "anomaly";
@@ -62,6 +63,8 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private final Period minLookback;
   private final double zscoreMin;
   private final double zscoreMax;
+  private final double zsumMin;
+  private final double zsumMax;
   private final double kernelMin;
   private final double kernelMax;
   private final int kernelPasses;
@@ -85,6 +88,8 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     this.quantileMax = MapUtils.getDoubleValue(config.getProperties(), "quantileMax", Double.NaN);
     this.zscoreMin = MapUtils.getDoubleValue(config.getProperties(), "zscoreMin", Double.NaN);
     this.zscoreMax = MapUtils.getDoubleValue(config.getProperties(), "zscoreMax", Double.NaN);
+    this.zsumMin = MapUtils.getDoubleValue(config.getProperties(), "zsumMin", Double.NaN);
+    this.zsumMax = MapUtils.getDoubleValue(config.getProperties(), "zsumMax", Double.NaN);
     this.kernelMin = MapUtils.getDoubleValue(config.getProperties(), "kernelMin", Double.NaN);
     this.kernelMax = MapUtils.getDoubleValue(config.getProperties(), "kernelMax", Double.NaN);
     this.kernelPasses = MapUtils.getIntValue(config.getProperties(), "kernelPasses", 4);
@@ -157,6 +162,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     double[] sMean = df.addSeries(COL_MEAN, DoubleSeries.nulls(df.size())).getDoubles(COL_MEAN).values();
     double[] sStd = df.addSeries(COL_STD, DoubleSeries.nulls(df.size())).getDoubles(COL_STD).values();
     double[] sZscore = df.addSeries(COL_ZSCORE, DoubleSeries.nulls(df.size())).getDoubles(COL_ZSCORE).values();
+    double[] sZsum = df.addSeries(COL_ZSUM, DoubleSeries.fillValues(df.size(), 0)).getDoubles(COL_ZSUM).values();
     double[] sQuantileMin = df.addSeries(COL_QUANTILE_MIN, DoubleSeries.nulls(df.size())).getDoubles(COL_QUANTILE_MIN).values();
     double[] sQuantileMax = df.addSeries(COL_QUANTILE_MAX, DoubleSeries.nulls(df.size())).getDoubles(COL_QUANTILE_MAX).values();
     double[] sKernel = df.addSeries(COL_KERNEL, DoubleSeries.nulls(df.size())).getDoubles(COL_KERNEL).values();
@@ -184,6 +190,15 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       sMean[index] = mean;
       sStd[index] = std;
       sZscore[index] = zscore;
+
+      DoubleSeries sRmean = AlgorithmUtils.robustMean(df.getDoubles(COL_ZSCORE), 8);
+      double rmean = sRmean.values()[index];
+
+      sZsum[index] = (index > 0 ? sZsum[index - 1] : 0);
+      if (!DoubleSeries.isNull(rmean)) {
+        sZsum[index] += rmean;
+      }
+      sZsum[index] = 0.95 * sZsum[index];
 
       if (!Double.isNaN(this.quantileMin)) {
         sQuantileMin[index] = values.quantile(this.quantileMin).doubleValue();

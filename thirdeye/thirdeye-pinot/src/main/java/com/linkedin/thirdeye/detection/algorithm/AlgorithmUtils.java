@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.LongSeries;
+import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -284,6 +285,34 @@ public class AlgorithmUtils {
     }
 
     return copy;
+  }
+
+  /**
+   * Helper for robust mean with window size
+   *
+   * @param s double series
+   * @return smoothed series
+   */
+  public static DoubleSeries robustMean(DoubleSeries s, int n) {
+    return s.groupByMovingWindow(n).aggregate(new Series.DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        if (values.length <= 0)
+          return DoubleSeries.NULL;
+
+        double[] sorted = Arrays.copyOf(values, values.length);
+        Arrays.sort(sorted);
+        int hi = (int) Math.ceil(sorted.length * 0.75);
+        int lo = (int) Math.floor(sorted.length * 0.25);
+
+        double sum = 0.0;
+        for (int i = lo; i < hi; i++) {
+          sum += sorted[i];
+        }
+
+        return sum / (hi - lo);
+      }
+    }).getValues().getDoubles();
   }
 
   /**
