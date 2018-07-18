@@ -115,14 +115,14 @@ public class FileUploadDownloadClient implements Closeable {
     return new URI(scheme, null, host, port, path, null, null);
   }
 
-  public static URI getRetrieveTableConfigURI(String host, int port, String tableName) throws URISyntaxException {
+  public static URI getRetrieveTableConfigURI(String scheme, String host, int port, String tableName) throws URISyntaxException {
     String path = TABLES_PATH + SLASH + tableName;
-    return getURI(HTTP, host, port, path);
+    return getURI(scheme, host, port, path);
   }
 
-  public static URI getRetrieveSchemaHttpURI(String host, int port, String tableName) throws URISyntaxException {
+  public static URI getRetrieveSchemaHttpURI(String scheme, String host, int port, String tableName) throws URISyntaxException {
     String path = SCHEMA_PATH + SLASH + tableName;
-    return getURI(HTTP, host, port, path);
+    return getURI(scheme, host, port, path);
   }
 
   public static URI getUploadSchemaHttpURI(String host, int port) throws URISyntaxException {

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.hadoop.job;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.SimpleHttpResponse;
 import com.linkedin.pinot.hadoop.utils.PushLocation;
@@ -23,6 +24,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+import javax.net.ssl.SSLContext;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,21 +35,39 @@ public class ControllerRestApi {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerRestApi.class);
   private final List<PushLocation> _pushLocations;
   private final String _tableName;
+  private SSLContext _sslContext = null;
+  private FileUploadDownloadClient _fileUploadDownloadClient;
+  private String _scheme;
 
+  private static final String HTTP = "http";
+  private static final String HTTPS = "https";
   private static final String OFFLINE = "OFFLINE";
+  private static final String CONFIG_OF_ENABLE_SERVER_VERIFICATION = "server.enable-verification";
 
-  public ControllerRestApi(List<PushLocation> pushLocations, String tableName) {
+  public ControllerRestApi(List<PushLocation> pushLocations, boolean enableHttps, String tableName) {
     LOGGER.info("Push Locations are: " + pushLocations);
     _pushLocations = pushLocations;
     _tableName = tableName;
+
+    if (enableHttps) {
+      org.apache.commons.configuration.Configuration configuration = new PropertiesConfiguration();
+      // TODO: Turn this to true and provide the right ca-bundle for server verification
+      configuration.addProperty(CONFIG_OF_ENABLE_SERVER_VERIFICATION, "false");
+      _scheme = HTTPS;
+
+      _sslContext = new ClientSSLContextGenerator(configuration).generate();
+      _fileUploadDownloadClient = new FileUploadDownloadClient(_sslContext);
+    } else {
+      _fileUploadDownloadClient = new FileUploadDownloadClient();
+      _scheme = HTTP;
+    }
   }
 
   public TableConfig getTableConfig() {
-    FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient();
     List<URI> tableConfigURIs = new ArrayList<>();
     try {
       for (PushLocation pushLocation : _pushLocations) {
-        tableConfigURIs.add(FileUploadDownloadClient.getRetrieveTableConfigURI(pushLocation.getHost(), pushLocation.getPort(), _tableName));
+        tableConfigURIs.add(FileUploadDownloadClient.getRetrieveTableConfigURI(_scheme, pushLocation.getHost(), pushLocation.getPort(), _tableName));
       }
     } catch (URISyntaxException e) {
       LOGGER.error("Could not construct table config URI for table {}", _tableName);
@@ -56,7 +77,7 @@ public class ControllerRestApi {
     // Return the first table config it can retrieve
     for (URI uri : tableConfigURIs) {
       try {
-        SimpleHttpResponse response = fileUploadDownloadClient.getTableConfig(uri);
+        SimpleHttpResponse response = _fileUploadDownloadClient.getTableConfig(uri);
         JSONObject queryResponse = new JSONObject(response.getResponse());
         JSONObject offlineTableConfig = queryResponse.getJSONObject(OFFLINE);
         LOGGER.info("Got table config {}", offlineTableConfig);
@@ -72,11 +93,10 @@ public class ControllerRestApi {
   }
 
   public String getSchema() {
-    FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient();
     List<URI> schemaURIs = new ArrayList<>();
     try {
       for (PushLocation pushLocation : _pushLocations) {
-        schemaURIs.add(FileUploadDownloadClient.getRetrieveSchemaHttpURI(pushLocation.getHost(), pushLocation.getPort(), _tableName));
+        schemaURIs.add(FileUploadDownloadClient.getRetrieveSchemaHttpURI(_scheme, pushLocation.getHost(), pushLocation.getPort(), _tableName));
       }
     } catch (URISyntaxException e) {
       LOGGER.error("Could not construct schema URI for table {}", _tableName);
@@ -85,7 +105,7 @@ public class ControllerRestApi {
 
     for (URI schemaURI : schemaURIs) {
       try {
-        SimpleHttpResponse response = fileUploadDownloadClient.getSchema(schemaURI);
+        SimpleHttpResponse response = _fileUploadDownloadClient.getSchema(schemaURI);
         if (response != null) {
           return response.getResponse();
         }

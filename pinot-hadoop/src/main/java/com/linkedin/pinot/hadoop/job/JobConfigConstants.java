@@ -31,4 +31,5 @@ public class JobConfigConstants {
   public static final String PUSH_TO_HOSTS = "push.to.hosts";
   public static final String PUSH_TO_PORT = "push.to.port";
 
+  public static final String ENABLE_HTTPS = "enable.https";
 }

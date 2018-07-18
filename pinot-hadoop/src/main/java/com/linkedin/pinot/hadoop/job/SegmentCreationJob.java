@@ -39,7 +39,6 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
-import org.apache.helix.task.JobConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +63,8 @@ public class SegmentCreationJob extends Configured {
 
   private String[] _hosts;
   private int _port;
+  // Defaults to false
+  private boolean _enableHttps = false;
 
   public SegmentCreationJob(String jobName, Properties properties) throws Exception {
     super(new Configuration());
@@ -86,6 +87,10 @@ public class SegmentCreationJob extends Configured {
       _port = Integer.parseInt(portString);
     }
     _tableName = _properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME);
+    String enableHttps = _properties.getProperty(JobConfigConstants.ENABLE_HTTPS);
+    if (enableHttps != null) {
+      _enableHttps = Boolean.parseBoolean(enableHttps);
+    }
 
     Utils.logVersions();
 
@@ -220,7 +225,7 @@ public class SegmentCreationJob extends Configured {
           .build());
     }
 
-    ControllerRestApi controllerRestApiObject = new ControllerRestApi(pushLocations, _tableName);
+    ControllerRestApi controllerRestApiObject = new ControllerRestApi(pushLocations, _enableHttps, _tableName);
 
     TableConfig tableConfig = controllerRestApiObject.getTableConfig();
     job.getConfiguration()
