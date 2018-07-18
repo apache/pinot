@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
@@ -413,10 +414,17 @@ public class PinotTableRestletResource {
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DRYRUN, dryRun);
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.INCLUDE_CONSUMING, includeConsuming);
 
+    TableType type = TableType.valueOf(tableType.toUpperCase());
+    if (type == TableType.OFFLINE && (!_pinotHelixResourceManager.hasOfflineTable(tableName))
+        || type == TableType.REALTIME && (!_pinotHelixResourceManager
+        .hasRealtimeTable(tableName))) {
+      throw new ControllerApplicationException(LOGGER, "Table " + tableName + " does not exist",
+          Response.Status.NOT_FOUND);
+    }
+
     JSONObject jsonObject;
     try {
-      jsonObject = _pinotHelixResourceManager.rebalanceTable(tableName,
-          CommonConstants.Helix.TableType.valueOf(tableType.toUpperCase()), rebalanceUserConfig);
+      jsonObject = _pinotHelixResourceManager.rebalanceTable(tableName, type, rebalanceUserConfig);
     } catch (JSONException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     } catch (InvalidConfigException e) {

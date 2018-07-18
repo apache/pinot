@@ -28,6 +28,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -264,6 +265,52 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       notFoundException = true;
     }
     Assert.assertTrue(notFoundException);
+  }
+
+  @Test(expectedExceptions = FileNotFoundException.class)
+  public void rebalanceNonExistentOfflineTable() throws IOException, JSONException {
+    String tableName = "nonExistentTable";
+    // should result in file not found exception
+    sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(tableName, "offline"), null);
+  }
+
+  @Test(expectedExceptions = FileNotFoundException.class)
+  public void rebalanceNonExistentRealtimeTable() throws IOException, JSONException {
+    String tableName = "nonExistentTable";
+    // should result in file not found exception
+    sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(tableName, "realtime"), null);
+  }
+
+  @Test
+  public void rebalanceOfflineTable() {
+    String tableName = "testOfflineTable";
+    _offlineBuilder.setTableName(tableName);
+    // create the table
+    try {
+      TableConfig offlineTableConfig = _offlineBuilder.build();
+      sendPostRequest(_createTableUrl, offlineTableConfig.toJSONConfigString());
+    } catch (Exception e) {
+      Assert.fail("Failed to create offline table " + tableName + "Error: " + e.getMessage());
+    }
+
+    // rebalance should not throw exception
+    try {
+      sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(tableName, "offline"), null);
+    } catch (Exception e) {
+      Assert.fail("Failed to rebalance existing offline table " + tableName);
+    }
+
+    // rebalance should throw exception because realtime table does not exist
+    try {
+      sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(tableName, "realtime"), null);
+    } catch (Exception e) {
+      if (!(e instanceof FileNotFoundException)) {
+        Assert.fail("Did not fail to create non existent realtime table " + tableName);
+      } else {
+        return;
+      }
+    }
+    Assert.fail("Did not fail to create non existent realtime table " + tableName);
   }
 
   @AfterClass
