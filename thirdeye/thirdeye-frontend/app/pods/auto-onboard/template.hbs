@@ -9,64 +9,122 @@
   </div>
 
   {{#if metricUrn}}
-  <div class="row">
-    <div class="col-xs-2">
-    metric name
+
+    <div class="row">
+      <label class="control-label te-label te-label--taller">
+        Detection Name:
+      </label>
     </div>
-    <div class="col-xs-2">
-      top k
+
+    <div class="row">
+      <div class="col-xs-6">
+        <input type="text"
+               onChange={{action "onChangeName" value="target.value"}}/>
+      </div>
     </div>
-    <div class="col-xs-2">
-      min value
+
+    <div class="row">
+      <label class="control-label te-label te-label--taller">
+        Choose the metrics:
+      </label>
     </div>
-    <div class="col-xs-2">
-      min contribution
-    </div>
-    <div class="col-xs-4">
-    filters
-    </div>
-  </div>
-  {{/if}}
+
 
   {{#each metrics as |metric|}}
     <div>
-      <div class="col-xs-2">
-      {{metric.name}}
-      <input type="checkbox"
-             checked=checkboxDefault
-             onclick={{action "toggleCheckBox" metric.name}}/>
-      </div>
-      <div class="col-xs-2">
-
-      <input type="text"
-             onChange={{action (action "onChangeValue" "topk" metric.name) value="target.value"}}/>
-      </div>
-      <div class="col-xs-2">
-
-      <input type="text"
-             onChange={{action (action "onChangeValue" "minvalue" metric.name) value="target.value"}}/>
-      </div>
-      <div class="col-xs-2">
-
-      <input type="text"
-             onChange={{action (action "onChangeValue" "mincontribution" metric.name) value="target.value"}}/>
-      </div>
-      <div class="col-xs-4">
-
-      {{#if metricUrn}}
-
-        {{filter-select
-          options=filterOptions
-          onChange=(action "onFilters" metric.name)
-        }}
-      {{/if}}
-      </div>
-
-
+        {{metric.name}}
+        <input type="checkbox"
+               checked=checkboxDefault
+               onclick={{action "toggleCheckBox" metric.name}}/>
     </div>
 
   {{/each}}
+    <div class="row">
+      <label class="control-label te-label te-label--taller">
+        Filter metric by(Optional):
+      </label>
+    </div>
 
-  <button onClick={{action "onSubmit"}}>submit</button>
+    {{filter-select
+      options=filterOptions
+      onChange=(action "onFilters")
+    }}
+
+  <div class="row">
+      <label for="select-dimension" class="control-label te-label te-label--taller">
+        Create an alert for each dimension value in: (optional)
+        <span>
+          <i class="glyphicon glyphicon-question-sign"></i>
+          {{#tooltip-on-element class="te-tooltip"}}
+            For example, selecting Continent means anomalies on each continent will be monitored.
+          {{/tooltip-on-element}}
+        </span>
+      </label>
+      {{#power-select
+        classNames="te-input"
+        options=dimensions
+        selected=selectedDimension
+        onchange=(action "onSelectDimension")
+        loadingMessage="Waiting for the server...."
+        placeholder="Break Dimensions By..."
+        searchPlaceholder="Type to filter..."
+        triggerId="select-dimension"
+        triggerClass="te-form__select"
+        disabled=(not generalFieldsEnabled)
+      as |dimension|
+      }}
+        {{dimension}}
+      {{/power-select}}
+  </div>
+
+  <div class="row">
+    <label class="control-label te-label te-label--taller">
+      Set up the business rules(Optional):
+    </label>
+  </div>
+
+    {{#power-select
+      classNames="te-input"
+      options=metrics
+      selected=selectedDimension
+      onchange=(action "onSelectDimension")
+      loadingMessage="Waiting for the server...."
+      placeholder="Choose metric for rules"
+      searchPlaceholder="Type to filter..."
+      triggerId="select-metric"
+      triggerClass="te-form__select"
+      disabled=(not generalFieldsEnabled)
+    as |dimension|
+    }}
+      {{dimension}}
+    {{/power-select}}
+
+
+    <label class="control-label te-label te-label--taller">
+      Explore top k dimensions:
+    </label>
+
+    <input type="text"
+           onChange={{action (action "onChangeValue" "topk") value="target.value"}}/>
+
+    <label class="control-label te-label te-label--taller">
+      Min value:
+    </label>
+
+    <input type="text"
+           onChange={{action (action "onChangeValue" "minvalue") value="target.value"}}/>
+
+    <label class="control-label te-label te-label--taller">
+      Min contribution:
+    </label>
+
+    <input type="text"
+           onChange={{action (action "onChangeValue" "mincontribution") value="target.value"}}/>
+
+  <div class="row">
+    <button onClick={{action "onSubmit"}}>submit</button>
+  </div>
+
+  {{/if}}
 
 </div>
