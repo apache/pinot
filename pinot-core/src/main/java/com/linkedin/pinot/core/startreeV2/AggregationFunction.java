@@ -16,12 +16,13 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+import java.io.IOException;
 import java.util.List;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
 
 
-public interface AggregationFunction<R, A> {
+public interface AggregationFunction<R, A, S> {
 
   /**
    * Get the name of an aggregation function.
@@ -33,7 +34,7 @@ public interface AggregationFunction<R, A> {
    * Get the return datatype of an aggregation function.
    */
   @Nonnull
-  FieldSpec.DataType getDatatype();
+  FieldSpec.DataType getDataType();
 
   /**
    * Perform aggregation on the given raw data.
@@ -44,4 +45,14 @@ public interface AggregationFunction<R, A> {
    * Perform aggregation on the pre aggregated data.
    */
   A aggregatePreAggregated(List<A> data);
+
+  /**
+   * Perform serialization of a object
+   */
+  S serialize(A obj) throws IOException;
+
+  /**
+   * Perform deserialization of a object
+   */
+  A deserialize(S obj) throws IOException;
 }

@@ -17,12 +17,15 @@
 package com.linkedin.pinot.core.startreeV2;
 
 import java.util.List;
+import java.io.IOException;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.clearspring.analytics.stream.quantile.TDigest;
+import com.linkedin.pinot.core.common.datatable.ObjectType;
+import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
 
 
-public class PercentileTDigestAggregationFunction implements AggregationFunction<Number, TDigest> {
+public class PercentileTDigestAggregationFunction implements AggregationFunction<Number, TDigest, byte[]> {
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
 
   @Nonnull
@@ -33,29 +36,35 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
 
   @Nonnull
   @Override
-  public FieldSpec.DataType getDatatype() {
-    return null;
+  public FieldSpec.DataType getDataType() {
+    return FieldSpec.DataType.BYTES;
   }
 
   @Override
   public TDigest aggregateRaw(List<Number> data) {
     TDigest tDigest = new TDigest(DEFAULT_TDIGEST_COMPRESSION);
-
-    for (Number obj: data) {
-      if (obj instanceof Double) {
-        tDigest.add(obj.doubleValue());
-      }
+    for (Number obj : data) {
+      tDigest.add(obj.doubleValue());
     }
-
     return tDigest;
   }
 
   @Override
   public TDigest aggregatePreAggregated(List<TDigest> data) {
     TDigest tDigest = new TDigest(DEFAULT_TDIGEST_COMPRESSION);
-    for (TDigest obj: data) {
+    for (TDigest obj : data) {
       tDigest.add(obj);
     }
     return tDigest;
+  }
+
+  @Override
+  public byte[] serialize(TDigest tDigest) throws IOException {
+    return ObjectCustomSerDe.serialize(tDigest);
+  }
+
+  @Override
+  public TDigest deserialize(byte[] buffer) throws IOException {
+    return ObjectCustomSerDe.deserialize(buffer, ObjectType.TDigest);
   }
 }

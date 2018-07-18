@@ -20,17 +20,19 @@ import java.util.List;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.startree.hll.HllConstants;
 import com.linkedin.pinot.core.common.datatable.ObjectType;
-import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
 
 
-public class DistinctCountHLLAggregationFunction implements AggregationFunction<Number, HyperLogLog, byte[]> {
+public class PercentileEstAggregationFunction implements AggregationFunction<Number, QuantileDigest, byte[]> {
+
+  public static final double DEFAULT_MAX_ERROR = 0.05;
+
   @Nonnull
   @Override
   public String getName() {
-    return StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL;
+    return StarTreeV2Constant.AggregateFunctions.PERCENTILEEST;
   }
 
   @Nonnull
@@ -40,31 +42,31 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   }
 
   @Override
-  public HyperLogLog aggregateRaw(List<Number> data) {
-    HyperLogLog hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+  public QuantileDigest aggregateRaw(List<Number> data) {
+    QuantileDigest qDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
 
     for (Number obj : data) {
-      hyperLogLog.offer(obj);
+      qDigest.add(obj.longValue());
     }
-    return hyperLogLog;
+    return qDigest;
   }
 
   @Override
-  public HyperLogLog aggregatePreAggregated(List<HyperLogLog> data) {
-    HyperLogLog hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
-    for (HyperLogLog a : data) {
-      hyperLogLog.offer(a);
+  public QuantileDigest aggregatePreAggregated(List<QuantileDigest> data) {
+    QuantileDigest qDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
+    for (QuantileDigest obj : data) {
+      qDigest.merge(obj);
     }
-    return hyperLogLog;
+    return qDigest;
   }
 
   @Override
-  public byte[] serialize(HyperLogLog hyperLogLog) throws IOException {
-    return ObjectCustomSerDe.serialize(hyperLogLog);
+  public byte[] serialize(QuantileDigest qDigest) throws IOException {
+    return ObjectCustomSerDe.serialize(qDigest);
   }
 
   @Override
-  public HyperLogLog deserialize(byte[] buffer) throws IOException {
-    return ObjectCustomSerDe.deserialize(buffer, ObjectType.HyperLogLog);
+  public QuantileDigest deserialize(byte[] buffer) throws IOException {
+    return ObjectCustomSerDe.deserialize(buffer, ObjectType.QuantileDigest);
   }
 }

@@ -47,16 +47,12 @@ public abstract class StarTreeV2ExecutorHelper {
   private static BlockSingleValIterator[] _metricValIterators;
   private static BlockSingleValIterator[] _groupByValIterators;
 
-
   private static IndexSegment _segment;
   private static BrokerRequest _brokerRequest;
   private static final Pql2Compiler COMPILER = new Pql2Compiler();
 
-
-  private static final String[] STAR_TREE1_HARD_CODED_QUERIES = new String[] {
-      "SELECT SUM(salary) FROM T",
-      "SELECT MAX(m1) FROM T WHERE Country IN ('US', 'IN') AND Name NOT IN ('Rahul') GROUP BY Language",
-  };
+  private static final String[] STAR_TREE1_HARD_CODED_QUERIES =
+      new String[]{"SELECT SUM(salary) FROM T", "SELECT MAX(m1) FROM T WHERE Country IN ('US', 'IN') AND Name NOT IN ('Rahul') GROUP BY Language",};
 
   public static void loadSegment(File indexDir) throws Exception {
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.heap);
@@ -68,16 +64,17 @@ public abstract class StarTreeV2ExecutorHelper {
 
   public static List<String> getMetricColumns(StarTreeV2Config config) {
     List<String> pairs = new ArrayList<>();
-    for (Met2AggfuncPair pair: config.getMetric2aggFuncPairs()) {
-        String s = pair.getMetricName() + "_" + pair.getAggregatefunction();
-        pairs.add(s);
+    for (Met2AggfuncPair pair : config.getMetric2aggFuncPairs()) {
+      String s = pair.getMetricName() + "_" + pair.getAggregatefunction();
+      pairs.add(s);
     }
     pairs.add("count");
 
     return pairs;
   }
 
-  public static void execute(List<StarTreeV2Config> starTreeV2ConfigList, List<Map<String, DataSource>> starTreeDataSourcesList, int starTreeId) throws Exception {
+  public static void execute(List<StarTreeV2Config> starTreeV2ConfigList,
+      List<Map<String, DataSource>> starTreeDataSourcesList, int starTreeId) throws Exception {
 
     Map<String, DataSource> dataSources = starTreeDataSourcesList.get(starTreeId);
     List<String> metricColumns = getMetricColumns(starTreeV2ConfigList.get(starTreeId));
@@ -90,7 +87,6 @@ public abstract class StarTreeV2ExecutorHelper {
       _metricDictionaries[i] = dataSource.getDictionary();
       _metricValIterators[i] = (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator();
     }
-
 
     String[] queries = getHardCodedQueries();
     for (String query : queries) {

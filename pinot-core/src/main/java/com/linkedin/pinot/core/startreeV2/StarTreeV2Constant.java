@@ -32,8 +32,7 @@ public class StarTreeV2Constant {
   public static final String METRIC_RAW_INDEX_SUFFIX = ".sv.raw.fwd";
   public static final String DIMENSION_FWD_INDEX_SUFFIX = ".sv.unsorted.fwd";
 
-  public static final String RAW_DATA = "raw";
-  public static final String AGGREGATED_DATA = "aggregated";
+  public static final Boolean IS_RAW_DATA = true;
 
   // aggregate functions name.
   public static class AggregateFunctions {
@@ -43,6 +42,7 @@ public class StarTreeV2Constant {
     public static final String COUNT = "count";
     public static final String DISTINCTCOUNTHLL = "distinctcounthll";
     public static final String PERCENTILETDIGEST = "percentileTDigest";
+    public static final String PERCENTILEEST = "percentileest";
   }
 
   // star tree meta data.

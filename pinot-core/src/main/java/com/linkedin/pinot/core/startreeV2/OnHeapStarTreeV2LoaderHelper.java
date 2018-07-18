@@ -29,12 +29,11 @@ public class OnHeapStarTreeV2LoaderHelper {
   /**
    * read meta data for star tree indexes.
    */
-  public static Map<String, Integer> readMetaData(String _indexMapFile) {
+  public static Map<String, Integer> readMetaData(File indexMapFile) {
 
     Map<String, Integer> metadata = new HashMap<>();
     try {
-      File file = new File(_indexMapFile);
-      FileReader fileReader = new FileReader(file);
+      FileReader fileReader = new FileReader(indexMapFile);
       BufferedReader bufferedReader = new BufferedReader(fileReader);
       String line;
 

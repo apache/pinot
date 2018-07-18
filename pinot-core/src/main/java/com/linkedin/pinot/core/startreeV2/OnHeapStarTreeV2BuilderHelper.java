@@ -97,7 +97,7 @@ public class OnHeapStarTreeV2BuilderHelper {
    * aggregate metric values ( raw or aggregated )
    */
   public static List<Object> aggregateMetrics(int start, int end, List<Record> starTreeData,
-      List<Met2AggfuncPair> met2aggfuncPairs, String dataSource) {
+      List<Met2AggfuncPair> met2aggfuncPairs, boolean isRawData) {
     List<Object> aggregatedMetricsValue = new ArrayList<>();
 
     List<List<Object>> metricValues = new ArrayList<>();
@@ -122,11 +122,11 @@ public class OnHeapStarTreeV2BuilderHelper {
       String aggfunc = pair.getAggregatefunction();
       List<Object> data = metricValues.get(i);
       AggregationFunction function = functionFactory.getAggregationFunction(aggfunc);
-      aggregatedMetricsValue.add(aggregate(function, dataSource, data));
+      aggregatedMetricsValue.add(aggregate(function, isRawData, data));
     }
     List<Object> data = metricValues.get(met2aggfuncPairs.size());
     AggregationFunction function = functionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.COUNT);
-    aggregatedMetricsValue.add(aggregate(function, dataSource, data));
+    aggregatedMetricsValue.add(aggregate(function, isRawData, data));
 
     return aggregatedMetricsValue;
   }
@@ -134,8 +134,8 @@ public class OnHeapStarTreeV2BuilderHelper {
   /**
    * aggregate raw or pre aggregated data.
    */
-  public static Object aggregate(AggregationFunction function, String dataSource, List<Object> data) {
-    if (dataSource.equals(StarTreeV2Constant.RAW_DATA)) {
+  public static Object aggregate(AggregationFunction function, boolean isRawData, List<Object> data) {
+    if (isRawData) {
       return function.aggregateRaw(data);
     } else {
       return function.aggregatePreAggregated(data);
@@ -146,7 +146,7 @@ public class OnHeapStarTreeV2BuilderHelper {
    * function to condense documents according to sorted order.
    */
   public static List<Record> condenseData(List<Record> starTreeData, List<Met2AggfuncPair> met2aggfuncPairs,
-      String dataSource) {
+      boolean isRawData) {
     int start = 0;
     List<Record> newData = new ArrayList<>();
     Record prevRecord = starTreeData.get(0);
@@ -157,7 +157,7 @@ public class OnHeapStarTreeV2BuilderHelper {
       int[] nextDimensions = nextRecord.getDimensionValues();
 
       if (!RecordUtil.compareDimensions(prevDimensions, nextDimensions)) {
-        List<Object> aggregatedMetricsValue = aggregateMetrics(start, i, starTreeData, met2aggfuncPairs, dataSource);
+        List<Object> aggregatedMetricsValue = aggregateMetrics(start, i, starTreeData, met2aggfuncPairs, isRawData);
         Record newRecord = new Record();
         newRecord.setMetricValues(aggregatedMetricsValue);
         newRecord.setDimensionValues(prevRecord.getDimensionValues());
@@ -169,7 +169,7 @@ public class OnHeapStarTreeV2BuilderHelper {
     Record record = new Record();
     record.setDimensionValues(starTreeData.get(start).getDimensionValues());
     List<Object> aggregatedMetricsValue =
-        aggregateMetrics(start, starTreeData.size(), starTreeData, met2aggfuncPairs, dataSource);
+        aggregateMetrics(start, starTreeData.size(), starTreeData, met2aggfuncPairs, isRawData);
     record.setMetricValues(aggregatedMetricsValue);
     newData.add(record);
 

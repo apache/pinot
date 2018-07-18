@@ -85,14 +85,14 @@ public class OnHeapStarTreeV2IntegrationTest {
   public void testBuilder() throws Exception {
     OnHeapStarTreeV2Builder buildTest = new OnHeapStarTreeV2Builder();
     try {
-
       for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
+
+        System.out.println("Working on star tree " + Integer.toString(i + 1));
+
         buildTest.init(_indexDir, _starTreeV2ConfigList.get(i));
         buildTest.build();
         buildTest.serialize();
       }
-
-
     } catch (Exception e) {
       e.printStackTrace();
     }
@@ -102,22 +102,21 @@ public class OnHeapStarTreeV2IntegrationTest {
   public void testLoaderAndExecutor() throws Exception {
     OnHeapStarTreeV2Loader loadTest = new OnHeapStarTreeV2Loader();
     try {
-      loadTest.init(_filepath);
-      List<StarTreeV2Impl> starTreeImplList = loadTest.load();
+      List<StarTreeV2> starTreeImplList = loadTest.load(_filepath);
 
       int starTreeId = 0;
-      for ( StarTreeV2Impl impl: starTreeImplList) {
+      for (StarTreeV2 impl : starTreeImplList) {
         StarTree s = impl.getStarTree();
         StarTreeV2LoaderHelper.printStarTree(s);
 
-        for (String dimension: _starTreeV2ConfigList.get(starTreeId).getDimensions()) {
-          DataSource source = impl.getDimensionDataSource(dimension);
+        for (String dimension : _starTreeV2ConfigList.get(starTreeId).getDimensions()) {
+          DataSource source = impl.getDataSource(dimension);
           StarTreeV2LoaderHelper.printDimensionDataFromDataSource(source);
         }
 
-        for (Met2AggfuncPair pair: _starTreeV2ConfigList.get(starTreeId).getMetric2aggFuncPairs()) {
+        for (Met2AggfuncPair pair : _starTreeV2ConfigList.get(starTreeId).getMetric2aggFuncPairs()) {
           String metpair = pair.getMetricName() + "_" + pair.getAggregatefunction();
-          DataSource source = impl.getMetricAggPairDataSource(metpair);
+          DataSource source = impl.getDataSource(metpair);
           StarTreeV2LoaderHelper.printMetricAggfuncDataFromDataSource(source);
         }
         starTreeId += 1;
@@ -127,16 +126,15 @@ public class OnHeapStarTreeV2IntegrationTest {
       for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
         StarTreeV2ExecutorHelper.execute(_starTreeV2ConfigList, _starTreeDataSourcesList, i);
       }
-
     } catch (Exception e) {
-        e.printStackTrace();
+      e.printStackTrace();
     }
   }
 
   @Test
   public void testExecutor() throws Exception {
     try {
-     // to be filled.
+      // to be filled.
     } catch (Exception e) {
       e.printStackTrace();
     }

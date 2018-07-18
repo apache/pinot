@@ -31,7 +31,6 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.operator.blocks.SingleValueBlock;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
 
@@ -51,8 +50,8 @@ public class StarTreeV2DimensionDataSource extends DataSource {
   private DataFileReader _forwardIndex;
   private DataSourceMetadata _metadata;
 
-  public StarTreeV2DimensionDataSource(File dataFile, String columnName, ImmutableSegment immutableSegment,
-      ColumnMetadata columnMetadata, int numDocs, int start, int size, int bits) throws IOException {
+  public StarTreeV2DimensionDataSource(File dataFile, String columnName, ColumnMetadata columnMetadata, int numDocs,
+      int start, int size, int bits) throws IOException {
     _columnDataFile = dataFile;
     _operatorName = "ColumnDataSource [" + columnName + "]";
 
@@ -61,9 +60,8 @@ public class StarTreeV2DimensionDataSource extends DataSource {
             "testing");
     _forwardIndex = new FixedBitSingleValueReader(buffer, numDocs, bits);
 
-    _dictionary = immutableSegment.getDictionary(columnName);
-
     _isSorted = false;
+    _dictionary = null;
     _numDocs = numDocs;
     _invertedIndex = null;
     _dataType = columnMetadata.getDataType();

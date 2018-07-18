@@ -16,20 +16,26 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import java.io.IOException;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.startree.StarTree;
+import java.io.File;
 
 
-public interface StarTreeV2 {
+public class StarTreeV2Util {
 
-  /**
-   * load all data sources.
-   */
-  StarTree getStarTree() throws IOException;
+  public static File findFormatFile(File indexDir, String fileName) {
 
-  /**
-   * return data source for particular star tree.
-   */
-  DataSource getDataSource(String column) throws Exception;
+    // Try to find v3 file first
+    File v3Dir = new File(indexDir, "v3");
+    File v3File = new File(v3Dir, fileName);
+    if (v3File.exists()) {
+      return v3File;
+    }
+
+    // If cannot find v3 file, try to find v1 file instead
+    File v1File = new File(indexDir, fileName);
+    if (v1File.exists()) {
+      return v1File;
+    }
+
+    return null;
+  }
 }
