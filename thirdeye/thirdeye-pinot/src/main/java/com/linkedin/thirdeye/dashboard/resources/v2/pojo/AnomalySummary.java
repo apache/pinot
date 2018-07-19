@@ -24,6 +24,7 @@ public class AnomalySummary {
   private long functionId;
   private String dataset;
   private AnomalyClassificationType classification;
+  private long detectionConfigId;
 
   public AnomalySummary() {
     // left blank
@@ -155,5 +156,13 @@ public class AnomalySummary {
 
   public void setClassification(AnomalyClassificationType classification) {
     this.classification = classification;
+  }
+
+  public long getDetectionConfigId() {
+    return detectionConfigId;
+  }
+
+  public void setDetectionConfigId(long detectionConfigId) {
+    this.detectionConfigId = detectionConfigId;
   }
 }
