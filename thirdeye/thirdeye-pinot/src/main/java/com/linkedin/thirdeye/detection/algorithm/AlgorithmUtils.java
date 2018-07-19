@@ -182,65 +182,6 @@ public class AlgorithmUtils {
     return changePoints;
   }
 
-//  /**
-//   * Determines outliers based on run length vs quartiles.
-//   * <b>NOTE:</b> this is very basic and sensitive to noise
-//   *
-//   * @param df time series
-//   * @param minDuration time series
-//   * @return outlier flag series
-//   */
-//  public static BooleanSeries getOutliersTercileMethod(DataFrame df, Duration minDuration, Set<Long> changePoints) {
-//    if (df.isEmpty()) {
-//      return BooleanSeries.empty();
-//    }
-//
-//    LongSeries time = df.getLongs(COL_TIME);
-//    DoubleSeries value = fastBSpline(df.getDoubles(COL_VALUE), FAST_SPLINE_ITERATIONS);
-//
-//    byte[] outlier = new byte[df.size()];
-//    Arrays.fill(outlier, (byte) 0);
-//
-//    TreeSet<Long> lastChanges = new TreeSet<>(changePoints);
-//    lastChanges.add(time.min().longValue());
-//
-//    int runStart = 0;
-//    int runSide = 0;
-//    for (int i = 0; i < df.size(); i++) {
-//      if (!value.isNull(i)) {
-//        long current = time.getLong(i);
-//        long minStart = current - MIN_WINDOW_SIZE;
-//        long lastChange = lastChanges.floor(current);
-//        long start = Math.min(minStart, lastChange);
-//
-//        DoubleSeries localValues = value.filter(time.between(start, current + 1));
-//
-//        double upTercile = localValues.quantile(0.666).doubleValue();
-//        double downTercile = localValues.quantile(0.333).doubleValue();
-//
-//        int side = 0;
-//        if (value.getDouble(i) > upTercile)
-//          side = 1;
-//        if (value.getDouble(i) < downTercile)
-//          side = -1;
-//
-//        // run side changed or last run
-//        if (runSide != side || i >= df.size() - 1) {
-//          long past = time.getLong(runStart);
-//          long now = time.getLong(i);
-//          long runDuration = now - past;
-//          if (runSide != 0 && runDuration >= minDuration.getMillis()) {
-//            Arrays.fill(outlier, runStart, i, (byte) 1);
-//          }
-//          runStart = i;
-//          runSide = side;
-//        }
-//      }
-//    }
-//
-//    return BooleanSeries.buildFrom(outlier);
-//  }
-
   /**
    * Helper for simulating B-spline with moving averages.
    *
@@ -363,38 +304,4 @@ public class AlgorithmUtils {
 
     return DataFrame.concatenate(segments);
   }
-
-//  /**
-//   * Returns indices of upper bound value in sorted series {@code s} for a sorted iterable
-//   * {@code values}
-//   *
-//   * @param s sorted long series
-//   * @param values sorted values iterable
-//   * @return uperr bound indices
-//   */
-//  private static List<Integer> findAllUpperBounds(LongSeries s, Iterable<Long> values) {
-//    Iterator<Long> itValue = values.iterator();
-//    if (!itValue.hasNext()) {
-//      return Collections.emptyList();
-//    }
-//
-//    List<Integer> indices = new ArrayList<>();
-//
-//    long nextValue = itValue.next();
-//    for (int i = 0; i < s.size(); i++) {
-//      if (!s.isNull(i)) {
-//        if (s.getLong(i) >= nextValue) {
-//          indices.add(i);
-//
-//          if (!itValue.hasNext()) {
-//            break;
-//          }
-//
-//          nextValue = itValue.next();
-//        }
-//      }
-//    }
-//
-//    return indices;
-//  }
 }

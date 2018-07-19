@@ -50,7 +50,7 @@ export default Controller.extend({
 
   baseline: null,
 
-  analysisRange: [moment().subtract(2, 'month').valueOf(), moment().valueOf()],
+  analysisRange: [moment().subtract(1.5, 'month').valueOf(), moment().valueOf()],
 
   compareMode: 'wo1w',
 
@@ -219,6 +219,11 @@ export default Controller.extend({
         }
       });
 
+      const changeSeries = this._makeDiagnosticsPoints(diagnosticsPath);
+      Object.keys(changeSeries).forEach(key => {
+        series[`diagnostics-${key}`] = changeSeries[key];
+      });
+
       return series;
     }
   ),
@@ -246,9 +251,7 @@ export default Controller.extend({
 
   _makeDiagnosticsSeries(path, key) {
     try {
-      const source = get(this, 'diagnostics.' + path);
-      console.log(get(this, 'diagnostics'));
-      console.log(source);
+      const source = get(this, 'diagnostics.' + path + '.data');
 
       if (_.isEmpty(source.timestamp) || _.isEmpty(source[key])) { return; }
 
@@ -261,6 +264,30 @@ export default Controller.extend({
 
     } catch (err) {
       return undefined;
+    }
+  },
+
+  _makeDiagnosticsPoints(path) {
+    try {
+      const changepoints = get(this, 'diagnostics.' + path + '.changepoints');
+
+      if (_.isEmpty(changepoints)) { return {}; }
+
+      const out = {};
+      changepoints.forEach((p, i) => {
+        out[i] = {
+          timestamps: [p],
+          values: [1.05],
+          type: 'scatter',
+          axis: 'y2',
+          color: 'red'
+        }
+      });
+
+      return out;
+
+    } catch (err) {
+      return {};
     }
   },
 

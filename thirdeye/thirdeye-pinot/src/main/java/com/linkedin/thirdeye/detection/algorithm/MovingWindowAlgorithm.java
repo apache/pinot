@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -47,7 +48,8 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private static final String COL_QUANTILE_MAX = "quantileMax";
   private static final String COL_ZSCORE = "zscore";
   private static final String COL_KERNEL = "kernel";
-  private static final String COL_KERNEL_VIOLATION = "kernelViolation";
+  private static final String COL_KERNEL_SUM = "kernelSum";
+  private static final String COL_VIOLATION = "violation";
   private static final String COL_ANOMALY = "anomaly";
   private static final String COL_OUTLIER = "outlier";
   private static final String COL_TIME = DataFrameUtils.COL_TIME;
@@ -66,6 +68,9 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private final double zscoreOutlier;
   private final double kernelMin;
   private final double kernelMax;
+  private final double kernelSumMin;
+  private final double kernelSumMax;
+  private final double kernelDecay;
   private final int kernelSize;
   private final double quantileMin;
   private final double quantileMax;
@@ -87,14 +92,17 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     this.quantileMax = MapUtils.getDoubleValue(config.getProperties(), "quantileMax", Double.NaN);
     this.zscoreMin = MapUtils.getDoubleValue(config.getProperties(), "zscoreMin", Double.NaN);
     this.zscoreMax = MapUtils.getDoubleValue(config.getProperties(), "zscoreMax", Double.NaN);
-    this.zscoreOutlier = MapUtils.getDoubleValue(config.getProperties(), "zscoreOutlier", 3);
+    this.zscoreOutlier = MapUtils.getDoubleValue(config.getProperties(), "zscoreOutlier", 5);
     this.kernelMin = MapUtils.getDoubleValue(config.getProperties(), "kernelMin", Double.NaN);
     this.kernelMax = MapUtils.getDoubleValue(config.getProperties(), "kernelMax", Double.NaN);
+    this.kernelSumMin = MapUtils.getDoubleValue(config.getProperties(), "kernelSumMin", Double.NaN);
+    this.kernelSumMax = MapUtils.getDoubleValue(config.getProperties(), "kernelSumMax", Double.NaN);
+    this.kernelDecay = MapUtils.getDoubleValue(config.getProperties(), "kernelDecay", 0.5);
     this.kernelSize = MapUtils.getIntValue(config.getProperties(), "kernelSize", 5);
     this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), "timezone", "UTC"));
     this.windowSize = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "windowSize", "1week"));
     this.minLookback = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "minLookback", "1day"));
-    this.changeDuration = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "changeDuration", "0"));
+    this.changeDuration = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "changeDuration", "5days"));
 
     int baselineWeeks = MapUtils.getIntValue(config.getProperties(), "baselineWeeks", 0);
     BaselineAggregateType baselineType = BaselineAggregateType.valueOf(MapUtils.getString(config.getProperties(), "baselineType", "MEDIAN"));
@@ -163,6 +171,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     double[] sQuantileMin = df.addSeries(COL_QUANTILE_MIN, DoubleSeries.nulls(df.size())).getDoubles(COL_QUANTILE_MIN).values();
     double[] sQuantileMax = df.addSeries(COL_QUANTILE_MAX, DoubleSeries.nulls(df.size())).getDoubles(COL_QUANTILE_MAX).values();
     double[] sKernel = df.addSeries(COL_KERNEL, DoubleSeries.nulls(df.size())).getDoubles(COL_KERNEL).values();
+    double[] sKernelSum = df.addSeries(COL_KERNEL_SUM, DoubleSeries.zeros(df.size())).getDoubles(COL_KERNEL_SUM).values();
     byte[] sAnomaly = df.addSeries(COL_ANOMALY, BooleanSeries.fillValues(df.size(), false)).getBooleans(COL_ANOMALY).values();
     byte[] sOutlier = df.addSeries(COL_OUTLIER, BooleanSeries.fillValues(df.size(), false)).getBooleans(COL_OUTLIER).values();
 
@@ -188,10 +197,12 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       sStd[index] = std;
       sZscore[index] = zscore;
 
-      if (Math.abs(zscore) > this.zscoreOutlier) {
+      // outlier elimination for future windows
+      if (!Double.isNaN(this.zscoreOutlier) && Math.abs(zscore) > this.zscoreOutlier) {
         sOutlier[index] = 1;
       }
 
+      // point anomalies
       if (!Double.isNaN(this.quantileMin)) {
         sQuantileMin[index] = values.quantile(this.quantileMin).doubleValue();
         sAnomaly[index] |= (value < sQuantileMin[index] ? 1 : 0);
@@ -210,42 +221,55 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
         sAnomaly[index] |= (zscore > this.zscoreMax ? 1 : 0);
       }
 
-      // batch anomalies
+      // range anomalies
 
-      // kernel check
-      if (!Double.isNaN(this.kernelMin) || !Double.isNaN(this.kernelMax)) {
+      // kernel
+      if (!Double.isNaN(this.kernelMin) || !Double.isNaN(this.kernelMax)
+          || !Double.isNaN(this.kernelSumMin) || !Double.isNaN(this.kernelSumMax)) {
         final int kernelOffset = -1 * this.kernelSize / 2;
 
         DoubleSeries smooth = AlgorithmUtils.robustMean(df.getDoubles(COL_ZSCORE).sliceTo(index + 1), this.kernelSize).shift(kernelOffset);
 
-        // approximate diagnostics only, may change at later execution
+        int kernelIndex = index + kernelOffset;
         if (index + kernelOffset >= 0) {
-          sKernel[index + kernelOffset] = smooth.values()[index + kernelOffset];
+          double kernelValue = smooth.values()[kernelIndex];
+
+          int prevKernelIndex = kernelIndex - 1;
+          sKernelSum[kernelIndex] = (prevKernelIndex >= 0) ? sKernelSum[prevKernelIndex] * (1.0 - this.kernelDecay) : 0;
+          sKernelSum[kernelIndex] += DoubleSeries.isNull(kernelValue) ? 0 : kernelValue;
+
+          // approximate diagnostics only, may change at later execution
+          sKernel[index + kernelOffset] = kernelValue;
         }
 
-        BooleanSeries padding = BooleanSeries.fillValues(df.size() - smooth.size(), false);
+        DoubleSeries kernelSum = df.getDoubles(COL_KERNEL_SUM).fillNull();
+        BooleanSeries smoothPadding = BooleanSeries.fillValues(df.size() - smooth.size(), false);
 
         if (!Double.isNaN(this.kernelMin)) {
-          BooleanSeries violations = smooth.lt(this.kernelMin).append(padding);
-          BooleanSeries halfViolations = smooth.lt(this.kernelMin / 2).append(padding);
-
-          df.addSeries(COL_KERNEL_VIOLATION, expandViolation(violations, halfViolations).fillNull());
-          df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_ANOMALY, COL_KERNEL_VIOLATION);
-
-          sAnomaly = df.getBooleans(COL_ANOMALY).values();
-          df.dropSeries(COL_KERNEL_VIOLATION);
+          BooleanSeries violations = smooth.lt(this.kernelMin).append(smoothPadding);
+          BooleanSeries halfViolations = smooth.lt(this.kernelMin / 2).append(smoothPadding);
+          anomalyRangeHelper(df, violations, halfViolations);
         }
 
         if (!Double.isNaN(this.kernelMax)) {
-          BooleanSeries violations = smooth.gt(this.kernelMax).append(padding);
-          BooleanSeries halfViolations = smooth.gt(this.kernelMax / 2).append(padding);
-
-          df.addSeries(COL_KERNEL_VIOLATION, expandViolation(violations, halfViolations).fillNull());
-          df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_ANOMALY, COL_KERNEL_VIOLATION);
-
-          sAnomaly = df.getBooleans(COL_ANOMALY).values();
-          df.dropSeries(COL_KERNEL_VIOLATION);
+          BooleanSeries violations = smooth.gt(this.kernelMax).append(smoothPadding);
+          BooleanSeries halfViolations = smooth.gt(this.kernelMax / 2).append(smoothPadding);
+          anomalyRangeHelper(df, violations, halfViolations);
         }
+
+        if (!Double.isNaN(this.kernelSumMin)) {
+          BooleanSeries violations = kernelSum.lt(this.kernelSumMin);
+          BooleanSeries halfViolations = kernelSum.lt(this.kernelSumMin / 2);
+          anomalyRangeHelper(df, violations, halfViolations);
+        }
+
+        if (!Double.isNaN(this.kernelSumMax)) {
+          BooleanSeries violations = kernelSum.gt(this.kernelSumMax);
+          BooleanSeries halfViolations = kernelSum.gt(this.kernelSumMax / 2);
+          anomalyRangeHelper(df, violations, halfViolations);
+        }
+
+        sAnomaly = df.getBooleans(COL_ANOMALY).values();
       }
 
       // mark anomalies as outliers
@@ -261,6 +285,21 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
     return new DetectionPipelineResult(anomalies)
         .setDiagnostics(diagnostics);
+  }
+
+  /**
+   * Helper for in-place insertion and expansion of anomaly ranges
+   *
+   * @param df data frame
+   * @param violations boolean series of violations
+   * @param halfViolations boolean series of half violations for expansion
+   * @return modified data frame
+   */
+  static DataFrame anomalyRangeHelper(DataFrame df, BooleanSeries violations, BooleanSeries halfViolations) {
+    df.addSeries(COL_VIOLATION, expandViolation(violations, halfViolations).fillNull());
+    df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_ANOMALY, COL_VIOLATION);
+    df.dropSeries(COL_VIOLATION);
+    return df;
   }
 
   /**
@@ -365,7 +404,12 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       Baseline baseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.SUM, 1, 1, this.timezone);
       DataFrame diffSeries = makeRelativeTimeseries(df, baseline, this.sliceData);
 
-      changePoints.addAll(AlgorithmUtils.getChangePointsTercileMethod(diffSeries, this.changeDuration.toStandardDuration()));
+      final int kernelOffset = -1 * this.kernelSize / 2;
+
+      DataFrame smooth = new DataFrame(diffSeries)
+        .addSeries(COL_VALUE, AlgorithmUtils.robustMean(diffSeries.getDoubles(COL_VALUE), this.kernelSize).fillNullBackward().shift(kernelOffset));
+
+      changePoints.addAll(AlgorithmUtils.getChangePoints(smooth, this.changeDuration.toStandardDuration()));
     }
 
     // from anomalies
@@ -407,10 +451,11 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   DataFrame makeWindow(DataFrame df, long tCurrent, TreeSet<Long> changePoints) {
     long tStart = new DateTime(tCurrent, this.timezone).minus(this.windowSize).getMillis();
 
-    // truncate history at change point
+    // truncate history at change point but leave at least 1 week
     Long changePoint = changePoints.lower(tCurrent);
     if (changePoint != null) {
-      tStart = Math.max(tStart, changePoint);
+      // TODO make minimum configurable
+      tStart = Math.min(Math.max(tStart, changePoint), tCurrent - TimeUnit.DAYS.toMillis(7));
     }
 
     // use non-outlier period, unless not enough history (anomalies are outliers too)
