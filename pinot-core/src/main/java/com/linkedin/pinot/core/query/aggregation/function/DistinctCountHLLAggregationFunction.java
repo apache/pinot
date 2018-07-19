@@ -63,7 +63,6 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull BlockValSet... blockValSets) {
-
     HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
     if (hyperLogLog == null) {
       hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
@@ -82,21 +81,21 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
       case LONG:
         long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
-          hyperLogLog.offer(Long.valueOf(longValues[i]).hashCode());
+          hyperLogLog.offer(longValues[i]);
         }
         break;
 
       case FLOAT:
         float[] floatValues = blockValSets[0].getFloatValuesSV();
         for (int i = 0; i < length; i++) {
-          hyperLogLog.offer(Float.valueOf(floatValues[i]).hashCode());
+          hyperLogLog.offer(floatValues[i]);
         }
         break;
 
       case DOUBLE:
         double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          hyperLogLog.offer(Double.valueOf(doubleValues[i]).hashCode());
+          hyperLogLog.offer(doubleValues[i]);
         }
         break;
 
@@ -128,14 +127,14 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
       case LONG:
         long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], Long.valueOf(longValues[i]).hashCode());
+          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], longValues[i]);
         }
         break;
 
       case FLOAT:
         float[] floatValues = blockValSets[0].getFloatValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], Float.valueOf(floatValues[i]).hashCode());
+          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], floatValues[i]);
         }
         break;
 
@@ -143,7 +142,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
         double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
           int groupKey = groupKeyArray[i];
-          setValueForGroupKey(groupByResultHolder, groupKey, Double.valueOf(doubleValues[i]).hashCode());
+          setValueForGroupKey(groupByResultHolder, groupKey, doubleValues[i]);
         }
         break;
 
@@ -151,7 +150,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
         String[] stringValues = blockValSets[0].getStringValuesSV();
         for (int i = 0; i < length; i++) {
           int groupKey = groupKeyArray[i];
-          setValueForGroupKey(groupByResultHolder, groupKey, stringValues[i].hashCode());
+          setValueForGroupKey(groupByResultHolder, groupKey, stringValues[i]);
         }
         break;
 
@@ -176,31 +175,28 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
       case LONG:
         long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], Long.valueOf(longValues[i]).hashCode());
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], longValues[i]);
         }
         break;
 
       case FLOAT:
         float[] floatValues = blockValSets[0].getFloatValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], Float.valueOf(floatValues[i]).hashCode());
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], floatValues[i]);
         }
         break;
 
       case DOUBLE:
         double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], Double.valueOf(doubleValues[i]).hashCode());
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], doubleValues[i]);
         }
         break;
 
       case STRING:
         String[] singleValues = blockValSets[0].getStringValuesSV();
         for (int i = 0; i < length; i++) {
-          int hashCode = singleValues[i].hashCode();
-          for (int groupKey : groupKeysArray[i]) {
-            setValueForGroupKey(groupByResultHolder, groupKey, hashCode);
-          }
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], singleValues[i]);
         }
         break;
 
@@ -266,7 +262,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
    * @param groupKey Group-key for which to set the value
    * @param value Value for the group key
    */
-  private void setValueForGroupKey(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey, int value) {
+  private void setValueForGroupKey(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey, Object value) {
     HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
     if (hyperLogLog == null) {
       hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
@@ -281,7 +277,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
    * @param groupKeys Group keys for which to set the value
    * @param value Value to set
    */
-  private void setValueForGroupKeys(@Nonnull GroupByResultHolder groupByResultHolder, int[] groupKeys, int value) {
+  private void setValueForGroupKeys(@Nonnull GroupByResultHolder groupByResultHolder, int[] groupKeys, Object value) {
     for (int groupKey : groupKeys) {
       setValueForGroupKey(groupByResultHolder, groupKey, value);
     }
