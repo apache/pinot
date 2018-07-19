@@ -15,20 +15,15 @@
  */
 package com.linkedin.pinot.hadoop.job;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.SimpleHttpResponse;
 import java.io.InputStream;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import shaded.org.apache.http.Header;
-import shaded.org.apache.http.message.BasicHeader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +33,6 @@ public class SegmentTarPushJob extends Configured {
   private String _segmentPath;
   private String[] _hosts;
   private int _port;
-  private String _tableName;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentTarPushJob.class);
 
@@ -47,7 +41,6 @@ public class SegmentTarPushJob extends Configured {
     _segmentPath = properties.getProperty(JobConfigConstants.PATH_TO_OUTPUT) + "/";
     _hosts = properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS).split(",");
     _port = Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_TO_PORT));
-    _tableName = properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME);
   }
 
   public void run() throws Exception {
@@ -81,10 +74,6 @@ public class SegmentTarPushJob extends Configured {
     if (!fileName.endsWith(".tar.gz")) {
       return;
     }
-    Header segmentNameHeader = new BasicHeader(CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER, fileName);
-    Header tableNameHeader = new BasicHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER, _tableName);
-    List<Header> httpHeaders = Arrays.asList(segmentNameHeader, tableNameHeader);
-
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       for (String host : _hosts) {
         try (InputStream inputStream = fs.open(path)) {
@@ -92,7 +81,7 @@ public class SegmentTarPushJob extends Configured {
           LOGGER.info("******** Uploading file: {} to Host: {} and Port: {} *******", fileName, host, _port);
           SimpleHttpResponse response =
               fileUploadDownloadClient.uploadSegment(FileUploadDownloadClient.getUploadSegmentHttpURI(host, _port),
-                  fileName, inputStream, httpHeaders, null, FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
+                  fileName, inputStream);
           LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
         } catch (Exception e) {
           LOGGER.error("******** Error Uploading file: {} to Host: {} and Port: {}  *******", fileName, host, _port);
