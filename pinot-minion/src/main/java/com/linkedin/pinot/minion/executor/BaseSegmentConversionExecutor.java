@@ -151,7 +151,9 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       Header segmentZKMetadataCustomMapModifierHeader =
           new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
               segmentZKMetadataCustomMapModifier.toJsonString());
-      final List<Header> httpHeaders = Arrays.asList(ifMatchHeader, segmentZKMetadataCustomMapModifierHeader);
+      Header segmentNameHeader = new BasicHeader(CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER, segmentName);
+      Header tableNameHeader = new BasicHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER, tableNameWithType);
+      final List<Header> httpHeaders = Arrays.asList(ifMatchHeader, segmentZKMetadataCustomMapModifierHeader, segmentNameHeader, tableNameHeader);
 
       // Set query parameters
       final List<NameValuePair> parameters = Collections.singletonList(
