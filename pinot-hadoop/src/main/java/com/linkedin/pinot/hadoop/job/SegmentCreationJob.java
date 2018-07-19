@@ -39,7 +39,6 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
-import org.apache.helix.task.JobConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -157,11 +156,7 @@ public class SegmentCreationJob extends Configured {
 
     Job job = Job.getInstance(getConf());
 
-    if (_hosts != null && _port != 0) {
-      setAdditionalJobProperties(job);
-    } else {
-      LOGGER.warn("Unable to set TableConfig-dependent properties. Please set {} and {}", JobConfigConstants.PUSH_TO_HOSTS, JobConfigConstants.PUSH_TO_PORT);
-    }
+    setAdditionalJobProperties(job);
 
     job.setJarByClass(SegmentCreationJob.class);
     job.setJobName(_jobName);
@@ -211,6 +206,11 @@ public class SegmentCreationJob extends Configured {
   }
 
   protected void setAdditionalJobProperties(Job job) throws Exception {
+    if (_hosts == null && _port == 0) {
+      LOGGER.warn("Unable to set TableConfig-dependent properties. Please set {} and {}", JobConfigConstants.PUSH_TO_HOSTS, JobConfigConstants.PUSH_TO_PORT);
+      return;
+    }
+
     List<PushLocation> pushLocations = new ArrayList<>();
 
     for (String host : _hosts) {
