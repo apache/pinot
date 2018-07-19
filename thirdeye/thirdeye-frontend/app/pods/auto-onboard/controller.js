@@ -29,7 +29,7 @@ export default Controller.extend({
 
   dimensions: null,
 
-  selectedDimension: null,
+  selectedDimensions: null,
 
   selectedMetric: null,
 
@@ -51,6 +51,8 @@ export default Controller.extend({
 
   toggleChecked: false,
 
+  output: null,
+
   generalFieldsEnabled: computed.or('dimensions'),
 
   metricsFieldEnabled: computed.or('metrics'),
@@ -61,7 +63,7 @@ export default Controller.extend({
     return fetch(`/thirdeye/entity?entityType=DETECTION_CONFIG`, {method: 'POST', body: jsonString})
       .then(checkStatus)
       .then(res => set(this, 'output', `saved '${detectionConfigBean.name}' as id ${res}`))
-      .catch(err => set(this, 'errorAnomalies', err));
+      .catch(err => set(this, 'output', err));
   },
 
   actions: {
@@ -84,7 +86,7 @@ export default Controller.extend({
             .then(checkStatus)
             .then(res => {
               this.set('filterOptions', res);
-              this.set('dimensions', Object.keys(res));
+              this.set('dimensions', {dimensions: Object.keys(res)});
             })
         })
         .catch(error => console.error(`Fetch Error =\n`, error));
@@ -123,7 +125,7 @@ export default Controller.extend({
       const metricsProperties = get(this, 'metricsProperties');
       const nestedProperties = [];
       const selectedMetric = this.get('selectedMetric');
-      const selectedDimension = this.get('selectedDimension');
+      const selectedDimensions = this.get('selectedDimensions');
       Object.keys(metricsProperties).forEach(function (key) {
         const properties = metricsProperties[key];
         if (!properties['monitor']) {
@@ -149,8 +151,9 @@ export default Controller.extend({
           detectionConfig['nestedMetricUrn'] = properties['urn'];
         }
 
-        if (selectedDimension != null){
-          detectionConfig['dimensions'] = [selectedDimension];
+        if (selectedDimensions != null){
+          debugger;
+          detectionConfig['dimensions'] = selectedDimensions;
         }
         if (properties['topk']) {
           detectionConfig['k'] = parseInt(properties['topk']);
@@ -175,12 +178,12 @@ export default Controller.extend({
         }
       };
 
-      // console.log(configResult);
       this._writeDetectionConfig(configResult);
     },
 
-    onSelectDimension(dim) {
-      this.set('selectedDimension', dim);
+    onSelectDimension(dims) {
+      const dimsMap = JSON.parse(dims);
+      this.set('selectedDimensions', dimsMap['dimensions']);
     },
 
     onChangeName(name) {

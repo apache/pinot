@@ -60,24 +60,16 @@
           {{/tooltip-on-element}}
         </span>
       </label>
-      {{#power-select
-        classNames="te-input"
-        options=dimensions
-        selected=selectedDimension
-        onchange=(action "onSelectDimension")
-        loadingMessage="Waiting for the server...."
-        placeholder="Break Dimensions By..."
-        searchPlaceholder="Type to filter..."
-        triggerId="select-dimension"
-        triggerClass="te-form__select"
-        disabled=(not generalFieldsEnabled)
-      as |dimension|
-      }}
-        {{dimension}}
-      {{/power-select}}
+
+    {{filter-select
+      options=dimensions
+      onChange=(action "onSelectDimension")
+    }}
+
   </div>
 
-  
+
+
   <div class="row">
     <label class="control-label te-label te-label--taller">
       Set up the business rules(Optional):
@@ -136,5 +128,9 @@
   </div>
 
   {{/if}}
+
+  <div class="row">
+    {{output}}
+  </div>
 
 </div>
