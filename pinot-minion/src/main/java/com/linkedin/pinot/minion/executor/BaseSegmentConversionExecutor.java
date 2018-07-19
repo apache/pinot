@@ -63,6 +63,8 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
   private static final double DEFAULT_RETRY_SCALE_FACTOR = 2.0;
   private static final String HTTPS_PROTOCOL = "https";
   private static final String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "enabled";
+  public static final String HDR_SEGMENT_NAME = "Pinot-Segment-Name";
+  public static final String HDR_TABLE_NAME = "Pinot-Table-Name";
 
   private static SSLContext _sslContext;
 
@@ -151,7 +153,9 @@ public abstract class BaseSegmentConversionExecutor extends BaseTaskExecutor {
       Header segmentZKMetadataCustomMapModifierHeader =
           new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
               segmentZKMetadataCustomMapModifier.toJsonString());
-      final List<Header> httpHeaders = Arrays.asList(ifMatchHeader, segmentZKMetadataCustomMapModifierHeader);
+      Header segmentNameHeader = new BasicHeader(HDR_SEGMENT_NAME, segmentName);
+      Header tableNameHeader = new BasicHeader(HDR_TABLE_NAME, tableNameWithType);
+      final List<Header> httpHeaders = Arrays.asList(ifMatchHeader, segmentZKMetadataCustomMapModifierHeader, segmentNameHeader, tableNameHeader);
 
       // Set query parameters
       final List<NameValuePair> parameters = Collections.singletonList(
