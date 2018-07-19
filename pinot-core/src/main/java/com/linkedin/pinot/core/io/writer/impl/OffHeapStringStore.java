@@ -109,7 +109,6 @@ public class OffHeapStringStore implements Closeable {
       }
       LOGGER.info("Allocationg string buffer of size {} for column {}", size, columnName);
       _pinotDataBuffer = memoryManager.allocate(size, columnName);
-      _pinotDataBuffer.order(ByteOrder.nativeOrder());
       _byteBuffer = _pinotDataBuffer.toDirectByteBuffer(0, (int) size);
       _startIndex = startIndex;
       _availEndOffset = _byteBuffer.capacity();

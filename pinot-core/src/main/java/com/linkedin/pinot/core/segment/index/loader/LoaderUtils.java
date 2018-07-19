@@ -66,7 +66,7 @@ public class LoaderUtils {
         buffer = segmentWriter.newIndexFor(column, indexType, fileLength);
       }
 
-      buffer.readFrom(indexFile);
+      buffer.readFrom(0, indexFile, 0, fileLength);
     } finally {
       FileUtils.deleteQuietly(indexFile);
       if (buffer != null) {

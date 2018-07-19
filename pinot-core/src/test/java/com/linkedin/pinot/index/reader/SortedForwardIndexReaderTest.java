@@ -15,12 +15,10 @@
  */
 package com.linkedin.pinot.index.reader;
 
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
-import java.nio.channels.FileChannel;
 import java.util.Random;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,33 +56,30 @@ public class SortedForwardIndexReaderTest {
       totalDocs += length;
     }
     writer.close();
-    PinotDataBuffer heapBuffer =
-        PinotDataBuffer.fromFile(file, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing");
-    SortedIndexReader reader = new SortedIndexReader(heapBuffer, cardinality);
-    // without using context
-    long start, end;
-    start = System.currentTimeMillis();
-    for (int i = 0; i < cardinality; i++) {
-      for (int docId = startDocIdArray[i]; docId <= endDocIdArray[i]; docId++) {
-        Assert.assertEquals(reader.getInt(docId), i);
-      }
-    }
-    end = System.currentTimeMillis();
-    System.out
-        .println("Took " + (end - start) + " to scan " + totalDocs + " docs without using context");
-    // with context
-    SortedIndexReader.Context context = reader.createContext();
-    start = System.currentTimeMillis();
-    for (int i = 0; i < cardinality; i++) {
-      for (int docId = startDocIdArray[i]; docId <= endDocIdArray[i]; docId++) {
-        Assert.assertEquals(reader.getInt(docId, context), i);
-      }
-    }
-    end = System.currentTimeMillis();
-    LOGGER.debug("Took " + (end - start) + " to scan " + totalDocs + " with context");
 
-    reader.close();
+    try (SortedIndexReader reader = new SortedIndexReader(PinotDataBuffer.loadBigEndianFile(file), cardinality)) {
+      // without using context
+      long start, end;
+      start = System.currentTimeMillis();
+      for (int i = 0; i < cardinality; i++) {
+        for (int docId = startDocIdArray[i]; docId <= endDocIdArray[i]; docId++) {
+          Assert.assertEquals(reader.getInt(docId), i);
+        }
+      }
+      end = System.currentTimeMillis();
+      System.out.println("Took " + (end - start) + " to scan " + totalDocs + " docs without using context");
+      // with context
+      SortedIndexReader.Context context = reader.createContext();
+      start = System.currentTimeMillis();
+      for (int i = 0; i < cardinality; i++) {
+        for (int docId = startDocIdArray[i]; docId <= endDocIdArray[i]; docId++) {
+          Assert.assertEquals(reader.getInt(docId, context), i);
+        }
+      }
+      end = System.currentTimeMillis();
+      LOGGER.debug("Took " + (end - start) + " to scan " + totalDocs + " with context");
+    }
+
     file.delete();
-    heapBuffer.close();
   }
 }

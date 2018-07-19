@@ -19,6 +19,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -26,10 +27,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
-import xerial.larray.buffer.LBuffer;
-import xerial.larray.buffer.LBufferAPI;
-import xerial.larray.mmap.MMapBuffer;
-import xerial.larray.mmap.MMapMode;
 
 
 /**
@@ -71,18 +68,16 @@ public final class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCre
   private final int _numValues;
   private final boolean _useMMapBuffer;
 
-  // TODO: After supporting trackable big size buffer, replace the LBufferAPI with the new buffer
-  // Right now the temporary buffers used are not tracked by MMapUtils
   // Forward index buffers (from docId to dictId)
   private int _nextDocId;
-  private LBufferAPI _forwardIndexValueBuffer;
+  private PinotDataBuffer _forwardIndexValueBuffer;
   // For multi-valued column only because each docId can have multiple dictIds
   private int _nextValueId;
-  private LBufferAPI _forwardIndexLengthBuffer;
+  private PinotDataBuffer _forwardIndexLengthBuffer;
 
   // Inverted index buffers (from dictId to docId)
-  private LBufferAPI _invertedIndexValueBuffer;
-  private LBufferAPI _invertedIndexLengthBuffer;
+  private PinotDataBuffer _invertedIndexValueBuffer;
+  private PinotDataBuffer _invertedIndexLengthBuffer;
 
   public OffHeapBitmapInvertedIndexCreator(File indexDir, FieldSpec fieldSpec, int cardinality, int numDocs,
       int numValues) throws IOException {
@@ -99,15 +94,18 @@ public final class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCre
     _useMMapBuffer = _numValues > NUM_VALUES_THRESHOLD_FOR_MMAP_BUFFER;
 
     try {
-      _forwardIndexValueBuffer = createBuffer((long) _numValues * Integer.BYTES, _forwardIndexValueBufferFile);
+      _forwardIndexValueBuffer = createTempBuffer((long) _numValues * Integer.BYTES, _forwardIndexValueBufferFile);
       if (!_singleValue) {
-        _forwardIndexLengthBuffer = createBuffer((long) _numDocs * Integer.BYTES, _forwardIndexLengthBufferFile);
+        _forwardIndexLengthBuffer = createTempBuffer((long) _numDocs * Integer.BYTES, _forwardIndexLengthBufferFile);
       }
 
       // We need to clear the inverted index length buffer because we rely on the initial value of 0, and keep updating
       // the value instead of directly setting the value
-      _invertedIndexLengthBuffer = createBuffer((long) _cardinality * Integer.BYTES, _invertedIndexLengthBufferFile);
-      _invertedIndexLengthBuffer.clear();
+      _invertedIndexLengthBuffer =
+          createTempBuffer((long) _cardinality * Integer.BYTES, _invertedIndexLengthBufferFile);
+      for (int i = 0; i < _cardinality; i++) {
+        _invertedIndexLengthBuffer.putInt((long) i * Integer.BYTES, 0);
+      }
     } catch (Exception e) {
       destroyBuffer(_forwardIndexValueBuffer, _forwardIndexValueBufferFile);
       destroyBuffer(_forwardIndexLengthBuffer, _forwardIndexLengthBufferFile);
@@ -145,7 +143,7 @@ public final class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCre
     }
 
     // Put values into inverted index value buffer
-    _invertedIndexValueBuffer = createBuffer((long) _numValues * Integer.BYTES, _invertedIndexValueBufferFile);
+    _invertedIndexValueBuffer = createTempBuffer((long) _numValues * Integer.BYTES, _invertedIndexValueBufferFile);
     if (_singleValue) {
       for (int docId = 0; docId < _numDocs; docId++) {
         int dictId = getInt(_forwardIndexValueBuffer, docId);
@@ -210,38 +208,34 @@ public final class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCre
   @Override
   public void close() throws IOException {
     destroyBuffer(_forwardIndexValueBuffer, _forwardIndexValueBufferFile);
-    _forwardIndexValueBuffer = null;
     destroyBuffer(_forwardIndexLengthBuffer, _forwardIndexLengthBufferFile);
-    _forwardIndexLengthBuffer = null;
     destroyBuffer(_invertedIndexValueBuffer, _invertedIndexValueBufferFile);
-    _invertedIndexValueBuffer = null;
     destroyBuffer(_invertedIndexLengthBuffer, _invertedIndexLengthBufferFile);
-    _invertedIndexLengthBuffer = null;
   }
 
-  private static void putInt(LBufferAPI buffer, long index, int value) {
+  private static void putInt(PinotDataBuffer buffer, long index, int value) {
     buffer.putInt(index << 2, value);
   }
 
-  private static int getInt(LBufferAPI buffer, long index) {
+  private static int getInt(PinotDataBuffer buffer, long index) {
     return buffer.getInt(index << 2);
   }
 
-  private LBufferAPI createBuffer(long size, File mmapFile) throws IOException {
+  private PinotDataBuffer createTempBuffer(long size, File mmapFile) throws IOException {
     if (_useMMapBuffer) {
-      return new MMapBuffer(mmapFile, 0L, size, MMapMode.READ_WRITE);
+      return PinotDataBuffer.mapFile(mmapFile, false, 0, size, PinotDataBuffer.NATIVE_ORDER,
+          "OffHeapBitmapInvertedIndexCreator: temp buffer");
     } else {
-      return new LBuffer(size);
+      return PinotDataBuffer.allocateDirect(size, PinotDataBuffer.NATIVE_ORDER,
+          "OffHeapBitmapInvertedIndexCreator: temp buffer for " + mmapFile.getName());
     }
   }
 
-  private void destroyBuffer(LBufferAPI buffer, File mmapFile) throws IOException {
+  private void destroyBuffer(PinotDataBuffer buffer, File mmapFile) throws IOException {
     if (buffer != null) {
-      if (_useMMapBuffer) {
-        ((MMapBuffer) buffer).close();
-        FileUtils.deleteQuietly(mmapFile);
-      } else {
-        buffer.release();
+      buffer.close();
+      if (mmapFile.exists()) {
+        FileUtils.forceDelete(mmapFile);
       }
     }
   }

@@ -22,6 +22,7 @@ import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.io.IOException;
 
 
 public final class SortedIndexReader
@@ -125,7 +126,7 @@ public final class SortedIndexReader
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     _reader.close();
   }
 

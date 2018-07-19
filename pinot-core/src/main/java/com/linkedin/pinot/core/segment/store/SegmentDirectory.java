@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.segment.store;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -90,7 +91,7 @@ import org.apache.commons.configuration.ConfigurationException;
  * change contents. If these buffers are mmapped then the changes will reflect
  * in the segment storage.
  */
-public abstract class SegmentDirectory implements AutoCloseable {
+public abstract class SegmentDirectory implements Closeable {
 
   /**
    * Create segment directory from local file system
@@ -126,7 +127,7 @@ public abstract class SegmentDirectory implements AutoCloseable {
   /**
    * Reader for columnar index buffers from segment directory
    */
-  public abstract class Reader implements AutoCloseable {
+  public abstract class Reader implements Closeable {
 
     /**
      * Get columnar index data buffer.
@@ -157,9 +158,6 @@ public abstract class SegmentDirectory implements AutoCloseable {
     public abstract boolean hasStarTree();
 
     public abstract boolean hasIndexFor(String column, ColumnIndexType type);
-
-    @Override
-    public abstract void close();
 
     public abstract String toString();
   }

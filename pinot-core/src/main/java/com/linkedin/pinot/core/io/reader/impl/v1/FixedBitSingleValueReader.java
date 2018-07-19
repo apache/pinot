@@ -19,6 +19,7 @@ import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.util.FixedBitIntReaderWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.io.IOException;
 
 
 public final class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader {
@@ -52,7 +53,7 @@ public final class FixedBitSingleValueReader extends BaseSingleColumnSingleValue
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     _reader.close();
   }
 }

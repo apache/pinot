@@ -15,19 +15,15 @@
  */
 package com.linkedin.pinot.index.reader;
 
-import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.RandomAccessFile;
-import java.nio.channels.FileChannel;
 import java.util.Random;
-
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 
 
 @Test
@@ -52,28 +48,14 @@ public class FixedByteWidthRowColDataFileReaderTest {
     RandomAccessFile raf = new RandomAccessFile(f, "rw");
 //    System.out.println("file size: " + raf.getChannel().size());
     raf.close();
-    
-    PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(f, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing");
-    FixedByteSingleValueMultiColReader heapReader =
-        new FixedByteSingleValueMultiColReader(heapBuffer, data.length, new int[] { 4 });
-    heapReader.open();
-    for (int i = 0; i < data.length; i++) {
-      Assert.assertEquals(heapReader.getInt(i, 0), data[i]);
-    }
-    heapBuffer.close();
-    heapReader.close();
 
-    // Not strictly required. Let the tests pass first...then we can remove
-    // TODO: remove me
-    PinotDataBuffer mmapBuffer = PinotDataBuffer.fromFile(f, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "mmap_testing");
-    FixedByteSingleValueMultiColReader mmapReader =
-        new FixedByteSingleValueMultiColReader(mmapBuffer, data.length, new int[] { 4 });
-    mmapReader.open();
-    for (int i = 0; i < data.length; i++) {
-      Assert.assertEquals(mmapReader.getInt(i, 0), data[i]);
+    try (FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(
+        PinotDataBuffer.loadBigEndianFile(f), data.length, new int[]{4})) {
+      heapReader.open();
+      for (int i = 0; i < data.length; i++) {
+        Assert.assertEquals(heapReader.getInt(i, 0), data[i]);
+      }
     }
-    mmapBuffer.close();
-    mmapReader.close();
 
     f.delete();
   }
@@ -102,24 +84,16 @@ public class FixedByteWidthRowColDataFileReaderTest {
     RandomAccessFile raf = new RandomAccessFile(f, "rw");
 //    System.out.println("file size: " + raf.getChannel().size());
     raf.close();
-    PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(f, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing-heap");
-    FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(heapBuffer, numRows, new int[] { 4, 4 });
-    heapReader.open();
-    for (int i = 0; i < numRows; i++) {
-      for (int j = 0; j < numCols; j++) {
-        Assert.assertEquals(heapReader.getInt(i, j), colData[i][j]);
+
+    try (FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(
+        PinotDataBuffer.loadBigEndianFile(f), numRows, new int[]{4, 4})) {
+      heapReader.open();
+      for (int i = 0; i < numRows; i++) {
+        for (int j = 0; j < numCols; j++) {
+          Assert.assertEquals(heapReader.getInt(i, j), colData[i][j]);
+        }
       }
     }
-    heapReader.close();
-    PinotDataBuffer mmapBuffer = PinotDataBuffer.fromFile(f, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "mmap_testing");
-    FixedByteSingleValueMultiColReader mmapReader = new FixedByteSingleValueMultiColReader(mmapBuffer, numRows, new int[] { 4, 4 });
-    mmapReader.open();
-    for (int i = 0; i < numRows; i++) {
-      for (int j = 0; j < numCols; j++) {
-        Assert.assertEquals(mmapReader.getInt(i, j), colData[i][j]);
-      }
-    }
-    mmapReader.close();
 
     f.delete();
   }

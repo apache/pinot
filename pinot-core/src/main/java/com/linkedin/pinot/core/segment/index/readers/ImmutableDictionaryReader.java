@@ -19,6 +19,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 
@@ -62,7 +63,7 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     _valueReader.close();
   }
 

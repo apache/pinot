@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.io.writer.impl;
 
-import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
@@ -24,7 +23,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -94,7 +92,7 @@ public class MmapMemoryManagerTest {
 
     memoryManager.close();
 
-    List<Pair<MmapUtils.AllocationContext, Integer>> allocationContexts = MmapUtils.getAllocationsAndSizes();
+    List<String> allocationContexts = PinotDataBuffer.getBufferInfo();
     Assert.assertEquals(allocationContexts.size(), 0);
     Assert.assertEquals(new File(_tmpDir).listFiles().length, 0);
   }
@@ -127,7 +125,7 @@ public class MmapMemoryManagerTest {
 
     memoryManager.close();
 
-    List<Pair<MmapUtils.AllocationContext, Integer>> allocationContexts = MmapUtils.getAllocationsAndSizes();
+    List<String> allocationContexts = PinotDataBuffer.getBufferInfo();
     Assert.assertEquals(allocationContexts.size(), 0);
 
     Assert.assertEquals(dir.listFiles().length, 0);
@@ -174,7 +172,8 @@ public class MmapMemoryManagerTest {
     Assert.assertEquals(bb3.get(0), v3);
 
     memoryManager.close();
-    List<Pair<MmapUtils.AllocationContext, Integer>> allocationContexts = MmapUtils.getAllocationsAndSizes();
+
+    List<String> allocationContexts = PinotDataBuffer.getBufferInfo();
     Assert.assertEquals(allocationContexts.size(), 0);
   }
 }

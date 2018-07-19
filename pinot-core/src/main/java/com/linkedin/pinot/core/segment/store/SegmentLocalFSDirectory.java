@@ -205,8 +205,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
   }
 
   @Override
-  public void close()
-      throws Exception {
+  public void close() throws IOException {
     segmentLock.close();
     synchronized (this) {
       if (columnIndexDirectory != null) {
@@ -440,7 +439,8 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       return segmentDirectory.toString();
     }
 
-    public void close() {
+    @Override
+    public void close() throws IOException {
       segmentLock.unlock();
       if (columnIndexDirectory != null) {
         columnIndexDirectory.close();

@@ -115,7 +115,7 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     buffer.close();
   }
 }

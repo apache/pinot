@@ -101,7 +101,6 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       }
       LOGGER.info("Allocating byte array store buffer of size {} for: {}", size, allocationContext);
       _pinotDataBuffer = memoryManager.allocate(size, allocationContext);
-      _pinotDataBuffer.order(ByteOrder.nativeOrder());
       _byteBuffer = _pinotDataBuffer.toDirectByteBuffer(0, (int) size);
       _startIndex = startIndex;
       _availEndOffset = _byteBuffer.capacity();

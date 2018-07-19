@@ -20,7 +20,6 @@ import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
-import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -308,7 +307,6 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     LOGGER.info("Allocating {} bytes for: {}", bbSize, _allocationContext);
     PinotDataBuffer buffer = _memoryManager.allocate(bbSize, _allocationContext);
     _pinotDataBuffers.add(buffer);
-    buffer.order(ByteOrder.nativeOrder());
     IntBuffer iBuf = buffer.toDirectByteBuffer(0L, bbSize).asIntBuffer();
     for (int i = 0; i < iBuf.capacity(); i++) {
       iBuf.put(i, NULL_VALUE_INDEX);

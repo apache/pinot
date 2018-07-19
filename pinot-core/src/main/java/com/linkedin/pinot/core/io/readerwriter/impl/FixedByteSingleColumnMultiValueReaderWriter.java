@@ -20,7 +20,7 @@ import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnMultiValueReaderW
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import java.nio.ByteOrder;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -139,9 +139,6 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   private void addHeaderBuffers() {
     LOGGER.info("Allocating header buffer of size {} for: {}", _headerSize, _context);
     _headerBuffer = _memoryManager.allocate(_headerSize, _context);
-    // We know that these buffers will not be copied directly into a file (or mapped from a file).
-    // So, we can use native byte order here.
-    _headerBuffer.order(ByteOrder.nativeOrder());
     // dataBufferId, startIndex, length
     _curHeaderWriter = new FixedByteSingleValueMultiColWriter(_headerBuffer, _rowCountPerChunk, 3,
         new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT});
@@ -165,7 +162,6 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
       final long size = rowCapacity * _columnSizeInBytes;
       LOGGER.info("Allocating data buffer of size {} for column {}", size, _context);
       dataBuffer = _memoryManager.allocate(size, _context);
-      dataBuffer.order(ByteOrder.nativeOrder());
       _dataBuffers.add(dataBuffer);
       _currentDataWriter =
           new FixedByteSingleValueMultiColWriter(dataBuffer, rowCapacity, 1, new int[]{_columnSizeInBytes});
@@ -184,7 +180,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     for (PinotDataBuffer dataBuffer : _dataBuffers) {
       dataBuffer.close();
     }

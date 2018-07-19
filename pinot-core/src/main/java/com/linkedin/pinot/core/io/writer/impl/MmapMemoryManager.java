@@ -15,22 +15,21 @@
  */
 package com.linkedin.pinot.core.io.writer.impl;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.channels.FileChannel;
+import java.nio.ByteOrder;
 import java.util.LinkedList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.annotations.VisibleForTesting;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**
@@ -129,10 +128,10 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
     try {
       raf.setLength(fileLen);
       raf.close();
-      _currentBuffer = PinotDataBuffer.fromFile(file, ReadMode.mmap, FileChannel.MapMode.READ_WRITE, thisContext);
+      _currentBuffer = PinotDataBuffer.mapFile(file, false, 0, fileLen, PinotDataBuffer.NATIVE_ORDER, thisContext);
       LOGGER.info("Mapped file {} for segment {} into buffer {}", file.getAbsolutePath(), _segmentName, _currentBuffer);
       _memMappedBuffers.add(_currentBuffer);
-    }  catch (IOException e) {
+    } catch (IOException e) {
       throw new RuntimeException(e);
     }
     _paths.add(filePath);
@@ -156,7 +155,7 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
   }
 
   @Override
-  protected void doClose() {
+  protected void doClose() throws IOException {
     for (PinotDataBuffer buffer : _memMappedBuffers) {
       LOGGER.info("Closing buffer {}", buffer);
       buffer.close();
