@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.hadoop.job;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.SimpleHttpResponse;
 import java.io.InputStream;
@@ -26,8 +27,8 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.http.Header;
-import org.apache.http.message.BasicHeader;
+import shaded.org.apache.http.Header;
+import shaded.org.apache.http.message.BasicHeader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,9 +39,6 @@ public class SegmentTarPushJob extends Configured {
   private String[] _hosts;
   private int _port;
   private String _tableName;
-
-  public static final String HDR_SEGMENT_NAME = "Pinot-Segment-Name";
-  public static final String HDR_TABLE_NAME = "Pinot-Table-Name";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentTarPushJob.class);
 
@@ -83,8 +81,8 @@ public class SegmentTarPushJob extends Configured {
     if (!fileName.endsWith(".tar.gz")) {
       return;
     }
-    Header segmentNameHeader = new BasicHeader(HDR_SEGMENT_NAME, fileName);
-    Header tableNameHeader = new BasicHeader(HDR_TABLE_NAME, _tableName);
+    Header segmentNameHeader = new BasicHeader(CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER, fileName);
+    Header tableNameHeader = new BasicHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER, _tableName);
     List<Header> httpHeaders = Arrays.asList(segmentNameHeader, tableNameHeader);
 
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
