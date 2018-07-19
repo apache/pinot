@@ -205,6 +205,7 @@ public class SegmentStatusChecker {
         }
 
         _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
+        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENT_COUNT, (long)(idealState.getPartitionSet().size()));
         ExternalView externalView = helixAdmin.getResourceExternalView(helixClusterName, tableName);
 
         int nReplicasIdealMax = 0; // Keeps track of maximum number of replicas in ideal state
