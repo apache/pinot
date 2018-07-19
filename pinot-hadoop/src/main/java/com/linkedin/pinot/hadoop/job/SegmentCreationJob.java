@@ -206,8 +206,8 @@ public class SegmentCreationJob extends Configured {
   }
 
   protected void setAdditionalJobProperties(Job job) throws Exception {
-    if (_hosts == null && _port == 0) {
-      LOGGER.warn("Unable to set TableConfig-dependent properties. Please set {} and {}", JobConfigConstants.PUSH_TO_HOSTS, JobConfigConstants.PUSH_TO_PORT);
+    if (_hosts == null || _port == 0) {
+      LOGGER.warn("Unable to set TableConfig-dependent properties. Please set host {} and port {}", JobConfigConstants.PUSH_TO_HOSTS, JobConfigConstants.PUSH_TO_PORT);
       return;
     }
 
