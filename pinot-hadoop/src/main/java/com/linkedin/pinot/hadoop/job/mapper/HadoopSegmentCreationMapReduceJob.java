@@ -16,6 +16,7 @@
 package com.linkedin.pinot.hadoop.job.mapper;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.DataSize;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.FileFormat;
@@ -194,7 +195,7 @@ public class HadoopSegmentCreationMapReduceJob {
       FileFormat fileFormat = getFileFormat(dataFilePath);
       segmentGeneratorConfig.setFormat(fileFormat);
       segmentGeneratorConfig.setOnHeap(true);
-      
+
       if (null != _postfix) {
         segmentGeneratorConfig.setSegmentNamePostfix(String.format("%s-%s", _postfix, seqId));
       } else {
@@ -220,12 +221,19 @@ public class HadoopSegmentCreationMapReduceJob {
       driver.build();
       // Tar the segment directory into file.
       String segmentName = driver.getSegmentName();
-      String localSegmentPath = new File(_localDiskSegmentDirectory, segmentName).getAbsolutePath();
+      File localSegmentFile = new File(_localDiskSegmentDirectory, segmentName);
+      String localSegmentPath = localSegmentFile.getAbsolutePath();
 
       String localTarPath = _localDiskSegmentTarPath + "/" + segmentName + JobConfigConstants.TARGZ;
       LOGGER.info("Trying to tar the segment to: {}", localTarPath);
       TarGzCompressionUtils.createTarGzOfDirectory(localSegmentPath, localTarPath);
       String hdfsTarPath = _localHdfsSegmentTarPath + "/" + segmentName + JobConfigConstants.TARGZ;
+
+      // Log segment size.
+      long uncompressedSegmentSize = localSegmentFile.length();
+      long compressedSegmentSize = new File(_localDiskSegmentTarPath, segmentName + JobConfigConstants.TARGZ).length();
+      LOGGER.info(String.format("Segment %s uncompressed size: %s, compressed size: %s", segmentName,
+          DataSize.fromBytes(uncompressedSegmentSize), DataSize.fromBytes(compressedSegmentSize)));
 
       LOGGER.info("*********************************************************************");
       LOGGER.info("Copy from : {} to {}", localTarPath, hdfsTarPath);
