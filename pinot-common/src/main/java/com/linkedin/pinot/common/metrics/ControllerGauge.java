@@ -29,6 +29,7 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   SEGMENTS_IN_ERROR_STATE("segments", false),
   PERCENT_SEGMENTS_AVAILABLE("segments", false), // Percentage of segments with at least one online replica in external view
                                                  // as compared to total number of segments in ideal state
+  SEGMENT_COUNT("SegmentCount", false),
   IDEALSTATE_ZNODE_SIZE("idealstate", false),
   REALTIME_TABLE_COUNT("TableCount", true),
   OFFLINE_TABLE_COUNT("TableCount", true),
