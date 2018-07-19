@@ -32,10 +32,10 @@
 
   {{#each metrics as |metric|}}
     <div>
-        {{metric.name}}
+        {{metric}}
         <input type="checkbox"
                checked=checkboxDefault
-               onclick={{action "toggleCheckBox" metric.name}}/>
+               onclick={{action "toggleCheckBox" metric}}/>
     </div>
 
   {{/each}}
@@ -77,26 +77,36 @@
       {{/power-select}}
   </div>
 
+  
   <div class="row">
     <label class="control-label te-label te-label--taller">
       Set up the business rules(Optional):
     </label>
   </div>
 
+    <label for="select-dimension" class="control-label te-label te-label--taller">
+      Metric for dimension breakdown
+      <span>
+          <i class="glyphicon glyphicon-question-sign"></i>
+        {{#tooltip-on-element class="te-tooltip"}}
+          .
+        {{/tooltip-on-element}}
+        </span>
+    </label>
     {{#power-select
       classNames="te-input"
       options=metrics
-      selected=selectedDimension
-      onchange=(action "onSelectDimension")
+      selected=selectedMetric
+      onchange=(action "onSelectMetric")
       loadingMessage="Waiting for the server...."
       placeholder="Choose metric for rules"
       searchPlaceholder="Type to filter..."
       triggerId="select-metric"
       triggerClass="te-form__select"
-      disabled=(not generalFieldsEnabled)
-    as |dimension|
+      disabled=(not metricsFieldEnabled)
+    as |metric|
     }}
-      {{dimension}}
+      {{metric}}
     {{/power-select}}
 
 

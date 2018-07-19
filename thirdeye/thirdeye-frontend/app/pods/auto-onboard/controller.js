@@ -31,13 +31,13 @@ export default Controller.extend({
 
   selectedDimension: null,
 
+  selectedMetric: null,
+
   checkboxDefault: true,
 
   filterOptions: {},
 
-  metrics: computed('metricsProperties', function () {
-    return Object.keys(get(this, 'metricsProperties'));
-  }),
+  metrics: null,
 
   metricsProperties: {},
 
@@ -53,14 +53,9 @@ export default Controller.extend({
 
   generalFieldsEnabled: computed.or('dimensions'),
 
-  _writeDetectionConfig() {
-    const detectionConfigBean = {
-      name: get(this, 'detectionConfigName'),
-      cron: get(this, 'detectionConfigCron'),
-      properties: JSON.parse(get(this, 'detectionConfig')),
-      lastTimestamp: 0
-    };
+  metricsFieldEnabled: computed.or('metrics'),
 
+  _writeDetectionConfig(detectionConfigBean) {
     const jsonString = JSON.stringify(detectionConfigBean);
 
     return fetch(`/thirdeye/entity?entityType=DETECTION_CONFIG`, {method: 'POST', body: jsonString})
@@ -74,62 +69,68 @@ export default Controller.extend({
       const url = `/dataset-auto-onboard/metrics?dataset=` + get(this, 'datasetName');
       fetch(url)
         .then(res => res.json())
-        .then(res => this.set('metricProperties', res.reduce(function (obj, metric) {
+        .then(res => this.set('metrics', res))
+        .then(res => this.set('metricsProperties', res.reduce(function (obj, metric) {
           obj[metric["name"]] = {
             "id": metric['id'], "urn": "thirdeye:metric:" + metric['id'], "monitor": true
           };
           return obj;
         }, {})))
-        .then(res => this.set('metricUrn', res[Object.keys(res)[0]]['id']))
-        .then(res => fetch(`/data/autocomplete/filters/metric/${res}`)
-          .then(checkStatus)
-          .then(res => {
-            this.set('filterOptions', res);
-            this.set('dimensions', Object.keys(res));
-          }))
+        .then(res => {
+          this.set('metrics', Object.keys(res));
+          const metricUrn = res[Object.keys(res)[0]]['id'];
+          this.set('metricUrn', res[Object.keys(res)[0]]['id']);
+          fetch(`/data/autocomplete/filters/metric/${metricUrn}`)
+            .then(checkStatus)
+            .then(res => {
+              this.set('filterOptions', res);
+              this.set('dimensions', Object.keys(res));
+            })
+        })
         .catch(error => console.error(`Fetch Error =\n`, error));
     },
 
     toggleCheckBox(name) {
-      const metricProperties = get(this, 'metricProperties');
-      metricProperties[name]['monitor'] = !metricProperties[name]['monitor'];
+      const metricsProperties = get(this, 'metricsProperties');
+      metricsProperties[name]['monitor'] = !metricsProperties[name]['monitor'];
     },
 
     onChangeValue(property, value) {
-      const metricProperties = get(this, 'metricProperties');
-      Object.keys(metricProperties).forEach(
+      const metricsProperties = get(this, 'metricsProperties');
+      Object.keys(metricsProperties).forEach(
         function (key) {
-          metricProperties[key][property] = value;
+          metricsProperties[key][property] = value;
         }
       );
     },
 
     onFilters(filters) {
-      const metricProperties = get(this, 'metricProperties');
+      const metricsProperties = get(this, 'metricsProperties');
       const filterMap = JSON.parse(filters);
-      Object.keys(metricProperties).forEach(function (key) {
-        const metricProperty = metricProperties[key];
+      Object.keys(metricsProperties).forEach(function (key) {
+        const metricProperty = metricsProperties[key];
         let metricUrn = "thirdeye:metric:" + metricProperty['id'];
         Object.keys(filterMap).forEach(function (key) {
           filterMap[key].forEach(function (value) {
             metricUrn = metricUrn + ":" + key + "=" + value;
           })
         });
-        metricProperties[key]['urn'] = metricUrn;
+        metricsProperties[key]['urn'] = metricUrn;
       });
     },
 
     onSubmit() {
-      const metricProperties = get(this, 'metricProperties');
+      const metricsProperties = get(this, 'metricsProperties');
       const nestedProperties = [];
-      Object.keys(metricProperties).forEach(function (key) {
-        const properties = metricProperties[key];
+      const selectedMetric = this.get('selectedMetric');
+      const selectedDimension = this.get('selectedDimension');
+      Object.keys(metricsProperties).forEach(function (key) {
+        const properties = metricsProperties[key];
         if (!properties['monitor']) {
           return;
         }
         const detectionConfig = {
               className: "com.linkedin.thirdeye.detection.algorithm.DimensionWrapper",
-              metricUrn: properties['urn'],
               nested: [{
                 className: "com.linkedin.thirdeye.detection.algorithm.MovingWindowAlgorithm",
                 baselineWeeks: 4,
@@ -141,14 +142,24 @@ export default Controller.extend({
                 zscoreMax: 4
               }]
         };
+        if(selectedMetric == null) {
+          detectionConfig['metricUrn'] = properties['urn'];
+        } else {
+          detectionConfig['metricUrn'] = metricsProperties[selectedMetric]['urn'];
+          detectionConfig['nestedMetricUrn'] = properties['urn'];
+        }
+
+        if (selectedDimension != null){
+          detectionConfig['dimensions'] = [selectedDimension];
+        }
         if (properties['topk']) {
-          detectionConfig['k'] = properties['topk'];
+          detectionConfig['k'] = parseInt(properties['topk']);
         }
         if (properties['minvalue']) {
-          detectionConfig['minValue'] = properties['minvalue'];
+          detectionConfig['minValue'] = parseFloat(properties['minvalue']);
         }
         if (properties['mincontribution']) {
-          detectionConfig['minContribution'] = properties['mincontribution'];
+          detectionConfig['minContribution'] = parseFloat(properties['mincontribution']);
         }
         nestedProperties.push(detectionConfig);
       });
@@ -164,7 +175,8 @@ export default Controller.extend({
         }
       };
 
-      console.log(configResult);
+      // console.log(configResult);
+      this._writeDetectionConfig(configResult);
     },
 
     onSelectDimension(dim) {
@@ -176,9 +188,7 @@ export default Controller.extend({
     },
 
     onSelectMetric(name) {
-      Object.keys(get(this, 'metricProperties')).forEach(function (key) {
-
-      });
+      this.set('selectedMetric', name);
     }
   }
 });
