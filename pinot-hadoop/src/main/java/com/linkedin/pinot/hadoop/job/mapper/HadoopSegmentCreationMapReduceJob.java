@@ -230,8 +230,8 @@ public class HadoopSegmentCreationMapReduceJob {
       String hdfsTarPath = _localHdfsSegmentTarPath + "/" + segmentName + JobConfigConstants.TARGZ;
 
       // Log segment size.
-      long uncompressedSegmentSize = localSegmentFile.length();
-      long compressedSegmentSize = new File(_localDiskSegmentTarPath, segmentName + JobConfigConstants.TARGZ).length();
+      long uncompressedSegmentSize = FileUtils.sizeOfDirectory(localSegmentFile);
+      long compressedSegmentSize = new File(localTarPath).length();
       LOGGER.info(String.format("Segment %s uncompressed size: %s, compressed size: %s", segmentName,
           DataSize.fromBytes(uncompressedSegmentSize), DataSize.fromBytes(compressedSegmentSize)));
 
