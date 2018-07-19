@@ -226,7 +226,10 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
         BooleanSeries padding = BooleanSeries.fillValues(df.size() - smooth.size(), false);
 
         if (!Double.isNaN(this.kernelMin)) {
-          df.addSeries(COL_KERNEL_VIOLATION, smooth.lt(this.kernelMin).append(padding).fillNull());
+          BooleanSeries violations = smooth.lt(this.kernelMin).append(padding);
+          BooleanSeries halfViolations = smooth.lt(this.kernelMin / 2).append(padding);
+
+          df.addSeries(COL_KERNEL_VIOLATION, expandViolation(violations, halfViolations).fillNull());
           df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_ANOMALY, COL_KERNEL_VIOLATION);
 
           sAnomaly = df.getBooleans(COL_ANOMALY).values();
@@ -234,7 +237,10 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
         }
 
         if (!Double.isNaN(this.kernelMax)) {
-          df.addSeries(COL_KERNEL_VIOLATION, smooth.gt(this.kernelMax).append(padding).fillNull());
+          BooleanSeries violations = smooth.gt(this.kernelMax).append(padding);
+          BooleanSeries halfViolations = smooth.gt(this.kernelMax / 2).append(padding);
+
+          df.addSeries(COL_KERNEL_VIOLATION, expandViolation(violations, halfViolations).fillNull());
           df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_ANOMALY, COL_KERNEL_VIOLATION);
 
           sAnomaly = df.getBooleans(COL_ANOMALY).values();
@@ -255,6 +261,53 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
     return new DetectionPipelineResult(anomalies)
         .setDiagnostics(diagnostics);
+  }
+
+  /**
+   * Expand violation ranges via the half-violation threshold.
+   *
+   * @param violation boolean series of violations
+   * @param halfViolation boolean series of half violations
+   * @return boolean series of expanded violations
+   */
+  static BooleanSeries expandViolation(BooleanSeries violation, BooleanSeries halfViolation) {
+    if (violation.size() != halfViolation.size()) {
+      throw new IllegalArgumentException("Series must be of equal size");
+    }
+
+    // TODO max lookback/forward range for performance
+
+    byte[] full = violation.values();
+    byte[] half = halfViolation.values();
+    byte[] output = new byte[full.length];
+
+    int lastHalf = -1;
+    for (int i = 0; i < violation.size(); i++) {
+      if (lastHalf >= 0 && BooleanSeries.isFalse(half[i])) {
+        lastHalf = -1;
+      }
+
+      if (lastHalf < 0 && BooleanSeries.isTrue(half[i])) {
+        lastHalf = i;
+      }
+
+      if (full[i] > 0) {
+        // half[i] must be 1 here
+
+        int j = lastHalf;
+
+        for (; j < full.length && !BooleanSeries.isFalse(half[j]); j++) {
+          if (!BooleanSeries.isNull(half[j])) {
+            output[j] = 1;
+          }
+        }
+
+        // move i to last checked candidate
+        i = j - 1;
+      }
+    }
+
+    return BooleanSeries.buildFrom(output);
   }
 
   /**
