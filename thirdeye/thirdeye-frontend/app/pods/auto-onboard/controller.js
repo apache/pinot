@@ -2,21 +2,6 @@ import {observer, computed, set, get} from '@ember/object';
 import {later, debounce} from '@ember/runloop';
 import {reads, gt, or} from '@ember/object/computed';
 import Controller from '@ember/controller';
-import { task, timeout } from 'ember-concurrency';
-import {
-  filterObject,
-  filterPrefix,
-  hasPrefix,
-  toBaselineUrn,
-  toBaselineRange,
-  toCurrentUrn,
-  toOffsetUrn,
-  toFilters,
-  toFilterMap,
-  appendFilters,
-  dateFormatFull,
-  colorMapping
-} from 'thirdeye-frontend/utils/rca-utils';
 import {checkStatus} from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
 
