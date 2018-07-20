@@ -24,6 +24,7 @@ import io.netty.util.HashedWheelTimer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import jdk.nashorn.internal.ir.annotations.Ignore;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -86,6 +87,7 @@ public class NettyCloseChannelTest {
    * Client sends a request. Server closes the channel.
    */
   @Test
+  @Ignore
   public void testCloseServerChannel()
       throws Exception {
     Assert.assertTrue(_nettyTCPClientConnection.connect());
