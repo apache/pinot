@@ -224,6 +224,7 @@ public class SegmentCreationJob extends Configured {
 
     // Fetch table config from controller API
     TableConfig tableConfig = controllerRestApiObject.getTableConfig();
+    job.getConfiguration().set(JobConfigConstants.TABLE_CONFIG, tableConfig.toJSONConfigString());
 
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     if (validationConfig == null) {

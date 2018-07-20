@@ -109,7 +109,7 @@ public class HadoopSegmentCreationMapReduceJob {
           } catch (JSONException e) {
             // Though we get table config directly from the controller of hosts and port of push location are set,
             // it is possible for the user to pass in a table config as a parameter
-            LOGGER.error("Table config {} isn't passed in correctly", tableConfigString);
+            LOGGER.error("Exception when parsing table config: {}", tableConfigString);
           }
         }
     }
