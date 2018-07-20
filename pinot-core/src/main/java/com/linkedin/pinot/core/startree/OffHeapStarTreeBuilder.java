@@ -30,9 +30,9 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
@@ -645,9 +645,12 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     if (tempBufferSize > MMAP_SIZE_THRESHOLD) {
       // Create a temporary file and use MMapBuffer
       File tempFile = new File(_tempDir, startDocId + "_" + endDocId + ".unique.tmp");
-      try (FileChannel src = new FileInputStream(_dataFile).getChannel();
-          FileChannel dest = new FileOutputStream(tempFile).getChannel()) {
-        dest.transferFrom(src, startDocId * _docSize, tempBufferSize);
+      try (FileChannel src = new RandomAccessFile(_dataFile, "r").getChannel();
+          FileChannel dest = new RandomAccessFile(tempFile, "rw").getChannel()) {
+        long numBytesTransferred = src.transferTo(startDocId * _docSize, tempBufferSize, dest);
+        Preconditions.checkState(numBytesTransferred == tempBufferSize,
+            "Error transferring data from data file to temp file, transfer size mis-match");
+        dest.force(false);
       }
       tempBuffer = new MMapBuffer(tempFile, MMapMode.READ_WRITE);
     } else {
@@ -684,10 +687,10 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     dataTable.flush();
 
     return new Iterator<Pair<DimensionBuffer, MetricBuffer>>() {
-      private final Iterator<Pair<byte[], byte[]>> _iterator = dataTable.iterator(startDocId, endDocId);
-      private DimensionBuffer _currentDimensions;
-      private MetricBuffer _currentMetrics;
-      boolean _hasNext = true;
+      final Iterator<Pair<byte[], byte[]>> _iterator = dataTable.iterator(startDocId, endDocId);
+      DimensionBuffer _currentDimensions;
+      MetricBuffer _currentMetrics;
+      boolean _hasNext = _iterator.hasNext();
 
       @Override
       public boolean hasNext() {
