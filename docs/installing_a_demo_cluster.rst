@@ -1,2 +1,0 @@
-Installing a Demonstration Cluster
-==================================
