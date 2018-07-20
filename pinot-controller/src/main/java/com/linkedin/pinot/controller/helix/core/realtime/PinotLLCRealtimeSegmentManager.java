@@ -236,7 +236,7 @@ public class PinotLLCRealtimeSegmentManager {
     _flushThresholdUpdateManager.clearFlushThresholdUpdater(tableConfig);
     if (!isConnected()) {
       throw new RuntimeException(
-          "Lost connection while setting up new table " + tableConfig.getTableName() + " isConnected=" + isConnected());
+          "Lost zk connection while setting up new table " + tableConfig.getTableName() + " isConnected=" + isConnected());
     }
     IdealState idealState = setupTable(tableConfig, emptyIdealState, partitionCount);
     setTableIdealState(tableConfig.getTableName(), idealState);
@@ -451,7 +451,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     // Step-2
     success = createNewSegmentMetadataZNRecord(tableConfig, committingLLCSegmentName, newLLCSegmentName,
-        partitionAssignment, committingSegmentDescriptor, true);
+        partitionAssignment, committingSegmentDescriptor, false);
     if (!success) {
       return false;
     }
@@ -543,13 +543,13 @@ public class PinotLLCRealtimeSegmentManager {
    * @param newLLCSegmentName  new segment name
    * @param partitionAssignment  stream partition assignment for this table
    * @param committingSegmentDescriptor
-   * @param checkLeader check if the controller has leadership when performing the metadata write
+   * @param isNewTableSetup
    * @return
    */
   protected boolean createNewSegmentMetadataZNRecord(TableConfig realtimeTableConfig,
       LLCSegmentName committingLLCSegmentName, LLCSegmentName newLLCSegmentName,
       PartitionAssignment partitionAssignment, CommittingSegmentDescriptor committingSegmentDescriptor,
-      boolean checkLeader) {
+      boolean isNewTableSetup) {
 
     String realtimeTableName = realtimeTableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
@@ -578,13 +578,15 @@ public class PinotLLCRealtimeSegmentManager {
     final String newZnodePath =
         ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, newSegmentNameStr);
 
-    if (checkLeader && (!isLeader() || !isConnected())) {
-      // We can potentially log a different value than what we saw ....
-      LOGGER.warn(
-          "Lost leadership while committing new segment metadata for {} for table {}: isLeader={}, isConnected={}",
-          newSegmentNameStr, rawTableName, isLeader(), isConnected());
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
-      return false;
+    if (!isNewTableSetup) {
+      if (!isLeader() || !isConnected()) {
+        // We can potentially log a different value than what we saw ....
+        LOGGER.warn(
+            "Lost leadership while committing new segment metadata for {} for table {}: isLeader={}, isConnected={}",
+            newSegmentNameStr, rawTableName, isLeader(), isConnected());
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
+        return false;
+      }
     }
 
     boolean success = writeSegmentToPropertyStore(newZnodePath, newZnRecord, realtimeTableName);
@@ -1097,7 +1099,7 @@ public class PinotLLCRealtimeSegmentManager {
             CommittingSegmentDescriptor committingSegmentDescriptor =
                 new CommittingSegmentDescriptor(segmentId, latestMetadata.getEndOffset(), 0);
             boolean success = createNewSegmentMetadataZNRecord(tableConfig, segmentName, newLLCSegmentName, partitionAssignment,
-                committingSegmentDescriptor, true);
+                committingSegmentDescriptor, false);
 
             // creation of segment metadata could fail due to lost leadership or an unsuccessful write to property store
             // in such a case, we will exclude the segment from ideal state update and let the next iteration of validation manager fix it
@@ -1133,7 +1135,7 @@ public class PinotLLCRealtimeSegmentManager {
                 new CommittingSegmentDescriptor(segmentId, startOffset, 0);
 
             boolean success = createNewSegmentMetadataZNRecord(tableConfig, segmentName, newLLCSegmentName, partitionAssignment,
-                committingSegmentDescriptor, true);
+                committingSegmentDescriptor, false);
 
             // creation of segment metadata could fail due to lost leadership or an unsuccessful write to property store
             // in such a case, we will exclude the segment from ideal state update and let the next iteration of validation manager fix it
@@ -1265,7 +1267,7 @@ public class PinotLLCRealtimeSegmentManager {
       CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null, startOffset, 0);
 
       boolean success = createNewSegmentMetadataZNRecord(tableConfig, null, newLLCSegmentName, partitionAssignment,
-          committingSegmentDescriptor, false);
+          committingSegmentDescriptor, true);
       // creation of segment metadata could fail due to an unsuccessful write to property store
       // in such a case, we will exclude the segment from ideal state update and let the validation manager fix it
       if (success) {
