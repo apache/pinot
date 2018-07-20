@@ -59,6 +59,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime");
 
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
+  protected final File _avroDir = new File(_tempDir, "avroDir");
   protected final File _segmentDir = new File(_tempDir, "segmentDir");
   protected final File _tarDir = new File(_tempDir, "tarDir");
 
