@@ -11,10 +11,12 @@ import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalySummary;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
@@ -55,17 +57,20 @@ public class UserDashboardResource {
   private final AnomalyFunctionManager functionDAO;
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
+  private final DetectionConfigManager detectionDAO;
   private final DetectionAlertConfigManager detectionAlertDAO;
   private final AggregationLoader aggregationLoader;
   private final CurrentAndBaselineLoader currentAndBaselineLoader;
 
 
   public UserDashboardResource(MergedAnomalyResultManager anomalyDAO, AnomalyFunctionManager functionDAO,
-      MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, DetectionAlertConfigManager detectionAlertDAO) {
+      MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, DetectionConfigManager detectionDAO,
+      DetectionAlertConfigManager detectionAlertDAO) {
     this.anomalyDAO = anomalyDAO;
     this.functionDAO = functionDAO;
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
+    this.detectionDAO = detectionDAO;
     this.detectionAlertDAO = detectionAlertDAO;
 
     this.aggregationLoader =
@@ -220,8 +225,7 @@ public class UserDashboardResource {
       }
     }
 
-    List<AnomalyFunctionDTO> functions =
-        this.functionDAO.findByPredicate(Predicate.IN("baseId", anomalyFunctionIds.toArray()));
+    List<AnomalyFunctionDTO> functions = this.functionDAO.findByPredicate(Predicate.IN("baseId", anomalyFunctionIds.toArray()));
     Map<Long, AnomalyFunctionDTO> id2function = new HashMap<>();
     for (AnomalyFunctionDTO function : functions) {
       id2function.put(function.getId(), function);
@@ -238,15 +242,22 @@ public class UserDashboardResource {
       summary.setEnd(anomaly.getEndTime());
       summary.setCurrent(anomaly.getAvgCurrentVal());
       summary.setBaseline(anomaly.getAvgBaselineVal());
+      summary.setMetricId(getMetricId(anomaly));
 
-      if (anomaly.getFunction() != null) {
-        summary.setMetricId(getMetricId(anomaly));
-      }
+      summary.setFunctionId(-1);
       if (anomaly.getFunctionId() != null) {
         summary.setFunctionId(anomaly.getFunctionId());
         if (id2function.get(anomaly.getFunctionId()) != null) {
           summary.setFunctionName(id2function.get(anomaly.getFunctionId()).getFunctionName());
         }
+      }
+
+      summary.setDetectionConfigId(-1);
+      if (anomaly.getDetectionConfigId() != null) {
+        long detectionConfigId = anomaly.getDetectionConfigId();
+        DetectionConfigDTO detectionDTO = this.detectionDAO.findById(detectionConfigId);
+        summary.setFunctionName(detectionDTO.getName());
+        summary.setDetectionConfigId(detectionConfigId);
       }
 
       summary.setMetricName(anomaly.getMetric());
@@ -322,7 +333,7 @@ public class UserDashboardResource {
    * @return metric id, or {@code -1} if the metric/dataset cannot be resolved
    */
   private long getMetricId(MergedAnomalyResultDTO anomaly) {
-    if (anomaly.getFunction().getMetricId() > 0) {
+    if (anomaly.getFunction() != null && anomaly.getFunction().getMetricId() > 0) {
       return anomaly.getFunction().getMetricId();
     }
     try {

@@ -152,9 +152,10 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new ConfigResource(DAO_REGISTRY.getConfigDAO()));
     env.jersey().register(new CustomizedEventResource(DAO_REGISTRY.getEventDAO()));
     env.jersey().register(new TimeSeriesResource());
-    env.jersey().register(new UserDashboardResource(DAO_REGISTRY.getMergedAnomalyResultDAO(), DAO_REGISTRY.getAnomalyFunctionDAO(),
-                DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
-                DAO_REGISTRY.getDetectionAlertConfigManager()));
+    env.jersey().register(new UserDashboardResource(
+        DAO_REGISTRY.getMergedAnomalyResultDAO(), DAO_REGISTRY.getAnomalyFunctionDAO(),
+        DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
+        DAO_REGISTRY.getDetectionConfigManager(), DAO_REGISTRY.getDetectionAlertConfigManager()));
     env.jersey().register(new DetectionOnboardResource(DAO_REGISTRY.getTaskDAO(), DAO_REGISTRY.getAnomalyFunctionDAO()));
     env.jersey().register(new DetectionResource());
 
