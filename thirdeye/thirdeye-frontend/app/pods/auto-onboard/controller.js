@@ -20,7 +20,7 @@ import {checkStatus} from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
 
 export default Controller.extend({
-  detectionConfig: null,
+  detectionConfigId: null,
 
   detectionConfigName: null,
 
@@ -34,25 +34,25 @@ export default Controller.extend({
 
   selectedMetric: null,
 
-  checkboxDefault: true,
-
   filterOptions: {},
 
   metrics: null,
 
   metricsProperties: {},
 
-  detectionConfigCron: null,
-
   metricUrn: null,
-
-  baseline: null,
 
   filterMap: null,
 
   toggleChecked: false,
 
   output: null,
+
+  topk: null,
+
+  mincontribution: null,
+
+  minvalue: null,
 
   idToNames: {},
 
@@ -65,9 +65,10 @@ export default Controller.extend({
       .then(res => {
         const nestedProperties = res['properties']['nested'];
         // fill in values:
+        this.set('detectionConfigId', res['id']);
         this.set('detectionConfigName', res['name']);
         this.set('topk', nestedProperties[0]['k']);
-        this.set('minvalue', nestedProperties[0]['minvalue']);
+        this.set('minvalue', nestedProperties[0]['minValue']);
         this.set('mincontribution', nestedProperties[0]['minContribution']);
         this.set('datasetName', res['properties']['datasetName']);
 
@@ -86,7 +87,7 @@ export default Controller.extend({
           let urnPieces = nestedProperties[0]['metricUrn'].split(':');
           const filters = {};
           var i;
-          for(i = 3; i < urnPieces.length; i++) {
+          for (i = 3; i < urnPieces.length; i++) {
             const filter = urnPieces[i].split('=');
             if (filter[0] in filters) {
               filters[filter[0]].push(filter[1]);
@@ -95,7 +96,7 @@ export default Controller.extend({
             }
           }
           this.set('selectedFilters', JSON.stringify(filters));
-
+          this._updateFilters();
           // fill in selected metrics
           const metricIds = nestedProperties.reduce(function (obj, property) {
             let urn;
@@ -110,9 +111,7 @@ export default Controller.extend({
           }, []);
 
           Object.keys(metricsProperties).forEach(function (key) {
-            console.log(metricsProperties[key]['id']);
-            console.log(metricIds);
-            if(metricIds.indexOf(metricsProperties[key]['id'].toString()) == -1) {
+            if (metricIds.indexOf(metricsProperties[key]['id'].toString()) == -1) {
               set(metricsProperties[key], 'monitor', false);
             }
           });
@@ -130,7 +129,6 @@ export default Controller.extend({
 
   _writeDetectionConfig(detectionConfigBean) {
     const jsonString = JSON.stringify(detectionConfigBean);
-
     return fetch(`/thirdeye/entity?entityType=DETECTION_CONFIG`, {method: 'POST', body: jsonString})
       .then(checkStatus)
       .then(res => set(this, 'output', `saved '${detectionConfigBean.name}' as id ${res}`))
@@ -138,8 +136,23 @@ export default Controller.extend({
   },
 
   _metricUrnToId(metricUrn) {
-    // return metricUrn.substring(16, metricUrn.indexOf(':', 16));
     return metricUrn.split(':')[2];
+  },
+
+  _updateFilters() {
+    const filters = this.get('selectedFilters');
+    const metricsProperties = get(this, 'metricsProperties');
+    const filterMap = JSON.parse(filters);
+    Object.keys(metricsProperties).forEach(function (key) {
+      const metricProperty = metricsProperties[key];
+      let metricUrn = "thirdeye:metric:" + metricProperty['id'];
+      Object.keys(filterMap).forEach(function (key) {
+        filterMap[key].forEach(function (value) {
+          metricUrn = metricUrn + ":" + key + "=" + value;
+        })
+      });
+      metricsProperties[key]['urn'] = metricUrn;
+    });
   },
 
   _datasetNameChanged() {
@@ -183,34 +196,23 @@ export default Controller.extend({
     },
 
     onChangeValue(property, value) {
-      const metricsProperties = get(this, 'metricsProperties');
       this.set(property, value);
-      Object.keys(metricsProperties).forEach(function (key) {
-        metricsProperties[key][property] = value;
-      });
     },
 
     onFilters(filters) {
       this.set('selectedFilters', filters);
-      const metricsProperties = get(this, 'metricsProperties');
-      const filterMap = JSON.parse(filters);
-      Object.keys(metricsProperties).forEach(function (key) {
-        const metricProperty = metricsProperties[key];
-        let metricUrn = "thirdeye:metric:" + metricProperty['id'];
-        Object.keys(filterMap).forEach(function (key) {
-          filterMap[key].forEach(function (value) {
-            metricUrn = metricUrn + ":" + key + "=" + value;
-          })
-        });
-        metricsProperties[key]['urn'] = metricUrn;
-      });
+      this._updateFilters();
     },
 
     onSubmit() {
       const metricsProperties = get(this, 'metricsProperties');
       const nestedProperties = [];
       const selectedMetric = this.get('selectedMetric');
-      const selectedDimensions = this.get('selectedDimensions');
+      const detectionConfigId = this.get('detectionConfigId');
+      const selectedDimensions = JSON.parse(this.get('selectedDimensions'));
+      const topk = this.get('topk');
+      const minvalue = this.get('minvalue');
+      const mincontribution = this.get('mincontribution');
       Object.keys(metricsProperties).forEach(function (key) {
         const properties = metricsProperties[key];
         if (!properties['monitor']) {
@@ -234,18 +236,17 @@ export default Controller.extend({
           detectionConfig['metricUrn'] = metricsProperties[selectedMetric]['urn'];
           detectionConfig['nestedMetricUrn'] = properties['urn'];
         }
-
         if (selectedDimensions != null) {
           detectionConfig['dimensions'] = selectedDimensions['dimensions'];
         }
-        if (properties['topk']) {
-          detectionConfig['k'] = parseInt(properties['topk']);
+        if (topk != null) {
+          detectionConfig['k'] = parseInt(topk);
         }
-        if (properties['minvalue']) {
-          detectionConfig['minValue'] = parseFloat(properties['minvalue']);
+        if (minvalue != null) {
+          detectionConfig['minValue'] = parseFloat(minvalue);
         }
-        if (properties['mincontribution']) {
-          detectionConfig['minContribution'] = parseFloat(properties['mincontribution']);
+        if (mincontribution != null) {
+          detectionConfig['minContribution'] = parseFloat(mincontribution);
         }
         nestedProperties.push(detectionConfig);
       });
@@ -259,6 +260,9 @@ export default Controller.extend({
         }
       };
 
+      if (detectionConfigId != null) {
+        configResult['id'] = detectionConfigId;
+      }
       this._writeDetectionConfig(configResult);
     },
 
