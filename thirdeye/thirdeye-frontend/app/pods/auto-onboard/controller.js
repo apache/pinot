@@ -27,6 +27,8 @@ export default Controller.extend({
 
   datasetName: null,
 
+  datasets: [],
+
   dimensions: null,
 
   selectedMetric: null,
@@ -187,7 +189,9 @@ export default Controller.extend({
   },
 
   actions: {
-    onSave() {
+    onSave(dataset) {
+      console.log(dataset);
+      this.set('datasetName', dataset);
       this._datasetNameChanged();
     },
 
@@ -277,6 +281,19 @@ export default Controller.extend({
 
     onSelectMetric(name) {
       this.set('selectedMetric', name);
+    },
+
+    onLoadDatasets() {
+      const url = `/thirdeye/entity/DATASET_CONFIG`;
+      return fetch(url)
+        .then(res => res.json())
+        .then(res => {
+          const datasets = res.reduce(function (obj, datasetConfig) {
+            obj.push(datasetConfig['dataset']);
+            return obj;
+          }, []);
+          this.set('datasets', datasets);
+        });
     }
   }
 });

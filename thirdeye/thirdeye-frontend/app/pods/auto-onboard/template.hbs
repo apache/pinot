@@ -1,12 +1,24 @@
 <div class="container">
   <h3>Dataset auto onboard</h3>
 
-  <div class="row">
-    <div class="col-xs-6">
-      <label>Dataset Name</label>{{input value=datasetName}}
-      <button onClick={{action "onSave"}}>save</button>
-    </div>
-  </div>
+
+  {{#power-select
+    classNames="te-input"
+    options=datasets
+    selected=datasetName
+    onchange=(action "onSave")
+    onopen=(action "onLoadDatasets")
+    loadingMessage="Waiting for the server...."
+    placeholder="Choose dataset to onboard"
+    searchPlaceholder="Type to filter..."
+    triggerId="select-dataset"
+    triggerClass="te-form__select"
+    disabled=false
+  as |dataset|
+  }}
+    {{dataset}}
+  {{/power-select}}
+
 
   {{#if metricUrn}}
 
@@ -16,13 +28,15 @@
       </label>
     </div>
 
-    <div class="row">
-      <div class="col-xs-6">
-        <input type="text"
-               value={{detectionConfigName}}
-               onChange={{action "onChangeName" value="target.value"}}/>
-      </div>
-    </div>
+    {{input
+      type="text"
+      id="anomaly-form-function-name"
+      class="form-control te-input te-input--read-only"
+      placeholder="Add a descriptive name"
+      value=detectionConfigName
+      key-up=(action "onChangeName" detectionConfigName)
+    }}
+
 
     <div class="row">
       <label class="control-label te-label te-label--taller">
@@ -107,29 +121,33 @@
     {{/power-select}}
 
 
+  <div class="col-xs-4">
     <label class="control-label te-label te-label--taller">
       Explore top k dimensions:
     </label>
-
     <input type="text"
            value={{topk}}
-           onChange={{action (action "onChangeValue" "topk") value="target.value"}}/>
+             onChange={{action (action "onChangeValue" "topk") value="target.value"}}/>
+  </div>
 
+  <div class="col-xs-4">
     <label class="control-label te-label te-label--taller">
       Min value:
     </label>
-
     <input type="text"
            value={{minValue}}
            onChange={{action (action "onChangeValue" "minValue") value="target.value"}}/>
 
+  </div>
+
+  <div class="col-xs-4">
     <label class="control-label te-label te-label--taller">
       Min contribution:
     </label>
-
     <input type="text"
            value={{minContribution}}
            onChange={{action (action "onChangeValue" "minContribution") value="target.value"}}/>
+  </div>
 
   <div class="row">
     <button onClick={{action "onSubmit"}}>submit</button>
