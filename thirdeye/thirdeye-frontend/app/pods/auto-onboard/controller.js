@@ -2,6 +2,7 @@ import {observer, computed, set, get} from '@ember/object';
 import {later, debounce} from '@ember/runloop';
 import {reads, gt, or} from '@ember/object/computed';
 import Controller from '@ember/controller';
+import { task, timeout } from 'ember-concurrency';
 import {
   filterObject,
   filterPrefix,
@@ -28,10 +29,6 @@ export default Controller.extend({
 
   dimensions: null,
 
-  selectedDimensions: '{}',
-
-  selectedFilters: '{}',
-
   selectedMetric: null,
 
   filterOptions: {},
@@ -56,7 +53,15 @@ export default Controller.extend({
 
   idToNames: {},
 
+  selectedDimensions: '{}',
+
+  selectedFilters: '{}',
+
   queryParams: ['detectionId'],
+
+  generalFieldsEnabled: computed.or('dimensions'),
+
+  metricsFieldEnabled: computed.or('metrics'),
 
   hasDetectionId: observer('detectionId', function () {
     const detectionId = this.get('detectionId');
@@ -122,10 +127,6 @@ export default Controller.extend({
       })
       .catch(error => console.error(`Fetch Error =\n`, error))
   }),
-
-  generalFieldsEnabled: computed.or('dimensions'),
-
-  metricsFieldEnabled: computed.or('metrics'),
 
   _writeDetectionConfig(detectionConfigBean) {
     const jsonString = JSON.stringify(detectionConfigBean);
