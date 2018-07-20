@@ -19,6 +19,7 @@
     <div class="row">
       <div class="col-xs-6">
         <input type="text"
+               value={{detectionConfigName}}
                onChange={{action "onChangeName" value="target.value"}}/>
       </div>
     </div>
@@ -30,15 +31,15 @@
     </div>
 
 
-  {{#each metrics as |metric|}}
+  {{#each-in metricsProperties as |name metric|}}
     <div>
-        {{metric}}
+        {{name}}
         <input type="checkbox"
-               checked=checkboxDefault
-               onclick={{action "toggleCheckBox" metric}}/>
+               checked={{metric.monitor}}
+               onclick={{action "toggleCheckBox" name}}/>
     </div>
 
-  {{/each}}
+  {{/each-in}}
     <div class="row">
       <label class="control-label te-label te-label--taller">
         Filter metric by(Optional):
@@ -47,6 +48,8 @@
 
     {{filter-select
       options=filterOptions
+      selected=selectedFilters
+      triggerId="select-filters"
       onChange=(action "onFilters")
     }}
 
@@ -62,7 +65,9 @@
       </label>
 
     {{filter-select
+      selected=selectedDimensions
       options=dimensions
+      triggerId="select-dimensions"
       onChange=(action "onSelectDimension")
     }}
 
@@ -107,6 +112,7 @@
     </label>
 
     <input type="text"
+           value={{topk}}
            onChange={{action (action "onChangeValue" "topk") value="target.value"}}/>
 
     <label class="control-label te-label te-label--taller">
@@ -114,6 +120,7 @@
     </label>
 
     <input type="text"
+           value={{minvalue}}
            onChange={{action (action "onChangeValue" "minvalue") value="target.value"}}/>
 
     <label class="control-label te-label te-label--taller">
@@ -121,6 +128,7 @@
     </label>
 
     <input type="text"
+           value={{mincontribution}}
            onChange={{action (action "onChangeValue" "mincontribution") value="target.value"}}/>
 
   <div class="row">
