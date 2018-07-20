@@ -18,13 +18,13 @@ import javax.ws.rs.core.Response;
 
 @Path("/dataset-auto-onboard")
 @Produces(MediaType.APPLICATION_JSON)
-public class DataSetAutoOnboardResource {
+public class DatasetAutoOnboardResource {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private final MetricConfigManager metricDAO;
   private final DetectionConfigManager detectionDAO;
   private final DatasetConfigManager datasetDAO;
 
-  public DataSetAutoOnboardResource() {
+  public DatasetAutoOnboardResource() {
     this.metricDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.detectionDAO = DAO_REGISTRY.getDetectionConfigManager();
     this.datasetDAO = DAO_REGISTRY.getDatasetConfigDAO();

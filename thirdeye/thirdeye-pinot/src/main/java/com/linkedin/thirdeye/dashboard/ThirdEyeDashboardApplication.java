@@ -54,7 +54,7 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.impl.RCAFrameworkLoader;
 import com.linkedin.thirdeye.tracking.RequestStatisticsLogger;
-import com.linkedin.thirdeye.dataset.DataSetAutoOnboardResource;
+import com.linkedin.thirdeye.dataset.DatasetAutoOnboardResource;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.auth.Authenticator;
 import io.dropwizard.auth.CachingAuthenticator;
@@ -133,7 +133,7 @@ public class ThirdEyeDashboardApplication
     AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
     AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
 
-    env.jersey().register(new DataSetAutoOnboardResource());
+    env.jersey().register(new DatasetAutoOnboardResource());
     env.jersey().register(new DashboardResource());
     env.jersey().register(new CacheResource());
     env.jersey().register(new AnomalyResource(anomalyFunctionFactory, alertFilterFactory));
