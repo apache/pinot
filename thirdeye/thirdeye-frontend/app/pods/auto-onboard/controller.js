@@ -50,9 +50,9 @@ export default Controller.extend({
 
   topk: null,
 
-  mincontribution: null,
+  minContribution: null,
 
-  minvalue: null,
+  minValue: null,
 
   idToNames: {},
 
@@ -68,8 +68,8 @@ export default Controller.extend({
         this.set('detectionConfigId', res['id']);
         this.set('detectionConfigName', res['name']);
         this.set('topk', nestedProperties[0]['k']);
-        this.set('minvalue', nestedProperties[0]['minValue']);
-        this.set('mincontribution', nestedProperties[0]['minContribution']);
+        this.set('minValue', nestedProperties[0]['minValue']);
+        this.set('minContribution', nestedProperties[0]['minContribution']);
         this.set('datasetName', res['properties']['datasetName']);
 
         this._datasetNameChanged().then(res => {
@@ -86,7 +86,7 @@ export default Controller.extend({
           // fill in filters
           let urnPieces = nestedProperties[0]['metricUrn'].split(':');
           const filters = {};
-          var i;
+          let i;
           for (i = 3; i < urnPieces.length; i++) {
             const filter = urnPieces[i].split('=');
             if (filter[0] in filters) {
@@ -211,8 +211,8 @@ export default Controller.extend({
       const detectionConfigId = this.get('detectionConfigId');
       const selectedDimensions = JSON.parse(this.get('selectedDimensions'));
       const topk = this.get('topk');
-      const minvalue = this.get('minvalue');
-      const mincontribution = this.get('mincontribution');
+      const minValue = this.get('minValue');
+      const minContribution = this.get('minContribution');
       Object.keys(metricsProperties).forEach(function (key) {
         const properties = metricsProperties[key];
         if (!properties['monitor']) {
@@ -242,11 +242,11 @@ export default Controller.extend({
         if (topk != null) {
           detectionConfig['k'] = parseInt(topk);
         }
-        if (minvalue != null) {
-          detectionConfig['minValue'] = parseFloat(minvalue);
+        if (minValue != null) {
+          detectionConfig['minValue'] = parseFloat(minValue);
         }
-        if (mincontribution != null) {
-          detectionConfig['minContribution'] = parseFloat(mincontribution);
+        if (minContribution != null) {
+          detectionConfig['minContribution'] = parseFloat(minContribution);
         }
         nestedProperties.push(detectionConfig);
       });
