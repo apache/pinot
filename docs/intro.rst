@@ -1,8 +1,4 @@
 Introduction
 ============
 
-Test?
 
-```
-what?
-```

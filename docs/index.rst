@@ -12,6 +12,15 @@ Contents:
    :maxdepth: 2
 
    intro
+   trying_pinot
+
+Reference:
+
+.. toctree::
+   :maxdepth: 2
+
+   in_production
+   reference
 
 
 
