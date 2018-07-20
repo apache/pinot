@@ -32,9 +32,8 @@ public class DatasetAutoOnboardResource {
 
   @GET
   @Path("/metrics")
-  public Response detectionPreview(@QueryParam("dataset") String dataSet) {
-    List<MetricConfigDTO> metrics = this.metricDAO.findByDataset(dataSet);
-    return Response.ok(metrics).build();
+  public List<MetricConfigDTO> detectionPreview(@QueryParam("dataset") String dataSet) {
+    return this.metricDAO.findByDataset(dataSet);
   }
 
   @GET

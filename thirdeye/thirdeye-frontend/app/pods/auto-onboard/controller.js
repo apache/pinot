@@ -175,7 +175,6 @@ export default Controller.extend({
 
   actions: {
     onSave(dataset) {
-      console.log(dataset);
       this.set('datasetName', dataset);
       this._datasetNameChanged();
     },
