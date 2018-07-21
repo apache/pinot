@@ -49,6 +49,7 @@ public class SegmentCreationJob extends Configured {
 
   private static final String PATH_TO_DEPS_JAR = "path.to.deps.jar";
   private static final String TEMP = "temp";
+  private static final String APPEND = "APPEND";
 
   private final String _jobName;
   private final Properties _properties;
@@ -223,6 +224,8 @@ public class SegmentCreationJob extends Configured {
 
     // Fetch table config from controller API
     TableConfig tableConfig = controllerRestApiObject.getTableConfig();
+    job.getConfiguration().set(JobConfigConstants.TABLE_CONFIG, tableConfig.toJSONConfigString());
+
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     if (validationConfig == null) {
       throw new RuntimeException(
@@ -239,7 +242,7 @@ public class SegmentCreationJob extends Configured {
     // Update table push type
     job.getConfiguration().set(JobConfigConstants.TABLE_PUSH_TYPE, segmentPushType);
 
-    if (segmentPushType.equalsIgnoreCase(TableConfigConstants.APPEND)) {
+    if (segmentPushType.equalsIgnoreCase(APPEND)) {
       // For append use cases, timeColumnName and timeType must be set
       String timeColumnName = validationConfig.getTimeColumnName();
       String timeColumnType = validationConfig.getTimeType();
