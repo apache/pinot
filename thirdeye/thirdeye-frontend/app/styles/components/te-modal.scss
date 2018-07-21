@@ -125,7 +125,11 @@
 
   &__input {
     // this is needed to force similar styling
-    padding-left: $te-spacing--sm !important; 
+    padding-left: $te-spacing--sm !important;
+
+    &--fullwidth {
+      width: 100%;
+    }
   }
 
   &__label-wrapper {

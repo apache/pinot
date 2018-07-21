@@ -1,0 +1,174 @@
+{{#te-modal
+  headerText="Manage Subscription Groups"
+  isShowingModal=showManageGroupsModal
+  cancelAction=(action "onCancel")
+  submitAction=(action "onSubmit")
+  hasFooter=true
+}}
+
+  {{#if message}}
+    <div class="row te-modal__settings">
+      <div class="col-md-2">
+        <span class="te-label te-label--bold te-label--dark"></span>
+      </div>
+      <div class="col-md-10">
+        {{message}}
+      </div>
+    </div>
+  {{/if}}
+
+  <div class="row te-modal__settings">
+    <div class="col-md-2">
+      <span class="te-label te-label--bold te-label--dark">Select Application</span>
+    </div>
+    <div class="col-md-10">
+      {{#power-select
+        class="te-modal__input"
+        triggerClass="te-modal__filter-select te-modal__filter-select--flushed"
+        selected=applicationOptionSelected
+        options=applicationOptions
+        renderInPlace=true
+        searchField="name"
+        triggerId="application-selection"
+        placeholder="Select application"
+        onchange=(action "onApplication")
+      as |option|
+      }}
+        {{option.name}}
+      {{/power-select}}
+    </div>
+  </div>
+
+  <div class="row te-modal__settings">
+    <div class="col-md-2">
+      <span class="te-label te-label--bold te-label--dark">Select Group</span>
+    </div>
+    <div class="col-md-9">
+      {{#power-select
+        triggerClass="te-modal__filter-select te-modal__filter-select--flushed"
+        selected=group
+        options=groupOptions
+        searchField="name"
+        renderInPlace=true
+        triggerId="group-selection"
+        placeholder="Search subscription group"
+        disabled=cannotSelect
+        onchange=(action "onGroup")
+      as |group|
+      }}
+        {{group.name}}
+      {{/power-select}}
+    </div>
+    <div class="col-md-1">
+      <button id="button-new" onclick={{action "onCopy"}} disabled={{cannotEdit}}>Copy</button>
+    </div>
+  </div>
+
+  <hr/>
+
+  <div class="row te-modal__settings">
+    <div class="col-md-2">
+      <span class="te-label te-label--bold te-label--dark">Group name / subject</span>
+    </div>
+    <div class="col-md-10">
+      {{input
+        type="text"
+        id="name"
+        value=group.name
+        placeholder="My Email Subject"
+        class="te-modal__input te-modal__input--fullwidth"
+        disabled=cannotEdit
+     }}
+    </div>
+  </div>
+
+  <div class="row te-modal__settings">
+    <div class="col-md-2">
+      <span class="te-label te-label--bold te-label--dark">FunctionIds</span>
+    </div>
+    <div class="col-md-10">
+      {{#power-select-multiple
+        triggerClass="te-modal__filter-select te-modal__filter-select--flushed"
+        selected=functionOptionsSelected
+        options=functionOptions
+        renderInPlace=true
+        searchField="name"
+        triggerId="function-selection"
+        disabled=cannotEdit
+        onchange=(action "onFunctionIds")
+      as |option|
+      }}
+        {{option.name}}
+      {{/power-select-multiple}}
+    </div>
+  </div>
+
+  <div class="row te-modal__settings">
+    <div class="col-md-2">
+      <span class="te-label te-label--bold te-label--dark">Schedule</span>
+    </div>
+    <div class="col-md-10">
+      {{#power-select
+        triggerClass="te-modal__filter-select te-modal__filter-select--flushed"
+        selected=cronOptionSelected
+        options=cronOptions
+        renderInPlace=true
+        searchEnabled=false
+        triggerId="cron-selection"
+        disabled=cannotEdit
+        onchange=(action "onCron")
+      as |option|
+      }}
+        {{option.name}}
+      {{/power-select}}
+    </div>
+  </div>
+
+  <div class="row te-modal__settings">
+    <div class="col-md-2">
+      <span class="te-label te-label--bold te-label--dark">Enabled</span>
+    </div>
+    <div class="col-md-10">
+      {{input
+        type="checkbox"
+        id="active"
+        checked=group.active
+        class="te-modal__input te-modal__input--fullwidth"
+        disabled=cannotEdit
+      }}
+    </div>
+  </div>
+
+  <div class="row te-modal__settings">
+    <div class="col-md-2">
+      <span class="te-label te-label--bold te-label--dark">Sender</span>
+    </div>
+    <div class="col-md-10">
+      {{input
+        type="text"
+        id="from-address"
+        value=group.fromAddress
+        placeholder="me@example.org"
+        class="te-modal__input te-modal__input--fullwidth"
+        disabled=cannotEdit
+      }}
+    </div>
+  </div>
+
+  <div class="row te-modal__settings">
+    <div class="col-md-2">
+      <span class="te-label te-label--bold te-label--dark">Recipients</span>
+    </div>
+    <div class="col-md-10">
+      {{input
+        type="text"
+        id="recipients"
+        value=groupRecipients
+        placeholder="recipient@example.org, other@example.org"
+        class="te-modal__input te-modal__input--fullwidth"
+        disabled=cannotEdit
+        change=(action "onRecipients")
+      }}
+    </div>
+  </div>
+{{/te-modal}}
