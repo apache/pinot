@@ -522,7 +522,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       case STRING:
       case BYTES:
         indexCreator =
-            new SingleValueVarByteRawIndexCreator(file, compressionType, column, FieldSpec.DataType.BYTES, totalDocs, lengthOfLongestEntry);
+            new SingleValueVarByteRawIndexCreator(file, compressionType, column, totalDocs, lengthOfLongestEntry);
         break;
 
       default:

@@ -16,8 +16,6 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
-import com.linkedin.pinot.core.segment.memory.PinotByteBuffer;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -28,11 +26,13 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
+import com.linkedin.pinot.core.segment.memory.PinotByteBuffer;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.operator.blocks.SingleValueBlock;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 
 
@@ -53,11 +53,14 @@ public class StarTreeV2AggfuncColumnPairDataSource extends DataSource {
     _operatorName = "ColumnDataSource [" + columnName + "]";
 
     if (dataType.equals(FieldSpec.DataType.BYTES)) {
-      PinotDataBuffer buffer = PinotByteBuffer.fromFile(_columnDataFile, start, size, ReadMode.mmap, FileChannel.MapMode.READ_WRITE, "testing");
+      PinotDataBuffer buffer =
+          PinotByteBuffer.fromFile(_columnDataFile, start, size, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
+              "testing");
       _forwardIndex = new VarByteChunkSingleValueReader(buffer);
-
     } else {
-      PinotDataBuffer buffer = PinotDataBuffer.fromFile(_columnDataFile, start, size, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "testing");
+      PinotDataBuffer buffer =
+          PinotDataBuffer.fromFile(_columnDataFile, start, size, ReadMode.mmap, FileChannel.MapMode.READ_ONLY,
+              "testing");
       _forwardIndex = new FixedByteChunkSingleValueReader(buffer);
     }
     _numDocs = numDocs;

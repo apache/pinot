@@ -127,7 +127,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     _metricsSpecMap = new HashMap<>();
     _aggfunColumnPairs = config.getMetric2aggFuncPairs();
     _aggfunColumnPairsCount = _aggfunColumnPairs.size();
-    List<String>_aggfunColumnPairsStringList = new ArrayList<>();
+    List<String> _aggfunColumnPairsStringList = new ArrayList<>();
     for (AggfunColumnPair pair : _aggfunColumnPairs) {
       _metricsName.add(pair.getColumnName());
       _aggfunColumnPairsStringList.add(pair.getAggregatefunction() + '_' + pair.getColumnName());
@@ -188,7 +188,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
     // gathering metric column reader
     Map<String, PinotSegmentColumnReader> metricColumnReaders = new HashMap<>();
-    for (String metricName: _metricsSpecMap.keySet()) {
+    for (String metricName : _metricsSpecMap.keySet()) {
       PinotSegmentColumnReader columnReader = new PinotSegmentColumnReader(_immutableSegment, metricName);
       metricColumnReaders.put(metricName, columnReader);
     }
@@ -334,12 +334,12 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
     // 'SingleValueRawIndexCreator' for metrics
     for (AggfunColumnPair pair : _aggfunColumnPairs) {
-      String columnName = pair._aggregatefunction  + '_' + pair._columnName;
+      String columnName = pair._aggregatefunction + '_' + pair._columnName;
       AggregationFunction function = _aggregationFunctionFactory.getAggregationFunction(pair._aggregatefunction);
 
       SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(_outDir,
-            ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getDataType(), _starTreeData.size(),
-            function.getEntrySize());
+          ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getDataType(), _starTreeData.size(),
+          function.getEntrySize());
       _metricForwardIndexCreatorList.add(rawIndexCreator);
     }
 
@@ -360,7 +360,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
         AggfunColumnPair pair = _aggfunColumnPairs.get(j);
         AggregationFunction function = _aggregationFunctionFactory.getAggregationFunction(pair._aggregatefunction);
         if (function.getDataType().equals(FieldSpec.DataType.BYTES)) {
-          ((SingleValueRawIndexCreator) _metricForwardIndexCreatorList.get(j)).index(i, function.serialize(metric.get(j)));
+          ((SingleValueRawIndexCreator) _metricForwardIndexCreatorList.get(j)).index(i,
+              function.serialize(metric.get(j)));
         } else {
           ((SingleValueRawIndexCreator) _metricForwardIndexCreatorList.get(j)).index(i, metric.get(j));
         }
