@@ -24,7 +24,6 @@ import io.netty.util.HashedWheelTimer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import jdk.nashorn.internal.ir.annotations.Ignore;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -85,9 +84,14 @@ public class NettyCloseChannelTest {
 
   /**
    * Client sends a request. Server closes the channel.
+   * This test sometimes fails only in Travis because the hardware who run this test may not have sufficient cores to be assigned to all the threads at a time.
+   * The reason why this test can be ignored is the purpose of this test is to test the response is null when the server connection gets closed.
+   * Whereas because of the hardware in Travis, threads in worker group may still get the request and thus cannot be closed in time.
+   * The expected behavior is that response is null but it's still acceptable when this response isn't null, i.e. getting a real response.
+   * And users won't have any big effect when getting a non-null response. What's more, discussed with Jackie offline, this part of code will be rewritten in the near future.
+   * So for now it's ok to just ignore this test.
    */
-  @Test
-  @Ignore
+  @Test(enabled = false)
   public void testCloseServerChannel()
       throws Exception {
     Assert.assertTrue(_nettyTCPClientConnection.connect());
