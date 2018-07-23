@@ -1,6 +1,4 @@
 import {observer, computed, set, get} from '@ember/object';
-import {later, debounce} from '@ember/runloop';
-import {reads, gt, or} from '@ember/object/computed';
 import Controller from '@ember/controller';
 import {checkStatus} from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
@@ -12,17 +10,17 @@ export default Controller.extend({
 
   datasetName: null,
 
-  datasets: [],
+  datasets: null,
 
   dimensions: null,
 
   selectedMetric: null,
 
-  filterOptions: {},
+  filterOptions: null,
 
   metrics: null,
 
-  metricsProperties: {},
+  metricsProperties: null,
 
   metricUrn: null,
 
@@ -38,7 +36,7 @@ export default Controller.extend({
 
   minValue: null,
 
-  idToNames: {},
+  idToNames: null,
 
   selectedDimensions: '{}',
 
@@ -112,7 +110,7 @@ export default Controller.extend({
           this.set('selectedMetric', idToNames[this._metricUrnToId(dimensionBreakdownUrn)]);
         });
       })
-      .catch(error => console.error(`Fetch Error =\n`, error))
+      .catch(error => this.set('output', "fail to load detection config. " + error.message));
   }),
 
   _writeDetectionConfig(detectionConfigBean) {
@@ -137,7 +135,7 @@ export default Controller.extend({
       Object.keys(filterMap).forEach(function (key) {
         filterMap[key].forEach(function (value) {
           metricUrn = metricUrn + ":" + key + "=" + value;
-        })
+        });
       });
       metricsProperties[key]['urn'] = metricUrn;
     });
@@ -168,9 +166,9 @@ export default Controller.extend({
           .then(res => {
             this.set('filterOptions', res);
             this.set('dimensions', {dimensions: Object.keys(res)});
-          })
+          });
       })
-      .catch(error => console.error(`Fetch Error =\n`, error));
+      .catch(error => this.set('output', error));
   },
 
   actions: {
