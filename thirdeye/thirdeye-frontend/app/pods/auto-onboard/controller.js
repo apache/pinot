@@ -48,19 +48,23 @@ export default Controller.extend({
 
   metricsFieldEnabled: computed.or('metrics'),
 
+  // TODO: replace with ember data
   hasDetectionId: observer('detectionId', function () {
     const detectionId = this.get('detectionId');
     fetch(`/dataset-auto-onboard/` + detectionId)
       .then(res => res.json())
       .then(res => {
-        const nestedProperties = res['properties']['nested'];
+        const property = res['properties']['nested'][0];
+
         // fill in values:
-        this.set('detectionConfigId', res['id']);
-        this.set('detectionConfigName', res['name']);
-        this.set('topk', nestedProperties[0]['k']);
-        this.set('minValue', nestedProperties[0]['minValue']);
-        this.set('minContribution', nestedProperties[0]['minContribution']);
-        this.set('datasetName', res['properties']['datasetName']);
+        this.setProperties({
+          detectionConfigId: res['id'],
+          detectionConfigName: res['name'],
+          topk: property['k'],
+          minValue: property['minValue'],
+          minContribution: property['minContribution'],
+          datasetName: res['properties']['datasetName']
+        });
 
         this._datasetNameChanged().then(res => {
 
@@ -70,11 +74,11 @@ export default Controller.extend({
 
           // fill in dimensions
           this.set('selectedDimensions', JSON.stringify({
-            'dimensions': nestedProperties[0]['dimensions']
+            'dimensions': property['dimensions']
           }));
 
           // fill in filters
-          let urnPieces = nestedProperties[0]['metricUrn'].split(':');
+          let urnPieces = property['metricUrn'].split(':');
           const filters = {};
           let i;
           for (i = 3; i < urnPieces.length; i++) {
@@ -87,6 +91,7 @@ export default Controller.extend({
           }
           this.set('selectedFilters', JSON.stringify(filters));
           this._updateFilters();
+
           // fill in selected metrics
           const metricIds = nestedProperties.reduce(function (obj, property) {
             let urn;
@@ -113,6 +118,7 @@ export default Controller.extend({
       .catch(error => this.set('output', "fail to load detection config. " + error.message));
   }),
 
+  // TODO: replace with ember data
   _writeDetectionConfig(detectionConfigBean) {
     const jsonString = JSON.stringify(detectionConfigBean);
     return fetch(`/thirdeye/entity?entityType=DETECTION_CONFIG`, {method: 'POST', body: jsonString})
@@ -141,6 +147,7 @@ export default Controller.extend({
     });
   },
 
+  // TODO: replace with ember data
   _datasetNameChanged() {
     const url = `/dataset-auto-onboard/metrics?dataset=` + get(this, 'datasetName');
     return fetch(url)
@@ -164,8 +171,10 @@ export default Controller.extend({
         fetch(`/data/autocomplete/filters/metric/${metricUrn}`)
           .then(checkStatus)
           .then(res => {
-            this.set('filterOptions', res);
-            this.set('dimensions', {dimensions: Object.keys(res)});
+            this.setProperties({
+              filterOptions: res,
+              dimensions: {dimensions: Object.keys(res)}
+            });
           });
       })
       .catch(error => this.set('output', error));
@@ -206,12 +215,12 @@ export default Controller.extend({
           return;
         }
         const detectionConfig = {
-          className: "com.linkedin.thirdeye.detection.algorithm.DimensionWrapper", nested: [{
-            className: "com.linkedin.thirdeye.detection.algorithm.MovingWindowAlgorithm",
+          className: 'com.linkedin.thirdeye.detection.algorithm.DimensionWrapper', nested: [{
+            className: 'com.linkedin.thirdeye.detection.algorithm.MovingWindowAlgorithm',
             baselineWeeks: 4,
-            windowSize: "4 weeks",
-            changeDuration: "7d",
-            outlierDuration: "12h",
+            windowSize: '4 weeks',
+            changeDuration: '7d',
+            outlierDuration: '12h',
             aucMin: -10,
             zscoreMin: -4,
             zscoreMax: 4
@@ -239,7 +248,8 @@ export default Controller.extend({
       });
 
       const configResult = {
-        "cron": "45 10/15 * * * ? *", "name": get(this, 'detectionConfigName'), "lastTimestamp": 0, "properties": {
+        "cron": "45 10/15 * * * ? *", "name": get(this, 'detectionConfigName'), "lastTimestamp": 0,
+        "properties": {
           "className": "com.linkedin.thirdeye.detection.algorithm.MergeWrapper",
           "maxGap": 7200000,
           "nested": nestedProperties,

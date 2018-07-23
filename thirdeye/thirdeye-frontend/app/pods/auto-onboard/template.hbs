@@ -1,7 +1,5 @@
 <div class="container">
   <h3>Dataset auto onboard</h3>
-
-
   {{#power-select
     classNames="te-input"
     options=datasets
@@ -18,16 +16,12 @@
   }}
     {{dataset}}
   {{/power-select}}
-
-
   {{#if metricUrn}}
-
     <div class="row">
       <label class="control-label te-label te-label--taller">
         Detection Name:
       </label>
     </div>
-
     {{input
       type="text"
       id="anomaly-form-function-name"
@@ -36,15 +30,11 @@
       value=detectionConfigName
       key-up=(action "onChangeName" detectionConfigName)
     }}
-
-
     <div class="row">
       <label class="control-label te-label te-label--taller">
         Choose the metrics:
       </label>
     </div>
-
-
     {{#each-in metricsProperties as |name metric|}}
       <div>
         {{name}}
@@ -52,7 +42,6 @@
                checked={{metric.monitor}}
                  onclick={{action "toggleCheckBox" name}}/>
       </div>
-
     {{/each-in}}
     <div class="row">
       <label class="control-label te-label te-label--taller">
@@ -65,14 +54,12 @@
         </span>
       </label>
     </div>
-
     {{filter-select
       options=filterOptions
       selected=selectedFilters
       triggerId="select-filters"
       onChange=(action "onFilters")
     }}
-
     <div class="row">
       <label for="select-dimension" class="control-label te-label te-label--taller">
         Create an alert for each dimension value in: (optional)
@@ -83,17 +70,13 @@
           {{/tooltip-on-element}}
         </span>
       </label>
-
       {{filter-select
         selected=selectedDimensions
         options=dimensions
         triggerId="select-dimensions"
         onChange=(action "onSelectDimension")
       }}
-
     </div>
-
-
     <div class="row">
       <label class="control-label te-label te-label--taller">
         Set up the business rules(Optional):
@@ -105,10 +88,8 @@
         </span>
       </label>
     </div>
-
     <label for="select-dimension" class="control-label te-label te-label--taller">
       Metric used in dimension breakdown
-
     </label>
     {{#power-select
       classNames="te-input"
@@ -125,8 +106,6 @@
     }}
       {{metric}}
     {{/power-select}}
-
-
     <div class="col-xs-4">
       <label class="control-label te-label te-label--taller">
         Explore top k dimensions:
@@ -135,7 +114,6 @@
              value={{topk}}
                onChange={{action (action "onChangeValue" "topk") value="target.value"}}/>
     </div>
-
     <div class="col-xs-4">
       <label class="control-label te-label te-label--taller">
         Min value:
@@ -143,9 +121,7 @@
       <input type="text"
              value={{minValue}}
                onChange={{action (action "onChangeValue" "minValue") value="target.value"}}/>
-
     </div>
-
     <div class="col-xs-4">
       <label class="control-label te-label te-label--taller">
         Min contribution:
@@ -154,15 +130,11 @@
              value={{minContribution}}
                onChange={{action (action "onChangeValue" "minContribution") value="target.value"}}/>
     </div>
-
     <div class="row">
       <button onClick={{action "onSubmit"}}>submit</button>
     </div>
-
   {{/if}}
-
   <div class="row">
     {{output}}
   </div>
-
 </div>
