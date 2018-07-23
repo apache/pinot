@@ -49,73 +49,69 @@ export default Controller.extend({
   metricsFieldEnabled: computed.or('metrics'),
 
   // TODO: replace with ember data
-  hasDetectionId: observer('detectionId', function () {
+  hasDetectionId: observer('detectionId', async function () {
     const detectionId = this.get('detectionId');
-    fetch(`/dataset-auto-onboard/` + detectionId)
-      .then(res => res.json())
-      .then(res => {
-        const property = res['properties']['nested'][0];
+    const res = await fetch(`/dataset-auto-onboard/` + detectionId).then(checkStatus);
+    const nestedProperties = res['properties']['nested'];
+    const nestedProperty = nestedProperties[0];
 
-        // fill in values:
-        this.setProperties({
-          detectionConfigId: res['id'],
-          detectionConfigName: res['name'],
-          topk: property['k'],
-          minValue: property['minValue'],
-          minContribution: property['minContribution'],
-          datasetName: res['properties']['datasetName']
-        });
+    // fill in values:
+    this.setProperties({
+      detectionConfigId: res['id'],
+      detectionConfigName: res['name'],
+      topk: nestedProperty['k'],
+      minValue: nestedProperty['minValue'],
+      minContribution: nestedProperty['minContribution'],
+      datasetName: res['properties']['datasetName']
+    });
 
-        this._datasetNameChanged().then(res => {
+    await this._datasetNameChanged();
 
-          let dimensionBreakdownUrn = null;
-          const idToNames = this.get('idToNames');
-          const metricsProperties = get(this, 'metricsProperties');
+    let dimensionBreakdownUrn = null;
+    const idToNames = this.get('idToNames');
+    const metricsProperties = get(this, 'metricsProperties');
 
-          // fill in dimensions
-          this.set('selectedDimensions', JSON.stringify({
-            'dimensions': property['dimensions']
-          }));
+    // fill in dimensions
+    this.set('selectedDimensions', JSON.stringify({
+      'dimensions': nestedProperty['dimensions']
+    }));
 
-          // fill in filters
-          let urnPieces = property['metricUrn'].split(':');
-          const filters = {};
-          let i;
-          for (i = 3; i < urnPieces.length; i++) {
-            const filter = urnPieces[i].split('=');
-            if (filter[0] in filters) {
-              filters[filter[0]].push(filter[1]);
-            } else {
-              filters[filter[0]] = [filter[1]];
-            }
-          }
-          this.set('selectedFilters', JSON.stringify(filters));
-          this._updateFilters();
+    // fill in filters
+    let urnPieces = nestedProperty['metricUrn'].split(':');
+    const filters = {};
+    let i;
+    for (i = 3; i < urnPieces.length; i++) {
+      const filter = urnPieces[i].split('=');
+      if (filter[0] in filters) {
+        filters[filter[0]].push(filter[1]);
+      } else {
+        filters[filter[0]] = [filter[1]];
+      }
+    }
+    this.set('selectedFilters', JSON.stringify(filters));
+    this._updateFilters();
 
-          // fill in selected metrics
-          const metricIds = nestedProperties.reduce(function (obj, property) {
-            let urn;
-            if ('nestedMetricUrn' in property) {
-              urn = property['nestedMetricUrn'];
-              dimensionBreakdownUrn = property['metricUrn'];
-            } else {
-              urn = property['metricUrn'];
-            }
-            obj.push(urn.split(':')[2]);
-            return obj;
-          }, []);
+    // fill in selected metrics
+    const metricIds = nestedProperties.reduce(function (obj, property) {
+      let urn;
+      if ('nestedMetricUrn' in property) {
+        urn = property['nestedMetricUrn'];
+        dimensionBreakdownUrn = property['metricUrn'];
+      } else {
+        urn = property['metricUrn'];
+      }
+      obj.push(urn.split(':')[2]);
+      return obj;
+    }, []);
 
-          Object.keys(metricsProperties).forEach(function (key) {
-            if (metricIds.indexOf(metricsProperties[key]['id'].toString()) == -1) {
-              set(metricsProperties[key], 'monitor', false);
-            }
-          });
+    Object.keys(metricsProperties).forEach(function (key) {
+      if (metricIds.indexOf(metricsProperties[key]['id'].toString()) == -1) {
+        set(metricsProperties[key], 'monitor', false);
+      }
+    });
 
-          // fill in dimension breakdown metric
-          this.set('selectedMetric', idToNames[this._metricUrnToId(dimensionBreakdownUrn)]);
-        });
-      })
-      .catch(error => this.set('output', "fail to load detection config. " + error.message));
+    // fill in dimension breakdown metric
+    this.set('selectedMetric', idToNames[this._metricUrnToId(dimensionBreakdownUrn)]);
   }),
 
   // TODO: replace with ember data
@@ -148,36 +144,33 @@ export default Controller.extend({
   },
 
   // TODO: replace with ember data
-  _datasetNameChanged() {
+  async _datasetNameChanged() {
     const url = `/dataset-auto-onboard/metrics?dataset=` + get(this, 'datasetName');
-    return fetch(url)
-      .then(res => res.json())
-      .then(res => this.set('metrics', res))
-      .then(res => this.set('metricsProperties', res.reduce(function (obj, metric) {
-        obj[metric["name"]] = {
-          "id": metric['id'], "urn": "thirdeye:metric:" + metric['id'], "monitor": true
-        };
-        return obj;
-      }, {})))
-      .then(res => {
-        this.set('metrics', Object.keys(res));
-        const metricUrn = res[Object.keys(res)[0]]['id'];
-        const idToNames = {};
-        Object.keys(res).forEach(function (key) {
-          idToNames[res[key]['id']] = key;
-        });
-        this.set('idToNames', idToNames);
-        this.set('metricUrn', metricUrn);
-        fetch(`/data/autocomplete/filters/metric/${metricUrn}`)
-          .then(checkStatus)
-          .then(res => {
-            this.setProperties({
-              filterOptions: res,
-              dimensions: {dimensions: Object.keys(res)}
-            });
-          });
-      })
-      .catch(error => this.set('output', error));
+    const res = await fetch(url).then(checkStatus);
+    const metricsProperties = res.reduce(function (obj, metric) {
+      obj[metric["name"]] = {
+        "id": metric['id'], "urn": "thirdeye:metric:" + metric['id'], "monitor": true
+      };
+      return obj;
+    }, {});
+    const metricUrn = metricsProperties[Object.keys(metricsProperties)[0]]['id'];
+    const idToNames = {};
+    Object.keys(metricsProperties).forEach(function (key) {
+      idToNames[metricsProperties[key]['id']] = key;
+    });
+
+    this.setProperties({
+      metricsProperties: metricsProperties,
+      metrics: Object.keys(metricsProperties),
+      idToNames: idToNames,
+      metricUrn: metricUrn
+    });
+
+    const result = await fetch(`/data/autocomplete/filters/metric/${metricUrn}`).then(checkStatus);
+
+    this.setProperties({
+      filterOptions: result, dimensions: {dimensions: Object.keys(result)}
+    });
   },
 
   actions: {
@@ -248,8 +241,7 @@ export default Controller.extend({
       });
 
       const configResult = {
-        "cron": "45 10/15 * * * ? *", "name": get(this, 'detectionConfigName'), "lastTimestamp": 0,
-        "properties": {
+        "cron": "45 10/15 * * * ? *", "name": get(this, 'detectionConfigName'), "lastTimestamp": 0, "properties": {
           "className": "com.linkedin.thirdeye.detection.algorithm.MergeWrapper",
           "maxGap": 7200000,
           "nested": nestedProperties,
@@ -275,17 +267,14 @@ export default Controller.extend({
       this.set('selectedMetric', name);
     },
 
-    onLoadDatasets() {
+    async onLoadDatasets() {
       const url = `/thirdeye/entity/DATASET_CONFIG`;
-      return fetch(url)
-        .then(res => res.json())
-        .then(res => {
-          const datasets = res.reduce(function (obj, datasetConfig) {
-            obj.push(datasetConfig['dataset']);
-            return obj;
-          }, []);
-          this.set('datasets', datasets);
-        });
+      const res = await fetch(url).then(checkStatus);
+      const datasets = res.reduce(function (obj, datasetConfig) {
+        obj.push(datasetConfig['dataset']);
+        return obj;
+      }, []);
+      this.set('datasets', datasets);
     }
   }
 });
