@@ -193,7 +193,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
        * simultaneously. Netty does not provide guarantees around this. So in worst case, the thread that
        * is flushing request could block for sometime and gets executed after the response is obtained.
        * We should checkin the connection to the pool only after all outstanding callbacks are complete.
-       * We do this by trancking the connection state. If we detect that response/error is already obtained,
+       * We do this by tracking the connection state. If we detect that response/error is already obtained,
        * we then do the process of checking back the connection to the pool or destroying (if error)
        */
       synchronized(_handler)
