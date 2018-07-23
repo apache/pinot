@@ -115,7 +115,7 @@ public class FixedByteChunkSingleValueReader extends BaseChunkSingleValueReader 
   public byte[] getBytes(int row) {
     if (!isCompressed()) {
       byte[] bytes = _reusableBytes.get();
-      getRawData().copyTo(row * _lengthOfLongestEntry, bytes);
+      getRawData().copyTo(row * _lengthOfLongestEntry, bytes, 0, _lengthOfLongestEntry);
       return bytes;
     } else {
       throw new UnsupportedOperationException("Read without context not supported for compressed data.");

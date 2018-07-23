@@ -172,7 +172,7 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
     final int length = getColumnSizes()[col];
     final byte[] dst = new byte[length];
     final int offset = computeOffset(row, col);
-    indexDataBuffer.copyTo(offset, dst);
+    indexDataBuffer.copyTo(offset, dst, 0, length);
     return dst;
   }
 

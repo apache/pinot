@@ -64,12 +64,16 @@ public class HllUtil {
     return b.toString();
   }
 
-  public static String convertHllToString(HyperLogLog hll) {
+  public static byte[] toBytes(HyperLogLog hll) {
     try {
-      return new String(SerializationConverter.byteArrayToChars(hll.getBytes()));
+      return hll.getBytes();
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public static String convertHllToString(HyperLogLog hll) {
+    return new String(SerializationConverter.byteArrayToChars(toBytes(hll)));
   }
 
   public static HyperLogLog convertStringToHll(String s) {
