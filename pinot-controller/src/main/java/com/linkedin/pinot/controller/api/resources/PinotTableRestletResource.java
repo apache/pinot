@@ -110,6 +110,8 @@ public class PinotTableRestletResource {
     try {
       ensureMinReplicas(tableConfig);
       _pinotHelixResourceManager.addTable(tableConfig);
+      // TODO: validate that table was created successfully
+      // (in realtime case, metadata might not have been created but would be created successfully in the next run of the validation manager)
       return new SuccessResponse("Table " + tableName + " succesfully added");
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);

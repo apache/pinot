@@ -355,7 +355,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     CommittingSegmentDescriptor committingSegmentDescriptor =
         new CommittingSegmentDescriptor(segmentName, nextOffset, 0);
     segmentManager.createNewSegmentMetadataZNRecord(tableConfig, llcSegmentName, newLlcSegmentName, partitionAssignment,
-        committingSegmentDescriptor);
+        committingSegmentDescriptor, false);
     segmentManager.updateIdealStateOnSegmentCompletion(idealState, segmentName, newLlcSegmentName.getSegmentName(),
         partitionAssignment);
   }
@@ -560,7 +560,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
           CommittingSegmentDescriptor committingSegmentDescriptor =
               new CommittingSegmentDescriptor(latestSegment.getSegmentName(), latestMetadata.getStartOffset() + 100, 0);
           segmentManager.createNewSegmentMetadataZNRecord(tableConfig, latestSegment, newLlcSegmentName,
-              expectedPartitionAssignment, committingSegmentDescriptor);
+              expectedPartitionAssignment, committingSegmentDescriptor, false);
 
           // get old state
           Assert.assertNull(idealState.getRecord().getMapFields().get(newLlcSegmentName.getSegmentName()));
@@ -1359,10 +1359,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     @Override
     protected boolean createNewSegmentMetadataZNRecord(TableConfig realtimeTableConfig,
         LLCSegmentName committingSegmentName, LLCSegmentName newLLCSegmentName, PartitionAssignment partitionAssignment,
-        CommittingSegmentDescriptor committingSegmentDescriptor) {
+        CommittingSegmentDescriptor committingSegmentDescriptor, boolean isNewTableSetup) {
       _nCallsToCreateNewSegmentMetadata++;
       return super.createNewSegmentMetadataZNRecord(realtimeTableConfig, committingSegmentName, newLLCSegmentName,
-          partitionAssignment, committingSegmentDescriptor);
+          partitionAssignment, committingSegmentDescriptor, isNewTableSetup);
     }
 
     @Override
