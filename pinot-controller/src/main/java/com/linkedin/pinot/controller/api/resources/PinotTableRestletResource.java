@@ -109,6 +109,7 @@ public class PinotTableRestletResource {
     }
     try {
       ensureMinReplicas(tableConfig);
+      verifyTableConfigs(tableConfig);
       _pinotHelixResourceManager.addTable(tableConfig);
       // TODO: validate that table was created successfully
       // (in realtime case, metadata might not have been created but would be created successfully in the next run of the validation manager)
@@ -292,6 +293,7 @@ public class PinotTableRestletResource {
       }
 
       ensureMinReplicas(tableConfig);
+      verifyTableConfigs(tableConfig);
       _pinotHelixResourceManager.setExistingTableConfig(tableConfig, tableNameWithType, tableType);
     } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
       String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
@@ -398,6 +400,54 @@ public class PinotTableRestletResource {
     }
   }
 
+  /**
+   * Verify table configs if it's a hybrid table, i.e. having both offline and real-time sub-tables.
+   */
+  private void verifyTableConfigs(TableConfig tableConfig) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
+    TableConfig offlineTableConfig = null;
+    TableConfig realtimeTableConfig = null;
+    if (tableConfig.getTableType() == CommonConstants.Helix.TableType.REALTIME) {
+      realtimeTableConfig = tableConfig;
+      if (_pinotHelixResourceManager.hasOfflineTable(rawTableName)) {
+        offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(rawTableName);
+      }
+    } else {
+      offlineTableConfig = tableConfig;
+      if (_pinotHelixResourceManager.hasRealtimeTable(rawTableName)) {
+        realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(rawTableName);
+      }
+    }
+
+    // Check if it is a hybrid table or not. If not, there's no need to verify anything.
+    if (offlineTableConfig == null || realtimeTableConfig == null) {
+      return;
+    }
+
+    SegmentsValidationAndRetentionConfig realTimeSegmentsValidationAndRetentionConfig =
+        realtimeTableConfig.getValidationConfig();
+    SegmentsValidationAndRetentionConfig offlineSegmentsValidationAndRetentionConfig =
+        offlineTableConfig.getValidationConfig();
+
+    String realtimeTimeColumnName = realTimeSegmentsValidationAndRetentionConfig.getTimeColumnName();
+    String offlineTimeColumnName = offlineSegmentsValidationAndRetentionConfig.getTimeColumnName();
+    if (!realtimeTimeColumnName.equalsIgnoreCase(offlineTimeColumnName)) {
+      throw new PinotHelixResourceManager.InvalidTableConfigException(String.format(
+          "Time column names are different! Real-time table time column name: %s. Offline table time column name: %s",
+          realtimeTimeColumnName, offlineTimeColumnName));
+    }
+
+    String realtimeTableTimeColumnType = realTimeSegmentsValidationAndRetentionConfig.getTimeType();
+    String offlineTableTimeColumnType = offlineSegmentsValidationAndRetentionConfig.getTimeType();
+    if (!realtimeTableTimeColumnType.equalsIgnoreCase(offlineTableTimeColumnType)) {
+      throw new PinotHelixResourceManager.InvalidTableConfigException(String.format(
+          "Time column types are different! Real-time table time column type: %s. Offline table time column type: %s",
+          realtimeTableTimeColumnType, offlineTableTimeColumnType));
+    }
+
+    // TODO: validate time unit size but now there's no metadata for that in table config.
+  }
+
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/rebalance")
@@ -418,8 +468,7 @@ public class PinotTableRestletResource {
 
     TableType type = TableType.valueOf(tableType.toUpperCase());
     if (type == TableType.OFFLINE && (!_pinotHelixResourceManager.hasOfflineTable(tableName))
-        || type == TableType.REALTIME && (!_pinotHelixResourceManager
-        .hasRealtimeTable(tableName))) {
+        || type == TableType.REALTIME && (!_pinotHelixResourceManager.hasRealtimeTable(tableName))) {
       throw new ControllerApplicationException(LOGGER, "Table " + tableName + " does not exist",
           Response.Status.NOT_FOUND);
     }
