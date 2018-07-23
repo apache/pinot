@@ -16,13 +16,13 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import java.io.IOException;
 import java.util.List;
+import java.io.IOException;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
 
 
-public interface AggregationFunction<R, A, S> {
+public interface AggregationFunction<R, A> {
 
   /**
    * Get the name of an aggregation function.
@@ -37,6 +37,12 @@ public interface AggregationFunction<R, A, S> {
   FieldSpec.DataType getDataType();
 
   /**
+   * Get length of longest Entry
+   */
+  @Nonnull
+  int getEntrySize();
+
+  /**
    * Perform aggregation on the given raw data.
    */
   A aggregateRaw(List<R> data);
@@ -49,10 +55,10 @@ public interface AggregationFunction<R, A, S> {
   /**
    * Perform serialization of a object
    */
-  S serialize(A obj) throws IOException;
+  byte[] serialize(A obj) throws IOException;
 
   /**
    * Perform deserialization of a object
    */
-  A deserialize(S obj) throws IOException;
+  A deserialize(byte[] obj) throws IOException;
 }

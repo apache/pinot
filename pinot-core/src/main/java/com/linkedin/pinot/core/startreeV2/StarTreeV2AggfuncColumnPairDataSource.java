@@ -16,6 +16,8 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
+import com.linkedin.pinot.core.segment.memory.PinotByteBuffer;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -34,7 +36,7 @@ import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 
 
-public class StarTreeV2MetricAggfuncPairDataSource extends DataSource {
+public class StarTreeV2AggfuncColumnPairDataSource extends DataSource {
 
   private int _numDocs;
   private boolean _isSingleValue;
@@ -45,16 +47,19 @@ public class StarTreeV2MetricAggfuncPairDataSource extends DataSource {
   private DataFileReader _forwardIndex;
   private DataSourceMetadata _metadata;
 
-  public StarTreeV2MetricAggfuncPairDataSource(File dataFile, String columnName, int numDocs, int start, int size,
+  public StarTreeV2AggfuncColumnPairDataSource(File dataFile, String columnName, int numDocs, int start, long size,
       FieldSpec.DataType dataType) throws IOException {
     _columnDataFile = dataFile;
     _operatorName = "ColumnDataSource [" + columnName + "]";
 
-    PinotDataBuffer buffer =
-        PinotDataBuffer.fromFile(_columnDataFile, start, size, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
-            "testing");
-    _forwardIndex = new FixedByteChunkSingleValueReader(buffer);
+    if (dataType.equals(FieldSpec.DataType.BYTES)) {
+      PinotDataBuffer buffer = PinotByteBuffer.fromFile(_columnDataFile, start, size, ReadMode.mmap, FileChannel.MapMode.READ_WRITE, "testing");
+      _forwardIndex = new VarByteChunkSingleValueReader(buffer);
 
+    } else {
+      PinotDataBuffer buffer = PinotDataBuffer.fromFile(_columnDataFile, start, size, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "testing");
+      _forwardIndex = new FixedByteChunkSingleValueReader(buffer);
+    }
     _numDocs = numDocs;
     _isSingleValue = false;
     _dataType = dataType;

@@ -43,7 +43,7 @@ public class StarTreeV2DataSource {
   private Map<String, Integer> _columnIndexInfoMap;
   private AggregationFunctionFactory _aggregationFunctionFactory;
   private Map<String, StarTreeV2DimensionDataSource> _dimensionIndexReader;
-  private Map<String, StarTreeV2MetricAggfuncPairDataSource> _metricRawIndexReader;
+  private Map<String, StarTreeV2AggfuncColumnPairDataSource> _metricRawIndexReader;
 
   private File _starTreeFile;
   private File _starTreeIndexMapFile;
@@ -75,7 +75,7 @@ public class StarTreeV2DataSource {
     String sb = "startree" + starTreeId + ".root.size";
 
     int start = _columnIndexInfoMap.get(sa);
-    int size = _columnIndexInfoMap.get(sb);
+    long size = _columnIndexInfoMap.get(sb);
 
     FileChannel src = new FileInputStream(_indexDataFile).getChannel();
     FileChannel dest = new FileOutputStream(_starTreeFile).getChannel();
@@ -97,7 +97,7 @@ public class StarTreeV2DataSource {
       String b = "startree" + starTreeId + "." + dimension + ".size";
 
       int start = _columnIndexInfoMap.get(a);
-      int size = _columnIndexInfoMap.get(b);
+      long size = _columnIndexInfoMap.get(b);
       ColumnMetadata columnMetadata = _segmentMetadataImpl.getColumnMetadataFor(dimension);
       int maxNumberOfBits = columnMetadata.getBitsPerElement();
       StarTreeV2DimensionDataSource starTreeV2DimensionDataSource =
@@ -111,19 +111,15 @@ public class StarTreeV2DataSource {
       String a = "startree" + starTreeId + "." + pair + ".start";
       String b = "startree" + starTreeId + "." + pair + ".size";
       int start = _columnIndexInfoMap.get(a);
-      int size = _columnIndexInfoMap.get(b);
+      long size = _columnIndexInfoMap.get(b);
 
       String parts[] = pair.split("_");
-      if (parts[0].equals(StarTreeV2Constant.AggregateFunctions.COUNT)) {
-        function = _aggregationFunctionFactory.getAggregationFunction(parts[0]);
-      } else {
-        function = _aggregationFunctionFactory.getAggregationFunction(parts[1]);
-      }
+      function = _aggregationFunctionFactory.getAggregationFunction(parts[0]);
 
-      StarTreeV2MetricAggfuncPairDataSource starTreeV2MetricAggfuncPairDataSource =
-          new StarTreeV2MetricAggfuncPairDataSource(_indexDataFile, pair, _docsCount, start, size,
+      StarTreeV2AggfuncColumnPairDataSource starTreeV2AggfuncColumnPairDataSource =
+          new StarTreeV2AggfuncColumnPairDataSource(_indexDataFile, pair, _docsCount, start, size,
               function.getDataType());
-      _metricRawIndexReader.put(pair, starTreeV2MetricAggfuncPairDataSource);
+      _metricRawIndexReader.put(pair, starTreeV2AggfuncColumnPairDataSource);
     }
 
     return;
@@ -133,7 +129,7 @@ public class StarTreeV2DataSource {
     return _dimensionIndexReader;
   }
 
-  public Map<String, StarTreeV2MetricAggfuncPairDataSource> getMetricRawIndexReader() {
+  public Map<String, StarTreeV2AggfuncColumnPairDataSource> getMetricRawIndexReader() {
     return _metricRawIndexReader;
   }
 }

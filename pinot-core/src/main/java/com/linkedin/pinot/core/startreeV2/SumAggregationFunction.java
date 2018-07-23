@@ -20,9 +20,10 @@ import java.util.List;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
-public class SumAggregationFunction implements AggregationFunction<Number, Double, Double> {
+public class SumAggregationFunction implements AggregationFunction<Number, Double> {
 
   @Nonnull
   @Override
@@ -34,6 +35,12 @@ public class SumAggregationFunction implements AggregationFunction<Number, Doubl
   @Override
   public FieldSpec.DataType getDataType() {
     return FieldSpec.DataType.DOUBLE;
+  }
+
+  @Nonnull
+  @Override
+  public int getEntrySize() {
+    return V1Constants.Numbers.DOUBLE_SIZE;
   }
 
   @Override
@@ -55,12 +62,12 @@ public class SumAggregationFunction implements AggregationFunction<Number, Doubl
   }
 
   @Override
-  public Double serialize(Double obj) throws IOException {
-    return obj;
+  public byte[] serialize(Double obj) throws IOException {
+    throw new IOException("method Not Supported");
   }
 
   @Override
-  public Double deserialize(Double obj) throws IOException {
-    return obj;
+  public Double deserialize(byte[] obj) throws IOException {
+    throw new IOException("method Not Supported");
   }
 }

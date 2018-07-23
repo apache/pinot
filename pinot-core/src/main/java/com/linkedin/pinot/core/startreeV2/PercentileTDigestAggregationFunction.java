@@ -25,8 +25,9 @@ import com.linkedin.pinot.core.common.datatable.ObjectType;
 import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
 
 
-public class PercentileTDigestAggregationFunction implements AggregationFunction<Number, TDigest, byte[]> {
-  public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
+public class PercentileTDigestAggregationFunction implements AggregationFunction<Number, TDigest> {
+  public static int _maxLength = 0;
+  public final int DEFAULT_TDIGEST_COMPRESSION = 100;
 
   @Nonnull
   @Override
@@ -40,11 +41,18 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
     return FieldSpec.DataType.BYTES;
   }
 
+  @Nonnull
+  @Override
+  public int getEntrySize() {
+    return _maxLength;
+  }
+
   @Override
   public TDigest aggregateRaw(List<Number> data) {
     TDigest tDigest = new TDigest(DEFAULT_TDIGEST_COMPRESSION);
     for (Number obj : data) {
       tDigest.add(obj.doubleValue());
+      _maxLength = Math.max(tDigest.byteSize(), _maxLength);
     }
     return tDigest;
   }
@@ -54,6 +62,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
     TDigest tDigest = new TDigest(DEFAULT_TDIGEST_COMPRESSION);
     for (TDigest obj : data) {
       tDigest.add(obj);
+      _maxLength = Math.max(tDigest.byteSize(), _maxLength);
     }
     return tDigest;
   }
