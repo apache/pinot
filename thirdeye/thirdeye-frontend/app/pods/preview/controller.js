@@ -276,10 +276,9 @@ export default Controller.extend({
       const out = {};
       changepoints.forEach((p, i) => {
         out[i] = {
-          timestamps: [p],
-          values: [1.05],
-          type: 'scatter',
-          axis: 'y2',
+          timestamps: [p, p + 3600000 * 24],
+          values: [1, 1],
+          type: 'region',
           color: 'red'
         }
       });
