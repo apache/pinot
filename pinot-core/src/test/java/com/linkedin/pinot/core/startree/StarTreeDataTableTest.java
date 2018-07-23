@@ -15,16 +15,14 @@
  */
 package com.linkedin.pinot.core.startree;
 
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import xerial.larray.buffer.LBuffer;
 
 
 public class StarTreeDataTableTest {
@@ -35,13 +33,14 @@ public class StarTreeDataTableTest {
     int numRows = 10;
     final int numDimensions = 10;
     int data[][] = new int[numRows][numDimensions];
-    int dimensionSize = numDimensions * V1Constants.Numbers.INTEGER_SIZE;
-    LBuffer dataBuffer = new LBuffer(numRows * dimensionSize);
+    int dimensionSize = numDimensions * Integer.BYTES;
+    PinotDataBuffer dataBuffer =
+        PinotDataBuffer.allocateDirect(numRows * dimensionSize, PinotDataBuffer.NATIVE_ORDER, null);
     for (int i = 0; i < numRows; i++) {
       for (int j = 0; j < numDimensions; j++) {
         int dimensionValue = random.nextInt(10);
         data[i][j] = dimensionValue;
-        dataBuffer.putInt((i * numDimensions + j) * V1Constants.Numbers.INTEGER_SIZE, dimensionValue);
+        dataBuffer.putInt((i * numDimensions + j) * Integer.BYTES, dimensionValue);
       }
     }
 
@@ -55,24 +54,20 @@ public class StarTreeDataTableTest {
       sortOrder[i] = sortOrderList.get(i);
     }
 
-    Arrays.sort(data, new Comparator<int[]>() {
-      @Override
-      public int compare(int[] o1, int[] o2) {
-        for (int index : sortOrder) {
-          if (o1[index] != o2[index]) {
-            return o1[index] - o2[index];
-          }
+    Arrays.sort(data, (o1, o2) -> {
+      for (int index : sortOrder) {
+        if (o1[index] != o2[index]) {
+          return o1[index] - o2[index];
         }
-        return 0;
       }
+      return 0;
     });
 
-    try (StarTreeDataTable dataTable = new StarTreeDataTable(dataBuffer, dimensionSize, 0, 0, numRows)) {
+    try (StarTreeDataTable dataTable = new StarTreeDataTable(dataBuffer, dimensionSize, 0, 0)) {
       dataTable.sort(0, numRows, sortOrder);
       for (int i = 0; i < numRows; i++) {
         for (int j = 0; j < numDimensions; j++) {
-          Assert.assertEquals(dataBuffer.getInt((i * numDimensions + j) * V1Constants.Numbers.INTEGER_SIZE),
-              data[i][j]);
+          Assert.assertEquals(dataBuffer.getInt((i * numDimensions + j) * Integer.BYTES), data[i][j]);
         }
       }
     }
