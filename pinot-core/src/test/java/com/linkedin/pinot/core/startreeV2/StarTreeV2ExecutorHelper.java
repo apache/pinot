@@ -64,8 +64,8 @@ public abstract class StarTreeV2ExecutorHelper {
 
   public static List<String> getMetricColumns(StarTreeV2Config config) {
     List<String> pairs = new ArrayList<>();
-    for (Met2AggfuncPair pair : config.getMetric2aggFuncPairs()) {
-      String s = pair.getMetricName() + "_" + pair.getAggregatefunction();
+    for (AggfunColumnPair pair : config.getMetric2aggFuncPairs()) {
+      String s = pair.getColumnName() + "_" + pair.getAggregatefunction();
       pairs.add(s);
     }
     pairs.add("count");

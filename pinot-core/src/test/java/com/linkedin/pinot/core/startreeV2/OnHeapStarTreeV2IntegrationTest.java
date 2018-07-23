@@ -17,7 +17,6 @@
 package com.linkedin.pinot.core.startreeV2;
 
 import java.io.File;
-import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
 import com.google.common.io.Files;
@@ -39,7 +38,6 @@ public class OnHeapStarTreeV2IntegrationTest {
   private String _segmentOutputDir;
   private RecordReader _recordReader;
   private static List<StarTreeV2Config> _starTreeV2ConfigList = new ArrayList<>();
-  private List<Map<String, DataSource>> _starTreeDataSourcesList = new ArrayList<>();
 
   @BeforeTest
   void setUp() throws Exception {
@@ -52,15 +50,25 @@ public class OnHeapStarTreeV2IntegrationTest {
     _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, _segmentOutputDir, _recordReader);
     _filepath = new File(_indexDir, "v3");
 
-    List<Met2AggfuncPair> metric2aggFuncPairs1 = new ArrayList<>();
-    List<Met2AggfuncPair> metric2aggFuncPairs2 = new ArrayList<>();
+    List<AggfunColumnPair> metric2aggFuncPairs1 = new ArrayList<>();
+    List<AggfunColumnPair> metric2aggFuncPairs2 = new ArrayList<>();
 
-    Met2AggfuncPair pair1 = new Met2AggfuncPair("salary", "sum");
-    Met2AggfuncPair pair2 = new Met2AggfuncPair("salary", "max");
-    Met2AggfuncPair pair3 = new Met2AggfuncPair("salary", "min");
+    AggfunColumnPair pair1 = new AggfunColumnPair("sum", "salary");
+    AggfunColumnPair pair2 = new AggfunColumnPair("max", "salary");
+    AggfunColumnPair pair3 = new AggfunColumnPair("min", "salary");
+    AggfunColumnPair pair4 = new AggfunColumnPair("distinctcounthll", "salary");
+    AggfunColumnPair pair5 = new AggfunColumnPair("percentileTDigest", "salary");
+    AggfunColumnPair pair6 = new AggfunColumnPair("percentileest", "salary");
+    AggfunColumnPair pair7 = new AggfunColumnPair("count", "star");
+
 
     metric2aggFuncPairs1.add(pair1);
     metric2aggFuncPairs1.add(pair2);
+    metric2aggFuncPairs1.add(pair4);
+    metric2aggFuncPairs1.add(pair5);
+    metric2aggFuncPairs1.add(pair6);
+    metric2aggFuncPairs1.add(pair7);
+
     metric2aggFuncPairs2.add(pair3);
     metric2aggFuncPairs2.add(pair1);
 
@@ -86,9 +94,6 @@ public class OnHeapStarTreeV2IntegrationTest {
     OnHeapStarTreeV2Builder buildTest = new OnHeapStarTreeV2Builder();
     try {
       for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
-
-        System.out.println("Working on star tree " + Integer.toString(i + 1));
-
         buildTest.init(_indexDir, _starTreeV2ConfigList.get(i));
         buildTest.build();
         buildTest.serialize();
@@ -106,26 +111,29 @@ public class OnHeapStarTreeV2IntegrationTest {
 
       int starTreeId = 0;
       for (StarTreeV2 impl : starTreeImplList) {
+        System.out.println("Working on star tree " + Integer.toString(starTreeId + 1));
+
         StarTree s = impl.getStarTree();
         StarTreeV2LoaderHelper.printStarTree(s);
 
         for (String dimension : _starTreeV2ConfigList.get(starTreeId).getDimensions()) {
           DataSource source = impl.getDataSource(dimension);
+          System.out.println("Printing for dimension : " + dimension);
           StarTreeV2LoaderHelper.printDimensionDataFromDataSource(source);
         }
 
-        for (Met2AggfuncPair pair : _starTreeV2ConfigList.get(starTreeId).getMetric2aggFuncPairs()) {
-          String metpair = pair.getMetricName() + "_" + pair.getAggregatefunction();
+        for (AggfunColumnPair pair : _starTreeV2ConfigList.get(starTreeId).getMetric2aggFuncPairs()) {
+          String metpair = pair.getAggregatefunction() + "_" + pair.getColumnName();
           DataSource source = impl.getDataSource(metpair);
-          StarTreeV2LoaderHelper.printMetricAggfuncDataFromDataSource(source);
+          System.out.println("Printing for Met2AggPair : " + metpair);
+          StarTreeV2LoaderHelper.printMetricAggfuncDataFromDataSource(source, pair.getAggregatefunction());
         }
         starTreeId += 1;
       }
-
-      StarTreeV2ExecutorHelper.loadSegment(_filepath);
-      for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
-        StarTreeV2ExecutorHelper.execute(_starTreeV2ConfigList, _starTreeDataSourcesList, i);
-      }
+//      StarTreeV2ExecutorHelper.loadSegment(_filepath);
+//      for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
+//        StarTreeV2ExecutorHelper.execute(_starTreeV2ConfigList, _starTreeDataSourcesList, i);
+//      }
     } catch (Exception e) {
       e.printStackTrace();
     }

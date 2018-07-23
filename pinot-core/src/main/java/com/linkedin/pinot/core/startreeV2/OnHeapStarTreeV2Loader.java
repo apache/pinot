@@ -59,7 +59,7 @@ public class OnHeapStarTreeV2Loader {
       StarTree starTree = dataSource.loadStarTree(starTreeId);
       dataSource.loadColumnsDataSource(starTreeId);
       Map<String, StarTreeV2DimensionDataSource> dimensionDataSourceMap = dataSource.getDimensionForwardIndexReader();
-      Map<String, StarTreeV2MetricAggfuncPairDataSource> metricAggfuncPairDataSourceMap =
+      Map<String, StarTreeV2AggfuncColumnPairDataSource> metricAggfuncPairDataSourceMap =
           dataSource.getMetricRawIndexReader();
 
       StarTreeV2Impl impl = new StarTreeV2Impl(starTree, dimensionDataSourceMap, metricAggfuncPairDataSourceMap);

@@ -97,36 +97,31 @@ public class OnHeapStarTreeV2BuilderHelper {
    * aggregate metric values ( raw or aggregated )
    */
   public static List<Object> aggregateMetrics(int start, int end, List<Record> starTreeData,
-      List<Met2AggfuncPair> met2aggfuncPairs, boolean isRawData) {
+      List<AggfunColumnPair> aggfunColumnPairs, boolean isRawData) {
     List<Object> aggregatedMetricsValue = new ArrayList<>();
 
     List<List<Object>> metricValues = new ArrayList<>();
-    for (int i = 0; i < met2aggfuncPairs.size(); i++) {
+    for (int i = 0; i < aggfunColumnPairs.size(); i++) {
       List<Object> l = new ArrayList<>();
       metricValues.add(l);
     }
-    List<Object> count = new ArrayList<>();
-    metricValues.add(count);
 
     for (int i = start; i < end; i++) {
       Record r = starTreeData.get(i);
       List<Object> metric = r.getMetricValues();
-      for (int j = 0; j < met2aggfuncPairs.size() + 1; j++) {
+      for (int j = 0; j < aggfunColumnPairs.size(); j++) {
         metricValues.get(j).add(metric.get(j));
       }
     }
 
     AggregationFunctionFactory functionFactory = new AggregationFunctionFactory();
-    for (int i = 0; i < met2aggfuncPairs.size(); i++) {
-      Met2AggfuncPair pair = met2aggfuncPairs.get(i);
+    for (int i = 0; i < aggfunColumnPairs.size(); i++) {
+      AggfunColumnPair pair = aggfunColumnPairs.get(i);
       String aggfunc = pair.getAggregatefunction();
       List<Object> data = metricValues.get(i);
       AggregationFunction function = functionFactory.getAggregationFunction(aggfunc);
       aggregatedMetricsValue.add(aggregate(function, isRawData, data));
     }
-    List<Object> data = metricValues.get(met2aggfuncPairs.size());
-    AggregationFunction function = functionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.COUNT);
-    aggregatedMetricsValue.add(aggregate(function, isRawData, data));
 
     return aggregatedMetricsValue;
   }
@@ -145,7 +140,7 @@ public class OnHeapStarTreeV2BuilderHelper {
   /**
    * function to condense documents according to sorted order.
    */
-  public static List<Record> condenseData(List<Record> starTreeData, List<Met2AggfuncPair> met2aggfuncPairs,
+  public static List<Record> condenseData(List<Record> starTreeData, List<AggfunColumnPair> aggfunColumnPairs,
       boolean isRawData) {
     int start = 0;
     List<Record> newData = new ArrayList<>();
@@ -157,7 +152,7 @@ public class OnHeapStarTreeV2BuilderHelper {
       int[] nextDimensions = nextRecord.getDimensionValues();
 
       if (!RecordUtil.compareDimensions(prevDimensions, nextDimensions)) {
-        List<Object> aggregatedMetricsValue = aggregateMetrics(start, i, starTreeData, met2aggfuncPairs, isRawData);
+        List<Object> aggregatedMetricsValue = aggregateMetrics(start, i, starTreeData, aggfunColumnPairs, isRawData);
         Record newRecord = new Record();
         newRecord.setMetricValues(aggregatedMetricsValue);
         newRecord.setDimensionValues(prevRecord.getDimensionValues());
@@ -169,7 +164,7 @@ public class OnHeapStarTreeV2BuilderHelper {
     Record record = new Record();
     record.setDimensionValues(starTreeData.get(start).getDimensionValues());
     List<Object> aggregatedMetricsValue =
-        aggregateMetrics(start, starTreeData.size(), starTreeData, met2aggfuncPairs, isRawData);
+        aggregateMetrics(start, starTreeData.size(), starTreeData, aggfunColumnPairs, isRawData);
     record.setMetricValues(aggregatedMetricsValue);
     newData.add(record);
 

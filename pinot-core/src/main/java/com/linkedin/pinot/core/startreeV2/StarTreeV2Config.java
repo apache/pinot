@@ -27,7 +27,7 @@ public class StarTreeV2Config {
   private List<String> _dimensions;
   private List<String> _dimensionsSplitOrder;
   private List<String> _dimensionsWithoutStarNode;
-  private List<Met2AggfuncPair> _metric2aggFuncPairs;
+  private List<AggfunColumnPair> _metric2aggFuncPairs;
 
   public StarTreeV2Config() {
 
@@ -107,14 +107,14 @@ public class StarTreeV2Config {
   /**
    * Set the mapping of metric to aggregation function
    */
-  public void setMetric2aggFuncPairs(List<Met2AggfuncPair> metric2aggFuncPairs) {
+  public void setMetric2aggFuncPairs(List<AggfunColumnPair> metric2aggFuncPairs) {
     _metric2aggFuncPairs = metric2aggFuncPairs;
   }
 
   /**
    * Get the mapping of metric to aggregation function.
    */
-  public List<Met2AggfuncPair> getMetric2aggFuncPairs() {
+  public List<AggfunColumnPair> getMetric2aggFuncPairs() {
     return _metric2aggFuncPairs;
   }
 }

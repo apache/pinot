@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.fwd;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
@@ -29,7 +30,7 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
   VarByteChunkSingleValueWriter _indexWriter;
 
   public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
-      String column, int totalDocs, int maxLength) throws IOException {
+      String column, FieldSpec.DataType bytes, int totalDocs, int maxLength) throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
 
     _indexWriter = new VarByteChunkSingleValueWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, maxLength);
@@ -38,6 +39,11 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
   @Override
   public void index(int docId, String valueToIndex) {
     _indexWriter.setString(docId, valueToIndex);
+  }
+
+  @Override
+  public void index(int docId, byte [] valueToIndex) {
+    _indexWriter.setBytes(docId, valueToIndex);
   }
 
   @Override

@@ -25,9 +25,10 @@ import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
 
 
-public class PercentileEstAggregationFunction implements AggregationFunction<Number, QuantileDigest, byte[]> {
+public class PercentileEstAggregationFunction implements AggregationFunction<Number, QuantileDigest> {
 
-  public static final double DEFAULT_MAX_ERROR = 0.05;
+  public static int _maxLength = 0;
+  public final double DEFAULT_MAX_ERROR = 0.05;
 
   @Nonnull
   @Override
@@ -41,12 +42,19 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Num
     return FieldSpec.DataType.BYTES;
   }
 
+  @Nonnull
+  @Override
+  public int getEntrySize() {
+    return _maxLength;
+  }
+
   @Override
   public QuantileDigest aggregateRaw(List<Number> data) {
     QuantileDigest qDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
 
     for (Number obj : data) {
       qDigest.add(obj.longValue());
+      _maxLength = Math.max(qDigest.estimatedSerializedSizeInBytes(), _maxLength);
     }
     return qDigest;
   }
@@ -56,6 +64,7 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Num
     QuantileDigest qDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
     for (QuantileDigest obj : data) {
       qDigest.merge(obj);
+      _maxLength = Math.max(qDigest.estimatedSerializedSizeInBytes(), _maxLength);
     }
     return qDigest;
   }

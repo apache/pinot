@@ -19,36 +19,20 @@ package com.linkedin.pinot.core.startreeV2;
 /**
  * Utility class to store a primitive 'String' and 'String' pair.
  */
-public class Met2AggfuncPair {
+public class AggfunColumnPair {
 
-  protected String _metricName;
+  protected String _columnName;
   protected String _aggregatefunction;
 
   /**
    * Constructor for the class
    *
    * @param met 'String' metric
-   * @param aggfunc 'String' aggregate function
+   * @param aggfun 'String' aggregate function
    */
-  public Met2AggfuncPair(String met, String aggfunc) {
-    _metricName = met;
-    _aggregatefunction = aggfunc;
-  }
-
-  /**
-   * Sets the provided value into the 'met' field.
-   * @param met Value to set
-   */
-  public void setMetricName(String met) {
-    _metricName = met;
-  }
-
-  /**
-   * Returns the Metric in  pair
-   * @return 'String' value
-   */
-  public String getMetricName() {
-    return _metricName;
+  public AggfunColumnPair(String aggfun, String met) {
+    _aggregatefunction = aggfun;
+    _columnName = met;
   }
 
   /**
@@ -65,5 +49,21 @@ public class Met2AggfuncPair {
    */
   public String getAggregatefunction() {
     return _aggregatefunction;
+  }
+
+  /**
+   * Sets the provided value into the 'met' field.
+   * @param met Value to set
+   */
+  public void setColumnName(String met) {
+    _columnName = met;
+  }
+
+  /**
+   * Returns the Metric in  pair
+   * @return 'String' value
+   */
+  public String getColumnName() {
+    return _columnName;
   }
 }

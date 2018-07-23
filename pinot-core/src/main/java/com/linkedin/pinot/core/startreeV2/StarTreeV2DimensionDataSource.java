@@ -51,7 +51,7 @@ public class StarTreeV2DimensionDataSource extends DataSource {
   private DataSourceMetadata _metadata;
 
   public StarTreeV2DimensionDataSource(File dataFile, String columnName, ColumnMetadata columnMetadata, int numDocs,
-      int start, int size, int bits) throws IOException {
+      int start, long size, int bits) throws IOException {
     _columnDataFile = dataFile;
     _operatorName = "ColumnDataSource [" + columnName + "]";
 

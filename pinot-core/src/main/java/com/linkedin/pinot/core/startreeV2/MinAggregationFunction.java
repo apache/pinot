@@ -16,13 +16,14 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import java.io.IOException;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.util.List;
+import java.io.IOException;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
 
 
-public class MinAggregationFunction implements AggregationFunction<Number, Double, Double> {
+public class MinAggregationFunction implements AggregationFunction<Number, Double> {
 
   @Nonnull
   @Override
@@ -34,6 +35,12 @@ public class MinAggregationFunction implements AggregationFunction<Number, Doubl
   @Override
   public FieldSpec.DataType getDataType() {
     return FieldSpec.DataType.DOUBLE;
+  }
+
+  @Nonnull
+  @Override
+  public int getEntrySize() {
+    return V1Constants.Numbers.DOUBLE_SIZE;
   }
 
   @Override
@@ -55,12 +62,12 @@ public class MinAggregationFunction implements AggregationFunction<Number, Doubl
   }
 
   @Override
-  public Double serialize(Double obj) throws IOException {
-    return obj;
+  public byte[] serialize(Double obj) throws IOException {
+    throw new IOException("Method Not Supported");
   }
 
   @Override
-  public Double deserialize(Double obj) throws IOException {
-    return obj;
+  public Double deserialize(byte[] obj) throws IOException {
+    throw new IOException("Method Not Supported");
   }
 }

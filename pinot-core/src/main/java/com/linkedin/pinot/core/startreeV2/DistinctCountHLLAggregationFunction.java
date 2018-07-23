@@ -19,14 +19,19 @@ package com.linkedin.pinot.core.startreeV2;
 import java.util.List;
 import java.io.IOException;
 import javax.annotation.Nonnull;
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.startree.hll.HllConstants;
 import com.linkedin.pinot.core.common.datatable.ObjectType;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
+import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 
 
-public class DistinctCountHLLAggregationFunction implements AggregationFunction<Number, HyperLogLog, byte[]> {
+public class DistinctCountHLLAggregationFunction implements AggregationFunction<Object, HyperLogLog> {
+
+  public static int _maxLength = 0;
+
   @Nonnull
   @Override
   public String getName() {
@@ -39,21 +44,38 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
     return FieldSpec.DataType.BYTES;
   }
 
+  @Nonnull
   @Override
-  public HyperLogLog aggregateRaw(List<Number> data) {
-    HyperLogLog hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+  public int getEntrySize() {
+    return _maxLength;
+  }
 
-    for (Number obj : data) {
-      hyperLogLog.offer(obj);
+  @Override
+  public HyperLogLog aggregateRaw(List<Object> data) {
+    HyperLogLog hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+    for (Object obj : data) {
+      try {
+        hyperLogLog.offer(obj);
+        _maxLength = Math.max(_maxLength, hyperLogLog.getBytes().length);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
     return hyperLogLog;
   }
 
   @Override
   public HyperLogLog aggregatePreAggregated(List<HyperLogLog> data) {
-    HyperLogLog hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
-    for (HyperLogLog a : data) {
-      hyperLogLog.offer(a);
+    HyperLogLog hyperLogLog = data.get(0);
+    for (int i = 1; i < data.size(); i++) {
+      try {
+        hyperLogLog.addAll(data.get(i));
+        _maxLength = Math.max(_maxLength, hyperLogLog.getBytes().length);
+      } catch (CardinalityMergeException e) {
+        Utils.rethrowException(e);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
     return hyperLogLog;
   }

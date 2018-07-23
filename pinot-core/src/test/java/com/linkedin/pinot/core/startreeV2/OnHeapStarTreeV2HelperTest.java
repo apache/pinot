@@ -16,6 +16,22 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.quantile.TDigest;
+import com.google.common.io.Files;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
+import com.linkedin.pinot.core.common.datatable.ObjectType;
+import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
+import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
+import com.linkedin.pinot.startree.hll.HllConstants;
+import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Arrays;
 import org.testng.Assert;
@@ -61,14 +77,16 @@ public class OnHeapStarTreeV2HelperTest {
     return data;
   }
 
-  public List<Met2AggfuncPair> createMet2AggfuncPairs() {
-    List<Met2AggfuncPair> metric2aggFuncPairs = new ArrayList<>();
-    Met2AggfuncPair pair1 = new Met2AggfuncPair("m1", "sum");
+  public List<AggfunColumnPair> createMet2AggfuncPairs() {
+    List<AggfunColumnPair> metric2aggFuncPairs = new ArrayList<>();
+    AggfunColumnPair pair1 = new AggfunColumnPair("sum", "m1");
     metric2aggFuncPairs.add(pair1);
-    Met2AggfuncPair pair2 = new Met2AggfuncPair("m2", "min");
+    AggfunColumnPair pair2 = new AggfunColumnPair("min", "m2");
     metric2aggFuncPairs.add(pair2);
-    Met2AggfuncPair pair3 = new Met2AggfuncPair("m3", "max");
+    AggfunColumnPair pair3 = new AggfunColumnPair("max", "m3");
     metric2aggFuncPairs.add(pair3);
+    AggfunColumnPair pair4 = new AggfunColumnPair("count", "star");
+    metric2aggFuncPairs.add(pair4);
 
     return metric2aggFuncPairs;
   }
@@ -168,7 +186,7 @@ public class OnHeapStarTreeV2HelperTest {
   @Test
   public void testCondenseData() {
     List<Record> data = expectedFilteredData();
-    List<Met2AggfuncPair> metric2aggFuncPairs = createMet2AggfuncPairs();
+    List<AggfunColumnPair> metric2aggFuncPairs = createMet2AggfuncPairs();
     List<Record> actual =
         OnHeapStarTreeV2BuilderHelper.condenseData(data, metric2aggFuncPairs, StarTreeV2Constant.IS_RAW_DATA);
 
@@ -176,6 +194,230 @@ public class OnHeapStarTreeV2HelperTest {
     printRecordsList(actual);
     printRecordsList(expected);
     assertRecordsList(expected, actual);
+  }
+
+  @Test
+  public void testTDigest() throws IOException {
+    int a = 10;
+    byte[] dest;
+
+    TDigest tDigest = new TDigest(100);
+    tDigest.add(a);
+    byte[] src = ObjectCustomSerDe.serialize(tDigest);
+    TDigest obj = ObjectCustomSerDe.deserialize(src, ObjectType.TDigest);
+    byte[] hola = ObjectCustomSerDe.serialize(obj);
+
+    System.out.println(tDigest.byteSize());
+
+    File temp = Files.createTempDir();
+    SingleValueRawIndexCreator indexCreator =
+        new SingleValueVarByteRawIndexCreator(temp, ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random",
+            FieldSpec.DataType.BYTES, 1, tDigest.byteSize());
+    indexCreator.index(0, src);
+    indexCreator.close();
+
+    File columnDataFile = new File(temp, "random.sv.raw.fwd");
+    long size = columnDataFile.length();
+
+    StarTreeV2AggfuncColumnPairDataSource source =
+        new StarTreeV2AggfuncColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+
+    Block b = source.getNextBlock();
+    BlockValSet blockValSet = b.getBlockValueSet();
+    BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
+
+    while (itr.hasNext()) {
+      dest = itr.nextBytesVal();
+      System.out.println("hola");
+    }
+  }
+
+  @Test
+  public void testTDigestRawData() throws IOException {
+
+    int _maxLength = 0;
+    TDigest tDigest = new TDigest(100);
+    for ( int i = 0; i < 5; i++) {
+      tDigest.add(i);
+      _maxLength = Math.max(tDigest.byteSize(), _maxLength);
+    }
+    byte[] src = ObjectCustomSerDe.serialize(tDigest);
+    TDigest obj = ObjectCustomSerDe.deserialize(src, ObjectType.TDigest);
+    byte[] hola = ObjectCustomSerDe.serialize(obj);
+
+    System.out.println(tDigest.byteSize());
+
+    File temp = Files.createTempDir();
+    SingleValueRawIndexCreator indexCreator = new SingleValueVarByteRawIndexCreator(temp,ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random", FieldSpec.DataType.BYTES, 1, tDigest.byteSize());
+    indexCreator.index(0, src);
+    indexCreator.close();
+
+    File columnDataFile = new File(temp, "random.sv.raw.fwd");
+    long size = columnDataFile.length();
+
+    StarTreeV2AggfuncColumnPairDataSource source = new StarTreeV2AggfuncColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+
+    Block b = source.getNextBlock();
+    BlockValSet blockValSet = b.getBlockValueSet();
+    BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
+
+    while (itr.hasNext()) {
+      byte[] dest = itr.nextBytesVal();
+      System.out.println("hola");
+    }
+
+    return;
+  }
+
+  @Test
+  public void testHLL() throws IOException {
+    int a = 10;
+    byte[] dest;
+
+    HyperLogLog hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+    hyperLogLog.offer(a);
+    byte[] src = ObjectCustomSerDe.serialize(hyperLogLog);
+    HyperLogLog obj = ObjectCustomSerDe.deserialize(src, ObjectType.HyperLogLog);
+    byte[] hola = ObjectCustomSerDe.serialize(obj);
+
+    System.out.println(hyperLogLog.sizeof());
+    System.out.println(hyperLogLog.getBytes().length);
+
+    File temp = Files.createTempDir();
+    SingleValueRawIndexCreator indexCreator =
+        new SingleValueVarByteRawIndexCreator(temp, ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random",
+            FieldSpec.DataType.BYTES, 1, hyperLogLog.getBytes().length);
+    indexCreator.index(0, src);
+    indexCreator.close();
+
+    File columnDataFile = new File(temp, "random.sv.raw.fwd");
+    long size = columnDataFile.length();
+
+    StarTreeV2AggfuncColumnPairDataSource source =
+        new StarTreeV2AggfuncColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+
+    Block b = source.getNextBlock();
+    BlockValSet blockValSet = b.getBlockValueSet();
+    BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
+
+    while (itr.hasNext()) {
+      dest = itr.nextBytesVal();
+      System.out.println("Hola");
+    }
+  }
+
+  @Test
+  public void testHLLRawData() throws IOException {
+    int _maxLength = 0;
+    byte[] dest;
+
+    HyperLogLog hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+    for ( int i = 0; i < 5; i++) {
+      hyperLogLog.offer(i);
+      _maxLength = Math.max(hyperLogLog.getBytes().length, _maxLength);
+    }
+
+    byte[] src = ObjectCustomSerDe.serialize(hyperLogLog);
+    HyperLogLog obj = ObjectCustomSerDe.deserialize(src, ObjectType.HyperLogLog);
+    byte[] hola = ObjectCustomSerDe.serialize(obj);
+
+    System.out.println(hyperLogLog.getBytes().length);
+    System.out.println(hyperLogLog.sizeof());
+
+
+
+    File temp = Files.createTempDir();
+    SingleValueRawIndexCreator indexCreator = new SingleValueVarByteRawIndexCreator(temp,ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random", FieldSpec.DataType.BYTES, 1, hyperLogLog.getBytes().length);
+    indexCreator.index(0, src);
+    indexCreator.close();
+
+    File columnDataFile = new File(temp, "random.sv.raw.fwd");
+    long size = columnDataFile.length();
+
+    StarTreeV2AggfuncColumnPairDataSource source = new StarTreeV2AggfuncColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+
+    Block b = source.getNextBlock();
+    BlockValSet blockValSet = b.getBlockValueSet();
+    BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
+
+    while (itr.hasNext()) {
+      dest = itr.nextBytesVal();
+      System.out.println("hola");
+    }
+
+    return;
+  }
+
+  @Test
+  public void testQDigest() throws IOException {
+    byte [] dest;
+    int _maxLength = 0;
+    final double DEFAULT_MAX_ERROR = 0.05;
+
+    QuantileDigest qDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
+    for ( int i = 0; i < 5; i++) {
+      qDigest.add(i);
+      _maxLength = Math.max(qDigest.estimatedSerializedSizeInBytes(), _maxLength);
+    }
+
+    byte [] src = ObjectCustomSerDe.serialize(qDigest);
+    QuantileDigest obj = ObjectCustomSerDe.deserialize(src, ObjectType.QuantileDigest);
+    byte [] hola = ObjectCustomSerDe.serialize(obj);
+
+    System.out.println(qDigest.estimatedSerializedSizeInBytes());
+
+    File temp = Files.createTempDir();
+    SingleValueRawIndexCreator indexCreator = new SingleValueVarByteRawIndexCreator(temp, ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random", FieldSpec.DataType.BYTES, 1, qDigest.estimatedSerializedSizeInBytes());
+    indexCreator.index(1, src);
+    indexCreator.close();
+
+    File columnDataFile = new File(temp, "random.sv.raw.fwd");
+    long size = columnDataFile.length();
+    StarTreeV2AggfuncColumnPairDataSource source = new StarTreeV2AggfuncColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+
+    Block b = source.getNextBlock();
+    BlockValSet blockValSet = b.getBlockValueSet();
+    BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
+
+    while (itr.hasNext()) {
+      dest = itr.nextBytesVal();
+      System.out.println("hola");
+    }
+
+    return;
+  }
+
+  @Test
+  public void testQDigestRawData() throws IOException {
+    long a = 10L;
+    byte [] dest;
+    final double DEFAULT_MAX_ERROR = 0.05;
+    QuantileDigest qDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
+    qDigest.add(a);
+    byte [] src = ObjectCustomSerDe.serialize(qDigest);
+    QuantileDigest obj = ObjectCustomSerDe.deserialize(src, ObjectType.QuantileDigest);
+    byte [] hola = ObjectCustomSerDe.serialize(obj);
+
+    System.out.println(qDigest.estimatedSerializedSizeInBytes());
+
+    File temp = Files.createTempDir();
+    SingleValueRawIndexCreator indexCreator = new SingleValueVarByteRawIndexCreator(temp, ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random", FieldSpec.DataType.BYTES, 1, qDigest.estimatedSerializedSizeInBytes());
+    indexCreator.index(1, src);
+    indexCreator.close();
+
+    File columnDataFile = new File(temp, "random.sv.raw.fwd");
+    long size = columnDataFile.length();
+    StarTreeV2AggfuncColumnPairDataSource source = new StarTreeV2AggfuncColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+
+    Block b = source.getNextBlock();
+    BlockValSet blockValSet = b.getBlockValueSet();
+    BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
+
+    while (itr.hasNext()) {
+      dest = itr.nextBytesVal();
+    }
+
+    return;
   }
 
   private void assertRecordsList(List<Record> expected, List<Record> actual) {

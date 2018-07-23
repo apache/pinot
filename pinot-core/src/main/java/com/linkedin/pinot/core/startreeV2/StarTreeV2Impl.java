@@ -26,10 +26,10 @@ public class StarTreeV2Impl implements StarTreeV2 {
 
   private final StarTree _starTree;
   private final Map<String, StarTreeV2DimensionDataSource> _dimensionDataSources;
-  private final Map<String, StarTreeV2MetricAggfuncPairDataSource> _metricaggFuncPairSources;
+  private final Map<String, StarTreeV2AggfuncColumnPairDataSource> _metricaggFuncPairSources;
 
   public StarTreeV2Impl(StarTree starTree, Map<String, StarTreeV2DimensionDataSource> dimensionDataSources,
-      Map<String, StarTreeV2MetricAggfuncPairDataSource> metricaggFuncPairSources) {
+      Map<String, StarTreeV2AggfuncColumnPairDataSource> metricaggFuncPairSources) {
 
     _starTree = starTree;
     _dimensionDataSources = dimensionDataSources;

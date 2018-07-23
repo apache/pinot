@@ -16,12 +16,14 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+import java.io.IOException;
 import java.util.List;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
-public class CountAggregationFunction implements AggregationFunction<Number, Long, Long> {
+public class CountAggregationFunction implements AggregationFunction<Number, Long> {
 
   @Nonnull
   @Override
@@ -33,6 +35,12 @@ public class CountAggregationFunction implements AggregationFunction<Number, Lon
   @Override
   public FieldSpec.DataType getDataType() {
     return FieldSpec.DataType.LONG;
+  }
+
+  @Nonnull
+  @Override
+  public int getEntrySize() {
+    return V1Constants.Numbers.LONG_SIZE;
   }
 
   @Override
@@ -54,12 +62,12 @@ public class CountAggregationFunction implements AggregationFunction<Number, Lon
   }
 
   @Override
-  public Long serialize(Long obj) {
-    return obj;
+  public byte[] serialize(Long obj) throws IOException {
+    throw new IOException("method Not Supported");
   }
 
   @Override
-  public Long deserialize(Long obj) {
-    return obj;
+  public Long deserialize(byte[] obj) throws IOException {
+    throw new IOException("method Not Supported");
   }
 }
