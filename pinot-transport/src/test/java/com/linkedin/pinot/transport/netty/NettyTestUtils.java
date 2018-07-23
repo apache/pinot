@@ -88,7 +88,6 @@ public class NettyTestUtils {
     long endTime = System.currentTimeMillis() + timeOutInMillis;
     while (System.currentTimeMillis() < endTime) {
       if (server.isStarted()) {
-        System.out.println("Netty server started successfully!");
         return;
       }
       Uninterruptibles.sleepUninterruptibly(10L, TimeUnit.MILLISECONDS);

@@ -29,6 +29,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
 import java.lang.reflect.Field;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -38,6 +39,8 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
@@ -59,6 +62,16 @@ public class HelixBrokerStarterTest {
 
   @BeforeTest
   public void setUp() throws Exception {
+    Enumeration<Logger> loggers = Logger.getRootLogger().getLoggerRepository().getCurrentLoggers();
+    while (loggers.hasMoreElements()) {
+      Logger logger = loggers.nextElement();
+      System.out.println("Log name: " + logger.getName());
+      if (logger.getName().startsWith("com.linkedin.pinot.common.utils") ||
+          logger.getName().startsWith("org.I0Itec.zkclient") ||
+          logger.getName().startsWith("org.apache.zookeeper.server")) {
+        logger.setLevel(Level.INFO);
+      }
+    }
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
     final String instanceId = "localhost_helixController";

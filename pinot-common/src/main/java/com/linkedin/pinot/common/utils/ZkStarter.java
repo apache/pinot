@@ -156,15 +156,9 @@ public class ZkStarter {
             if (isSaslEnable != null) {
               System.setProperty(ZK_SASL_CLIENT, isSaslEnable);
             }
-            System.out.println("Total run time for zookeeper is: " + (zookeeperEndTime - zookeeperStartTime) + "ms. dataDirPath: " + dataDirPath);
-          } catch (QuorumPeerConfig.ConfigException e) {
-            System.out.println("Caught exception while starting ZK" + e.getMessage());
-            e.printStackTrace();
-            LOGGER.warn("Caught exception while starting ZK", e);
-          } catch (IOException e) {
-            System.out.println("Caught exception while starting ZK" + e.getMessage());
-            e.printStackTrace();
-            LOGGER.warn("Caught exception while starting ZK", e);
+            LOGGER.info("Total run time for zookeeper is: " + (zookeeperEndTime - zookeeperStartTime) + "ms. dataDirPath: " + dataDirPath);
+          } catch (QuorumPeerConfig.ConfigException | IOException e) {
+            LOGGER.warn("Caught exception while starting ZK ", e);
           }
         }
       }.start();
@@ -173,14 +167,11 @@ public class ZkStarter {
       ZkClient client = new ZkClient("localhost:" + port, 10000);
       client.waitUntilConnected(10L, TimeUnit.SECONDS);
       long endTime = System.currentTimeMillis();
-      System.out.println("Initialized zk connection successfully! Duration: " + (endTime - startTime));
+      LOGGER.info("Initialized zk connection successfully! Duration: " + (endTime - startTime));
       client.close();
-
       return new ZookeeperInstance(zookeeperServerMain, dataDirPath);
     } catch (Exception e) {
-      System.out.println("Caught exception while starting ZK" + e.getMessage());
-      e.printStackTrace();
-      LOGGER.warn("Caught exception while starting ZK", e);
+      LOGGER.warn("Caught exception while starting ZK ", e);
       throw new RuntimeException(e);
     }
   }
@@ -209,7 +200,7 @@ public class ZkStarter {
           org.apache.commons.io.FileUtils.deleteDirectory(new File(instance._dataDirPath));
         }
         long endTime = System.currentTimeMillis();
-        System.out.println("Shut down zk connection successfully! Duration: " + (endTime - startTime));
+        LOGGER.info("Shut down zk connection successfully! Duration: " + (endTime - startTime));
       } catch (Exception e) {
         LOGGER.warn("Caught exception while stopping ZK server", e);
         throw new RuntimeException(e);

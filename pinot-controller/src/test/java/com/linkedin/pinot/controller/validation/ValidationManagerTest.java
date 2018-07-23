@@ -30,6 +30,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
@@ -37,6 +38,8 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -68,6 +71,16 @@ public class ValidationManagerTest {
 
   @BeforeClass
   public void setUp() throws Exception {
+    Enumeration<Logger> loggers = Logger.getRootLogger().getLoggerRepository().getCurrentLoggers();
+    while (loggers.hasMoreElements()) {
+      Logger logger = loggers.nextElement();
+      System.out.println("Log name: " + logger.getName());
+      if (logger.getName().startsWith("com.linkedin.pinot.common.utils") ||
+          logger.getName().startsWith("org.I0Itec.zkclient") ||
+          logger.getName().startsWith("org.apache.zookeeper.server")) {
+        logger.setLevel(Level.INFO);
+      }
+    }
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZK_STR);
     Thread.sleep(1000);

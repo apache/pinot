@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import java.io.IOException;
+import java.util.Enumeration;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.HelixManager;
@@ -33,6 +34,8 @@ import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.json.JSONException;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -54,6 +57,16 @@ public class TableQueryQuotaManagerTest {
 
   @BeforeTest
   public void beforeTest() {
+    Enumeration<Logger> loggers = Logger.getRootLogger().getLoggerRepository().getCurrentLoggers();
+    while (loggers.hasMoreElements()) {
+      Logger logger = loggers.nextElement();
+      System.out.println("Log name: " + logger.getName());
+      if (logger.getName().startsWith("com.linkedin.pinot.common.utils") ||
+          logger.getName().startsWith("org.I0Itec.zkclient") ||
+          logger.getName().startsWith("org.apache.zookeeper.server")) {
+        logger.setLevel(Level.INFO);
+      }
+    }
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     String helixClusterName = "TestTableQueryQuotaManagerService";
 
