@@ -78,17 +78,20 @@ public class StarTreeV2LoaderHelper {
       } else if (dataType.equals(StarTreeV2Constant.AggregateFunctions.MIN)) {
         System.out.println(itr.nextDoubleVal());
       } else if (dataType.equals(StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL)) {
-        AggregationFunction function = aggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL);
+        AggregationFunction function =
+            aggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL);
         byte[] h = itr.nextBytesVal();
         System.out.println(function.deserialize(h) instanceof HyperLogLog);
         System.out.println(h.length);
       } else if (dataType.equals(StarTreeV2Constant.AggregateFunctions.PERCENTILEEST)) {
-        AggregationFunction function = aggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.PERCENTILEEST);
+        AggregationFunction function =
+            aggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.PERCENTILEEST);
         byte[] h = itr.nextBytesVal();
         System.out.println(function.deserialize(h) instanceof QuantileDigest);
         System.out.println(h.length);
       } else if (dataType.equals(StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST)) {
-        AggregationFunction function = aggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST);
+        AggregationFunction function =
+            aggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST);
         byte[] h = itr.nextBytesVal();
         System.out.println(function.deserialize(h) instanceof TDigest);
         System.out.println(h.length);

@@ -61,7 +61,6 @@ public class OnHeapStarTreeV2IntegrationTest {
     AggfunColumnPair pair6 = new AggfunColumnPair("percentileest", "salary");
     AggfunColumnPair pair7 = new AggfunColumnPair("count", "star");
 
-
     metric2aggFuncPairs1.add(pair1);
     metric2aggFuncPairs1.add(pair2);
     metric2aggFuncPairs1.add(pair4);
