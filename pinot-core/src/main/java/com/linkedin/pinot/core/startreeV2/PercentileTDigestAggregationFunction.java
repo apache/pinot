@@ -43,7 +43,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
 
   @Nonnull
   @Override
-  public int getEntrySize() {
+  public int getLongestEntrySize() {
     return _maxLength;
   }
 

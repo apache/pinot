@@ -87,8 +87,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   private String _starTreeId = null;
   private List<Record> _starTreeData = new ArrayList<>();
   private List<Record> _rawStarTreeData = new ArrayList<>();
-  private List<ForwardIndexCreator> _metricForwardIndexCreatorList;
   private List<ForwardIndexCreator> _dimensionForwardIndexCreatorList;
+  private List<ForwardIndexCreator> _aggfunColumnPairForwardIndexCreatorList;
 
   @Override
   public void init(File indexDir, StarTreeV2Config config) throws Exception {
@@ -255,6 +255,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     _properties.setProperty(StarTreeV2Constant.STAR_TREE_V2_COUNT, _starTreeCount);
     _properties.save();
 
+    // combining all the indexes and star tree in one file.
     combineIndexesFiles(_starTreeCount - 1);
 
     return;
@@ -281,6 +282,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   /**
    * Helper method to combine all the files to one
    *
+   * @param starTreeId 'int'  star tree id which has to be converted into single file.
+   *
    * @return void.
    */
   private void combineIndexesFiles(int starTreeId) throws Exception {
@@ -292,6 +295,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
   /**
    * Helper method to serialize the start tree into a file.
+   *
+   * @param starTreeFile 'File' in which star tree would be saved.
    *
    * @return void.
    */
@@ -320,7 +325,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   private void createIndexes() throws Exception {
 
     _dimensionForwardIndexCreatorList = new ArrayList<>();
-    _metricForwardIndexCreatorList = new ArrayList<>();
+    _aggfunColumnPairForwardIndexCreatorList = new ArrayList<>();
 
     // 'SingleValueForwardIndexCreator' for dimensions.
     for (String dimensionName : _dimensionsName) {
@@ -339,8 +344,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
       SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(_outDir,
           ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getDataType(), _starTreeData.size(),
-          function.getEntrySize());
-      _metricForwardIndexCreatorList.add(rawIndexCreator);
+          function.getLongestEntrySize());
+      _aggfunColumnPairForwardIndexCreatorList.add(rawIndexCreator);
     }
 
     // indexing each record.
@@ -355,15 +360,15 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
         ((SingleValueForwardIndexCreator) _dimensionForwardIndexCreatorList.get(j)).index(i, val);
       }
 
-      // indexing metricAggPair data.
+      // indexing AggfunColumn Pair data.
       for (int j = 0; j < metric.size(); j++) {
         AggfunColumnPair pair = _aggfunColumnPairs.get(j);
         AggregationFunction function = _aggregationFunctionFactory.getAggregationFunction(pair._aggregatefunction);
         if (function.getDataType().equals(FieldSpec.DataType.BYTES)) {
-          ((SingleValueRawIndexCreator) _metricForwardIndexCreatorList.get(j)).index(i,
+          ((SingleValueRawIndexCreator) _aggfunColumnPairForwardIndexCreatorList.get(j)).index(i,
               function.serialize(metric.get(j)));
         } else {
-          ((SingleValueRawIndexCreator) _metricForwardIndexCreatorList.get(j)).index(i, metric.get(j));
+          ((SingleValueRawIndexCreator) _aggfunColumnPairForwardIndexCreatorList.get(j)).index(i, metric.get(j));
         }
       }
     }
@@ -373,8 +378,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
       _dimensionForwardIndexCreatorList.get(i).close();
     }
 
-    for (int i = 0; i < _metricForwardIndexCreatorList.size(); i++) {
-      _metricForwardIndexCreatorList.get(i).close();
+    for (int i = 0; i < _aggfunColumnPairForwardIndexCreatorList.size(); i++) {
+      _aggfunColumnPairForwardIndexCreatorList.get(i).close();
     }
 
     return;
@@ -382,6 +387,11 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
   /**
    * Helper function to construct a star tree.
+   *
+   * @param node TreeNode to work on
+   * @param startDocId int start index in star tree data.
+   * @param endDocId int end index in star tree data.
+   * @param level int dimension split order level.
    *
    * @return void.
    */
@@ -449,7 +459,11 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   }
 
   /**
-   * Group all documents based on a dimension's value.
+   * Helper function to group all documents based on a dimension's value.
+   *
+   * @param startDocId int start index in star tree data.
+   * @param endDocId int end index in star tree data.
+   * @param dimensionId dimension id to group on.
    *
    * @return Map from dimension value to a pair of start docId and end docId (exclusive)
    */
@@ -478,6 +492,10 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   /**
    * Helper function to read value of a doc in a column
    *
+   * @param reader 'PinotSegmentColumnReader' to read data.
+   * @param dataType 'FieldSpec.DataType' of the data to be read.
+   * @param docId 'int' doc id to be read.
+   *
    * @return Object
    */
   private Object readHelper(PinotSegmentColumnReader reader, FieldSpec.DataType dataType, int docId) {
@@ -499,6 +517,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
   /**
    * Helper function to create aggregated document for all nodes
+   *
+   * @param node 'TreeNode' to start creating aggregated documents from.
    *
    * @return void.
    */
@@ -526,6 +546,8 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   /**
    * Helper function to create aggregated document from children for a parent node.
    *
+   * @param parent 'TreeNode' to create aggregate documents for.
+   *
    * @return aggregated document id.
    */
   private Integer calculateAggregatedDocumentFromChildren(TreeNode parent) {
@@ -550,7 +572,10 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   }
 
   /**
-   * Create a aggregated document for this range.
+   * Helper function to create a aggregated document for this range.
+   *
+   * @param startDocId 'int' start index in star tree data.
+   * @param endDocId 'int' end index in star tree data.
    *
    * @return list of all metric2aggfunc value.
    */
@@ -564,7 +589,10 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
   }
 
   /**
-   * Append a aggregated document to star tree data.
+   * Helper function to append a aggregated document to star tree data.
+   *
+   * @param aggregatedValues 'List' of all aggregated values
+   * @param node 'TreeNode' currently in use.
    *
    * @return aggregated document id.
    */

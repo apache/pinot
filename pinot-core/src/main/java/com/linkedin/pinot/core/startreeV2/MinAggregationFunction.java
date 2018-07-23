@@ -16,11 +16,11 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.util.List;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
 public class MinAggregationFunction implements AggregationFunction<Number, Double> {
@@ -39,7 +39,7 @@ public class MinAggregationFunction implements AggregationFunction<Number, Doubl
 
   @Nonnull
   @Override
-  public int getEntrySize() {
+  public int getLongestEntrySize() {
     return V1Constants.Numbers.DOUBLE_SIZE;
   }
 

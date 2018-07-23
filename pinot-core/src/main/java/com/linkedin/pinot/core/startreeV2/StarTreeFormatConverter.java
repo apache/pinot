@@ -19,6 +19,9 @@ package com.linkedin.pinot.core.startreeV2;
 import java.io.File;
 
 
+/**
+ * Interface to be implemented by star tree converted to combine all star tree files into one.
+ */
 public interface StarTreeFormatConverter {
 
   void convert(File indexSegmentDir, int starTreeId) throws Exception;

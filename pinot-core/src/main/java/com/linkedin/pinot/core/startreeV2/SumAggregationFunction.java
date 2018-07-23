@@ -39,7 +39,7 @@ public class SumAggregationFunction implements AggregationFunction<Number, Doubl
 
   @Nonnull
   @Override
-  public int getEntrySize() {
+  public int getLongestEntrySize() {
     return V1Constants.Numbers.DOUBLE_SIZE;
   }
 

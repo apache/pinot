@@ -129,7 +129,7 @@ public class OnHeapStarTreeV2BuilderHelper {
   /**
    * aggregate raw or pre aggregated data.
    */
-  public static Object aggregate(AggregationFunction function, boolean isRawData, List<Object> data) {
+  private static Object aggregate(AggregationFunction function, boolean isRawData, List<Object> data) {
     if (isRawData) {
       return function.aggregateRaw(data);
     } else {

@@ -24,7 +24,7 @@ import com.linkedin.pinot.core.startree.StarTree;
 public interface StarTreeV2 {
 
   /**
-   * load all data sources.
+   * load star tree.
    */
   StarTree getStarTree() throws IOException;
 

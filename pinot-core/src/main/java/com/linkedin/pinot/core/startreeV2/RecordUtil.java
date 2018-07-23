@@ -20,12 +20,16 @@ import java.util.List;
 import java.util.ArrayList;
 
 
+/**
+ * Utility class for Record class.
+ */
 public class RecordUtil {
 
   /**
    * Get Integer values for the given data.
    *
    * @param data list of Object
+   *
    * @return Integer array.
    */
   public static List<Integer> getIntValues(List<Object> data) {
@@ -42,6 +46,7 @@ public class RecordUtil {
    * Get Long values for the given data.
    *
    * @param data list of Object
+   *
    * @return Integer array.
    */
   public static List<Long> getLongValues(List<Object> data) {
@@ -58,6 +63,7 @@ public class RecordUtil {
    * Get Float values for the given data.
    *
    * @param data list of Object
+   *
    * @return float array.
    */
   public static List<Float> getFloatValues(List<Object> data) {
@@ -73,6 +79,7 @@ public class RecordUtil {
    * Get Double values for the given data.
    *
    * @param data list of Object
+   *
    * @return double array.
    */
   public static List<Double> getDoubleValues(List<Object> data) {
@@ -84,6 +91,14 @@ public class RecordUtil {
     return doubleData;
   }
 
+  /**
+   * Check if two dimensions data is same or not.
+   *
+   * @param aD dimension a data.
+   * @param bD dimension b data.
+   *
+   * @return boolean if two dimensions are same or not.
+   */
   public static boolean compareDimensions(int[] aD, int[] bD) {
     if (aD.length != bD.length) {
       return false;

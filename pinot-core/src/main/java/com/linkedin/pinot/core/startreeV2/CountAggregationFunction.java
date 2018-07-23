@@ -16,8 +16,8 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import java.io.IOException;
 import java.util.List;
+import java.io.IOException;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -39,7 +39,7 @@ public class CountAggregationFunction implements AggregationFunction<Number, Lon
 
   @Nonnull
   @Override
-  public int getEntrySize() {
+  public int getLongestEntrySize() {
     return V1Constants.Numbers.LONG_SIZE;
   }
 

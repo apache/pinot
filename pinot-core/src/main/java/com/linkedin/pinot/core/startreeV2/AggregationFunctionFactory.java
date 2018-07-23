@@ -16,6 +16,10 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+
+/**
+ * Factory class to create instances of aggregation function of the given name.
+ */
 public class AggregationFunctionFactory {
 
   private static SumAggregationFunction _sumFunction;
@@ -37,6 +41,13 @@ public class AggregationFunctionFactory {
     _percentileEstFunction = new PercentileEstAggregationFunction();
   }
 
+  /**
+   * Given the name of aggregation function, return an instance of the corresponding aggregation function.
+   *
+   * @param functionName 'String' function Name
+   *
+   * @return 'AggregationFunction' aggregate function instance.
+   */
   public static AggregationFunction getAggregationFunction(String functionName) {
 
     switch (functionName) {
